@@ -13,13 +13,20 @@ use std::{
     time::{Duration, SystemTime},
 };
 
-const MEMBERS: &str = "repository clone worktree branch task_key page out acceptance implementer verifier acceptance_seconds gate store merge pull_request verdict repair";
+const MEMBERS: &str = "repository clone worktree branch task_key page out acceptance implementer verifier acceptance_seconds gate store merge pull_request verdict repair judge_threads";
 const STAGE: &str =
     "account model effort prompt permission_mode timeout_seconds next_accounts env resume runtime";
 /// The files of one call, by suffix of `out`: a stage's answer also has `ap run`'s three files.
 const FILES: &str =
     ".unit.json .implementer.md .verifier.md .verifier.prompt.md .gate.json .accept.log";
 const RUN_FILES: [&str; 4] = ["", ".run.json", ".stream.jsonl", ".err"];
+/// The words of a report's line `Thread <id>: <word>`.
+const WORDS: [&str; 4] = ["fixed", "wrong", "note", "blocking"];
+/// One review thread read again before the status, and its resolution.
+const THREAD: &str =
+    "query($id:ID!){node(id:$id){... on PullRequestReviewThread{isResolved comments{totalCount}}}}";
+const RESOLVE: &str =
+    "mutation($id:ID!){resolveReviewThread(input:{threadId:$id}){thread{isResolved}}}";
 /// The acceptance executable runs in the worktree under `timeout`, with the arguments after the
 /// fourth; its exit is printed last.
 const ACCEPT: &str = "cd \"$1\" || exit 0; a=$2 o=$3 t=$4; shift 4; timeout -k 10 \"$t\" \"$a\" \"$@\" > \"$o\" 2>&1 < /dev/null; echo \"$?\"";
@@ -96,13 +103,26 @@ fn executable(acceptance: &str) -> Result<(), Failure> {
 fn record(path: &str) -> Option<Value> {
     serde_json::from_slice(&std::fs::read(path).ok()?).ok()
 }
-/// The block of facts appended to the verifier's prompt.
-fn facts(r: &Value, number: u64, head: &str, base: &str) -> String {
+/// The block of facts appended to the verifier's prompt, with the threads given to it.
+fn facts(r: &Value, number: u64, head: &str, base: &str, threads: &Value) -> String {
     let f = |k: &str| r[k].as_str().unwrap_or_default();
     let (repo, wt, out) = (f("repository"), f("worktree"), f("out"));
-    format!(
+    let mut block = format!(
         "\n## Facts of this unit (ap unit)\n\nRepository: {repo}\nPull request: {number}\nHead: {head}\nBase: {base}\nDiff: git -C {wt} diff {base} {head}\nGate answer: {out}.gate.json\nAcceptance output: {out}.accept.log\n"
-    )
+    );
+    for (i, t) in threads.as_array().into_iter().flatten().enumerate() {
+        if i == 0 {
+            block.push_str("\nThreads of the automatic reviewer to judge: for each, the report holds exactly one line `Thread <id>: <word>`, the word `fixed`, `wrong`, `note` or `blocking`.\n");
+        }
+        let (id, path) = (t["id"].as_str(), t["path"].as_str());
+        block.push_str(&format!(
+            "- {} {}:{}\n",
+            id.unwrap_or_default(),
+            path.unwrap_or_default(),
+            t["line"]
+        ));
+    }
+    block
 }
 /// The `ap run` request of a stage, the same when it is admitted and when it starts.
 fn stage_request(r: &Value, which: &str, prompt: &str) -> Value {
@@ -161,6 +181,38 @@ fn renamed(f: Failure, prompt: &str, prefix: &str) -> Failure {
     };
     fail(f.code, &field, f.detail)
 }
+/// The host as `ap run` judges it before a stage's prompt file exists: `path` reads as `bytes`.
+struct Rendered<'a, S> {
+    s: &'a mut S,
+    path: String,
+    bytes: Vec<u8>,
+}
+impl<S: System> System for Rendered<'_, S> {
+    fn call(&mut self, p: &str, a: &[String], i: &Value, ms: u64) -> crate::work::Answer {
+        self.s.call(p, a, i, ms)
+    }
+    fn read(&self, path: &str) -> std::io::Result<Vec<u8>> {
+        match path == self.path {
+            true => Ok(self.bytes.clone()),
+            false => self.s.read(path),
+        }
+    }
+    fn directory(&self, path: &str) -> std::io::Result<std::path::PathBuf> {
+        self.s.directory(path)
+    }
+    fn exists(&self, path: &str) -> std::io::Result<bool> {
+        self.s.exists(path)
+    }
+    fn work_root(&self) -> std::path::PathBuf {
+        self.s.work_root()
+    }
+    fn units(&self) -> bool {
+        self.s.units()
+    }
+    fn environment(&self) -> Vec<(String, String)> {
+        self.s.environment()
+    }
+}
 /// The checks before any effect; the answer is the page's write set.
 fn request(s: &mut impl System, r: &Value) -> Result<Vec<String>, Failure> {
     let o = r
@@ -199,6 +251,8 @@ fn request(s: &mut impl System, r: &Value) -> Result<Vec<String>, Failure> {
         |(i, c): (usize, u8)| c.is_ascii_lowercase() || c.is_ascii_digit() || (i > 0 && c == b'-');
     require!(key.len() <= 64 && key.bytes().enumerate().all(key_char) => "invalid_input", "task_key");
     require!(r.get("merge").is_none_or(Value::is_boolean) => "invalid_input", "merge");
+    let judge = r.get("judge_threads");
+    require!(judge.is_none_or(Value::is_boolean) => "invalid_input", "judge_threads");
     seconds(r)?;
     if let Some(v) = r.get("pull_request") {
         require!(v.as_u64().is_some_and(|n| n > 0) => "invalid_input", "pull_request");
@@ -263,7 +317,8 @@ fn request(s: &mut impl System, r: &Value) -> Result<Vec<String>, Failure> {
     }
     // The stage refuses a prompt over the limit once the block of facts is appended: room for it.
     if let Some(lead) = r["verifier"]["prompt"].as_str() {
-        let room = facts(r, u64::MAX, &"0".repeat(40), &"0".repeat(40)).len() as u64 + 1;
+        let zeros = "0".repeat(40);
+        let room = facts(r, u64::MAX, &zeros, &zeros, &Value::Null).len() as u64 + 1;
         let size = std::fs::metadata(lead).map_or(LIMIT, |m| m.len());
         require!(size + room <= LIMIT => "prompt_unreadable", "verifier.prompt");
     }
@@ -272,9 +327,19 @@ fn request(s: &mut impl System, r: &Value) -> Result<Vec<String>, Failure> {
         let lead = repair["prompt"].as_str().unwrap_or_default();
         let field = |f| renamed(f, "repair.prompt", "repair");
         crate::run::admit_stage(s, &fixer_request(r, lead, None)).map_err(field)?;
-        let room = fixer_facts(r, &json!(u64::MAX), &"0".repeat(40)).len() as u64 + 1;
-        let size = std::fs::metadata(lead).map_or(LIMIT, |m| m.len());
-        require!(size + room <= LIMIT => "prompt_unreadable", "repair.prompt");
+        // The prompt the fixer will get, the Lead's file and its facts, as `ap run` will judge it.
+        let mut bytes = regular(lead, "prompt_unreadable", "repair.prompt")?;
+        if !bytes.ends_with(b"\n") {
+            bytes.push(b'\n');
+        }
+        bytes.extend(fixer_facts(r, &json!(u64::MAX), &"0".repeat(40)).as_bytes());
+        let path = format!("{out}.fixer.prompt.md");
+        let mut seen = Rendered {
+            s: &mut *s,
+            path: path.clone(),
+            bytes,
+        };
+        crate::run::admit_stage(&mut seen, &fixer_request(r, &path, None)).map_err(field)?;
         // The come-back's verifier, as `ap run` judges it before the record it resumes exists, with
         // room for the facts of `<out>-2`.
         let lead = repair["verifier_prompt"].as_str().unwrap_or_default();
@@ -285,7 +350,8 @@ fn request(s: &mut impl System, r: &Value) -> Result<Vec<String>, Failure> {
         }
         let field = |f| renamed(f, "repair.verifier_prompt", "verifier");
         crate::run::admit_stage(s, &stage_request(&next, "verifier", lead)).map_err(field)?;
-        let room = facts(&next, u64::MAX, &"0".repeat(40), &"0".repeat(40)).len() as u64 + 1;
+        let zeros = "0".repeat(40);
+        let room = facts(&next, u64::MAX, &zeros, &zeros, &Value::Null).len() as u64 + 1;
         let size = std::fs::metadata(lead).map_or(LIMIT, |m| m.len());
         require!(size + room <= LIMIT => "prompt_unreadable", "repair.verifier_prompt");
     }
@@ -395,9 +461,11 @@ fn stage_run(s: &mut impl System, u: &mut Unit, which: &str, r: Value) -> Step {
     u.rec["stages"][which] = json!(format!("{}.run.json", text(&r, "out")?));
     u.save();
     let refused = |f: Failure| stop("stage_refused", json!({"code": f.code, "field": f.field}));
-    let (rec, _) = crate::run::execute(s, &r).map_err(refused)?;
+    let (rec, status) = crate::run::execute(s, &r).map_err(refused)?;
     let state = rec["state"].as_str().unwrap_or("failed");
     ensure!(state == "ok" => state);
+    // `ok` with an exit that is not 0: the stage's final record could not be written.
+    ensure!(status == 0 => "stage_record_unwritten");
     Ok(json!({"session": rec["session"]}))
 }
 /// `acceptance` in `wt` with `extra` arguments under the bound; its exit, when one was read.
@@ -431,6 +499,91 @@ fn names_head(line: Option<&str>, head: &str) -> bool {
         .split(|c: char| !c.is_alphanumeric())
         .filter(|s| s.len() == 40 && s.bytes().all(|b| b.is_ascii_hexdigit()));
     heads.next() == Some(head) && heads.next().is_none()
+}
+/// The word of the one line `Thread <id>: <word>` of a report, when it holds exactly one for `id`.
+fn word<'a>(report: &'a str, id: &Value) -> Option<&'a str> {
+    let prefix = format!("Thread {}: ", id.as_str()?);
+    let lines = report.split('\n').map(|l| l.trim_end_matches('\r'));
+    let mut found = lines.filter_map(|l| l.strip_prefix(prefix.as_str()));
+    let w = found.next()?;
+    (found.next().is_none() && WORDS.contains(&w)).then_some(w)
+}
+/// After the head rule of an accept: every given thread judged, none `blocking`; the words recorded.
+fn judged(u: &mut Unit, report: &[u8]) -> Result<(), Stop> {
+    let Some(mut list) = u.rec["threads"].as_array().cloned() else {
+        return Ok(());
+    };
+    let text = String::from_utf8_lossy(report);
+    let ids = |want: &dyn Fn(Option<&str>) -> bool| {
+        let named = list.iter().filter(|t| want(word(&text, &t["id"])));
+        json!({"threads": named.map(|t| t["id"].clone()).collect::<Vec<_>>()})
+    };
+    let unjudged = ids(&|w| w.is_none());
+    ensure!(unjudged["threads"] == json!([]) => "threads_unjudged", unjudged);
+    let blocking = ids(&|w| w == Some("blocking"));
+    ensure!(blocking["threads"] == json!([]) => "thread_blocking", blocking);
+    for t in &mut list {
+        t["word"] = json!(word(&text, &t["id"]));
+    }
+    u.rec["threads"] = json!(list);
+    Ok(())
+}
+/// A recorded thread read again: whether it is resolved, and its number of comments.
+fn thread(s: &mut impl System, id: &Value) -> Result<(bool, u64), Stop> {
+    let id = format!("id={}", id.as_str().unwrap_or_default());
+    let v = gh(
+        s,
+        &[
+            "api",
+            "graphql",
+            "-f",
+            &id,
+            "-f",
+            &format!("query={THREAD}"),
+        ],
+    )?;
+    let node = &v["data"]["node"];
+    let read = node["isResolved"]
+        .as_bool()
+        .zip(node["comments"]["totalCount"].as_u64());
+    read.ok_or_else(|| stop("github_unreadable", Value::Null))
+}
+/// Inside `status`, before the status is posted: the recorded threads, each still unresolved with
+/// its one comment, resolved and read back resolved. Nothing else is resolved, nothing unresolved.
+fn resolve(s: &mut impl System, u: &mut Unit) -> Result<(), Stop> {
+    let list = u.rec["threads"].as_array().cloned().unwrap_or_default();
+    let mut changed = vec![];
+    for t in &list {
+        let (resolved, comments) = thread(s, &t["id"])?;
+        if resolved || comments != 1 {
+            changed.push(t["id"].clone());
+        }
+    }
+    ensure!(changed.is_empty() => "thread_changed", json!({"threads": changed}));
+    for t in &list {
+        let id = format!("id={}", t["id"].as_str().unwrap_or_default());
+        // The read back decides, also after a call that failed.
+        let _ = gh(
+            s,
+            &[
+                "api",
+                "graphql",
+                "-f",
+                &id,
+                "-f",
+                &format!("query={RESOLVE}"),
+            ],
+        );
+    }
+    let mut open = vec![];
+    for (i, t) in list.iter().enumerate() {
+        match thread(s, &t["id"])? {
+            (true, _) => u.rec["threads"][i]["resolved"] = json!(true),
+            _ => open.push(t["id"].clone()),
+        }
+    }
+    ensure!(open.is_empty() => "thread_not_resolved", json!({"threads": open}));
+    Ok(())
 }
 /// A round starts on a `Verdict: repair` of the step `verifier` whose head line names the head.
 fn repairs(r: &Value, rec: &Value) -> bool {
@@ -533,8 +686,28 @@ fn steps(s: &mut impl System, r: &Value, write_set: &[String], u: &mut Unit) -> 
         let on_head = &answer["autoreview"]["threads_on_head"];
         let unseen = on_head.is_null() || on_head == 0;
         ensure!(!(answer["autoreview"]["has_unresolved_findings"] == true && unseen) => "unresolved_findings");
+        // `judge_threads`: an unresolved thread whose one comment is the reviewer's is given to the
+        // verifier; with `verdict`, only one the pinned report judges with a word but `blocking`.
         let threads = &answer["threads"];
-        ensure!(threads.as_array().is_some_and(Vec::is_empty) => "unresolved_threads", json!({"threads": threads}));
+        let pinned = r["verdict"].as_str().map(|f| regular(f, "verdict_unreadable", "verdict"));
+        let pinned = pinned.map(|b| String::from_utf8_lossy(&b.unwrap_or_default()).into_owned());
+        let reviewer = &answer["autoreview"]["login"];
+        let given = |t: &&Value| {
+            let judged = |p: &String| word(p, &t["id"]).is_some_and(|w| w != "blocking");
+            r["judge_threads"] == true
+                && reviewer.is_string()
+                && t["author"] == *reviewer
+                && t["comments"] == 1
+                && pinned.as_ref().is_none_or(judged)
+        };
+        let (given, rest): (Vec<&Value>, Vec<&Value>) =
+            threads.as_array().into_iter().flatten().partition(given);
+        let rest = if threads.is_array() { json!(rest) } else { Value::Null };
+        ensure!(rest.as_array().is_some_and(Vec::is_empty) => "unresolved_threads", json!({"threads": rest}));
+        if r["judge_threads"] == true {
+            let entry = |t: &&Value| json!({"id": t["id"], "path": t["path"], "line": t["line"]});
+            u.rec["threads"] = json!(given.iter().map(entry).collect::<Vec<_>>());
+        }
         // The status `lead-review` the gate lists and does not judge: a revoked acceptance is seen.
         let mut checks = answer["checks"].as_array().into_iter().flatten();
         let lead = checks.find(|c| c["judged"] == false).map(|c| c["state"].clone());
@@ -574,7 +747,9 @@ fn steps(s: &mut impl System, r: &Value, write_set: &[String], u: &mut Unit) -> 
         Some(file) => {
             u.begin("verifier");
             unchanged(&u.rec["verdict_file"], file)?;
-            verdict(&regular(file, "verdict_unreadable", "verdict")?, &head)?;
+            let bytes = regular(file, "verdict_unreadable", "verdict")?;
+            verdict(&bytes, &head)?;
+            judged(u, &bytes)?;
             u.rec["stages"]["verifier"] = json!(format!("{file}.run.json"));
             u.end("skipped", Value::Null);
             file.to_owned()
@@ -589,12 +764,14 @@ fn steps(s: &mut impl System, r: &Value, write_set: &[String], u: &mut Unit) -> 
                 if !bytes.ends_with(b"\n") {
                     bytes.push(b'\n');
                 }
-                bytes.extend(facts(r, number, &head, &base).as_bytes());
+                bytes.extend(facts(r, number, &head, &base, &u.rec["threads"]).as_bytes());
                 let prompt = format!("{out}.verifier.prompt.md");
                 create(&prompt, &bytes)?;
                 let session = stage_run(s, u, "verifier", stage_request(r, "verifier", &prompt))?;
                 u.rec["files"]["report"] = json!(report);
-                verdict(&regular(&report, "verdict_unreadable", "report")?, &head)?;
+                let bytes = regular(&report, "verdict_unreadable", "report")?;
+                verdict(&bytes, &head)?;
+                judged(u, &bytes)?;
                 Ok(session)
             })?;
             report
@@ -642,6 +819,7 @@ fn steps(s: &mut impl System, r: &Value, write_set: &[String], u: &mut Unit) -> 
             p["state"] == "OPEN" && p["baseRefName"] == "main" && p["headRefOid"] == head.as_str();
         ensure!(open => "head_differs", json!({"head": p["headRefOid"], "state": p["state"]}));
         let key = text(&u.rec["review"], "native_key")?.to_owned();
+        resolve(s, u)?;
         let target = json!({"repository": repo, "head": head});
         let posted = review::post(s, &target, "success", &format!("review {key} accept"));
         posted.map_err(|_| stop("status_failed", Value::Null))?;
@@ -773,13 +951,14 @@ fn fix(s: &mut impl System, r: &Value, u: &mut Unit) -> Result<Option<Value>, St
     let run = record(&implementer).unwrap_or_default();
     let req = fixer_request(r, &prompt, Some((&implementer, &run)));
     let refused = |f: Failure| stop("stage_refused", json!({"code": f.code, "field": f.field}));
-    let (run, _) = crate::run::execute(s, &req).map_err(refused)?;
+    let (run, status) = crate::run::execute(s, &req).map_err(refused)?;
     u.rec["repair"]["state"] = run["state"].clone();
     // The fixer's state is on disk before the wait; a record that cannot hold it starts no come-back.
     u.save();
     if run["state"] != "ok" || !u.clean {
         return Ok(None);
     }
+    ensure!(status == 0 => "stage_record_unwritten");
     let lead = text(&r["repair"], "verifier_prompt")?;
     unchanged(&u.rec["repair"]["verifier_prompt"], lead)?;
     // The come-back's gate takes the head GitHub reports first: a pushed head must be seen there.

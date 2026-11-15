@@ -64,6 +64,10 @@ struct U {
     store_refuses: bool,
     /// The fake store's reviews: the parameters of `start_review`, `id`, then those of the close.
     reviews: Vec<Value>,
+    /// What happens to the last thread when the review closes: `resolved` by another hand, or a `reply`.
+    thread_change_on_close: Option<&'static str>,
+    /// `resolveReviewThread` answers and resolves nothing.
+    resolve_fails: bool,
 }
 
 fn git(dir: &PathBuf, args: &[&str]) -> String {
@@ -160,6 +164,8 @@ impl U {
             lead_review: None,
             store_refuses: false,
             reviews: vec![],
+            thread_change_on_close: None,
+            resolve_fails: false,
         }
     }
     fn p(&self, rel: &str) -> String {
@@ -361,7 +367,31 @@ impl U {
             ("pr", "ready") => ok(json!({})),
             ("api", "graphql") => {
                 let query = a.last().unwrap();
+                let id = a
+                    .iter()
+                    .find_map(|x| x.strip_prefix("id="))
+                    .map(str::to_owned);
+                if query.contains("resolveReviewThread") {
+                    let t = self.threads.iter_mut().find(|t| t["id"] == json!(id));
+                    let t = t.expect("a resolve of a thread the fake does not hold");
+                    if !self.resolve_fails {
+                        t["isResolved"] = json!(true);
+                    }
+                    let thread = json!({"isResolved": t["isResolved"]});
+                    return ok(json!({"data":{"resolveReviewThread":{"thread":thread}}}));
+                }
+                if query.contains("node(id:") {
+                    let t = self.threads.iter().find(|t| t["id"] == json!(id)).unwrap();
+                    let count = t["first"]["totalCount"].clone();
+                    return ok(json!({"data":{"node":{"isResolved":t["isResolved"],
+                        "comments":{"totalCount":count}}}}));
+                }
                 if query.contains("reviewThreads") {
+                    // The fixer's script opens a second thread of the reviewer.
+                    let new = self.t.join("new-thread").exists();
+                    if new && !self.threads.iter().any(|t| t["id"] == "T2") {
+                        self.threads.push(given("T2", 9));
+                    }
                     if self.threads_unreadable {
                         return ok(json!({"errors":[{"message":"unavailable"}]}));
                     }
@@ -475,6 +505,13 @@ impl U {
                 row[k] = p[k].clone();
             }
             row["status"] = json!("closed");
+            if let Some(t) = self.threads.last_mut() {
+                match self.thread_change_on_close {
+                    Some("resolved") => t["isResolved"] = json!(true),
+                    Some("reply") => t["first"]["totalCount"] = json!(2),
+                    _ => (),
+                }
+            }
             if self.move_head_on_close {
                 self.move_head();
             }
@@ -3499,6 +3536,443 @@ fn r4_a_pushed_head_that_github_never_reports_ends_head_not_seen() {
     assert_eq!(v["repair"]["detail"], json!({"head": u.head()}));
     assert!(u.clock >= Duration::from_secs(120), "{:?}", u.clock);
     assert!(head_readings(&u) >= 2);
+    assert_eq!(u.launches, 3, "no come-back");
+    assert!(!exists(&u, "work/task/u1-2.unit.json"));
+    assert!(u.statuses().is_empty() && u.merges().is_empty());
+}
+
+// ---- R5 the verifier judges the automatic reviewer's threads -----------------------------------
+
+/// An unresolved thread whose one comment is the automatic reviewer's (on a commit that is not the
+/// head).
+fn given(id: &str, line: u64) -> Value {
+    let first = json!({"totalCount":1,"nodes":[{"author":{"__typename":REVIEWER.0,"login":REVIEWER.1},
+        "originalCommit":{"oid":"0000000000000000000000000000000000000000"}}]});
+    json!({"id":id,"isResolved":false,"path":"src/a.rs","line":line,"first":first,"last":first})
+}
+/// A unit call with the member and the automatic reviewer on: no marker, so the review's wait ends
+/// at its bound on the fake clock.
+fn r5_request(u: &U) -> Value {
+    let mut r = u.request();
+    (r["gate"], r["judge_threads"]) = (json!({"autoreview_minutes":1}), json!(true));
+    r
+}
+/// The verifier accepts the head; `lines` (with `\\n` between them) follow.
+fn accepting(u: &U, lines: &str) {
+    u.script(
+        "a2",
+        &format!("printf 'Verdict: accept\\n%s\\n{lines}\\n' \"$(git rev-parse HEAD)\""),
+    );
+}
+fn graphql_with(u: &U, part: &str) -> Vec<Vec<String>> {
+    let calls = u.gh_calls("api", "graphql");
+    calls
+        .into_iter()
+        .filter(|a| a.last().unwrap().contains(part))
+        .collect()
+}
+/// The ids the runner resolved, in order.
+fn resolves(u: &U) -> Vec<String> {
+    graphql_with(u, "resolveReviewThread")
+        .iter()
+        .map(|a| {
+            a.iter()
+                .find_map(|x| x.strip_prefix("id="))
+                .unwrap()
+                .to_owned()
+        })
+        .collect()
+}
+/// The positions in `calls` of the `gh` calls `f` names.
+fn at(u: &U, f: impl Fn(&[String]) -> bool) -> Vec<usize> {
+    let gh =
+        |(i, (p, a, _)): (usize, &(String, Vec<String>, Value))| (p == "gh" && f(a)).then_some(i);
+    u.calls.iter().enumerate().filter_map(gh).collect()
+}
+fn ids(threads: &Value) -> Vec<Value> {
+    let list = threads.as_array().unwrap().iter();
+    list.map(|t| t["id"].clone()).collect()
+}
+/// The call ended at `step` with `cause` (exit 3) and the record on disk is the answer.
+fn r5_stopped(u: &U, (v, code): (Value, u8), out: &str, step: &str, cause: &str) -> Value {
+    assert_eq!(
+        (
+            v["state"].as_str(),
+            v["stopped_at"].as_str(),
+            v["cause"].as_str(),
+            code
+        ),
+        (Some("stopped"), Some(step), Some(cause), 3),
+        "{v}"
+    );
+    assert_eq!(v, u.record(out));
+    v
+}
+
+#[test]
+fn r5_a_thread_of_the_automatic_reviewer_is_judged_and_resolved_before_the_status() {
+    let mut u = U::new();
+    u.threads = vec![given("T1", 42)];
+    accepting(&u, "Thread T1: wrong");
+    let (v, code) = u.run(&r5_request(&u)).unwrap();
+    assert_eq!((v["state"].as_str(), code), (Some("merged"), 0), "{v}");
+    let prompt = std::fs::read_to_string(u.t.join("work/task/u1.verifier.prompt.md")).unwrap();
+    assert!(
+        prompt
+            .lines()
+            .any(|l| l.contains("T1") && l.contains("src/a.rs") && l.contains("42")),
+        "{prompt}"
+    );
+    assert_eq!(
+        v["threads"],
+        json!([{"id":"T1","path":"src/a.rs","line":42,"word":"wrong","resolved":true}])
+    );
+    assert_eq!(resolves(&u), ["T1"]);
+    assert_eq!(u.threads[0]["isResolved"], true);
+    // Read, resolved, read back, then the status, then the merge.
+    let reads = at(&u, |a| a.last().unwrap().contains("node(id:"));
+    let resolve = at(&u, |a| a.last().unwrap().contains("resolveReviewThread"));
+    let status = at(&u, |a| a.iter().any(|x| x.contains("/statuses/")));
+    let merge = at(&u, |a| a[0] == "pr" && a[1] == "merge");
+    assert_eq!((reads.len(), resolve.len(), status.len()), (2, 1, 1));
+    assert!(reads[0] < resolve[0] && resolve[0] < reads[1] && reads[1] < status[0]);
+    assert!(status[0] < merge[0]);
+    assert_eq!(v, u.record("u1"));
+}
+
+#[test]
+fn r5_judge_threads_is_a_boolean_and_not_a_member_of_a_case_call() {
+    let mut u = U::new();
+    for bad in [json!("yes"), json!(1), json!(null), json!({})] {
+        let mut r = r5_request(&u);
+        r["judge_threads"] = bad;
+        assert_eq!(code(u.run(&r)), "invalid_input@judge_threads");
+    }
+    assert_eq!(names(&u.t.join("work/task")), ["TASK.md"]);
+    assert_eq!((u.launches, u.calls.len()), (0, 0));
+    let mut u = U::new();
+    let c = case(&u);
+    for value in [true, false] {
+        let mut r = case_request(&u, &c);
+        r["judge_threads"] = json!(value);
+        assert_eq!(code(u.run(&r)), "invalid_input@judge_threads");
+    }
+    assert!(!copy(&u).exists());
+    assert_eq!((u.launches, u.calls.len()), (0, 0));
+}
+
+#[test]
+fn r5_without_the_member_a_thread_stops_as_today() {
+    for member in [None, Some(false)] {
+        let mut u = U::new();
+        u.threads = vec![given("T1", 42)];
+        accepting(&u, "Thread T1: wrong");
+        let mut r = r5_request(&u);
+        match member {
+            None => {
+                r.as_object_mut().unwrap().remove("judge_threads");
+            }
+            Some(b) => r["judge_threads"] = json!(b),
+        }
+        let v = u.stop(&r, "gate", "unresolved_threads");
+        assert_eq!(
+            v["detail"]["threads"],
+            json!([{"id":"T1","path":"src/a.rs","line":42,"author":"chatgpt-codex-connector[bot]",
+                "answered":false,"comments":1}])
+        );
+        assert!(v.get("threads").is_none(), "{v}");
+        assert_eq!(u.launches, 1, "no verifier stage");
+        assert!(graphql_with(&u, "node(id:").is_empty() && resolves(&u).is_empty());
+    }
+    // With the member and no thread to give, the block of facts is today's, byte for byte.
+    let mut u = U::new();
+    let (v, code) = u.run(&r5_request(&u)).unwrap();
+    assert_eq!((v["state"].as_str(), code), (Some("merged"), 0), "{v}");
+    assert_eq!(v["threads"], json!([]));
+    let prompt = std::fs::read_to_string(u.t.join("work/task/u1.verifier.prompt.md")).unwrap();
+    let (head, base, out) = (
+        v["head"].as_str().unwrap(),
+        v["base"].as_str().unwrap(),
+        u.p("work/task/u1"),
+    );
+    let wt = u.p("work/task/wt/repo");
+    assert_eq!(
+        prompt,
+        format!(
+            "{VERIFIER_PROMPT}\n## Facts of this unit (ap unit)\n\nRepository: o/r\nPull request: 7\nHead: {head}\nBase: {base}\nDiff: git -C {wt} diff {base} {head}\nGate answer: {out}.gate.json\nAcceptance output: {out}.accept.log\n"
+        )
+    );
+    assert!(graphql_with(&u, "node(id:").is_empty() && resolves(&u).is_empty());
+}
+
+#[test]
+fn r5_a_thread_with_a_reply_or_of_another_author_stops() {
+    let mut reply = given("T2", 5);
+    reply["first"]["totalCount"] = json!(2);
+    reply["last"] = json!({"nodes":[{"author":{"__typename":"User","login":"someone"}}]});
+    let mut person = given("T3", 6);
+    person["first"]["nodes"][0]["author"] = json!({"__typename":"User","login":"someone"});
+    // A user whose login is the reviewer's without `[bot]`.
+    let mut same_name = given("T4", 7);
+    same_name["first"]["nodes"][0]["author"]["__typename"] = json!("User");
+    for other in [reply, person, same_name] {
+        let mut u = U::new();
+        u.threads = vec![given("T1", 42), other.clone()];
+        accepting(
+            &u,
+            "Thread T1: wrong\\nThread T2: wrong\\nThread T3: wrong\\nThread T4: wrong",
+        );
+        let v = u.stop(&r5_request(&u), "gate", "unresolved_threads");
+        assert_eq!(ids(&v["detail"]["threads"]), [other["id"].clone()], "{v}");
+        assert_eq!(u.launches, 1, "no verifier stage");
+        assert!(resolves(&u).is_empty());
+    }
+    // Without the automatic reviewer the gate names no login: no thread is given.
+    let mut u = U::new();
+    u.threads = vec![given("T1", 42)];
+    let mut r = r5_request(&u);
+    r["gate"] = json!({"autoreview": false});
+    let v = u.stop(&r, "gate", "unresolved_threads");
+    assert_eq!(ids(&v["detail"]["threads"]), [json!("T1")]);
+    assert_eq!(u.launches, 1);
+}
+
+#[test]
+fn r5_a_report_that_does_not_judge_every_thread_stops() {
+    for (lines, what) in [
+        ("Thread T2: fixed", "a missing line"),
+        (
+            "Thread T1: fixed\\nThread T2: fixed\\nThread T1: fixed",
+            "a doubled line",
+        ),
+        (
+            "Thread T1: fixed\\nThread T2: fixed\\nThread T1: wrong",
+            "two words",
+        ),
+        ("Thread T1: right\\nThread T2: fixed", "an unknown word"),
+        (
+            "Thread T1: fixed.\\nThread T2: fixed",
+            "a line that is not exact",
+        ),
+    ] {
+        let mut u = U::new();
+        u.threads = vec![given("T1", 1), given("T2", 2)];
+        accepting(&u, lines);
+        let v = u.stop(&r5_request(&u), "verifier", "threads_unjudged");
+        assert_eq!(v["detail"], json!({"threads":["T1"]}), "{what}");
+        assert!(u.store("start_review").is_empty() && u.store("close_review").is_empty());
+        assert!(graphql_with(&u, "node(id:").is_empty() && resolves(&u).is_empty());
+        let words = v["threads"].as_array().unwrap().iter();
+        assert!(words.into_iter().all(|t| t.get("word").is_none()), "{v}");
+    }
+    // A `Verdict: repair` is read as today: its thread lines are not inspected.
+    let mut u = U::new();
+    u.threads = vec![given("T1", 1)];
+    u.script("a2", VERIFY_REPAIR);
+    u.stop(&r5_request(&u), "verifier", "verdict_repair");
+}
+
+#[test]
+fn r5_an_accept_with_a_blocking_thread_stops() {
+    let mut u = U::new();
+    u.threads = vec![given("T1", 1), given("T2", 2)];
+    accepting(&u, "Thread T1: fixed\\nThread T2: blocking");
+    let v = u.stop(&r5_request(&u), "verifier", "thread_blocking");
+    assert_eq!(v["detail"], json!({"threads":["T2"]}));
+    assert!(u.store("close_review").is_empty());
+    assert!(graphql_with(&u, "node(id:").is_empty() && resolves(&u).is_empty());
+    // An id without its line is named first.
+    let mut u = U::new();
+    u.threads = vec![given("T1", 1), given("T2", 2)];
+    accepting(&u, "Thread T2: blocking");
+    let v = u.stop(&r5_request(&u), "verifier", "threads_unjudged");
+    assert_eq!(v["detail"], json!({"threads":["T1"]}));
+}
+
+#[test]
+fn r5_a_thread_that_changed_before_the_resolve_stops() {
+    for change in ["resolved", "reply"] {
+        let mut u = U::new();
+        u.threads = vec![given("T1", 1), given("T2", 2)];
+        accepting(&u, "Thread T1: fixed\\nThread T2: note");
+        u.thread_change_on_close = Some(change);
+        let v = u.stop(&r5_request(&u), "status", "thread_changed");
+        assert_eq!(v["detail"], json!({"threads":["T2"]}), "{change}");
+        assert!(resolves(&u).is_empty(), "nothing resolved: {change}");
+        assert_eq!(u.threads[0]["isResolved"], false);
+        assert_eq!(u.store("close_review").len(), 1);
+    }
+}
+
+#[test]
+fn r5_a_thread_that_does_not_read_back_resolved_stops() {
+    let mut u = U::new();
+    u.threads = vec![given("T1", 1)];
+    accepting(&u, "Thread T1: fixed");
+    u.resolve_fails = true;
+    let v = u.stop(&r5_request(&u), "status", "thread_not_resolved");
+    assert_eq!(v["detail"], json!({"threads":["T1"]}));
+    assert_eq!(resolves(&u), ["T1"]);
+    assert!(v["threads"][0].get("resolved").is_none(), "{v}");
+}
+
+#[test]
+fn r5_a_verdict_come_back_resolves_only_what_the_report_judged() {
+    let come_back = |u: &U, out: &str| {
+        let mut r = r5_request(u);
+        r.as_object_mut().unwrap().remove("verifier");
+        (r["pull_request"], r["verdict"]) = (json!(7), json!(u.p("work/task/u1.verifier.md")));
+        r["out"] = json!(u.p(&format!("work/task/{out}")));
+        r
+    };
+    let mut u = U::new();
+    u.threads = vec![given("T1", 1)];
+    accepting(&u, "Thread T1: fixed");
+    let mut r = r5_request(&u);
+    r["merge"] = json!(false);
+    let (v, code) = u.run(&r).unwrap();
+    assert_eq!((v["state"].as_str(), code), (Some("accepted"), 0), "{v}");
+    // A thread the pinned report has no line for stops at the gate.
+    u.threads.push(given("T2", 2));
+    let ended = u.run(&come_back(&u, "u2")).unwrap();
+    let v = r5_stopped(&u, ended, "u2", "gate", "unresolved_threads");
+    assert_eq!(ids(&v["detail"]["threads"]), [json!("T2")]);
+    assert!(resolves(&u).is_empty() && u.statuses().is_empty());
+    u.threads.pop();
+    let (v, code) = u.run(&come_back(&u, "u3")).unwrap();
+    assert_eq!((v["state"].as_str(), code), (Some("merged"), 0), "{v}");
+    assert_eq!(
+        v["threads"],
+        json!([{"id":"T1","path":"src/a.rs","line":1,"word":"fixed","resolved":true}])
+    );
+    assert_eq!(resolves(&u), ["T1"]);
+    assert_eq!(u.launches, 2, "no stage in a come-back");
+
+    // A thread whose line says `blocking` stops at the gate of a come-back.
+    let mut u = U::new();
+    u.threads = vec![given("T1", 1)];
+    accepting(&u, "Thread T1: blocking");
+    u.stop(&r5_request(&u), "verifier", "thread_blocking");
+    let ended = u.run(&come_back(&u, "u2")).unwrap();
+    let v = r5_stopped(&u, ended, "u2", "gate", "unresolved_threads");
+    assert_eq!(ids(&v["detail"]["threads"]), [json!("T1")]);
+    assert!(resolves(&u).is_empty() && u.statuses().is_empty() && u.merges().is_empty());
+}
+
+#[test]
+fn r5_the_round_judges_the_threads_of_the_new_head() {
+    let mut u = U::new();
+    let t = u.t.display().to_string();
+    // The fixer pushes and the automatic reviewer opens a second thread.
+    fixing(&u, &format!("touch {t}/new-thread; {FIX}"));
+    u.script(
+        "a2",
+        "if [ -f notes.md ]; then printf 'Verdict: accept\\n%s\\nThread T1: fixed\\nThread T2: wrong\\n' \"$(git rev-parse HEAD)\"; else printf 'Verdict: repair\\n%s\\nL1 blocks' \"$(git rev-parse HEAD)\"; fi",
+    );
+    u.threads = vec![given("T1", 1)];
+    let mut r = r4_request(&u);
+    (r["gate"], r["judge_threads"]) = (json!({"autoreview_minutes":1}), json!(true));
+    let (v, code) = u.run(&r).unwrap();
+    assert_eq!((v["state"].as_str(), code), (Some("merged"), 0), "{v}");
+    assert_eq!(v, u.record("u1-2"));
+    let first = u.record("u1");
+    assert_eq!(first["cause"], "verdict_repair");
+    assert_eq!(
+        first["threads"],
+        json!([{"id":"T1","path":"src/a.rs","line":1}])
+    );
+    let prompt = std::fs::read_to_string(u.t.join("work/task/u1-2.verifier.prompt.md")).unwrap();
+    for (id, line) in [("T1", "1"), ("T2", "9")] {
+        let named = |l: &&str| l.contains(id) && l.contains("src/a.rs") && l.contains(line);
+        assert!(prompt.lines().any(|l| named(&l)), "{prompt}");
+    }
+    assert_eq!(
+        v["threads"],
+        json!([{"id":"T1","path":"src/a.rs","line":1,"word":"fixed","resolved":true},
+            {"id":"T2","path":"src/a.rs","line":9,"word":"wrong","resolved":true}])
+    );
+    assert_eq!(resolves(&u), ["T1", "T2"]);
+    assert_eq!(u.statuses().len(), 1);
+}
+
+#[test]
+fn r5_a_call_that_does_not_merge_resolves_nothing() {
+    let mut u = U::new();
+    u.threads = vec![given("T1", 1)];
+    accepting(&u, "Thread T1: note");
+    let mut r = r5_request(&u);
+    r["merge"] = json!(false);
+    let (v, code) = u.run(&r).unwrap();
+    assert_eq!((v["state"].as_str(), code), (Some("accepted"), 0), "{v}");
+    assert_eq!(
+        v["threads"],
+        json!([{"id":"T1","path":"src/a.rs","line":1,"word":"note"}])
+    );
+    assert!(graphql_with(&u, "node(id:").is_empty() && resolves(&u).is_empty());
+    assert_eq!(u.threads[0]["isResolved"], false);
+    assert!(u.statuses().is_empty() && u.merges().is_empty());
+}
+
+#[test]
+fn r5_findings_without_a_visible_thread_still_stop() {
+    let (mut u, mut r, _) = finding_on_the_head();
+    r["judge_threads"] = json!(true);
+    // A thread that would be given, on another commit: the summary's finding is not visible.
+    u.threads = vec![given("T1", 1)];
+    accepting(&u, "Thread T1: fixed");
+    u.stop(&r, "gate", "unresolved_findings");
+    assert_eq!(u.launches, 1);
+    assert!(resolves(&u).is_empty());
+}
+
+#[test]
+fn r5_a_fixer_prompt_that_would_be_refused_is_refused_before_any_effect() {
+    let mut u = U::new();
+    // The page's path holds the fixer's answer name `u1.fixer.md`, and the fixer's facts name the page.
+    let dir = u.t.join("work/task/u1.fixer.md.d");
+    std::fs::create_dir_all(&dir).unwrap();
+    std::fs::copy(u.t.join("work/task/TASK.md"), dir.join("TASK.md")).unwrap();
+    let mut r = r4_request(&u);
+    r["page"] = json!(u.p("work/task/u1.fixer.md.d/TASK.md"));
+    assert_eq!(code(u.run(&r)), "out_named_in_prompt@repair.prompt");
+    assert_eq!(names(&u.t.join("work/task")), ["TASK.md", "u1.fixer.md.d"]);
+    assert_eq!(branches(&u), "* main");
+    assert_eq!((u.launches, u.calls.len()), (0, 0));
+}
+
+#[test]
+fn r5_a_stage_whose_record_could_not_be_written_ends_the_step() {
+    let unwritable = |u: &U, which: &str| {
+        let r = u.p(&format!("work/task/u1.{which}.md.run.json"));
+        format!("; rm -f {r} && mkdir {r}")
+    };
+    let mut u = U::new();
+    u.script(
+        "a1",
+        &format!("{IMPLEMENT}{}", unwritable(&u, "implementer")),
+    );
+    u.stop(&u.request(), "implementer", "stage_record_unwritten");
+    assert_eq!(u.launches, 1);
+    assert!(u.calls.is_empty(), "no pull request read");
+
+    let mut u = U::new();
+    u.script(
+        "a2",
+        &format!("{VERIFY_ACCEPT}{}", unwritable(&u, "verifier")),
+    );
+    u.stop(&u.request(), "verifier", "stage_record_unwritten");
+    assert!(u.store("start_review").is_empty());
+
+    let mut u = U::new();
+    fixing(&u, &format!("{FIX}{}", unwritable(&u, "fixer")));
+    u.script("a2", VERIFY_AFTER_FIX);
+    let (v, code) = u.run(&r4_request(&u)).unwrap();
+    assert_eq!(code, 3, "{v}");
+    assert_eq!(v, u.record("u1"), "stdout is the first record");
+    assert_eq!(
+        (&v["repair"]["state"], &v["repair"]["cause"]),
+        (&json!("ok"), &json!("stage_record_unwritten"))
+    );
     assert_eq!(u.launches, 3, "no come-back");
     assert!(!exists(&u, "work/task/u1-2.unit.json"));
     assert!(u.statuses().is_empty() && u.merges().is_empty());

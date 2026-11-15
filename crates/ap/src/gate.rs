@@ -26,7 +26,7 @@ commits(last:1){nodes{commit{oid statusCheckRollup{contexts(first:100,after:$aft
 comments(last:100){nodes{author{__typename login} body}}}}}";
 const THREADS: &str = "query($owner:String!,$name:String!,$n:Int!,$after:String){repository(owner:$owner,name:$name){pullRequest(number:$n){
 reviewThreads(first:100,after:$after){pageInfo{hasNextPage endCursor} nodes{id isResolved path line
-first:comments(first:1){nodes{author{__typename login} originalCommit{oid}}} last:comments(last:1){nodes{author{__typename login}}}}}}}}";
+first:comments(first:1){totalCount nodes{author{__typename login} originalCommit{oid}}} last:comments(last:1){nodes{author{__typename login}}}}}}}}";
 
 struct Request {
     repository: String,
@@ -255,7 +255,8 @@ fn threads(s: &mut impl System, q: &Request, head: &str) -> (Value, Value) {
             let last = login(&t["last"]["nodes"][0]["author"]);
             list.push(json!({"id": t["id"], "path": t["path"], "line": t["line"],
                 "author": login(&t["first"]["nodes"][0]["author"]),
-                "answered": q.login.as_deref().is_none_or(|l| last != l)}));
+                "answered": q.login.as_deref().is_none_or(|l| last != l),
+                "comments": t["first"]["totalCount"]}));
         }
         match page["pageInfo"]["endCursor"].as_str() {
             Some(c) if page["pageInfo"]["hasNextPage"] == true => after = Some(c.to_owned()),
