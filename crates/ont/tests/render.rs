@@ -135,6 +135,298 @@ fn fields(title: &str, rank: i64) -> BTreeMap<String, Knowledge> {
         ("rank".into(), Knowledge::Value(json!(rank))),
     ])
 }
+
+fn constrained_schema() -> Value {
+    let mut s = schema();
+    s["value_types"] = json!({
+        "day_text":{"base":"string","pattern":"^[0-9]{4}-[0-9]{2}-[0-9]{2}$"},
+        "choice_text":{"base":"string","enum":["open","done"]},
+        "floor_text":{"base":"string","min":"m"},
+        "ceiling_text":{"base":"string","max":"m"}
+    });
+    for (property, definition) in [
+        ("day", json!({"type":{"value_type":"day_text"}})),
+        ("short", json!({"type":"string","max_bytes":4})),
+        ("choice", json!({"type":{"value_type":"choice_text"}})),
+        ("floor", json!({"type":{"value_type":"floor_text"}})),
+        ("ceiling", json!({"type":{"value_type":"ceiling_text"}})),
+    ] {
+        s["object_types"]["item"]["properties"][property] = definition;
+    }
+    for (name, args, filter) in [
+        ("day_eq", json!(["when"]), json!({"eq":["day","$when"]})),
+        ("day_ge", json!(["when"]), json!({"ge":["day","$when"]})),
+        (
+            "day_prefix",
+            json!(["when"]),
+            json!({"prefix":["day","$when"]}),
+        ),
+        ("ref_eq", json!(["key"]), json!({"eq":["ref","$key"]})),
+        (
+            "day_in",
+            json!(["a", "z"]),
+            json!({"in":["day",["$a","$z"]]}),
+        ),
+        (
+            "two_properties",
+            json!(["value"]),
+            json!({"all":[
+                {"eq":["title","$value"]},{"any":[{"eq":["day","$value"]}]}
+            ]}),
+        ),
+        (
+            "two_refusals",
+            json!(["value"]),
+            json!({"none":[
+                {"eq":["short","$value"]},{"eq":["day","$value"]}
+            ]}),
+        ),
+        (
+            "argument_order",
+            json!(["z", "a"]),
+            json!({"any":[
+                {"eq":["day","$z"]},{"eq":["short","$a"]}
+            ]}),
+        ),
+    ] {
+        let mut view = s["views"]["items"].clone();
+        view["args"] = args;
+        view["filter"] = filter;
+        s["views"][name] = view;
+    }
+    for property in ["short", "choice", "floor", "ceiling"] {
+        let mut view = s["views"]["items"].clone();
+        view["args"] = json!(["value"]);
+        view["filter"] = json!({"eq":[property,"$value"]});
+        s["views"][format!("{property}_eq")] = view;
+    }
+    s
+}
+
+fn argument_refusal(code: i32, answer: &Value, argument: &str, property: &str) {
+    assert_eq!(code, 2, "{answer}");
+    assert_eq!(answer["code"], "invalid_argument", "{answer}");
+    assert_eq!(answer["field"], format!("/args/{argument}"));
+    assert_eq!(answer["argument"], argument);
+    assert_eq!(answer["property"], property);
+    assert_eq!(
+        answer["rule"],
+        "argument must satisfy the compared property's value constraints"
+    );
+}
+
+#[test]
+fn a1_argument_against_a_pattern_is_refused_for_eq_and_ordering() {
+    let t = Temp::new();
+    t.install(constrained_schema());
+    for (key, day, rank) in [
+        ("before", "2040-06-01", 1),
+        ("equal", "2040-06-15", 2),
+        ("after", "2040-07-01", 3),
+    ] {
+        let mut f = fields(key, rank);
+        f.insert("day".into(), Knowledge::Value(json!(day)));
+        append(&t, key, f, Change::Initial, 2000);
+    }
+    for (view, rows) in [("day_eq", 1), ("day_ge", 2)] {
+        for value in ["2040-6-1", "20400102", "2040"] {
+            let (code, answer) = t.render(view, json!({"when":value}));
+            argument_refusal(code, &answer, "when", "day");
+        }
+        let (code, answer) = t.render(view, json!({"when":"2040-06-15"}));
+        assert_eq!(code, 0, "{answer}");
+        assert_eq!(answer["rows"], rows);
+        let mut expected = format!(
+            "<!-- ont:render {view} when=2040-06-15 schema=board@1 -->\n\
+             | Key | Title | Rank |\n| --- | --- | --- |\n| equal | equal | 2 |\n"
+        );
+        if view == "day_ge" {
+            expected.push_str("| after | after | 3 |\n");
+        }
+        expected.push_str("<!-- /ont:render -->");
+        assert_eq!(answer["markdown"], expected);
+    }
+    // A literal keeps its existing search semantics, including constraint violations.
+    let (code, answer) = t.run(
+        &["search"],
+        json!({"object_type":"item","where":{"ge":["day","2040"]}}),
+    );
+    assert_eq!(code, 0, "{answer}");
+    assert_eq!(answer["result"]["objects"].as_array().unwrap().len(), 3);
+}
+
+#[test]
+fn a1_argument_over_max_bytes_outside_allowed_values_or_bounds_is_refused() {
+    let t = Temp::new();
+    t.install(constrained_schema());
+    let mut f = fields("bounds", 1);
+    for (property, value) in [
+        ("short", "four"),
+        ("choice", "open"),
+        ("floor", "m"),
+        ("ceiling", "m"),
+    ] {
+        f.insert(property.into(), Knowledge::Value(json!(value)));
+    }
+    append(&t, "bounds", f, Change::Initial, 2000);
+    for (property, invalid, bound) in [
+        ("short", "five5", "four"),
+        ("choice", "absent", "open"),
+        ("floor", "l", "m"),
+        ("ceiling", "n", "m"),
+    ] {
+        let view = format!("{property}_eq");
+        let (code, answer) = t.render(&view, json!({"value":invalid}));
+        argument_refusal(code, &answer, "value", property);
+        let (code, answer) = t.render(&view, json!({"value":bound}));
+        assert_eq!(code, 0, "{answer}");
+        assert_eq!(answer["rows"], 1);
+        assert!(
+            answer["markdown"]
+                .as_str()
+                .unwrap()
+                .contains("| bounds | bounds | 1 |")
+        );
+    }
+}
+
+#[test]
+fn a1_prefix_and_reference_arguments_are_read_as_before() {
+    let t = Temp::new();
+    t.install(constrained_schema());
+    let key = "/synthetic/item-1";
+    let mut f = fields("matched", 1);
+    f.insert("day".into(), Knowledge::Value(json!("2040-06-15")));
+    f.insert("ref".into(), Knowledge::Value(json!(id(key))));
+    append(&t, "match", f, Change::Initial, 2000);
+    for (view, args, opening) in [
+        ("day_prefix", json!({"when":"2040-06"}), "when=2040-06"),
+        ("ref_eq", json!({"key":key}), "key=/synthetic/item-1"),
+    ] {
+        let (code, answer) = t.render(view, args);
+        assert_eq!(code, 0, "{answer}");
+        assert_eq!(answer["rows"], 1);
+        assert_eq!(
+            answer["markdown"],
+            format!(
+                "<!-- ont:render {view} {opening} schema=board@1 -->\n\
+             | Key | Title | Rank |\n| --- | --- | --- |\n\
+             | match | matched | 1 |\n<!-- /ont:render -->"
+            )
+        );
+    }
+    let (code, answer) = t.render("ref_eq", json!({"key":"bad key"}));
+    assert_eq!(code, 2);
+    assert_eq!(answer["code"], "reference_argument_unrepresentable");
+    assert_eq!(answer["field"], "/args/key");
+    // The same partial value is refused for equality, so the exemption is operator-specific.
+    let (code, answer) = t.render("day_eq", json!({"when":"2040-06"}));
+    argument_refusal(code, &answer, "when", "day");
+}
+
+#[test]
+fn a1_argument_in_a_list_and_in_two_leaves_is_checked_in_each() {
+    let t = Temp::new();
+    t.install(constrained_schema());
+    let (code, answer) = t.render("day_in", json!({"a":"2040-06-15","z":"2040"}));
+    argument_refusal(code, &answer, "z", "day");
+    let (code, answer) = t.render("two_properties", json!({"value":"2040"}));
+    argument_refusal(code, &answer, "value", "day");
+    // Written leaf order wins over the alphabetical property order (day, short).
+    let (code, answer) = t.render("two_refusals", json!({"value":"2040-6-1"}));
+    argument_refusal(code, &answer, "value", "short");
+    // Argument names are alphabetical even when declaration and filter order differ.
+    let (code, answer) = t.render("argument_order", json!({"z":"2040","a":"too-long"}));
+    argument_refusal(code, &answer, "a", "short");
+    let mut f = fields("2040-06-15", 1);
+    f.insert("day".into(), Knowledge::Value(json!("2040-06-15")));
+    append(&t, "match", f, Change::Initial, 2000);
+    for (view, args) in [
+        ("day_in", json!({"a":"2040-06-15","z":"2040-06-16"})),
+        ("two_properties", json!({"value":"2040-06-15"})),
+    ] {
+        let (code, answer) = t.render(view, args);
+        assert_eq!(code, 0, "{answer}");
+        assert_eq!(answer["rows"], 1);
+    }
+}
+
+#[test]
+fn a1_refusal_names_argument_and_property_and_holds_no_value() {
+    let t = Temp::new();
+    t.install(constrained_schema());
+    let marker = "REJECTED_VALUE_MARKER";
+    let args = vec![
+        "--store".into(),
+        t.0.join("store.sqlite").display().to_string(),
+        "render".into(),
+    ];
+    let out = ont::run(
+        &args,
+        json!({"view":"day_eq","args":{"when":marker}})
+            .to_string()
+            .as_bytes(),
+        0,
+        0,
+    );
+    assert!(!out.stdout.contains(marker));
+    assert!(!out.stderr.contains(marker));
+    let answer: Value = serde_json::from_str(&out.stdout).unwrap();
+    argument_refusal(out.code, &answer, "when", "day");
+    let ctx = ont::Context::new(t.0.join("store.sqlite"), 1000);
+    let req = ont::render::RenderRequest::parse(
+        json!({"view":"day_eq","args":{"when":marker}})
+            .to_string()
+            .as_bytes(),
+    )
+    .unwrap();
+    let Err(ont::Failure::Refused(refusal)) = ont::render::render(&ctx, &req) else {
+        panic!("library render must refuse the argument");
+    };
+    assert_eq!(refusal.code, "invalid_argument");
+    assert_eq!(refusal.extra["property"], "day");
+    assert!(!format!("{refusal:?}").contains(marker));
+    let block = format!(
+        "<!-- ont:render day_eq when={marker} schema=board@1 -->\nold\n<!-- /ont:render -->"
+    );
+    let file = t.file("refused.md", block.as_bytes());
+    let (code, answer) = t.run(
+        &[
+            "render",
+            "--write",
+            &file,
+            "--section",
+            "day_eq",
+            "--arg",
+            &format!("when={marker}"),
+            "--preimage-dir",
+            t.0.to_str().unwrap(),
+        ],
+        json!({}),
+    );
+    argument_refusal(code, &answer, "when", "day");
+    assert!(!answer.to_string().contains(marker));
+    assert_eq!(std::fs::read_to_string(file).unwrap(), block);
+}
+
+#[test]
+fn a1_check_reports_a_refused_block_as_drift() {
+    let t = Temp::new();
+    t.install(constrained_schema());
+    let block = "<!-- ont:render day_eq when=2040 schema=board@1 -->\nold\n<!-- /ont:render -->";
+    let file = t.file("drift.md", block.as_bytes());
+    let (code, answer) = t.run(&["render", "--check", &file], json!({}));
+    assert_eq!(code, 2);
+    assert_eq!(answer["code"], "render_drift");
+    assert_eq!(
+        answer["drift"],
+        json!([
+            {"view":"day_eq","args":{"when":"2040"},"line":1,"refusal_code":"invalid_argument"}
+        ])
+    );
+    assert_eq!(std::fs::read_to_string(file).unwrap(), block);
+}
+
 #[test]
 fn deterministic_order_ties_arguments_and_actions() {
     let t = Temp::setup();
