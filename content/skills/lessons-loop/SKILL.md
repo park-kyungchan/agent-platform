@@ -9,7 +9,7 @@ description: At task closure, on a repeated user correction, or as assigned cura
 
 Use at the closure of a task or a worker run, when the user corrects the Lead, and when STATE names you curator.
 
-1. At closure, run the read-out of K1 (cost) and K2 (implementer tier) for the task's window: `evals/readout.py` of `agent-platform`; copy nothing of it into STATE. An unknown value stays unknown.
+1. At closure, run the read-out of K1 (cost) and K2 (implementer tier) for the task's window: `evals/readout.py` of `agent-platform`, run from a checkout at `origin/main`; copy nothing of it into STATE. An unknown value stays unknown.
 2. Capture a lesson only when something durable was learned. Levels: L0 incident, L1 lesson, L2 pattern, L3 structural issue with a direction proposal. Promotion needs independent occurrences of a verified mechanism, never a document count.
 3. A correction from the user is an occurrence. The first one changes the instance (skill `lead` section 3). A second correction of the same kind becomes a case of the Lead suite (`agent-platform` `evals/README.md`, "The Lead suite"), then the change of the instruction that makes the case pass, judged by that suite and reported.
 4. An expression of the user that appears in a second task is added to `/root/.agents/runtime-references/GLOSSARY.md` section 7 the same way.
