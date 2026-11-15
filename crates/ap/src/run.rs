@@ -2,7 +2,7 @@
 //! scope under `agents.slice`, ended at its time bound, its exit or (a reviewer only) its first
 //! `result` event, after which the whole scope is stopped. One record `<out>.run.json` per run; no
 //! other ledger, no store write.
-use crate::work::{
+use crate::host::{
     Failure, LIMIT, System, args, digest, error, fail, new_session_id, require, text,
 };
 use serde_json::{Value, json};
@@ -205,7 +205,7 @@ fn git(
     env: &[(String, String)],
     cwd: &str,
     command: &[&str],
-) -> Result<crate::work::Reply, Failure> {
+) -> Result<crate::host::Reply, Failure> {
     let mut a = vec!["-i".to_owned()];
     a.extend(
         env.iter()
@@ -1111,7 +1111,7 @@ pub fn cli(argv: &[OsString]) -> ExitCode {
 /// One JSON request on stdin, the answer on stdout, a refusal on stderr with exit 2.
 pub(crate) fn cli_with(
     argv: &[OsString],
-    execute: impl FnOnce(&mut crate::work::Host, &Value) -> Result<(Value, u8), Failure>,
+    execute: impl FnOnce(&mut crate::host::Host, &Value) -> Result<(Value, u8), Failure>,
 ) -> ExitCode {
     let result = (|| {
         require!(argv.is_empty() => "usage", "args");
@@ -1123,7 +1123,7 @@ pub(crate) fn cli_with(
         require!(bytes.len() as u64 <= LIMIT => "input_too_large", "stdin");
         let r: Value = serde_json::from_slice(&bytes)
             .map_err(|_| fail("invalid_input", "stdin", Value::Null))?;
-        execute(&mut crate::work::Host, &r)
+        execute(&mut crate::host::Host, &r)
     })();
     match result {
         Ok((v, status)) => {

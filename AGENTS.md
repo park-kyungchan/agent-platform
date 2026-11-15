@@ -7,7 +7,7 @@ Shared rules of this host: `/root/.agents/AGENTS.md` (its source is `content/AGE
 | Path | What it is | Its check |
 | --- | --- | --- |
 | `content/` | The shared instructions every coding CLI of the host loads: `AGENTS.md`, `runtime-references/`, `skills/`. Installed to `/root/.agents` by `scripts/install-content.sh` | `ci/check-content.py`: checksums in `content/SHA256SUMS`, the one list of the content, routes, words the glossary replaces, limits |
-| `crates/ap` | The command `ap`: `work start`, `work wait`, `work close`, `review`, `render`, `install`, `doctor`, `pane` | Its tests; `crates/ap/README.md` is the contract |
+| `crates/ap` | The command `ap`: `version`, `run`, `gate`, `review`, `unit`, `deliver` | Its tests; `crates/ap/README.md` is the contract |
 | `ontology/work.schema.json` | The schema of the Lead's own records in the Ontology store. Frozen: no new version without a decision of the Lead | `ontology/rehearsal.sh` installs it into a disposable store of the engine revision in `ontology/ENGINE-PIN` and asserts every action answer that `ap` parses |
 | `memory/` | Originals of engineering memory records | `ci/check-memory-records.py` and its tests |
 | `scripts/install-ap.sh` | Installs `ap` on the host from a commit on `main`; `check`, `rollback` | `scripts/test-install-ap.sh` |

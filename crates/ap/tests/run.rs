@@ -2,8 +2,8 @@
 //! only through the `System` trait: the `systemd-run … --` prefix is checked and dropped, the fake
 //! runs in its own process group, and `systemctl stop <unit>` kills that group. The real unit is
 //! exercised by ci/host-run-scope.sh.
+use ap::host::{Answer, Failure, Host, Reply, System};
 use ap::run::execute;
-use ap::work::{Answer, Failure, Host, Reply, System};
 use serde_json::{Value, json};
 use sha2::Digest;
 use std::{

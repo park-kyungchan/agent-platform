@@ -7,7 +7,7 @@
 //! installs, fetches or touches the host's store; the lock, the backup directories, the reports
 //! and the state directory are files of a temporary directory.
 use ap::deliver::execute;
-use ap::work::{Answer, Failure, Reply, System};
+use ap::host::{Answer, Failure, Reply, System};
 use serde_json::{Value, json};
 use sha2::Digest;
 use std::{

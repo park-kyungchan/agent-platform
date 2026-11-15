@@ -11,7 +11,7 @@ deployment or host configuration changes. PR #98 merged on 2026-11-05 at `2dd51a
 ## Purpose and scope
 
 The shared layer supplies a few explicit mechanisms so an agent can find common
-guidance, identify its caller pane and continue a task from clear state. Each CLI
+guidance and continue a task from clear state. Each CLI
 continues to execute the task with its native tools, trust, sessions, hooks,
 permissions and context handling. Herdr supplies terminals and coordination;
 Hindsight supplies mid/long-term context memory; Ontology and domain modules own
@@ -27,14 +27,12 @@ session supervisor hidden behind those conventions. [A1]
 | Mechanism | Current implementation or convention | Boundary proposed for the shared layer |
 | --- | --- | --- |
 | Canonical guidance | `/root/.agents/AGENTS.md` is the deployed shared instruction source; `content/` is its reviewed source, installed by `scripts/install-content.sh`. | Maintain reviewed source/distribution. Keep runtime details on demand. No second instruction loader, per-CLI instruction copies or automatic content rewrite. [G1] |
-| Caller-pane lookup | Linux `ap pane` resolves through Herdr/process/terminal evidence; it also retains explicitly warned Codex session heuristics. | Return a bounded observation of pane identity. No agent/task authorization, session creation, role inference, pane lifecycle control or universal cross-CLI session identity claim. [A2] |
 | Task state and handoff | Canonical guidance requires a short task `STATE.md` and a five-part handoff. `ap` does not parse, allocate or store tasks. | Share a human-readable handoff convention. The task owner updates it; a receiving agent explicitly reads current authority. No registry, receipt gate, automatic context contract or replacement Git ledger. [G1][G2] |
 | Memory routing | Official Hindsight coding-agents integration supplies hooks/MCP and bank routing independently of `ap`. | Document the official shared-bank route and platform provenance. Agent-initiated reads remain visible and purposeful. No Rust Hindsight client, database, proxy, ingestion engine or transcript pipeline is implemented or proposed here. [H1][G3] |
 | Workspace layout | `work/<scope>-<topic>/STATE.md`, task-owned `wt/<repo>/`, main platform checkouts under `platforms/` and pinned sources under `external/` are workspace conventions. | Use the approved layout and actual path map. Record real worktree/cwd identity in handoffs. No automatic relocation, Git cleanup or task-directory allocator. [G1][G2] |
-| Herdr coordination | Herdr owns workspace/tab/pane topology and agent control. A Lead can use native Herdr tools within the task's authority. | Use caller-bound IDs and actual output/readback; never equate idle/done with verification. `ap pane` only resolves identity and cannot close a pane or certify child cleanup. [A2][G2] |
+| Herdr coordination | Herdr owns workspace/tab/pane topology and agent control. A Lead can use native Herdr tools within the task's authority. | Use caller-bound IDs and actual output/readback; never equate idle/done with verification. [G2] |
 
-The caller-pane row describes existing Rust functionality. The other rows
-describe coordination/documentation boundaries, not new executable modules.
+The rows describe coordination/documentation boundaries, not new executable modules.
 Any later proposal to add code needs an actual consumer and a separate scope.
 The mechanism-only boundary is permanent: do not re-implement native CLI
 features or official Hindsight capabilities in Rust.
@@ -55,15 +53,7 @@ These rules are uniform across all four CLIs. Their concrete native interfaces
 differ, so the common layer preserves those differences rather than translating
 flags or editing vendor stores. [G2][G3][G4]
 
-## Pane identity is a bounded lookup
-
-`ap pane` requires `HERDR_ENV=1` for lookup. It compares process ancestry,
-caller-terminal association and reported session evidence. Default lookup may
-fall back to a warned resume/new-session candidate; `--exports` refuses those
-heuristics. `--focused` reports UI focus and must not be used as caller identity.
-Non-focused results are checked again against fresh pane/process association.
-Inherited pane variables alone cannot bind a caller. The residual race after
-returning an ID remains. [A2]
+## A pane is not an agent identity
 
 Herdr owns its server and topology. Workspace/tab/pane IDs are scoped to the
 selected server/machine. A pane is a terminal, not an agent identity; a recognized
@@ -148,7 +138,6 @@ operating guidance. The official Hindsight checkout was read at the pinned
 revision, including system-eval tests 01, 06 and 10. No eval was executed.
 
 [A1]: ../crates/ap/src/main.rs "Current command dispatch"
-[A2]: ../crates/ap/pane/README.md "Pane resolver, heuristics, rechecks and compatibility limits; implementation in src/pane.rs"
 [G1]: ../content/AGENTS.md "Canonical runtime core and approved task/layout conventions"
 [G2]: ../content/runtime-references/CONCURRENT-WORK.md "Ownership, handoffs, acceptance and Herdr lifecycle meanings"
 [G3]: ../content/runtime-references/CLI-RUNTIMES.md "Per-CLI files, launch, loading, MCP, hooks and skills"

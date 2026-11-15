@@ -58,7 +58,7 @@ class CheckContent(unittest.TestCase):
 
     def test_a_verb_the_command_has_passes(self):
         root = self.fixture()
-        self.append(root, 'Run `ap unit < request.json`, `ap run`, `ap gate` and `ap work start`; see `crates/ap/README.md` sections "One stage" and "The gate" and README "One unit".')
+        self.append(root, 'Run `ap unit < request.json`, `ap run`, `ap gate` and `ap deliver`; see `crates/ap/README.md` sections "One stage" and "The gate" and README "One unit".')
         code, out = run_check(root)
         self.assertEqual(code, 0, out)
 
@@ -79,7 +79,7 @@ class CheckContent(unittest.TestCase):
 
     def test_a_section_named_after_the_word_readme_is_read_too(self):
         root = self.fixture()
-        line = self.append(root, '(README "One worker run" and README "Gone")')
+        line = self.append(root, '(README "One unit" and README "Gone")')
         code, out = run_check(root)
         self.assertEqual(code, 1, out)
         self.assertIn(f'unknown_readme_section@content/{TARGET}:{line}: "Gone"', out)

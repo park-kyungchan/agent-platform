@@ -6,18 +6,8 @@ use serde::Serialize;
 const HELP: &str = "Usage: ap <verb> [< request.json]\n";
 /// Every verb the dispatch below knows: the verb, its request form, the heading of the section of
 /// `crates/ap/README.md` that documents it. `ap --help` prints one line of this table per verb.
-const VERBS: [(&str, &str, &str); 8] = [
-    (
-        "pane",
-        "pane [--exports|--focused|--resume-candidate]",
-        "The older verbs",
-    ),
+const VERBS: [(&str, &str, &str); 6] = [
     ("version", "version | --version", "The older verbs"),
-    (
-        "work",
-        "work <start|wait|close> < request.json",
-        "One worker run",
-    ),
     ("run", "run < request.json", "One stage"),
     ("gate", "gate < request.json", "The gate"),
     (
@@ -31,7 +21,6 @@ const VERBS: [(&str, &str, &str); 8] = [
 fn verb_line(verb: &str, form: &str, heading: &str) -> String {
     format!("  {verb}: ap {form} (README \"{heading}\")\n")
 }
-const WORK_HELP: &str = "Usage: ap work <start|wait|close> < request.json\nOne JSON request; admission through ont and lifecycle through herdr.\n";
 const RUN_HELP: &str = "Usage: ap run < request.json\nOne headless Claude Code stage in a transient scope of agents.slice; one record <out>.run.json.\n";
 const GATE_HELP: &str = "Usage: ap gate < request.json\nWaits on a pull request's head for its required checks and the automatic review; one JSON answer.\n";
 const UNIT_HELP: &str = "Usage: ap unit < request.json\nOne unit of work once from its page to the merge; one record <out>.unit.json.\n";
@@ -90,15 +79,6 @@ fn main() -> ExitCode {
             Err(_) => fail("io_error", "stdout", 4),
         };
     }
-    if args.first().is_some_and(|arg| arg == "work") {
-        if args.len() == 2 && args[1] == "--help" {
-            return match io::stdout().lock().write_all(WORK_HELP.as_bytes()) {
-                Ok(()) => ExitCode::SUCCESS,
-                Err(_) => fail("io_error", "stdout", 4),
-            };
-        }
-        return ap::work::cli(&args[1..]);
-    }
     if args.first().is_some_and(|arg| arg == "review") {
         if args.len() == 2 && args[1] == "--help" {
             return match io::stdout()
@@ -146,10 +126,6 @@ fn main() -> ExitCode {
             };
         }
         return ap::deliver::cli(&args[1..]);
-    }
-    #[cfg(target_os = "linux")]
-    if args.first().is_some_and(|arg| arg == "pane") {
-        return ap::pane::cli(&args[1..]);
     }
     if args.len() == 1 && (args[0] == "--help" || args[0] == "-h") {
         let mut text = format!("{HELP}Verbs; the section is of crates/ap/README.md:\n");

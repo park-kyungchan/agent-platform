@@ -1,9 +1,6 @@
-//! The verbs of `ap`: each module is one verb's code.
+//! The verbs of `ap`: each module is one verb's code, except `host`, which the verbs share.
 
-#[cfg(target_os = "linux")]
-pub mod pane;
-
-pub mod work;
+pub mod host;
 
 pub mod review;
 

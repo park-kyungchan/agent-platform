@@ -5,8 +5,8 @@
 //! unit launcher replaced as in tests/run.rs; a virtual clock for the gate. The work root is the
 //! temporary directory's `work/` through `System::work_root`. The fake answers `gh` with JSON that
 //! holds every member the command may ask for (no `--jq`).
+use ap::host::{Answer, Failure, Host, Reply, System};
 use ap::unit::execute;
-use ap::work::{Answer, Failure, Host, Reply, System};
 use serde_json::{Value, json};
 use sha2::Digest;
 use std::{

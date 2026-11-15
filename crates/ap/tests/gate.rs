@@ -2,7 +2,7 @@
 //! recorded, and the clock is virtual (a pause moves it). Each test names the case of
 //! `await-autoreview.sh` or of the gate part of `deliver.sh` it now holds.
 use ap::gate::execute;
-use ap::work::{Answer, Failure, Reply, System};
+use ap::host::{Answer, Failure, Reply, System};
 use serde_json::{Value, json};
 use std::time::{Duration, Instant};
 

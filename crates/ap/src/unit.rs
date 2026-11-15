@@ -1,8 +1,8 @@
 //! `ap unit`: one unit of work once from its page to the merge (README "One unit"). The stages are
 //! `ap run`'s code, the gate is `ap gate`'s, the review and the status are `ap review`'s.
+use crate::host::{Failure, LIMIT, System, args, digest, error, fail, id, require, text};
 use crate::review::{self, DIFF_OPTIONS};
 use crate::run::{stamp, write};
-use crate::work::{Failure, LIMIT, System, args, digest, error, fail, id, require, text};
 use serde_json::{Value, json};
 use std::{
     ffi::OsString,
@@ -188,7 +188,7 @@ struct Rendered<'a, S> {
     bytes: Vec<u8>,
 }
 impl<S: System> System for Rendered<'_, S> {
-    fn call(&mut self, p: &str, a: &[String], i: &Value, ms: u64) -> crate::work::Answer {
+    fn call(&mut self, p: &str, a: &[String], i: &Value, ms: u64) -> crate::host::Answer {
         self.s.call(p, a, i, ms)
     }
     fn read(&self, path: &str) -> std::io::Result<Vec<u8>> {
@@ -199,9 +199,6 @@ impl<S: System> System for Rendered<'_, S> {
     }
     fn directory(&self, path: &str) -> std::io::Result<std::path::PathBuf> {
         self.s.directory(path)
-    }
-    fn exists(&self, path: &str) -> std::io::Result<bool> {
-        self.s.exists(path)
     }
     fn work_root(&self) -> std::path::PathBuf {
         self.s.work_root()

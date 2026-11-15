@@ -393,18 +393,13 @@ supplied or verdict is `abandoned`. `reviews(task)` renders newest starts first.
 `agent` may read/derive reviews and apply both actions.
 
 `worker_run.write_set` and the optional `start_worker_run.write_set` parameter
-are ordered arrays of repository-relative patterns. `ap work start` requires a
-column-1 `Write set:` line for worktree packets, split at commas and trimmed.
-It accepts 1 to 64 members whose path part is at most 297 bytes (at most 300
-bytes including optional trailing `/**`): relative paths without empty,
-`.` or `..` components or backslashes, optionally ending in `/**`, with no other
-`*`, `?` or `[` wildcard. No worktree means no write_set parameter.
-`write_pattern` checks each member against
+are ordered arrays of repository-relative patterns: relative paths without
+empty, `.` or `..` components or backslashes, optionally ending in `/**`, with
+no other `*`, `?` or `[` wildcard. `write_pattern` checks each member against
 `^[A-Za-z0-9._][A-Za-z0-9._/+@-]{0,296}(/\*\*)?$`; the schema has no
-member-count bound, so only the caller enforces the count of 64.
+member-count bound.
 Members use ASCII letters, digits and `._/+@-`, begin with a letter, digit, `.`
-or `_`, and may have a final `/**`; duplicate members and multiple column-1
-`Write set:` lines are refused. The tracked-path character check finds 0
+or `_`, and may have a final `/**`. The tracked-path character check finds 0
 incompatible paths in `agent-platform`; the Lead measured 0 in `ontology-platform`
 and 27 non-ASCII tracked paths in one directory of `education-platform`, which
 packets name by the directory and `/**`.
