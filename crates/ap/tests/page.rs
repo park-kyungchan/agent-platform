@@ -528,7 +528,7 @@ fn b3_the_members_the_page_shapes_and_the_bounds_are_accepted() {
     let mut write_set = vec!["src/**"; 39];
     write_set.push("docs/d.md");
     let b = json!({"unit": "A-z-9", "write_set": write_set,
-        "repository": "park-kyungchan/agent-platform", "branch": "ap/unit-x", "item": "k1",
+        "repository": "owner/name", "branch": "ap/unit-x", "item": "k1",
         "tier": "x".repeat(40), "merge": false,
         "checks": {"unchanged": vec!["zzz"; 40], "lines": [{"path": "nothing", "max": 0, "min": 0}],
             "adds": [{"path": "src/n.rs", "words": ["w".repeat(2000)]}],
