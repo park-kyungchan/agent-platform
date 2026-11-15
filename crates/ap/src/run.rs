@@ -529,6 +529,29 @@ fn glob(pattern: &str, line: &str) -> bool {
     }
     p[i..].iter().all(|c| *c == '*')
 }
+/// Keep a matching first line unchanged; otherwise drop whole lines only for one unique match.
+/// The returned suffix borrows the original bytes, including its line endings and final newline.
+fn answer_start<'a>(answer: &'a str, pattern: Option<&str>) -> (&'a str, usize) {
+    let Some(pattern) = pattern else {
+        return (answer, 0);
+    };
+    if glob(pattern, answer.lines().next().unwrap_or("")) {
+        return (answer, 0);
+    }
+    let mut matches = answer.lines().enumerate().filter(|(_, l)| glob(pattern, l));
+    let Some((dropped, _)) = matches.next() else {
+        return (answer, 0);
+    };
+    if matches.next().is_some() {
+        return (answer, 0);
+    }
+    let offset: usize = answer
+        .split_inclusive('\n')
+        .take(dropped)
+        .map(str::len)
+        .sum();
+    (&answer[offset..], dropped)
+}
 /// Writes through a temporary name and a rename: a reader never sees half a file.
 /// The temporary name is unique per write and created exclusively, so it is never a file of
 /// another run (whose `out` may be any name).
@@ -717,6 +740,7 @@ fn judge(
         record["session"] = json!(id);
     }
     let answer = e["result"].as_str().unwrap_or("");
+    let (answer, dropped) = answer_start(answer, q.expect_line.as_deref());
     if cut(seen, e) {
         "cut"
     } else if e["is_error"] == true {
@@ -729,6 +753,9 @@ fn judge(
         record["unmet"] = json!("write");
         "failed"
     } else {
+        if dropped > 0 {
+            record["answer_dropped_lines"] = json!(dropped);
+        }
         record["answer"] = json!({"path": q.out, "sha256": digest(answer.as_bytes())});
         let first = answer.lines().next().unwrap_or("");
         if q.expect_file
@@ -781,6 +808,7 @@ fn cut(seen: &Seen, e: &Value) -> bool {
 fn chosen<'a>(q: &Request, seen: &'a Seen) -> Option<&'a Value> {
     let meets = |e: &&Value| {
         let answer = e["result"].as_str().unwrap_or("");
+        let (answer, _) = answer_start(answer, q.expect_line.as_deref());
         e["is_error"] != true
             && !answer.is_empty()
             && !cut(seen, e)

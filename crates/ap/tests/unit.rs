@@ -1132,6 +1132,104 @@ fn i4_the_gate_step_names_the_state_of_lead_review() {
 
 // ---- I8 one verdict of a model per accept ------------------------------------------------------
 
+#[test]
+fn p2_head_line_with_a_label_is_the_head() {
+    for line in ["Head: %s", "`%s`", ":%s:", "head_%s_suffix", "«%s»"] {
+        let mut u = U::new();
+        u.script(
+            "a2",
+            &format!("printf 'Verdict: accept\\n{line}\\nno finding' \"$(git rev-parse HEAD)\""),
+        );
+        let mut r = u.request();
+        r["merge"] = json!(false);
+        let (first, code) = u.run(&r).unwrap();
+        assert_eq!(
+            (first["state"].as_str(), code),
+            (Some("accepted"), 0),
+            "{line}: {first}"
+        );
+        assert_eq!(u.store("close_review").len(), 1);
+        // The same labeled report is also valid on a come-back with `verdict`.
+        r.as_object_mut().unwrap().remove("verifier");
+        r["pull_request"] = json!(7);
+        r["verdict"] = json!(u.p("work/task/u1.verifier.md"));
+        r["out"] = json!(u.p("work/task/u2"));
+        let launches = u.launches;
+        let (v, code) = u.run(&r).unwrap();
+        assert_eq!(
+            (v["state"].as_str(), code),
+            (Some("accepted"), 0),
+            "{line}: {v}"
+        );
+        assert_eq!(v["review"], first["review"]);
+        assert_eq!(u.launches, launches);
+    }
+}
+
+#[test]
+fn p2_head_line_with_two_hex_runs_or_another_head_differs() {
+    let other = "0".repeat(40);
+    for line in [
+        format!("%s {other}"),
+        "%s %s".to_owned(),
+        "%s0".to_owned(),
+        "0%s".to_owned(),
+        "g%s".to_owned(),
+        "%sZ".to_owned(),
+        "é%s".to_owned(),
+        "%sé".to_owned(),
+        other,
+        "no head".to_owned(),
+    ] {
+        let mut u = U::new();
+        let expanded = line.replace("%s", "$h");
+        u.script(
+            "a2",
+            &format!("h=$(git rev-parse HEAD); printf 'Verdict: accept\\n%s\\n' \"{expanded}\""),
+        );
+        let v = u.stop(&u.request(), "verifier", "verdict_head_differs");
+        assert!(u.store("start_review").is_empty());
+        // Admission of the existing report succeeds, then the same parser rejects its head.
+        let mut r = u.request();
+        r.as_object_mut().unwrap().remove("verifier");
+        r["pull_request"] = json!(7);
+        r["verdict"] = json!(u.p("work/task/u1.verifier.md"));
+        r["out"] = json!(u.p("work/task/u2"));
+        let launches = u.launches;
+        let (come_back, code) = u.run(&r).unwrap();
+        assert_eq!(
+            (come_back["cause"].as_str(), code),
+            (Some("verdict_head_differs"), 3),
+            "{line}: {come_back}"
+        );
+        assert_eq!(come_back["stopped_at"], v["stopped_at"]);
+        assert_eq!(u.launches, launches);
+        assert!(
+            u.store("start_review").is_empty() && u.statuses().is_empty() && u.merges().is_empty()
+        );
+    }
+}
+
+#[test]
+fn p2_a_repair_after_a_preamble_stays_a_repair() {
+    for verdict in ["repair", "accept is not possible", "accepted", "accept "] {
+        let mut u = U::new();
+        u.script("a2", &format!("printf 'I have read the change.\\n\\nVerdict: {verdict}\\nHead: %s\\nbody' \"$(git rev-parse HEAD)\""));
+        let cause = if verdict == "repair" {
+            "verdict_repair"
+        } else {
+            "verdict_unreadable"
+        };
+        let v = u.stop(&u.request(), "verifier", cause);
+        let rec = stage_record(&v["stages"]["verifier"]);
+        assert_eq!(rec["state"], "ok");
+        assert_eq!(rec["answer_dropped_lines"], 2);
+        let answer = std::fs::read_to_string(u.p("work/task/u1.verifier.md")).unwrap();
+        assert!(answer.starts_with(&format!("Verdict: {verdict}\n")));
+        assert!(u.store("start_review").is_empty() && u.store("close_review").is_empty());
+    }
+}
+
 /// Writes `<verdict>.run.json` as `ap run` writes a reviewer's record and returns it.
 fn reviewer_record(u: &U, verdict: &str, prompt: &str) -> Value {
     let (v, p) = (u.p(verdict), u.p(prompt));
