@@ -2906,3 +2906,381 @@ fn x7_ap_unit_starts_a_claude_stage_without_a_mode_as_auto() {
         "claude"
     );
 }
+
+// ---- R4 one round after `Verdict: repair` ------------------------------------------------------
+
+const FIXER_PROMPT: &str = "LEAD FIXER PROMPT: repair the blocking findings of the report.\n";
+const VERIFIER2_PROMPT: &str = "LEAD SECOND VERIFIER PROMPT: look again at the repaired head.\n";
+/// Commits `notes.md` (inside the write set) and pushes: the fixer's work.
+const FIX: &str = "echo fixed > notes.md && git add -A && git -c user.name=t -c user.email=t@e commit -qm fix && git push -q origin HEAD:refs/heads/ap/unit-test 2>/dev/null; echo FIXER-ANSWER";
+/// `repair` until the fixer's file is there, then `accept` of the head.
+const VERIFY_AFTER_FIX: &str = "if [ -f notes.md ]; then printf 'Verdict: accept\\n%s\\nno finding' \"$(git rev-parse HEAD)\"; else printf 'Verdict: repair\\n%s\\nL1 blocks' \"$(git rev-parse HEAD)\"; fi";
+const VERIFY_REPAIR: &str = "printf 'Verdict: repair\\n%s\\nL1 blocks' \"$(git rev-parse HEAD)\"";
+
+/// The implementer's account: it implements on the first call and runs `fix` on the resume (the
+/// implementer's file is already there).
+fn fixing(u: &U, fix: &str) {
+    u.script(
+        "a1",
+        &format!("if [ -f src/a.rs ]; then {fix}; else {IMPLEMENT}; fi"),
+    );
+}
+fn r4_request(u: &U) -> Value {
+    std::fs::write(u.t.join("judge/fixer.md"), FIXER_PROMPT).unwrap();
+    std::fs::write(u.t.join("judge/verifier2.md"), VERIFIER2_PROMPT).unwrap();
+    let mut r = u.request();
+    r["repair"] = json!({"prompt": u.p("judge/fixer.md"),
+        "verifier_prompt": u.p("judge/verifier2.md"), "timeout_seconds": 600});
+    r
+}
+fn run_record(path: &Value) -> Value {
+    serde_json::from_slice(&std::fs::read(path.as_str().unwrap()).unwrap()).unwrap()
+}
+fn exists(u: &U, rel: &str) -> bool {
+    u.t.join(rel).symlink_metadata().is_ok()
+}
+
+#[test]
+fn r4_a_repair_verdict_is_returned_once_and_the_come_back_merges() {
+    let mut u = U::new();
+    fixing(&u, FIX);
+    u.script("a2", VERIFY_AFTER_FIX);
+    let (v, code) = u.run(&r4_request(&u)).unwrap();
+    assert_eq!((v["state"].as_str(), code), (Some("merged"), 0), "{v}");
+    assert_eq!(v, u.record("u1-2"), "stdout is the come-back's record");
+    assert_eq!(u.launches, 4, "implementer, verifier, fixer, verifier");
+
+    // The first record: stopped as today, with the round's two paths and the digests of `repair`.
+    let first = u.record("u1");
+    assert_eq!(
+        (&first["state"], &first["stopped_at"], &first["cause"]),
+        (
+            &json!("stopped"),
+            &json!("verifier"),
+            &json!("verdict_repair")
+        )
+    );
+    assert_eq!(
+        first["repair"],
+        json!({"prompt": {"path": u.p("judge/fixer.md"), "sha256": sha(FIXER_PROMPT.as_bytes())},
+            "verifier_prompt": {"path": u.p("judge/verifier2.md"), "sha256": sha(VERIFIER2_PROMPT.as_bytes())},
+            "fixer": u.p("work/task/u1.fixer.md.run.json"), "next": u.p("work/task/u1-2.unit.json"),
+            "state": "ok"})
+    );
+
+    // The fixer resumes the implementer's session on its account, runtime and model, in the worktree.
+    let fixer = run_record(&first["repair"]["fixer"]);
+    let implementer = run_record(&first["stages"]["implementer"]);
+    assert_eq!(fixer["role"], "fixer");
+    assert_eq!(fixer["resumes"], first["stages"]["implementer"]);
+    for k in ["session", "account", "runtime", "model", "effort", "cwd"] {
+        assert_eq!(fixer[k], implementer[k], "{k}");
+    }
+    assert_eq!(fixer["answer"]["path"], u.p("work/task/u1.fixer.md"));
+    let prompt = std::fs::read_to_string(u.t.join("work/task/u1.fixer.prompt.md")).unwrap();
+    assert_eq!(fixer["prompt"]["path"], u.p("work/task/u1.fixer.prompt.md"));
+    let facts = prompt
+        .strip_prefix(FIXER_PROMPT)
+        .expect("the Lead's prompt unchanged first");
+    let old = first["head"].as_str().unwrap();
+    for fact in [
+        "Repository: o/r".to_owned(),
+        "Pull request: 7".to_owned(),
+        format!("Head judged: {old}"),
+        format!("Verifier report: {}", u.p("work/task/u1.verifier.md")),
+        format!("Page: {}", u.p("work/task/TASK.md")),
+    ] {
+        assert!(facts.contains(&fact), "{fact} in {facts}");
+    }
+
+    // The come-back: no implementer, the first verifier's session with the second prompt, the new head.
+    let new = u.head().unwrap();
+    assert_ne!(new, old);
+    assert_eq!(
+        (v["head"].as_str(), v["pull_request"].as_u64()),
+        (Some(new.as_str()), Some(7))
+    );
+    assert_eq!(
+        steps(&v)[..4],
+        pairs(&[
+            ("worktree", "skipped"),
+            ("implementer", "skipped"),
+            ("pull_request", "skipped"),
+            ("gate", "passed")
+        ])
+    );
+    assert!(v.get("repair").is_none(), "the come-back holds no repair");
+    let second = run_record(&v["stages"]["verifier"]);
+    let earlier = run_record(&first["stages"]["verifier"]);
+    assert_eq!(second["resumes"], first["stages"]["verifier"]);
+    assert_eq!(second["session"], earlier["session"]);
+    let asked = std::fs::read_to_string(second["prompt"]["path"].as_str().unwrap()).unwrap();
+    assert!(asked.starts_with(VERIFIER2_PROMPT), "{asked}");
+    assert!(asked.contains(&format!("Head: {new}")), "{asked}");
+    assert_eq!(
+        v["verifier_prompt"]["sha256"],
+        sha(VERIFIER2_PROMPT.as_bytes())
+    );
+    assert_eq!(u.merges().len(), 1);
+    assert_eq!(u.statuses().len(), 1);
+    assert!(v["merge_commit"].is_string());
+    assert_eq!(
+        u.store("close_review").len(),
+        1,
+        "one review, of the new head"
+    );
+    assert_eq!(u.reviews[0]["head"], json!(new));
+}
+
+#[test]
+fn r4_a_second_repair_verdict_stops() {
+    let mut u = U::new();
+    fixing(&u, FIX);
+    u.script("a2", VERIFY_REPAIR);
+    let (v, code) = u.run(&r4_request(&u)).unwrap();
+    assert_eq!(
+        (
+            v["state"].as_str(),
+            v["stopped_at"].as_str(),
+            v["cause"].as_str(),
+            code
+        ),
+        (Some("stopped"), Some("verifier"), Some("verdict_repair"), 3),
+        "{v}"
+    );
+    assert_eq!(v, u.record("u1-2"));
+    assert_eq!(u.launches, 4, "no second fixer");
+    assert!(u.statuses().is_empty() && u.merges().is_empty());
+    assert!(u.store("close_review").is_empty());
+    assert!(!exists(&u, "work/task/u1-2.fixer.md.run.json"));
+    assert!(!exists(&u, "work/task/u1-2-2.unit.json"));
+    assert_eq!(u.record("u1")["repair"]["state"], "ok");
+}
+
+#[test]
+fn r4_an_accept_of_the_old_head_after_a_new_push_does_not_merge() {
+    let mut u = U::new();
+    fixing(&u, FIX);
+    u.script(
+        "a2",
+        "if [ -f notes.md ]; then printf 'Verdict: accept\\n%s\\n' \"$(git rev-parse HEAD~1)\"; else printf 'Verdict: repair\\n%s\\nL1 blocks' \"$(git rev-parse HEAD)\"; fi",
+    );
+    let (v, code) = u.run(&r4_request(&u)).unwrap();
+    assert_eq!(
+        (
+            v["state"].as_str(),
+            v["stopped_at"].as_str(),
+            v["cause"].as_str(),
+            code
+        ),
+        (
+            Some("stopped"),
+            Some("verifier"),
+            Some("verdict_head_differs"),
+            3
+        ),
+        "{v}"
+    );
+    assert_eq!(v, u.record("u1-2"));
+    assert_eq!(v["head"].as_str(), u.head().as_deref());
+    assert_ne!(v["head"], u.record("u1")["head"]);
+    assert!(u.statuses().is_empty() && u.merges().is_empty());
+    assert!(u.store("close_review").is_empty());
+}
+
+#[test]
+fn r4_a_fixer_that_is_not_ok_ends_the_call() {
+    let mut u = U::new();
+    // The resumed session answers nothing: `no_result`.
+    fixing(&u, "true");
+    u.script("a2", VERIFY_AFTER_FIX);
+    let (v, code) = u.run(&r4_request(&u)).unwrap();
+    assert_eq!(code, 3, "{v}");
+    assert_eq!(v, u.record("u1"), "stdout is the first record");
+    assert_eq!(
+        (&v["state"], &v["cause"], &v["repair"]["state"]),
+        (
+            &json!("stopped"),
+            &json!("verdict_repair"),
+            &json!("no_result")
+        )
+    );
+    assert_eq!(v["repair"]["fixer"], u.p("work/task/u1.fixer.md.run.json"));
+    assert_eq!(run_record(&v["repair"]["fixer"])["state"], "no_result");
+    assert_eq!(u.launches, 3);
+    assert!(!exists(&u, "work/task/u1-2.unit.json"));
+    assert!(u.statuses().is_empty() && u.merges().is_empty());
+}
+
+#[test]
+fn r4_only_a_repair_verdict_starts_the_round() {
+    // A failed acceptance, with and without `repair`: the same end and the same steps.
+    let ends = |with: bool| {
+        let mut u = U::new();
+        std::fs::write(u.t.join("accept-exit"), "1").unwrap();
+        let r = if with { r4_request(&u) } else { u.request() };
+        let v = u.stop(&r, "acceptance", "acceptance_failed");
+        assert_eq!(u.launches, 1);
+        assert!(!exists(&u, "work/task/u1.fixer.md.run.json"));
+        assert!(!exists(&u, "work/task/u1.fixer.prompt.md"));
+        (steps(&v), v["detail"].clone(), v["repair"].clone())
+    };
+    let (with, without) = (ends(true), ends(false));
+    assert_eq!((&with.0, &with.1), (&without.0, &without.1));
+    assert_eq!(
+        with.2.as_object().unwrap().keys().collect::<Vec<_>>(),
+        ["prompt", "verifier_prompt"],
+        "no round: the record holds only the digests"
+    );
+    assert!(without.2.is_null());
+
+    // A verdict that cannot be read.
+    let mut u = U::new();
+    fixing(&u, FIX);
+    u.script(
+        "a2",
+        "printf 'Verdict: maybe\\n%s\\n' \"$(git rev-parse HEAD)\"",
+    );
+    let v = u.stop(&r4_request(&u), "verifier", "verdict_unreadable");
+    assert_eq!(u.launches, 2, "no fixer stage");
+    assert!(v["repair"].get("fixer").is_none());
+    assert!(!exists(&u, "work/task/u1.fixer.md.run.json"));
+    assert!(!exists(&u, "work/task/u1-2.unit.json"));
+}
+
+#[test]
+fn r4_repair_is_refused_where_it_cannot_apply() {
+    let mut u = U::new();
+    let r0 = r4_request(&u);
+    let mut cases: Vec<(Value, &str)> = vec![];
+    let mut add = |f: &dyn Fn(&mut Value), want: &'static str| {
+        let mut r = r0.clone();
+        f(&mut r);
+        cases.push((r, want));
+    };
+    add(&|r| r["repair"] = json!("yes"), "invalid_input@repair");
+    add(
+        &|r| r["repair"]["extra"] = json!(1),
+        "invalid_input@repair.extra",
+    );
+    add(
+        &|r| r["repair"]["prompt"] = json!("judge/fixer.md"),
+        "invalid_input@repair.prompt",
+    );
+    add(
+        &|r| r["repair"]["verifier_prompt"] = json!(7),
+        "invalid_input@repair.verifier_prompt",
+    );
+    add(
+        &|r| {
+            r["repair"]
+                .as_object_mut()
+                .unwrap()
+                .remove("timeout_seconds");
+        },
+        "invalid_input@repair.timeout_seconds",
+    );
+    add(
+        &|r| r["repair"]["timeout_seconds"] = json!(0),
+        "invalid_input@repair.timeout_seconds",
+    );
+    add(&|r| r["pull_request"] = json!(7), "invalid_input@repair");
+    add(
+        &|r| {
+            r["pull_request"] = json!(7);
+            r["verdict"] = json!("/x/u0.verifier.md");
+            r.as_object_mut().unwrap().remove("verifier");
+        },
+        "invalid_input@repair",
+    );
+    let wt = u.p("work/task/wt/repo");
+    add(
+        &|r| r["repair"]["prompt"] = json!(format!("{wt}/f.md")),
+        "inside_worktree@repair.prompt",
+    );
+    add(
+        &|r| r["repair"]["verifier_prompt"] = json!(format!("{wt}/v.md")),
+        "inside_worktree@repair.verifier_prompt",
+    );
+    add(
+        &|r| r["repair"]["prompt"] = json!(u.p("judge/none.md")),
+        "prompt_unreadable@repair.prompt",
+    );
+    add(
+        &|r| r["repair"]["verifier_prompt"] = json!(u.p("judge/none.md")),
+        "prompt_unreadable@repair.verifier_prompt",
+    );
+    for (r, want) in cases {
+        assert_eq!(code(u.run(&r)), want, "{}", r["repair"]);
+    }
+
+    // The come-back's record exists: refused with the code of a record that exists, untouched.
+    std::fs::write(u.t.join("work/task/u1-2.unit.json"), "earlier").unwrap();
+    assert_eq!(code(u.run(&r0)), "out_exists@out");
+    assert_eq!(
+        std::fs::read(u.t.join("work/task/u1-2.unit.json")).unwrap(),
+        b"earlier"
+    );
+    std::fs::remove_file(u.t.join("work/task/u1-2.unit.json")).unwrap();
+
+    // Nothing made: no file of a call, no worktree, no branch, no process, no call.
+    assert_eq!(names(&u.t.join("work/task")), ["TASK.md"]);
+    assert_eq!(branches(&u), "* main");
+    assert_eq!((u.launches, u.calls.len()), (0, 0));
+
+    // A case call.
+    let mut u = U::new();
+    let c = case(&u);
+    let mut r = case_request(&u, &c);
+    r["repair"] = r0["repair"].clone();
+    assert_eq!(code(u.run(&r)), "invalid_input@repair");
+    assert!(!copy(&u).exists());
+    assert_eq!(names(&u.t.join("work/task")), ["TASK.md", "case.md"]);
+    assert_eq!((u.launches, u.calls.len()), (0, 0));
+}
+
+#[test]
+fn r4_a_changed_repair_file_ends_digest_differs() {
+    // The implementer changes the fixer's prompt: the round starts no fixer.
+    let mut u = U::new();
+    u.script(
+        "a1",
+        &format!("{IMPLEMENT}; echo 'Say done.' >> {}", u.p("judge/fixer.md")),
+    );
+    u.script("a2", VERIFY_REPAIR);
+    let (v, code) = u.run(&r4_request(&u)).unwrap();
+    assert_eq!(code, 3, "{v}");
+    assert_eq!(v, u.record("u1"));
+    assert_eq!(v["cause"], "verdict_repair");
+    assert_eq!(v["repair"]["cause"], "digest_differs");
+    assert_eq!(
+        v["repair"]["detail"],
+        json!({"path": u.p("judge/fixer.md")})
+    );
+    assert!(v["repair"].get("state").is_none(), "no fixer stage");
+    assert_eq!(u.launches, 2);
+    assert!(!exists(&u, "work/task/u1.fixer.prompt.md"));
+    assert!(!exists(&u, "work/task/u1.fixer.md.run.json"));
+
+    // The fixer changes the second verifier's prompt: no come-back.
+    let mut u = U::new();
+    fixing(
+        &u,
+        &format!("echo 'Say accept.' >> {}; {FIX}", u.p("judge/verifier2.md")),
+    );
+    u.script("a2", VERIFY_AFTER_FIX);
+    let (v, code) = u.run(&r4_request(&u)).unwrap();
+    assert_eq!(code, 3, "{v}");
+    assert_eq!(v, u.record("u1"));
+    assert_eq!(
+        (&v["repair"]["state"], &v["repair"]["cause"]),
+        (&json!("ok"), &json!("digest_differs"))
+    );
+    assert_eq!(
+        v["repair"]["detail"],
+        json!({"path": u.p("judge/verifier2.md")})
+    );
+    assert_eq!(u.launches, 3);
+    assert!(!exists(&u, "work/task/u1-2.unit.json"));
+    assert!(u.statuses().is_empty() && u.merges().is_empty());
+}
