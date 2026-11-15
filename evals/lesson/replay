@@ -178,10 +178,10 @@ def parse_get(ans):
         return None
     got = {}
     for f in fields:
-        if isinstance(f, dict) and f.get("field") in FIELDS and isinstance(f.get("before"), dict) and isinstance(f["before"].get("value"), str) \
-                and isinstance(f.get("target"), dict) and f["field"] not in got:
-            if not all(isinstance(f["target"].get(k, ""), str) for k in ("studentId", "membershipId", "recordId", "courseId", "lessonDate")):
-                return None
+        if isinstance(f, dict) and isinstance(f.get("field"), str) and f["field"] in FIELDS and isinstance(f.get("before"), dict) \
+                and isinstance(f["before"].get("value"), str) and isinstance(f.get("target"), dict):
+            if f["field"] in got or not all(isinstance(f["target"].get(k, ""), str) for k in ("studentId", "membershipId", "recordId", "courseId", "lessonDate")):
+                return None  # a field named twice, or a target member of another type
             got[f["field"]] = (f["before"]["value"], f["target"])
     if set(got) != set(FIELDS):
         return None

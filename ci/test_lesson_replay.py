@@ -355,11 +355,17 @@ class Replay(unittest.TestCase):
         handle = answer(base(4))
         handle["authoringHandle"]["observationHandle"] = {"a": 1}
         self.make(L, 4, ans=handle)
+        tag = answer(base(5))
+        tag["fields"][0]["field"] = ["a", "list"]  # an unhashable field name
+        self.make(L, 5, ans=tag)
+        twice = answer(base(6))
+        twice["fields"].append(dict(twice["fields"][0]))  # one field named twice
+        self.make(L, 6, ans=twice)
         self.write(L, "b.jsonl")
         out = self.ok()
-        self.assertEqual(out["calls"], 4)
+        self.assertEqual(out["calls"], 6)
         self.assertEqual(out["outcomes"]["compared"], 1)
-        self.assertEqual(out["outcomes"]["malformed"], 3)
+        self.assertEqual(out["outcomes"]["malformed"], 5)
         self.assertEqual(set(out), {"status", "days", "calls", "outcomes", "answered_equal", "fields", "keys", "store", "k3_equal", "k3_of"})
 
     def test_point7_schema_without_members_ends_before_any_read(self):
