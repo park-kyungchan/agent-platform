@@ -48,6 +48,10 @@ case "$mode" in
            init; python3 -I -c 'import sys; sys.stdout.write(("x" * 1023 + "\n") * 40960)'; result false 'Verdict: accept\nafter 40 MiB' 1 ;;
   nonl)    # the last result line has no newline
            init; result false 'Verdict: accept' 1 | tr -d '\n' ;;
+  raw)     # the stream is the file `raw-<account basename>`, line for line (tests/run.rs)
+           init; cat "$here/raw-$(basename "$CLAUDE_CONFIG_DIR")" ;;
+  vanish)  # a cut after work; the program then disappears, so a next launch cannot start
+           init; tool; rejected; result true 'You have hit your 5-hour limit · resets 6:30pm (UTC)' 9; rm -f "$here/claude" ;;
   limit1)  init; rejected; result true 'You have hit your 5-hour limit · resets 6:30pm (UTC)' 1 ;;
   limit45) init; tool; rejected; result true 'You have hit your 5-hour limit · resets 6:30pm (UTC)' 45 ;;
   watch)   # the record as it is while the CLI runs

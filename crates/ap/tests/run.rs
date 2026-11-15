@@ -288,6 +288,8 @@ fn a1_answer_is_saved_byte_for_byte_and_the_record_has_every_member() {
         "expect_met",
         "unmet",
         "resumes",
+        "limit",
+        "attempts",
     ];
     want.sort_unstable();
     assert_eq!(keys, want);
@@ -565,9 +567,10 @@ fn a1_reviewer_cut_after_work_goes_to_the_next_account() {
     assert_eq!(f.calls().len(), 1);
 }
 
-/// A1: an implementer or a fixer cut after a tool ran stays cut: no session on the next account.
+/// A1: an implementer or a fixer cut after a tool ran goes on at the next account (CUT1), as a
+/// new session.
 #[test]
-fn a1_implementer_cut_after_work_stays_cut() {
+fn a1_implementer_cut_after_work_goes_to_the_next_account() {
     let mut f = Fake::new();
     for (role, out) in [("implementer", "im.md"), ("fixer", "fx.md")] {
         f.reset_calls();
@@ -576,11 +579,11 @@ fn a1_implementer_cut_after_work_stays_cut() {
         r["next_accounts"] = json!([f.p("a2")]);
         f.mode("a1", "limit45");
         let (v, status) = f.run(&r).unwrap();
-        assert_eq!((status, v["state"].as_str()), (75, Some("cut")), "{role}");
-        assert_eq!(f.calls().len(), 1, "{role}");
-        assert_eq!(v["account"], f.p("a1"));
-        assert!(!Path::new(&f.p(out)).exists());
-        assert!(v["session"].is_string());
+        assert_eq!((status, v["state"].as_str()), (0, Some("ok")), "{role}");
+        assert_eq!(f.calls().len(), 2, "{role}");
+        assert_eq!(v["account"], f.p("a2"));
+        assert!(Path::new(&f.p(out)).exists());
+        assert!(!f.calls()[1].contains("--resume"));
     }
 }
 
@@ -592,10 +595,9 @@ fn a2_cut_after_work_resume_and_an_existing_out_refuses() {
     let mut f = Fake::new();
     let mut r = f.request("v.md");
     r["role"] = json!("implementer");
-    r["next_accounts"] = json!([f.p("a2")]);
-    // (b) a cut after work, of an implementer (a reviewer's goes on at the next account: see
-    // `a1_reviewer_cut_after_work_goes_to_the_next_account`): exit 75, no answer, a resume record,
-    // the next account is NOT tried.
+    // (b) a cut after work, of an implementer with no next account (with one, the call goes on
+    // there: see `a1_implementer_cut_after_work_goes_to_the_next_account`): exit 75, no answer,
+    // a resume record.
     f.mode("a1", "limit45");
     let (v, status) = f.run(&r).unwrap();
     assert_eq!((status, v["state"].as_str()), (75, Some("cut")));
@@ -2551,4 +2553,419 @@ fn v1_p5_an_error_and_a_cut_end_as_today() {
     );
     let (v, status) = f.run(&f.typed("cut.md")).unwrap();
     assert_eq!((status, v["state"].as_str()), (75, Some("cut")), "{v}");
+}
+
+// ---- CUT1: `limit` and `attempts` of the record, and the continuation ------------------------
+
+/// The text a launch after a launch that worked and was cut gets before the prompt's bytes.
+const CONTINUATION: &str = "A session of this stage on another account was cut by a usage limit after it had begun to work. This directory may hold its work, committed or not. First read the state it left: in a Git worktree `git status`, `git log --oneline origin/main..HEAD` and `git diff HEAD`. Keep what serves the task, do not start over, and go on until the task below is done.\n\n";
+/// The event as the CLI printed it in a stage that ended ok (2026-11-15): `overageStatus` is
+/// `rejected` while the limit's status is `allowed`.
+const ALLOWED: &str = r#"{"type":"rate_limit_event","rate_limit_info":{"status":"allowed","resetsAt":1794772800,"rateLimitType":"five_hour","overageStatus":"rejected","overageDisabledReason":"org_level_disabled","isUsingOverage":false,"unifiedWindows":{"five_hour":{"utilization":0.3,"resetsAt":1794772800,"status":"allowed"},"seven_day":{"utilization":0.48,"resetsAt":1795244400,"status":"allowed"}}},"uuid":"u","session_id":"s"}"#;
+const FINISHED: &str = r#"{"type":"result","subtype":"success","is_error":false,"num_turns":1,"result":"Verdict: accept\nok","session_id":"s","usage":{"input_tokens":1,"output_tokens":1},"permission_denials":[]}"#;
+
+impl Fake {
+    /// A stage whose stream on `account` is `lines`, then a finished answer.
+    fn stream(&self, account: &str, lines: &[&str]) {
+        let mut text = lines.join("\n");
+        text.push('\n');
+        text.push_str(FINISHED);
+        std::fs::write(self.t.join(format!("bin/raw-{account}")), text).unwrap();
+        self.mode(account, "raw");
+    }
+    /// The record's `limit` of a stage on `account` whose stream is `lines`, then a finished answer.
+    fn limit_of(&mut self, out: &str, lines: &[&str]) -> Value {
+        self.stream("a1", lines);
+        let (v, status) = self.run(&self.request(out)).unwrap();
+        assert_eq!((status, v["state"].as_str()), (0, Some("ok")), "{v}");
+        assert_eq!(v["attempts"][0]["limit"], v["limit"]);
+        v["limit"].clone()
+    }
+    /// The number of calls the fake has had.
+    fn count_now(&self) -> usize {
+        std::fs::read_to_string(self.t.join("bin/count")).map_or(0, |c| c.trim().parse().unwrap())
+    }
+    /// What the fake's `n`-th call (counted from 1) got on stdin.
+    fn input(&self, n: usize) -> Vec<u8> {
+        std::fs::read(self.t.join(format!("bin/prompt.{n}"))).unwrap()
+    }
+    fn with_next(&self, role: &str, out: &str, next: &[&str]) -> Value {
+        let mut r = self.request(out);
+        r["role"] = json!(role);
+        r["next_accounts"] = json!(next.iter().map(|a| self.p(a)).collect::<Vec<_>>());
+        r
+    }
+}
+
+#[test]
+fn cut1_limit_of_an_allowed_event_with_windows_ignores_overage_status() {
+    let mut f = Fake::new();
+    let limit = f.limit_of("l.md", &[ALLOWED]);
+    assert_eq!(
+        limit,
+        json!({"status": "allowed", "kind": "five_hour", "resets_at": 1794772800_u64,
+            "windows": {
+                "five_hour": {"status": "allowed", "utilization": 0.3, "resets_at": 1794772800_u64},
+                "seven_day": {"status": "allowed", "utilization": 0.48, "resets_at": 1795244400_u64}}})
+    );
+    // The `overageStatus` of the event is no status and no cut.
+    assert!(!limit.to_string().contains("overage") && !limit.to_string().contains("rejected"));
+    // The last event of the stream is the one read: its utilization is the later one.
+    let later = ALLOWED.replace("0.3", "0.5");
+    let limit = f.limit_of("l2.md", &[ALLOWED, &later]);
+    assert_eq!(limit["windows"]["five_hour"]["utilization"], 0.5);
+}
+
+#[test]
+fn cut1_limit_of_an_event_without_the_undocumented_members_and_odd_types() {
+    let mut f = Fake::new();
+    let bare = r#"{"type":"rate_limit_event","rate_limit_info":{"status":"allowed_warning"}}"#;
+    let limit = f.limit_of("b.md", &[bare]);
+    assert_eq!(
+        limit,
+        json!({"status": "allowed_warning", "kind": null, "resets_at": null, "windows": {}})
+    );
+    // Members of another shape are null, never copied: a negative or fractional `resetsAt`, a
+    // text `utilization`, a window that is no object, an event with no info at all.
+    let odd = r#"{"type":"rate_limit_event","rate_limit_info":{"status":7,"resetsAt":-5,"rateLimitType":false,"unifiedWindows":{"a":3,"b":{"status":null,"utilization":"high","resetsAt":1.5}}}}"#;
+    let limit = f.limit_of("o.md", &[odd]);
+    assert_eq!(
+        limit,
+        json!({"status": null, "kind": null, "resets_at": null,
+            "windows": {"b": {"status": null, "utilization": null, "resets_at": null}}})
+    );
+    let none = r#"{"type":"rate_limit_event"}"#;
+    let limit = f.limit_of("n.md", &[none]);
+    assert_eq!(
+        limit,
+        json!({"status": null, "kind": null, "resets_at": null, "windows": {}})
+    );
+    // At most eight windows, taken in the order of their names, objects only.
+    let names: Vec<String> = (0..10)
+        .rev()
+        .map(|n| format!("\"w{n}\":{{\"status\":\"allowed\"}}"))
+        .collect();
+    let many = format!(
+        r#"{{"type":"rate_limit_event","rate_limit_info":{{"status":"allowed","unifiedWindows":{{"a":1,{}}}}}}}"#,
+        names.join(",")
+    );
+    let limit = f.limit_of("m.md", &[&many]);
+    let keys: Vec<&str> = limit["windows"]
+        .as_object()
+        .unwrap()
+        .keys()
+        .map(String::as_str)
+        .collect();
+    assert_eq!(keys, ["w0", "w1", "w2", "w3", "w4", "w5", "w6", "w7"]);
+}
+
+#[test]
+fn cut1_a_rejected_event_is_kept_when_an_allowed_one_follows() {
+    let mut f = Fake::new();
+    let rejected = r#"{"type":"rate_limit_event","rate_limit_info":{"status":"rejected","resetsAt":1794780000,"rateLimitType":"five_hour"}}"#;
+    let later_rejected = rejected.replace("1794780000", "1794790000");
+    let limit = f.limit_of("r.md", &[ALLOWED, rejected, ALLOWED]);
+    assert_eq!(
+        (limit["status"].as_str(), limit["resets_at"].as_u64()),
+        (Some("rejected"), Some(1794780000))
+    );
+    // Of several rejected events, the last.
+    let limit = f.limit_of("r2.md", &[rejected, ALLOWED, &later_rejected, ALLOWED]);
+    assert_eq!(limit["resets_at"], 1794790000_u64);
+}
+
+#[test]
+fn cut1_a_stream_without_the_event_has_no_limit_and_attempts_has_one_entry() {
+    let mut f = Fake::new();
+    f.mode("a1", "file");
+    let (v, status) = f.run(&f.request("z.md")).unwrap();
+    assert_eq!(status, 0, "{v}");
+    assert!(v["limit"].is_null());
+    let attempts = v["attempts"].as_array().unwrap();
+    assert_eq!(attempts.len(), 1);
+    let want = [
+        "account",
+        "session",
+        "start",
+        "end",
+        "state",
+        "worked",
+        "continued",
+        "limit",
+    ];
+    let mut keys: Vec<&str> = attempts[0]
+        .as_object()
+        .unwrap()
+        .keys()
+        .map(String::as_str)
+        .collect();
+    keys.sort_unstable();
+    let mut want = want.to_vec();
+    want.sort_unstable();
+    assert_eq!(keys, want);
+    for k in ["account", "session", "start", "end", "state"] {
+        assert_eq!(attempts[0][k], v[k], "{k}");
+    }
+    assert_eq!(attempts[0]["worked"], true);
+    assert_eq!(attempts[0]["continued"], false);
+    assert!(attempts[0]["limit"].is_null());
+    assert_eq!(f.record("z.md"), v);
+    // A launch that ran no tool says so.
+    f.mode("a1", "");
+    let (v, _) = f.run(&f.request("z2.md")).unwrap();
+    assert_eq!(v["attempts"][0]["worked"], false);
+}
+
+#[test]
+fn cut1_while_a_launch_runs_its_entry_is_last_and_running() {
+    let mut f = Fake::new();
+    std::fs::write(f.t.join("bin/watch"), f.p("w.md.run.json")).unwrap();
+    f.mode("a1", "watch");
+    let (v, _) = f.run(&f.request("w.md")).unwrap();
+    let seen: Value =
+        serde_json::from_slice(&std::fs::read(f.t.join("bin/seen.json")).unwrap()).unwrap();
+    assert!(seen["limit"].is_null());
+    let attempts = seen["attempts"].as_array().unwrap();
+    assert_eq!(attempts.len(), 1);
+    assert_eq!(attempts[0]["state"], "running");
+    assert!(attempts[0]["end"].is_null() && attempts[0]["limit"].is_null());
+    assert_eq!(
+        (
+            attempts[0]["account"].clone(),
+            attempts[0]["session"].clone()
+        ),
+        (seen["account"].clone(), seen["session"].clone())
+    );
+    assert_eq!(v["attempts"][0]["state"], "ok");
+}
+
+#[test]
+fn cut1_attempts_of_a_move_before_any_tool_ran() {
+    let mut f = Fake::new();
+    f.mode("a1", "limit1");
+    let (v, status) = f
+        .run(&f.with_next("implementer", "mv.md", &["a2"]))
+        .unwrap();
+    assert_eq!((status, v["state"].as_str()), (0, Some("ok")), "{v}");
+    let attempts = v["attempts"].as_array().unwrap();
+    assert_eq!(attempts.len(), 2);
+    assert_eq!(
+        (
+            attempts[0]["account"].clone(),
+            attempts[1]["account"].clone()
+        ),
+        (json!(f.p("a1")), json!(f.p("a2")))
+    );
+    assert_eq!(attempts[0]["state"], "cut");
+    assert_eq!(attempts[0]["worked"], false);
+    assert_eq!(attempts[0]["limit"]["status"], "rejected");
+    assert_eq!(attempts[0]["limit"]["kind"], "five_hour");
+    assert_ne!(attempts[0]["session"], attempts[1]["session"]);
+    // No tool ran before: the next launch gets the prompt alone, and the record is the last launch's.
+    assert_eq!(
+        (
+            attempts[0]["continued"].clone(),
+            attempts[1]["continued"].clone()
+        ),
+        (json!(false), json!(false))
+    );
+    assert_eq!(f.input(2), b"review this\n");
+    assert_eq!(attempts[1]["state"], "ok");
+    assert!(attempts[1]["limit"].is_null() && v["limit"].is_null());
+    for k in ["account", "session", "start", "end", "state"] {
+        assert_eq!(attempts[1][k], v[k], "{k}");
+    }
+    assert_eq!(f.record("mv.md"), v);
+}
+
+#[test]
+fn cut1_a_launch_after_work_and_a_cut_gets_the_continuation_for_an_implementer_and_a_fixer() {
+    let mut f = Fake::new();
+    for (role, out) in [("implementer", "im.md"), ("fixer", "fx.md")] {
+        f.mode("a1", "limit45");
+        let before = f.count_now();
+        let (v, status) = f.run(&f.with_next(role, out, &["a2"])).unwrap();
+        assert_eq!((status, v["state"].as_str()), (0, Some("ok")), "{role} {v}");
+        // The first launch got the prompt alone; the second the text, an empty line, the prompt.
+        assert_eq!(f.input(before + 1), b"review this\n");
+        let want = [CONTINUATION.as_bytes(), b"review this\n"].concat();
+        assert_eq!(f.input(before + 2), want, "{role}");
+        let attempts = v["attempts"].as_array().unwrap();
+        assert_eq!(attempts.len(), 2);
+        assert_eq!(
+            (
+                attempts[0]["state"].clone(),
+                attempts[0]["worked"].clone(),
+                attempts[0]["continued"].clone()
+            ),
+            (json!("cut"), json!(true), json!(false))
+        );
+        assert_eq!(attempts[0]["limit"]["status"], "rejected");
+        assert_eq!(attempts[1]["continued"], true);
+        assert_eq!(attempts[1]["account"], f.p("a2"));
+        // A new session, not a resume; the record's prompt is still the file's digest.
+        assert!(!f.calls().last().unwrap().contains("--resume"));
+        assert_eq!(v["prompt"]["sha256"], f.sha("prompt.md"));
+        assert_eq!(v["prompt"]["path"], f.p("prompt.md"));
+        assert_eq!(f.record(out), v);
+    }
+    // The text is one line of four sentences and one empty line.
+    assert_eq!(CONTINUATION.matches("\n").count(), 2);
+    assert!(CONTINUATION.ends_with(".\n\n"));
+    // No file of the call but the names a call writes.
+    let mut names: Vec<String> = std::fs::read_dir(&f.t)
+        .unwrap()
+        .map(|e| e.unwrap().file_name().into_string().unwrap())
+        .collect();
+    names.sort_unstable();
+    for n in &names {
+        assert!(
+            ["a1", "a2", "bin", "cwd", "prompt.md"].contains(&n.as_str())
+                || n.starts_with("im.md")
+                || n.starts_with("fx.md"),
+            "{n}"
+        );
+    }
+    assert!(
+        !names
+            .iter()
+            .any(|n| n.ends_with(".ap-tmp") || n.contains("continu"))
+    );
+}
+
+#[test]
+fn cut1_a_second_cut_goes_on_with_a_third_account_and_the_text_once() {
+    let mut f = Fake::new();
+    std::fs::create_dir_all(f.t.join("a3")).unwrap();
+    f.mode("a1", "limit45");
+    f.mode("a2", "limit45");
+    let (v, status) = f
+        .run(&f.with_next("implementer", "t.md", &["a2", "a3"]))
+        .unwrap();
+    assert_eq!((status, v["state"].as_str()), (0, Some("ok")), "{v}");
+    assert_eq!(v["account"], f.p("a3"));
+    let want = [CONTINUATION.as_bytes(), b"review this\n"].concat();
+    assert_eq!(f.input(1), b"review this\n");
+    assert_eq!((f.input(2), f.input(3)), (want.clone(), want));
+    let continued: Vec<bool> = v["attempts"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|a| a["continued"].as_bool().unwrap())
+        .collect();
+    assert_eq!(continued, [false, true, true]);
+    // A launch that is cut before any tool, after one that worked, still hands the text on.
+    f.mode("a2", "limit1");
+    let (v, status) = f
+        .run(&f.with_next("fixer", "t2.md", &["a2", "a3"]))
+        .unwrap();
+    assert_eq!((status, v["state"].as_str()), (0, Some("ok")), "{v}");
+    assert_eq!(v["attempts"].as_array().unwrap().len(), 3);
+    let want = [CONTINUATION.as_bytes(), b"review this\n"].concat();
+    assert_eq!((f.input(5), f.input(6)), (want.clone(), want));
+    // Every account cut: the last launch gets the text and the call ends cut, with no launch more.
+    f.mode("a3", "limit45");
+    let (v, status) = f
+        .run(&f.with_next("implementer", "t3.md", &["a2", "a3"]))
+        .unwrap();
+    assert_eq!((status, v["state"].as_str()), (75, Some("cut")));
+    assert_eq!(f.count(), "9");
+    assert_eq!(v["attempts"].as_array().unwrap().len(), 3);
+    assert_eq!(v["limit"]["status"], "rejected");
+}
+
+#[test]
+fn cut1_no_continuation_without_a_next_account() {
+    let mut f = Fake::new();
+    f.mode("a1", "limit45");
+    let (v, status) = f.run(&f.request("s.md")).unwrap();
+    assert_eq!((status, v["state"].as_str()), (75, Some("cut")));
+    assert_eq!(f.count(), "1");
+    assert_eq!(f.input(1), b"review this\n");
+    assert_eq!(v["attempts"].as_array().unwrap().len(), 1);
+    assert_eq!(v["attempts"][0]["continued"], false);
+    assert_eq!(v["limit"]["status"], "rejected");
+    assert_eq!(v["attempts"][0]["limit"], v["limit"]);
+}
+
+#[test]
+fn cut1_no_continuation_for_a_reviewer() {
+    let mut f = Fake::new();
+    f.mode("a1", "limit45");
+    let (v, status) = f.run(&f.with_next("reviewer", "rv.md", &["a2"])).unwrap();
+    assert_eq!((status, v["state"].as_str()), (0, Some("ok")), "{v}");
+    assert_eq!(f.input(2), b"review this\n");
+    let attempts = v["attempts"].as_array().unwrap();
+    assert_eq!(
+        (
+            attempts[0]["worked"].clone(),
+            attempts[0]["continued"].clone(),
+            attempts[1]["continued"].clone()
+        ),
+        (json!(true), json!(false), json!(false))
+    );
+}
+
+#[test]
+fn cut1_a_resumed_stage_has_no_continuation_and_its_limit_says_what_cut_it() {
+    let mut f = Fake::new();
+    f.mode("a1", "limit45");
+    f.mode("a2", "limit45");
+    let r = f.with_next("implementer", "c.md", &["a2"]);
+    let (v, status) = f.run(&r).unwrap();
+    assert_eq!((status, v["state"].as_str()), (75, Some("cut")));
+    assert_eq!(f.count(), "2");
+    // The record's account is the last launch's; the resume runs there alone, and its input is the
+    // prompt file's bytes, the text not given.
+    let (v, status) = f.run(&f.resume(r, "c2.md", "c.md")).unwrap();
+    assert_eq!((status, v["state"].as_str()), (75, Some("cut")));
+    assert_eq!(f.count(), "3");
+    assert_eq!(f.input(3), b"review this\n");
+    assert!(f.calls()[2].starts_with(&format!("{}|", f.p("a2"))));
+    let attempts = v["attempts"].as_array().unwrap();
+    assert_eq!(attempts.len(), 1);
+    assert_eq!(attempts[0]["continued"], false);
+    assert_eq!(v["limit"]["status"], "rejected");
+    assert_eq!(v["limit"]["kind"], "five_hour");
+}
+
+#[test]
+fn cut1_a_launch_that_could_not_start_is_an_entry_of_attempts() {
+    let mut f = Fake::new();
+    // The first launch is cut after work and removes the program: the next launch cannot start.
+    f.mode("a1", "vanish");
+    let (v, status) = f.run(&f.with_next("implementer", "g.md", &["a2"])).unwrap();
+    assert_eq!(
+        (status, v["state"].as_str(), v["unmet"].as_str()),
+        (3, Some("failed"), Some("launch"))
+    );
+    let attempts = v["attempts"].as_array().unwrap();
+    assert_eq!(attempts.len(), 2);
+    assert_eq!(attempts[0]["state"], "cut");
+    // It got no text, because it was never started; its entry is the record's state.
+    assert_eq!(
+        (
+            attempts[1]["state"].clone(),
+            attempts[1]["worked"].clone(),
+            attempts[1]["continued"].clone()
+        ),
+        (json!("failed"), json!(false), json!(false))
+    );
+    assert!(attempts[1]["end"].is_string() && attempts[1]["limit"].is_null());
+    assert_eq!(attempts[1]["account"], f.p("a2"));
+    assert_eq!(f.record("g.md"), v);
+}
+
+#[test]
+fn cut1_a_codex_stage_has_a_null_limit_and_one_entry() {
+    let mut f = Fake::new();
+    let (v, status) = f.run(&f.codex("cx.md")).unwrap();
+    assert_eq!((status, v["state"].as_str()), (0, Some("ok")), "{v}");
+    assert!(v["limit"].is_null());
+    let attempts = v["attempts"].as_array().unwrap();
+    assert_eq!(attempts.len(), 1);
+    assert_eq!(attempts[0]["continued"], false);
+    assert!(attempts[0]["limit"].is_null());
+    assert_eq!(attempts[0]["session"], v["session"]);
+    assert_eq!(attempts[0]["worked"], true);
 }
