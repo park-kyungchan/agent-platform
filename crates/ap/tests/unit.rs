@@ -312,7 +312,11 @@ impl U {
             }
             ("pr", "view") => {
                 assert_eq!(a[2], "7", "{a:?}");
-                ok(pr(self))
+                let mut p = pr(self);
+                if let Some(old) = self.lagging() {
+                    p["headRefOid"] = json!(old);
+                }
+                ok(p)
             }
             ("pr", "merge") => {
                 let head = head.clone().unwrap();
@@ -387,6 +391,18 @@ impl U {
             }
             _ => panic!("unexpected gh call {a:?}"),
         }
+    }
+    /// GitHub still reports the head in `old-head` for the next `view-lag` readings of the pull
+    /// request (files the stage's script writes).
+    fn lagging(&self) -> Option<String> {
+        let lag = std::fs::read_to_string(self.t.join("view-lag")).ok()?;
+        let lag: u64 = lag.trim().parse().ok()?;
+        if lag == 0 {
+            return None;
+        }
+        std::fs::write(self.t.join("view-lag"), (lag - 1).to_string()).unwrap();
+        let old = std::fs::read_to_string(self.t.join("old-head")).ok()?;
+        Some(old.trim().to_owned())
     }
     /// A store of reviews: `search` by `all` of `eq`, `start_review` creates `rv-<n>`,
     /// `close_review` closes it.
@@ -3281,6 +3297,130 @@ fn r4_a_changed_repair_file_ends_digest_differs() {
         json!({"path": u.p("judge/verifier2.md")})
     );
     assert_eq!(u.launches, 3);
+    assert!(!exists(&u, "work/task/u1-2.unit.json"));
+    assert!(u.statuses().is_empty() && u.merges().is_empty());
+}
+
+#[test]
+fn r4_a_record_that_cannot_hold_the_round_starts_no_fixer() {
+    let mut u = U::new();
+    fixing(&u, FIX);
+    // The verifier answers `repair`, then the record's path becomes a directory: no save succeeds.
+    u.script(
+        "a2",
+        &format!(
+            "{VERIFY_REPAIR}; rm -f {r} && mkdir {r}",
+            r = u.p("work/task/u1.unit.json")
+        ),
+    );
+    let (v, code) = u.run(&r4_request(&u)).unwrap();
+    assert_eq!(code, 5, "{v}");
+    assert_eq!(
+        (&v["state"], &v["stopped_at"], &v["cause"]),
+        (
+            &json!("stopped"),
+            &json!("verifier"),
+            &json!("verdict_repair")
+        )
+    );
+    // stdout holds the last record: the one that could not be saved with the round's two paths.
+    assert_eq!(v["repair"]["fixer"], u.p("work/task/u1.fixer.md.run.json"));
+    assert_eq!(v["repair"]["next"], u.p("work/task/u1-2.unit.json"));
+    assert!(v["repair"].get("state").is_none());
+    assert_eq!(u.launches, 2, "no fixer stage");
+    assert!(!exists(&u, "work/task/u1.fixer.prompt.md"));
+    assert!(!exists(&u, "work/task/u1.fixer.md.run.json"));
+    assert!(!exists(&u, "work/task/u1-2.unit.json"));
+}
+
+#[test]
+fn r4_a_repair_verdict_without_the_head_starts_no_round() {
+    for answer in [
+        "printf 'Verdict: repair\\n'",
+        "printf 'Verdict: repair\\nno head here\\nL1 blocks'",
+        "printf 'Verdict: repair\\n%s\\nL1 blocks' 0000000000000000000000000000000000000000",
+        "printf 'Verdict: repair\\n%s %s\\n' \"$(git rev-parse HEAD)\" 1111111111111111111111111111111111111111",
+    ] {
+        let mut u = U::new();
+        fixing(&u, FIX);
+        u.script("a2", answer);
+        let v = u.stop(&r4_request(&u), "verifier", "verdict_repair");
+        assert_eq!(u.launches, 2, "no fixer stage: {answer}");
+        let keys: Vec<_> = v["repair"].as_object().unwrap().keys().collect();
+        assert_eq!(keys, ["prompt", "verifier_prompt"], "{answer}");
+        assert!(!exists(&u, "work/task/u1.fixer.md.run.json"));
+        assert!(!exists(&u, "work/task/u1-2.unit.json"));
+    }
+}
+
+#[test]
+fn r4_the_come_back_verifier_is_admitted_before_any_effect() {
+    let mut u = U::new();
+    let r = r4_request(&u);
+    // The come-back's verifier answers into `u1-2.verifier.md`: a prompt that names it.
+    std::fs::write(
+        u.t.join("judge/verifier2.md"),
+        "Write your report to u1-2.verifier.md.\n",
+    )
+    .unwrap();
+    assert_eq!(
+        code(u.run(&r)),
+        "out_named_in_prompt@repair.verifier_prompt"
+    );
+    std::fs::write(u.t.join("judge/verifier2.md"), "").unwrap();
+    assert_eq!(code(u.run(&r)), "prompt_unreadable@repair.verifier_prompt");
+    assert_eq!(names(&u.t.join("work/task")), ["TASK.md"]);
+    assert_eq!(branches(&u), "* main");
+    assert_eq!((u.launches, u.calls.len()), (0, 0));
+}
+
+/// The fixer pushes and GitHub reports the old head for the next `lag` readings.
+fn lagging_fix(u: &U, lag: u64) {
+    let t = u.t.display();
+    fixing(
+        u,
+        &format!("git rev-parse HEAD > {t}/old-head; echo {lag} > {t}/view-lag; {FIX}"),
+    );
+}
+fn head_readings(u: &U) -> usize {
+    u.gh_calls("pr", "view")
+        .iter()
+        .filter(|a| a.iter().any(|x| x == "state,baseRefName,headRefOid"))
+        .count()
+}
+
+#[test]
+fn r4_the_come_back_waits_until_github_reports_the_pushed_head() {
+    let mut u = U::new();
+    lagging_fix(&u, 2);
+    u.script("a2", VERIFY_AFTER_FIX);
+    let (v, code) = u.run(&r4_request(&u)).unwrap();
+    assert_eq!((v["state"].as_str(), code), (Some("merged"), 0), "{v}");
+    assert_eq!(v, u.record("u1-2"));
+    assert_eq!(v["head"].as_str(), u.head().as_deref());
+    // Three readings until the pushed head is seen, then the come-back's own: `ap review start`
+    // and `status`.
+    assert_eq!(head_readings(&u), 5);
+    assert!(u.clock >= Duration::from_secs(10), "{:?}", u.clock);
+    assert!(u.record("u1")["repair"].get("cause").is_none());
+}
+
+#[test]
+fn r4_a_pushed_head_that_github_never_reports_ends_head_not_seen() {
+    let mut u = U::new();
+    lagging_fix(&u, 1000);
+    u.script("a2", VERIFY_AFTER_FIX);
+    let (v, code) = u.run(&r4_request(&u)).unwrap();
+    assert_eq!(code, 3, "{v}");
+    assert_eq!(v, u.record("u1"), "stdout is the first record");
+    assert_eq!(
+        (&v["repair"]["state"], &v["repair"]["cause"]),
+        (&json!("ok"), &json!("head_not_seen"))
+    );
+    assert_eq!(v["repair"]["detail"], json!({"head": u.head()}));
+    assert!(u.clock >= Duration::from_secs(120), "{:?}", u.clock);
+    assert!(head_readings(&u) >= 2);
+    assert_eq!(u.launches, 3, "no come-back");
     assert!(!exists(&u, "work/task/u1-2.unit.json"));
     assert!(u.statuses().is_empty() && u.merges().is_empty());
 }

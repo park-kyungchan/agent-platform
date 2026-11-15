@@ -10,7 +10,7 @@ use std::{
     os::unix::fs::PermissionsExt,
     path::{Component, Path},
     process::ExitCode,
-    time::SystemTime,
+    time::{Duration, SystemTime},
 };
 
 const MEMBERS: &str = "repository clone worktree branch task_key page out acceptance implementer verifier acceptance_seconds gate store merge pull_request verdict repair";
@@ -152,6 +152,15 @@ fn fixer_request(r: &Value, prompt: &str, implementer: Option<(&str, &Value)>) -
     r["fixer"] = block;
     stage_request(&r, "fixer", prompt)
 }
+/// A refusal of `ap run` for a stage of the round: `prompt` is the file of `repair` it was given.
+fn renamed(f: Failure, prompt: &str, prefix: &str) -> Failure {
+    let field = match f.field.as_str() {
+        "out" => "out".to_owned(),
+        "prompt" => prompt.to_owned(),
+        k => format!("{prefix}.{k}"),
+    };
+    fail(f.code, &field, f.detail)
+}
 /// The checks before any effect; the answer is the page's write set.
 fn request(s: &mut impl System, r: &Value) -> Result<Vec<String>, Failure> {
     let o = r
@@ -261,26 +270,24 @@ fn request(s: &mut impl System, r: &Value) -> Result<Vec<String>, Failure> {
     if let Some(repair) = r.get("repair") {
         // The fixer as `ap run` judges it before its resume record exists, with room for its facts.
         let lead = repair["prompt"].as_str().unwrap_or_default();
-        let field = |f: Failure| {
-            let k = if f.field == "out" {
-                "out".to_owned()
-            } else {
-                format!("repair.{}", f.field)
-            };
-            fail(f.code, &k, f.detail)
-        };
+        let field = |f| renamed(f, "repair.prompt", "repair");
         crate::run::admit_stage(s, &fixer_request(r, lead, None)).map_err(field)?;
         let room = fixer_facts(r, &json!(u64::MAX), &"0".repeat(40)).len() as u64 + 1;
         let size = std::fs::metadata(lead).map_or(LIMIT, |m| m.len());
         require!(size + room <= LIMIT => "prompt_unreadable", "repair.prompt");
-        // The come-back's verifier prompt, with room for the facts of `<out>-2`.
+        // The come-back's verifier, as `ap run` judges it before the record it resumes exists, with
+        // room for the facts of `<out>-2`.
         let lead = repair["verifier_prompt"].as_str().unwrap_or_default();
-        let bytes = regular(lead, "prompt_unreadable", "repair.verifier_prompt")?;
         let mut next = r.clone();
         next["out"] = json!(format!("{out}-2"));
-        let room = facts(&next, u64::MAX, &"0".repeat(40), &"0".repeat(40)).len() + 1;
-        let fits = !bytes.is_empty() && bytes.len() + room <= LIMIT as usize;
-        require!(fits => "prompt_unreadable", "repair.verifier_prompt");
+        if let Some(o) = next["verifier"].as_object_mut() {
+            o.remove("resume");
+        }
+        let field = |f| renamed(f, "repair.verifier_prompt", "verifier");
+        crate::run::admit_stage(s, &stage_request(&next, "verifier", lead)).map_err(field)?;
+        let room = facts(&next, u64::MAX, &"0".repeat(40), &"0".repeat(40)).len() as u64 + 1;
+        let size = std::fs::metadata(lead).map_or(LIMIT, |m| m.len());
+        require!(size + room <= LIMIT => "prompt_unreadable", "repair.verifier_prompt");
     }
     executable(acceptance)?;
     // A verdict is taken only as the answer of a reviewer's stage: its `ap run` record lies beside.
@@ -414,13 +421,25 @@ fn verdict(bytes: &[u8], head: &str) -> Result<(), Stop> {
     let first = lines.next().unwrap_or_default();
     ensure!(first != "Verdict: repair" => "verdict_repair");
     ensure!(first == "Verdict: accept" => "verdict_unreadable");
-    let mut heads = lines
-        .next()
+    ensure!(names_head(lines.next(), head) => "verdict_head_differs");
+    Ok(())
+}
+/// The head line of a verdict: exactly one run of 40 hexadecimal characters, and it is the head.
+fn names_head(line: Option<&str>, head: &str) -> bool {
+    let mut heads = line
         .unwrap_or_default()
         .split(|c: char| !c.is_alphanumeric())
         .filter(|s| s.len() == 40 && s.bytes().all(|b| b.is_ascii_hexdigit()));
-    ensure!(heads.next() == Some(head) && heads.next().is_none() => "verdict_head_differs");
-    Ok(())
+    heads.next() == Some(head) && heads.next().is_none()
+}
+/// A round starts on a `Verdict: repair` of the step `verifier` whose head line names the head.
+fn repairs(r: &Value, rec: &Value) -> bool {
+    let report = rec["files"]["report"].as_str().unwrap_or_default();
+    let bytes = regular(report, "verdict_unreadable", "report").unwrap_or_default();
+    let text = String::from_utf8_lossy(&bytes);
+    let line = text.split('\n').nth(1).map(|l| l.trim_end_matches('\r'));
+    let head = rec["head"].as_str().unwrap_or_default();
+    r.get("repair").is_some() && rec["step"] == "verifier" && names_head(line, head)
 }
 fn create(path: &str, bytes: &[u8]) -> Result<(), Stop> {
     let mut options = std::fs::OpenOptions::new();
@@ -686,9 +705,18 @@ pub fn execute(s: &mut impl System, r: &Value) -> Result<(Value, u8), Failure> {
         );
         rec["repair"] = json!({"prompt": file(fixer)?, "verifier_prompt": file(verifier)?});
     }
-    let (rec, code) = claimed(r, rec, |u| steps(s, r, &write_set, u))?;
-    let repairs = rec["stopped_at"] == "verifier" && rec["cause"] == "verdict_repair";
-    if r.get("repair").is_none() || code != 3 || !repairs {
+    let (rec, code) = claimed(r, rec, |u| {
+        let end = steps(s, r, &write_set, u);
+        // The round's two paths are in the save that completes the record: when it fails (exit 5),
+        // no fixer starts.
+        if matches!(&end, Err(f) if f.cause == "verdict_repair") && repairs(r, &u.rec) {
+            let out = r["out"].as_str().unwrap_or_default();
+            u.rec["repair"]["fixer"] = json!(format!("{out}.fixer.md.run.json"));
+            u.rec["repair"]["next"] = json!(format!("{out}-2.unit.json"));
+        }
+        end
+    })?;
+    if code != 3 || !rec["repair"]["next"].is_string() {
         return Ok((rec, code));
     }
     round(s, r, rec)
@@ -704,9 +732,6 @@ fn round(s: &mut impl System, r: &Value, rec: Value) -> Result<(Value, u8), Fail
         clean,
         started,
     };
-    u.rec["repair"]["fixer"] = json!(format!("{out}.fixer.md.run.json"));
-    u.rec["repair"]["next"] = json!(format!("{out}-2.unit.json"));
-    u.save();
     let end = |mut u: Unit| {
         u.save();
         let status = if u.clean { 3 } else { 5 };
@@ -736,8 +761,8 @@ fn fix(s: &mut impl System, r: &Value, u: &mut Unit) -> Result<Option<Value>, St
     if !bytes.ends_with(b"\n") {
         bytes.push(b'\n');
     }
-    let head = u.rec["head"].as_str().unwrap_or_default();
-    bytes.extend(fixer_facts(r, &u.rec["pull_request"], head).as_bytes());
+    let head = u.rec["head"].as_str().unwrap_or_default().to_owned();
+    bytes.extend(fixer_facts(r, &u.rec["pull_request"], &head).as_bytes());
     let prompt = format!("{out}.fixer.prompt.md");
     create(&prompt, &bytes)?;
     let implementer = text(&u.rec["stages"], "implementer")?.to_owned();
@@ -751,6 +776,20 @@ fn fix(s: &mut impl System, r: &Value, u: &mut Unit) -> Result<Option<Value>, St
     }
     let lead = text(&r["repair"], "verifier_prompt")?;
     unchanged(&u.rec["repair"]["verifier_prompt"], lead)?;
+    // The come-back's gate takes the head GitHub reports first: a pushed head must be seen there.
+    let (repo, number) = (text(r, "repository")?, &u.rec["pull_request"]);
+    let local = git(s, text(r, "worktree")?, &["rev-parse", "HEAD"])?;
+    let deadline = s.now() + Duration::from_secs(120);
+    // A fixer that made no commit needs no wait.
+    let mut seen = local == head;
+    while !seen {
+        let read = review::pr(s, repo, number);
+        seen = read.is_ok_and(|p| p["headRefOid"] == local.as_str());
+        ensure!(seen || s.now() < deadline => "head_not_seen", json!({"head": local}));
+        if !seen {
+            s.pause(Duration::from_secs(5));
+        }
+    }
     let mut next = r.clone();
     if let Some(o) = next.as_object_mut() {
         o.remove("repair");
