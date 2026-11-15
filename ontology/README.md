@@ -535,7 +535,7 @@ of a review started under version 8 (`duplicate_running_review`).
 A "current row of the user with words" below is a `decision` of the named task
 with `status` `current`, `decided_by` `user` and a nonempty `user_words`. Every
 "later than" compares two stored times of one-second resolution: a row recorded
-in the same second as the stated, confirmed or ordered time is not later (the
+in the same second as the stated or confirmed time is not later (the
 rehearsal moves its own clock by one second before each such row). All the types
 are Ontology-owned and written only by the actions; they are keyed by the action
 id, except `board`, keyed by its task's key.
@@ -557,7 +557,7 @@ Properties: `task`, `name` (at most 60 bytes), `statement` (600), optional `chec
 | `confirm_objective` | `objective`, `row` | `objective_not_stated`; `row_not_user_words`; `row_is_source_or_earlier` (the row is the source, or not decided later than `stated_at`) |
 | `amend_objective` | `objective`, `decision`; optional `rank`, `check` | `objective_not_live`; `row_not_current` (not a current decision of the task); `nothing_to_amend` (neither `rank` nor `check`) |
 | `retire_objective` | `objective`, `reason`; optional `row` | `objective_not_live` (retired already); `confirmed_needs_later_row` (a confirmed objective needs a row of the user with words decided later than `confirmed_at`) |
-| `record_check` | `objective`, `exit`, `line` | `objective_not_live` |
+| `record_check` | `objective`, `exit`, `line` | `objective_not_live`; `objective_without_check` (the objective has no `check`: a result is recorded only where a check command stands) |
 
 `restate_objective` modifies the same object: `statement`, `source`, `stated_at`
 `$now`, `status` `stated`, and `confirmed_by` cleared. `confirm_objective` sets
@@ -608,24 +608,30 @@ repository, and no `evidence`. An item without a repository needs `evidence` and
 no `review`. Any other combination answers `review_or_evidence` (a running,
 abandoned, revoked, other-repository or other-task review, a review with
 evidence, and neither, are rows of the rehearsal). A review that another item
-already names answers `review_closes_another_item`.
+already names answers `review_closes_another_item`. That is all the store binds
+of a review: its task, its repository, `closed` with the verdict `accept`, and
+named by no other item. That the review is the one of the item's own pull request
+is held by the caller (`ap unit` passes the accepting review of the pull request
+it merged); the `review` has no property that names the item in this version.
 
 ### `board`: the order of a task's work
 Properties: `task`, `order` (an array of references to `item`, kept in the order
 given: the rehearsal reads back a list of five, a replacement and an empty list),
-`reason` (600), optional `ordered_by` (a `decision`) and `set_at`. A board is
+`reason` (600) and `set_at`. A board is
 keyed by its task's key, which the caller writes in the `board` parameter; there
 is at most one per task. Links: `board_task` (reverse `boards`), `board_order`
-(reverse `ordering_boards`: the boards that name an item), `board_ordered_by`
-(reverse `ordering_rows`), and, from `decision`, `decision_triage_item`
+(reverse `ordering_boards`: the boards that name an item), and, from `decision`, `decision_triage_item`
 (`triaged_rows`) and `decision_triage_objective` (`intent_rows`).
 
 | Action | Parameters | Refusals |
 | --- | --- | --- |
-| `set_order` | `board`, `task`, `order`, `reason`; optional `row` | `unknown_task`; `board_of_another_task` (the board is of another task, or the task has a board and the call names a second one); `row_not_user_words` (a given `row` is not a current row of the user with words of the task) |
+| `set_order` | `board`, `task`, `order`, `reason` | `unknown_task`; `board_of_another_task` (the board is of another task, or the task has a board and the call names a second one) |
 
 `set_order` creates the board at its first use and replaces the whole list,
-`reason`, `ordered_by` and `set_at` afterwards.
+`reason` and `set_at` afterwards. It takes no row and the board holds no
+reference to one: a property cannot be cleared, so a later order given without a
+row would keep naming the earlier row. When a row of the user caused the order,
+the `reason` names the topic of that row.
 
 ### Triage of the user's rows
 `decision` gains the optional properties `triage` (`item`, `intent`,
@@ -640,6 +646,7 @@ them once on a row.
 | `item_required` | `triage` is `item` and `item` is missing or of another task than the row |
 | `objective_required` | `triage` is `intent` and `objective` is missing or of another task than the row |
 | `reason_required` | `triage` is `not_adopted` or `none` and `reason` is missing |
+| `reference_not_for_triage` | `item` is given with a word other than `item`, or `objective` with a word other than `intent`: a reference is stored only under the word that chose it |
 
 A row of version 8 or earlier has no `triage`; nothing triages it by itself.
 

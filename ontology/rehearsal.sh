@@ -560,6 +560,8 @@ o3 = created(gate('state_objective', 'o3', {k: v for k, v in dict(op, name='neve
 assert 'confirmed_at' not in fields(o3) and 'check' not in fields(o3)
 gate('restate_objective', 'never-confirmed-earlier-row', dict(objective=o3, statement='never confirmed, restated', source=u_early))
 assert fields(o3)['source'] == u_early and fields(o3)['status'] == 'stated'
+gate('record_check', 'no-check-command', dict(objective=o3, exit=0, line='x'), 'objective_without_check')
+assert 'last_exit' not in fields(o3)
 # amend_objective
 am = dict(objective=o1, rank=2, decision=lead_row)
 gate('amend_objective', 'nothing', dict(objective=o1, decision=lead_row), 'nothing_to_amend')
@@ -618,17 +620,15 @@ gate('start_item', 'no-board', dict(item=i1, repository=repo8, branch='unit/one'
 board = oid('board', task['native_key']); other_board = oid('board', other_task['native_key'])
 so = dict(board=board, task=task, order=[i2, i1, i3, i5, i6], reason='the order of the next work')
 gate('set_order', 'unknown-task', dict(so, task=invented), 'unknown_task')
-gate('set_order', 'lead-row', dict(so, row=lead_row), 'row_not_user_words')
-gate('set_order', 'other-task-row', dict(so, row=uo), 'row_not_user_words')
 gate('set_order', 'first', so)
-f = fields(board); assert f['task'] == task and f['order'] == so['order'] and f['reason'] == so['reason'] and 'ordered_by' not in f and f['set_at'] == stamp(), f
+f = fields(board); assert f['task'] == task and f['order'] == so['order'] and f['reason'] == so['reason'] and set(f) == {'task', 'order', 'reason', 'set_at'} and f['set_at'] == stamp(), f
 gate('set_order', 'other-board', dict(so, board=other_board, order=[other_item], task=other_task))
 gate('set_order', 'second-board-of-the-task', dict(so, board=oid('board', 'second-board-of-a-task')), 'board_of_another_task')
 gate('set_order', 'board-of-another-task', dict(so, board=other_board), 'board_of_another_task')
 # The store does not check the elements of the list: an item of another task, a dangling element and an empty list are stored.
 unchecked = [i6, other_item2, oid('item', 'absent-v9-item'), i1]
-tick(); gate('set_order', 'unchecked-elements', dict(so, order=unchecked, row=u_src))
-f = fields(board); assert f['order'] == unchecked and f['ordered_by'] == u_src, f
+tick(); gate('set_order', 'unchecked-elements', dict(so, order=unchecked))
+assert fields(board)['order'] == unchecked
 gate('set_order', 'empty', dict(so, order=[])); assert fields(board)['order'] == []
 gate('set_order', 'ordered', so); assert fields(board)['order'] == so['order']
 gate('set_order', 'reordered', dict(so, order=[i2, i1, i5, i6, i3, other_item2])); assert fields(board)['order'] == [i2, i1, i5, i6, i3, other_item2]
@@ -698,6 +698,10 @@ gate('triage_decision', 'intent-missing', dict(decision=t_intent, triage='intent
 gate('triage_decision', 'intent-other-task', dict(decision=t_intent, triage='intent', objective=o_other), 'objective_required')
 gate('triage_decision', 'not-adopted-no-reason', dict(decision=t_na, triage='not_adopted'), 'reason_required')
 gate('triage_decision', 'none-no-reason', dict(decision=t_none, triage='none'), 'reason_required')
+for label, params in [('item-with-none', dict(decision=t_none, triage='none', reason='r', item=i4)), ('item-with-intent', dict(decision=t_intent, triage='intent', objective=o3, item=i4)),
+                      ('item-with-not-adopted', dict(decision=t_na, triage='not_adopted', reason='r', item=i4)), ('objective-with-item', dict(td, objective=o3)),
+                      ('objective-with-none', dict(decision=t_none, triage='none', reason='r', objective=o3)), ('objective-with-not-adopted', dict(decision=t_na, triage='not_adopted', reason='r', objective=o3))]:
+    gate('triage_decision', label, params, 'reference_not_for_triage')
 gate('triage_decision', 'item', td)
 f = fields(t_item); assert f['triage'] == 'item' and f['triage_item'] == i4 and f['triaged_at'] == stamp() and 'triage_objective' not in f, f
 gate('triage_decision', 'intent', dict(decision=t_intent, triage='intent', objective=o3)); assert fields(t_intent)['triage_objective'] == o3

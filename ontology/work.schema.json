@@ -1084,7 +1084,6 @@
         "task": {"type": {"ref": "task"}, "required": true},
         "order": {"type": {"array": {"ref": "item"}}, "required": true, "description": "Items in order; elements are not checked by the store."},
         "reason": {"type": "string", "required": true, "max_bytes": 600},
-        "ordered_by": {"type": {"ref": "decision"}, "required": false, "description": "Row of the user that ordered it, when one did."},
         "set_at": {"type": {"value_type": "utc_time"}, "required": true, "max_bytes": 40}
       }
     }
@@ -1277,7 +1276,6 @@
     "item_review": {"from": "item", "via": "review", "to": "review", "cardinality": "many_to_one", "names": {"forward": "item_review", "reverse": "closed_items"}},
     "board_task": {"from": "board", "via": "task", "to": "task", "cardinality": "many_to_one", "names": {"forward": "board_task", "reverse": "boards"}},
     "board_order": {"from": "board", "via": "order", "to": "item", "cardinality": "many_to_many", "names": {"forward": "board_order", "reverse": "ordering_boards"}},
-    "board_ordered_by": {"from": "board", "via": "ordered_by", "to": "decision", "cardinality": "many_to_one", "names": {"forward": "board_ordered_by", "reverse": "ordering_rows"}},
     "decision_triage_item": {"from": "decision", "via": "triage_item", "to": "item", "cardinality": "many_to_one", "names": {"forward": "decision_triage_item", "reverse": "triaged_rows"}},
     "decision_triage_objective": {"from": "decision", "via": "triage_objective", "to": "objective", "cardinality": "many_to_one", "names": {"forward": "decision_triage_objective", "reverse": "intent_rows"}}
   },
@@ -2753,7 +2751,8 @@
         "line": {"type": "string", "required": true, "max_bytes": 200}
       },
       "submission_criteria": [
-        {"code": "objective_not_live", "message": "Choose a stated or confirmed objective.", "all": [{"exists": "$objective"}, {"in": ["$objective.status", ["stated", "confirmed"]]}]}
+        {"code": "objective_not_live", "message": "Choose a stated or confirmed objective.", "all": [{"exists": "$objective"}, {"in": ["$objective.status", ["stated", "confirmed"]]}]},
+        {"code": "objective_without_check", "message": "Record a result only for an objective that has a check command.", "all": [{"present": "$objective.check"}]}
       ],
       "rules": [
         {
@@ -2915,13 +2914,11 @@
         "board": {"type": {"ref": "board"}, "required": true, "description": "Id of type board whose native_key is the task's key."},
         "task": {"type": {"ref": "task"}, "required": true},
         "order": {"type": {"array": {"ref": "item"}}, "required": true},
-        "reason": {"type": "string", "required": true, "max_bytes": 600},
-        "row": {"type": {"ref": "decision"}, "required": false}
+        "reason": {"type": "string", "required": true, "max_bytes": 600}
       },
       "submission_criteria": [
         {"code": "unknown_task", "message": "Choose an existing task.", "all": [{"exists": "$task"}]},
-        {"code": "board_of_another_task", "message": "Name this task's board, or a new one when the task has none.", "any": [{"all": [{"exists": "$board"}, {"eq": ["$board.task", "$task"]}]}, {"all": [{"none": [{"exists": "$board"}]}, {"none": [{"linked": {"from": "$task", "link": "boards"}}]}]}]},
-        {"code": "row_not_user_words", "message": "Name a current row of the user with words of the task, or none.", "any": [{"none": [{"present": "$row"}]}, {"all": [{"exists": "$row"}, {"eq": ["$row.status", "current"]}, {"eq": ["$row.decided_by", "user"]}, {"present": "$row.user_words"}, {"eq": ["$row.task", "$task"]}]}]}
+        {"code": "board_of_another_task", "message": "Name this task's board, or a new one when the task has none.", "any": [{"all": [{"exists": "$board"}, {"eq": ["$board.task", "$task"]}]}, {"all": [{"none": [{"exists": "$board"}]}, {"none": [{"linked": {"from": "$task", "link": "boards"}}]}]}]}
       ],
       "rules": [
         {
@@ -2930,7 +2927,6 @@
             "task": "$task",
             "order": "$order",
             "reason": "$reason",
-            "ordered_by": "$row",
             "set_at": "$now"
           }
         }
@@ -2950,7 +2946,8 @@
         {"code": "already_triaged", "message": "A row is triaged once.", "none": [{"present": "$decision.triage"}]},
         {"code": "item_required", "message": "Triage item names an item of the row's task.", "any": [{"ne": ["$triage", "item"]}, {"all": [{"present": "$item"}, {"exists": "$item"}, {"eq": ["$item.task", "$decision.task"]}]}]},
         {"code": "objective_required", "message": "Triage intent names an objective of the row's task.", "any": [{"ne": ["$triage", "intent"]}, {"all": [{"present": "$objective"}, {"exists": "$objective"}, {"eq": ["$objective.task", "$decision.task"]}]}]},
-        {"code": "reason_required", "message": "Triage not_adopted and none carry a reason.", "any": [{"in": ["$triage", ["item", "intent"]]}, {"present": "$reason"}]}
+        {"code": "reason_required", "message": "Triage not_adopted and none carry a reason.", "any": [{"in": ["$triage", ["item", "intent"]]}, {"present": "$reason"}]},
+        {"code": "reference_not_for_triage", "message": "Give item only with the word item and objective only with the word intent.", "all": [{"any": [{"none": [{"present": "$item"}]}, {"eq": ["$triage", "item"]}]}, {"any": [{"none": [{"present": "$objective"}]}, {"eq": ["$triage", "intent"]}]}]}
       ],
       "rules": [
         {
