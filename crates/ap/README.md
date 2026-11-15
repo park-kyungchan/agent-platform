@@ -7,7 +7,7 @@ Limitation: a source tarball nested inside another Git repository reports the ou
 
 ## The older verbs
 
-`ap --help` (or `-h`) prints one line per verb the command dispatches: the verb, its request form and the heading of the section of this file that documents it; `ap <verb> --help` prints that verb's own usage. The verbs of the first generation: `ap render < request.json` is a pure proposal for the instruction files (`ap render content` is the pure proposal for the fixed owned set of public content, `ap doctor content` the diagnosis of explicit host paths against it); `ap install plan|apply|recover < request.json` and `ap doctor inspect < spec.json` are the scoped Linux installation of those files and its inspection, for disposable or externally coordinated writers, with no hook run; `ap pane [--exports|--focused|--resume-candidate]` prints the caller's Herdr pane; `ap version` is `--version`, above. Their contracts are `crates/ap/DESIGN.md`, `crates/ap/s03/` and `crates/ap/pane/README.md`; every other verb has its own section below.
+`ap --help` (or `-h`) prints one line per verb the command dispatches: the verb, its request form and the heading of the section of this file that documents it; `ap <verb> --help` prints that verb's own usage. `ap pane [--exports|--focused|--resume-candidate]` prints the caller's Herdr pane; its contract is `crates/ap/pane/README.md`. `ap version` is `--version`, above. The earlier installer's verbs `install`, `doctor` and `render` were removed: the command refuses them like any unknown verb. Every other verb has its own section below.
 
 ## One worker run
 

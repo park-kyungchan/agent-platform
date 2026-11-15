@@ -26,7 +26,7 @@ One codebase on Rust and one Ontology. "Ontology" is Palantir's sense: object ty
 - R7 First use. Every built thing names who first uses it (a route of the user's domain, an agent) and the real run that shows it. Work on the engine or the harness without such a user is not started.
 - R8 One check. Each repository has one check command that an agent runs on the host and the CI job runs unchanged; the required check of the main branch is that job.
 
-## Lens file (`LENS.md` in the task directory, at most two pages)
+## Lens file (`LENS.md` in the task directory, about two pages)
 
 ```markdown
 # LENS — <task>

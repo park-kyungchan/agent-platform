@@ -19,6 +19,7 @@ python3 -I -B -m unittest discover -s ci -p 'test_*memory*.py'
 bash scripts/test-install-content.sh
 python3 -I -B -m unittest discover -s ci -p 'test_readout*.py'
 python3 -I -B -m unittest discover -s ci -p 'test_evaluate_case.py'
+python3 -I -B -m unittest discover -s ci -p 'test_lead_suite.py'
 if [ "$mode" = content ]; then echo "check: ok (content)"; exit 0; fi
 
 if [ "${CI:-}" != true ] && [ -z "${CHECK_LOCKED:-}" ]; then
@@ -38,7 +39,7 @@ fi
 bash scripts/test-install-ap.sh
 cargo fmt --all -- --check
 cargo clippy --workspace --all-targets --locked -- -D warnings
-# The install tests need a private root whose ancestors they can verify.
+# The review and pane tests need a private root that this check creates and removes.
 AP_S03_TEST_ROOT=$(mktemp -d "$PWD/.ap-rust-test.XXXXXXXX")
 export AP_S03_TEST_ROOT
 chmod 0700 "$AP_S03_TEST_ROOT"

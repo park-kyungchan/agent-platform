@@ -1,0 +1,320 @@
+#!/usr/bin/env -S python3 -I -B
+"""The Lead suite: `run answers` writes the answer to each frozen case under an instruction text; `run score`
+has a model score one set, or two sets blind, against the rubrics. A stage is started only through `ap run`
+(`--ap`); only its record, answer and stream are read. The cases are host files, the repository holds their
+digests (`cases.sha256`). Exit 0 done, 1 an answer or a sheet is missing, 2 a refusal or a usage error (one
+JSON line on stderr with `code`). Method and limits: evals/README.md, section "The Lead suite".
+"""
+import argparse
+import hashlib
+import json
+import os
+import random
+import re
+import shutil
+import signal
+import subprocess
+import sys
+import tempfile
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+RESULTS = ("caught", "partly", "missed")
+INSTALLED = "/root/.agents"
+# An absolute path (or one that starts at the home directory) in a string: not the tail of a relative one.
+PATH = re.compile(r"(?<![\w.~$:/-])(~?/[^\s'\"`;|&<>()=,{}\[\]*?]*)")
+SCORE = re.compile(r'^(\S+) \| ([pq]) \| (\S+) \| "(.*)" \| (.*)$')
+
+class Refuse(Exception):
+    """A refusal: its code and detail go to stderr, exit 2."""
+
+def refuse(code, detail=""):
+    raise Refuse(code, detail)
+
+class Parser(argparse.ArgumentParser):
+    def error(self, message):
+        refuse("usage", message)
+
+def sha(data):
+    return hashlib.sha256(data).hexdigest()
+
+def read(path):
+    with open(path, "rb") as f:
+        return f.read()
+
+def tree_digest(root):
+    """The SHA-256 of one line `<sha256>  <relative path>` per regular file below `root`, sorted by path bytes.
+    Anything below it that is not a directory or a regular file (a link, a device) is refused `not_regular`."""
+    rows = []
+    for d, dirs, files in os.walk(root):
+        for f in dirs + files:
+            p = os.path.join(d, f)
+            if os.path.islink(p) or not (os.path.isdir(p) or os.path.isfile(p)):
+                refuse("not_regular", os.path.relpath(p, root))
+        rows += [(os.path.relpath(os.path.join(d, f), root).encode(), sha(read(os.path.join(d, f)))) for f in files]
+    return sha(b"".join(h.encode() + b"  " + r + b"\n" for r, h in sorted(rows)))
+
+def write_atomic(path, text):
+    fd, tmp = tempfile.mkstemp(dir=os.path.dirname(path), prefix=".tmp-")
+    with os.fdopen(fd, "w") as f:
+        f.write(text)
+    os.replace(tmp, path)
+
+def load_json(path):
+    try:
+        with open(path) as f:
+            return json.load(f)
+    except (OSError, ValueError):
+        return None
+
+def check_cases(a):
+    """Every case of cases.sha256 is present and unchanged; no other directory below the cases; the selected ids are known."""
+    want = {}
+    for line in read(os.path.join(HERE, "cases.sha256")).decode().splitlines():
+        digest, _, cid = line.partition("  ")
+        want[cid] = digest
+    bad = [c for c, d in want.items() if not os.path.isdir(os.path.join(a.cases, c)) or tree_digest(os.path.join(a.cases, c)) != d]
+    if bad:
+        refuse("case_digest_differs", " ".join(bad))
+    extra = [n for n in sorted(os.listdir(a.cases)) if n not in want and os.path.isdir(os.path.join(a.cases, n))]
+    extra += [c for c in a.case if c not in want]
+    if extra:
+        refuse("case_unknown", " ".join(extra))
+    for d in [a.account] + a.next_account:
+        if not os.path.isdir(d):
+            refuse("account_missing", "an account directory does not exist")
+    if os.sep in a.ap and not os.access(a.ap, os.X_OK) or os.sep not in a.ap and not shutil.which(a.ap):
+        refuse("ap_missing", "the program of --ap is not executable")
+    return list(want)
+
+def stage(a, **fields):
+    """One stage through `ap run`: the request on stdin; its record, answer and stream are read afterwards."""
+    req = {"role": "reviewer", "account": a.account, "model": a.model, "effort": a.effort, "permission_mode": "auto", **fields}
+    if a.next_account:
+        req["next_accounts"] = a.next_account
+    subprocess.run([a.ap, "run"], input=json.dumps(req), capture_output=True, text=True)
+
+def strings(v):
+    """Every string in a tool call's input."""
+    if isinstance(v, str):
+        yield v
+    for x in v.values() if isinstance(v, dict) else v if isinstance(v, list) else ():
+        yield from strings(x)
+
+def scan_stream(path, roots):
+    """(paths outside the roots, reads of the installed instructions) over every string of every tool call input; None if unreadable."""
+    outside, installed = [], 0
+    try:
+        with open(path) as f:
+            events = [json.loads(line) for line in f if line.strip()]
+    except (OSError, ValueError):
+        return None
+    for e in events:
+        content = (e.get("message") or {}).get("content") if e.get("type") == "assistant" else None
+        blocks = [b for b in content if isinstance(b, dict) and b.get("type") == "tool_use"] if isinstance(content, list) else []
+        for p in [p for b in blocks for s in strings(b.get("input")) for p in PATH.findall(s)]:
+            n = os.path.normpath(p)
+            if not p.startswith("~") and (n == INSTALLED or n.startswith(INSTALLED + "/")):
+                installed += 1
+            elif p.startswith("~") or not (n.startswith("/dev/") or any(n == r or n.startswith(r + "/") for r in roots)):
+                outside.append(p)
+    return outside, installed
+
+def judge(out, cid, n):
+    """One try, read from its files: record, answer, stream."""
+    base = "%s/%s.%d.md" % (out, cid, n)
+    rec = load_json(base + ".run.json")
+    rec = rec if isinstance(rec, dict) else None
+    state = str(rec.get("state")) if rec else "refused"
+    root = os.path.dirname(str(rec.get("cwd", "")).rstrip("/")) if rec else ""
+    scan = scan_stream(base + ".stream.jsonl", [r for r in {root, os.path.realpath(root)} if len(r) > 1])
+    reason = None
+    if state != "ok":
+        reason = "stage_" + state
+    elif not os.path.isfile(base) or os.path.getsize(base) == 0:
+        reason = "empty"
+    elif scan is None or scan[0]:
+        reason = "outside_path"
+    return {"try": n, "state": state, "valid": reason is None, "reason": reason, "turns": rec.get("turns") if rec else None,
+            "tokens": rec.get("tokens") if rec else None, "installed_reads": scan[1] if scan else 0}
+
+def summary(out, ids):
+    result = {}
+    for cid in ids:
+        tries = [judge(out, cid, n) for n in (1, 2) if os.path.exists("%s/%s.%d.prompt.md" % (out, cid, n))]
+        if tries:
+            result[cid] = {"tries": tries, "valid_try": next((t["try"] for t in tries if t["valid"]), None)}
+    return result
+
+def answer_one(a, cid, n):
+    root = tempfile.mkdtemp()
+    try:
+        case, task, instr = os.path.join(a.cases, cid), root + "/task", root + "/instructions"
+        shutil.copytree(case + "/TASK", task, symlinks=True) if os.path.isdir(case + "/TASK") else os.mkdir(task)
+        shutil.copytree(a.instructions, instr, symlinks=True)
+        text = read(os.path.join(HERE, "prompt.md")).replace(b"@CASE@", read(case + "/PROMPT.txt"))
+        text = text.replace(b"@TASK@", task.encode()).replace(b"@INSTRUCTIONS@", instr.encode())
+        base = "%s/%s.%d" % (a.out, cid, n)
+        with open(base + ".prompt.md", "xb") as f:
+            f.write(text)
+        stage(a, cwd=task, prompt=base + ".prompt.md", out=base + ".md", timeout_seconds=900)
+    finally:
+        shutil.rmtree(root, ignore_errors=True)
+
+def cmd_answers(a):
+    ids = check_cases(a)
+    if not os.path.isdir(a.instructions):
+        refuse("usage", "--instructions is not a directory")
+    meta = {"instructions": tree_digest(a.instructions), "cases_sha256": sha(read(os.path.join(HERE, "cases.sha256"))),
+            "prompt_sha256": sha(read(os.path.join(HERE, "prompt.md"))), "model": a.model, "effort": a.effort}
+    old = load_json(a.out + "/META.json")
+    if old is not None and old != meta:
+        refuse("meta_differs", " ".join(k for k in meta if old.get(k) != meta[k]))
+    os.makedirs(a.out, exist_ok=True)
+    if old is None:
+        with open(a.out + "/META.json", "x") as f:
+            json.dump(meta, f, indent=1)
+    for cid in a.case or ids:
+        while True:
+            have = summary(a.out, [cid]).get(cid)
+            if have and (have["valid_try"] or len(have["tries"]) >= 2):
+                break
+            answer_one(a, cid, 1 if not have or have["tries"][0]["try"] != 1 else 2)
+            write_atomic(a.out + "/answers.json", json.dumps(summary(a.out, ids), indent=1))
+    done = summary(a.out, ids)
+    write_atomic(a.out + "/answers.json", json.dumps(done, indent=1))
+    return 0 if all(done.get(c, {}).get("valid_try") for c in a.case or ids) else 1
+
+def parse_scores(text, expected):
+    """({(id, letter): (result, quote, clause)}, None) or (None, the reason the lines are not read)."""
+    lines = text.splitlines()
+    if not lines or lines[0] != "Verdict: scored":
+        return None, "first_line_is_not_the_verdict"
+    got, deviations = {}, 0
+    for line in lines[1:]:
+        m = SCORE.match(line)
+        if not line.strip():
+            continue
+        if line.startswith("deviation: "):
+            deviations += 1
+            if deviations > 5:
+                return None, "more_than_five_deviation_lines"
+        elif not m:
+            return None, "line_not_of_the_fixed_form"
+        elif (m.group(1), m.group(2)) not in expected:
+            return None, "unknown_answer_file"
+        elif (m.group(1), m.group(2)) in got:
+            return None, "answer_file_scored_twice"
+        elif m.group(3) not in RESULTS:
+            return None, "result_word_not_allowed"
+        else:
+            got[(m.group(1), m.group(2))] = (m.group(3), m.group(4), m.group(5))
+    missing = sorted("%s/%s" % k for k in expected if k not in got)
+    return (None, "answer_file_not_scored: " + " ".join(missing)) if missing else (got, None)
+
+def valid_answer(d, cid):
+    entry = (load_json(d + "/answers.json") or {}).get(cid) or {}
+    n = entry.get("valid_try")
+    path = "%s/%s.%s.md" % (d, cid, n)
+    return path if n and os.path.isfile(path) and os.path.getsize(path) else None
+
+def sheet_md(sheet, ids, sets):
+    """The public sheet: results, counts, lost and gained, digests, models and efforts; no quote, clause or path."""
+    out = ["# Lead suite sheet", "", "| case | %s |" % " | ".join(s.upper() for s in sets), "| --- |" + " --- |" * len(sets)]
+    out += ["| %s | %s |" % (c, " | ".join(sheet["cases"][c][s]["result"] for s in sets)) for c in ids] + [""]
+    for s in sets:
+        k, m = sheet["sets"][s]["counts"], sheet["sets"][s]["meta"]
+        out += ["%s: caught %d, partly %d, missed %d, installed reads %d" % (s.upper(), k["caught"], k["partly"], k["missed"],
+                                                                           sheet["sets"][s]["installed_reads"]),
+                "%s: instructions %s, cases %s, prompt %s, model %s, effort %s" % (
+                    s.upper(), m["instructions"], m["cases_sha256"], m["prompt_sha256"], m["model"], m["effort"])]
+    if len(sets) == 2:
+        out += ["lost (caught in A, not in B): " + (" ".join(sheet["lost"]) or "none"),
+                "gained (caught in B, not in A): " + (" ".join(sheet["gained"]) or "none")]
+    return "\n".join(out + ["scorer: model %s, effort %s" % (sheet["scorer"]["model"], sheet["scorer"]["effort"])]) + "\n"
+
+def cmd_score(a):
+    ids = check_cases(a)
+    sel = a.case or ids
+    dirs = {"a": a.a, **({"b": a.b} if a.b else {})}
+    lacking = {s: [c for c in sel if not valid_answer(d, c)] for s, d in dirs.items()}
+    if any(lacking.values()):
+        refuse("set_incomplete", "; ".join("%s: %s" % (s.upper(), " ".join(v)) for s, v in lacking.items() if v))
+    metas = {s: load_json(d + "/META.json") or {} for s, d in dirs.items()}
+    if len(dirs) == 2 and any(metas["a"].get(k) != metas["b"].get(k) for k in ("cases_sha256", "prompt_sha256", "model", "effort")):
+        refuse("sets_not_comparable", "the sets differ in the cases file, the prompt, the model or the effort")
+    if os.path.exists(a.out):
+        refuse("out_exists", "the output exists")
+    os.mkdir(a.out)
+    rng = random.Random(a.seed) if a.seed is not None else random.SystemRandom()
+    mapping = {}
+    for c in sel:
+        swap = len(dirs) == 2 and rng.random() < 0.5
+        mapping[c] = {"p": "b" if swap else "a", **({"q": "a" if swap else "b"} if len(dirs) == 2 else {})}
+    write_atomic(a.out + "/mapping.json", json.dumps(mapping, indent=1))
+    shutil.copyfile(os.path.join(HERE, "score-prompt.md"), a.out + "/scorer.prompt.md")
+    root = tempfile.mkdtemp()
+    try:
+        shutil.copyfile(os.path.join(HERE, "scoring.md"), root + "/scoring.md")
+        for c in sel:
+            os.makedirs("%s/cases/%s" % (root, c))
+            shutil.copyfile(os.path.join(a.cases, c, "EXPECTED.md"), "%s/cases/%s/rubric.md" % (root, c))
+            for letter, s in mapping[c].items():
+                shutil.copyfile(valid_answer(dirs[s], c), "%s/cases/%s/%s.md" % (root, c, letter))
+        stage(a, cwd=root, prompt=a.out + "/scorer.prompt.md", out=a.out + "/scorer.md", timeout_seconds=1800,
+              expect={"first_line": "Verdict: scored"})
+    finally:
+        shutil.rmtree(root, ignore_errors=True)
+    rec = load_json(a.out + "/scorer.md.run.json")
+    state = str(rec.get("state")) if isinstance(rec, dict) else "refused"
+    got, why = None, "stage_" + state
+    if state == "ok":
+        try:
+            expected = {(c, l) for c in sel for l in mapping[c]}
+            got, why = parse_scores(read(a.out + "/scorer.md").decode(), expected)
+        except (OSError, UnicodeDecodeError):
+            why = "scorer_answer_unreadable"
+    if got is None:
+        write_atomic(a.out + "/sheet.json", json.dumps({"complete": False, "reason": why}, indent=1))
+        return 1
+    cases = {c: {mapping[c][l]: dict(zip(("result", "quote", "clause"), got[(c, l)])) for l in mapping[c]} for c in sel}
+    sets = {}
+    for s, d in dirs.items():
+        found = summary(d, sel)
+        reads = sum(found[c]["tries"][found[c]["valid_try"] - 1]["installed_reads"] for c in sel)
+        sets[s] = {"counts": {r: sum(cases[c][s]["result"] == r for c in sel) for r in RESULTS}, "installed_reads": reads,
+                   "meta": metas[s]}
+    won = {s: {c for c in sel if cases[c][s]["result"] == "caught"} for s in dirs}
+    sheet = {"complete": True, "cases": cases, "sets": sets, "scorer": {"model": a.model, "effort": a.effort},
+             "lost": [c for c in sel if len(dirs) == 2 and c in won["a"] - won["b"]],
+             "gained": [c for c in sel if len(dirs) == 2 and c in won["b"] - won["a"]]}
+    write_atomic(a.out + "/sheet.json", json.dumps(sheet, indent=1))
+    write_atomic(a.out + "/sheet.md", sheet_md(sheet, sel, list(dirs)))
+    return 0
+
+def main():
+    signal.signal(signal.SIGTERM, lambda *_: sys.exit(143))
+    p = Parser(prog="run", allow_abbrev=False)
+    sub = p.add_subparsers(dest="verb", required=True, parser_class=Parser)
+    for verb, own in (("answers", ("--instructions",)), ("score", ("--a",))):
+        s = sub.add_parser(verb, allow_abbrev=False)
+        for opt in ("--cases", "--out", "--account", "--model", "--effort") + own:
+            s.add_argument(opt, required=True)
+        for opt in ("--next-account", "--case"):
+            s.add_argument(opt, action="append", default=[])
+        s.add_argument("--ap", default="ap")
+        if verb == "score":
+            s.add_argument("--b")
+            s.add_argument("--seed", type=int)
+    try:
+        a = p.parse_args()
+        for name in ("cases", "out", "account", "instructions", "a", "b"):
+            if getattr(a, name, None):
+                setattr(a, name, os.path.abspath(getattr(a, name)))
+        a.next_account = [os.path.abspath(d) for d in a.next_account]
+        return cmd_answers(a) if a.verb == "answers" else cmd_score(a)
+    except Refuse as e:
+        print(json.dumps({"code": e.args[0], "detail": e.args[1]}), file=sys.stderr)
+        return 2
+
+if __name__ == "__main__":
+    sys.exit(main())
