@@ -1,0 +1,228 @@
+{
+ "action_types": {
+  "put": {
+   "description": "Invented fixture action: create one record.",
+   "parameters": {
+    "attendance": {
+     "max_bytes": 2000,
+     "required": false,
+     "type": "string"
+    },
+    "cut_fields": {
+     "required": false,
+     "type": "integer"
+    },
+    "daily_test_assessment": {
+     "max_bytes": 2000,
+     "required": false,
+     "type": "string"
+    },
+    "homework": {
+     "max_bytes": 2000,
+     "required": false,
+     "type": "string"
+    },
+    "lesson_date": {
+     "max_bytes": 2000,
+     "required": false,
+     "type": "string"
+    },
+    "lesson_memo": {
+     "max_bytes": 2000,
+     "required": false,
+     "type": "string"
+    },
+    "membership_key": {
+     "max_bytes": 2000,
+     "required": false,
+     "type": "string"
+    },
+    "previous_homework": {
+     "max_bytes": 2000,
+     "required": false,
+     "type": "string"
+    },
+    "previous_homework_assessment": {
+     "max_bytes": 2000,
+     "required": false,
+     "type": "string"
+    },
+    "previous_lesson_memo": {
+     "max_bytes": 2000,
+     "required": false,
+     "type": "string"
+    },
+    "previous_progress": {
+     "max_bytes": 2000,
+     "required": false,
+     "type": "string"
+    },
+    "previous_record_key": {
+     "max_bytes": 2000,
+     "required": false,
+     "type": "string"
+    },
+    "progress": {
+     "max_bytes": 2000,
+     "required": false,
+     "type": "string"
+    },
+    "record_key": {
+     "max_bytes": 2000,
+     "required": false,
+     "type": "string"
+    },
+    "student_id": {
+     "max_bytes": 2000,
+     "required": false,
+     "type": "string"
+    },
+    "student_name": {
+     "max_bytes": 2000,
+     "required": false,
+     "type": "string"
+    }
+   },
+   "rules": [
+    {
+     "create_object": "lesson_record",
+     "set": {
+      "attendance": "$attendance",
+      "cut_fields": "$cut_fields",
+      "daily_test_assessment": "$daily_test_assessment",
+      "homework": "$homework",
+      "lesson_date": "$lesson_date",
+      "lesson_memo": "$lesson_memo",
+      "membership_key": "$membership_key",
+      "previous_homework": "$previous_homework",
+      "previous_homework_assessment": "$previous_homework_assessment",
+      "previous_lesson_memo": "$previous_lesson_memo",
+      "previous_progress": "$previous_progress",
+      "previous_record_key": "$previous_record_key",
+      "progress": "$progress",
+      "record_key": "$record_key",
+      "student_id": "$student_id",
+      "student_name": "$student_name"
+     }
+    }
+   ],
+   "submission_criteria": []
+  }
+ },
+ "domain": "lessonfix",
+ "format": "ontology-schema/v1",
+ "functions": {},
+ "grants": [
+  {
+   "actions": [
+    "put"
+   ],
+   "derive": [],
+   "principal": "agent",
+   "read": [
+    "lesson_record"
+   ],
+   "scope": {}
+  }
+ ],
+ "link_types": {},
+ "namespace": {
+  "account": "root",
+  "instance": "fixture"
+ },
+ "object_types": {
+  "lesson_record": {
+   "description": "Invented fixture of the replay tests: one daily record per student and date.",
+   "owner": "ontology",
+   "primary_key": {
+    "from": "$action_id"
+   },
+   "properties": {
+    "attendance": {
+     "max_bytes": 2000,
+     "required": false,
+     "type": "string"
+    },
+    "cut_fields": {
+     "required": false,
+     "type": "integer"
+    },
+    "daily_test_assessment": {
+     "max_bytes": 2000,
+     "required": false,
+     "type": "string"
+    },
+    "homework": {
+     "max_bytes": 2000,
+     "required": false,
+     "type": "string"
+    },
+    "lesson_date": {
+     "max_bytes": 2000,
+     "required": false,
+     "type": "string"
+    },
+    "lesson_memo": {
+     "max_bytes": 2000,
+     "required": false,
+     "type": "string"
+    },
+    "membership_key": {
+     "max_bytes": 2000,
+     "required": false,
+     "type": "string"
+    },
+    "previous_homework": {
+     "max_bytes": 2000,
+     "required": false,
+     "type": "string"
+    },
+    "previous_homework_assessment": {
+     "max_bytes": 2000,
+     "required": false,
+     "type": "string"
+    },
+    "previous_lesson_memo": {
+     "max_bytes": 2000,
+     "required": false,
+     "type": "string"
+    },
+    "previous_progress": {
+     "max_bytes": 2000,
+     "required": false,
+     "type": "string"
+    },
+    "previous_record_key": {
+     "max_bytes": 2000,
+     "required": false,
+     "type": "string"
+    },
+    "progress": {
+     "max_bytes": 2000,
+     "required": false,
+     "type": "string"
+    },
+    "record_key": {
+     "max_bytes": 2000,
+     "required": false,
+     "type": "string"
+    },
+    "student_id": {
+     "max_bytes": 2000,
+     "required": false,
+     "type": "string"
+    },
+    "student_name": {
+     "max_bytes": 2000,
+     "required": false,
+     "type": "string"
+    }
+   }
+  }
+ },
+ "scope_keys": [],
+ "sources": {},
+ "value_types": {},
+ "version": 1,
+ "views": {}
+}
