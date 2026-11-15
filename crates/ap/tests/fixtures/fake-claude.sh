@@ -57,6 +57,33 @@ case "$mode" in
   script)  # runs `script-<account basename>.sh` in the cwd; its stdout is the answer (tests/unit.rs)
            init; tool; text=$(bash "$here/script-$(basename "$CLAUDE_CONFIG_DIR").sh")
            python3 -I -c 'import json,sys; print(json.dumps({"type":"result","subtype":"success","is_error":False,"num_turns":2,"result":sys.argv[1],"session_id":sys.argv[2],"usage":{"input_tokens":1,"output_tokens":1},"permission_denials":[]}))' "$text" "$sid" ;;
+  typed)   # a run with `--json-schema`: one result event per line of the file `object`, whose line is
+           # the raw JSON of that event's `structured_output` (an empty line: the member is absent).
+           # Its `result` is that object as compact JSON text, as the real CLI printed it (Claude
+           # Code 2.1.325); for an event without an object, the same line of the file `resulttext`
+           # (JSON-escaped), else empty. The file `iserror` makes every event an error.
+           init; python3 -I - "$here" "$sid" <<'PY'
+import json, os, sys
+here, sid = sys.argv[1], sys.argv[2]
+objects = open(here + "/object", encoding="utf-8").read().split("\n")
+texts = open(here + "/resulttext", encoding="utf-8").read().split("\n") if os.path.exists(here + "/resulttext") else []
+error = os.path.exists(here + "/iserror")
+for n, line in enumerate(objects):
+    out = {"type": "assistant", "session_id": sid, "message": {"role": "assistant", "content": [
+        {"type": "tool_use", "id": "t1", "name": "StructuredOutput", "input": {}}]}}
+    print(json.dumps(out), flush=True)
+    e = {"type": "result", "subtype": "error_during_execution" if error else "success", "is_error": error,
+         "num_turns": 3, "session_id": sid,
+         "usage": {"input_tokens": 1, "output_tokens": 1}, "permission_denials": [], "api_error_status": None}
+    if line:
+        e["structured_output"] = json.loads(line)
+    if isinstance(e.get("structured_output"), dict):
+        e["result"] = json.dumps(e["structured_output"], separators=(",", ":"))
+    else:
+        e["result"] = json.loads('"' + texts[n] + '"') if n < len(texts) else ""
+    print(json.dumps(e), flush=True)
+PY
+           ;;
   denied)  init; tool; result false 'done' 2 '[{"tool_name":"Bash","tool_use_id":"t1","tool_input":{"command":"git push"}}]' ;;
   file)    init; tool; echo ready > a.txt; result false 'done' 2 ;;
   skeleton) # replays the event skeleton in `skeleton`; the n-th result answers line n of `answers`

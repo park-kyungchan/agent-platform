@@ -2228,3 +2228,327 @@ fn x5_tokens_of_a_resume_whose_chain_cannot_be_followed_are_null() {
     // A chain followed to its end keeps its tokens known.
     assert_ne!(resume(&mut f, "r4.md", "c0.md"), null);
 }
+
+// ---- V1: a typed answer (`answer_schema`) --------------------------------------------------
+
+/// The object the real CLI printed for the probe's schema (verdict, head, notes).
+const OBJECT: &str = r#"{"verdict":"accept","head":"0123abcd","notes":["ok"]}"#;
+/// A schema file whose text is not what a parser would print back.
+const SCHEMA: &str = "{\n  \"type\": \"object\",   \"required\": [\"verdict\"],\n  \"properties\": {\"verdict\": {\"enum\": [\"accept\", \"repair\"]}}\n}\n";
+
+impl Fake {
+    /// A request with the schema file `schema.json` (written with `SCHEMA`).
+    fn typed(&self, out: &str) -> Value {
+        std::fs::write(self.t.join("schema.json"), SCHEMA).unwrap();
+        let mut r = self.request(out);
+        r["answer_schema"] = json!(self.p("schema.json"));
+        r
+    }
+    /// The fake's `typed` mode: one result event per line (see the fixture).
+    fn objects(&self, lines: &[&str], texts: Option<&[&str]>) {
+        self.mode("a1", "typed");
+        std::fs::write(self.t.join("bin/object"), lines.join("\n")).unwrap();
+        let file = self.t.join("bin/resulttext");
+        match texts {
+            Some(texts) => std::fs::write(file, texts.join("\n")).unwrap(),
+            None => drop(std::fs::remove_file(file)),
+        }
+    }
+    /// The CLI's arguments of the launch `n` (from 0), without the program.
+    fn cli_of(&self, n: usize) -> Vec<String> {
+        let launch = &self.launches[n];
+        let at = launch.iter().position(|a| a == "--").unwrap();
+        launch[at + 2..].to_vec()
+    }
+}
+fn pretty(object: &str) -> String {
+    let v: Value = serde_json::from_str(object).unwrap();
+    format!("{}\n", serde_json::to_string_pretty(&v).unwrap())
+}
+fn without_schema(mut cli: Vec<String>) -> Vec<String> {
+    let at = cli.iter().position(|a| a == "--json-schema").unwrap();
+    cli.drain(at..at + 2);
+    cli
+}
+
+/// Point 1: a value that is no such file, and the combinations, refuse before any effect.
+#[test]
+fn v1_p1_an_answer_schema_that_is_not_a_json_object_file_is_refused_before_any_effect() {
+    let mut f = Fake::new();
+    let t = f.t.clone();
+    let big = format!("{{\"description\": \"{}\"}}", "x".repeat(65_536));
+    assert!(big.len() > 65_536);
+    let at_limit = format!("{{\"description\": \"{}\"}}", "x".repeat(65_536 - 19));
+    assert_eq!(at_limit.len(), 65_536);
+    std::fs::write(t.join("big.json"), big).unwrap();
+    std::fs::write(t.join("limit.json"), at_limit).unwrap();
+    std::fs::write(t.join("array.json"), "[1]").unwrap();
+    std::fs::write(t.join("text.json"), "not json").unwrap();
+    std::fs::write(t.join("empty.json"), "").unwrap();
+    std::fs::write(t.join("trail.json"), "{} x").unwrap();
+    std::fs::create_dir(t.join("dir.json")).unwrap();
+    std::os::unix::fs::symlink(t.join("nowhere.json"), t.join("dangling.json")).unwrap();
+    let bad = [
+        json!(null),
+        json!(7),
+        json!(""),
+        json!({"type": "object"}),
+        json!("schema.json"),
+        json!(f.p("missing.json")),
+        json!(f.p("dangling.json")),
+        json!(f.p("dir.json")),
+        json!(f.p("big.json")),
+        json!(f.p("array.json")),
+        json!(f.p("text.json")),
+        json!(f.p("empty.json")),
+        json!(f.p("trail.json")),
+    ];
+    for value in bad {
+        let mut r = f.request("s.md");
+        r["answer_schema"] = value.clone();
+        assert_eq!(code(f.run(&r)), "invalid_input@answer_schema", "{value}");
+    }
+    // The limit itself is admitted.
+    let mut r = f.request("ok.md");
+    r["answer_schema"] = json!(f.p("limit.json"));
+    f.objects(&[OBJECT], None);
+    assert_eq!(f.run(&r).unwrap().1, 0);
+    // The member with `expect.first_line`, with or without a `file`.
+    let mut r = f.typed("s.md");
+    r["expect"] = json!({"first_line": "Verdict: *"});
+    assert_eq!(code(f.run(&r)), "invalid_input@answer_schema");
+    r["expect"] = json!({"first_line": "Verdict: *", "file": f.p("e.md")});
+    assert_eq!(code(f.run(&r)), "invalid_input@answer_schema");
+    // The member with the Codex runtime.
+    let mut r = f.codex("s.md");
+    r["answer_schema"] = json!(f.p("schema.json"));
+    assert_eq!(code(f.run(&r)), "invalid_input@answer_schema");
+    // `expect.file` alone is no obstacle.
+    let mut r = f.typed("file.md");
+    r["expect"] = json!({"file": f.p("e.md")});
+    assert_eq!(f.run(&r).unwrap().0["unmet"], "file");
+    // Before any effect: one launch only (the admitted ones above), and no file of a refused out.
+    assert_eq!(f.launches.len(), 2);
+    assert!(!t.join("s.md.run.json").exists() && !t.join("s.md").exists());
+    assert!(!t.join("s.md.stream.jsonl").exists());
+}
+
+/// Point 2: without the member nothing of a call changes: the argument list has no schema flag,
+/// the record no member, and a `structured_output` in the stream is not read.
+#[test]
+fn v1_p2_without_the_member_nothing_changes() {
+    let mut f = Fake::new();
+    f.objects(&[OBJECT], Some(&["unused"]));
+    let (v, status) = f.run(&f.request("n.md")).unwrap();
+    assert_eq!((status, v["state"].as_str()), (0, Some("ok")), "{v}");
+    assert!(!f.cli_of(0).iter().any(|a| a == "--json-schema"));
+    assert!(v.get("answer_schema").is_none());
+    // The text of the `result` member, not the object, is the answer.
+    assert_eq!(std::fs::read_to_string(f.p("n.md")).unwrap(), OBJECT);
+    assert_ne!(
+        std::fs::read_to_string(f.p("n.md")).unwrap(),
+        pretty(OBJECT)
+    );
+    // A pattern still applies to the text, and a result without text is still no answer.
+    f.objects(&["null"], None);
+    let mut r = f.request("m.md");
+    r["expect"] = json!({"first_line": "Verdict: *"});
+    let (v, status) = f.run(&r).unwrap();
+    assert_eq!((status, v["unmet"].as_str()), (3, Some("answer")), "{v}");
+}
+
+/// Point 3: the flag and the file's text, for a first run and a resume; nothing else changes; the
+/// record holds the file's path and digest from the launch on.
+#[test]
+fn v1_p3_the_argument_list_gains_the_schema_and_the_record_names_the_file() {
+    let mut f = Fake::new();
+    f.objects(&[OBJECT], None);
+    // A first run without and with the member.
+    let (plain, _) = f.run(&f.request("p.md")).unwrap();
+    let (v, status) = f.run(&f.typed("t.md")).unwrap();
+    assert_eq!((status, v["state"].as_str()), (0, Some("ok")), "{v}");
+    let (plain_cli, cli) = (f.cli_of(0), f.cli_of(1));
+    let at = cli.iter().position(|a| a == "--json-schema").unwrap();
+    assert_eq!(cli[at + 1], SCHEMA, "the file's text, as it is");
+    assert_eq!(cli.len(), plain_cli.len() + 2);
+    // Everything else is the same but the session of the run.
+    let (mut a, mut b) = (without_schema(cli.clone()), plain_cli);
+    assert_eq!((a.pop().is_some(), b.pop().is_some()), (true, true));
+    assert_eq!(a, b);
+    assert!(cli.contains(&"--session-id".to_owned()) && !cli.contains(&"--resume".to_owned()));
+    assert_eq!(v["session"].as_str(), cli.last().map(String::as_str));
+    assert_ne!(v["session"], plain["session"]);
+    let want = json!({"path": f.p("schema.json"), "sha256": f.sha("schema.json")});
+    assert_eq!(v["answer_schema"], want);
+    assert_eq!(f.record("t.md")["answer_schema"], want);
+    // A resume, without and with the member: only the two arguments differ.
+    f.objects(&[OBJECT], None);
+    let (r1, _) = f
+        .run(&f.resume(f.request("r1.md"), "r1.md", "t.md"))
+        .unwrap();
+    assert_eq!(r1["state"], "ok");
+    let (r2, _) = f.run(&f.resume(f.typed("r2.md"), "r2.md", "t.md")).unwrap();
+    assert_eq!(
+        (r2["state"].as_str(), &r2["answer_schema"]),
+        (Some("ok"), &want)
+    );
+    let n = f.launches.len();
+    let (plain_cli, cli) = (f.cli_of(n - 2), f.cli_of(n - 1));
+    assert!(cli.contains(&"--resume".to_owned()) && !cli.contains(&"--session-id".to_owned()));
+    let at = cli.iter().position(|a| a == "--json-schema").unwrap();
+    assert_eq!(cli[at + 1], SCHEMA);
+    assert_eq!(without_schema(cli), plain_cli);
+    assert_eq!(r2["session"], v["session"]);
+}
+
+/// The record holds `answer_schema` while the CLI is still running (the fake copies it).
+#[test]
+fn v1_p3_the_running_record_names_the_schema_file() {
+    let mut f = Fake::new();
+    std::fs::write(f.t.join("bin/watch"), f.p("w.md.run.json")).unwrap();
+    f.mode("a1", "watch");
+    let (v, _) = f.run(&f.typed("w.md")).unwrap();
+    let seen: Value =
+        serde_json::from_slice(&std::fs::read(f.t.join("bin/seen.json")).unwrap()).unwrap();
+    assert_eq!(seen["state"], "running");
+    assert_eq!(
+        seen["answer_schema"],
+        json!({"path": f.p("schema.json"), "sha256": f.sha("schema.json")})
+    );
+    assert_eq!(v["answer_schema"], seen["answer_schema"]);
+}
+
+/// Point 4: the object is the answer: pretty-printed with one newline; the digest is the file's.
+#[test]
+fn v1_p4_the_answer_file_holds_the_object() {
+    let mut f = Fake::new();
+    // The `result` text is not the object's pretty text: the object is what is written.
+    f.objects(&[OBJECT], None);
+    let (v, status) = f.run(&f.typed("o.md")).unwrap();
+    assert_eq!((status, v["state"].as_str()), (0, Some("ok")), "{v}");
+    let bytes = std::fs::read_to_string(f.p("o.md")).unwrap();
+    assert_eq!(bytes, pretty(OBJECT));
+    assert!(bytes.ends_with("}\n") && !bytes.ends_with("\n\n") && bytes.contains("\n  \"head\""));
+    assert_eq!(
+        v["answer"],
+        json!({"path": f.p("o.md"), "sha256": f.sha("o.md")})
+    );
+    assert_eq!(v["expect_met"], true);
+    assert!(v["unmet"].is_null());
+    // An object with no member is an object.
+    f.objects(&["{}"], None);
+    let (v, status) = f.run(&f.typed("e.md")).unwrap();
+    assert_eq!((status, v["state"].as_str()), (0, Some("ok")), "{v}");
+    assert_eq!(std::fs::read_to_string(f.p("e.md")).unwrap(), "{}\n");
+    // No temporary file is left beside the answer.
+    let left = std::fs::read_dir(&f.t).unwrap().filter_map(Result::ok);
+    assert!(
+        left.filter(|e| e.file_name().to_string_lossy().ends_with(".ap-tmp"))
+            .count()
+            == 0
+    );
+}
+
+/// Point 4: among several results the last one with an object is chosen, a later one without does
+/// not unmake it (an implementer runs to the exit and sees them all).
+#[test]
+fn v1_p4_among_several_results_the_last_with_an_object_is_chosen() {
+    let mut f = Fake::new();
+    let (a, b) = (
+        r#"{"verdict":"accept","n":1}"#,
+        r#"{"verdict":"repair","n":2}"#,
+    );
+    let typed = |f: &Fake, out: &str| {
+        let mut r = f.typed(out);
+        r["role"] = json!("implementer");
+        r
+    };
+    f.objects(&[a, b, ""], Some(&["", "", "late prose"]));
+    let (v, status) = f.run(&typed(&f, "c1.md")).unwrap();
+    assert_eq!(
+        (status, v["state"].as_str(), v["results"].as_u64()),
+        (0, Some("ok"), Some(3)),
+        "{v}"
+    );
+    assert_eq!(std::fs::read_to_string(f.p("c1.md")).unwrap(), pretty(b));
+    f.objects(&["", a], Some(&["early prose", ""]));
+    let (v, status) = f.run(&typed(&f, "c2.md")).unwrap();
+    assert_eq!((status, v["state"].as_str()), (0, Some("ok")), "{v}");
+    assert_eq!(std::fs::read_to_string(f.p("c2.md")).unwrap(), pretty(a));
+    // No result has an object: the last one is judged.
+    f.objects(&["", "null", "[1]"], Some(&["", "", "last prose"]));
+    let (v, _) = f.run(&typed(&f, "c3.md")).unwrap();
+    assert_eq!(
+        (v["state"].as_str(), v["unmet"].as_str()),
+        (Some("no_result"), Some("schema")),
+        "{v}"
+    );
+    assert_eq!(std::fs::read_to_string(f.p("c3.md")).unwrap(), "last prose");
+}
+
+/// Point 5: a chosen result without an object ends `no_result` with `unmet: schema`; the text is
+/// saved when it is not empty.
+#[test]
+fn v1_p5_a_result_without_an_object_is_no_result_schema() {
+    let mut f = Fake::new();
+    for (n, line) in ["", "null", "[1]", "\"text\"", "7", "true"]
+        .iter()
+        .enumerate()
+    {
+        let out = format!("m{n}.md");
+        f.objects(&[line], Some(&["prose of the model"]));
+        let (v, status) = f.run(&f.typed(&out)).unwrap();
+        assert_eq!(
+            (
+                status,
+                v["state"].as_str(),
+                v["unmet"].as_str(),
+                v["expect_met"].as_bool()
+            ),
+            (3, Some("no_result"), Some("schema"), Some(false)),
+            "{line} {v}"
+        );
+        assert_eq!(
+            std::fs::read_to_string(f.p(&out)).unwrap(),
+            "prose of the model"
+        );
+        let sha = f.sha(&out);
+        assert_eq!(
+            v["answer"],
+            json!({"path": f.p(&out), "sha256": sha}),
+            "{line}"
+        );
+        assert_eq!(f.record(&out), v);
+    }
+    // Without text: no answer file and no answer in the record, the same cause.
+    f.objects(&[""], None);
+    let (v, status) = f.run(&f.typed("none.md")).unwrap();
+    assert_eq!(
+        (status, v["state"].as_str(), v["unmet"].as_str()),
+        (3, Some("no_result"), Some("schema")),
+        "{v}"
+    );
+    assert!(v["answer"].is_null() && !f.t.join("none.md").exists());
+}
+
+/// Point 5: an error and a cut end as today, also when an object came with them.
+#[test]
+fn v1_p5_an_error_and_a_cut_end_as_today() {
+    let mut f = Fake::new();
+    std::fs::write(f.t.join("bin/iserror"), "").unwrap();
+    f.objects(&[OBJECT], Some(&[""]));
+    let (v, status) = f.run(&f.typed("err.md")).unwrap();
+    assert_eq!(
+        (status, v["state"].as_str(), v["unmet"].is_null()),
+        (3, Some("failed"), true),
+        "{v}"
+    );
+    assert!(!f.t.join("err.md").exists());
+    // A cut: an error result with the usage-limit text (no object, as the CLI printed none).
+    f.objects(
+        &[""],
+        Some(&["You have hit your 5-hour limit · resets 6:30pm (UTC)"]),
+    );
+    let (v, status) = f.run(&f.typed("cut.md")).unwrap();
+    assert_eq!((status, v["state"].as_str()), (75, Some("cut")), "{v}");
+}

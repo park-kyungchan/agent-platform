@@ -35,7 +35,7 @@ const MODES: [&str; 6] = [
 const KEEP: [&str; 10] = [
     "PATH", "HOME", "USER", "LOGNAME", "SHELL", "LANG", "LC_ALL", "TERM", "TMPDIR", "TZ",
 ];
-const MEMBERS: [&str; 20] = [
+const MEMBERS: [&str; 21] = [
     "role",
     "runtime",
     "account",
@@ -56,7 +56,10 @@ const MEMBERS: [&str; 20] = [
     "bind",
     "skills",
     "memory",
+    "answer_schema",
 ];
+/// The largest file of `answer_schema`, in bytes.
+const SCHEMA_MAX: u64 = 65_536;
 /// The unit's own bound runs this long past the request's: `ap run` stops the unit first, and the
 /// bound still ends it when `ap run` is gone.
 const GRACE: u64 = 10;
@@ -91,6 +94,8 @@ struct Request {
     timeout: u64,
     expect_file: Option<String>,
     expect_line: Option<String>,
+    /// The file of `answer_schema`: its path, text and digest as read.
+    schema: Option<(String, String, String)>,
     mcp: Vec<String>,
     /// The session, account and record path of the earlier run this one continues.
     resume: Option<(String, String, String)>,
@@ -319,6 +324,26 @@ fn request_at(s: &mut impl System, r: &Value, at_cwd: bool) -> Result<Request, F
             expect_line = Some(line.to_owned());
         }
     }
+    // A typed answer is the Claude CLI's: its answer is the object, not a text with a first line.
+    let schema = match r.get("answer_schema") {
+        None => None,
+        Some(_) => {
+            require!(!codex && expect_line.is_none() => "invalid_input", "answer_schema");
+            let file = path(r, "answer_schema")?;
+            let regular =
+                std::fs::metadata(&file).is_ok_and(|m| m.is_file() && m.len() <= SCHEMA_MAX);
+            let bytes = s
+                .read(&file)
+                .ok()
+                .filter(|b| regular && b.len() as u64 <= SCHEMA_MAX);
+            let text = bytes.and_then(|b| String::from_utf8(b).ok());
+            let object = text.as_deref().map(serde_json::from_str::<Value>);
+            require!(object.is_some_and(|v| v.is_ok_and(|v| v.is_object())) => "invalid_input", "answer_schema");
+            let text = text.unwrap_or_default();
+            let sha = digest(text.as_bytes());
+            Some((file, text, sha))
+        }
+    };
     for (i, a) in accounts.iter().enumerate() {
         admit(s, a, if i == 0 { "account" } else { "next_accounts" })?;
     }
@@ -451,6 +476,7 @@ fn request_at(s: &mut impl System, r: &Value, at_cwd: bool) -> Result<Request, F
         timeout,
         expect_file,
         expect_line,
+        schema,
         mcp,
         spent: match (&earlier, codex) {
             (Some((_, (_, _, file))), true) => spent(file),
@@ -716,28 +742,54 @@ fn judge(
     if let Some(id) = e["session_id"].as_str().filter(|id| !id.is_empty()) {
         record["session"] = json!(id);
     }
-    let answer = e["result"].as_str().unwrap_or("");
+    // A typed answer is the object, as JSON text; a result without one is saved as its text.
+    let typed = q.schema.is_some();
+    let object = e["structured_output"].as_object().filter(|_| typed);
+    let body = match object {
+        Some(o) => [
+            serde_json::to_vec_pretty(o).unwrap_or_default(),
+            b"\n".to_vec(),
+        ]
+        .concat(),
+        None => e["result"].as_str().unwrap_or("").as_bytes().to_vec(),
+    };
+    let missed = typed && object.is_none();
     if cut(seen, e) {
         "cut"
     } else if e["is_error"] == true {
         "failed"
-    } else if answer.is_empty() {
+    } else if body.is_empty() && !missed {
         record["unmet"] = json!("answer");
         "no_result"
-    } else if write(&q.out, answer.as_bytes()).is_err() {
+    } else if !body.is_empty() && write(&q.out, &body).is_err() {
         *write_failed = true;
         record["unmet"] = json!("write");
         "failed"
     } else {
-        record["answer"] = json!({"path": q.out, "sha256": digest(answer.as_bytes())});
-        let first = answer.lines().next().unwrap_or("");
-        if q.expect_file
+        if !body.is_empty() {
+            record["answer"] = json!({"path": q.out, "sha256": digest(&body)});
+        }
+        if missed {
+            record["unmet"] = json!("schema");
+            "no_result"
+        } else if q
+            .expect_file
             .as_deref()
             .is_some_and(|f| !written(f, &q.expect_before))
         {
             record["unmet"] = json!("file");
             "no_result"
-        } else if q.expect_line.as_deref().is_some_and(|p| !glob(p, first)) {
+        } else if q.expect_line.as_deref().is_some_and(|p| {
+            !glob(
+                p,
+                e["result"]
+                    .as_str()
+                    .unwrap_or("")
+                    .lines()
+                    .next()
+                    .unwrap_or(""),
+            )
+        }) {
             record["unmet"] = json!("first_line");
             "no_result"
         } else {
@@ -781,12 +833,17 @@ fn cut(seen: &Seen, e: &Value) -> bool {
 fn chosen<'a>(q: &Request, seen: &'a Seen) -> Option<&'a Value> {
     let meets = |e: &&Value| {
         let answer = e["result"].as_str().unwrap_or("");
+        let typed = q.schema.is_some();
         e["is_error"] != true
-            && !answer.is_empty()
             && !cut(seen, e)
-            && q.expect_line
-                .as_deref()
-                .is_none_or(|p| glob(p, answer.lines().next().unwrap_or("")))
+            && if typed {
+                e["structured_output"].is_object()
+            } else {
+                !answer.is_empty()
+                    && q.expect_line
+                        .as_deref()
+                        .is_none_or(|p| glob(p, answer.lines().next().unwrap_or("")))
+            }
     };
     seen.results
         .iter()
@@ -839,6 +896,9 @@ fn claude_args(q: &Request, argv: &mut Vec<String>, resume: Option<&str>, sessio
     }
     if !q.skills {
         argv.push("--disable-slash-commands".into());
+    }
+    if let Some((_, text, _)) = &q.schema {
+        argv.extend(args(&["--json-schema", text]));
     }
     argv.extend(args(&[
         if resume.is_some() {
@@ -914,6 +974,9 @@ fn attempt(
         "expect_file_before": q.expect_before, "unmet": null,
         "resumes": q.resume.as_ref().map(|(_, _, file)| file),
     });
+    if let Some((path, _, sha256)) = &q.schema {
+        record["answer_schema"] = json!({"path": path, "sha256": sha256});
+    }
     let not_launched = |mut record: Value, unmet: &str| {
         record["state"] = json!("failed");
         record["unmet"] = json!(unmet);
