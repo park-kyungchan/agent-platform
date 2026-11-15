@@ -47,6 +47,9 @@ pub trait System {
     fn work_root(&self) -> PathBuf {
         PathBuf::from(ROOT)
     }
+    fn cwd(&self) -> std::io::Result<PathBuf> {
+        std::env::current_dir()
+    }
     /// The resolved path of an existing directory.
     fn directory(&self, path: &str) -> std::io::Result<PathBuf> {
         let resolved = std::fs::canonicalize(path)?;
