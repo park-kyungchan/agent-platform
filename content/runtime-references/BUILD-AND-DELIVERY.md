@@ -22,7 +22,7 @@ Each stage is a separate fact with its own evidence. A later stage does not show
 One Cargo build or test runs on the host at a time. Every Cargo command of every task takes the same lock:
 
 ```sh
-flock /home/palantirkc/work/ws-replan/wt/.host-cargo.lock env \
+flock /var/lib/agent-platform/build.lock env \
   CARGO_TARGET_DIR="<target root>" CARGO_BUILD_JOBS=2 RUST_TEST_THREADS=2 \
   CARGO_INCREMENTAL=0 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 \
   cargo <arguments>

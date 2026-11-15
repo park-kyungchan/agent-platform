@@ -70,7 +70,7 @@ A task's current holds, decisions, KPI values and worker runs are in the Ontolog
 | Installed shared instructions | `/root/.agents/AGENTS.md`, `runtime-references/`, `skills/` | `agent-platform` `content/` |
 | Delivery of `ap` and the shared instructions | the timer `ap-deliver.timer`; its request `/etc/agent-platform/deliver.json`; its state under `/var/lib/agent-platform/deliver/` | `agent-platform` `deploy/README.md` |
 | Configuration of each CLI | `CLI-RUNTIMES.md` section 1 | that CLI |
-| Cargo build lock of the host | `/home/palantirkc/work/ws-replan/wt/.host-cargo.lock` | `BUILD-AND-DELIVERY.md` section 2 |
+| Cargo build lock of the host | `/var/lib/agent-platform/build.lock` | `BUILD-AND-DELIVERY.md` section 2 |
 
 ## 5. External tools
 
