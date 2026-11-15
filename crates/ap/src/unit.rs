@@ -775,7 +775,9 @@ fn fix(s: &mut impl System, r: &Value, u: &mut Unit) -> Result<Option<Value>, St
     let refused = |f: Failure| stop("stage_refused", json!({"code": f.code, "field": f.field}));
     let (run, _) = crate::run::execute(s, &req).map_err(refused)?;
     u.rec["repair"]["state"] = run["state"].clone();
-    if run["state"] != "ok" {
+    // The fixer's state is on disk before the wait; a record that cannot hold it starts no come-back.
+    u.save();
+    if run["state"] != "ok" || !u.clean {
         return Ok(None);
     }
     let lead = text(&r["repair"], "verifier_prompt")?;
@@ -794,6 +796,8 @@ fn fix(s: &mut impl System, r: &Value, u: &mut Unit) -> Result<Option<Value>, St
             s.pause(Duration::from_secs(5));
         }
     }
+    // The wait can last: the come-back's verifier prompt is still the file the first record holds.
+    unchanged(&u.rec["repair"]["verifier_prompt"], lead)?;
     let mut next = r.clone();
     if let Some(o) = next.as_object_mut() {
         o.remove("repair");

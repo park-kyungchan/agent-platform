@@ -401,6 +401,12 @@ impl U {
             return None;
         }
         std::fs::write(self.t.join("view-lag"), (lag - 1).to_string()).unwrap();
+        // A file named in `lag-append` gets one more line at each such reading.
+        if let Ok(path) = std::fs::read_to_string(self.t.join("lag-append")) {
+            let mut bytes = std::fs::read(path.trim()).unwrap();
+            bytes.extend(b"appended during the wait\n");
+            std::fs::write(path.trim(), bytes).unwrap();
+        }
         let old = std::fs::read_to_string(self.t.join("old-head")).ok()?;
         Some(old.trim().to_owned())
     }
@@ -3426,6 +3432,32 @@ fn r4_the_come_back_waits_until_github_reports_the_pushed_head() {
     assert_eq!(head_readings(&u), 5);
     assert!(u.clock >= Duration::from_secs(10), "{:?}", u.clock);
     assert!(u.record("u1")["repair"].get("cause").is_none());
+}
+
+#[test]
+fn r4_a_verifier_prompt_changed_during_the_wait_ends_digest_differs() {
+    let mut u = U::new();
+    let t = u.t.display();
+    // While GitHub still reports the old head, a line is appended to the come-back's verifier
+    // prompt: the file is not the one the first record holds.
+    fixing(
+        &u,
+        &format!(
+            "git rev-parse HEAD > {t}/old-head; echo 2 > {t}/view-lag; \
+             echo {t}/judge/verifier2.md > {t}/lag-append; {FIX}"
+        ),
+    );
+    u.script("a2", VERIFY_AFTER_FIX);
+    let (v, code) = u.run(&r4_request(&u)).unwrap();
+    assert_eq!(code, 3, "{v}");
+    assert_eq!(v, u.record("u1"), "stdout is the first record");
+    assert_eq!(
+        (&v["repair"]["state"], &v["repair"]["cause"]),
+        (&json!("ok"), &json!("digest_differs"))
+    );
+    assert_eq!(u.launches, 3, "no stage of a come-back");
+    assert!(!exists(&u, "work/task/u1-2.unit.json"));
+    assert!(u.statuses().is_empty() && u.merges().is_empty());
 }
 
 #[test]
