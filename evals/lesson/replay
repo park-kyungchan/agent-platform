@@ -13,7 +13,9 @@ import collections
 import datetime
 import glob
 import json
+import os
 import re
+import signal
 import subprocess
 import sys
 import unicodedata
@@ -27,6 +29,7 @@ MEMBERS = ("lesson_date", "student_name", "student_id", "membership_key", "recor
            *FIELDS.values(), *PREVIOUS.values())
 OUTCOMES = ("unavailable", "malformed", "saved_later", "no_object", "ambiguous", "identity_differs", "compared")
 WORDS = ("equal", "equal_after_whitespace", "store_cut", "store_missing", "differs")
+BAD = {"status": "observed"}  # the answer of a call whose result has a member of another type: observed, with no fields
 KEYS = ("key_equal", "key_missing", "key_differs")
 SEOUL = datetime.timezone(datetime.timedelta(hours=9))  # no daylight saving time in Seoul
 
@@ -59,12 +62,14 @@ def lines(path):
 
 
 def blocks(raw):
-    """The content blocks of a session-record line (a JSON object), and the line itself."""
+    """The line (a JSON object; {} for any other line) and its content blocks."""
     try:
         o = json.loads(raw)
     except ValueError:
         return {}, []
-    m = o.get("message") if isinstance(o, dict) else None
+    if not isinstance(o, dict):
+        return {}, []
+    m = o.get("message")
     c = m.get("content") if isinstance(m, dict) else None
     return o, [b for b in c if isinstance(b, dict)] if isinstance(c, list) else []
 
@@ -96,9 +101,12 @@ def read_answers(files, calls):
                 c = calls.get(b.get("tool_use_id")) if b.get("type") == "tool_result" and isinstance(b.get("tool_use_id"), str) else None
                 if c is not None and c["answer"] is None:
                     body = b.get("content")
-                    text = body if isinstance(body, str) else "".join(x.get("text", "") for x in body if isinstance(x, dict)) if isinstance(body, list) else ""
+                    parts = [body] if isinstance(body, str) else [x.get("text", "") for x in body if isinstance(x, dict)] if isinstance(body, list) else [""]
+                    if not all(isinstance(x, str) for x in parts):
+                        c["answer"] = BAD
+                        continue
                     try:
-                        ans = json.loads(text)
+                        ans = json.loads("".join(parts))
                     except ValueError:
                         ans = None
                     c["answer"] = ans if isinstance(ans, dict) else {}
@@ -163,19 +171,21 @@ def key_word(stored, recorded):
 
 
 def parse_get(ans):
-    """(date, handle, {field: (value, target)}) of an observed answer, or None when it lacks the six fields."""
-    fields = ans.get("fields")
-    if not isinstance(fields, list) or not isinstance(ans.get("lessonDate"), str):
+    """(date, handle, {field: (value, target)}) of an observed answer; None when it lacks the six fields or a member has another type."""
+    fields, handle = ans.get("fields"), ans.get("authoringHandle", {})
+    if not isinstance(fields, list) or not isinstance(ans.get("lessonDate"), str) or not isinstance(handle, dict) \
+            or not isinstance(handle.get("observationHandle", ""), str):
         return None
     got = {}
     for f in fields:
         if isinstance(f, dict) and f.get("field") in FIELDS and isinstance(f.get("before"), dict) and isinstance(f["before"].get("value"), str) \
                 and isinstance(f.get("target"), dict) and f["field"] not in got:
+            if not all(isinstance(f["target"].get(k, ""), str) for k in ("studentId", "membershipId", "recordId", "courseId", "lessonDate")):
+                return None
             got[f["field"]] = (f["before"]["value"], f["target"])
     if set(got) != set(FIELDS):
         return None
-    h = ans.get("authoringHandle")
-    return ans["lessonDate"], h.get("observationHandle") if isinstance(h, dict) else None, got
+    return ans["lessonDate"], handle.get("observationHandle"), got
 
 
 def session_files(pattern):
@@ -280,7 +290,6 @@ def main(argv):
     ap.add_argument("--sessions")
     ap.add_argument("--lesson-cwd", default="/home/palantirkc/work/edu-lessons")
     ap.add_argument("--ont", default="ont")
-    ap.add_argument("--client", help="accepted and not passed: `ont` refuses --client on describe and search")
     ap.add_argument("--cut-marker", default="\u2026", help="the store's cut marker, removed from the end of a cut text")
     a = ap.parse_args(argv)
     for d in a.day:
@@ -290,17 +299,27 @@ def main(argv):
             datetime.date.fromisoformat(d)
         except ValueError:
             raise Stop("day_invalid")
-    print(json.dumps(replay(a, sorted(set(a.day)))))
+    return replay(a, sorted(set(a.day)))
+
+
+def emit(result, code):
+    """The one line on standard output, then the exit; a closed standard output ends with code 2 and nothing else."""
+    try:
+        sys.stdout.write(json.dumps(result) + "\n")
+        sys.stdout.flush()
+    except (OSError, AttributeError, ValueError):
+        os._exit(2)
+    sys.exit(code)
 
 
 if __name__ == "__main__":
     try:
-        main(sys.argv[1:])
+        emit(main(sys.argv[1:]), 0)
     except Stop as e:
-        print(json.dumps({"status": str(e)}))
-        sys.exit(2)
+        result = {"status": str(e)}
     except SystemExit:
         raise
-    except Exception as e:
-        print(json.dumps({"status": "internal_error", "exception": type(e).__name__}))
-        sys.exit(2)
+    except BaseException as e:
+        signal.signal(signal.SIGINT, signal.SIG_IGN)  # a second interrupt must not break the one line
+        result = {"status": "interrupted"} if isinstance(e, KeyboardInterrupt) else {"status": "internal_error", "exception": type(e).__name__}
+    emit(result, 2)

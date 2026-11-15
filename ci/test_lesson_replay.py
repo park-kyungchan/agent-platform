@@ -11,10 +11,12 @@ import hashlib
 import json
 import os
 import shutil
+import signal
 import stat
 import subprocess
 import sys
 import tempfile
+import time
 import unittest
 from pathlib import Path
 
@@ -25,6 +27,7 @@ ONT = os.environ.get("ONT_BIN", "")
 GET = "mcp__academy_operations__academy_dailyrecord_get"
 SAVE = "mcp__academy_operations__academy_dailyrecord_save"
 MARK = "LEAKMARK"
+PREFIX_TEXT = "mcp__academy_operations__academy_dailyrecord_get"  # a line holding it is parsed
 LESSON = "/lesson"
 FIELDS = {"attendance": "attendance", "dailyTestAssessment": "daily_test_assessment", "homework": "homework",
           "lessonMemo": "lesson_memo", "previousHomeworkAssessment": "previous_homework_assessment", "progress": "progress"}
@@ -272,6 +275,7 @@ class Replay(unittest.TestCase):
         self.fails(self.run_script(days=("20261112",)), "day_invalid")
         self.fails(self.run_script(days=()), "bad_arguments")
         self.fails(self.run_script("--no-such-option"), "bad_arguments")
+        self.fails(self.run_script("--client", "x"), "bad_arguments")  # the engine refuses the flag on reads: the option is not offered
         self.fails(self.run_script(store=self.tmp / "absent.sqlite"), "store_unreadable")
         self.fails(self.run_script(ont=str(self.tmp / "no-such-ont")), "ont_not_found")
         self.fails(self.run_script(ont=self.fake_ont(f"echo {MARK}; echo {MARK} >&2; exit 1")), "ont_failed")
@@ -279,6 +283,84 @@ class Replay(unittest.TestCase):
         self.fails(self.run_script(ont=self.fake_ont(f"echo '{{\"result\":{{\"object_types\":[]}},\"m\":\"{MARK}\"}}'; exit 1")), "ont_failed")
         self.fails(self.run_script(ont=self.fake_ont(f"echo '\"{MARK}\"'")), "internal_error", {"exception": "TypeError"})
         self.fails(self.run_script(ont=self.fake_ont(f'case "$*" in *describe*) exec {ONT} "$@";; *) echo {MARK}; echo {MARK} >&2; exit 1;; esac')), "ont_failed")
+
+    # --- an interrupt, a closed standard output, records and answers of an unexpected type
+
+    def start(self, ont, *args):
+        cmd = [sys.executable, "-I", "-B", str(SCRIPT), "--store", str(self.store), "--day", DAY, "--lesson-cwd", LESSON, "--ont", ont,
+               "--sessions", str(self.sessions / "*.jsonl"), *args]
+        return subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+
+    def wait_for(self, path, proc):
+        for _ in range(600):
+            if path.exists() or proc.poll() is not None:
+                return
+            time.sleep(0.05)
+        self.fail("the script did not reach the engine")
+
+    def slow_ont(self, first_only=False):
+        """An engine that announces itself and then waits (`exec`, so that it ends when it is killed)."""
+        ready = self.tmp / "ready"
+        wait = f"if [ ! -e {ready} ]; then touch {ready}; sleep 1; fi; exec {ONT} \"$@\"" if first_only else f"touch {ready}; exec sleep 60"
+        return ready, self.fake_ont(wait)
+
+    def test_interrupt_during_an_engine_call_ends_with_one_line(self):
+        self.write(Lines())
+        ready, ont = self.slow_ont()
+        proc = self.start(ont)
+        self.wait_for(ready, proc)
+        proc.send_signal(signal.SIGINT)
+        out, err = proc.communicate(timeout=60)
+        self.assertEqual((proc.returncode, err, out), (2, "", '{"status": "interrupted"}\n'))
+
+    def test_interrupt_while_a_large_record_is_read(self):
+        big = json.dumps({"type": "assistant", "cwd": LESSON, "timestamp": f"{DAY}T03:00:00Z", "note": MARK + "x" * 64_000_000, "n": PREFIX_TEXT})
+        (self.sessions / "big.jsonl").write_text(big + "\n")
+        proc = self.start(ONT)
+        for _ in range(600):  # as soon as the script has the record open
+            if proc.poll() is not None or any(str(self.sessions / "big.jsonl") == os.path.realpath(f"/proc/{proc.pid}/fd/{fd}") for fd in os.listdir(f"/proc/{proc.pid}/fd")):
+                break
+            time.sleep(0.005)
+        proc.send_signal(signal.SIGINT)
+        out, err = proc.communicate(timeout=120)
+        self.assertEqual(err, "")  # the interrupt may come after the last read: then the run is a complete one
+        self.assertIn((proc.returncode, json.loads(out)["status"]), ((2, "interrupted"), (0, "ok")))
+        self.assertNotIn(MARK, out)
+
+    def test_closed_standard_output_ends_with_code_2_and_nothing_on_standard_error(self):
+        L = Lines()
+        self.make(L, 1)
+        self.write(L)
+        ready, ont = self.slow_ont(first_only=True)
+        proc = self.start(ont)
+        self.wait_for(ready, proc)
+        proc.stdout.close()
+        err = proc.stderr.read()
+        proc.stderr.close()
+        proc.wait(timeout=60)
+        self.assertEqual((proc.returncode, err), (2, ""))
+
+    def test_a_record_or_an_answer_of_an_unexpected_type_never_ends_the_run(self):
+        L = Lines()
+        self.make(L, 1)  # one good call
+        self.write(f'["{GET}"]\n"{GET}"\n5\nnull\n' + L.text())
+        L = Lines()
+        L.n = 100  # other call ids than the first file's
+        self.make(L, 2)
+        L.lines[-1]["message"]["content"][0]["content"][0]["text"] = 5  # the result's text is a number
+        listed = answer(base(3))
+        for f in listed["fields"]:
+            f["target"]["studentId"] = ["a", "list"]  # an unhashable id
+        self.make(L, 3, ans=listed)
+        handle = answer(base(4))
+        handle["authoringHandle"]["observationHandle"] = {"a": 1}
+        self.make(L, 4, ans=handle)
+        self.write(L, "b.jsonl")
+        out = self.ok()
+        self.assertEqual(out["calls"], 4)
+        self.assertEqual(out["outcomes"]["compared"], 1)
+        self.assertEqual(out["outcomes"]["malformed"], 3)
+        self.assertEqual(set(out), {"status", "days", "calls", "outcomes", "answered_equal", "fields", "keys", "store", "k3_equal", "k3_of"})
 
     def test_point7_schema_without_members_ends_before_any_read(self):
         schema = json.loads(SCHEMA.read_text())
