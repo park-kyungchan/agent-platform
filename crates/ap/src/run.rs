@@ -1008,7 +1008,7 @@ fn mirror(record: &mut Value, worked: bool) {
 /// What the launch reads on stdin: the prompt file, or after a launch that worked and was cut the
 /// continuation, an empty line and the file's bytes, through a pipe that a thread fills (no file).
 fn input(q: &Request, continued: bool) -> std::io::Result<File> {
-    let mut file = File::open(&q.prompt)?;
+    let file = File::open(&q.prompt)?;
     if !continued {
         return Ok(file);
     }
