@@ -4912,3 +4912,236 @@ fn s9_6_backlog_counts_every_untriaged_row_and_names_at_most_ten_topics() {
     want.extend((0..9).map(|n| format!("topic-e{n:02}")));
     assert_eq!(v["untriaged"]["topics"], json!(want), "the ten oldest");
 }
+
+// ---- the page's block: a unit call without `acceptance` ----------------------------------------
+
+/// A page with a typed block and no line `Write set:`.
+fn block_page(u: &U, block: &Value) {
+    let text = format!("# TASK: a unit\n```unit\n{block}\n```\nOther line\n");
+    std::fs::write(u.t.join("work/task/TASK.md"), text).unwrap();
+}
+fn block(checks: Value) -> Value {
+    json!({"unit": "U-1", "write_set": ["src/**", "notes.md"], "checks": checks})
+}
+fn without_acceptance(u: &U) -> Value {
+    let mut r = u.request();
+    r.as_object_mut().unwrap().remove("acceptance");
+    r
+}
+fn accept_in(t: &std::path::Path) -> (i32, Vec<String>) {
+    let page = t.join("work/task/TASK.md");
+    let out = Command::new(env!("CARGO_BIN_EXE_ap"))
+        .arg("accept")
+        .arg(page)
+        .current_dir(t.join("work/task/wt/repo"))
+        .output()
+        .unwrap();
+    let lines = String::from_utf8(out.stdout).unwrap();
+    (
+        out.status.code().unwrap(),
+        lines.lines().map(str::to_owned).collect(),
+    )
+}
+
+#[test]
+fn p1_a_unit_call_without_acceptance_evaluates_the_blocks_checks_in_process() {
+    let mut u = U::new();
+    let checks = json!({
+        "unchanged": ["README.md"],
+        "adds": [{"path": "src/a.rs", "words": ["fn a"]}],
+        "holds": [{"path": "src/a.rs", "exact": "fn a() {}\n"}],
+        "lines": [{"path": "src/**", "max": 1, "min": 1}]
+    });
+    block_page(&u, &block(checks));
+    let page = std::fs::read(u.t.join("work/task/TASK.md")).unwrap();
+    let (v, code) = u.run(&without_acceptance(&u)).unwrap();
+    assert_eq!(code, 0, "{v}");
+    assert_eq!(v["state"], "merged");
+    assert_eq!(v["acceptance"], Value::Null);
+    assert_eq!(v["write_set"], json!(["src/**", "notes.md"]));
+    assert_eq!(v["page"]["sha256"], sha(&page));
+    assert_eq!(
+        steps(&v).iter().find(|(n, _)| n == "acceptance"),
+        Some(&("acceptance".to_owned(), "passed".to_owned()))
+    );
+    assert!(u.accept_calls().is_empty(), "no executable ran");
+    let log = v["files"]["acceptance_output"].as_str().unwrap();
+    assert_eq!(std::fs::read_to_string(log).unwrap(), "accept: ok\n");
+    assert_eq!(log, u.p("work/task/u1.accept.log"));
+}
+
+#[test]
+fn p2_a_failed_check_stops_the_step_and_ap_accept_fails_the_same_checks() {
+    let mut u = U::new();
+    let checks = json!({
+        "unchanged": ["src/a.rs"],
+        "adds": [{"path": "src/a.rs", "words": ["fn b"]}],
+        "holds": [{"path": "src/a.rs", "exact": "fn a() {}"}],
+        "lines": [{"path": "src/**", "max": 0}]
+    });
+    block_page(&u, &block(checks));
+    let v = u.stop(&without_acceptance(&u), "acceptance", "acceptance_failed");
+    assert_eq!(v["detail"]["count"], 4);
+    let failed: Vec<String> = v["detail"]["checks"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|c| c.as_str().unwrap().to_owned())
+        .collect();
+    assert_eq!(failed.len(), 4);
+    let kinds: Vec<_> = failed
+        .iter()
+        .map(|l| l.split(':').next().unwrap())
+        .collect();
+    assert_eq!(kinds, ["unchanged", "adds", "holds", "lines"]);
+    // The log holds the lines of `ap accept`, and `ap accept` in the worktree prints the same.
+    let log = std::fs::read_to_string(v["files"]["acceptance_output"].as_str().unwrap()).unwrap();
+    let want: Vec<String> = failed
+        .iter()
+        .map(|l| format!("accept: FAILED: {l}"))
+        .collect();
+    assert_eq!(log.lines().map(str::to_owned).collect::<Vec<_>>(), want);
+    assert_eq!(accept_in(&u.t), (1, want));
+    assert_eq!(u.launches, 1, "no verifier after a failed check");
+    assert!(u.accept_calls().is_empty());
+}
+
+#[test]
+fn p2_the_detail_names_at_most_ten_checks_and_the_count() {
+    let mut u = U::new();
+    let words: Vec<String> = (0..12).map(|i| format!("absent{i}")).collect();
+    let checks = json!({"adds": [{"path": "src/a.rs", "words": words}]});
+    block_page(&u, &block(checks));
+    let v = u.stop(&without_acceptance(&u), "acceptance", "acceptance_failed");
+    assert_eq!(v["detail"]["count"], 12);
+    assert_eq!(v["detail"]["checks"].as_array().unwrap().len(), 10);
+    let log = std::fs::read_to_string(u.p("work/task/u1.accept.log")).unwrap();
+    assert_eq!(log.lines().count(), 12);
+}
+
+#[test]
+fn p3_the_step_keeps_its_conditions_and_fetches_before_the_checks() {
+    // The clean tree and the gated head, with today's causes, and no check ran.
+    let mut u = U::new();
+    block_page(&u, &block(json!({})));
+    u.script("a1", &format!("{IMPLEMENT}; echo x > stray.txt"));
+    u.stop(&without_acceptance(&u), "acceptance", "worktree_dirty");
+    assert!(!u.t.join("work/task/u1.accept.log").exists());
+    let mut u = U::new();
+    block_page(&u, &block(json!({})));
+    let local = "git -c user.name=t -c user.email=t@e commit -q --allow-empty -m local";
+    u.script("a1", &format!("{IMPLEMENT}; {local}"));
+    u.stop(&without_acceptance(&u), "acceptance", "head_differs");
+    // `git fetch origin main` in the clone.
+    let mut u = U::new();
+    block_page(&u, &block(json!({})));
+    let gone = format!(
+        "git -C {t}/clone remote set-url origin {t}/gone.git",
+        t = u.t.display()
+    );
+    u.script("a1", &format!("{IMPLEMENT}; {gone}"));
+    u.stop(&without_acceptance(&u), "acceptance", "fetch_failed");
+    assert!(!u.t.join("work/task/u1.accept.log").exists());
+}
+
+#[test]
+fn p4_the_block_is_the_one_of_the_bytes_read_at_admission() {
+    let mut u = U::new();
+    block_page(
+        &u,
+        &block(json!({"adds": [{"path": "src/a.rs", "words": ["absent"]}]})),
+    );
+    let before = sha(&std::fs::read(u.t.join("work/task/TASK.md")).unwrap());
+    // The implementer replaces the page by one whose checks hold; the call judges the first.
+    let page = u.p("work/task/TASK.md");
+    let ok =
+        "# T\\n```unit\\n{\\\"unit\\\":\\\"U-1\\\",\\\"write_set\\\":[\\\"src/**\\\"]}\\n```\\n";
+    u.script("a1", &format!("{IMPLEMENT}; printf '{ok}' > {page}"));
+    let v = u.stop(&without_acceptance(&u), "acceptance", "acceptance_failed");
+    assert_eq!(v["page"]["sha256"], before);
+    assert_eq!(v["detail"]["count"], 1);
+    assert_ne!(sha(&std::fs::read(&page).unwrap()), before);
+}
+
+#[test]
+fn p5_a_page_without_a_block_needs_acceptance_and_the_page_refusals_come_first() {
+    let mut u = U::new();
+    let r = without_acceptance(&u);
+    assert_eq!(code(u.run(&r)), "invalid_input@acceptance");
+    std::fs::write(u.t.join("work/task/none.md"), "# no write set\n").unwrap();
+    let mut other = r.clone();
+    other["page"] = json!(u.p("work/task/none.md"));
+    assert_eq!(code(u.run(&other)), "write_set_missing@page");
+    other["page"] = json!(u.p("work/task/missing.md"));
+    assert_eq!(code(u.run(&other)), "page_unreadable@page");
+    block_page(&u, &json!({"unit": "U-1"}));
+    assert_eq!(code(u.run(&r)), "page_block_invalid@page");
+    // Nothing exists afterwards.
+    assert_eq!(names(&u.t.join("work/task")), ["TASK.md", "none.md"]);
+    assert_eq!(branches(&u), "* main");
+    assert_eq!((u.launches, u.calls.len()), (0, 0));
+}
+
+#[test]
+fn p6_the_blocks_refusals_are_those_of_ap_accept_before_any_effect() {
+    let mut u = U::new();
+    let ok = json!({"unit": "U-1", "write_set": ["src/**"]});
+    let two = format!("```unit\n{ok}\n```\n```unit\n{ok}\n```\n");
+    let unclosed = format!("```unit\n{ok}\n");
+    let mut unknown = ok.clone();
+    unknown["bogus"] = json!(1);
+    let mut wrong = ok.clone();
+    wrong["merge"] = json!("yes");
+    let cases = [
+        (two, "two_blocks", json!(null)),
+        (unclosed, "unclosed", json!(null)),
+        (
+            "```unit\n[]\n```\n".to_owned(),
+            "not_an_object",
+            json!(null),
+        ),
+        (
+            format!("```unit\n{unknown}\n```\n"),
+            "unknown_member",
+            json!("bogus"),
+        ),
+        (format!("```unit\n{wrong}\n```\n"), "shape", json!("merge")),
+    ];
+    for r in [u.request(), without_acceptance(&u)] {
+        for (text, reason, member) in &cases {
+            std::fs::write(u.t.join("work/task/TASK.md"), text).unwrap();
+            let Err(f) = u.run(&r) else {
+                panic!("{reason}")
+            };
+            assert_eq!((f.code, f.field.as_str()), ("page_block_invalid", "page"));
+            assert_eq!(f.detail, json!({"reason": reason, "member": member}));
+        }
+        // A block and a line `Write set:` in one page.
+        let both = format!("Write set: src/**\n```unit\n{ok}\n```\n");
+        std::fs::write(u.t.join("work/task/TASK.md"), both).unwrap();
+        assert_eq!(code(u.run(&r)), "write_set_twice@page");
+    }
+    assert_eq!(names(&u.t.join("work/task")), ["TASK.md"]);
+    assert_eq!(branches(&u), "* main");
+    assert_eq!((u.launches, u.calls.len()), (0, 0));
+}
+
+#[test]
+fn p7_a_request_with_acceptance_runs_the_executable_and_ignores_the_blocks_checks() {
+    let mut u = U::new();
+    // The checks cannot hold; the executable decides, and the block's write set is the page's.
+    let checks = json!({"adds": [{"path": "src/a.rs", "words": ["absent"]}]});
+    block_page(&u, &block(checks));
+    let (v, code) = u.run(&u.request()).unwrap();
+    assert_eq!(code, 0, "{v}");
+    assert_eq!(u.accept_calls().len(), 1);
+    assert_eq!(v["acceptance"]["path"], u.p("judge/accept.sh"));
+    let log = std::fs::read_to_string(u.p("work/task/u1.accept.log")).unwrap();
+    assert_eq!(log, "acceptance ran\n");
+
+    let mut u = U::new();
+    block_page(&u, &json!({"unit": "U-1", "write_set": ["notes.md"]}));
+    let v = u.stop(&u.request(), "write_set", "path_outside_write_set");
+    assert_eq!(v["write_set"], json!(["notes.md"]));
+    assert_eq!(v["detail"]["paths"], json!(["src/a.rs"]));
+}
