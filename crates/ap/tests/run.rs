@@ -39,6 +39,8 @@ struct Fake {
     launches: Vec<Vec<String>>,
     /// `directory()` answers for these paths instead of the file system.
     dirs: BTreeMap<String, String>,
+    /// `environment()` creates this file: the call's own file then exists when it is opened.
+    precreate: Option<String>,
 }
 impl Fake {
     fn new() -> Self {
@@ -80,6 +82,7 @@ impl Fake {
             git_calls: vec![],
             launches: vec![],
             dirs: BTreeMap::new(),
+            precreate: None,
         }
     }
     fn p(&self, rel: &str) -> String {
@@ -231,6 +234,9 @@ impl System for Fake {
         self.units
     }
     fn environment(&self) -> Vec<(String, String)> {
+        if let Some(p) = &self.precreate {
+            std::fs::write(p, b"").unwrap();
+        }
         self.env.clone()
     }
 }
@@ -2954,6 +2960,21 @@ fn cut1_a_launch_that_could_not_start_is_an_entry_of_attempts() {
     assert!(attempts[1]["end"].is_string() && attempts[1]["limit"].is_null());
     assert_eq!(attempts[1]["account"], f.p("a2"));
     assert_eq!(f.record("g.md"), v);
+}
+
+#[test]
+fn cut1_a_call_whose_files_cannot_be_opened_writes_the_record_without_the_two_members() {
+    let mut f = Fake::new();
+    // The stream file exists after the record was claimed: the files cannot be opened.
+    f.precreate = Some(f.p("h.md.stream.jsonl"));
+    let (v, status) = f.run(&f.request("h.md")).unwrap();
+    assert_eq!(status, 5, "{v}");
+    assert_eq!(
+        v,
+        json!({"state": "failed", "unmet": "launch", "account": f.p("a1")})
+    );
+    assert_eq!(f.record("h.md"), v);
+    assert_eq!(f.count_now(), 0, "no CLI call");
 }
 
 #[test]
