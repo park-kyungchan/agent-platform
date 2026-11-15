@@ -491,13 +491,17 @@ the come-back of `ap unit` does not reuse it (see [One review](../crates/ap/READ
 `start_install` and `close_install` is `ap deliver`, with the client and agent
 `ap-deliver` (see [Delivery](../crates/ap/README.md#delivery)).
 
-The rehearsal runs the rows of version 7 on that pinned file, starts a review
-and closes two reviews with `accept` there, installs this file, closes the
-running review, revokes one closed review and later names the other as the
-`review` of a forward attempt. `installed_artifact` is owned by a source of four
+Version 8 remains pinned at
+`64fb1f59c6ff426807886d5a10397f5be3e496fa:ontology/work.schema.json`,
+sha256 `8b4b4236d9e5cff8ce3286211682cc977f4cdf1fdbfb36b42aefa08021e04d23`.
+The rehearsal runs the rows of version 7 on the pinned version 7 file, starts a
+review and closes two reviews with `accept` there, installs the pinned version 8
+file, closes the running review and revokes one closed review; it then installs
+version 9 (below) and later names the other review as the `review` of a
+forward attempt. `installed_artifact` is owned by a source of four
 paths under `/usr/local/bin` that need not exist where the rehearsal runs, so the
 install rows run on a copy that differs from this file only in those paths (two
-files of the rehearsal's own directory) and in its version (9); the rehearsal
+files of the rehearsal's own directory) and in its version (10, above the installed 9); the rehearsal
 asserts that every other member is equal. It prints the basis of the search of
 `ap unit` made before this change, for the review closed under version 7
 (`v8_upgrade_search_basis=`): on this engine a filter on an optional property
@@ -510,3 +514,180 @@ every review has (`kind`, `head`, `status`, and a task) is qualified, and
 `verdict`, `repository` and the report's digest are compared on the objects of
 the answer. `ap unit` and `ap deliver` read an accepting review only this way,
 through one function (`accepting` in `crates/ap/src/review.rs`).
+
+## Version 9: the objective, the backlog item, the order of a task and the triage of the user's rows
+Version 8 remains pinned at
+`64fb1f59c6ff426807886d5a10397f5be3e496fa:ontology/work.schema.json`,
+sha256 `8b4b4236d9e5cff8ce3286211682cc977f4cdf1fdbfb36b42aefa08021e04d23`.
+Version 9 only adds. Every object type, action type, link type, view, value type
+and grant of version 8 reads the same; `decision` gains five optional
+properties, the grants gain the three new types and the fourteen new actions, and
+the version number changes. The rehearsal installs version 9 over the store that
+the rows of version 8 leave, compares 19 named objects (listed under "Install over
+version 8" below) and every view before and after, and then applies `record_decision` and refuses a duplicate
+of a review started under version 8 (`duplicate_running_review`).
+
+A "current row of the user with words" below is a `decision` of the named task
+with `status` `current`, `decided_by` `user` and a nonempty `user_words`. Every
+"later than" compares two stored times of one-second resolution: a row recorded
+in the same second as the stated or confirmed time is not later (the
+rehearsal moves its own clock by one second before each such row). All the types
+are Ontology-owned and written only by the actions; they are keyed by the action
+id, except `board`, keyed by its task's key.
+
+### `objective`: the state the user wants
+Properties: `task`, `name` (at most 60 bytes), `statement` (600), optional `check`
+(400, a command whose exit 0 shows the objective holds), `rank` (integer),
+`status` (`stated`, `confirmed`, `retired`), `source` (a `decision`), `stated_at`,
+`confirmed_by` (a `decision`) and `confirmed_at`, `retire_reason` and
+`retired_at`, and the last check: `last_exit`, `last_line` (200),
+`last_checked_at`. Links: `objective_task` (reverse `objectives`),
+`objective_source` (`sourced_objectives`), `objective_confirmed_by`
+(`confirmed_objectives`).
+
+| Action | Parameters | Refusals |
+| --- | --- | --- |
+| `state_objective` | `task`, `name`, `statement`, `rank`, `source`; optional `check` | `unknown_task`; `source_not_user_words` (the source is not a current row of the user with words of this task); `name_used` (any objective of the task ever had the name, a retired one too) |
+| `restate_objective` | `objective`, `statement`, `source` | `objective_not_live` (retired); `source_not_user_words`; `confirmed_needs_later_row` (the objective is `confirmed` and the source was not decided later than `confirmed_at`) |
+| `confirm_objective` | `objective`, `row` | `objective_not_stated`; `row_not_user_words`; `row_is_source_or_earlier` (the row is the source, or not decided later than `stated_at`) |
+| `amend_objective` | `objective`, `decision`; optional `rank`, `check` | `objective_not_live`; `row_not_current` (not a current decision of the task); `nothing_to_amend` (neither `rank` nor `check`) |
+| `retire_objective` | `objective`, `reason`; optional `row` | `objective_not_live` (retired already); `confirmed_needs_later_row` (a confirmed objective needs a row of the user with words decided later than `confirmed_at`) |
+| `record_check` | `objective`, `exit`, `line` | `objective_not_live`; `objective_without_check` (the objective has no `check`: a result is recorded only where a check command stands) |
+
+`restate_objective` modifies the same object: `statement`, `source`, `stated_at`
+`$now`, `status` `stated`, and `confirmed_by` cleared. `confirm_objective` sets
+`confirmed`, `confirmed_by` and `confirmed_at`. A time cannot be cleared, so
+`confirmed_at` stays after a restate; it means something only while `status` is
+`confirmed`, and the criterion of `restate_objective` and `retire_objective`
+reads it only for a confirmed objective: an objective that was never confirmed,
+or was restated since, is restated with any current row of the user.
+`amend_objective` changes `rank` or `check` and nothing else, and does not change
+the status. Reading an earlier statement back: `ont get` on the objective prints
+`objects[0].observations[]`, one entry per edit, each with its full `fields`; the
+statements, with consecutive repeats removed, are the sentences in the order they
+were stated (`ont` has no command that prints the action log). The rehearsal reads
+them back this way.
+
+### `item`: one piece of work that was asked for
+Properties: `task`, `key` (60 bytes), `title` (200), `statement` (400), `objective`,
+`origin` (a `decision`), `first_use` (300), `state` (`queued`, `in_work`, `done`,
+`dropped`), optional `repository` (200) and `branch` (100), `review`, `evidence`
+(600), `release_reason` (400), `drop_reason` (600), and the times `added_at`,
+`started_at`, `closed_at`, `dropped_at`. Links: `item_task` (reverse `items`),
+`item_objective` (`objective_items`), `item_origin` (`originated_items`),
+`item_review` (`closed_items`: the items a review closed).
+
+| Action | Parameters | Refusals |
+| --- | --- | --- |
+| `add_item` | `task`, `key`, `title`, `statement`, `objective`, `origin`, `first_use`, all required | `unknown_task`; `origin_not_current` (not a current decision of the task); `objective_not_live` (of another task, or retired); `key_used` (any item of the task ever had the key, a dropped one too) |
+| `amend_item` | `item`; optional `title`, `statement`, `first_use`, `objective` | `item_closed` (done or dropped); `objective_not_live` (a given objective is of another task or retired) |
+| `start_item` | `item`; optional `repository`, `branch` | `item_not_queued`; `item_not_ordered` (the board of the item's task does not name the item); `repository_and_branch` (only one of the two is given, or the item holds a repository and the call gives none) |
+| `release_item` | `item`, `reason` | `item_not_in_work` |
+| `close_item` | `item`; optional `review`, `evidence` | `item_not_in_work`; `review_or_evidence`; `review_closes_another_item` |
+| `drop_item` | `item`, `reason` | `item_done_or_dropped` |
+
+`add_item` sets `state` `queued`. `start_item` sets `in_work`, `started_at` and,
+when given, `repository` and `branch`; `release_item` returns to `queued` with
+`release_reason`; `close_item` sets `done`, `closed_at` and its `review` or
+`evidence`; `drop_item` sets `dropped`, `drop_reason` and `dropped_at`. No action
+reopens a done or dropped item: each action refuses every state it does not
+start from, and a defect of a done item is a new item. A property that was set
+cannot be cleared, so a repository stays on an item after `release_item`; that is
+why `start_item` refuses a start without a repository on an item that holds one:
+an item that ever had a repository closes only with a review. A new start may
+name another repository and branch.
+
+`close_item` takes one of two forms. An item with a repository needs a `review`
+that is `closed`, has verdict `accept`, and is of the item's task and the item's
+repository, and no `evidence`. An item without a repository needs `evidence` and
+no `review`. Any other combination answers `review_or_evidence` (a running,
+abandoned, revoked, other-repository or other-task review, a review with
+evidence, and neither, are rows of the rehearsal). A review that another item
+already names answers `review_closes_another_item`. That is all the store binds
+of a review: its task, its repository, `closed` with the verdict `accept`, and
+named by no other item. That the review is the one of the item's own pull request
+is held by the caller (`ap unit` passes the accepting review of the pull request
+it merged); the `review` has no property that names the item in this version.
+
+### `board`: the order of a task's work
+Properties: `task`, `order` (an array of references to `item`, kept in the order
+given: the rehearsal reads back a list of five, a replacement and an empty list),
+`reason` (600) and `set_at`. A board is
+keyed by its task's key, which the caller writes in the `board` parameter; there
+is at most one per task. Links: `board_task` (reverse `boards`), `board_order`
+(reverse `ordering_boards`: the boards that name an item), and, from `decision`, `decision_triage_item`
+(`triaged_rows`) and `decision_triage_objective` (`intent_rows`).
+
+| Action | Parameters | Refusals |
+| --- | --- | --- |
+| `set_order` | `board`, `task`, `order`, `reason` | `unknown_task`; `board_of_another_task` (the board is of another task, or the task has a board and the call names a second one) |
+
+`set_order` creates the board at its first use and replaces the whole list,
+`reason` and `set_at` afterwards. It takes no row and the board holds no
+reference to one: a property cannot be cleared, so a later order given without a
+row would keep naming the earlier row. When a row of the user caused the order,
+the `reason` names the topic of that row.
+
+### Triage of the user's rows
+`decision` gains the optional properties `triage` (`item`, `intent`,
+`not_adopted`, `none`), `triage_item`, `triage_objective`, `triage_reason` and
+`triaged_at`. `triage_decision(decision, triage; item, objective, reason)` sets
+them once on a row. Any current row decided by the user is triaged, with or
+without `user_words`: rows recorded under versions 2 to 4 have none and are still
+current (the rehearsal records one under version 2 and triages it after version 9).
+
+| Refusal | When |
+| --- | --- |
+| `not_a_user_row` | the decision is not current, or not decided by the user |
+| `already_triaged` | the row has a `triage` |
+| `item_required` | `triage` is `item` and `item` is missing or of another task than the row |
+| `objective_required` | `triage` is `intent` and `objective` is missing or of another task than the row |
+| `reason_required` | `triage` is `not_adopted` or `none` and `reason` is missing |
+| `reference_not_for_triage` | `item` is given with a word other than `item`, or `objective` with a word other than `intent`: a reference is stored only under the word that chose it |
+
+A row of version 8 or earlier has no `triage`; nothing triages it by itself.
+
+### What the store does not check
+- The elements of `order`. The engine cannot test each element of an array
+  parameter in a criterion, so a done or dropped item, an item of another task, a
+  dangling reference and one item named twice are stored, and so is an empty list
+  (the rehearsal stores an item of another task, a dangling element and an empty
+  list; the engine stores `[A, A, C]` as given). The check lives in `start_item`: it refuses an item that no board of the
+  item's own task names (`item_not_ordered`), including an item that only another
+  task's board names; a reader that prints the order shows the elements that fail.
+- That a row is about the thing it is cited for. A row is checked for its task,
+  its status, its author and its words, and by its time where a rule says so; the
+  store does not read what it says. The same holds for the `evidence` text of an
+  item and for the `check` command and the `line` of an objective.
+- That the key of a board equals its task's key: that is the caller's convention;
+  only the task, through `board_of_another_task`, is checked.
+
+### Install over version 8 and the rehearsal
+`ont schema install` of version 9 over a store at version 8 changes no object:
+the rehearsal asserts it by reading 19 objects written under version 8 and
+earlier (a task, a packet and a report, one hold, three decisions: a Lead row, its
+successor and a row of the user without words recorded under version 2, one KPI,
+one worker run, one thread, one plan, and eight reviews: closed, running and
+revoked) and the views before and after; measurements, the other holds, workers,
+threads and plans and every install record are not in that list, and it
+checks that `ont_describe` and `ont_action_list` stay within the MCP limit of
+262,144 bytes. Version 9 has no new view or function. Delivery refuses with
+`schema_differs` while the store's version differs from the repository's, so the
+host's store is installed once, by the authorized step above, and delivery
+installs again after it. An installed version cannot be taken back by a revert;
+the way back is a later version.
+
+An empty string is no value. Every string parameter of the fourteen actions,
+except `line` of `record_check` (a check may print nothing), has the value type
+`nonempty_text` (a string of at least one character of any kind: spaces, line
+breaks and bytes outside ASCII included), so `""` is refused with
+`invalid_parameter` before any rule runs. No refusal code was added for it, and no
+rule reads an empty value: an objective never holds an empty `check`, so
+`record_check` records only where a check command stands; `close_item` never
+closes on an empty `evidence`; `triage_decision` never takes an empty `reason`;
+`start_item` never stores an empty `repository` or `branch`.
+
+The rows of version 9 run after the rows of version 8, each refusal before the
+action it guards, with the answer's code asserted (a row of several failed
+criteria asserts the whole set). They are in `ontology/rehearsal.sh` under the
+comment "Version 9".

@@ -1,7 +1,7 @@
 {
   "format": "ontology-schema/v1",
   "domain": "work",
-  "version": 8,
+  "version": 9,
   "namespace": {
     "instance": "vps://palantirkc",
     "account": "root"
@@ -92,7 +92,11 @@
     "file_path": {
       "base": "string",
       "pattern": "^/[!-~]{1,399}$"
-    }
+    },
+    "nonempty_text": {"base": "string", "pattern": "^[\\s\\S]+$"},
+    "objective_status": {"base": "string", "enum": ["stated", "confirmed", "retired"]},
+    "item_state": {"base": "string", "enum": ["queued", "in_work", "done", "dropped"]},
+    "triage_kind": {"base": "string", "enum": ["item", "intent", "not_adopted", "none"]}
   },
   "sources": {
     "task_states": {
@@ -662,7 +666,12 @@
         "user_form": {
           "type": {"value_type": "user_form"},
           "required": false
-        }
+        },
+        "triage": {"type": {"value_type": "triage_kind"}, "required": false, "description": "Set once by triage_decision on a row of the user."},
+        "triage_item": {"type": {"ref": "item"}, "required": false},
+        "triage_objective": {"type": {"ref": "objective"}, "required": false},
+        "triage_reason": {"type": "string", "required": false, "max_bytes": 600},
+        "triaged_at": {"type": {"value_type": "utc_time"}, "required": false, "max_bytes": 40}
       }
     },
     "kpi": {
@@ -1017,6 +1026,67 @@
         "code": {"type": "string", "required": false, "max_bytes": 100},
         "closed_at": {"type": {"value_type": "utc_time"}, "required": false, "max_bytes": 40}
       }
+    },
+    "objective": {
+      "description": "Ontology-owned objective of a task: a checkable sentence the user's row is the source of, written only by actions; restated in place (history and action log keep earlier sentences).",
+      "owner": "ontology",
+      "primary_key": {"from": "$action_id"},
+      "title": "name",
+      "properties": {
+        "task": {"type": {"ref": "task"}, "required": true},
+        "name": {"type": "string", "required": true, "max_bytes": 60, "description": "Unique per task for ever."},
+        "statement": {"type": "string", "required": true, "max_bytes": 600},
+        "check": {"type": "string", "required": false, "max_bytes": 400, "description": "Command whose exit 0 shows the objective holds; absent: unmeasured."},
+        "rank": {"type": "integer", "required": true},
+        "status": {"type": {"value_type": "objective_status"}, "required": true},
+        "source": {"type": {"ref": "decision"}, "required": true, "description": "Current row of the user with words when stated or restated."},
+        "stated_at": {"type": {"value_type": "utc_time"}, "required": true, "max_bytes": 40, "description": "Set by state and restate."},
+        "confirmed_by": {"type": {"ref": "decision"}, "required": false, "description": "Row of the user, later than stated_at; cleared by restate."},
+        "confirmed_at": {"type": {"value_type": "utc_time"}, "required": false, "max_bytes": 40, "description": "Kept after a restate (a scalar cannot be cleared); valid only while status is confirmed."},
+        "retire_reason": {"type": "string", "required": false, "max_bytes": 400},
+        "retired_at": {"type": {"value_type": "utc_time"}, "required": false, "max_bytes": 40},
+        "last_exit": {"type": "integer", "required": false},
+        "last_line": {"type": "string", "required": false, "max_bytes": 200},
+        "last_checked_at": {"type": {"value_type": "utc_time"}, "required": false, "max_bytes": 40}
+      }
+    },
+    "item": {
+      "description": "Ontology-owned entry of a task's backlog, written only by actions.",
+      "owner": "ontology",
+      "primary_key": {"from": "$action_id"},
+      "title": "key",
+      "properties": {
+        "task": {"type": {"ref": "task"}, "required": true},
+        "key": {"type": "string", "required": true, "max_bytes": 60, "description": "Unique per task for ever: the handle a unit request names."},
+        "title": {"type": "string", "required": true, "max_bytes": 200},
+        "statement": {"type": "string", "required": true, "max_bytes": 400, "description": "The state it wants, checkable."},
+        "objective": {"type": {"ref": "objective"}, "required": true},
+        "origin": {"type": {"ref": "decision"}, "required": true},
+        "first_use": {"type": "string", "required": true, "max_bytes": 300, "description": "Who uses the result first and the run that shows it."},
+        "state": {"type": {"value_type": "item_state"}, "required": true},
+        "repository": {"type": "string", "required": false, "max_bytes": 200, "description": "owner/name; set by start_item for a unit, kept after a release (a scalar cannot be cleared)."},
+        "branch": {"type": "string", "required": false, "max_bytes": 100},
+        "review": {"type": {"ref": "review"}, "required": false, "description": "The accepting review that closed a unit."},
+        "evidence": {"type": "string", "required": false, "max_bytes": 600, "description": "Command and output that closed work without a pull request."},
+        "release_reason": {"type": "string", "required": false, "max_bytes": 400},
+        "drop_reason": {"type": "string", "required": false, "max_bytes": 600},
+        "added_at": {"type": {"value_type": "utc_time"}, "required": true, "max_bytes": 40},
+        "started_at": {"type": {"value_type": "utc_time"}, "required": false, "max_bytes": 40},
+        "closed_at": {"type": {"value_type": "utc_time"}, "required": false, "max_bytes": 40},
+        "dropped_at": {"type": {"value_type": "utc_time"}, "required": false, "max_bytes": 40}
+      }
+    },
+    "board": {
+      "description": "Ontology-owned order of one task's items; key: the task's key. The first set_order creates it (the opt-in of a task).",
+      "owner": "ontology",
+      "primary_key": {"from": "/native_key"},
+      "title": "task",
+      "properties": {
+        "task": {"type": {"ref": "task"}, "required": true},
+        "order": {"type": {"array": {"ref": "item"}}, "required": true, "description": "Items in order; elements are not checked by the store."},
+        "reason": {"type": "string", "required": true, "max_bytes": 600},
+        "set_at": {"type": {"value_type": "utc_time"}, "required": true, "max_bytes": 40}
+      }
     }
   },
   "link_types": {
@@ -1197,7 +1267,18 @@
     "install_running_target": {"from": "install", "via": "running_in", "to": "installed_artifact", "cardinality": "many_to_one", "names": {"forward": "install_running_target", "reverse": "running_installs"}},
     "install_review": {"from": "install", "via": "review", "to": "review", "cardinality": "many_to_one", "names": {"forward": "install_review", "reverse": "review_installs"}},
     "install_reviews": {"from": "install", "via": "reviews", "to": "review", "cardinality": "many_to_many", "names": {"forward": "install_reviews", "reverse": "range_installs"}},
-    "install_rolls_back": {"from": "install", "via": "rolls_back", "to": "install", "cardinality": "many_to_one", "names": {"forward": "install_rolls_back", "reverse": "rolled_back_by"}}
+    "install_rolls_back": {"from": "install", "via": "rolls_back", "to": "install", "cardinality": "many_to_one", "names": {"forward": "install_rolls_back", "reverse": "rolled_back_by"}},
+    "objective_task": {"from": "objective", "via": "task", "to": "task", "cardinality": "many_to_one", "names": {"forward": "objective_task", "reverse": "objectives"}},
+    "objective_source": {"from": "objective", "via": "source", "to": "decision", "cardinality": "many_to_one", "names": {"forward": "objective_source", "reverse": "sourced_objectives"}},
+    "objective_confirmed_by": {"from": "objective", "via": "confirmed_by", "to": "decision", "cardinality": "many_to_one", "names": {"forward": "objective_confirmed_by", "reverse": "confirmed_objectives"}},
+    "item_task": {"from": "item", "via": "task", "to": "task", "cardinality": "many_to_one", "names": {"forward": "item_task", "reverse": "items"}},
+    "item_objective": {"from": "item", "via": "objective", "to": "objective", "cardinality": "many_to_one", "names": {"forward": "item_objective", "reverse": "objective_items"}},
+    "item_origin": {"from": "item", "via": "origin", "to": "decision", "cardinality": "many_to_one", "names": {"forward": "item_origin", "reverse": "originated_items"}},
+    "item_review": {"from": "item", "via": "review", "to": "review", "cardinality": "many_to_one", "names": {"forward": "item_review", "reverse": "closed_items"}},
+    "board_task": {"from": "board", "via": "task", "to": "task", "cardinality": "many_to_one", "names": {"forward": "board_task", "reverse": "boards"}},
+    "board_order": {"from": "board", "via": "order", "to": "item", "cardinality": "many_to_many", "names": {"forward": "board_order", "reverse": "ordering_boards"}},
+    "decision_triage_item": {"from": "decision", "via": "triage_item", "to": "item", "cardinality": "many_to_one", "names": {"forward": "decision_triage_item", "reverse": "triaged_rows"}},
+    "decision_triage_objective": {"from": "decision", "via": "triage_objective", "to": "objective", "cardinality": "many_to_one", "names": {"forward": "decision_triage_objective", "reverse": "intent_rows"}}
   },
   "action_types": {
     "set_hold": {
@@ -2540,6 +2621,347 @@
           }
         }
       ]
+    },
+    "state_objective": {
+      "description": "State an objective of a task from a current row of the user with words.",
+      "parameters": {
+        "task": {"type": {"ref": "task"}, "required": true},
+        "name": {"type": {"value_type": "nonempty_text"}, "required": true, "max_bytes": 60},
+        "statement": {"type": {"value_type": "nonempty_text"}, "required": true, "max_bytes": 600},
+        "check": {"type": {"value_type": "nonempty_text"}, "required": false, "max_bytes": 400},
+        "rank": {"type": "integer", "required": true},
+        "source": {"type": {"ref": "decision"}, "required": true}
+      },
+      "submission_criteria": [
+        {"code": "unknown_task", "message": "Choose an existing task.", "all": [{"exists": "$task"}]},
+        {"code": "source_not_user_words", "message": "Name a current row of the user with words of this task.", "all": [{"exists": "$source"}, {"eq": ["$source.status", "current"]}, {"eq": ["$source.decided_by", "user"]}, {"present": "$source.user_words"}, {"eq": ["$source.task", "$task"]}]},
+        {"code": "name_used", "message": "Choose a name no objective of the task ever had.", "none": [{"linked": {"from": "$task", "link": "objectives", "where": {"all": [{"eq": ["name", "$name"]}]}}}]}
+      ],
+      "rules": [
+        {
+          "create_object": "objective",
+          "set": {
+            "task": "$task",
+            "name": "$name",
+            "statement": "$statement",
+            "check": "$check",
+            "rank": "$rank",
+            "status": "stated",
+            "source": "$source",
+            "stated_at": "$now"
+          }
+        }
+      ]
+    },
+    "restate_objective": {
+      "description": "Restate an objective in place: new statement and source, status stated, confirmation cleared.",
+      "parameters": {
+        "objective": {"type": {"ref": "objective"}, "required": true},
+        "statement": {"type": {"value_type": "nonempty_text"}, "required": true, "max_bytes": 600},
+        "source": {"type": {"ref": "decision"}, "required": true}
+      },
+      "submission_criteria": [
+        {"code": "objective_not_live", "message": "Choose a stated or confirmed objective.", "all": [{"exists": "$objective"}, {"in": ["$objective.status", ["stated", "confirmed"]]}]},
+        {"code": "source_not_user_words", "message": "Name a current row of the user with words of the objective's task.", "all": [{"exists": "$source"}, {"eq": ["$source.status", "current"]}, {"eq": ["$source.decided_by", "user"]}, {"present": "$source.user_words"}, {"eq": ["$source.task", "$objective.task"]}]},
+        {"code": "confirmed_needs_later_row", "message": "A confirmed objective changes only with a row of the user decided after its confirmation.", "any": [{"ne": ["$objective.status", "confirmed"]}, {"all": [{"present": "$objective.confirmed_at"}, {"gt": ["$source.decided_at", "$objective.confirmed_at"]}]}]}
+      ],
+      "rules": [
+        {
+          "modify_object": "objective",
+          "set": {
+            "statement": "$statement",
+            "source": "$source",
+            "status": "stated",
+            "stated_at": "$now"
+          }
+        },
+        {
+          "clear_reference": {"object_type": "objective", "property": "confirmed_by"}
+        }
+      ]
+    },
+    "confirm_objective": {
+      "description": "Confirm a stated objective by a later row of the user that is not its source.",
+      "parameters": {
+        "objective": {"type": {"ref": "objective"}, "required": true},
+        "row": {"type": {"ref": "decision"}, "required": true}
+      },
+      "submission_criteria": [
+        {"code": "objective_not_stated", "message": "Choose a stated objective.", "all": [{"exists": "$objective"}, {"eq": ["$objective.status", "stated"]}]},
+        {"code": "row_not_user_words", "message": "Name a current row of the user with words of the objective's task.", "all": [{"exists": "$row"}, {"eq": ["$row.status", "current"]}, {"eq": ["$row.decided_by", "user"]}, {"present": "$row.user_words"}, {"eq": ["$row.task", "$objective.task"]}]},
+        {"code": "row_is_source_or_earlier", "message": "Name a row other than the source, decided after the statement.", "all": [{"ne": ["$row", "$objective.source"]}, {"gt": ["$row.decided_at", "$objective.stated_at"]}]}
+      ],
+      "rules": [
+        {
+          "modify_object": "objective",
+          "set": {
+            "status": "confirmed",
+            "confirmed_by": "$row",
+            "confirmed_at": "$now"
+          }
+        }
+      ]
+    },
+    "amend_objective": {
+      "description": "Change rank or check only, with a current decision row of the task.",
+      "parameters": {
+        "objective": {"type": {"ref": "objective"}, "required": true},
+        "rank": {"type": "integer", "required": false},
+        "check": {"type": {"value_type": "nonempty_text"}, "required": false, "max_bytes": 400},
+        "decision": {"type": {"ref": "decision"}, "required": true}
+      },
+      "submission_criteria": [
+        {"code": "objective_not_live", "message": "Choose a stated or confirmed objective.", "all": [{"exists": "$objective"}, {"in": ["$objective.status", ["stated", "confirmed"]]}]},
+        {"code": "row_not_current", "message": "Name a current decision row of the objective's task.", "all": [{"exists": "$decision"}, {"eq": ["$decision.status", "current"]}, {"eq": ["$decision.task", "$objective.task"]}]},
+        {"code": "nothing_to_amend", "message": "Supply rank or check.", "any": [{"present": "$rank"}, {"present": "$check"}]}
+      ],
+      "rules": [
+        {
+          "modify_object": "objective",
+          "set": {"rank": "$rank", "check": "$check"}
+        }
+      ]
+    },
+    "retire_objective": {
+      "description": "Retire an objective with a reason; a confirmed one needs a row of the user later than its confirmation.",
+      "parameters": {
+        "objective": {"type": {"ref": "objective"}, "required": true},
+        "reason": {"type": {"value_type": "nonempty_text"}, "required": true, "max_bytes": 400},
+        "row": {"type": {"ref": "decision"}, "required": false}
+      },
+      "submission_criteria": [
+        {"code": "objective_not_live", "message": "Choose a stated or confirmed objective.", "all": [{"exists": "$objective"}, {"in": ["$objective.status", ["stated", "confirmed"]]}]},
+        {"code": "confirmed_needs_later_row", "message": "Name a current row of the user with words decided after the confirmation.", "any": [{"ne": ["$objective.status", "confirmed"]}, {"all": [{"present": "$row"}, {"exists": "$row"}, {"eq": ["$row.status", "current"]}, {"eq": ["$row.decided_by", "user"]}, {"present": "$row.user_words"}, {"eq": ["$row.task", "$objective.task"]}, {"present": "$objective.confirmed_at"}, {"gt": ["$row.decided_at", "$objective.confirmed_at"]}]}]}
+      ],
+      "rules": [
+        {
+          "modify_object": "objective",
+          "set": {
+            "status": "retired",
+            "retire_reason": "$reason",
+            "retired_at": "$now"
+          }
+        }
+      ]
+    },
+    "record_check": {
+      "description": "Record the last result of the objective's check.",
+      "parameters": {
+        "objective": {"type": {"ref": "objective"}, "required": true},
+        "exit": {"type": "integer", "required": true},
+        "line": {"type": "string", "required": true, "max_bytes": 200}
+      },
+      "submission_criteria": [
+        {"code": "objective_not_live", "message": "Choose a stated or confirmed objective.", "all": [{"exists": "$objective"}, {"in": ["$objective.status", ["stated", "confirmed"]]}]},
+        {"code": "objective_without_check", "message": "Record a result only for an objective that has a check command.", "all": [{"present": "$objective.check"}]}
+      ],
+      "rules": [
+        {
+          "modify_object": "objective",
+          "set": {
+            "last_exit": "$exit",
+            "last_line": "$line",
+            "last_checked_at": "$now"
+          }
+        }
+      ]
+    },
+    "add_item": {
+      "description": "Add a queued item to a task's backlog.",
+      "parameters": {
+        "task": {"type": {"ref": "task"}, "required": true},
+        "key": {"type": {"value_type": "nonempty_text"}, "required": true, "max_bytes": 60},
+        "title": {"type": {"value_type": "nonempty_text"}, "required": true, "max_bytes": 200},
+        "statement": {"type": {"value_type": "nonempty_text"}, "required": true, "max_bytes": 400},
+        "objective": {"type": {"ref": "objective"}, "required": true},
+        "origin": {"type": {"ref": "decision"}, "required": true},
+        "first_use": {"type": {"value_type": "nonempty_text"}, "required": true, "max_bytes": 300}
+      },
+      "submission_criteria": [
+        {"code": "unknown_task", "message": "Choose an existing task.", "all": [{"exists": "$task"}]},
+        {"code": "origin_not_current", "message": "Name a current decision row of the task.", "all": [{"exists": "$origin"}, {"eq": ["$origin.status", "current"]}, {"eq": ["$origin.task", "$task"]}]},
+        {"code": "objective_not_live", "message": "Name a stated or confirmed objective of the task.", "all": [{"exists": "$objective"}, {"eq": ["$objective.task", "$task"]}, {"in": ["$objective.status", ["stated", "confirmed"]]}]},
+        {"code": "key_used", "message": "Choose a key no item of the task ever had.", "none": [{"linked": {"from": "$task", "link": "items", "where": {"all": [{"eq": ["key", "$key"]}]}}}]}
+      ],
+      "rules": [
+        {
+          "create_object": "item",
+          "set": {
+            "task": "$task",
+            "key": "$key",
+            "title": "$title",
+            "statement": "$statement",
+            "objective": "$objective",
+            "origin": "$origin",
+            "first_use": "$first_use",
+            "state": "queued",
+            "added_at": "$now"
+          }
+        }
+      ]
+    },
+    "amend_item": {
+      "description": "Change title, statement, first use or objective of an open item.",
+      "parameters": {
+        "item": {"type": {"ref": "item"}, "required": true},
+        "title": {"type": {"value_type": "nonempty_text"}, "required": false, "max_bytes": 200},
+        "statement": {"type": {"value_type": "nonempty_text"}, "required": false, "max_bytes": 400},
+        "first_use": {"type": {"value_type": "nonempty_text"}, "required": false, "max_bytes": 300},
+        "objective": {"type": {"ref": "objective"}, "required": false}
+      },
+      "submission_criteria": [
+        {"code": "item_closed", "message": "Choose a queued or in-work item.", "all": [{"exists": "$item"}, {"in": ["$item.state", ["queued", "in_work"]]}]},
+        {"code": "objective_not_live", "message": "Name a stated or confirmed objective of the item's task.", "any": [{"none": [{"present": "$objective"}]}, {"all": [{"exists": "$objective"}, {"eq": ["$objective.task", "$item.task"]}, {"in": ["$objective.status", ["stated", "confirmed"]]}]}]}
+      ],
+      "rules": [
+        {
+          "modify_object": "item",
+          "set": {
+            "title": "$title",
+            "statement": "$statement",
+            "first_use": "$first_use",
+            "objective": "$objective"
+          }
+        }
+      ]
+    },
+    "start_item": {
+      "description": "queued to in_work; repository and branch both or neither; the item must be named by its task's board.",
+      "parameters": {
+        "item": {"type": {"ref": "item"}, "required": true},
+        "repository": {"type": {"value_type": "nonempty_text"}, "required": false, "max_bytes": 200},
+        "branch": {"type": {"value_type": "nonempty_text"}, "required": false, "max_bytes": 100}
+      },
+      "submission_criteria": [
+        {"code": "item_not_queued", "message": "Choose a queued item.", "all": [{"exists": "$item"}, {"eq": ["$item.state", "queued"]}]},
+        {"code": "item_not_ordered", "message": "Name the item in its task's order first.", "all": [{"linked": {"from": "$item", "link": "ordering_boards", "where": {"all": [{"eq": ["task", "$item.task"]}]}}}]},
+        {"code": "repository_and_branch", "message": "Supply repository and branch both or neither; an item that held a repository takes one again.", "none": [{"all": [{"present": "$repository"}, {"none": [{"present": "$branch"}]}]}, {"all": [{"present": "$branch"}, {"none": [{"present": "$repository"}]}]}, {"all": [{"present": "$item.repository"}, {"none": [{"present": "$repository"}]}]}]}
+      ],
+      "rules": [
+        {
+          "modify_object": "item",
+          "set": {
+            "state": "in_work",
+            "repository": "$repository",
+            "branch": "$branch",
+            "started_at": "$now"
+          }
+        }
+      ]
+    },
+    "release_item": {
+      "description": "in_work back to queued with a reason (a unit closed without a merge).",
+      "parameters": {
+        "item": {"type": {"ref": "item"}, "required": true},
+        "reason": {"type": {"value_type": "nonempty_text"}, "required": true, "max_bytes": 400}
+      },
+      "submission_criteria": [
+        {"code": "item_not_in_work", "message": "Choose an in-work item.", "all": [{"exists": "$item"}, {"eq": ["$item.state", "in_work"]}]}
+      ],
+      "rules": [
+        {
+          "modify_object": "item",
+          "set": {"state": "queued", "release_reason": "$reason"}
+        }
+      ]
+    },
+    "close_item": {
+      "description": "in_work to done: with a repository, a closed accepting review of the task and repository that closes no other item; without, evidence.",
+      "parameters": {
+        "item": {"type": {"ref": "item"}, "required": true},
+        "review": {"type": {"ref": "review"}, "required": false},
+        "evidence": {"type": {"value_type": "nonempty_text"}, "required": false, "max_bytes": 600}
+      },
+      "submission_criteria": [
+        {"code": "item_not_in_work", "message": "Choose an in-work item.", "all": [{"exists": "$item"}, {"eq": ["$item.state", "in_work"]}]},
+        {"code": "review_or_evidence", "message": "A unit closes with its accepting review; other work with evidence.", "any": [{"all": [{"present": "$item.repository"}, {"present": "$review"}, {"exists": "$review"}, {"eq": ["$review.status", "closed"]}, {"eq": ["$review.verdict", "accept"]}, {"eq": ["$review.task", "$item.task"]}, {"eq": ["$review.repository", "$item.repository"]}, {"none": [{"present": "$evidence"}]}]}, {"all": [{"none": [{"present": "$item.repository"}]}, {"present": "$evidence"}, {"none": [{"present": "$review"}]}]}]},
+        {"code": "review_closes_another_item", "message": "Name a review no other item names.", "none": [{"all": [{"present": "$review"}, {"linked": {"from": "$review", "link": "closed_items"}}]}]}
+      ],
+      "rules": [
+        {
+          "modify_object": "item",
+          "set": {
+            "state": "done",
+            "review": "$review",
+            "evidence": "$evidence",
+            "closed_at": "$now"
+          }
+        }
+      ]
+    },
+    "drop_item": {
+      "description": "Drop an item that is not done, with a reason.",
+      "parameters": {
+        "item": {"type": {"ref": "item"}, "required": true},
+        "reason": {"type": {"value_type": "nonempty_text"}, "required": true, "max_bytes": 600}
+      },
+      "submission_criteria": [
+        {"code": "item_done_or_dropped", "message": "Choose an item that is neither done nor dropped.", "all": [{"exists": "$item"}, {"in": ["$item.state", ["queued", "in_work"]]}]}
+      ],
+      "rules": [
+        {
+          "modify_object": "item",
+          "set": {
+            "state": "dropped",
+            "drop_reason": "$reason",
+            "dropped_at": "$now"
+          }
+        }
+      ]
+    },
+    "set_order": {
+      "description": "Replace a task's order in one action; the first call creates the board (key: the task's key, by convention of the caller).",
+      "parameters": {
+        "board": {"type": {"ref": "board"}, "required": true, "description": "Id of type board whose native_key is the task's key."},
+        "task": {"type": {"ref": "task"}, "required": true},
+        "order": {"type": {"array": {"ref": "item"}}, "required": true},
+        "reason": {"type": {"value_type": "nonempty_text"}, "required": true, "max_bytes": 600}
+      },
+      "submission_criteria": [
+        {"code": "unknown_task", "message": "Choose an existing task.", "all": [{"exists": "$task"}]},
+        {"code": "board_of_another_task", "message": "Name this task's board, or a new one when the task has none.", "any": [{"all": [{"exists": "$board"}, {"eq": ["$board.task", "$task"]}]}, {"all": [{"none": [{"exists": "$board"}]}, {"none": [{"linked": {"from": "$task", "link": "boards"}}]}]}]}
+      ],
+      "rules": [
+        {
+          "create_or_modify_object": "board",
+          "set": {
+            "task": "$task",
+            "order": "$order",
+            "reason": "$reason",
+            "set_at": "$now"
+          }
+        }
+      ]
+    },
+    "triage_decision": {
+      "description": "Triage a row of the user once: item, intent, not_adopted or none.",
+      "parameters": {
+        "decision": {"type": {"ref": "decision"}, "required": true},
+        "triage": {"type": {"value_type": "triage_kind"}, "required": true},
+        "item": {"type": {"ref": "item"}, "required": false},
+        "objective": {"type": {"ref": "objective"}, "required": false},
+        "reason": {"type": {"value_type": "nonempty_text"}, "required": false, "max_bytes": 600}
+      },
+      "submission_criteria": [
+        {"code": "not_a_user_row", "message": "Choose a current row decided by the user.", "all": [{"exists": "$decision"}, {"eq": ["$decision.status", "current"]}, {"eq": ["$decision.decided_by", "user"]}]},
+        {"code": "already_triaged", "message": "A row is triaged once.", "none": [{"present": "$decision.triage"}]},
+        {"code": "item_required", "message": "Triage item names an item of the row's task.", "any": [{"ne": ["$triage", "item"]}, {"all": [{"present": "$item"}, {"exists": "$item"}, {"eq": ["$item.task", "$decision.task"]}]}]},
+        {"code": "objective_required", "message": "Triage intent names an objective of the row's task.", "any": [{"ne": ["$triage", "intent"]}, {"all": [{"present": "$objective"}, {"exists": "$objective"}, {"eq": ["$objective.task", "$decision.task"]}]}]},
+        {"code": "reason_required", "message": "Triage not_adopted and none carry a reason.", "any": [{"in": ["$triage", ["item", "intent"]]}, {"present": "$reason"}]},
+        {"code": "reference_not_for_triage", "message": "Give item only with the word item and objective only with the word intent.", "all": [{"any": [{"none": [{"present": "$item"}]}, {"eq": ["$triage", "item"]}]}, {"any": [{"none": [{"present": "$objective"}]}, {"eq": ["$triage", "intent"]}]}]}
+      ],
+      "rules": [
+        {
+          "modify_object": "decision",
+          "set": {
+            "triage": "$triage",
+            "triage_item": "$item",
+            "triage_objective": "$objective",
+            "triage_reason": "$reason",
+            "triaged_at": "$now"
+          }
+        }
+      ]
     }
   },
   "functions": {},
@@ -2562,7 +2984,10 @@
         "thread",
         "plan",
         "review",
-        "install"
+        "install",
+        "objective",
+        "item",
+        "board"
       ],
       "derive": [
         "hold",
@@ -2571,7 +2996,10 @@
         "measurement",
         "worker_run",
         "review",
-        "install"
+        "install",
+        "objective",
+        "item",
+        "board"
       ],
       "actions": [
         "set_hold",
@@ -2597,7 +3025,21 @@
         "close_review",
         "start_install",
         "close_install",
-        "revoke_review"
+        "revoke_review",
+        "state_objective",
+        "restate_objective",
+        "confirm_objective",
+        "amend_objective",
+        "retire_objective",
+        "record_check",
+        "add_item",
+        "amend_item",
+        "start_item",
+        "release_item",
+        "close_item",
+        "drop_item",
+        "set_order",
+        "triage_decision"
       ]
     }
   ],

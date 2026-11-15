@@ -51,6 +51,9 @@ second = pathlib.Path(store).with_name('v2.json'); second.write_bytes(v2)
 call(['schema', 'install', str(second)])
 probe = created(apply('set_hold', 'v2-probe', dict(task=task, effect='upgrade probe', until='schema v3')), 'hold')
 apply('lift_hold', 'v2-probe-lift', dict(hold=probe))
+# Versions 2 to 4 took a row of the user without words; such a row stays current and is triaged after version 9.
+early_user = created(apply('record_decision', 'v2-user-row-without-words', dict(task=oid('task', 'ontology-operational-base'), topic='v2-user-approval', text='an approval', decided_by='user', undo='supersede')), 'decision')
+assert 'user_words' not in fields(early_user) and fields(early_user)['decided_by'] == 'user' and fields(early_user)['status'] == 'current'
 probe_revision = obj(probe)['head']
 # Preserve a real v5 flag-only review across the upgrade to v6.
 legacy = pathlib.Path(store).with_name('v5.json')
@@ -369,7 +372,11 @@ for label, head in [('admitted', '8' * 40), ('revoked', '9' * 40)]:
     item = created(apply('start_review', 'v7-closed-' + label, dict(rp8, head=head)), 'review')
     apply('close_review', 'v7-closed-close-' + label, dict(closed8, review=item))
     v7_closed[label] = item
-call(['schema', 'install', str(pathlib.Path(repo, 'ontology/work.schema.json'))])
+# Version 8 is pinned in Git: its rows run on it, then version 9 is installed over the store they leave.
+v8 = pathlib.Path(store).with_name('v8.json')
+v8.write_bytes(subprocess.check_output(['git', '-C', repo, 'show', '64fb1f59c6ff426807886d5a10397f5be3e496fa:ontology/work.schema.json'], timeout=10))
+assert hashlib.sha256(v8.read_bytes()).hexdigest() == '8b4b4236d9e5cff8ce3286211682cc977f4cdf1fdbfb36b42aefa08021e04d23'
+call(['schema', 'install', str(v8)])
 assert fields(next_review)['status'] == 'closed' and fields(next_review)['verdict'] == 'accept'
 gate('close_review', 'v8-upgrade-running-review-closes', dict(review=v7_running, verdict='abandoned'))
 assert fields(v7_running)['status'] == 'closed' and fields(v7_running).get('running_in') is None
@@ -410,17 +417,35 @@ gate('revoke_review', 'v8-revoke-long-reason', dict(review=accepting, reason='x'
 # A revoked review is not a closed one for any other reader of the store.
 gate('record_scope_review', 'v8-scope-revoked-review', dict(review, review=to_revoke), 'review_not_closed')
 assert to_revoke not in [o['id'] for o in call(['search'], dict(object_type='review', where={'eq': ['status', 'closed']}))['objects']]
+# Version 9: every object written under version 8 so far reads the same after the install, and the actions of version 8 still apply.
+v8_objects = [task, packet, report, h, d, successor, early_user, k, w, thread, plan, first_review, next_review, running8, accepting, to_revoke, v7_running, v7_closed['admitted'], v7_closed['revoked']]
+v8_before = [obj(i) for i in v8_objects]
+v8_views = {view: call(['render'], dict(view=view, args={} if view in ('current_memory_records', 'installs') else dict(task=task['native_key']))) for view in json.loads(v8.read_text())['views']}
+call(['schema', 'install', str(pathlib.Path(repo, 'ontology/work.schema.json'))])
+assert [obj(i) for i in v8_objects] == v8_before
+for view, before in v8_views.items():
+    answer = call(['render'], dict(view=view, args={} if view in ('current_memory_records', 'installs') else dict(task=task['native_key'])))
+    assert answer['rows'] == before['rows'] and answer['markdown'] == before['markdown'].replace('schema=work@8', 'schema=work@9'), view
+print('gate_row=v9-v8-objects-and-views-unchanged expected=admitted objects=' + str(len(v8_objects)) + ' views=' + str(len(v8_views)))
+gate('record_decision', 'v9-record-decision', dict(dp, topic='after-v9'))
+gate('start_review', 'v9-duplicate-of-v8-review', dict(rp8, head='5' * 40), 'duplicate_running_review')
+sizes = []
+for name in ('ont_describe', 'ont_action_list'):
+    wire = subprocess.run([binary, '--store', store, 'mcp'], input=json.dumps(dict(jsonrpc='2.0', id=1, method='tools/call', params=dict(name=name, arguments={}))) + '\n', text=True, capture_output=True, timeout=60)
+    answer = json.loads(wire.stdout.splitlines()[0])['result']; assert wire.returncode == 0 and not answer['isError'], answer
+    sizes.append(len(answer['content'][0]['text'].encode())); assert sizes[-1] <= 262144, (name, sizes[-1])
+print('gate_row=v9-mcp-sizes expected=admitted bytes=' + ','.join(map(str, sizes)))
 # installed_artifact is owned by a source of four paths under /usr/local/bin that need not exist where the
 # rehearsal runs. The rows run on a copy that differs only in those paths (two files of this store's
 # directory) and in its version.
-schema8 = json.loads(pathlib.Path(repo, 'ontology/work.schema.json').read_text())
+schema9 = json.loads(pathlib.Path(repo, 'ontology/work.schema.json').read_text())
 binaries = [pathlib.Path(store).with_name(n) for n in ('installed-a', 'installed-b')]
 for b in binaries: b.write_bytes(b'fixture\n')
-copy = json.loads(json.dumps(schema8)); copy['version'] = 9
+copy = json.loads(json.dumps(schema9)); copy['version'] = 10
 copy['sources']['installed_binaries']['paths'] = [str(b) for b in binaries]
-assert {k: v for k, v in copy.items() if k not in ('version', 'sources')} == {k: v for k, v in schema8.items() if k not in ('version', 'sources')}
-assert {k: v for k, v in copy['sources'].items() if k != 'installed_binaries'} == {k: v for k, v in schema8['sources'].items() if k != 'installed_binaries'}
-assert {k: v for k, v in copy['sources']['installed_binaries'].items() if k != 'paths'} == {k: v for k, v in schema8['sources']['installed_binaries'].items() if k != 'paths'}
+assert {k: v for k, v in copy.items() if k not in ('version', 'sources')} == {k: v for k, v in schema9.items() if k not in ('version', 'sources')}
+assert {k: v for k, v in copy['sources'].items() if k != 'installed_binaries'} == {k: v for k, v in schema9['sources'].items() if k != 'installed_binaries'}
+assert {k: v for k, v in copy['sources']['installed_binaries'].items() if k != 'paths'} == {k: v for k, v in schema9['sources']['installed_binaries'].items() if k != 'paths'}
 fixture = pathlib.Path(store).with_name('v8-installed-paths.json'); fixture.write_text(json.dumps(copy))
 call(['schema', 'install', str(fixture)]); call(['index', '--source', 'installed_binaries'])
 ta, tb = (oid('installed_artifact', str(b)) for b in binaries)
@@ -484,6 +509,241 @@ print(view['markdown'])
 print('gate_row=v8-view-installs expected=admitted')
 assert call(['render'], dict(view='reviews', args=dict(task=task['native_key'])))['rows'] > 0
 print('v8_gate_rows_complete')
+
+# Version 9: the objective, the backlog item, the order of a task and the triage of the user's rows. Each refusal row is before the action it guards.
+def stamp(): return datetime.datetime.fromtimestamp(now, datetime.timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
+def tick():
+    global now
+    now += 1
+def row(topic, owner=None, who='user'):
+    tick()
+    words = dict(user_words='"v9 ' + topic + '."', user_form='decision') if who == 'user' else {}
+    return created(gate('record_decision', 'v9-row-' + topic, dict(task=owner or task, topic='v9-' + topic, text='v9 ' + topic, decided_by=who, undo='supersede', **words)), 'decision')
+invented = oid('task', 'invented-v9-task')
+lead_row, u_early, u_src, u_old, uo = row('lead', who='lead'), row('early'), row('source'), row('old'), row('other', other_task)
+gate('supersede_decision', 'v9-row-old-superseded', dict(decision=u_old, text='v9 old, replaced', decided_by='user', user_words='"v9 old, replaced."', user_form='decision', undo='supersede'))
+assert fields(u_old)['status'] == 'superseded'
+tick()
+op = dict(task=task, name='ship-board', statement='the board orders the work', check='true', rank=1, source=u_src)
+gate('state_objective', 'unknown-task', dict(op, task=invented), ('unknown_task', 'source_not_user_words'))
+for label, source in [('lead-row', lead_row), ('other-task-row', uo), ('superseded-row', u_old)]:
+    gate('state_objective', label, dict(op, source=source), 'source_not_user_words')
+o1 = created(gate('state_objective', 'o1', op), 'objective')
+f = fields(o1)
+assert f['status'] == 'stated' and f['source'] == u_src and f['rank'] == 1 and f['stated_at'] == stamp() and f['statement'] == op['statement'], f
+gate('state_objective', 'name-used', dict(op, statement='again'), 'name_used')
+# confirm_objective
+tick(); lead_late = row('lead-late', who='lead'); uo_late = row('other-late', other_task); u_late = row('late')
+for label, r, code in [('lead-row', lead_late, 'row_not_user_words'), ('other-task-row', uo_late, 'row_not_user_words'), ('source', u_src, 'row_is_source_or_earlier'), ('earlier-row', u_early, 'row_is_source_or_earlier')]:
+    gate('confirm_objective', label, dict(objective=o1, row=r), code)
+tick()
+gate('confirm_objective', 'o1', dict(objective=o1, row=u_late))
+f = fields(o1); assert f['status'] == 'confirmed' and f['confirmed_by'] == u_late and f['confirmed_at'] == stamp(), f
+gate('confirm_objective', 'not-stated', dict(objective=o1, row=u_late), 'objective_not_stated')
+# restate_objective
+tick(); lead_after = row('lead-after-confirm', who='lead'); uo_after = row('other-after-confirm', other_task)
+rp9 = dict(objective=o1, statement='the board orders and refuses')
+gate('restate_objective', 'lead-row', dict(rp9, source=lead_after), 'source_not_user_words')
+gate('restate_objective', 'other-task-row', dict(rp9, source=uo_after), 'source_not_user_words')
+gate('restate_objective', 'row-before-confirmation', dict(rp9, source=u_src), 'confirmed_needs_later_row')
+gate('restate_objective', 'row-of-the-confirmation', dict(rp9, source=u_late), 'confirmed_needs_later_row')
+u_re = row('restate')
+gate('restate_objective', 'o1', dict(rp9, source=u_re))
+f = fields(o1)
+assert f['status'] == 'stated' and f['statement'] == rp9['statement'] and f['source'] == u_re and f.get('confirmed_by') is None and f['stated_at'] == stamp(), f
+seen = [o['fields']['statement']['value'] for o in obj(o1)['observations']]
+statements = [x for n, x in enumerate(seen) if n == 0 or x != seen[n - 1]]
+assert statements == [op['statement'], rp9['statement']], statements
+print('gate_row=v9-earlier-statement-read-back expected=admitted statements=' + json.dumps(statements))
+# An objective that is not confirmed is restated with any current row of the user, also one earlier than a kept confirmed_at.
+gate('restate_objective', 'stated-with-earlier-row', dict(rp9, statement='the board orders, refuses and shows', source=u_early))
+assert fields(o1)['status'] == 'stated' and fields(o1)['source'] == u_early
+gate('restate_objective', 'again-with-later-row', dict(rp9, statement='the board orders, refuses and shows it', source=u_re))
+o3 = created(gate('state_objective', 'o3', {k: v for k, v in dict(op, name='never-confirmed', rank=3).items() if k != 'check'}), 'objective')
+assert 'confirmed_at' not in fields(o3) and 'check' not in fields(o3)
+gate('restate_objective', 'never-confirmed-earlier-row', dict(objective=o3, statement='never confirmed, restated', source=u_early))
+assert fields(o3)['source'] == u_early and fields(o3)['status'] == 'stated'
+gate('record_check', 'no-check-command', dict(objective=o3, exit=0, line='x'), 'objective_without_check')
+assert 'last_exit' not in fields(o3)
+# amend_objective
+am = dict(objective=o1, rank=2, decision=lead_row)
+gate('amend_objective', 'nothing', dict(objective=o1, decision=lead_row), 'nothing_to_amend')
+gate('amend_objective', 'superseded-row', am | dict(decision=d), 'row_not_current')
+gate('amend_objective', 'other-task-row', am | dict(decision=uo), 'row_not_current')
+gate('amend_objective', 'rank', am)
+assert fields(o1)['rank'] == 2 and fields(o1)['check'] == 'true' and fields(o1)['status'] == 'stated'
+gate('amend_objective', 'check', dict(objective=o1, check='test -f ok', decision=lead_row))
+assert fields(o1)['rank'] == 2 and fields(o1)['check'] == 'test -f ok'
+# record_check, and retire_objective of a confirmed objective
+gate('record_check', 'o1', dict(objective=o1, exit=1, line='not yet'))
+f = fields(o1); assert f['last_exit'] == 1 and f['last_line'] == 'not yet' and f['last_checked_at'] == stamp(), f
+tick(); u_conf = row('confirm-again'); tick()
+gate('confirm_objective', 'o1-again', dict(objective=o1, row=u_conf))
+tick(); lead_ret = row('lead-retire', who='lead'); uo_ret = row('other-retire', other_task)
+rt = dict(objective=o1, reason='replaced by a later objective')
+gate('retire_objective', 'confirmed-no-row', rt, 'confirmed_needs_later_row')
+gate('retire_objective', 'confirmed-earlier-row', dict(rt, row=u_late), 'confirmed_needs_later_row')
+gate('retire_objective', 'confirmed-row-of-the-confirmation', dict(rt, row=u_conf), 'confirmed_needs_later_row')
+gate('retire_objective', 'confirmed-lead-row', dict(rt, row=lead_ret), 'confirmed_needs_later_row')
+gate('retire_objective', 'confirmed-other-task-row', dict(rt, row=uo_ret), 'confirmed_needs_later_row')
+u_ret = row('retire')
+gate('retire_objective', 'o1', dict(rt, row=u_ret))
+f = fields(o1); assert f['status'] == 'retired' and f['retire_reason'] == rt['reason'] and f['retired_at'] == stamp(), f
+gate('retire_objective', 'again', rt, 'objective_not_live')
+gate('restate_objective', 'retired', dict(rp9, source=u_ret), 'objective_not_live')
+gate('amend_objective', 'retired', dict(objective=o1, rank=5, decision=lead_row), 'objective_not_live')
+gate('record_check', 'retired', dict(objective=o1, exit=0, line='x'), 'objective_not_live')
+gate('state_objective', 'name-of-a-retired-objective', op, 'name_used')
+o2 = created(gate('state_objective', 'o2', dict(op, name='second', rank=4)), 'objective')
+gate('retire_objective', 'stated-no-row', dict(objective=o2, reason='not wanted'))
+assert fields(o2)['status'] == 'retired'
+o_other = created(gate('state_objective', 'o-other', dict(op, task=other_task, name='other', source=uo)), 'objective')
+print('v9_objective_rows_complete')
+# item
+item_params = dict(task=task, key='k-queued', title='a queued item', statement='the state it wants', objective=o3, origin=u_src, first_use='the Lead, in the run of the next message')
+def add(key, **changes): return created(gate('add_item', 'add-' + key, dict(item_params, key=key, **changes)), 'item')
+gate('add_item', 'unknown-task', dict(item_params, task=invented), ('unknown_task', 'origin_not_current', 'objective_not_live'))
+gate('add_item', 'origin-superseded', dict(item_params, origin=d), 'origin_not_current')
+gate('add_item', 'origin-superseded-user-row', dict(item_params, origin=u_old), 'origin_not_current')
+gate('add_item', 'origin-other-task', dict(item_params, origin=uo), 'origin_not_current')
+gate('add_item', 'objective-retired', dict(item_params, objective=o2), 'objective_not_live')
+gate('add_item', 'objective-other-task', dict(item_params, objective=o_other), 'objective_not_live')
+i1 = add('k-unit'); i2 = add('k-evidence', origin=lead_row); i3 = add('k-drop'); i4 = add('k-unordered'); i5 = add('k-rework'); i6 = add('k-drop-in-work')
+f = fields(i1); assert f['state'] == 'queued' and f['objective'] == o3 and f['origin'] == u_src and f['added_at'] == stamp() and 'repository' not in f, f
+gate('add_item', 'key-used', dict(item_params, key='k-unit'), 'key_used')
+other_item = created(gate('add_item', 'add-other', dict(item_params, task=other_task, key='k-other', objective=o_other, origin=uo)), 'item')
+other_item2 = created(gate('add_item', 'add-other-2', dict(item_params, task=other_task, key='k-other-2', objective=o_other, origin=uo)), 'item')
+gate('amend_item', 'objective-retired', dict(item=i4, objective=o2), 'objective_not_live')
+gate('amend_item', 'objective-other-task', dict(item=i4, objective=o_other), 'objective_not_live')
+gate('amend_item', 'i4', dict(item=i4, title='an unordered item', first_use='the user, in a progress message', objective=o3))
+f = fields(i4); assert f['title'] == 'an unordered item' and f['first_use'] == 'the user, in a progress message' and f['statement'] == item_params['statement'], f
+# start_item before the task has a board
+gate('start_item', 'no-board', dict(item=i1, repository=repo8, branch='unit/one'), 'item_not_ordered')
+# set_order
+board = oid('board', task['native_key']); other_board = oid('board', other_task['native_key'])
+so = dict(board=board, task=task, order=[i2, i1, i3, i5, i6], reason='the order of the next work')
+gate('set_order', 'unknown-task', dict(so, task=invented), 'unknown_task')
+gate('set_order', 'first', so)
+f = fields(board); assert f['task'] == task and f['order'] == so['order'] and f['reason'] == so['reason'] and set(f) == {'task', 'order', 'reason', 'set_at'} and f['set_at'] == stamp(), f
+gate('set_order', 'other-board', dict(so, board=other_board, order=[other_item], task=other_task))
+gate('set_order', 'second-board-of-the-task', dict(so, board=oid('board', 'second-board-of-a-task')), 'board_of_another_task')
+gate('set_order', 'board-of-another-task', dict(so, board=other_board), 'board_of_another_task')
+# The store does not check the elements of the list: an item of another task, a dangling element and an empty list are stored.
+unchecked = [i6, other_item2, oid('item', 'absent-v9-item'), i1]
+tick(); gate('set_order', 'unchecked-elements', dict(so, order=unchecked))
+assert fields(board)['order'] == unchecked
+gate('set_order', 'empty', dict(so, order=[])); assert fields(board)['order'] == []
+gate('set_order', 'ordered', so); assert fields(board)['order'] == so['order']
+gate('set_order', 'reordered', dict(so, order=[i2, i1, i5, i6, i3, other_item2])); assert fields(board)['order'] == [i2, i1, i5, i6, i3, other_item2]
+assert len(call(['search'], dict(object_type='board'))['objects']) == 2
+# start_item, release_item
+gate('start_item', 'unordered', dict(item=i4), 'item_not_ordered')
+gate('start_item', 'ordered-by-another-task-only', dict(item=other_item2), 'item_not_ordered')
+gate('start_item', 'repository-only', dict(item=i1, repository=repo8), 'repository_and_branch')
+gate('start_item', 'branch-only', dict(item=i1, branch='unit/one'), 'repository_and_branch')
+gate('release_item', 'queued', dict(item=i1, reason='not started'), 'item_not_in_work')
+tick(); gate('start_item', 'i1', dict(item=i1, repository=repo8, branch='unit/one'))
+f = fields(i1); assert f['state'] == 'in_work' and f['repository'] == repo8 and f['branch'] == 'unit/one' and f['started_at'] == stamp(), f
+gate('start_item', 'in-work', dict(item=i1, repository=repo8, branch='unit/one'), 'item_not_queued')
+gate('start_item', 'i2', dict(item=i2)); f = fields(i2); assert f['state'] == 'in_work' and 'repository' not in f and 'branch' not in f, f
+gate('start_item', 'i5', dict(item=i5, repository=repo8, branch='unit/rework'))
+tick(); gate('release_item', 'i5', dict(item=i5, reason='closed without a merge'))
+f = fields(i5); assert f['state'] == 'queued' and f['release_reason'] == 'closed without a merge' and f['repository'] == repo8, f
+gate('start_item', 'released-without-repository', dict(item=i5), 'repository_and_branch')
+gate('start_item', 'released-restart', dict(item=i5, repository=repo8, branch='unit/rework-2')); assert fields(i5)['branch'] == 'unit/rework-2'
+gate('start_item', 'i6', dict(item=i6))
+# close_item
+def review9(rid, head, verdict='accept', **changes):
+    r = created(gate('start_review', 'v9-review-' + rid, dict(rp8, head=head, **changes)), 'review')
+    if verdict: gate('close_review', 'v9-review-close-' + rid, dict(closed8, review=r, verdict=verdict))
+    return r
+r_ok, r_ok2 = review9('ok', 'a1' * 20), review9('ok-2', 'a2' * 20)
+r_other_repo, r_abandoned, r_running, r_revoked = review9('other-repo', 'a3' * 20, repository='owner/other'), review9('abandoned', 'a4' * 20, 'abandoned'), review9('running', 'a5' * 20, None), review9('revoked', 'a6' * 20)
+gate('revoke_review', 'v9-review-revoke', dict(review=r_revoked, reason='revoked before the close'))
+r_task = created(gate('start_review', 'v9-review-other-task', dict(rp8, task=other_task, head='a7' * 20)), 'review')
+gate('close_review', 'v9-review-close-other-task', dict(closed8, review=r_task))
+for label, extra in [('evidence-only', dict(evidence='cargo test: ok')), ('nothing', {}), ('review-and-evidence', dict(review=r_ok, evidence='cargo test: ok')),
+                     ('review-of-another-repository', dict(review=r_other_repo)), ('review-abandoned', dict(review=r_abandoned)), ('review-running', dict(review=r_running)),
+                     ('review-revoked', dict(review=r_revoked)), ('review-of-another-task', dict(review=r_task))]:
+    gate('close_item', 'unit-' + label, dict(item=i1, **extra), 'review_or_evidence')
+for label, extra in [('review', dict(review=r_ok)), ('nothing', {}), ('review-and-evidence', dict(review=r_ok, evidence='ran it: ok'))]:
+    gate('close_item', 'no-repository-' + label, dict(item=i2, **extra), 'review_or_evidence')
+gate('close_item', 'queued', dict(item=i4, evidence='x'), 'item_not_in_work')
+tick(); gate('close_item', 'i1', dict(item=i1, review=r_ok))
+f = fields(i1); assert f['state'] == 'done' and f['review'] == r_ok and f['closed_at'] == stamp() and 'evidence' not in f, f
+gate('close_item', 'i2', dict(item=i2, evidence='ran it: ok'))
+f = fields(i2); assert f['state'] == 'done' and f['evidence'] == 'ran it: ok' and 'review' not in f, f
+gate('close_item', 'review-closes-another-item', dict(item=i5, review=r_ok), 'review_closes_another_item')
+gate('close_item', 'i5', dict(item=i5, review=r_ok2)); assert fields(i5)['state'] == 'done'
+# drop_item, and no action reopens a done or dropped item
+gate('release_item', 'queued-drop', dict(item=i3, reason='x'), 'item_not_in_work')
+tick(); gate('drop_item', 'i3', dict(item=i3, reason='not wanted'))
+f = fields(i3); assert f['state'] == 'dropped' and f['drop_reason'] == 'not wanted' and f['dropped_at'] == stamp(), f
+gate('drop_item', 'i6-in-work', dict(item=i6, reason='not wanted either')); assert fields(i6)['state'] == 'dropped'
+r_spare = review9('spare', 'a8' * 20)
+for label, closed_item, closing in [('done', i1, dict(review=r_spare)), ('dropped', i3, dict(evidence='x'))]:
+    gate('drop_item', 'closed-' + label, dict(item=closed_item, reason='x'), 'item_done_or_dropped')
+    gate('start_item', 'closed-' + label, dict(item=closed_item, repository=repo8, branch='unit/again'), 'item_not_queued')
+    gate('release_item', 'closed-' + label, dict(item=closed_item, reason='x'), 'item_not_in_work')
+    gate('close_item', 'closed-' + label, dict(item=closed_item, **closing), 'item_not_in_work')
+    gate('amend_item', 'closed-' + label, dict(item=closed_item, title='x'), 'item_closed')
+gate('add_item', 'key-of-a-dropped-item', dict(item_params, key='k-drop'), 'key_used')
+print('v9_item_rows_complete')
+# triage_decision
+t_item, t_intent, t_na, t_none = row('t-item'), row('t-intent'), row('t-not-adopted'), row('t-none')
+tick()
+td = dict(decision=t_item, triage='item', item=i4)
+gate('triage_decision', 'lead-row', dict(decision=lead_row, triage='none', reason='a limit'), 'not_a_user_row')
+gate('triage_decision', 'superseded-row', dict(decision=u_old, triage='none', reason='a limit'), 'not_a_user_row')
+gate('triage_decision', 'item-missing', dict(decision=t_item, triage='item'), 'item_required')
+gate('triage_decision', 'item-of-another-task', dict(td, item=other_item), 'item_required')
+gate('triage_decision', 'intent-missing', dict(decision=t_intent, triage='intent'), 'objective_required')
+gate('triage_decision', 'intent-other-task', dict(decision=t_intent, triage='intent', objective=o_other), 'objective_required')
+gate('triage_decision', 'not-adopted-no-reason', dict(decision=t_na, triage='not_adopted'), 'reason_required')
+gate('triage_decision', 'none-no-reason', dict(decision=t_none, triage='none'), 'reason_required')
+for label, params in [('item-with-none', dict(decision=t_none, triage='none', reason='r', item=i4)), ('item-with-intent', dict(decision=t_intent, triage='intent', objective=o3, item=i4)),
+                      ('item-with-not-adopted', dict(decision=t_na, triage='not_adopted', reason='r', item=i4)), ('objective-with-item', dict(td, objective=o3)),
+                      ('objective-with-none', dict(decision=t_none, triage='none', reason='r', objective=o3)), ('objective-with-not-adopted', dict(decision=t_na, triage='not_adopted', reason='r', objective=o3))]:
+    gate('triage_decision', label, params, 'reference_not_for_triage')
+gate('triage_decision', 'item', td)
+f = fields(t_item); assert f['triage'] == 'item' and f['triage_item'] == i4 and f['triaged_at'] == stamp() and 'triage_objective' not in f, f
+gate('triage_decision', 'intent', dict(decision=t_intent, triage='intent', objective=o3)); assert fields(t_intent)['triage_objective'] == o3
+gate('triage_decision', 'not-adopted', dict(decision=t_na, triage='not_adopted', reason='a design that was refused')); assert fields(t_na)['triage_reason'] == 'a design that was refused'
+gate('triage_decision', 'none', dict(decision=t_none, triage='none', reason='a question, answered')); assert fields(t_none)['triage'] == 'none'
+gate('triage_decision', 'again', dict(decision=t_item, triage='none', reason='again'), 'already_triaged')
+gate('triage_decision', 'again-same', td, 'already_triaged')
+assert 'triage' not in fields(d) and 'triage' not in fields(successor)
+# A row of the user recorded under version 2 has no words and is triaged like any other current row of the user.
+gate('triage_decision', 'row-without-words', dict(decision=early_user, triage='none', reason='an approval, before the board'))
+f = fields(early_user); assert f['triage'] == 'none' and f['triage_reason'] == 'an approval, before the board' and 'user_words' not in f, f
+# The empty string is no value: each string parameter of the fourteen actions but `line` of record_check refuses "" by its type.
+i7 = add('k-empty-strings'); t_empty = row('t-empty'); tick()
+gate('set_order', 'with-i7', dict(so, order=[i2, i1, i5, i6, i3, other_item2, i7]))
+gate('start_item', 'i7', dict(item=i7)); assert fields(i7)['state'] == 'in_work' and 'repository' not in fields(i7)
+empty_rows = [('state_objective', dict(op, name='empty-parameters', source=u_src), ['name', 'statement', 'check']),
+              ('restate_objective', dict(objective=o3, statement='s', source=u_re), ['statement']),
+              ('amend_objective', dict(objective=o3, check='true', decision=lead_row), ['check']),
+              ('retire_objective', dict(objective=o3, reason='r'), ['reason']),
+              ('add_item', dict(item_params, key='k-empty-parameters'), ['key', 'title', 'statement', 'first_use']),
+              ('amend_item', dict(item=i4, title='t', statement='s', first_use='u'), ['title', 'statement', 'first_use']),
+              ('start_item', dict(item=i4, repository=repo8, branch='unit/empty'), ['repository', 'branch']),
+              ('release_item', dict(item=i7, reason='r'), ['reason']),
+              ('close_item', dict(item=i7, evidence='e'), ['evidence']),
+              ('drop_item', dict(item=i7, reason='r'), ['reason']),
+              ('set_order', dict(so, order=[i7]), ['reason']),
+              ('triage_decision', dict(decision=t_empty, triage='none', reason='r'), ['reason'])]
+for action, base, names in empty_rows:
+    for name in names: gate(action, 'empty-' + name, dict(base, **{name: ''}), 'invalid_parameter')
+gate('triage_decision', 'empty-reason-not-adopted', dict(decision=t_empty, triage='not_adopted', reason=''), 'invalid_parameter')
+assert 'check' not in fields(o3) and 'triage' not in fields(t_empty) and fields(i7)['state'] == 'in_work' and 'evidence' not in fields(i7)
+# A value that applied before still applies: spaces, a line break and bytes outside ASCII; and a check that prints nothing.
+o4 = created(gate('state_objective', 'o4', dict(op, name='with-check', rank=5)), 'objective')
+gate('record_check', 'empty-line', dict(objective=o4, exit=0, line=''))
+assert fields(o4)['last_exit'] == 0 and fields(o4)['last_line'] == ''
+gate('close_item', 'multiline-evidence', dict(item=i7, evidence='ran it\nthen: ok \u00e9'))
+assert fields(i7)['state'] == 'done' and fields(i7)['evidence'] == 'ran it\nthen: ok \u00e9'
+gate('add_item', 'multiline-title', dict(item_params, key='k-multiline', title='two words\nand \u00e9'))
+print('v9_gate_rows_complete')
 PY
 
 python3 -I -B "$repo/ontology/memory-index-walk.py" "$ont_binary" "$rehearsal_root/memory-walk" --records 2
