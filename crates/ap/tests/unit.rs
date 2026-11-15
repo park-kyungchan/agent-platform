@@ -68,6 +68,17 @@ struct U {
     thread_change_on_close: Option<&'static str>,
     /// `resolveReviewThread` answers and resolves nothing.
     resolve_fails: bool,
+    /// The fake store's boards, items, objectives and decisions: `id`, `rev` and the properties.
+    objects: Vec<Value>,
+    /// The request ids the store applied: a repeated id answers `already_applied` and changes nothing.
+    applied: BTreeSet<String>,
+    /// `start_item` / `close_item` are refused with this code (`None`: the store's own criteria).
+    start_refuses: Option<&'static str>,
+    close_refuses: Option<&'static str>,
+    /// The state the item `k1` takes when the review closes (someone drops or closes it by hand).
+    item_on_close: Option<&'static str>,
+    /// The same when the status `lead-review` is posted (a call with `verdict` closes no review).
+    item_on_status: Option<&'static str>,
 }
 
 fn git(dir: &PathBuf, args: &[&str]) -> String {
@@ -166,6 +177,12 @@ impl U {
             reviews: vec![],
             thread_change_on_close: None,
             resolve_fails: false,
+            objects: vec![],
+            applied: BTreeSet::new(),
+            start_refuses: None,
+            close_refuses: None,
+            item_on_close: None,
+            item_on_status: None,
         }
     }
     fn p(&self, rel: &str) -> String {
@@ -417,6 +434,9 @@ impl U {
             }
             ("api", _) => {
                 assert!(a.iter().any(|x| x == "context=lead-review"), "{a:?}");
+                if let Some(state) = self.item_on_status {
+                    self.set("it-k1", "state", json!(state));
+                }
                 ok(json!({}))
             }
             _ => panic!("unexpected gh call {a:?}"),
@@ -451,8 +471,30 @@ impl U {
                 stdout,
             })
         };
+        if a[0] == "get" {
+            let found = self.objects.iter().find(|o| o["id"] == body["id"]);
+            let Some(o) = found else {
+                return Ok(Reply {
+                    success: false,
+                    bytes: br#"{"status":"refused","code":"unavailable"}"#.to_vec(),
+                    stdout: vec![],
+                });
+            };
+            let rev = format!("{}#{}", o["id"]["native_key"].as_str().unwrap(), o["rev"]);
+            let fields = props(o);
+            return reply(
+                json!({"status":"ok","result":{"objects":[{"id":o["id"],"head":rev,"observations":[{"revision":rev,"change":"update","fields":fields}]}]}}),
+            );
+        }
         if a[0] == "search" {
-            assert_eq!(body["object_type"], "review");
+            let kind = body["object_type"].as_str().unwrap();
+            let rows: Vec<Value> = match kind {
+                "review" => self.reviews.clone(),
+                _ => {
+                    let mine = |o: &&Value| o["id"]["object_type"] == kind;
+                    self.objects.iter().filter(mine).cloned().collect()
+                }
+            };
             let all = body["where"]["all"].as_array().unwrap();
             let matches = |r: &&Value| {
                 all.iter()
@@ -464,19 +506,12 @@ impl U {
             let qualified = all
                 .iter()
                 .all(|c| !optional.contains(&c["eq"][0].as_str().unwrap()));
-            let found: Vec<_> = self
-                .reviews
+            let found: Vec<_> = rows
                 .iter()
                 .filter(matches)
                 .map(|r| {
-                    let fields: serde_json::Map<String, Value> = r
-                        .as_object()
-                        .unwrap()
-                        .iter()
-                        .filter(|(k, _)| *k != "id")
-                        .map(|(k, v)| (k.clone(), json!({"kind": "value", "value": v})))
-                        .collect();
-                    json!({"id": r["id"], "head": {"fields": fields}})
+                    let rev = format!("{}#{}", r["id"]["native_key"].as_str().unwrap(), r["rev"]);
+                    json!({"id": r["id"], "head": {"fields": props(r), "revision": rev}})
                 })
                 .collect();
             return reply(
@@ -485,6 +520,12 @@ impl U {
         }
         assert_eq!(&a[..4], ["action", "apply", "--client", "lead"], "{a:?}");
         let p = &body["parameters"];
+        if matches!(
+            body["action_type"].as_str(),
+            Some("start_item" | "close_item")
+        ) {
+            return self.item_action(body);
+        }
         let edits = if body["action_type"] == "start_review" {
             if self.store_refuses {
                 return reply(json!({"status":"error","code":"refused"}));
@@ -515,10 +556,135 @@ impl U {
             if self.move_head_on_close {
                 self.move_head();
             }
+            if let Some(state) = self.item_on_close {
+                self.set("it-k1", "state", json!(state));
+            }
             json!([{"change":"update","id":p["review"],"revision":"c#0"},{"change":"update","id":p["review"],"revision":"c#1"}])
         };
         reply(json!({"status":"ok","result":{"outcome":"applied","edits":edits}}))
     }
+    /// `start_item` and `close_item` as the engine applies them: the criteria of the schema that the
+    /// fake can see, a refusal in the engine's form (exit 2), a repeated request id replayed.
+    fn item_action(&mut self, body: &Value) -> Answer {
+        let (action, p) = (body["action_type"].as_str().unwrap(), &body["parameters"]);
+        let refused = |codes: Vec<&str>| {
+            let v = json!({"status":"refused","code":"submission_criteria","failed":codes});
+            Ok(Reply {
+                success: false,
+                bytes: serde_json::to_vec(&v).unwrap(),
+                stdout: vec![],
+            })
+        };
+        let applied = |outcome: &str| {
+            let v = json!({"status":"ok","result":{"outcome":outcome,"edits":[{"change":"update","id":p["item"]}]}});
+            let stdout = serde_json::to_vec(&v).unwrap();
+            Ok(Reply {
+                success: true,
+                bytes: stdout.clone(),
+                stdout,
+            })
+        };
+        let id = body["request_id"].as_str().unwrap().to_owned();
+        if self.applied.contains(&id) {
+            return applied("already_applied");
+        }
+        let item = self.objects.iter().find(|o| o["id"] == p["item"]).cloned();
+        let key = p["item"]["native_key"].as_str().unwrap().to_owned();
+        let state = item.as_ref().map(|i| i["state"].clone());
+        if action == "start_item" {
+            let mut failed = vec![];
+            if state != Some(json!("queued")) {
+                failed.push("item_not_queued");
+            }
+            let task = item.as_ref().map(|i| i["task"].clone());
+            let ordered = self.objects.iter().any(|b| {
+                b["id"]["object_type"] == "board"
+                    && Some(&b["task"]) == task.as_ref()
+                    && b["order"].as_array().unwrap().contains(&p["item"])
+            });
+            if !ordered {
+                failed.push("item_not_ordered");
+            }
+            failed.extend(self.start_refuses);
+            if !failed.is_empty() {
+                return refused(failed);
+            }
+            self.set(&key, "state", json!("in_work"));
+            self.set(&key, "repository", p["repository"].clone());
+            self.set(&key, "branch", p["branch"].clone());
+        } else {
+            let mut failed = vec![];
+            if state != Some(json!("in_work")) {
+                failed.push("item_not_in_work");
+            }
+            failed.extend(self.close_refuses);
+            if !failed.is_empty() {
+                return refused(failed);
+            }
+            self.set(&key, "state", json!("done"));
+            self.set(&key, "review", p["review"].clone());
+        }
+        self.applied.insert(id);
+        applied("applied")
+    }
+    /// Sets a property of the object whose native key is `key`, as an action does: a new revision.
+    fn set(&mut self, key: &str, k: &str, v: Value) {
+        let o = self
+            .objects
+            .iter_mut()
+            .find(|o| o["id"]["native_key"] == key);
+        let o = o.expect("an object of the fake store");
+        o[k] = v;
+        o["rev"] = json!(o["rev"].as_u64().unwrap() + 1);
+    }
+    fn object(&self, key: &str) -> Value {
+        let o = self.objects.iter().find(|o| o["id"]["native_key"] == key);
+        o.unwrap().clone()
+    }
+    /// A board for the task `store-task`: the objective `o1` stated from the user's current row
+    /// `d1`, the items `(key, state)` with the objective `o1`, the order naming `ordered` (keys).
+    fn board(&mut self, items: &[(&str, &str)], ordered: &[&str]) {
+        let task = oid("task", "store-task");
+        let d1 = json!({"id": oid("decision", "d1"), "rev": 0, "task": task, "topic": "t1",
+            "decided_by": "user", "status": "current", "decided_at": "2026-11-15T10:00:00Z",
+            "triage": "intent"});
+        let o1 = json!({"id": oid("objective", "o1"), "rev": 0, "task": task, "name": "ship-board",
+            "statement": "OBJECTIVE-STATEMENT the board orders the work", "rank": 1,
+            "status": "stated", "source": oid("decision", "d1")});
+        self.objects.extend([d1, o1]);
+        for (key, state) in items {
+            self.objects.push(json!({"id": oid("item", &format!("it-{key}")), "rev": 0,
+                "task": task, "key": key, "title": format!("TITLE of {key}"),
+                "statement": format!("STATEMENT of {key}"), "first_use": format!("FIRST-USE of {key}"),
+                "objective": oid("objective", "o1"), "origin": oid("decision", "d1"),
+                "state": state, "added_at": "2026-11-15T11:00:00Z"}));
+        }
+        let order: Vec<_> = ordered
+            .iter()
+            .map(|k| oid("item", &format!("it-{k}")))
+            .collect();
+        self.objects.push(json!({"id": oid("board", "store-task"), "rev": 0, "task": task,
+            "order": order, "reason": "the order of the next work", "set_at": "2026-11-15T12:00:00Z"}));
+    }
+    /// The effects of a call: stages launched, GitHub calls, store writes other than `start_item`.
+    fn effects(&self) -> (usize, usize, usize) {
+        let gh = self.calls.iter().filter(|(p, ..)| p == "gh").count();
+        let writes = self
+            .calls
+            .iter()
+            .filter(|(p, a, b)| p == "ont" && a[0] == "action" && b["action_type"] != "start_item");
+        (self.launches, gh, writes.count())
+    }
+}
+/// The properties of a row of the fake store, in the engine's form.
+fn props(r: &Value) -> serde_json::Map<String, Value> {
+    let o = r.as_object().unwrap().iter();
+    let mine = o.filter(|(k, _)| *k != "id" && *k != "rev");
+    mine.map(|(k, v)| (k.clone(), json!({"kind": "value", "value": v})))
+        .collect()
+}
+fn oid(kind: &str, key: &str) -> Value {
+    json!({"object_type":kind,"namespace":{"instance":"vps://palantirkc","account":"root"},"native_key":key})
 }
 impl Drop for U {
     fn drop(&mut self) {
@@ -1459,7 +1625,10 @@ fn i10_a_branch_behind_main_stops_at_the_write_set() {
     let main = git(&u.t.join("origin.git"), &["rev-parse", "main"]);
     assert_eq!(v["detail"], json!(main));
     assert_eq!(u.launches, 1, "no verifier");
-    assert!(u.calls.iter().all(|(p, _, _)| p != "ont"), "no review");
+    // The one read of the store before the worktree is the task's board.
+    let board =
+        |(p, _, b): &(String, Vec<String>, Value)| p != "ont" || b["object_type"] == "board";
+    assert!(u.calls.iter().all(board), "no review");
 }
 
 // ---- I5 the merge ------------------------------------------------------------------------------
@@ -1956,7 +2125,7 @@ fn d14_reuse_reads_by_required_properties() {
         assert_eq!((v["state"].as_str(), code), (Some("accepted"), 0), "{v}");
         let search = u.calls[before..]
             .iter()
-            .find(|(p, a, _)| p == "ont" && a[0] == "search")
+            .find(|(p, a, b)| p == "ont" && a[0] == "search" && b["object_type"] == "review")
             .unwrap()
             .2
             .clone();
@@ -4064,7 +4233,10 @@ fn r5_a_stage_whose_record_could_not_be_written_ends_the_step() {
     );
     u.stop(&u.request(), "implementer", "stage_record_unwritten");
     assert_eq!(u.launches, 1);
-    assert!(u.calls.is_empty(), "no pull request read");
+    // The one call before the implementer is the read of the task's board.
+    let board =
+        |(p, _, b): &(String, Vec<String>, Value)| p == "ont" && b["object_type"] == "board";
+    assert!(u.calls.iter().all(board), "no pull request read");
 
     let mut u = U::new();
     u.script(
@@ -4134,4 +4306,609 @@ fn r5_no_cause_of_the_threads_starts_a_round() {
         assert!(!exists(&u, "work/task/u1-2.unit.json"), "{cause}");
         assert!(resolves(&u).is_empty(), "{cause}");
     }
+}
+
+// ---- S9 a unit call names an item of the task's board ------------------------------------------
+
+fn item_request(u: &U, key: &str) -> Value {
+    let mut r = u.request();
+    r["item"] = json!(key);
+    r
+}
+/// A refusal before any effect: the code, and no stage, no GitHub call, no store write other than
+/// `start_item`, no file of the call, no worktree, no branch.
+fn refused_untouched(u: &mut U, r: &Value, want: &str) {
+    assert_eq!(code(u.run(r)), want);
+    assert_eq!(u.effects(), (0, 0, 0), "{want}");
+    assert_eq!(names(&u.t.join("work/task")), ["TASK.md"], "{want}");
+    assert!(!u.wt().exists(), "{want}");
+    assert_eq!(branches(u), "* main", "{want}");
+}
+/// The `ont` actions applied, in order.
+fn actions(u: &U) -> Vec<String> {
+    let applied = u
+        .calls
+        .iter()
+        .filter(|(p, a, _)| p == "ont" && a[0] == "action");
+    applied
+        .map(|(_, _, b)| b["action_type"].as_str().unwrap().to_owned())
+        .collect()
+}
+
+#[test]
+fn s9_1_item_is_a_string_of_at_most_60_bytes_and_no_member_of_a_case_call() {
+    let mut u = U::new();
+    u.board(&[("k1", "queued")], &["k1"]);
+    for bad in [
+        json!(1),
+        json!(""),
+        json!("x".repeat(61)),
+        json!(null),
+        json!(["k1"]),
+    ] {
+        let mut r = u.request();
+        r["item"] = bad.clone();
+        assert_eq!(code(u.run(&r)), "invalid_input@item", "{bad}");
+    }
+    assert_eq!((u.launches, u.calls.len()), (0, 0));
+    // 60 bytes pass the member's check and reach the store: no item of the task has that key.
+    let r = item_request(&u, &"x".repeat(60));
+    refused_untouched(&mut u, &r, "item_unknown@item");
+    let c = case(&u);
+    let mut r = case_request(&u, &c);
+    r["item"] = json!("k1");
+    assert_eq!(code(u.run(&r)), "invalid_input@item");
+    assert!(!u.t.join("work/task/c1.unit.json").exists());
+}
+
+#[test]
+fn s9_2a_without_a_board_an_item_is_refused_and_a_call_without_one_runs_as_before() {
+    let mut u = U::new();
+    let r = item_request(&u, "k1");
+    refused_untouched(&mut u, &r, "item_not_ordered@item");
+    let (v, code) = u.run(&u.request()).unwrap();
+    assert_eq!((v["state"].as_str(), code), (Some("merged"), 0), "{v}");
+    assert!(v.get("item").is_none(), "{v}");
+    assert_eq!(actions(&u), ["start_review", "close_review"]);
+    // The verifier's block of facts is the one of a call before the member existed, byte for byte.
+    let prompt = std::fs::read_to_string(u.t.join("bin/prompt.2")).unwrap();
+    let (head, base) = (v["head"].as_str().unwrap(), v["base"].as_str().unwrap());
+    let (wt, out) = (u.p("work/task/wt/repo"), u.p("work/task/u1"));
+    assert_eq!(
+        prompt,
+        format!(
+            "{VERIFIER_PROMPT}\n## Facts of this unit (ap unit)\n\nRepository: o/r\nPull request: 7\nHead: {head}\nBase: {base}\nDiff: git -C {wt} diff {base} {head}\nGate answer: {out}.gate.json\nAcceptance output: {out}.accept.log\n"
+        )
+    );
+}
+
+#[test]
+fn s9_2b_2c_2d_refusals_of_an_item_come_before_any_effect() {
+    type Change = fn(&mut U);
+    let cases: [(&str, &str, Change); 7] = [
+        ("", "item_required@item", |_| ()),
+        ("k9", "item_unknown@item", |_| ()),
+        ("k1", "item_done@item", |u| {
+            u.set("it-k1", "state", json!("done"))
+        }),
+        ("k1", "item_dropped@item", |u| {
+            u.set("it-k1", "state", json!("dropped"))
+        }),
+        ("k1", "objective_not_current@item", |u| {
+            u.set("o1", "status", json!("retired"))
+        }),
+        ("k1", "objective_source_superseded@item", |u| {
+            u.set("d1", "status", json!("superseded"))
+        }),
+        // A key of another task's item is no item of this task.
+        ("k1", "item_unknown@item", |u| {
+            u.set("it-k1", "task", oid("task", "other-task"))
+        }),
+    ];
+    for (key, want, change) in cases {
+        let mut u = U::new();
+        u.board(&[("k1", "queued")], &["k1"]);
+        change(&mut u);
+        let r = match key {
+            "" => u.request(),
+            k => item_request(&u, k),
+        };
+        refused_untouched(&mut u, &r, want);
+        assert!(actions(&u).is_empty(), "{want}");
+    }
+}
+
+#[test]
+fn s9_2e_an_item_in_work_goes_on_only_for_its_own_repository_and_branch() {
+    for (repo, branch) in [("o/other", BRANCH), ("o/r", "ap/another")] {
+        let mut u = U::new();
+        u.board(&[("k1", "in_work")], &["k1"]);
+        u.set("it-k1", "repository", json!(repo));
+        u.set("it-k1", "branch", json!(branch));
+        let r = item_request(&u, "k1");
+        refused_untouched(&mut u, &r, "item_of_another_unit@item");
+        assert!(actions(&u).is_empty());
+    }
+    // A call repeated after a death: the item is in work for this repository and branch.
+    let mut u = U::new();
+    u.board(&[("k1", "in_work")], &["k1"]);
+    u.set("it-k1", "repository", json!("o/r"));
+    u.set("it-k1", "branch", json!(BRANCH));
+    let (v, code) = u.run(&item_request(&u, "k1")).unwrap();
+    assert_eq!((v["state"].as_str(), code), (Some("merged"), 0), "{v}");
+    assert_eq!(
+        actions(&u),
+        ["start_review", "close_review", "close_item"],
+        "no second start"
+    );
+}
+
+#[test]
+fn s9_2f_a_queued_item_is_started_before_any_other_effect_or_the_call_is_refused() {
+    // Not named by the board: the store refuses the start; nothing else happens.
+    let mut u = U::new();
+    u.board(&[("k1", "queued"), ("k2", "queued")], &["k2"]);
+    let r = item_request(&u, "k1");
+    refused_untouched(&mut u, &r, "item_not_ordered@item");
+    assert_eq!(actions(&u), ["start_item"]);
+    assert_eq!(u.object("it-k1")["state"], "queued");
+    // Any other refusal of the store: `item_unwritten` with the store's code.
+    let mut u = U::new();
+    u.board(&[("k1", "queued")], &["k1"]);
+    u.start_refuses = Some("repository_and_branch");
+    let f = u.run(&item_request(&u, "k1")).unwrap_err();
+    assert_eq!((f.code, f.field.as_str()), ("item_unwritten", "item"));
+    assert_eq!(f.detail, json!({"code": "repository_and_branch"}));
+    assert_eq!(u.effects(), (0, 0, 0));
+    assert_eq!(names(&u.t.join("work/task")), ["TASK.md"]);
+    // Started with the request's repository and branch, before the first call to GitHub.
+    let mut u = U::new();
+    u.board(&[("k1", "queued")], &["k1"]);
+    let mut r = item_request(&u, "k1");
+    r["merge"] = json!(false);
+    let (v, code) = u.run(&r).unwrap();
+    assert_eq!((v["state"].as_str(), code), (Some("accepted"), 0), "{v}");
+    let start = &u.store("start_item")[0]["parameters"];
+    assert_eq!(
+        start,
+        &json!({"item": oid("item", "it-k1"), "repository": "o/r", "branch": BRANCH})
+    );
+    let first_gh = u.calls.iter().position(|(p, ..)| p == "gh").unwrap();
+    let started = u
+        .calls
+        .iter()
+        .position(|(_, _, b)| b["action_type"] == "start_item");
+    assert!(started.unwrap() < first_gh);
+    let item = u.object("it-k1");
+    assert_eq!(
+        (&item["state"], &item["repository"], &item["branch"]),
+        (&json!("in_work"), &json!("o/r"), &json!(BRANCH))
+    );
+    // Released by hand: a new call for the same item, repository and branch starts it again.
+    u.set("it-k1", "state", json!("queued"));
+    std::fs::remove_dir_all(u.wt()).unwrap();
+    git(&u.t.join("clone"), &["worktree", "prune"]);
+    git(&u.t.join("clone"), &["branch", "-D", BRANCH]);
+    let ref_ = format!("refs/heads/{BRANCH}");
+    git(&u.t.join("origin.git"), &["update-ref", "-d", &ref_]);
+    let mut r = item_request(&u, "k1");
+    (r["merge"], r["out"]) = (json!(false), json!(u.p("work/task/u2")));
+    let (v, code) = u.run(&r).unwrap();
+    assert_eq!((v["state"].as_str(), code), (Some("accepted"), 0), "{v}");
+    let starts = u.store("start_item");
+    assert_eq!(starts.len(), 2);
+    assert_ne!(starts[0]["request_id"], starts[1]["request_id"]);
+    assert_eq!(u.object("it-k1")["state"], "in_work");
+}
+
+#[test]
+fn s9_3_5_the_record_names_the_item_the_verifier_reads_it_and_the_merge_closes_it() {
+    let mut u = U::new();
+    u.board(&[("k1", "queued")], &["k1"]);
+    let (v, code) = u.run(&item_request(&u, "k1")).unwrap();
+    assert_eq!((v["state"].as_str(), code), (Some("merged"), 0), "{v}");
+    assert_eq!(
+        v["item"],
+        json!({"key": "k1", "id": oid("item", "it-k1"),
+            "objective": {"name": "ship-board", "id": oid("objective", "o1")}, "closed": true})
+    );
+    let prompt = std::fs::read_to_string(u.t.join("bin/prompt.2")).unwrap();
+    let facts = prompt.strip_prefix(VERIFIER_PROMPT).unwrap();
+    for fact in [
+        "k1",
+        "TITLE of k1",
+        "STATEMENT of k1",
+        "FIRST-USE of k1",
+        "ship-board",
+        "OBJECTIVE-STATEMENT the board orders the work",
+    ] {
+        assert!(facts.contains(fact), "{fact} in {facts}");
+    }
+    // The close comes after the merge and names the accepting review of this unit.
+    let order: Vec<&str> = u
+        .calls
+        .iter()
+        .filter_map(|(p, a, b)| match p.as_str() {
+            "ont" => b["action_type"].as_str(),
+            _ if a.len() > 1 && a[1] == "merge" => Some("merge"),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(
+        order,
+        [
+            "start_item",
+            "start_review",
+            "close_review",
+            "merge",
+            "close_item"
+        ]
+    );
+    let item = u.object("it-k1");
+    assert_eq!(
+        (&item["state"], &item["review"]),
+        (&json!("done"), &v["review"])
+    );
+}
+
+#[test]
+fn s9_4_an_item_dropped_or_done_before_the_merge_stops_the_call_unmerged() {
+    for (state, cause) in [("dropped", "item_dropped"), ("done", "item_done")] {
+        let mut u = U::new();
+        u.board(&[("k1", "queued")], &["k1"]);
+        u.item_on_close = Some(state);
+        let (v, code) = u.run(&item_request(&u, "k1")).unwrap();
+        assert_eq!(
+            (&v["state"], &v["stopped_at"], &v["cause"], code),
+            (&json!("stopped"), &json!("merge"), &json!(cause), 3),
+            "{v}"
+        );
+        assert!(u.merges().is_empty(), "{cause}");
+        assert!(u.store("close_item").is_empty(), "{cause}");
+        assert!(v["item"].get("closed").is_none(), "{v}");
+    }
+}
+
+#[test]
+fn s9_5_a_close_the_store_refuses_leaves_the_unit_merged_and_the_item_in_work() {
+    let mut u = U::new();
+    u.board(&[("k1", "queued")], &["k1"]);
+    u.close_refuses = Some("review_closes_another_item");
+    let (v, code) = u.run(&item_request(&u, "k1")).unwrap();
+    assert_eq!((v["state"].as_str(), code), (Some("merged"), 0), "{v}");
+    assert_eq!(v["item"]["closed"], false);
+    assert_eq!(v["item"]["code"], "review_closes_another_item");
+    assert_eq!(v, u.record("u1"));
+    assert_eq!(u.object("it-k1")["state"], "in_work");
+    // `close_item` applied later by hand succeeds: the item is still in work.
+    u.close_refuses = None;
+    let by_hand = json!({"action_type": "close_item", "request_id": "by-hand",
+        "parameters": {"item": oid("item", "it-k1"), "review": v["review"]}});
+    assert!(u.item_action(&by_hand).unwrap().success);
+    assert_eq!(u.object("it-k1")["state"], "done");
+}
+
+#[test]
+fn s9_5_a_call_that_does_not_merge_closes_nothing() {
+    // `merge: false`, and a stop: the item stays in work, nothing closes or releases it.
+    let mut u = U::new();
+    u.board(&[("k1", "queued")], &["k1"]);
+    let mut r = item_request(&u, "k1");
+    r["merge"] = json!(false);
+    let (v, _) = u.run(&r).unwrap();
+    assert_eq!(v["state"], "accepted");
+    assert!(v["item"].get("closed").is_none(), "{v}");
+    assert_eq!(actions(&u), ["start_item", "start_review", "close_review"]);
+    assert_eq!(u.object("it-k1")["state"], "in_work");
+    let mut u = U::new();
+    u.board(&[("k1", "queued")], &["k1"]);
+    u.script("a2", VERIFY_REPAIR);
+    u.stop(&item_request(&u, "k1"), "verifier", "verdict_repair");
+    assert_eq!(actions(&u), ["start_item"]);
+    assert_eq!(u.object("it-k1")["state"], "in_work");
+}
+
+#[test]
+fn s9_2_the_come_back_of_a_round_goes_on_for_the_item_it_started() {
+    let mut u = U::new();
+    u.board(&[("k1", "queued")], &["k1"]);
+    fixing(&u, FIX);
+    u.script("a2", VERIFY_AFTER_FIX);
+    let mut r = r4_request(&u);
+    r["item"] = json!("k1");
+    let (v, code) = u.run(&r).unwrap();
+    assert_eq!((v["state"].as_str(), code), (Some("merged"), 0), "{v}");
+    assert_eq!(u.store("start_item").len(), 1);
+    assert_eq!(v["item"]["closed"], true);
+    assert!(u.record("u1")["item"].get("closed").is_none());
+    assert_eq!(u.object("it-k1")["state"], "done");
+}
+
+// ---- S9 `ap backlog` ---------------------------------------------------------------------------
+
+fn backlog(u: &mut U, args: &[&str]) -> Result<String, Failure> {
+    let args: Vec<String> = args.iter().map(|a| (*a).to_owned()).collect();
+    ap::backlog::execute(u, &args)
+}
+/// A board of every kind of element: k1 queued, k2 in work, k3 done, k4 dropped, k7 of a retired
+/// objective, an item of another task and a missing element; k5 queued and k6 in work unlisted.
+fn full_board(u: &mut U) {
+    let states = [
+        ("k1", "queued"),
+        ("k2", "in_work"),
+        ("k3", "done"),
+        ("k4", "dropped"),
+        ("k5", "queued"),
+        ("k6", "in_work"),
+        ("k7", "queued"),
+    ];
+    u.board(&states, &["k2", "k1", "k3", "k4", "k7", "kx", "missing"]);
+    for (k, repo, branch) in [("it-k2", "o/r", "b2"), ("it-k6", "o/s", "b6")] {
+        u.set(k, "repository", json!(repo));
+        u.set(k, "branch", json!(branch));
+    }
+    let task = oid("task", "store-task");
+    u.objects.extend([
+        json!({"id": oid("objective", "o3"), "rev": 0, "task": task, "name": "old-aim",
+            "statement": "an aim given up", "rank": 3, "status": "retired",
+            "source": oid("decision", "d1")}),
+        json!({"id": oid("objective", "o2"), "rev": 0, "task": task, "name": "measured",
+            "statement": "a measured aim", "rank": 2, "status": "confirmed",
+            "source": oid("decision", "d1"), "check": "true", "last_exit": 0, "last_line": "ok",
+            "last_checked_at": "2026-11-15T12:30:00Z"}),
+        json!({"id": oid("item", "it-kx"), "rev": 0, "task": oid("task", "other-task"),
+            "key": "kx", "state": "queued"}),
+    ]);
+    u.set("it-k7", "objective", oid("objective", "o3"));
+    for (key, by, status, triage) in [
+        ("d2", "user", "current", None),
+        ("d3", "lead", "current", None),
+        ("d4", "user", "superseded", None),
+        ("d5", "user", "current", Some("none")),
+    ] {
+        let mut d = json!({"id": oid("decision", key), "rev": 0, "task": task,
+            "topic": format!("topic-{key}"), "decided_by": by, "status": status,
+            "decided_at": "2026-11-15T10:00:00Z"});
+        if let Some(t) = triage {
+            d["triage"] = json!(t);
+        }
+        u.objects.push(d);
+    }
+}
+
+#[test]
+fn s9_6_backlog_prints_the_board_with_the_refusal_of_each_item_and_writes_nothing() {
+    let mut u = U::new();
+    full_board(&mut u);
+    let v: Value = serde_json::from_str(&backlog(&mut u, &["store-task"]).unwrap()).unwrap();
+    assert_eq!(
+        v["board"],
+        json!({"set_at": "2026-11-15T12:00:00Z", "reason": "the order of the next work"})
+    );
+    let names: Vec<_> = v["objectives"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|o| o["name"].clone())
+        .collect();
+    assert_eq!(names, ["ship-board", "measured", "old-aim"], "by rank");
+    assert_eq!(
+        v["objectives"][1],
+        json!({"name": "measured", "rank": 2, "status": "confirmed", "statement": "a measured aim",
+            "last_check": {"exit": 0, "line": "ok", "at": "2026-11-15T12:30:00Z"}})
+    );
+    assert_eq!(v["objectives"][0]["last_check"], Value::Null);
+    let order: Vec<_> = v["order"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|i| (i["key"].clone(), i["state"].clone(), i["refusal"].clone()))
+        .collect();
+    assert_eq!(
+        order,
+        [
+            (json!("k2"), json!("in_work"), json!("item_of_another_unit")),
+            (json!("k1"), json!("queued"), Value::Null),
+            (json!("k3"), json!("done"), json!("item_done")),
+            (json!("k4"), json!("dropped"), json!("item_dropped")),
+            (json!("k7"), json!("queued"), json!("objective_not_current")),
+        ]
+    );
+    assert_eq!(
+        v["order"][0],
+        json!({"key": "k2", "title": "TITLE of k2", "state": "in_work", "objective": "ship-board",
+            "repository": "o/r", "branch": "b2", "refusal": "item_of_another_unit"})
+    );
+    assert!(v["order"][1].get("repository").is_none());
+    let bad: Vec<_> = v["bad"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|b| (b["id"]["native_key"].clone(), b["problem"].clone()))
+        .collect();
+    assert_eq!(
+        bad,
+        [
+            (json!("it-k3"), json!("done")),
+            (json!("it-k4"), json!("dropped")),
+            (json!("it-kx"), json!("another_task")),
+            (json!("it-missing"), json!("missing")),
+        ]
+    );
+    assert_eq!(
+        v["unplaced"],
+        json!([{"key": "k5", "title": "TITLE of k5", "added_at": "2026-11-15T11:00:00Z"}])
+    );
+    assert_eq!(
+        v["in_work_unlisted"],
+        json!([{"key": "k6", "title": "TITLE of k6", "repository": "o/s", "branch": "b6"}])
+    );
+    assert_eq!(v["untriaged"], json!({"count": 1, "topics": ["topic-d2"]}));
+    // The verb reads only.
+    assert!(actions(&u).is_empty());
+    assert!(
+        u.calls
+            .iter()
+            .all(|(p, a, _)| p == "ont" && ["search", "get"].contains(&a[0].as_str()))
+    );
+    // The refusal printed is the one a unit call for the item is refused with.
+    for (key, _, refusal) in &order {
+        if let Some(code_) = refusal.as_str() {
+            let r = item_request(&u, key.as_str().unwrap());
+            assert_eq!(code(u.run(&r)), format!("{code_}@item"));
+        }
+    }
+    assert!(actions(&u).is_empty());
+}
+
+#[test]
+fn s9_6_backlog_text_is_one_line_per_item_and_at_most_80_lines() {
+    let mut u = U::new();
+    full_board(&mut u);
+    let text = backlog(&mut u, &["store-task", "--text"]).unwrap();
+    for word in [
+        "k1",
+        "k2",
+        "k3",
+        "k4",
+        "k5",
+        "k6",
+        "k7",
+        "item_of_another_unit",
+        "topic-d2",
+    ] {
+        assert!(text.contains(word), "{word} in {text}");
+    }
+    let lines = |t: &str| t.lines().filter(|l| l.contains("TITLE of k")).count();
+    assert_eq!(lines(&text), 7, "{text}");
+    let task = oid("task", "store-task");
+    for n in 0..100 {
+        u.objects.push(
+            json!({"id": oid("item", &format!("it-m{n}")), "rev": 0, "task": task,
+            "key": format!("m{n}"), "title": "a\nqueued item", "state": "queued",
+            "objective": oid("objective", "o1"), "added_at": "2026-11-15T11:00:00Z"}),
+        );
+    }
+    let text = backlog(&mut u, &["store-task", "--text"]).unwrap();
+    assert!(text.lines().count() <= 80, "{}", text.lines().count());
+}
+
+#[test]
+fn s9_6_backlog_of_a_task_without_a_board() {
+    let mut u = U::new();
+    full_board(&mut u);
+    u.objects.retain(|o| o["id"]["object_type"] != "board");
+    let v: Value = serde_json::from_str(&backlog(&mut u, &["store-task"]).unwrap()).unwrap();
+    let keys: Vec<_> = v.as_object().unwrap().keys().cloned().collect();
+    assert_eq!(keys, ["board", "objectives", "unplaced", "untriaged"]);
+    assert_eq!(v["board"], Value::Null);
+    let unplaced: Vec<_> = v["unplaced"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|i| i["key"].clone())
+        .collect();
+    assert_eq!(unplaced, ["k1", "k5", "k7"]);
+    assert_eq!(v["untriaged"]["count"], 1);
+    for bad in [&["store-task", "--bogus"][..], &["Bad/Key"], &[]] {
+        assert_eq!(backlog(&mut u, bad).unwrap_err().code, "usage", "{bad:?}");
+    }
+    assert!(actions(&u).is_empty());
+}
+
+#[test]
+fn s9_2_a_verdict_call_resolves_the_item_and_closes_it_with_the_reused_review() {
+    let mut u = U::new();
+    u.board(&[("k1", "queued")], &["k1"]);
+    let mut r = item_request(&u, "k1");
+    r["merge"] = json!(false);
+    let (first, exit) = u.run(&r).unwrap();
+    assert_eq!(
+        (first["state"].as_str(), exit),
+        (Some("accepted"), 0),
+        "{first}"
+    );
+    // The merging call with the first call's verdict.
+    let mut r = u.request();
+    r.as_object_mut().unwrap().remove("verifier");
+    (r["pull_request"], r["verdict"], r["out"]) = (
+        json!(7),
+        json!(u.p("work/task/u1.verifier.md")),
+        json!(u.p("work/task/u2")),
+    );
+    // Without `item`: refused before any effect.
+    let (calls, launches) = (u.calls.len(), u.launches);
+    assert_eq!(code(u.run(&r)), "item_required@item");
+    let new = &u.calls[calls..];
+    assert!(
+        new.iter().all(|(p, a, _)| p == "ont" && a[0] == "search"),
+        "{new:?}"
+    );
+    assert_eq!(u.launches, launches);
+    assert!(!u.t.join("work/task/u2.unit.json").exists());
+    // With `item`: the item in work for this branch goes on, merges and closes with the reused review.
+    r["item"] = json!("k1");
+    let (v, exit) = u.run(&r).unwrap();
+    assert_eq!((v["state"].as_str(), exit), (Some("merged"), 0), "{v}");
+    assert_eq!(u.store("start_item").len(), 1, "no second start");
+    let review = v["steps"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|s| s["name"] == "review");
+    assert_eq!(review.unwrap()["detail"], json!({"reused": true}));
+    assert_eq!(v["review"], first["review"]);
+    assert_eq!(v["item"]["closed"], true);
+    let close = &u.store("close_item")[0]["parameters"];
+    assert_eq!(
+        close,
+        &json!({"item": oid("item", "it-k1"), "review": first["review"]})
+    );
+    assert_eq!(u.object("it-k1")["state"], "done");
+    // Dropped after the resolution and before the merge: the call with `verdict` stops unmerged.
+    let mut u = U::new();
+    u.board(&[("k1", "queued")], &["k1"]);
+    let mut r = item_request(&u, "k1");
+    r["merge"] = json!(false);
+    u.run(&r).unwrap();
+    r.as_object_mut().unwrap().remove("verifier");
+    (r["merge"], r["pull_request"], r["verdict"], r["out"]) = (
+        json!(true),
+        json!(7),
+        json!(u.p("work/task/u1.verifier.md")),
+        json!(u.p("work/task/u2")),
+    );
+    u.item_on_status = Some("dropped");
+    let (v, exit) = u.run(&r).unwrap();
+    assert_eq!(
+        (&v["state"], &v["stopped_at"], &v["cause"], exit),
+        (
+            &json!("stopped"),
+            &json!("merge"),
+            &json!("item_dropped"),
+            3
+        ),
+        "{v}"
+    );
+    assert!(u.merges().is_empty() && u.store("close_item").is_empty());
+}
+
+#[test]
+fn s9_6_backlog_counts_every_untriaged_row_and_names_at_most_ten_topics() {
+    let mut u = U::new();
+    full_board(&mut u);
+    // Eleven more current rows of the user without triage: twelve with `d2`.
+    let task = oid("task", "store-task");
+    for n in 0..11 {
+        u.objects.push(
+            json!({"id": oid("decision", &format!("e{n}")), "rev": 0, "task": task,
+            "topic": format!("topic-e{n:02}"), "decided_by": "user", "status": "current",
+            "decided_at": format!("2026-11-15T11:{n:02}:00Z")}),
+        );
+    }
+    let v: Value = serde_json::from_str(&backlog(&mut u, &["store-task"]).unwrap()).unwrap();
+    assert_eq!(v["untriaged"]["count"], 12);
+    let mut want = vec!["topic-d2".to_owned()];
+    want.extend((0..9).map(|n| format!("topic-e{n:02}")));
+    assert_eq!(v["untriaged"]["topics"], json!(want), "the ten oldest");
 }
