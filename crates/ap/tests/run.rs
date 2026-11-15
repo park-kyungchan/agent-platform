@@ -2122,3 +2122,52 @@ fn x5_resume_of_the_other_runtime_is_refused() {
         !Path::new(&f.p("c2.md.run.json")).exists() && !Path::new(&f.p("x2.md.run.json")).exists()
     );
 }
+
+#[test]
+fn x3_a_failed_write_of_the_session_at_the_thread_start_is_a_failed_write() {
+    let mut f = Fake::new();
+    f.mode("a1", "blockrecord");
+    let (v, status) = f.run(&f.codex("b.md")).unwrap();
+    // The record could not be written when the thread started: exit 5, as for any write of the
+    // record after the launch; the final record is on stdout and, once writable, in the file.
+    assert_eq!(status, 5, "{v}");
+    assert_eq!(v["session"], "00000000-0000-7000-8000-000000000001");
+    assert_eq!(f.record("b.md"), v);
+}
+
+#[test]
+fn x5_tokens_of_a_resume_whose_chain_cannot_be_followed_are_null() {
+    let mut f = Fake::new();
+    f.run(&f.codex("c0.md")).unwrap();
+    let base = f.record("c0.md");
+    // `name` resumes `earlier` (a record path), with the tokens of one turn.
+    let link = |f: &Fake, name: &str, earlier: &str| {
+        let mut rec = base.clone();
+        rec["resumes"] = json!(f.p(earlier));
+        std::fs::write(f.p(&format!("{name}.run.json")), rec.to_string()).unwrap();
+    };
+    let null = json!({"input": null, "output": null, "cache_read": null, "cache_creation": null});
+    let resume = |f: &mut Fake, out: &str, earlier: &str| {
+        let mut r = f.resume(f.codex("x"), out, earlier);
+        r["role"] = json!("fixer");
+        let (v, status) = f.run(&r).unwrap();
+        assert_eq!((status, v["state"].as_str()), (0, Some("ok")), "{out} {v}");
+        v["tokens"].clone()
+    };
+    // Past the bound: 256 records before the one resumed, 257 in the chain.
+    let mut earlier = "c0.md.run.json".to_owned();
+    for i in 1..=256 {
+        link(&f, &format!("long{i}.md"), &earlier);
+        earlier = format!("long{i}.md.run.json");
+    }
+    assert_eq!(resume(&mut f, "r1.md", "long256.md"), null);
+    // A record of the chain that cannot be read.
+    link(&f, "gap.md", "missing.md.run.json");
+    assert_eq!(resume(&mut f, "r2.md", "gap.md"), null);
+    // A chain that returns to a record already seen.
+    link(&f, "loop1.md", "loop2.md.run.json");
+    link(&f, "loop2.md", "loop1.md.run.json");
+    assert_eq!(resume(&mut f, "r3.md", "loop2.md"), null);
+    // A chain followed to its end keeps its tokens known.
+    assert_ne!(resume(&mut f, "r4.md", "c0.md"), null);
+}

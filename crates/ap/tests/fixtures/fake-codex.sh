@@ -39,6 +39,9 @@ case "$mode" in
   hang)       started; said "stage ok"; sleep 600 ;;
   empty)      started; thought; completed ;;
   nowrite)    started; said "stage ok"; completed nowrite ;;
+  blockrecord) # a directory stands where the record goes while the thread starts, then is gone
+              p=$(readlink "/proc/$$/fd/1"); r=${p%.stream.jsonl}.run.json; rm -f "$r"; mkdir "$r"
+              started; sleep 1; rmdir "$r"; said "stage ok"; completed ;;
   watch)      # the record as it is after the thread started, while the CLI runs
               started; for _ in $(seq 100); do grep -q "$tid" "$(cat "$here/watch")" && break; sleep 0.05; done
               cp "$(cat "$here/watch")" "$here/seen.json"; failed "unexpected status 401 Unauthorized" ;;
