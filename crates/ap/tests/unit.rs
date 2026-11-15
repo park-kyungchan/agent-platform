@@ -3435,6 +3435,30 @@ fn r4_the_come_back_waits_until_github_reports_the_pushed_head() {
 }
 
 #[test]
+fn r4_the_fixer_state_is_saved_before_the_wait() {
+    let mut u = U::new();
+    let t = u.t.display();
+    // The record's path becomes a directory during the fixer and GitHub never reports the pushed
+    // head: the save before the wait fails, so the head is never read and no cause is set.
+    fixing(
+        &u,
+        &format!(
+            "rm -f {r} && mkdir {r}; git rev-parse HEAD > {t}/old-head; \
+             echo 1000 > {t}/view-lag; {FIX}",
+            r = u.p("work/task/u1.unit.json")
+        ),
+    );
+    u.script("a2", VERIFY_AFTER_FIX);
+    let (v, code) = u.run(&r4_request(&u)).unwrap();
+    assert_eq!(code, 5, "{v}");
+    assert_eq!(v["repair"]["state"], "ok");
+    assert!(v["repair"].get("cause").is_none(), "{v}");
+    assert_eq!(head_readings(&u), 0, "no wait for a head");
+    assert_eq!(u.launches, 3, "no stage of a come-back");
+    assert!(!exists(&u, "work/task/u1-2.unit.json"));
+}
+
+#[test]
 fn r4_a_verifier_prompt_changed_during_the_wait_ends_digest_differs() {
     let mut u = U::new();
     let t = u.t.display();
