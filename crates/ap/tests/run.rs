@@ -852,6 +852,63 @@ fn ok_means_the_expected_result_and_denials_are_recorded() {
 
 // ---- repair 1 --------------------------------------------------------------------------------
 
+#[test]
+fn p3_a_preamble_before_the_verdict_is_no_result() {
+    for (runtime, role) in [
+        ("claude", "reviewer"),
+        ("claude", "implementer"),
+        ("claude", "fixer"),
+        ("codex", "implementer"),
+        ("codex", "fixer"),
+    ] {
+        for newline in ["\n", "\r\n"] {
+            let mut f = Fake::new();
+            let answer = format!(
+                "I have read the change.{newline}Verdict: accept{newline}{}{newline}body «ü» \t {newline}",
+                "a".repeat(40)
+            );
+            std::fs::write(f.t.join("bin/answer"), &answer).unwrap();
+            f.mode("a1", "answer");
+            let mut r = if runtime == "codex" {
+                f.codex("p.md")
+            } else {
+                f.request("p.md")
+            };
+            r["role"] = json!(role);
+            r["expect"] = json!({"first_line": "Verdict: *"});
+            let (v, status) = f.run(&r).unwrap();
+            assert_eq!(
+                (status, v["state"].as_str(), v["unmet"].as_str()),
+                (3, Some("no_result"), Some("first_line")),
+                "{v}"
+            );
+            assert_eq!(std::fs::read(f.p("p.md")).unwrap(), answer.as_bytes());
+            assert_eq!(v["expect_met"], false);
+            assert_eq!(v["answer"]["sha256"], f.sha("bin/answer"));
+            assert_eq!(v, f.record("p.md"));
+        }
+    }
+    // A later result with a preamble does not replace an earlier matching result.
+    let mut f = Fake::new();
+    std::fs::write(f.t.join("bin/skeleton"), "result success\nresult success\n").unwrap();
+    std::fs::write(
+        f.t.join("bin/answers"),
+        "Verdict: accept\\nfirst\npreamble\\nVerdict: accept\\nsecond",
+    )
+    .unwrap();
+    f.mode("a1", "skeleton");
+    let mut r = f.request("p.md");
+    r["role"] = json!("implementer");
+    r["expect"] = json!({"first_line": "Verdict: *"});
+    let (v, status) = f.run(&r).unwrap();
+    assert_eq!((status, v["state"].as_str()), (0, Some("ok")), "{v}");
+    assert_eq!(
+        std::fs::read(f.p("p.md")).unwrap(),
+        b"Verdict: accept\nfirst"
+    );
+    assert_eq!(v["results"], 2);
+}
+
 /// R1: a result is not final while a shell the session started lives. An implementer's stage runs
 /// to the exit and keeps the LAST answer; a reviewer's ends at the first.
 #[test]

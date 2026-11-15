@@ -332,7 +332,12 @@ fn verdict(bytes: &[u8], head: &str) -> Result<(), Stop> {
     let first = lines.next().unwrap_or_default();
     ensure!(first != "Verdict: repair" => "verdict_repair");
     ensure!(first == "Verdict: accept" => "verdict_unreadable");
-    ensure!(lines.next().map(str::trim) == Some(head) => "verdict_head_differs");
+    let mut heads = lines
+        .next()
+        .unwrap_or_default()
+        .split(|c: char| !c.is_alphanumeric())
+        .filter(|s| s.len() == 40 && s.bytes().all(|b| b.is_ascii_hexdigit()));
+    ensure!(heads.next() == Some(head) && heads.next().is_none() => "verdict_head_differs");
     Ok(())
 }
 fn create(path: &str, bytes: &[u8]) -> Result<(), Stop> {

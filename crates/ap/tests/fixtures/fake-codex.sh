@@ -38,6 +38,7 @@ case "$mode" in
   noend)      started; tool ;;
   hang)       started; said "stage ok"; sleep 600 ;;
   empty)      started; thought; completed ;;
+  answer)     started; python3 -I -c 'import json,sys; print(json.dumps({"type":"item.completed","item":{"type":"agent_message","text":open(sys.argv[1],encoding="utf-8",newline="").read()}}))' "$here/answer"; completed ;;
   nowrite)    started; said "stage ok"; completed nowrite ;;
   blockrecord) # a directory stands where the record goes while the thread starts, then is gone
               p=$(readlink "/proc/$$/fd/1"); r=${p%.stream.jsonl}.run.json; rm -f "$r"; mkdir "$r"
