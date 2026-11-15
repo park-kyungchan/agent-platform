@@ -4378,7 +4378,8 @@ fn s9_2a_without_a_board_an_item_is_refused_and_a_call_without_one_runs_as_befor
 
 #[test]
 fn s9_2b_2c_2d_refusals_of_an_item_come_before_any_effect() {
-    let cases: [(&str, &str, fn(&mut U)); 7] = [
+    type Change = fn(&mut U);
+    let cases: [(&str, &str, Change); 7] = [
         ("", "item_required@item", |_| ()),
         ("k9", "item_unknown@item", |_| ()),
         ("k1", "item_done@item", |u| {
