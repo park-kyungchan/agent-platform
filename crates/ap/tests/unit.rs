@@ -3334,6 +3334,29 @@ fn r4_a_record_that_cannot_hold_the_round_starts_no_fixer() {
 }
 
 #[test]
+fn r4_a_record_that_cannot_hold_the_fixer_state_starts_no_come_back() {
+    let mut u = U::new();
+    // The fixer ends `ok`, and while it runs the record's path becomes a directory: the save after it fails.
+    fixing(
+        &u,
+        &format!(
+            "rm -f {r} && mkdir {r}; {FIX}",
+            r = u.p("work/task/u1.unit.json")
+        ),
+    );
+    u.script("a2", VERIFY_AFTER_FIX);
+    let (v, code) = u.run(&r4_request(&u)).unwrap();
+    assert_eq!(code, 5, "{v}");
+    assert_eq!(
+        (&v["state"], &v["cause"], &v["repair"]["state"]),
+        (&json!("stopped"), &json!("verdict_repair"), &json!("ok"))
+    );
+    assert_eq!(u.launches, 3, "no stage of a come-back");
+    assert!(!exists(&u, "work/task/u1-2.unit.json"));
+    assert!(u.statuses().is_empty() && u.merges().is_empty());
+}
+
+#[test]
 fn r4_a_repair_verdict_without_the_head_starts_no_round() {
     for answer in [
         "printf 'Verdict: repair\\n'",

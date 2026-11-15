@@ -746,6 +746,10 @@ fn round(s: &mut impl System, r: &Value, rec: Value) -> Result<(Value, u8), Fail
         }
     };
     u.save();
+    if !u.clean {
+        // The fixer's state could not be recorded: no come-back starts (exit 5, as for every record that cannot be written).
+        return end(u);
+    }
     execute(s, &next).or_else(|f| {
         u.rec["repair"]["cause"] = json!("come_back_refused");
         u.rec["repair"]["detail"] = json!({"code": f.code, "field": f.field});
