@@ -52,7 +52,7 @@ Every platform repository has one workflow, `.github/workflows/rust.yml`, with t
 | Any task | `/home/palantirkc/work/<scope>-<topic>/STATE.md` |
 | Directory standard and where an old path went | `/home/palantirkc/work/ws-layout-standard/LAYOUT.md` and `PATH-MAP.tsv` beside it |
 | Whole-host improvement program (the whole view, the order of work) | `/home/palantirkc/work/ws-program/STATE.md`, with `LENS.md` beside it |
-| Rust migration plan and Academy parity | `/home/palantirkc/work/ws-replan/STATE.md`, with the plan and strategy files beside it |
+| The Academy lesson route on the Rust programs and the Ontology store (it replaced the Rust migration plan and tool-by-tool parity) | `/home/palantirkc/work/ws-program/DESIGN-LESSON-ROUTE.md` |
 | Academy lessons | `/home/palantirkc/work/edu-lessons/STATE.md` |
 | Memory selection and evaluation | `/home/palantirkc/work/mem-host-memory/STATE.md` |
 | Recovery archives | `/home/palantirkc/archive/INDEX.md`. An archive is for recovery; it carries no current rule |
