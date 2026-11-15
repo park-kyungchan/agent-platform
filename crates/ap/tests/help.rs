@@ -58,7 +58,7 @@ fn r2_help_lists_every_verb() {
     quoted_after(source, "arg == ", &mut dispatched);
     quoted_after(source, "args[0] == ", &mut dispatched);
     quoted_after(source, "args[0] != ", &mut dispatched);
-    assert!(dispatched.contains("gate") && dispatched.contains("pane"));
+    assert!(dispatched.contains("gate") && dispatched.contains("version"));
     let missing: Vec<_> = dispatched.difference(&names).collect();
     assert!(missing.is_empty(), "dispatched and not listed: {missing:?}");
 

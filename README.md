@@ -3,19 +3,15 @@
 A small Rust workspace of the command `ap`. Native Muse, Claude Code, Codex,
 Antigravity CLI (`agy`) and Hermes own their sessions, tools and lifecycle.
 
-`crates/ap` implements the verbs `version`, `work`, `run`, `gate`, `review`,
-`unit`, `deliver` and `pane`; [crates/ap/README.md](crates/ap/README.md)
-documents each. `ap pane` resolves the caller's Herdr pane;
-`--focused` explicitly selects UI focus, `--exports` emits validated caller
-variables and `--resume-candidate` returns an unverified Codex candidate.
-See [pane compatibility](crates/ap/pane/README.md). The earlier installer's
-verbs were removed; the command refuses them like any unknown verb.
+`crates/ap` implements the verbs `version`, `run`, `gate`, `review`, `unit` and
+`deliver`; [crates/ap/README.md](crates/ap/README.md) documents each. The
+earlier installer's verbs were removed; the command refuses them like any
+unknown verb.
 
 `./check` is the one check of this repository and what the CI job `rust` runs:
 the content check, the memory record checks, the test of the install script,
 format, lints as errors, all tests, and the rehearsal of `ontology/work.schema.json`
 against the engine revision in `ontology/ENGINE-PIN`.
-`ci/check-rust-source.sh` builds the pane fixture and runs the frozen pane oracle `crates/ap/pane/golden.py`; the conformance judges it also ran were removed, and no job runs it.
 How an agent works here: [AGENTS.md](AGENTS.md). What blocks a pull request: [REVIEW.md](REVIEW.md).
 
 Source changes require independent review and Lead integration. Real-host
