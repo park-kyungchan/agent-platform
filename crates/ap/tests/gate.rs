@@ -429,9 +429,12 @@ fn a_head_that_moves_while_waiting() {
 fn unresolved_threads_answered_and_not() {
     let author =
         |kind: &str, login: &str| json!({"nodes":[{"author":{"__typename":kind,"login":login}}]});
+    // `comments`: the number of comments of the thread (`totalCount`).
     let t = |id: &str, resolved: bool, last: Value| {
+        let mut first = author("Bot", "chatgpt-codex-connector");
+        first["totalCount"] = json!(if last == first { 1 } else { 2 });
         json!({"id":id,"isResolved":resolved,"path":"src/a.rs","line":4,
-        "first":author("Bot","chatgpt-codex-connector"),"last":last})
+        "first":first,"last":last})
     };
     let page = |nodes: Vec<Value>, next: bool| {
         json!({"data":{"repository":{"pullRequest":{"reviewThreads":{
@@ -455,8 +458,8 @@ fn unresolved_threads_answered_and_not() {
     assert_eq!(
         v["threads"],
         json!([
-        {"id":"T1","path":"src/a.rs","line":4,"author":"chatgpt-codex-connector[bot]","answered":true},
-        {"id":"T3","path":"src/a.rs","line":4,"author":"chatgpt-codex-connector[bot]","answered":false}])
+        {"id":"T1","path":"src/a.rs","line":4,"author":"chatgpt-codex-connector[bot]","answered":true,"comments":2},
+        {"id":"T3","path":"src/a.rs","line":4,"author":"chatgpt-codex-connector[bot]","answered":false,"comments":1}])
     );
 }
 
