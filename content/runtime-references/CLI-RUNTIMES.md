@@ -28,7 +28,7 @@ Every pointer resolves to `/root/.agents/AGENTS.md`. If a CLI does not show that
 | CLI | Interactive | Headless (one prompt, then exit) | Resume an exact session |
 | --- | --- | --- | --- |
 | Claude Code | `claude --model <model> --effort <effort>` in the assigned checkout | `claude --print <prompt>` | `claude --resume <session-id>` |
-| Codex | `codex --no-daemon -C <checkout> -m <model> -c model_reasoning_effort=<effort>` | `codex --no-daemon exec -C <checkout> --json <prompt>` | `codex --no-daemon resume <session-id>` |
+| Codex | `codex --no-daemon -C <checkout> -m <model> -c model_reasoning_effort=<effort>` | `codex --no-daemon exec -C <checkout> --json <prompt>`; a stage of a unit is started by `ap run` with `runtime: codex` (`crates/ap/README.md`, "One stage") | `codex --no-daemon resume <session-id>` |
 | Muse | `muse --model <model> --reasoning-effort <effort>` | `MUSE_NO_AUTO_UPDATE=1 muse exec --model <model> --reasoning-effort <effort> --disable-reminders --session-id <new uuid> --workspace <checkout> --prompt-file <absolute TASK path>` | `muse resume <session-ref>` |
 | Antigravity | `agy --model <model>` | `agy --print <prompt> --output-format stream-json` | `agy --conversation <id>` |
 | Grok Build | `grok --cwd <checkout>` | `grok --cwd <checkout> -p <prompt> --output-format streaming-json` | `grok --cwd <checkout> --resume <session-id>` |
