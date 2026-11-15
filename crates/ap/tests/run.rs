@@ -853,7 +853,7 @@ fn ok_means_the_expected_result_and_denials_are_recorded() {
 // ---- repair 1 --------------------------------------------------------------------------------
 
 #[test]
-fn p1_answer_with_one_expected_line_after_a_preamble_is_ok() {
+fn p3_a_preamble_before_the_verdict_is_no_result() {
     for (runtime, role) in [
         ("claude", "reviewer"),
         ("claude", "implementer"),
@@ -863,11 +863,10 @@ fn p1_answer_with_one_expected_line_after_a_preamble_is_ok() {
     ] {
         for newline in ["\n", "\r\n"] {
             let mut f = Fake::new();
-            let suffix = format!(
-                "Verdict: accept{newline}{}{newline}líne «ü» \t ",
+            let answer = format!(
+                "I have read the change.{newline}Verdict: accept{newline}{}{newline}body «ü» \t {newline}",
                 "a".repeat(40)
             );
-            let answer = format!("I have read the change.{newline}{newline}{suffix}");
             std::fs::write(f.t.join("bin/answer"), &answer).unwrap();
             f.mode("a1", "answer");
             let mut r = if runtime == "codex" {
@@ -878,29 +877,23 @@ fn p1_answer_with_one_expected_line_after_a_preamble_is_ok() {
             r["role"] = json!(role);
             r["expect"] = json!({"first_line": "Verdict: *"});
             let (v, status) = f.run(&r).unwrap();
-            assert_eq!((status, v["state"].as_str()), (0, Some("ok")), "{v}");
-            assert_eq!(std::fs::read(f.p("p.md")).unwrap(), suffix.as_bytes());
-            assert_eq!(v["answer_dropped_lines"], 2);
-            assert_eq!(v["answer"]["sha256"], f.sha("p.md"));
-            assert_eq!(v, f.record("p.md"));
-            let stream = std::fs::read_to_string(f.p("p.md.stream.jsonl")).unwrap();
-            let events: Vec<Value> = stream
-                .lines()
-                .map(|l| serde_json::from_str(l).unwrap())
-                .collect();
-            assert!(
-                events
-                    .iter()
-                    .any(|e| e["result"] == answer || e["item"]["text"] == answer)
+            assert_eq!(
+                (status, v["state"].as_str(), v["unmet"].as_str()),
+                (3, Some("no_result"), Some("first_line")),
+                "{v}"
             );
+            assert_eq!(std::fs::read(f.p("p.md")).unwrap(), answer.as_bytes());
+            assert_eq!(v["expect_met"], false);
+            assert_eq!(v["answer"]["sha256"], f.sha("bin/answer"));
+            assert_eq!(v, f.record("p.md"));
         }
     }
-    // Result selection must use the same rule: a later unmatched answer cannot unmake this one.
+    // A later result with a preamble does not replace an earlier matching result.
     let mut f = Fake::new();
     std::fs::write(f.t.join("bin/skeleton"), "result success\nresult success\n").unwrap();
     std::fs::write(
         f.t.join("bin/answers"),
-        "preamble\\nVerdict: accept\\nbody\nlater notification",
+        "Verdict: accept\\nfirst\npreamble\\nVerdict: accept\\nsecond",
     )
     .unwrap();
     f.mode("a1", "skeleton");
@@ -911,63 +904,9 @@ fn p1_answer_with_one_expected_line_after_a_preamble_is_ok() {
     assert_eq!((status, v["state"].as_str()), (0, Some("ok")), "{v}");
     assert_eq!(
         std::fs::read(f.p("p.md")).unwrap(),
-        b"Verdict: accept\nbody"
+        b"Verdict: accept\nfirst"
     );
-    assert_eq!(v["answer_dropped_lines"], 1);
     assert_eq!(v["results"], 2);
-}
-
-#[test]
-fn p1_answer_with_two_expected_lines_is_no_result() {
-    for answer in [
-        "I have read the change.\nVerdict: accept is not possible, because ...\nVerdict: accept\nbody",
-        "I have read the change.\nNo verdict here\nbody",
-        "I have read the change.\n Verdict: accept\nbody",
-    ] {
-        let mut f = Fake::new();
-        std::fs::write(f.t.join("bin/answer"), answer).unwrap();
-        f.mode("a1", "answer");
-        let mut r = f.request("p.md");
-        r["expect"] = json!({"first_line": "Verdict: *"});
-        let (v, status) = f.run(&r).unwrap();
-        assert_eq!(
-            (status, v["state"].as_str(), v["unmet"].as_str()),
-            (3, Some("no_result"), Some("first_line")),
-            "{v}"
-        );
-        assert_eq!(std::fs::read(f.p("p.md")).unwrap(), answer.as_bytes());
-        assert!(v.get("answer_dropped_lines").is_none());
-    }
-}
-
-#[test]
-fn p1_answer_that_begins_with_the_expected_line_is_unchanged() {
-    let mut f = Fake::new();
-    // A matching first line wins even when another line matches; preserve all bytes.
-    let answer = "Verdict: accept\r\nbody «ü» \t\nVerdict: repair\n";
-    std::fs::write(f.t.join("bin/answer"), answer).unwrap();
-    f.mode("a1", "answer");
-    let mut r = f.request("p.md");
-    r["expect"] = json!({"first_line": "Verdict: *"});
-    let (v, status) = f.run(&r).unwrap();
-    assert_eq!(status, 0, "{v}");
-    assert_eq!(std::fs::read(f.p("p.md")).unwrap(), answer.as_bytes());
-    // The complete record shape and bytes produced by the base implementation, with only the
-    // clock and generated identifiers taken from this run.
-    let base = json!({
-        "role": "reviewer", "runtime": "claude", "model": "sonnet", "effort": "high",
-        "account": f.p("a1"), "session": v["session"], "cwd": f.p("cwd"), "unit": v["unit"],
-        "prompt": {"path": f.p("prompt.md"), "sha256": f.sha("prompt.md")},
-        "answer": {"path": f.p("p.md"), "sha256": f.sha("bin/answer")},
-        "start": v["start"], "end": v["end"], "state": "ok", "turns": 2,
-        "tokens": {"input": 7, "output": 9, "cache_read": null, "cache_creation": null},
-        "permission_denials": [], "results": 1, "expect_met": true,
-        "expect_file_before": null, "unmet": null, "resumes": null
-    });
-    assert_eq!(v, base);
-    let mut bytes = serde_json::to_vec_pretty(&base).unwrap();
-    bytes.push(b'\n');
-    assert_eq!(std::fs::read(f.p("p.md.run.json")).unwrap(), bytes);
 }
 
 /// R1: a result is not final while a shell the session started lives. An implementer's stage runs

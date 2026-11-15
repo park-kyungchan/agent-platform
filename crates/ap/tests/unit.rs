@@ -1211,21 +1211,29 @@ fn p2_head_line_with_two_hex_runs_or_another_head_differs() {
 }
 
 #[test]
-fn p2_a_repair_after_a_preamble_stays_a_repair() {
-    for verdict in ["repair", "accept is not possible", "accepted", "accept "] {
+fn p3_a_quoted_form_with_another_verdict_never_accepts() {
+    for report in [
+        "I read it. The form is:\\nVerdict: accept\\n%s\\n**Verdict: repair**\\nA finding.",
+        "I read it. The form is:\\n```\\nVerdict: accept\\n%s\\n```\\n**Verdict: repair**\\nA finding.",
+    ] {
         let mut u = U::new();
-        u.script("a2", &format!("printf 'I have read the change.\\n\\nVerdict: {verdict}\\nHead: %s\\nbody' \"$(git rev-parse HEAD)\""));
-        let cause = if verdict == "repair" {
-            "verdict_repair"
-        } else {
-            "verdict_unreadable"
-        };
-        let v = u.stop(&u.request(), "verifier", cause);
+        u.script(
+            "a2",
+            &format!("printf '{report}' \"$(git rev-parse HEAD)\""),
+        );
+        let mut r = u.request();
+        r["merge"] = json!(false);
+        let v = u.stop(&r, "verifier", "no_result");
         let rec = stage_record(&v["stages"]["verifier"]);
-        assert_eq!(rec["state"], "ok");
-        assert_eq!(rec["answer_dropped_lines"], 2);
-        let answer = std::fs::read_to_string(u.p("work/task/u1.verifier.md")).unwrap();
-        assert!(answer.starts_with(&format!("Verdict: {verdict}\n")));
+        assert_eq!(rec["state"], "no_result");
+        assert_eq!(rec["unmet"], "first_line");
+        let expected = report
+            .replace("\\n", "\n")
+            .replace("%s", v["head"].as_str().unwrap());
+        assert_eq!(
+            std::fs::read(u.p("work/task/u1.verifier.md")).unwrap(),
+            expected.as_bytes()
+        );
         assert!(u.store("start_review").is_empty() && u.store("close_review").is_empty());
     }
 }
