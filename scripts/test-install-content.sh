@@ -87,6 +87,7 @@ fresh; before=$(snap "$ck"); AP_CONTENT_DST=$absent inst rollback-check "$ck/k.t
 { [ "$rc" -eq 0 ] && [ "$before" = "$(snap "$ck")" ] && [ ! -e "$absent" ] && [ ! -s "$t/err" ]; } && ok "rollback-check takes a kept copy this script wrote" || bad "rollback-check of a kept copy rc=$rc $(cat "$t/err")"
 fresh; rm "$ck/k.tar.sha256"; rcheck "a missing .sha256" "tarball, .sha256 or .paths missing"
 fresh; rm "$ck/k.tar.paths"; rcheck "a missing .paths" "tarball, .sha256 or .paths missing"
+fresh; (cd "$ck" && sha256sum k.tar.paths > k.tar.sha256); rcheck "a checksum line that names another file" "the checksum file names another file than the tarball"
 fresh; echo x >> "$ck/k.tar"; rcheck "a wrong checksum" "the tarball does not match its checksum"
 fresh; mkdir -p "$t/evil" && echo e > "$t/evil/evil.txt" && tar -C "$t/evil" -cf "$ck/k.tar" evil.txt && (cd "$ck" && sha256sum k.tar > k.tar.sha256); rcheck "a member that is not the installer's" "the tarball lists a path that is not the installer's"
 fresh; echo '../escape' >> "$ck/k.tar.paths"; rcheck "an entry of .paths that is not owned" "unexpected path in .paths"

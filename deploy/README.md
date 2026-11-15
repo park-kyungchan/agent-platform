@@ -6,7 +6,7 @@ The files of this directory make `ap deliver` run with no session in the path. T
 | --- | --- | --- |
 | `ap-deliver.service` | One run of `/usr/local/bin/ap deliver` with the host's request on stdin (`Type=oneshot`, in `agents.slice`, which holds the host's CPU and memory limits; `Nice=10`; at most an hour). `SuccessExitStatus=2`: a refusal (exit 2, nothing installed) is no failure of the unit; the exits 3, 4 and 5 fail it | `/etc/systemd/system/ap-deliver.service` |
 | `ap-deliver.timer` | Starts the service ten minutes after boot and ten minutes after each run ended | `/etc/systemd/system/ap-deliver.timer` |
-| `deliver.json` | The timer's request of this host: `repository`, `url`, `state` (`/var/lib/agent-platform/deliver`) and `build_lock` (the build lock `scripts/install-ap.sh` names). It has no `by` and no `reason`: that is the timer's form | `/etc/agent-platform/deliver.json` |
+| `deliver.json` | The timer's request of this host: `repository`, `url`, `state` (`/var/lib/agent-platform/deliver`), `build_lock` (the build lock `scripts/install-ap.sh` names), and `build_wait_seconds: 480` (wait up to eight minutes for that lock). It has no `by` and no `reason`: that is the timer's form | `/etc/agent-platform/deliver.json` |
 
 `ap deliver` installs `ap` and `content/`; it never installs a file of this directory. The service relies on systemd's default search path for `cargo`, `git`, `flock` and `ont` (on the host these files are written for, `/usr/bin/cargo`, the rustup proxy, answers in a system service with only `HOME=/root`); on a host where `cargo` lies elsewhere, add the drop-in `/etc/systemd/system/ap-deliver.service.d/path.conf` with the lines `[Service]` and `Environment=PATH=<the directory of cargo>:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin`. A change of `deploy/` reaches the host only when a Lead copies it again as below.
 
@@ -35,6 +35,8 @@ systemctl list-timers ap-deliver.timer       # the next run
 python3 -m json.tool /var/lib/agent-platform/deliver/last.json
 printf '{"view":"installs","args":{}}' | ont render   # the first row is the newest attempt
 ```
+
+`journalctl -u ap-deliver.service` shows a waiting run by its stderr JSON line `{"at":"<UTC RFC 3339, to the second>","waiting":"build_lock","seconds":480}`. The request's `build_wait_seconds` bounds that wait; a free lock prints no waiting line. The run keeps the deliver lock while waiting, so another call refuses `busy`. The final answer still goes to stdout as one line.
 
 A run that exited 3 because of `attempt_running` (an attempt is `running` that a call could not settle: a dead rollback at neither commit, a clone that cannot answer, a close the store did not apply) keeps the service failed until a call settled that attempt; a Lead's own request ends the same way with exit 2.
 
@@ -99,7 +101,7 @@ A recorded `rollback_content` holds the tree of `from` and is a tarball `scripts
 
 ## Undo
 
-Disable the timer, and wait until a run that is going on has ended: a run is not stopped while it installs: a killed call leaves an attempt `running` that the next call has to settle.
+Disable the timer, and wait until a run that is going on has ended. A run stopped while it waits for the build lock has started no attempt and leaves the pair and store unchanged; the next call needs no repair of that wait. Do not stop a run while it installs: a killed call leaves an attempt `running` that the next call has to settle.
 
 ```sh
 systemctl disable --now ap-deliver.timer

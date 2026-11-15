@@ -47,8 +47,13 @@ owned_ok() { case "$1" in *..*|skills/|skills/*/*) return 1 ;; AGENTS.md|runtime
 paths_of() { # <SHA256SUMS> -> the top paths it owns: AGENTS.md, runtime-references, skills/<name>
   cut -c67- "$1" | awk -F/ '$1=="skills"{print "skills/"$2; next} {print $1}' | sort -u; }
 # The checks of a rollback that do not read the target (rollback-check runs these and nothing else); it sets paths.
-kept_copy_ok() { local p tarball=$1
+kept_copy_ok() { local p tarball=$1 checksum
+  local -a checksum_lines
   [ -f "$tarball" ] && [ -f "$tarball.sha256" ] && [ -f "$tarball.paths" ] || refuse "tarball, .sha256 or .paths missing"
+  mapfile -t checksum_lines < "$tarball.sha256"
+  checksum=${checksum_lines[0]:-}
+  [ "${#checksum_lines[@]}" -eq 1 ] && [[ "$checksum" =~ ^[[:xdigit:]]{64}\ [\ \*] ]] &&
+    [ "${checksum:66}" = "$(basename -- "$tarball")" ] || refuse "the checksum file names another file than the tarball"
   (cd "$(dirname -- "$tarball")" && sha256sum -c --quiet "$(basename -- "$tarball").sha256") || refuse "the tarball does not match its checksum"
   if tar -tf "$tarball" | grep -Ev '^(AGENTS\.md|runtime-references(/.*)?|skills/[A-Za-z0-9_-]+(/.*)?)$' | grep -q .; then refuse "the tarball lists a path that is not the installer's"; fi
   mapfile -t paths < "$tarball.paths"

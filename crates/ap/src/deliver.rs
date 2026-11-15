@@ -17,7 +17,7 @@ use std::{
     time::SystemTime,
 };
 
-const MEMBERS: &str = "repository url state build_lock by reason past rollback";
+const MEMBERS: &str = "repository url state build_lock build_wait_seconds by reason past rollback";
 const TARGET: &str = "/usr/local/bin/ap";
 const CLIENT: [&str; 4] = ["action", "apply", "--client", "ap-deliver"];
 const FREE_MIB: u64 = 10_240;
@@ -89,6 +89,11 @@ fn check(r: &Value) -> Result<(), String> {
         ("url", url),
         ("state", text("state", 4096).is_some_and(absolute)),
         ("build_lock", text("build_lock", 4096).is_some_and(absolute)),
+        (
+            "build_wait_seconds",
+            r.get("build_wait_seconds")
+                .is_none_or(|v| v.as_u64().is_some_and(|n| n <= 900)),
+        ),
         ("rollback", r.get("rollback").is_none_or(|v| *v == true)),
         ("by", !lead || text("by", 200).is_some()),
         ("reason", !lead || text("reason", 400).is_some()),
@@ -766,8 +771,23 @@ fn deliver(s: &mut impl System, c: &mut Call) -> Step<()> {
         return Err(No("disk_low", Value::Null));
     }
     let build_lock = c.r["build_lock"].as_str().unwrap_or_default();
-    run(s, "flock", args(&["-n", build_lock, "true"]), 10_000)
+    if run(s, "flock", args(&["-n", build_lock, "true"]), 10_000).is_none() {
+        let seconds = c.r["build_wait_seconds"].as_u64().unwrap_or(0);
+        if seconds == 0 {
+            return Err(No("build_busy", Value::Null));
+        }
+        eprintln!(
+            "{}",
+            json!({"at": stamp(SystemTime::now()), "waiting": "build_lock", "seconds": seconds})
+        );
+        run(
+            s,
+            "flock",
+            args(&["-w", &seconds.to_string(), build_lock, "true"]),
+            seconds * 1_000 + 10_000,
+        )
         .ok_or(No("build_busy", Value::Null))?;
+    }
     // 8. The attempt, applied before any installer.
     c.rec["index"] = json!({"before": index(s, c), "after": null});
     let (same, _) = search(
