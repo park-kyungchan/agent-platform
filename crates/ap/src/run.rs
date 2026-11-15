@@ -1,6 +1,7 @@
-//! One stage of a unit: one headless Claude Code session in a transient systemd scope under
-//! `agents.slice`, ended at its time bound, its exit or (a reviewer only) its first `result` event,
-//! after which the whole scope is stopped. One record `<out>.run.json` per run; no other ledger, no store write.
+//! One stage of a unit: one headless Claude Code (or Codex CLI) session in a transient systemd
+//! scope under `agents.slice`, ended at its time bound, its exit or (a reviewer only) its first
+//! `result` event, after which the whole scope is stopped. One record `<out>.run.json` per run; no
+//! other ledger, no store write.
 use crate::work::{
     Failure, LIMIT, System, args, digest, error, fail, new_session_id, require, text,
 };
@@ -102,6 +103,9 @@ struct Request {
     /// The account's skills and slash commands, and its auto-memory, load only when asked.
     skills: bool,
     memory: bool,
+    /// The stage runs on the Codex CLI; on a resume, the thread's tokens before this run.
+    codex: bool,
+    spent: Option<[u64; 4]>,
 }
 
 fn path(r: &Value, key: &str) -> Result<String, Failure> {
@@ -142,7 +146,7 @@ fn admit(s: &impl System, account: &str, field: &str) -> Result<(), Failure> {
         .map(|_| ())
         .map_err(|_| error("account_missing", field))
 }
-fn environment(r: &Value) -> Result<Vec<(String, String)>, Failure> {
+fn environment(r: &Value, codex: bool) -> Result<Vec<(String, String)>, Failure> {
     let Some(v) = r.get("env") else {
         return Ok(vec![]);
     };
@@ -159,6 +163,8 @@ fn environment(r: &Value) -> Result<Vec<(String, String)>, Failure> {
             // The account named in the record must be the account that answers.
             require!(!k.starts_with("HERDR_") && !k.starts_with("CLAUDE_")
                 && !k.starts_with("ANTHROPIC_") && k != "HOME" => "env_forbidden", "env");
+            let other = k.starts_with("CODEX_") || k.starts_with("OPENAI_");
+            require!(!(codex && other) => "env_forbidden", "env");
             let v = v
                 .as_str()
                 .filter(|v| !v.contains('\0') && v.len() <= 4096)
@@ -243,13 +249,21 @@ fn request_at(s: &mut impl System, r: &Value, at_cwd: bool) -> Result<Request, F
     if let Some(k) = object.keys().find(|k| !MEMBERS.contains(&k.as_str())) {
         return Err(error("invalid_input", k));
     }
-    match r.get("runtime") {
-        None => (),
-        Some(v) if v == "claude" => (),
-        Some(v) if v == "codex" => return Err(error("runtime_not_built", "runtime")),
+    let codex = match r.get("runtime") {
+        None => false,
+        Some(v) if v == "claude" => false,
+        Some(v) if v == "codex" => true,
         Some(_) => return Err(error("invalid_input", "runtime")),
-    }
+    };
     let role = text(r, "role")?;
+    // Not built for a Codex stage: a reviewer (reviewers run on Claude Code) and these members.
+    require!(!codex || role != "reviewer" => "invalid_input", "role");
+    if let Some(k) = ["skills", "memory", "integration"]
+        .into_iter()
+        .find(|k| codex && r.get(*k).is_some())
+    {
+        return Err(error("invalid_input", k));
+    }
     let default = ROLES
         .iter()
         .find(|(name, _)| *name == role)
@@ -269,6 +283,8 @@ fn request_at(s: &mut impl System, r: &Value, at_cwd: bool) -> Result<Request, F
     let (model, effort) = (word(r, "model", 40)?, word(r, "effort", 16)?);
     let mode = text(r, "permission_mode")?;
     require!(MODES.contains(&mode) => "invalid_input", "permission_mode");
+    // No approval and no sandbox of the CLI's own: only when the request says so.
+    require!(!codex || mode == "bypassPermissions" => "invalid_input", "permission_mode");
     let timeout = match r.get("timeout_seconds") {
         None => default,
         Some(v) => v
@@ -284,8 +300,10 @@ fn request_at(s: &mut impl System, r: &Value, at_cwd: bool) -> Result<Request, F
     );
     let mut accounts = vec![account];
     accounts.extend(paths(r, "next_accounts", 4)?);
+    require!(!codex || accounts.len() == 1 => "invalid_input", "next_accounts");
     let mcp = paths(r, "mcp_config", 8)?;
-    let env = environment(r)?;
+    require!(!codex || mcp.is_empty() => "invalid_input", "mcp_config");
+    let env = environment(r, codex)?;
     let (mut expect_file, mut expect_line) = (None, None);
     if let Some(e) = r.get("expect") {
         let o = e
@@ -344,10 +362,14 @@ fn request_at(s: &mut impl System, r: &Value, at_cwd: bool) -> Result<Request, F
                 .and_then(|b| serde_json::from_slice(&b).ok())
                 .ok_or_else(|| error("resume_record_missing", "resume"))?;
             let missing = |_| error("resume_record_missing", "resume");
+            let was_codex = rec["runtime"] == "codex";
+            require!(was_codex == codex => "resume_runtime_differs", "runtime");
             let (session, account) = (
                 text(&rec, "session").map_err(missing)?,
                 text(&rec, "account").map_err(missing)?,
             );
+            // The Codex CLI takes the session as an argument of its own: never one it reads as a flag.
+            require!(!session.starts_with('-') => "resume_record_missing", "resume");
             require!(accounts.iter().any(|a| a == account) => "resume_account_differs", "account");
             require!(rec["cwd"] == cwd.as_str() => "resume_cwd_differs", "cwd");
             let fixes = role == "fixer" && (rec["role"] == "implementer" || rec["role"] == "fixer");
@@ -430,13 +452,38 @@ fn request_at(s: &mut impl System, r: &Value, at_cwd: bool) -> Result<Request, F
         expect_file,
         expect_line,
         mcp,
+        spent: match (&earlier, codex) {
+            (Some((_, (_, _, file))), true) => spent(file),
+            _ => Some([0; 4]),
+        },
         resume: earlier.map(|(_, r)| r),
         expect_before,
         base_env,
         bind,
         skills: flag(r, "skills")?,
         memory: flag(r, "memory")?,
+        codex,
     })
+}
+const TOKENS: [&str; 4] = ["input", "output", "cache_read", "cache_creation"];
+/// The tokens of a Codex thread up to the end of the run of `file`: that record's and those of
+/// every record it resumes (the CLI reports the thread's usage, a record its own part). None when
+/// the chain cannot be followed to its end: a record that cannot be read, a record met twice, or
+/// more than 256 records.
+fn spent(file: &str) -> Option<[u64; 4]> {
+    let (mut sum, mut next, mut met) = ([0; 4], file.to_owned(), vec![]);
+    while met.len() < 256 && !met.contains(&next) {
+        let rec: Value = serde_json::from_slice(&std::fs::read(&next).ok()?).ok()?;
+        for (s, k) in sum.iter_mut().zip(TOKENS) {
+            *s += rec["tokens"][k].as_u64().unwrap_or(0);
+        }
+        met.push(next);
+        match &rec["resumes"] {
+            Value::Null => return Some(sum),
+            v => next = v.as_str()?.to_owned(),
+        }
+    }
+    None
 }
 
 /// UTC RFC 3339 to the second.
@@ -535,6 +582,13 @@ struct Seen {
     worked: bool,
     /// A rate-limit event said `rejected`.
     rejected: bool,
+    /// A Codex stream (with the thread's tokens before this run): its thread, the last agent
+    /// message of the turn running, and the items completed since the last turn end.
+    /// (Some(None): the tokens before this run are unknown, so this run's are too.)
+    codex: Option<Option<[u64; 4]>>,
+    thread: Option<String>,
+    message: Option<String>,
+    items: u64,
 }
 impl Seen {
     fn done(&self) -> bool {
@@ -547,6 +601,9 @@ impl Seen {
         let Ok(e) = serde_json::from_slice::<Value>(line) else {
             return;
         };
+        if let Some(spent) = self.codex {
+            return self.codex_line(&e, spent);
+        }
         match e["type"].as_str() {
             Some("result") => self.results.push(e),
             Some("assistant") => {
@@ -555,6 +612,49 @@ impl Seen {
             }
             Some("rate_limit_event") => {
                 self.rejected |= e["rate_limit_info"]["status"] == "rejected";
+            }
+            _ => (),
+        }
+    }
+    /// A Codex event, read into the shape of a `result`: a turn end is one, with the last agent
+    /// message of its turn as the answer when it completed, the error's message when it failed.
+    /// An `error` event alone is none: the CLI prints one for each reconnection attempt.
+    fn codex_line(&mut self, e: &Value, spent: Option<[u64; 4]>) {
+        let (item, kind) = (&e["item"], e["item"]["type"].as_str());
+        match e["type"].as_str().unwrap_or("") {
+            "thread.started" => self.thread = e["thread_id"].as_str().map(str::to_owned),
+            "turn.started" => self.message = None,
+            t @ ("item.started" | "item.completed") => {
+                self.worked |= !matches!(kind, Some("agent_message" | "reasoning" | "error"));
+                if t == "item.completed" {
+                    self.items += 1;
+                    if kind == Some("agent_message") {
+                        self.message = Some(item["text"].as_str().unwrap_or("").to_owned());
+                    }
+                }
+            }
+            t @ ("turn.completed" | "turn.failed") => {
+                let message = self.message.take();
+                let mut r = json!({"type": "result", "session_id": self.thread,
+                    "num_turns": std::mem::take(&mut self.items), "is_error": t == "turn.failed",
+                    "result": e["error"]["message"], "permission_denials": []});
+                if t == "turn.completed" {
+                    // As evals/readout.py maps a Codex session; the thread's usage less what the
+                    // runs before this one spent.
+                    let u = |k: &str| e["usage"][k].as_u64();
+                    let (read, write) = (u("cached_input_tokens"), u("cache_write_input_tokens"));
+                    let (read, write) = (read.unwrap_or(0), write.unwrap_or(0));
+                    let input = u("input_tokens").map(|i| i.saturating_sub(read + write));
+                    let own = |v: Option<u64>, i: usize| {
+                        spent.and_then(|s| v.map(|v| v.saturating_sub(s[i])))
+                    };
+                    r["result"] = json!(message.unwrap_or_default());
+                    r["usage"] = json!({"input_tokens": own(input, 0),
+                        "output_tokens": own(u("output_tokens"), 1),
+                        "cache_read_input_tokens": own(Some(read), 2),
+                        "cache_creation_input_tokens": own(Some(write), 3)});
+                }
+                self.results.push(r);
             }
             _ => (),
         }
@@ -701,80 +801,10 @@ fn limit_text(text: &str) -> bool {
             || (t.contains("hit your") && t.contains("limit"))
             || t.contains("resets "))
 }
-/// One launch on one account. Returns the final record, whether the session did work, and
-/// whether every write after the first effect succeeded.
-fn attempt(
-    s: &mut impl System,
-    q: &Request,
-    account: &str,
-    (output, errs): &(File, File),
-) -> (Value, bool, bool) {
-    let resume = q.resume.as_ref().map(|(session, _, _)| session.as_str());
-    let mut record = json!({
-        "role": q.role, "runtime": "claude", "model": q.model, "effort": q.effort,
-        "account": account, "session": resume, "cwd": q.cwd, "unit": null,
-        "prompt": {"path": q.prompt, "sha256": q.prompt_sha256},
-        "answer": null, "start": stamp(SystemTime::now()), "end": null, "state": "running",
-        "turns": null,
-        "tokens": {"input": null, "output": null, "cache_read": null, "cache_creation": null},
-        "permission_denials": [], "results": 0, "expect_met": null,
-        "expect_file_before": q.expect_before, "unmet": null,
-        "resumes": q.resume.as_ref().map(|(_, _, file)| file),
-    });
-    let not_launched = |mut record: Value, unmet: &str| {
-        record["state"] = json!("failed");
-        record["unmet"] = json!(unmet);
-        record["end"] = json!(stamp(SystemTime::now()));
-        let saved = persist(&q.out, &record);
-        (record, false, saved)
-    };
-    let (Ok(session), Ok(unit)) = (
-        resume.map_or_else(|| new_session_id(s), |r| Ok(r.to_owned())),
-        new_session_id(s),
-    ) else {
-        return not_launched(record, "launch");
-    };
-    let unit = format!("ap-run-{unit}.scope");
-    record["session"] = json!(session);
-    record["unit"] = json!(unit);
-    // The run's own stream and error files, emptied for a next account's attempt.
-    let empty = |mut f: &File| {
-        f.set_len(0)?;
-        f.seek(SeekFrom::Start(0))?;
-        f.try_clone()
-    };
-    let (Ok(prompt), Ok(stdout), Ok(stderr)) = (File::open(&q.prompt), empty(output), empty(errs))
-    else {
-        return not_launched(record, "launch");
-    };
-    let reader = output;
-    // The record names the session BEFORE the launch.
-    if !persist(&q.out, &record) {
-        return not_launched(record, "write");
-    }
-    let mut argv = args(&[
-        "systemd-run",
-        "--scope",
-        "--quiet",
-        "--collect",
-        &format!("--unit={unit}"),
-        &format!("--slice={SLICE}"),
-        "-p",
-        &format!("RuntimeMaxSec={}s", q.timeout + GRACE),
-        "-p",
-        "TimeoutStopSec=10s",
-    ]);
-    if let Some(b) = &q.bind {
-        // The bound unit's end, for any reason, stops this one (`BindsTo` with `After`).
-        argv.extend(args(&[
-            "-p",
-            &format!("BindsTo={b}"),
-            "-p",
-            &format!("After={b}"),
-        ]));
-    }
-    // No hook of any source; no auto-memory unless asked; the Bash tool runs a 40-minute check in
-    // the foreground and never moves a command to the background.
+/// The Claude Code CLI after `systemd-run … --`. No hook of any source; no auto-memory unless
+/// asked; the Bash tool runs a 40-minute check in the foreground and never moves a command to the
+/// background.
+fn claude_args(q: &Request, argv: &mut Vec<String>, resume: Option<&str>, session: &str) {
     let mut settings = json!({"disableAllHooks": true, "env": {
         "BASH_DEFAULT_TIMEOUT_MS": BASH_MS, "BASH_MAX_TIMEOUT_MS": BASH_MS,
         "CLAUDE_CODE_DISABLE_BACKGROUND_TASKS": "1"}});
@@ -816,10 +846,137 @@ fn attempt(
         } else {
             "--session-id"
         },
-        &session,
+        session,
     ]));
+}
+/// The Codex CLI after `systemd-run … --`, headless and without the home's configuration, hooks,
+/// rules, apps, plugins, memories or further agents (README "One stage" names each flag).
+fn codex_args(q: &Request, resume: Option<&str>) -> Vec<String> {
+    let mut a = args(&["--", "codex", "--no-daemon", "exec"]);
+    a.extend(resume.map(|_| "resume".to_owned()));
+    a.extend(args(&["--json", "--ignore-user-config", "--ignore-rules"]));
+    for feature in [
+        "hooks",
+        "apps",
+        "plugins",
+        "plugin_discovery_prefetch",
+        "skill_mcp_dependency_install",
+        "memories",
+        "multi_agent",
+    ] {
+        a.extend(args(&["--disable", feature]));
+    }
+    let effort = format!("model_reasoning_effort=\"{}\"", q.effort);
+    a.extend(args(&[
+        "-c",
+        "features.multi_agent_v2.max_concurrent_threads_per_session=1",
+        "--skip-git-repo-check",
+        "--dangerously-bypass-approvals-and-sandbox",
+        "-m",
+        &q.model,
+        "-c",
+        &effort,
+    ]));
+    a.extend(match resume {
+        Some(session) => args(&[session]),
+        None => args(&["-C", &q.cwd]),
+    });
+    a.push("-".into());
+    a
+}
+/// The session the Codex CLI named at the thread's start enters the record at once. False when
+/// that write of the record failed, which counts as every failed write of it after the launch.
+fn named(out: &str, record: &mut Value, seen: &Seen) -> bool {
+    if let (true, Some(thread)) = (record["session"].is_null(), &seen.thread) {
+        record["session"] = json!(thread);
+        return persist(out, record);
+    }
+    true
+}
+/// One launch on one account. Returns the final record, whether the session did work, and
+/// whether every write after the first effect succeeded.
+fn attempt(
+    s: &mut impl System,
+    q: &Request,
+    account: &str,
+    (output, errs): &(File, File),
+) -> (Value, bool, bool) {
+    let resume = q.resume.as_ref().map(|(session, _, _)| session.as_str());
+    let mut record = json!({
+        "role": q.role, "runtime": if q.codex { "codex" } else { "claude" },
+        "model": q.model, "effort": q.effort,
+        "account": account, "session": resume, "cwd": q.cwd, "unit": null,
+        "prompt": {"path": q.prompt, "sha256": q.prompt_sha256},
+        "answer": null, "start": stamp(SystemTime::now()), "end": null, "state": "running",
+        "turns": null,
+        "tokens": {"input": null, "output": null, "cache_read": null, "cache_creation": null},
+        "permission_denials": [], "results": 0, "expect_met": null,
+        "expect_file_before": q.expect_before, "unmet": null,
+        "resumes": q.resume.as_ref().map(|(_, _, file)| file),
+    });
+    let not_launched = |mut record: Value, unmet: &str| {
+        record["state"] = json!("failed");
+        record["unmet"] = json!(unmet);
+        record["end"] = json!(stamp(SystemTime::now()));
+        let saved = persist(&q.out, &record);
+        (record, false, saved)
+    };
+    let (Ok(session), Ok(unit)) = (
+        resume.map_or_else(|| new_session_id(s), |r| Ok(r.to_owned())),
+        new_session_id(s),
+    ) else {
+        return not_launched(record, "launch");
+    };
+    let unit = format!("ap-run-{unit}.scope");
+    // The Codex CLI names a fresh session itself, at the thread's start.
+    if !q.codex || resume.is_some() {
+        record["session"] = json!(session);
+    }
+    record["unit"] = json!(unit);
+    // The run's own stream and error files, emptied for a next account's attempt.
+    let empty = |mut f: &File| {
+        f.set_len(0)?;
+        f.seek(SeekFrom::Start(0))?;
+        f.try_clone()
+    };
+    let (Ok(prompt), Ok(stdout), Ok(stderr)) = (File::open(&q.prompt), empty(output), empty(errs))
+    else {
+        return not_launched(record, "launch");
+    };
+    let reader = output;
+    // The record names the session BEFORE the launch.
+    if !persist(&q.out, &record) {
+        return not_launched(record, "write");
+    }
+    let mut argv = args(&[
+        "systemd-run",
+        "--scope",
+        "--quiet",
+        "--collect",
+        &format!("--unit={unit}"),
+        &format!("--slice={SLICE}"),
+        "-p",
+        &format!("RuntimeMaxSec={}s", q.timeout + GRACE),
+        "-p",
+        "TimeoutStopSec=10s",
+    ]);
+    if let Some(b) = &q.bind {
+        // The bound unit's end, for any reason, stops this one (`BindsTo` with `After`).
+        argv.extend(args(&[
+            "-p",
+            &format!("BindsTo={b}"),
+            "-p",
+            &format!("After={b}"),
+        ]));
+    }
     let mut env = q.base_env.clone();
-    env.push(("CLAUDE_CONFIG_DIR".into(), account.into()));
+    if q.codex {
+        argv.extend(codex_args(q, resume));
+        env.push(("CODEX_HOME".into(), account.into()));
+    } else {
+        claude_args(q, &mut argv, resume, &session);
+        env.push(("CLAUDE_CONFIG_DIR".into(), account.into()));
+    }
     let started = s.now();
     let mut child = match s.launch(&argv, &env, &q.cwd, [prompt, stdout, stderr]) {
         Ok(child) => child,
@@ -830,12 +987,14 @@ fn attempt(
     // CLI's exit or the bound, because a result is not final while a shell it started lives.
     let mut seen = Seen {
         first_only: q.role == "reviewer",
+        codex: q.codex.then_some(q.spent),
         ..Seen::default()
     };
-    let (mut offset, mut partial) = (0, vec![]);
+    let (mut offset, mut partial, mut kept) = (0, vec![], true);
     let end = loop {
         let exited = !matches!(child.try_wait(), Ok(None));
         follow(reader, &mut offset, &mut partial, &mut seen);
+        kept &= named(&q.out, &mut record, &seen);
         if seen.done() {
             break End::Result;
         }
@@ -863,6 +1022,7 @@ fn attempt(
     if !partial.is_empty() {
         seen.line(&partial);
     }
+    kept &= named(&q.out, &mut record, &seen);
     // The bound decides for every role: a result read during the shutdown gives the saved answer
     // and `expect_met`, never another state.
     let timed_out = matches!(end, End::Timeout);
@@ -889,7 +1049,7 @@ fn attempt(
         record["unmet"] = json!("stop");
     }
     let saved = persist(&q.out, &record);
-    (record, seen.worked, saved && !write_failed)
+    (record, seen.worked, saved && kept && !write_failed)
 }
 /// One `ap run` request. A refusal (exit 2) comes before any effect and writes no file.
 pub fn execute(s: &mut impl System, r: &Value) -> Result<(Value, u8), Failure> {

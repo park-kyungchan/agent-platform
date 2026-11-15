@@ -20,6 +20,7 @@ use std::{
 
 static NEXT: AtomicU32 = AtomicU32::new(0);
 const FAKE: &str = include_str!("fixtures/fake-claude.sh");
+const FAKE_CODEX: &str = include_str!("fixtures/fake-codex.sh");
 const BRANCH: &str = "ap/unit-test";
 const IMPLEMENTER_PROMPT: &str = "Implement the page.\n";
 const VERIFIER_PROMPT: &str = "LEAD VERIFIER PROMPT: review the candidate under REVIEW.md.\n";
@@ -99,6 +100,7 @@ impl U {
             std::fs::create_dir_all(t.join(d)).unwrap();
         }
         write_exec(&t.join("bin/claude"), FAKE);
+        write_exec(&t.join("bin/codex"), FAKE_CODEX);
         std::fs::write(t.join("bin/mode-a1"), "script").unwrap();
         std::fs::write(t.join("bin/mode-a2"), "script").unwrap();
         std::fs::write(t.join("bin/script-a1.sh"), IMPLEMENT).unwrap();
@@ -537,13 +539,13 @@ impl System for U {
     ) -> std::io::Result<Child> {
         self.launches += 1;
         let at = argv.iter().position(|a| a == "--").unwrap();
-        assert_eq!(argv[at + 1], "claude");
+        assert!(["claude", "codex"].contains(&argv[at + 1].as_str()));
         let unit = argv[..at]
             .iter()
             .find_map(|a| a.strip_prefix("--unit="))
             .unwrap()
             .to_owned();
-        let child = Command::new(self.t.join("bin/claude"))
+        let child = Command::new(self.t.join("bin").join(&argv[at + 1]))
             .args(&argv[at + 2..])
             .env_clear()
             .envs(env.iter().map(|(k, v)| (k, v)))
@@ -2682,4 +2684,81 @@ fn c11_a_copy_swapped_for_a_link_stops_before_cleanup() {
     r["acceptance"] = json!(u.p("judge/swap.sh"));
     let (v, code) = u.run(&r).unwrap();
     swapped(&u, &v, code, "cleanup");
+}
+
+// ---- runtime codex: a stage's `runtime` --------------------------------------------------------
+
+fn stage_record(path: &Value) -> Value {
+    serde_json::from_slice(&std::fs::read(path.as_str().unwrap()).unwrap()).unwrap()
+}
+
+#[test]
+fn x7_ap_unit_passes_the_runtime_to_its_stages() {
+    let mut u = U::new();
+    let mut r = u.request();
+    r["implementer"]["runtime"] = json!("codex");
+    r["implementer"]["permission_mode"] = json!("bypassPermissions");
+    r["implementer"]["model"] = json!("gpt-6.1-terra");
+    let (v, exit) = u.run(&r).unwrap();
+    assert_eq!((v["state"].as_str(), exit), (Some("merged"), 0), "{v}");
+    let implementer = stage_record(&v["stages"]["implementer"]);
+    assert_eq!(
+        (
+            implementer["runtime"].as_str(),
+            implementer["state"].as_str()
+        ),
+        (Some("codex"), Some("ok"))
+    );
+    let verifier = stage_record(&v["stages"]["verifier"]);
+    assert_eq!(verifier["runtime"], "claude");
+    let calls = std::fs::read_to_string(u.t.join("bin/calls.log")).unwrap();
+    let first = calls.lines().next().unwrap();
+    assert!(
+        first.starts_with(&format!("{}|--no-daemon exec --json ", u.p("a1"))),
+        "{first}"
+    );
+    assert!(
+        first.contains(" --dangerously-bypass-approvals-and-sandbox -m gpt-6.1-terra "),
+        "{first}"
+    );
+    // The stage of a case call.
+    let mut u = U::new();
+    let c = case(&u);
+    let mut r = case_request(&u, &c);
+    r["implementer"]["runtime"] = json!("codex");
+    r["implementer"]["permission_mode"] = json!("bypassPermissions");
+    let (v, end) = ended(u.run(&r));
+    assert_eq!(end.0, "passed", "{v}");
+    assert_eq!(
+        stage_record(&v["stages"]["implementer"])["runtime"],
+        "codex"
+    );
+}
+
+#[test]
+fn x7_ap_unit_refuses_a_codex_stage_without_a_stated_mode() {
+    let mut u = U::new();
+    let mut r = u.request();
+    r["implementer"]["runtime"] = json!("codex");
+    assert_eq!(code(u.run(&r)), "invalid_input@implementer.permission_mode");
+    r["implementer"]["permission_mode"] = json!("auto");
+    assert_eq!(code(u.run(&r)), "invalid_input@implementer.permission_mode");
+    let c = case(&u);
+    let mut r = case_request(&u, &c);
+    r["implementer"]["runtime"] = json!("codex");
+    assert_eq!(code(u.run(&r)), "invalid_input@implementer.permission_mode");
+    assert_eq!(names(&u.t.join("work/task")), ["TASK.md", "case.md"]);
+    assert_eq!((u.launches, u.calls.len()), (0, 0));
+}
+
+#[test]
+fn x7_ap_unit_refuses_a_codex_verifier() {
+    let mut u = U::new();
+    let mut r = u.request();
+    r["verifier"]["runtime"] = json!("codex");
+    assert_eq!(code(u.run(&r)), "invalid_input@verifier.role");
+    r["verifier"]["permission_mode"] = json!("bypassPermissions");
+    assert_eq!(code(u.run(&r)), "invalid_input@verifier.role");
+    assert_eq!(names(&u.t.join("work/task")), ["TASK.md"]);
+    assert_eq!((u.launches, u.calls.len()), (0, 0));
 }
