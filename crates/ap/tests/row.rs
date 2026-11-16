@@ -201,7 +201,7 @@ fn run(r: &mut R, request: &Value) -> Result<Value, Refusal> {
     execute(r, None, request)
 }
 fn refusal(r: &mut R, request: &Value) -> Refusal {
-    run(r, request).err().expect("a refusal")
+    run(r, request).expect_err("a refusal")
 }
 fn with(mut v: Value, k: &str, x: Value) -> Value {
     v[k] = x;
@@ -711,12 +711,8 @@ fn ap(args: &[&str], stdin: &str) -> (Option<i32>, Value) {
         .stderr(std::process::Stdio::piped())
         .spawn()
         .unwrap();
-    child
-        .stdin
-        .take()
-        .unwrap()
-        .write_all(stdin.as_bytes())
-        .unwrap();
+    // A refusal of the arguments is made before stdin is read.
+    let _ = child.stdin.take().unwrap().write_all(stdin.as_bytes());
     let out = child.wait_with_output().unwrap();
     let said = if out.stderr.is_empty() {
         &out.stdout
