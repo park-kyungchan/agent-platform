@@ -6415,3 +6415,155 @@ fn pc1_a_call_from_the_page_and_the_same_request_on_stdin_give_the_same_record_b
     assert_eq!(records[0], records[1]);
     assert_eq!(records[0]["merge"], json!(false));
 }
+
+/// The tests' host, and a file of the call made by someone else at the first store call: after the
+/// admission's scan for existing files and before the claim.
+struct Racing<'a> {
+    u: &'a mut U,
+    file: PathBuf,
+}
+impl System for Racing<'_> {
+    fn call(&mut self, program: &str, args: &[String], input: &Value, ms: u64) -> Answer {
+        if program == "ont" && !self.file.exists() {
+            std::fs::write(&self.file, "someone else's").unwrap();
+        }
+        self.u.call(program, args, input, ms)
+    }
+    fn directory(&self, path: &str) -> std::io::Result<PathBuf> {
+        self.u.directory(path)
+    }
+    fn now(&self) -> Instant {
+        self.u.now()
+    }
+    fn pause(&mut self, d: Duration) {
+        self.u.pause(d);
+    }
+    fn work_root(&self) -> PathBuf {
+        self.u.work_root()
+    }
+    fn launch(
+        &mut self,
+        argv: &[String],
+        env: &[(String, String)],
+        cwd: &str,
+        files: [std::fs::File; 3],
+    ) -> std::io::Result<Child> {
+        self.u.launch(argv, env, cwd, files)
+    }
+    fn units(&self) -> bool {
+        self.u.units()
+    }
+    fn environment(&self) -> Vec<(String, String)> {
+        self.u.environment()
+    }
+}
+
+#[test]
+fn pc1_a_file_that_cannot_be_created_after_the_claim_stops_the_call_with_io_error() {
+    let mut u = U::new();
+    let page = pc_setup(&mut u);
+    let file = u.t.join("work/task/runs/U-PC1.request.json");
+    let (rec, code) = ap::unit::execute_page(
+        &mut Racing {
+            u: &mut u,
+            file: file.clone(),
+        },
+        &page,
+    )
+    .unwrap();
+    assert_eq!(code, 3, "{rec}");
+    assert_eq!(
+        (
+            rec["state"].as_str(),
+            rec["stopped_at"].as_str(),
+            rec["cause"].as_str()
+        ),
+        (Some("stopped"), Some("composed"), Some("io_error"))
+    );
+    assert_eq!(rec["detail"]["path"], json!(file.to_str().unwrap()));
+    assert_eq!(steps(&rec), pairs(&[("composed", "stopped")]));
+    assert_eq!(rec, u.record("runs/U-PC1"));
+    assert_eq!(u.launches, 0);
+    // The file is the other hand's; the two prompts were not made; no stage started.
+    assert_eq!(std::fs::read(&file).unwrap(), b"someone else's");
+    assert_eq!(
+        names(&u.t.join("work/task/runs")),
+        ["U-PC1.request.json", "U-PC1.unit.json"]
+    );
+}
+
+#[test]
+fn pc1_a_page_call_does_not_read_standard_input() {
+    let mut u = U::new();
+    let page = pc_setup(&mut u);
+    let before = tree(&u.t);
+    // A request on a stdin that stays open: a call that read it would block or run that request.
+    for args in [
+        vec!["unit", page.as_str()],
+        vec!["unit", "--compose-only", page.as_str()],
+    ] {
+        let mut child = Command::new(env!("CARGO_BIN_EXE_ap"))
+            .args(&args)
+            .stdin(std::process::Stdio::piped())
+            .stdout(std::process::Stdio::piped())
+            .stderr(std::process::Stdio::piped())
+            .spawn()
+            .unwrap();
+        use std::io::{Read, Write};
+        let mut hold = child.stdin.take().unwrap();
+        hold.write_all(br#"{"bogus":1}"#).unwrap();
+        let deadline = Instant::now() + Duration::from_secs(20);
+        let status = loop {
+            if let Some(s) = child.try_wait().unwrap() {
+                break s;
+            }
+            assert!(Instant::now() < deadline, "{args:?} waits on stdin");
+            std::thread::sleep(Duration::from_millis(20));
+        };
+        let (mut out, mut err) = (String::new(), String::new());
+        child
+            .stdout
+            .take()
+            .unwrap()
+            .read_to_string(&mut out)
+            .unwrap();
+        child
+            .stderr
+            .take()
+            .unwrap()
+            .read_to_string(&mut err)
+            .unwrap();
+        drop(hold);
+        if args[1] == "--compose-only" {
+            assert_eq!(status.code(), Some(0), "{err}");
+            let printed: Value = serde_json::from_str(&out).unwrap();
+            assert_eq!(printed["request"], pc_expected(&u));
+        } else {
+            // The page's own answer: its directory is outside the host's work root, not `bogus`.
+            let e: Value = serde_json::from_str(&err).unwrap();
+            assert_eq!(
+                (status.code(), &e["error"]["code"]),
+                (Some(2), &json!("outside_work_root"))
+            );
+        }
+    }
+    assert_eq!(tree(&u.t), before);
+}
+
+#[test]
+fn pc1_a_non_claude_block_gets_no_window_even_for_a_model_the_task_file_names() {
+    let mut u = U::new();
+    let page = pc_setup(&mut u);
+    let mut b = pc_block();
+    b["implementer"]["model"] = json!("sonnet");
+    pc_write(&u, &pc_units(&u), &pc_text(&b));
+    let r = ap::unit::compose(&page).unwrap()["request"].clone();
+    assert_eq!(r["implementer"]["runtime"], json!("muse"));
+    assert!(r["implementer"].get("compact_window").is_none());
+    // The same model on Claude Code gets the window.
+    assert_eq!(r["verifier"]["compact_window"], json!(400000));
+    b["implementer"] = json!({"model": "sonnet", "effort": "high", "runtime": "codex", "permission_mode": "bypassPermissions"});
+    pc_write(&u, &pc_units(&u), &pc_text(&b));
+    let r = ap::unit::compose(&page).unwrap()["request"].clone();
+    assert!(r["implementer"].get("compact_window").is_none());
+}
