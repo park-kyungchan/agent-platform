@@ -5681,3 +5681,889 @@ fn agy_the_second_look_of_an_agy_verifier_resumes_its_record() {
     assert!(std::path::Path::new(home).join(".gemini/config").is_dir());
     assert!(!u.t.join("g1/.gemini/config").exists());
 }
+
+// ---- PC1: a unit from its page ----------------------------------------------------------------
+// The page `work/task/PC1.md` and `work/task/units.json` are made here; the standing texts are files
+// of `judge/`. The implementer runs on Muse (account `m1`), the verifier on Claude Code (`a2`).
+
+const PC_STANDING_I: &str = "STANDING-I {page} of {unit} in {repository}\nkeep {word} and {page}\n";
+const PC_STANDING_V: &str = "STANDING-V {unit}\nno final newline here";
+const PC_NOTES: &str = "NOTE-A {unit} stays\n### a detail line\nNOTE-B\n\n";
+const PC_ASKS: &str = "ASK-1 {page}\n\n";
+
+fn pc_block() -> Value {
+    json!({"unit":"PC1","repository":"o/r","branch":BRANCH,"item":"k1","merge":false,
+        "write_set":["src/**","notes.md"],"tier":"x",
+        "implementer":{"model":"muse-wonder-1.0","effort":"high","runtime":"muse","permission_mode":"bypassPermissions"},
+        "verifier":{"model":"sonnet","effort":"high"}})
+}
+fn pc_text(block: &Value) -> String {
+    let b = serde_json::to_string_pretty(block).unwrap();
+    format!(
+        "# TASK PC1\n\nIntro.\n\n## Unit notes\n{PC_NOTES}## Verifier questions\n{PC_ASKS}```unit\n{b}\n```\n\nTail {{unit}}\n"
+    )
+}
+fn pc_units(u: &U) -> Value {
+    json!({"task_key":"store-task","clones":{"o/r":u.p("clone")},
+        "accounts":{"claude":[u.p("a2"),u.p("a1")],"muse":[u.p("m1/muse")],"codex":[u.p("a1")]},
+        "timeouts":{"implementer":600,"verifier":700,"fixer":800},
+        "compact_window":{"sonnet":400000,"opus":600000},
+        "prompts":{"implementer":u.p("judge/standing-i.txt"),"verifier":u.p("judge/standing-v.txt"),
+            "fix":u.p("judge/fixer.md"),"second_look":u.p("judge/verifier2.md")},
+        "judge_threads":false})
+}
+/// The fixture: the standing texts, `units.json`, the page, `runs/`, the board and the Muse homes.
+fn pc_setup(u: &mut U) -> String {
+    for (f, t) in [
+        ("standing-i.txt", PC_STANDING_I),
+        ("standing-v.txt", PC_STANDING_V),
+        ("fixer.md", FIXER_PROMPT),
+        ("verifier2.md", VERIFIER2_PROMPT),
+    ] {
+        std::fs::write(u.t.join("judge").join(f), t).unwrap();
+    }
+    std::fs::create_dir_all(u.t.join("work/task/runs")).unwrap();
+    std::fs::write(u.t.join("bin/mode-m1"), "script").unwrap();
+    u.script("m1", IMPLEMENT);
+    u.board(&[("k1", "queued")], &["k1"]);
+    pc_write(u, &pc_units(u), &pc_text(&pc_block()))
+}
+fn pc_write(u: &U, units: &Value, page: &str) -> String {
+    std::fs::write(u.t.join("work/task/units.json"), units.to_string()).unwrap();
+    std::fs::write(u.t.join("work/task/PC1.md"), page).unwrap();
+    u.p("work/task/PC1.md")
+}
+/// Every path under `dir`, relative, sorted.
+fn tree(dir: &PathBuf) -> Vec<String> {
+    let mut all = vec![];
+    let mut todo = vec![dir.clone()];
+    while let Some(d) = todo.pop() {
+        for e in std::fs::read_dir(&d).unwrap() {
+            let p = e.unwrap().path();
+            all.push(p.strip_prefix(dir).unwrap().to_str().unwrap().to_owned());
+            if p.is_dir() && !p.is_symlink() {
+                todo.push(p);
+            }
+        }
+    }
+    all.sort();
+    all
+}
+fn pc_expected(u: &U) -> Value {
+    json!({"repository":"o/r","branch":BRANCH,"item":"k1","merge":false,"clone":u.p("clone"),
+        "task_key":"store-task","judge_threads":false,"page":u.p("work/task/PC1.md"),
+        "out":u.p("work/task/runs/U-PC1"),"worktree":u.p("work/task/wt/r-pc1"),
+        "implementer":{"model":"muse-wonder-1.0","effort":"high","runtime":"muse",
+            "permission_mode":"bypassPermissions","account":u.p("m1/muse"),"timeout_seconds":600,
+            "prompt":u.p("work/task/runs/U-PC1.prompt.md")},
+        "verifier":{"model":"sonnet","effort":"high","runtime":"claude","account":u.p("a2"),
+            "next_accounts":[u.p("a1")],"timeout_seconds":700,"compact_window":400000,
+            "prompt":u.p("work/task/runs/U-PC1.verify.prompt.md")},
+        "repair":{"prompt":u.p("judge/fixer.md"),"verifier_prompt":u.p("judge/verifier2.md"),
+            "timeout_seconds":800}})
+}
+fn pc_prompts(page: &str) -> (String, String) {
+    let i = format!(
+        "STANDING-I {page} of PC1 in o/r\nkeep {{word}} and {page}\n\nNOTE-A {{unit}} stays\n### a detail line\nNOTE-B\n\n"
+    );
+    let v = "STANDING-V PC1\nno final newline here\n\nASK-1 {page}\n\n".to_owned();
+    (i, v)
+}
+fn pc_call(u: &mut U, page: &str) -> Result<(Value, u8), Failure> {
+    ap::unit::execute_page(u, page)
+}
+fn refusal(r: Result<Value, Failure>) -> (String, String, Value) {
+    let f = r.expect_err("a refusal");
+    (f.code.to_owned(), f.field, f.detail)
+}
+fn pc_pretty(v: &Value) -> Vec<u8> {
+    let mut b = serde_json::to_vec_pretty(v).unwrap();
+    b.push(b'\n');
+    b
+}
+
+#[test]
+fn pc1_the_composition_is_byte_for_byte_from_a_page_and_units_json() {
+    let mut u = U::new();
+    let page = pc_setup(&mut u);
+    let printed = ap::unit::compose(&page).unwrap();
+    let (i, v) = pc_prompts(&page);
+    assert_eq!(printed["request"], pc_expected(&u));
+    assert_eq!(printed["prompt"], json!(i));
+    assert_eq!(printed["verify_prompt"], json!(v));
+    assert_eq!(
+        printed.as_object().unwrap().len(),
+        3,
+        "request, prompt, verify_prompt"
+    );
+    // The call from the page: the three files hold exactly these bytes.
+    let (rec, code) = pc_call(&mut u, &page).unwrap();
+    assert_eq!(
+        (rec["state"].as_str(), code),
+        (Some("accepted"), 0),
+        "{rec}"
+    );
+    let read = |s: &str| std::fs::read(u.t.join(format!("work/task/runs/U-PC1{s}"))).unwrap();
+    assert_eq!(read(".prompt.md"), i.as_bytes());
+    assert_eq!(read(".verify.prompt.md"), v.as_bytes());
+    assert_eq!(read(".request.json"), pc_pretty(&pc_expected(&u)));
+    // The stages got the composed files, and the verifier's prompt is the composed one first.
+    let asked =
+        std::fs::read_to_string(u.t.join("work/task/runs/U-PC1.verifier.prompt.md")).unwrap();
+    assert!(asked.starts_with(&v), "{asked}");
+}
+
+#[test]
+fn pc1_vectors_of_the_placeholders_and_of_the_ends_of_a_section() {
+    let mut u = U::new();
+    let page = pc_setup(&mut u);
+    // `{page}` twice and an unknown `{word}` in a standing text; `{unit}` in a section and in the
+    // text after the block stay as written; the section `### ` line is inside the section.
+    let printed = ap::unit::compose(&page).unwrap();
+    let prompt = printed["prompt"].as_str().unwrap();
+    assert_eq!(prompt.matches(page.as_str()).count(), 2);
+    assert!(
+        prompt.contains("{word}") && prompt.contains("NOTE-A {unit} stays\n### a detail line\n")
+    );
+    // A section ended by the end of the page (no final newline), after the block.
+    let block = serde_json::to_string(&pc_block()).unwrap();
+    let text = format!(
+        "# T\n```unit\n{block}\n```\n## Verifier questions\nQ {{repository}}\nlast line\n## Unit notes\nN1\n#### not a heading\n## Verifier questions-not\n"
+    );
+    pc_write(&u, &pc_units(&u), &text);
+    let printed = ap::unit::compose(&page).unwrap();
+    assert_eq!(
+        printed["prompt"].as_str().unwrap(),
+        format!(
+            "STANDING-I {page} of PC1 in o/r\nkeep {{word}} and {page}\n\nN1\n#### not a heading\n"
+        )
+    );
+    assert_eq!(
+        printed["verify_prompt"].as_str().unwrap(),
+        "STANDING-V PC1\nno final newline here\n\nQ {repository}\nlast line\n"
+    );
+    // Both sections after the block, the last ended by the end of the page without a line feed.
+    let text = format!("```unit\n{block}\n```\n## Unit notes\nN\n## Verifier questions\nlast");
+    pc_write(&u, &pc_units(&u), &text);
+    let printed = ap::unit::compose(&page).unwrap();
+    assert!(printed["prompt"].as_str().unwrap().ends_with("\n\nN\n"));
+    assert!(
+        printed["verify_prompt"]
+            .as_str()
+            .unwrap()
+            .ends_with("\n\nlast")
+    );
+}
+
+#[test]
+fn pc1_a_block_member_sets_the_stage_and_a_task_value_fills_the_rest() {
+    let mut u = U::new();
+    let page = pc_setup(&mut u);
+    // `merge: false` is the fixture's; a Muse block carries no `next_accounts` and no window; a
+    // block's `timeout_seconds` replaces the task file's; a Claude block without a stated mode has none.
+    let r = ap::unit::compose(&page).unwrap()["request"].clone();
+    assert_eq!(r["merge"], json!(false));
+    assert!(r["implementer"].get("next_accounts").is_none());
+    assert!(r["implementer"].get("compact_window").is_none());
+    assert!(r["verifier"].get("permission_mode").is_none());
+    let mut b = pc_block();
+    b["merge"] = json!(true);
+    b["verifier"]["timeout_seconds"] = json!(99);
+    b["verifier"]["model"] = json!("unnamed-model");
+    b["implementer"] = json!({"model":"opus","effort":"high"});
+    pc_write(&u, &pc_units(&u), &pc_text(&b));
+    let r = ap::unit::compose(&page).unwrap()["request"].clone();
+    assert_eq!(r["merge"], json!(true));
+    assert_eq!(r["verifier"]["timeout_seconds"], json!(99));
+    assert!(
+        r["verifier"].get("compact_window").is_none(),
+        "a model the task file does not name"
+    );
+    assert_eq!(r["implementer"]["runtime"], json!("claude"));
+    assert_eq!(r["implementer"]["compact_window"], json!(600000));
+    assert_eq!(r["implementer"]["next_accounts"], json!([u.p("a1")]));
+    assert_eq!(r["implementer"]["account"], json!(u.p("a2")));
+}
+
+#[test]
+fn pc1_each_refusal_of_the_composition_is_before_any_effect() {
+    let mut u = U::new();
+    let page = pc_setup(&mut u);
+    let before = tree(&u.t.join("work/task"));
+    let units = pc_units(&u);
+    let block = pc_block();
+    let mut cases: Vec<(String, Value, String, String)> = vec![];
+    let ok = pc_text(&block);
+    // Members of units.json: unknown, missing, malformed.
+    let mut with = |what: &str, f: &dyn Fn(&mut Value), member: &str| {
+        let mut v = units.clone();
+        f(&mut v);
+        cases.push((what.to_owned(), v, ok.clone(), member.to_owned()));
+    };
+    with("unknown", &|v| v["extra"] = json!(1), "units.extra");
+    for k in [
+        "task_key",
+        "clones",
+        "accounts",
+        "timeouts",
+        "compact_window",
+        "prompts",
+        "judge_threads",
+    ] {
+        let remove = |v: &mut Value| {
+            v.as_object_mut().unwrap().remove(k);
+        };
+        with(&format!("missing {k}"), &remove, &format!("units.{k}"));
+    }
+    let p = u.p("a1");
+    let rel = json!("relative/path");
+    with(
+        "key",
+        &|v| v["task_key"] = json!("Bad Key"),
+        "units.task_key",
+    );
+    with(
+        "clones kind",
+        &|v| v["clones"] = json!(["x"]),
+        "units.clones",
+    );
+    with(
+        "clone relative",
+        &|v| v["clones"]["o/r"] = rel.clone(),
+        "units.clones",
+    );
+    with("clone absent", &|v| v["clones"] = json!({}), "units.clones");
+    with(
+        "no account",
+        &|v| v["accounts"]["claude"] = json!([]),
+        "units.accounts",
+    );
+    with(
+        "account relative",
+        &|v| v["accounts"]["claude"] = json!([rel]),
+        "units.accounts",
+    );
+    with(
+        "unknown runtime",
+        &|v| v["accounts"]["other"] = json!([p]),
+        "units.accounts",
+    );
+    with(
+        "two on muse",
+        &|v| v["accounts"]["muse"] = json!([p, p]),
+        "units.accounts",
+    );
+    with(
+        "two on codex",
+        &|v| v["accounts"]["codex"] = json!([p, p]),
+        "units.accounts",
+    );
+    with(
+        "runtime without accounts",
+        &|v| {
+            v["accounts"].as_object_mut().unwrap().remove("muse");
+        },
+        "units.accounts",
+    );
+    with(
+        "timeout missing",
+        &|v| {
+            v["timeouts"].as_object_mut().unwrap().remove("fixer");
+        },
+        "units.timeouts",
+    );
+    with(
+        "timeout zero",
+        &|v| v["timeouts"]["fixer"] = json!(0),
+        "units.timeouts",
+    );
+    with(
+        "timeout text",
+        &|v| v["timeouts"]["fixer"] = json!("5"),
+        "units.timeouts",
+    );
+    with(
+        "timeout extra",
+        &|v| v["timeouts"]["other"] = json!(5),
+        "units.timeouts",
+    );
+    with(
+        "window text",
+        &|v| v["compact_window"]["sonnet"] = json!("x"),
+        "units.compact_window",
+    );
+    with(
+        "prompt missing",
+        &|v| {
+            v["prompts"].as_object_mut().unwrap().remove("fix");
+        },
+        "units.prompts",
+    );
+    with(
+        "prompt relative",
+        &|v| v["prompts"]["fix"] = rel.clone(),
+        "units.prompts",
+    );
+    with(
+        "judge text",
+        &|v| v["judge_threads"] = json!("yes"),
+        "units.judge_threads",
+    );
+    for (what, units, text, field) in cases {
+        pc_write(&u, &units, &text);
+        let got = refusal(ap::unit::compose(&page));
+        assert_eq!(
+            (got.0.as_str(), got.1.as_str()),
+            ("invalid_input", field.as_str()),
+            "{what}"
+        );
+        let f = pc_call(&mut u, &page).expect_err(&what);
+        assert_eq!(
+            (f.code, f.field.as_str()),
+            ("invalid_input", field.as_str()),
+            "{what}: the call"
+        );
+        assert_eq!(tree(&u.t.join("work/task")), before, "{what}");
+        assert!(u.calls.is_empty() && u.launches == 0, "{what}");
+    }
+    // The file: missing, a directory, not an object, and the page itself.
+    pc_write(&u, &units, &ok);
+    let file = u.t.join("work/task/units.json");
+    std::fs::remove_file(&file).unwrap();
+    let got = refusal(ap::unit::compose(&page));
+    assert_eq!(
+        (got.0.as_str(), got.1.as_str()),
+        ("units_unreadable", "page")
+    );
+    std::fs::create_dir(&file).unwrap();
+    assert_eq!(refusal(ap::unit::compose(&page)).0, "units_unreadable");
+    std::fs::remove_dir(&file).unwrap();
+    std::fs::write(&file, "[1]").unwrap();
+    let got = refusal(ap::unit::compose(&page));
+    assert_eq!((got.0.as_str(), got.1.as_str()), ("invalid_input", "units"));
+    std::fs::remove_file(u.t.join("work/task/PC1.md")).unwrap();
+    let got = refusal(ap::unit::compose(&page));
+    assert_eq!(
+        (got.0.as_str(), got.1.as_str()),
+        ("page_unreadable", "page")
+    );
+}
+
+#[test]
+fn pc1_each_refusal_of_the_page_is_before_any_effect() {
+    let mut u = U::new();
+    let page = pc_setup(&mut u);
+    let units = pc_units(&u);
+    let block = pc_block();
+    let ok = pc_text(&block);
+    let before = tree(&u.t.join("work/task"));
+    let mut texts: Vec<(String, String, (&str, Value))> = vec![];
+    // Required members of the block, each absent: `shape` with the member.
+    for k in [
+        "repository",
+        "branch",
+        "item",
+        "merge",
+        "implementer",
+        "verifier",
+    ] {
+        let mut b = block.clone();
+        b.as_object_mut().unwrap().remove(k);
+        let want = json!({"reason":"shape","member":k});
+        texts.push((format!("no {k}"), pc_text(&b), ("page_block_invalid", want)));
+    }
+    for (k, bad) in [
+        ("implementer", json!({"model":"m"})),
+        ("verifier", json!({"model":"m","effort":"e","x":1})),
+        (
+            "implementer",
+            json!({"model":"m","effort":"e","timeout_seconds":0}),
+        ),
+        ("verifier", json!({"model":"m","effort":"e","runtime":1})),
+    ] {
+        let mut b = block.clone();
+        b[k] = bad;
+        let want = json!({"reason":"shape","member":k});
+        texts.push((
+            format!("bad {k}"),
+            pc_text(&b),
+            ("page_block_invalid", want),
+        ));
+    }
+    let want = json!({"reason":"no_block","member":null});
+    let no_block = ok.split("```unit").next().unwrap().to_owned();
+    texts.push(("no block".into(), no_block, ("page_block_invalid", want)));
+    // Sections: none or two of each, by the exact heading line.
+    for h in ["## Unit notes", "## Verifier questions"] {
+        let want = json!({"heading": h});
+        texts.push((
+            format!("no {h}"),
+            ok.replace(&format!("{h}\n"), "## Other\n"),
+            ("page_section_missing", want.clone()),
+        ));
+        texts.push((
+            format!("inexact {h}"),
+            ok.replace(&format!("{h}\n"), &format!("{h} \n")),
+            ("page_section_missing", want.clone()),
+        ));
+        texts.push((
+            format!("twice {h}"),
+            ok.replace("\nIntro.\n", &format!("\n{h}\nx\n")),
+            ("page_section_twice", want),
+        ));
+    }
+    for (what, text, (code, detail)) in texts {
+        pc_write(&u, &units, &text);
+        let got = refusal(ap::unit::compose(&page));
+        assert_eq!((got.0.as_str(), got.1.as_str()), (code, "page"), "{what}");
+        assert_eq!(got.2, detail, "{what}");
+        let f = pc_call(&mut u, &page).expect_err(&what);
+        assert_eq!(
+            (f.code, f.field.as_str()),
+            (code, "page"),
+            "{what}: the call"
+        );
+        assert_eq!(tree(&u.t.join("work/task")), before, "{what}");
+        assert!(u.calls.is_empty() && u.launches == 0, "{what}");
+    }
+}
+
+#[test]
+fn pc1_an_existing_file_of_the_three_refuses_out_exists_before_any_store_write() {
+    for suffix in [".prompt.md", ".verify.prompt.md", ".request.json"] {
+        let mut u = U::new();
+        let page = pc_setup(&mut u);
+        let file = u.t.join(format!("work/task/runs/U-PC1{suffix}"));
+        std::fs::write(&file, "mine").unwrap();
+        let before = tree(&u.t.join("work/task"));
+        let f = pc_call(&mut u, &page).expect_err(suffix);
+        assert_eq!(
+            (f.code, f.field.as_str()),
+            ("out_exists", "out"),
+            "{suffix}"
+        );
+        assert_eq!(tree(&u.t.join("work/task")), before, "{suffix}");
+        assert_eq!(std::fs::read(&file).unwrap(), b"mine");
+        assert_eq!(u.effects(), (0, 0, 0), "{suffix}");
+        assert!(actions(&u).is_empty(), "no store write: {suffix}");
+    }
+    // A dangling link counts as a file.
+    let mut u = U::new();
+    let page = pc_setup(&mut u);
+    std::os::unix::fs::symlink("nowhere", u.t.join("work/task/runs/U-PC1.request.json")).unwrap();
+    assert_eq!(code(pc_call(&mut u, &page)), "out_exists@out");
+}
+
+#[test]
+fn pc1_a_refusal_of_the_admission_or_of_the_item_leaves_no_file() {
+    // The item: no board names it.
+    let mut u = U::new();
+    let page = pc_setup(&mut u);
+    u.objects.clear();
+    let before = tree(&u.t.join("work/task"));
+    assert_eq!(code(pc_call(&mut u, &page)), "item_not_ordered@item");
+    assert_eq!(tree(&u.t.join("work/task")), before);
+    assert_eq!((u.launches, u.effects()), (0, (0, 0, 0)));
+    // The admission: a Muse block without a stated mode is refused as on stdin.
+    let mut u = U::new();
+    let page = pc_setup(&mut u);
+    let mut b = pc_block();
+    b["implementer"]
+        .as_object_mut()
+        .unwrap()
+        .remove("permission_mode");
+    pc_write(&u, &pc_units(&u), &pc_text(&b));
+    let before = tree(&u.t.join("work/task"));
+    assert_eq!(
+        code(pc_call(&mut u, &page)),
+        "invalid_input@implementer.permission_mode"
+    );
+    assert_eq!(tree(&u.t.join("work/task")), before);
+    assert_eq!(u.launches, 0);
+    // A page outside the work root is refused by the admission.
+    let mut u = U::new();
+    let _ = pc_setup(&mut u);
+    let outside = u.t.join("outside");
+    std::fs::create_dir_all(outside.join("runs")).unwrap();
+    for f in ["PC1.md", "units.json"] {
+        std::fs::copy(u.t.join("work/task").join(f), outside.join(f)).unwrap();
+    }
+    let outside_page = outside.join("PC1.md").to_str().unwrap().to_owned();
+    assert_eq!(
+        code(pc_call(&mut u, &outside_page)),
+        "outside_work_root@page"
+    );
+    assert_eq!(tree(&outside), ["PC1.md", "runs", "units.json"]);
+}
+
+#[test]
+fn pc1_the_composed_digests_equal_the_files_bytes_and_the_page_digest_is_the_one_read() {
+    let mut u = U::new();
+    let page = pc_setup(&mut u);
+    let (rec, code) = pc_call(&mut u, &page).unwrap();
+    assert_eq!(
+        (rec["state"].as_str(), code),
+        (Some("accepted"), 0),
+        "{rec}"
+    );
+    assert_eq!(rec, u.record("runs/U-PC1"));
+    let c = &rec["composed"];
+    assert_eq!(c.as_object().unwrap().len(), 3);
+    for (k, suffix) in [
+        ("request", ".request.json"),
+        ("prompt", ".prompt.md"),
+        ("verify_prompt", ".verify.prompt.md"),
+    ] {
+        let path = u.p(&format!("work/task/runs/U-PC1{suffix}"));
+        assert_eq!(c[k]["path"], json!(path), "{k}");
+        assert_eq!(
+            c[k]["sha256"],
+            json!(sha(&std::fs::read(&path).unwrap())),
+            "{k}"
+        );
+    }
+    assert_eq!(rec["verifier_prompt"], c["verify_prompt"]);
+    assert_eq!(
+        rec["page"]["sha256"],
+        json!(sha(&std::fs::read(&page).unwrap()))
+    );
+    assert_eq!(rec["write_set"], json!(["src/**", "notes.md"]));
+    // The stages were admitted and run on the composed files.
+    let imp = stage_record(&rec["stages"]["implementer"]);
+    assert_eq!(imp["prompt"]["sha256"], c["prompt"]["sha256"]);
+    assert_eq!(rec["merge"], json!(false));
+}
+
+#[test]
+fn pc1_compose_only_writes_no_file_and_prints_the_three() {
+    let mut u = U::new();
+    let page = pc_setup(&mut u);
+    let before = tree(&u.t);
+    let run = |args: &[&str]| {
+        Command::new(env!("CARGO_BIN_EXE_ap"))
+            .arg("unit")
+            .args(args)
+            .stdin(std::process::Stdio::null())
+            .output()
+            .unwrap()
+    };
+    let out = run(&["--compose-only", &page]);
+    assert_eq!(
+        out.status.code(),
+        Some(0),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    assert!(out.stderr.is_empty());
+    let printed: Value = serde_json::from_slice(&out.stdout).unwrap();
+    assert_eq!(printed, ap::unit::compose(&page).unwrap());
+    assert_eq!(printed["request"], pc_expected(&u));
+    assert_eq!(tree(&u.t), before, "no file, no directory");
+    assert_eq!((u.launches, u.calls.len()), (0, 0));
+    // A refusal of the composition on the binary: exit 2, the error form, nothing written.
+    std::fs::remove_file(u.t.join("work/task/units.json")).unwrap();
+    let before = tree(&u.t);
+    let out = run(&["--compose-only", &page]);
+    assert_eq!((out.status.code(), out.stdout.is_empty()), (Some(2), true));
+    let e: Value = serde_json::from_slice(&out.stderr).unwrap();
+    assert_eq!(
+        (&e["error"]["code"], &e["error"]["field"]),
+        (&json!("units_unreadable"), &json!("page"))
+    );
+    assert_eq!(tree(&u.t), before);
+}
+
+#[test]
+fn pc1_another_form_of_arguments_is_usage_and_a_page_call_on_the_binary_admits_as_on_stdin() {
+    let mut u = U::new();
+    let page = pc_setup(&mut u);
+    let before = tree(&u.t);
+    let run = |args: &[&str]| {
+        Command::new(env!("CARGO_BIN_EXE_ap"))
+            .arg("unit")
+            .args(args)
+            .stdin(std::process::Stdio::null())
+            .output()
+            .unwrap()
+    };
+    for args in [
+        vec![page.as_str(), page.as_str()],
+        vec!["--compose-only"],
+        vec!["--compose-only", "relative.md"],
+        vec!["relative.md"],
+        vec![page.as_str(), "--compose-only"],
+        vec!["--compose-only", &page, "x"],
+        vec!["--other", &page],
+        vec!["/work/../x.md"],
+    ] {
+        let out = run(&args);
+        assert_eq!(out.status.code(), Some(2), "{args:?}");
+        assert!(out.stdout.is_empty(), "{args:?}");
+        let e: Value = serde_json::from_slice(&out.stderr).unwrap();
+        assert_eq!(
+            (&e["error"]["code"], &e["error"]["field"]),
+            (&json!("usage"), &json!("args")),
+            "{args:?}"
+        );
+    }
+    // The page is outside the host's work root: the admission refuses it, as it does on stdin.
+    let out = run(&[&page]);
+    let e: Value = serde_json::from_slice(&out.stderr).unwrap();
+    assert_eq!(out.status.code(), Some(2));
+    assert_eq!(e["error"]["code"], "outside_work_root");
+    assert_eq!(tree(&u.t), before);
+}
+
+#[test]
+fn pc1_a_round_started_from_a_page_carries_the_composed_request_into_the_come_back() {
+    let mut u = U::new();
+    let page = pc_setup(&mut u);
+    u.script(
+        "m1",
+        &format!("if [ -f src/a.rs ]; then {FIX}; else {IMPLEMENT}; fi"),
+    );
+    u.script("a2", VERIFY_AFTER_FIX);
+    let (v, code) = pc_call(&mut u, &page).unwrap();
+    assert_eq!((v["state"].as_str(), code), (Some("accepted"), 0), "{v}");
+    assert_eq!(u.launches, 4, "implementer, verifier, fixer, verifier");
+    let first = u.record("runs/U-PC1");
+    let back = u.record("runs/U-PC1-2");
+    assert_eq!(v, back, "stdout is the come-back's record");
+    assert_eq!(first["cause"], json!("verdict_repair"));
+    assert_eq!(first["composed"].as_object().unwrap().len(), 3);
+    assert_eq!(
+        back["composed"],
+        json!({"request": first["composed"]["request"]})
+    );
+    // The round's prompts are the standing `fix` and `second_look` texts, not composed ones.
+    assert_eq!(
+        first["repair"]["prompt"]["sha256"],
+        json!(sha(FIXER_PROMPT.as_bytes()))
+    );
+    assert_eq!(
+        back["verifier_prompt"]["sha256"],
+        json!(sha(VERIFIER2_PROMPT.as_bytes()))
+    );
+    assert!(!u.t.join("work/task/runs/U-PC1-2.prompt.md").exists());
+}
+
+/// A record without the times, the paths of this fixture and the member `composed`.
+fn pc_plain(u: &U, v: &Value) -> Value {
+    fn strip(v: &mut Value) {
+        match v {
+            Value::Object(o) => {
+                o.remove("start");
+                o.remove("end");
+                o.remove("composed");
+                o.values_mut().for_each(strip);
+            }
+            Value::Array(a) => a.iter_mut().for_each(strip),
+            _ => {}
+        }
+    }
+    let mut v = v.clone();
+    strip(&mut v);
+    let text = v.to_string().replace(u.t.to_str().unwrap(), "T");
+    serde_json::from_str(&text).unwrap()
+}
+
+#[test]
+fn pc1_a_call_from_the_page_and_the_same_request_on_stdin_give_the_same_record_but_composed() {
+    // Both stop at the step `worktree` (the clone's origin is unreachable): nothing in the record
+    // depends on a commit or a clock but the times.
+    let mut records = vec![];
+    for from_page in [true, false] {
+        let mut u = U::new();
+        let page = pc_setup(&mut u);
+        git(
+            &u.t.join("clone"),
+            &["remote", "set-url", "origin", "/nonexistent"],
+        );
+        let (rec, code) = if from_page {
+            pc_call(&mut u, &page).unwrap()
+        } else {
+            let printed = ap::unit::compose(&page).unwrap();
+            for (k, suffix) in [
+                ("prompt", ".prompt.md"),
+                ("verify_prompt", ".verify.prompt.md"),
+            ] {
+                let file = u.t.join(format!("work/task/runs/U-PC1{suffix}"));
+                std::fs::write(file, printed[k].as_str().unwrap()).unwrap();
+            }
+            u.run(&printed["request"]).unwrap()
+        };
+        assert_eq!(
+            (rec["state"].as_str(), rec["cause"].as_str(), code),
+            (Some("stopped"), Some("fetch_failed"), 3),
+            "{rec}"
+        );
+        assert_eq!(rec.get("composed").is_some(), from_page);
+        assert_eq!(
+            rec["page"]["sha256"],
+            json!(sha(&std::fs::read(&page).unwrap()))
+        );
+        let plain = pc_plain(&u, &rec);
+        records.push(plain);
+        if !from_page {
+            assert_eq!(
+                names(&u.t.join("work/task/runs")).len(),
+                3,
+                "the prompts and the record"
+            );
+        }
+    }
+    assert_eq!(records[0], records[1]);
+    assert_eq!(records[0]["merge"], json!(false));
+}
+
+/// The tests' host, and a file of the call made by someone else at the first store call: after the
+/// admission's scan for existing files and before the claim.
+struct Racing<'a> {
+    u: &'a mut U,
+    file: PathBuf,
+}
+impl System for Racing<'_> {
+    fn call(&mut self, program: &str, args: &[String], input: &Value, ms: u64) -> Answer {
+        if program == "ont" && !self.file.exists() {
+            std::fs::write(&self.file, "someone else's").unwrap();
+        }
+        self.u.call(program, args, input, ms)
+    }
+    fn directory(&self, path: &str) -> std::io::Result<PathBuf> {
+        self.u.directory(path)
+    }
+    fn now(&self) -> Instant {
+        self.u.now()
+    }
+    fn pause(&mut self, d: Duration) {
+        self.u.pause(d);
+    }
+    fn work_root(&self) -> PathBuf {
+        self.u.work_root()
+    }
+    fn launch(
+        &mut self,
+        argv: &[String],
+        env: &[(String, String)],
+        cwd: &str,
+        files: [std::fs::File; 3],
+    ) -> std::io::Result<Child> {
+        self.u.launch(argv, env, cwd, files)
+    }
+    fn units(&self) -> bool {
+        self.u.units()
+    }
+    fn environment(&self) -> Vec<(String, String)> {
+        self.u.environment()
+    }
+}
+
+#[test]
+fn pc1_a_file_that_cannot_be_created_after_the_claim_stops_the_call_with_io_error() {
+    let mut u = U::new();
+    let page = pc_setup(&mut u);
+    let file = u.t.join("work/task/runs/U-PC1.request.json");
+    let (rec, code) = ap::unit::execute_page(
+        &mut Racing {
+            u: &mut u,
+            file: file.clone(),
+        },
+        &page,
+    )
+    .unwrap();
+    assert_eq!(code, 3, "{rec}");
+    assert_eq!(
+        (
+            rec["state"].as_str(),
+            rec["stopped_at"].as_str(),
+            rec["cause"].as_str()
+        ),
+        (Some("stopped"), Some("composed"), Some("io_error"))
+    );
+    assert_eq!(rec["detail"]["path"], json!(file.to_str().unwrap()));
+    assert_eq!(steps(&rec), pairs(&[("composed", "stopped")]));
+    assert_eq!(rec, u.record("runs/U-PC1"));
+    assert_eq!(u.launches, 0);
+    // The file is the other hand's; the two prompts were not made; no stage started.
+    assert_eq!(std::fs::read(&file).unwrap(), b"someone else's");
+    assert_eq!(
+        names(&u.t.join("work/task/runs")),
+        ["U-PC1.request.json", "U-PC1.unit.json"]
+    );
+}
+
+#[test]
+fn pc1_a_page_call_does_not_read_standard_input() {
+    let mut u = U::new();
+    let page = pc_setup(&mut u);
+    let before = tree(&u.t);
+    // A request on a stdin that stays open: a call that read it would block or run that request.
+    for args in [
+        vec!["unit", page.as_str()],
+        vec!["unit", "--compose-only", page.as_str()],
+    ] {
+        let mut child = Command::new(env!("CARGO_BIN_EXE_ap"))
+            .args(&args)
+            .stdin(std::process::Stdio::piped())
+            .stdout(std::process::Stdio::piped())
+            .stderr(std::process::Stdio::piped())
+            .spawn()
+            .unwrap();
+        use std::io::{Read, Write};
+        let mut hold = child.stdin.take().unwrap();
+        hold.write_all(br#"{"bogus":1}"#).unwrap();
+        let deadline = Instant::now() + Duration::from_secs(20);
+        let status = loop {
+            if let Some(s) = child.try_wait().unwrap() {
+                break s;
+            }
+            assert!(Instant::now() < deadline, "{args:?} waits on stdin");
+            std::thread::sleep(Duration::from_millis(20));
+        };
+        let (mut out, mut err) = (String::new(), String::new());
+        child
+            .stdout
+            .take()
+            .unwrap()
+            .read_to_string(&mut out)
+            .unwrap();
+        child
+            .stderr
+            .take()
+            .unwrap()
+            .read_to_string(&mut err)
+            .unwrap();
+        drop(hold);
+        if args[1] == "--compose-only" {
+            assert_eq!(status.code(), Some(0), "{err}");
+            let printed: Value = serde_json::from_str(&out).unwrap();
+            assert_eq!(printed["request"], pc_expected(&u));
+        } else {
+            // The page's own answer: its directory is outside the host's work root, not `bogus`.
+            let e: Value = serde_json::from_str(&err).unwrap();
+            assert_eq!(
+                (status.code(), &e["error"]["code"]),
+                (Some(2), &json!("outside_work_root"))
+            );
+        }
+    }
+    assert_eq!(tree(&u.t), before);
+}
+
+#[test]
+fn pc1_a_non_claude_block_gets_no_window_even_for_a_model_the_task_file_names() {
+    let mut u = U::new();
+    let page = pc_setup(&mut u);
+    let mut b = pc_block();
+    b["implementer"]["model"] = json!("sonnet");
+    pc_write(&u, &pc_units(&u), &pc_text(&b));
+    let r = ap::unit::compose(&page).unwrap()["request"].clone();
+    assert_eq!(r["implementer"]["runtime"], json!("muse"));
+    assert!(r["implementer"].get("compact_window").is_none());
+    // The same model on Claude Code gets the window.
+    assert_eq!(r["verifier"]["compact_window"], json!(400000));
+    b["implementer"] = json!({"model": "sonnet", "effort": "high", "runtime": "codex", "permission_mode": "bypassPermissions"});
+    pc_write(&u, &pc_units(&u), &pc_text(&b));
+    let r = ap::unit::compose(&page).unwrap()["request"].clone();
+    assert!(r["implementer"].get("compact_window").is_none());
+}

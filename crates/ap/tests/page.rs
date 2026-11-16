@@ -650,3 +650,64 @@ fn c5_a_renamed_file_is_its_old_path_removed_and_its_new_path_added() {
         ["accept: ok"]
     );
 }
+
+#[test]
+fn pc1_the_block_members_implementer_and_verifier_are_read_and_shaped() {
+    let s = S::new();
+    s.change();
+    let mut b = unit(&["src/**", "docs/d.md"], json!({}));
+    let stage = json!({"model": "m", "effort": "high", "runtime": "muse",
+        "permission_mode": "bypassPermissions", "timeout_seconds": 60});
+    b["implementer"] = stage.clone();
+    b["verifier"] = json!({"model": "m", "effort": "high"});
+    assert_eq!(s.lines(&b), ["accept: ok"]);
+    // Neither is required by `ap accept`; a bad one is `shape`, named whole.
+    for (k, v) in [
+        ("implementer", json!([])),
+        ("implementer", json!({"model": "m"})),
+        ("verifier", json!({"effort": "e"})),
+        ("verifier", json!({"model": "", "effort": "e"})),
+        (
+            "implementer",
+            json!({"model": "m", "effort": "e", "extra": 1}),
+        ),
+        (
+            "verifier",
+            json!({"model": "m", "effort": "e", "timeout_seconds": 0}),
+        ),
+        (
+            "verifier",
+            json!({"model": "m", "effort": "e", "timeout_seconds": "9"}),
+        ),
+        (
+            "verifier",
+            json!({"model": "m", "effort": "e", "runtime": 1}),
+        ),
+        (
+            "verifier",
+            json!({"model": "m", "effort": "e", "permission_mode": ""}),
+        ),
+    ] {
+        let mut b = unit(&["src/**"], json!({}));
+        b[k] = v.clone();
+        bad(&b, "shape", Some(k));
+    }
+}
+
+#[test]
+fn pc1_a_holds_path_is_a_pathspec_and_a_name_with_a_colon_fails_the_check() {
+    // The README names it: `git ls-tree -- <path>` reads `:x` as pathspec magic.
+    let s = S::new();
+    s.put(":x", b"colon\n");
+    s.put("y", b"plain\n");
+    s.commit("names");
+    let w = ["y", ":x"];
+    let holds = |p: &str| s.lines(&unit(&w, json!({"holds": [{"path": p, "text": "l"}]})));
+    let lines = holds(":x");
+    assert_eq!(lines.len(), 1, "{lines:?}");
+    assert!(
+        lines[0].ends_with("is not a regular file of HEAD"),
+        "{lines:?}"
+    );
+    assert_eq!(failed(&holds("y"), "holds"), 0);
+}

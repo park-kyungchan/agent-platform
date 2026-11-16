@@ -1,7 +1,7 @@
 //! `ap unit`: one unit of work once from its page to the merge (README "One unit"). The stages are
 //! `ap run`'s code, the gate is `ap gate`'s, the review and the status are `ap review`'s.
 use crate::backlog::Item;
-use crate::host::{Failure, LIMIT, System, args, digest, error, fail, id, require, text};
+use crate::host::{Failure, Host, LIMIT, System, args, digest, error, fail, id, require, text};
 use crate::page;
 use crate::review::{self, DIFF_OPTIONS};
 use crate::run::{stamp, write};
@@ -59,10 +59,17 @@ macro_rules! ensure {
     };
 }
 mod case;
+mod compose;
+use compose::Composed;
 
 fn absolute(p: &str) -> bool {
     let path = Path::new(p);
     path.is_absolute() && !p.contains('\0') && !path.components().any(|c| c == Component::ParentDir)
+}
+fn task_key_ok(key: &str) -> bool {
+    let ok =
+        |(i, c): (usize, u8)| c.is_ascii_lowercase() || c.is_ascii_digit() || (i > 0 && c == b'-');
+    key.len() <= 64 && key.bytes().enumerate().all(ok)
 }
 fn path<'a>(r: &'a Value, key: &str, field: &str) -> Result<&'a str, Failure> {
     let p = r[key].as_str().filter(|p| absolute(p));
@@ -182,20 +189,27 @@ fn renamed(f: Failure, prompt: &str, prefix: &str) -> Failure {
     };
     fail(f.code, &field, f.detail)
 }
-/// The host as `ap run` judges it before a stage's prompt file exists: `path` reads as `bytes`.
+/// The composed file at `path`, when a call from a page holds it in memory.
+fn held<'a>(c: Option<&'a Composed>, path: &str) -> Option<&'a [u8]> {
+    let files = c.map(|c| &c.files)?;
+    files
+        .iter()
+        .find(|(p, _)| p == path)
+        .map(|(_, b)| b.as_slice())
+}
+/// The host as `ap run` judges it before a stage's prompt file exists: each of `files` reads as its bytes.
 struct Rendered<'a, S> {
     s: &'a mut S,
-    path: String,
-    bytes: Vec<u8>,
+    files: Vec<(String, Vec<u8>)>,
 }
 impl<S: System> System for Rendered<'_, S> {
     fn call(&mut self, p: &str, a: &[String], i: &Value, ms: u64) -> crate::host::Answer {
         self.s.call(p, a, i, ms)
     }
     fn read(&self, path: &str) -> std::io::Result<Vec<u8>> {
-        match path == self.path {
-            true => Ok(self.bytes.clone()),
-            false => self.s.read(path),
+        match self.files.iter().find(|(p, _)| p == path) {
+            Some((_, bytes)) => Ok(bytes.clone()),
+            None => self.s.read(path),
         }
     }
     fn directory(&self, path: &str) -> std::io::Result<std::path::PathBuf> {
@@ -216,6 +230,7 @@ impl<S: System> System for Rendered<'_, S> {
 fn request(
     s: &mut impl System,
     r: &Value,
+    c: Option<&Composed>,
 ) -> Result<(Vec<String>, Option<page::Checks>, String), Failure> {
     let o = r
         .as_object()
@@ -249,9 +264,7 @@ fn request(
         branch.len() <= 100 && !branch.starts_with(['-', '/']) && !branch.contains("..");
     require!(branch_ok && branch.bytes().all(safe) => "invalid_input", "branch");
     let key = text(r, "task_key")?;
-    let key_char =
-        |(i, c): (usize, u8)| c.is_ascii_lowercase() || c.is_ascii_digit() || (i > 0 && c == b'-');
-    require!(key.len() <= 64 && key.bytes().enumerate().all(key_char) => "invalid_input", "task_key");
+    require!(task_key_ok(key) => "invalid_input", "task_key");
     require!(r.get("merge").is_none_or(Value::is_boolean) => "invalid_input", "merge");
     let judge = r.get("judge_threads");
     require!(judge.is_none_or(Value::is_boolean) => "invalid_input", "judge_threads");
@@ -308,7 +321,10 @@ fn request(
             require!(!inside(p) => "inside_worktree", &format!("repair.{k}"));
         }
     }
-    let bytes = regular(page, "page_unreadable", "page")?;
+    let bytes = match c.and_then(|c| c.page.clone()) {
+        Some(read) => read,
+        None => regular(page, "page_unreadable", "page")?,
+    };
     let page_text = String::from_utf8_lossy(&bytes);
     let block = page::block(&page_text)?;
     let mut lines = page_text
@@ -321,19 +337,23 @@ fn request(
     let write_set = block.as_ref().map_or(write_set, |b| b.write_set.clone());
     require!(acceptance.is_some() || block.is_some() => "invalid_input", "acceptance");
     // Every member `ap run` can judge before its stage's worktree exists, by its own code.
+    // A call from a page: its two composed prompts are read from memory, the files do not exist yet.
+    let files = c.map_or(vec![], |c| c.files.clone());
+    let mut composed = Rendered { s: &mut *s, files };
     for k in ["implementer", "verifier"]
         .into_iter()
         .filter(|k| r.get(*k).is_some())
     {
         let lead = r[k]["prompt"].as_str().unwrap_or_default();
         let field = |f: Failure| fail(f.code, &format!("{k}.{}", f.field), f.detail);
-        crate::run::admit_stage(s, &stage_request(r, k, lead)).map_err(field)?;
+        crate::run::admit_stage(&mut composed, &stage_request(r, k, lead)).map_err(field)?;
     }
     // The stage refuses a prompt over the limit once the block of facts is appended: room for it.
     if let Some(lead) = r["verifier"]["prompt"].as_str() {
         let zeros = "0".repeat(40);
         let room = facts(r, u64::MAX, &zeros, &zeros, "", &Value::Null).len() as u64 + room;
-        let size = std::fs::metadata(lead).map_or(LIMIT, |m| m.len());
+        let on_disk = || std::fs::metadata(lead).map_or(LIMIT, |m| m.len());
+        let size = held(c, lead).map_or_else(on_disk, |b| b.len() as u64);
         require!(size + room <= LIMIT => "prompt_unreadable", "verifier.prompt");
     }
     if let Some(repair) = r.get("repair") {
@@ -350,8 +370,7 @@ fn request(
         let path = format!("{out}.fixer.prompt.md");
         let mut seen = Rendered {
             s: &mut *s,
-            path: path.clone(),
-            bytes,
+            files: vec![(path.clone(), bytes)],
         };
         crate::run::admit_stage(&mut seen, &fixer_request(r, &path, None)).map_err(field)?;
         // The come-back's verifier, as `ap run` judges it before the record it resumes exists, with
@@ -397,6 +416,10 @@ fn request(
                 require!(Path::new(&file).symlink_metadata().is_err() => "out_exists", "out");
             }
         }
+    }
+    // A call from a page: its three files are files of the call.
+    for (file, _) in c.iter().flat_map(|c| &c.files) {
+        require!(Path::new(file).symlink_metadata().is_err() => "out_exists", "out");
     }
     if r.get("pull_request").is_none() {
         let exists = Path::new(worktree).symlink_metadata().is_ok();
@@ -914,9 +937,25 @@ pub fn execute(s: &mut impl System, r: &Value) -> Result<(Value, u8), Failure> {
     if r.get("case").is_some() {
         return case::execute(s, r);
     }
-    let (write_set, checks, page) = request(s, r)?;
+    run_unit(s, r, None)
+}
+/// `ap unit <page>`: the request composed from the page, then run as a request on stdin is.
+pub fn execute_page(s: &mut impl System, page: &str) -> Result<(Value, u8), Failure> {
+    let c = compose::compose(page)?;
+    run_unit(s, &c.request.clone(), Some(&c))
+}
+/// `ap unit --compose-only <page>`: `{request, prompt, verify_prompt}`; no effect.
+pub fn compose(page: &str) -> Result<Value, Failure> {
+    compose::compose(page).map(|c| c.printed())
+}
+fn run_unit(s: &mut impl System, r: &Value, c: Option<&Composed>) -> Result<(Value, u8), Failure> {
+    let (write_set, checks, page) = request(s, r, c)?;
     let file = |p: Option<&str>| match p {
-        Some(p) => regular(p, "io_error", "file").map(|b| json!({"path": p, "sha256": digest(&b)})),
+        Some(p) => {
+            let read =
+                held(c, p).map_or_else(|| regular(p, "io_error", "file"), |b| Ok(b.to_vec()));
+            read.map(|b| json!({"path": p, "sha256": digest(&b)}))
+        }
         None => Ok(Value::Null),
     };
     let verifier_prompt = r["verifier"]["prompt"].as_str();
@@ -929,6 +968,9 @@ pub fn execute(s: &mut impl System, r: &Value) -> Result<(Value, u8), Failure> {
         "review": null, "merge_commit": null, "stages": {"implementer": null, "verifier": null},
         "files": {"gate": null, "acceptance_output": null, "report": null}, "state": "running",
         "step": null, "stopped_at": null, "cause": null, "detail": null, "steps": [], "start": now(), "end": null});
+    if let Some(c) = c {
+        rec["composed"] = c.record.clone();
+    }
     // What instructs the round's two stages is fixed before the implementer starts.
     if let Some(repair) = r.get("repair") {
         let (fixer, verifier) = (
@@ -943,6 +985,14 @@ pub fn execute(s: &mut impl System, r: &Value) -> Result<(Value, u8), Failure> {
         rec["item"] = i.record.clone();
     }
     let (rec, code) = claimed(r, rec, |u| {
+        // A call from a page: its three files are the first thing created after the claim.
+        if let Some(c) = c {
+            u.rec["step"] = json!("composed");
+            for (file, bytes) in &c.files {
+                create(file, bytes)?;
+            }
+            u.rec["step"] = Value::Null;
+        }
         let end = steps(s, r, (&write_set, checks.as_ref()), item.as_ref(), u);
         // The round's two paths are in the save that completes the record: when it fails (exit 5),
         // no fixer starts.
@@ -987,7 +1037,9 @@ fn round(s: &mut impl System, r: &Value, rec: Value) -> Result<(Value, u8), Fail
         // The fixer's state could not be recorded: no come-back starts (exit 5, as for every record that cannot be written).
         return end(u);
     }
-    execute(s, &next).or_else(|f| {
+    let first = &u.rec["composed"]["request"];
+    let back = first.is_object().then(|| Composed::back(first));
+    run_unit(s, &next, back.as_ref()).or_else(|f| {
         u.rec["repair"]["cause"] = json!("come_back_refused");
         u.rec["repair"]["detail"] = json!({"code": f.code, "field": f.field});
         end(u)
@@ -1090,6 +1142,32 @@ fn claimed(
     };
     Ok((u.rec, status))
 }
+/// No argument: a request on stdin. One absolute path: a unit from its page. `--compose-only` and a
+/// path: the composition printed. Any other form is `usage`.
 pub fn cli(argv: &[OsString]) -> ExitCode {
-    crate::run::cli_with(argv, execute)
+    let page = |p: &OsString| p.to_str().filter(|p| absolute(p)).map(str::to_owned);
+    let result = match argv {
+        [] => return crate::run::cli_with(argv, execute),
+        [p] => page(p).map(|p| execute_page(&mut Host, &p)),
+        [f, p] if f == "--compose-only" => page(p).map(|p| compose(&p).map(|v| (v, 0))),
+        _ => None,
+    };
+    let (line, status, ok) = match result.unwrap_or_else(|| Err(error("usage", "args"))) {
+        Ok((v, status)) => (v, status, true),
+        Err(e) => (
+            json!({"error": {"code": e.code, "field": e.field, "detail": e.detail}}),
+            2,
+            false,
+        ),
+    };
+    let out: &mut dyn Write = if ok {
+        &mut std::io::stdout()
+    } else {
+        &mut std::io::stderr()
+    };
+    ExitCode::from(if writeln!(out, "{line}").is_ok() {
+        status
+    } else {
+        4
+    })
 }
