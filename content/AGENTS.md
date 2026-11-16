@@ -31,7 +31,7 @@ Read one of these only when its situation applies. References are in `/root/.age
 | I do not know which area owns a thing or where a repository, crate, task, plan or service lives | `CODEBASE-ORIENTATION.md` |
 | I name a new repository, crate, tool, task, branch or file | `NAMING.md` |
 | I build or test Rust, push, open a pull request, merge or install | `BUILD-AND-DELIVERY.md` |
-| I start, resume or configure a CLI, register an MCP server, or check what a session loaded | `CLI-RUNTIMES.md` |
+| I start, run without a terminal UI, resume or configure a CLI (permission mode, MCP servers, hooks, compaction, events, usage limit, account), register an MCP server, or check what a session loaded | `CLI-RUNTIMES.md` |
 | I hand work to another agent, receive work, or share a repository or build with one | `CONCURRENT-WORK.md` |
 | I need a task's holds, decisions, KPI values or worker runs from the Ontology store, or I am Lead and record one | `ONTOLOGY-USE.md` |
 | I decide where information belongs or whether it may go to memory | `CONTEXT-GOVERNANCE.md` |
