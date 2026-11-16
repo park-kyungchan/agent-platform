@@ -30,6 +30,8 @@ impl Rec {
             .is_some_and(|r| r.starts_with('.'))
     }
 }
+/// The calls of one pull request (`repository`, number), or of one call without.
+type Chain<'a> = (Option<(String, u64)>, Vec<&'a Rec>);
 /// The records of one kind, by `start` (then path), and the paths that did not parse.
 fn records(runs: &Path, suffix: &str, bad: &mut Vec<String>) -> Vec<Rec> {
     let mut names: Vec<String> = std::fs::read_dir(runs)
@@ -141,7 +143,7 @@ pub fn execute(s: &mut impl System, argv: &[String]) -> Result<String, Failure> 
         }
     };
 
-    let mut chains: Vec<(Option<(String, u64)>, Vec<&Rec>)> = vec![];
+    let mut chains: Vec<Chain> = vec![];
     for c in &calls {
         let key = c.v["pull_request"]
             .as_u64()
