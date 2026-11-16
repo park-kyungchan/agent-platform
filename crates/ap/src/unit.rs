@@ -16,8 +16,7 @@ use std::{
 };
 
 const MEMBERS: &str = "repository clone worktree branch task_key page out acceptance implementer verifier acceptance_seconds gate store merge pull_request verdict repair judge_threads item";
-const STAGE: &str =
-    "account model effort prompt permission_mode timeout_seconds next_accounts env resume runtime";
+const STAGE: &str = "account model effort prompt permission_mode timeout_seconds next_accounts env resume runtime compact_window";
 /// The files of one call, by suffix of `out`: a stage's answer also has `ap run`'s three files.
 const FILES: &str =
     ".unit.json .implementer.md .verifier.md .verifier.prompt.md .gate.json .accept.log";

@@ -35,7 +35,7 @@ const MODES: [&str; 6] = [
 const KEEP: [&str; 10] = [
     "PATH", "HOME", "USER", "LOGNAME", "SHELL", "LANG", "LC_ALL", "TERM", "TMPDIR", "TZ",
 ];
-const MEMBERS: [&str; 21] = [
+const MEMBERS: [&str; 22] = [
     "role",
     "runtime",
     "account",
@@ -57,6 +57,7 @@ const MEMBERS: [&str; 21] = [
     "skills",
     "memory",
     "answer_schema",
+    "compact_window",
 ];
 /// The largest file of `answer_schema`, in bytes.
 const SCHEMA_MAX: u64 = 65_536;
@@ -122,6 +123,8 @@ struct Request {
     /// The stage runs on the Codex CLI; on a resume, the thread's tokens before this run.
     codex: bool,
     spent: Option<[u64; 4]>,
+    /// The compaction window the stated `CLAUDE_CODE_AUTO_COMPACT_WINDOW` gets (a Claude stage).
+    compact_window: Option<u64>,
 }
 
 fn path(r: &Value, key: &str) -> Result<String, Failure> {
@@ -274,7 +277,7 @@ fn request_at(s: &mut impl System, r: &Value, at_cwd: bool) -> Result<Request, F
     let role = text(r, "role")?;
     // Not built for a Codex stage: a reviewer (reviewers run on Claude Code) and these members.
     require!(!codex || role != "reviewer" => "invalid_input", "role");
-    if let Some(k) = ["skills", "memory", "integration"]
+    if let Some(k) = ["skills", "memory", "integration", "compact_window"]
         .into_iter()
         .find(|k| codex && r.get(*k).is_some())
     {
@@ -307,6 +310,15 @@ fn request_at(s: &mut impl System, r: &Value, at_cwd: bool) -> Result<Request, F
             .as_u64()
             .filter(|t| (1..=MAX_TIMEOUT).contains(t))
             .ok_or_else(|| error("invalid_input", "timeout_seconds"))?,
+    };
+    // An integer of the CLI's range; a fraction or an exponent is no integer here (as for timeout).
+    let compact_window = match r.get("compact_window") {
+        None => None,
+        Some(v) => Some(
+            v.as_u64()
+                .filter(|n| (100_000..=1_000_000).contains(n))
+                .ok_or_else(|| error("invalid_input", "compact_window"))?,
+        ),
     };
     let (account, cwd, prompt, out) = (
         path(r, "account")?,
@@ -515,6 +527,7 @@ fn request_at(s: &mut impl System, r: &Value, at_cwd: bool) -> Result<Request, F
         skills: flag(r, "skills")?,
         memory: flag(r, "memory")?,
         codex,
+        compact_window,
     })
 }
 const TOKENS: [&str; 4] = ["input", "output", "cache_read", "cache_creation"];
@@ -930,6 +943,9 @@ fn claude_args(q: &Request, argv: &mut Vec<String>, resume: Option<&str>, sessio
     if !q.memory {
         settings["autoMemoryEnabled"] = json!(false);
     }
+    if let Some(window) = q.compact_window {
+        settings["env"]["CLAUDE_CODE_AUTO_COMPACT_WINDOW"] = json!(window.to_string());
+    }
     argv.extend(args(&[
         "--",
         "claude",
@@ -1069,6 +1085,7 @@ fn attempt(
         "permission_denials": [], "results": 0, "expect_met": null,
         "expect_file_before": q.expect_before, "unmet": null,
         "resumes": q.resume.as_ref().map(|(_, _, file)| file), "limit": null,
+        "compact_window": q.compact_window,
     });
     let mut attempts = earlier.to_vec();
     attempts.push(json!({"continued": continued}));
