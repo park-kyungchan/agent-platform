@@ -4,7 +4,8 @@ terminal UI? For each case of cases.json it starts ONE headless session of the r
 the fixed prompt, saves the answer, and scores it by two literal rules (no model judges): `routed` (the last line
 that begins `File:` names one of the case's files) and `answered` (every token is in the answer). `--score <dir>`
 starts no session and scores the answers saved there. It prints ONE JSON object. Exit 0 when every session ran or the
-reader may not be run; 2 when a start failed or a usage error (the object, or one JSON line, says which).
+reader may not be run; 2 when a start failed, a session ran past its bound, a session ran but exited non-zero or gave
+no answer (state `failed`), the MCP rule below did not hold, or a usage error (the object, or one JSON line, says which).
 Method and limits: evals/README.md, section "The instructions suite".
 """
 import argparse
@@ -49,7 +50,7 @@ def muse_argv(prompt, root, work, sid):
     # A new workspace Muse Code does not trust: no --yolo, no --trust-workspace, so MCP startup is withheld; no shell,
     # no web. File reads pass in every approval mode. (--disable-write is left out: with it the CLI refused the model,
     # "does not exist or you lack access", on this host.)
-    return ["muse", "exec", "--json", "--model", "muse-ember-1.0", "--disable-reminders", "--disable-shell",
+    return ["muse", "exec", "--json", "--model", "muse-ember-1.0", "--contributor-mode", "off", "--disable-reminders", "--disable-shell",
             "--disable-web-tools", "--disable-request-user-input", "--session-id", sid,
             "--workspace", work, prompt]
 
@@ -92,12 +93,25 @@ def answer_of(reader, stream):
     return text
 
 
+def muse_registered_servers():
+    """How many MCP servers the Muse Code configuration directory registers (0 when it cannot be read)."""
+    try:
+        with open(os.path.expanduser("~/.config/muse/settings.json"), encoding="utf-8") as f:
+            servers = json.load(f).get("mcpServers")
+    except (OSError, ValueError, AttributeError):
+        return 0
+    return len(servers) if isinstance(servers, dict) else 0
+
+
+# No reader is confined to the copy: every reader can read any path the host user can, the login token linked
+# into the agy reader's temporary HOME included. An allow rule of --settings does not confine `read_file`.
+# That boundary belongs to the item `stage-limits`, not to this script.
 # One row per reader: the CLI, its command line, its environment beyond KEEP, and whether invariant 3 lets it run.
 READERS = {
     "claude-haiku": {"cli": "claude", "argv": claude_argv, "env": ("CLAUDE_CONFIG_DIR",), "runnable": True,
                      "rule": "--strict-mcp-config: no MCP server of the account starts"},
     "muse-ember": {"cli": "muse", "argv": muse_argv, "env": (), "set": {"MUSE_NO_AUTO_UPDATE": "1"}, "runnable": True,
-                   "rule": "a new untrusted workspace; the session record must say MCP startup was withheld"},
+                   "rule": "a new untrusted workspace; no MCP server process runs, and the session record must say MCP startup was withheld only when a server is registered"},
     "agy-hydrogen": {"cli": "agy", "argv": agy_argv, "env": (), "home": agy_home, "runnable": True,
                      "rule": "HOME is a new directory without MCP configuration; shown by pgrep to start no MCP server"},
 }
@@ -185,7 +199,10 @@ def run_case(a, row, case, out):
         if a.reader == "muse-ember":
             records = glob.glob(os.path.expanduser("~/.local/share/muse/sessions/*/*/*/%s/session.jsonl" % sid))
             text = "".join(open(r, encoding="utf-8", errors="replace").read() for r in records)
-            meta["mcp_withheld"] = WITHHELD in text
+            # With no registered server the CLI never prints the withheld text: the process watch above is the
+            # rule then, and the text is required only where a server is registered.
+            meta["mcp_registered"] = muse_registered_servers()
+            meta["mcp_withheld"] = (WITHHELD in text) if meta["mcp_registered"] else None
         if meta["state"] is None:
             meta["state"] = "ok" if meta["exit"] == 0 and answer else "failed"
         return meta
@@ -195,6 +212,13 @@ def run_case(a, row, case, out):
             shutil.rmtree(home, ignore_errors=True)
         with open(out + ".json", "w") as f:
             json.dump(meta, f, indent=1)
+
+
+def routed_file(line):
+    """The file a `File:` line names: its first token, markdown marks and a section suffix stripped, basename only."""
+    value = line.split("File:", 1)[1].strip().strip("*_`") if "File:" in line else ""
+    token = value.split()[0].strip("*_`").rstrip(",;:") if value.split() else ""
+    return token.rsplit("/", 1)[-1]
 
 
 def score(cases, d, reader, states):
@@ -210,7 +234,7 @@ def score(cases, d, reader, states):
         with open(path, encoding="utf-8", errors="replace") as f:
             text = f.read()
         files = [line for line in text.splitlines() if line.strip().lstrip("*_`").startswith("File:")]
-        routed = bool(files) and any(name in files[-1] for name in c["files"])
+        routed = bool(files) and routed_file(files[-1]) in c["files"]
         missing = [t for t in c["tokens"] if t not in text]
         result[cid] = {"state": "ok", "routed": routed, "answered": not missing, "missing": missing}
         counts["routed"] += routed
@@ -283,6 +307,7 @@ def main():
     for t in threads:
         t.join()
     result = score(cases, a.out, a.reader, states)
+    # Named for its first members: every case whose session did not end ok (start_failed, timeout, failed).
     result["start_failed"] = [cid for cid, s in states.items() if s != "ok"]
     result["mcp_rule_broken"] = broke
     print(json.dumps(result, indent=1))
