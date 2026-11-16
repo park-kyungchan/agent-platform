@@ -33,8 +33,11 @@ ROUTES = ("engineering", "lesson", "other")
 UNCOUNTED = (("agy", "no usage record exists under its state directory"),)  # CLIs whose sessions this command cannot count
 CLASSES = ("state", "commit", "store")
 STATE_FILE = r"(STATE|HANDOVER)\.md"
-WRITES = re.compile(rf">>?\s*\S*{STATE_FILE}|\b(tee|sed\s+-\S*i\S*|mv|cp|install)\b[^\n|;&]*{STATE_FILE}")
-PY_WRITE = re.compile(r"write_text|\.write\(|open\([^)]*,\s*['\"][wa]")
+WRITES = re.compile(rf">>?\s*\S*{STATE_FILE}|\btee\b[^\n|;&]*{STATE_FILE}|\bsed\s+(?:-\S+\s+)*-\S*i\S*\s[^\n|;&]*{STATE_FILE}"
+                    rf"|\b(?:cp|mv|install)\b[^\n|;&]*?\S*{STATE_FILE}['\"]?\s*(?:$|[;&|])", re.M)  # a redirect, tee, sed -i, the destination of cp, mv, install
+PATH_VAR = re.compile(r"(\w+)\s*=\s*(?:Path\()?\s*[rf]?['\"]([^'\"\n]*)['\"]")
+PY_OPEN = re.compile(r"open\(([^\n]*?),\s*(?:mode\s*=\s*)?['\"][wa]")
+PY_TEXT = re.compile(r"([^\n;]*)\.write_text\(")
 STORE = re.compile(r"(^|[\s;&|(/])ont(\s|$)|\bap\s+row\b|record_decision|apply_action")
 REPOS = ("park-kyungchan/agent-platform", "park-kyungchan/ontology-platform", "park-kyungchan/education-platform")
 
@@ -84,6 +87,16 @@ def jsonl(path, lines):
                 lines["unreadable"] += 1
 
 
+def writes_state(cmd):
+    """A Bash command writes STATE.md or HANDOVER.md when a write target names it: the patterns above, or a Python write
+    whose path, or the variable assigned that path, names it."""
+    if not re.search(STATE_FILE, cmd):
+        return False
+    paths = {m[1] for m in PATH_VAR.finditer(cmd) if re.search(STATE_FILE, m[2])}
+    names = lambda text: re.search(STATE_FILE, text) or any(re.search(rf"\b{v}\b", text) for v in paths)
+    return bool(WRITES.search(cmd) or any(names(m[1]) for m in PY_OPEN.finditer(cmd)) or any(names(m[1]) for m in PY_TEXT.finditer(cmd)))
+
+
 def call_of(b):
     """(class or None, size, name, file_path) of a tool_use block; the input is measured, never kept."""
     inp, name = b.get("input"), b.get("name")
@@ -91,7 +104,7 @@ def call_of(b):
     fp, cmd = get("file_path"), get("command")
     bash = name == "Bash"
     cls = ("state" if (name in ("Edit", "Write") and fp.endswith(("/STATE.md", "/HANDOVER.md")))
-           or (bash and re.search(STATE_FILE, cmd) and (WRITES.search(cmd) or PY_WRITE.search(cmd))) else
+           or (bash and writes_state(cmd)) else
            "commit" if bash and "git" in cmd and "commit" in cmd and ("-m" in cmd or "-F" in cmd) else
            "store" if bash and STORE.search(cmd) else None)
     return cls, len(json.dumps(inp, ensure_ascii=False)), name, fp if name in ("Edit", "Write") else ""

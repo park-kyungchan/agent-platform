@@ -340,6 +340,7 @@ class Rb1(unittest.TestCase):
         (d / f"{name}.unit.json").write_text(json.dumps(rec))
 
     def answer(self, name, first):
+        (self.work / "t" / "runs").mkdir(parents=True, exist_ok=True)
         p = self.work / "t" / "runs" / f"{name}.verifier.md"
         p.write_text(first + "\nrest\n")
         rec = self.stage(f"{name}.verifier", role="reviewer", runtime="claude", model="sonnet", answer={"path": str(p)})
@@ -416,6 +417,85 @@ class Rb1(unittest.TestCase):
         text = self.run_readout("--detail")
         self.assertEqual(before, tree_digest(self.tmp))
         self.assertNotIn(str(self.tmp), text)
+
+
+    # round 2: the state class names a write target; the rules of points 1, 3 and 4 each have a test that fails without them
+    def test_a_bash_call_is_state_only_when_a_write_target_names_the_file(self):
+        cls = lambda cmd: readout.call_of({"type": "tool_use", "id": "x", "name": "Bash", "input": {"command": cmd}})[0]
+        py_reads = "python3 - <<'EOF'\ntext = open('/w/STATE.md').read()\nopen('/tmp/other.md', 'w').write(text)\nEOF"
+        for cmd in ("cat /w/STATE.md", "cp STATE.md /tmp/bak", "mv /w/HANDOVER.md /tmp/h", "cp /w/STATE.md /tmp/b && echo done", py_reads,
+                    "grep x /w/STATE.md > /tmp/out", "sed -n 1p /w/STATE.md", "cat /w/STATE.md | tee /tmp/copy", "sed -i s/a/b/ /tmp/other.md; cat /w/STATE.md"):
+            self.assertIsNone(cls(cmd), cmd)
+        py_writes = "python3 - <<'EOF'\nfrom pathlib import Path\nP = '/w/STATE.md'\nPath(P).write_text('x')\nEOF"
+        py_open = "python3 - <<'EOF'\nSTATE = \"/w/STATE.md\"\nwith open(STATE, 'w') as f:\n    f.write('x')\nEOF"
+        for cmd in ("echo x > /w/STATE.md", "cat >> /w/HANDOVER.md <<'EOF'\nx\nEOF", "echo x | tee -a /w/STATE.md", "sed -i s/a/b/ /w/STATE.md",
+                    "cp /tmp/x /w/STATE.md", "mv /tmp/x /w/HANDOVER.md && git status", "python3 -c \"open('/w/STATE.md','w').write('x')\"",
+                    "python3 -c \"from pathlib import Path; Path('/w/STATE.md').write_text('x')\"", py_writes, py_open):
+            self.assertEqual(cls(cmd), "state", cmd)
+
+    def test_every_block_of_a_message_counts_across_its_lines(self):
+        sid = "s-multi-0001"
+        store, commit = self.use("b1", "Bash", command="ont " + "a" * 400), self.use("b2", "Bash", command="git commit -m " + "b" * 400)
+        state = self.use("b3", "Write", file_path="/w/STATE.md", content="c" * 400)
+        first, second = self.line(sid, "2026-11-12T09:00:00Z", [store, commit], out=1000, mid="mm"), self.line(sid, "2026-11-12T09:00:01Z", [state], out=1000, mid="mm")
+        self.session("a.jsonl", first, second)
+        (self.tmp / "acct" / "projects" / "q").mkdir()
+        (self.tmp / "acct" / "projects" / "q" / "fork.jsonl").write_text(first)
+        pct = lambda b: f"{len(json.dumps(b['input'], ensure_ascii=False)) / 4 / 1000 * 100:.1f}"
+        total = f"{sum(len(json.dumps(b['input'], ensure_ascii=False)) for b in (store, commit, state)) / 4 / 1000 * 100:.1f}"
+        self.assertIn(f"output=1,000 bookkeeping={total} state={pct(state)} commit={pct(commit)} store={pct(store)}\n", self.run_readout())
+
+    def test_only_the_window_counts_for_the_output_and_the_calls(self):
+        inside = self.use("w1", "Bash", command="ont " + "a" * 400)
+        outside = self.use("w2", "Bash", command="git commit -m " + "b" * 400)
+        self.session("a.jsonl", self.line("s-win-00001", "2026-11-12T09:00:00Z", [inside], out=1000),
+                     self.line("s-win-00001", "2026-11-15T09:00:00Z", [outside], out=3000))
+        share = len(json.dumps(inside["input"], ensure_ascii=False)) / 4 / 1000 * 100
+        self.assertIn(f"output=1,000 bookkeeping={share:.1f} state=0.0 commit=0.0 store={share:.1f}\n", self.run_readout())
+
+    def test_apply_action_and_the_size_of_a_call_in_characters(self):
+        call = self.use("u1", "Bash", command="apply_action " + "\u00e9" * 100)
+        self.session("a.jsonl", self.line("s-uni-00001", "2026-11-12T09:00:00Z", [call], out=1000))
+        share = len(json.dumps(call["input"], ensure_ascii=False)) / 4 / 1000 * 100  # 12.4: with ensure_ascii it would be 24.9
+        self.assertIn(f"bookkeeping={share:.1f} state=0.0 commit=0.0 store={share:.1f}\n", self.run_readout())
+
+    def test_chains_by_repository_and_pull_request_in_the_order_of_start(self):
+        t, other = "2026-11-12T", "park-kyungchan/other-platform"
+        pa, pb = str(self.work / "t" / "pa.md"), str(self.work / "t" / "pb.md")
+        self.lead_writes("s-lead-haiku", t + "07:00:00Z", pa, model="claude-haiku-9-9")
+        self.lead_writes("s-lead-opus", t + "07:00:00Z", pb)
+        # `U-A-2.unit.json` sorts before `U-A.unit.json` by name, and starts after it
+        self.unit("U-A", t + "08:00:00Z", "stopped", pr=7, page=pa, cause="verdict_repair", stages={"implementer": None, "verifier": self.answer("U-A", "Verdict: repair")})
+        self.unit("U-A-2", t + "09:00:00Z", "merged", pr=7, page=pb, stages={"implementer": None, "verifier": self.answer("U-A-2", "Verdict: accept")})
+        self.unit("U-B", t + "08:30:00Z", "merged", repo=other, pr=7, page=pb)  # the same number in another repository: a chain of its own
+        text = self.run_readout("--detail")
+        self.assertEqual([l for l in text.splitlines() if l.startswith("units chain ")], [
+            "units chain park-kyungchan/agent-platform#7 lead_family=haiku implementer=none first_verdict=repair repair_twice=no",
+            f"units chain {other}#7 lead_family=opus implementer=none first_verdict=none repair_twice=no"])
+
+    def test_the_first_verdict_the_window_and_repair_twice_follow_the_records_of_the_chain(self):
+        t, page = "2026-11-12T", str(self.work / "t" / "p.md")
+        self.lead_writes("s-lead-opus", t + "07:00:00Z", page)
+        # the earliest record names no verifier: the first verdict is the one of the first record that names one; two stops at the gate, another cause
+        self.unit("F-a", t + "08:00:00Z", "stopped", pr=21, page=page, stopped_at="gate", cause="gate_red")
+        self.unit("F-b", t + "09:00:00Z", "stopped", pr=21, page=page, stopped_at="gate", cause="gate_red")
+        self.unit("F-c", t + "10:00:00Z", "merged", pr=21, page=page, stages={"implementer": None, "verifier": self.answer("F-c", "Verdict: accept")})
+        # begun before the window, finished inside it: not counted
+        self.unit("W-a", "2026-11-10T08:00:00Z", "stopped", pr=20, page=page)
+        self.unit("W-b", t + "08:00:00Z", "merged", pr=20, page=page)
+        text = self.run_readout("--detail")
+        self.assertEqual([l for l in text.splitlines() if l.startswith("units ")], [
+            "units chain park-kyungchan/agent-platform#21 lead_family=opus implementer=none first_verdict=accept repair_twice=no",
+            "units lead_family=opus chains=1 first_verdict accept=1 repair=0 unknown=0 none=0 repair_twice=0"])
+
+    def test_the_units_lines_follow_the_stages_lines(self):
+        page = str(self.work / "t" / "p.md")
+        self.lead_writes("s-lead-opus", "2026-11-12T07:00:00Z", page)
+        self.unit("a", "2026-11-12T08:00:00Z", "merged", pr=1, page=page)
+        self.stage("m1")
+        text = self.run_readout()
+        order = [text.index(x) for x in ("stages cut:", "lead state_bytes=", "stages runtime=", "uncounted outside stages", "units lead_family=")]
+        self.assertEqual(order, sorted(order))
 
 
 if __name__ == "__main__":
