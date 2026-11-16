@@ -57,11 +57,10 @@ def muse_argv(prompt, root, work, sid):
 
 def agy_argv(prompt, root, work, sid):
     # Run with HOME set to a new directory (agy_home) that holds no MCP configuration; no permission flag, so an
-    # action that needs approval is soft-denied. --settings (this session only, never saved) allows only
-    # `read_file` under the copy of the instructions: no command is allowed at all, so no command can be pointed
-    # at a file outside the root (the linked login token included), with the root as a later argument or in any
-    # other position. The model is the slug of the level the user calls Hydrogen.
-    allow = ["read_file(%s)" % root]
+    # action that needs approval is soft-denied. --settings (this session only, never saved) allows reading the copy
+    # and the read-only search commands a reader uses; any other command is soft-denied. The model is the slug of the
+    # level the user calls Hydrogen.
+    allow = ["read_file(%s)" % root] + ["command(%s)" % c for c in ("rg", "grep", "cat", "sed", "head", "tail", "ls", "find", "wc")]
     return ["agy", "--print", prompt, "--output-format", "stream-json", "--model", "gemini-4-hydrogen-low",
             "--add-dir", root, "--settings", json.dumps({"permissions": {"allow": allow}})]
 
@@ -104,6 +103,9 @@ def muse_registered_servers():
     return len(servers) if isinstance(servers, dict) else 0
 
 
+# No reader is confined to the copy: every reader can read any path the host user can, the login token linked
+# into the agy reader's temporary HOME included. An allow rule of --settings does not confine `read_file`.
+# That boundary belongs to the item `stage-limits`, not to this script.
 # One row per reader: the CLI, its command line, its environment beyond KEEP, and whether invariant 3 lets it run.
 READERS = {
     "claude-haiku": {"cli": "claude", "argv": claude_argv, "env": ("CLAUDE_CONFIG_DIR",), "runnable": True,
