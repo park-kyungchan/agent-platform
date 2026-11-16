@@ -153,17 +153,16 @@ fn fixer_facts(r: &Value, number: &Value, head: &str) -> String {
         "\n## Facts of this repair (ap unit)\n\nRepository: {repo}\nPull request: {number}\nHead judged: {head}\nVerifier report: {out}.verifier.md\nPage: {page}\n"
     )
 }
-/// The fixer's `ap run` request: the implementer's block with `repair`'s bound; given the
-/// implementer's record, a resume of its session on its account, runtime and model.
+/// The fixer's `ap run` request: the implementer's block with `repair`'s bound (its accounts
+/// included); given the implementer's record, a resume of its session, with its runtime and model.
 fn fixer_request(r: &Value, prompt: &str, implementer: Option<(&str, &Value)>) -> Value {
     let mut block = r["implementer"].clone();
     if let Some(o) = block.as_object_mut() {
-        o.remove("next_accounts");
         o.remove("resume");
     }
     block["timeout_seconds"] = r["repair"]["timeout_seconds"].clone();
     if let Some((path, rec)) = implementer {
-        for k in ["account", "model", "effort", "runtime"] {
+        for k in ["model", "effort", "runtime"] {
             if !rec[k].is_null() {
                 block[k] = rec[k].clone();
             }
