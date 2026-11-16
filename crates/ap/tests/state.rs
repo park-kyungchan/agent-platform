@@ -16,6 +16,8 @@ static NEXT: AtomicU32 = AtomicU32::new(0);
 struct Fake {
     active: BTreeSet<String>,
     ps: Option<Vec<String>>,
+    /// `systemctl` cannot reach its manager: exit 1, nothing on stdout.
+    systemctl_fails: bool,
     programs: Vec<(String, Vec<String>)>,
 }
 impl Fake {
@@ -23,6 +25,7 @@ impl Fake {
         Fake {
             active: BTreeSet::new(),
             ps: Some(vec!["/usr/lib/systemd/systemd --system".into()]),
+            systemctl_fails: false,
             programs: vec![],
         }
     }
@@ -40,6 +43,9 @@ impl System for Fake {
         match program {
             "systemctl" => {
                 assert_eq!(args[0], "is-active");
+                if self.systemctl_fails {
+                    return reply(false, String::new());
+                }
                 match self.active.contains(args.last().unwrap()) {
                     true => reply(true, "active\n".into()),
                     false => reply(false, "inactive\n".into()),
@@ -305,14 +311,14 @@ fn sr1_stages_are_the_running_ones_and_the_newest_twenty_of_no_call() {
             "u",
         ),
     );
-    // Not owned: the prefix is not followed by a dot.
+    // Not owned: the prefix is not followed by a dot, so it is listed, as the newest of no call.
     d.json(
         "U-A-2.fixer.md.run.json",
         &stage(
             "fixer",
             "/a",
-            "2026-11-01T10:01:00Z",
-            Some("2026-11-01T10:20:00Z"),
+            "2026-11-20T10:01:00Z",
+            Some("2026-11-20T10:20:00Z"),
             "u",
         ),
     );
@@ -343,11 +349,10 @@ fn sr1_stages_are_the_running_ones_and_the_newest_twenty_of_no_call() {
         .collect();
     assert!(names.contains(&"runs/U-A.old.run.json"), "{names:?}");
     assert!(!names.contains(&"runs/U-A.implementer.md.run.json"));
-    // The newest twenty by start: s24 .. s05, then U-A-2 (2026-11-01) is older than all of them.
-    assert!(names.contains(&"runs/s24.run.json") && names.contains(&"runs/s05.run.json"));
-    assert!(
-        !names.contains(&"runs/s04.run.json") && !names.contains(&"runs/U-A-2.fixer.md.run.json")
-    );
+    // The newest twenty of no call by start: U-A-2 (not owned by U-A) and s24 .. s06.
+    assert!(names.contains(&"runs/U-A-2.fixer.md.run.json"));
+    assert!(names.contains(&"runs/s24.run.json") && names.contains(&"runs/s06.run.json"));
+    assert!(!names.contains(&"runs/s05.run.json"));
     let r = stages
         .iter()
         .find(|s| s["record"] == "runs/U-A.old.run.json")
@@ -393,7 +398,7 @@ fn sr1_stages_are_the_running_ones_and_the_newest_twenty_of_no_call() {
         )
     );
     // Newest first.
-    assert_eq!(names[0], "runs/s24.run.json");
+    assert_eq!(names[0], "runs/U-A-2.fixer.md.run.json");
 }
 
 #[test]
@@ -935,4 +940,41 @@ fn sr1_a_run_writes_nothing_and_calls_only_git_systemctl_and_ps() {
             assert!(args.iter().any(|a| a == "--no-optional-locks"), "{args:?}");
         }
     }
+}
+
+#[test]
+fn sr1_stale_of_a_stage_is_null_when_systemctl_cannot_be_read() {
+    let d = Dir::new();
+    d.json(
+        "live.run.json",
+        &stage(
+            "implementer",
+            "/a",
+            "2026-11-14T10:00:00Z",
+            None,
+            "ap-run-1.scope",
+        ),
+    );
+    d.json(
+        "U-live.unit.json",
+        &unit(Value::Null, "running", "2026-11-14T10:00:00Z", None),
+    );
+    d.json(
+        "U-live.implementer.md.run.json",
+        &stage(
+            "implementer",
+            "/a",
+            "2026-11-14T10:00:00Z",
+            None,
+            "ap-run-1.scope",
+        ),
+    );
+    let mut f = Fake::new();
+    f.systemctl_fails = true;
+    let v = state(&mut f, &d);
+    for s in v["stages"].as_array().unwrap() {
+        assert_eq!(s["stale"], Value::Null, "{s}");
+    }
+    // The call's own rule does not read `systemctl`: no `ap unit` lives, so it is stale.
+    assert_eq!(v["units"][0]["calls"][0]["stale"], true);
 }

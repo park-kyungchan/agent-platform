@@ -66,7 +66,10 @@ fn active(s: &mut impl System, unit: &Value) -> Option<bool> {
         &Value::Null,
         10_000,
     );
-    Some(String::from_utf8_lossy(&reply.ok()?.stdout).trim() == "active")
+    // An answer is a word on stdout; a call that printed none (no manager to ask) says nothing.
+    let reply = reply.ok()?;
+    let word = String::from_utf8_lossy(&reply.stdout);
+    (!word.trim().is_empty()).then(|| word.trim() == "active")
 }
 /// Whether a process of `ap unit` lives; None when the process table cannot be read.
 fn unit_lives(s: &mut impl System) -> Option<bool> {
