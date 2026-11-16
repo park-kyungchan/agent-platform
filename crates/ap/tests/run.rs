@@ -18,6 +18,7 @@ use std::{
 static NEXT: AtomicU32 = AtomicU32::new(0);
 const FAKE: &str = include_str!("fixtures/fake-claude.sh");
 const FAKE_CODEX: &str = include_str!("fixtures/fake-codex.sh");
+const FAKE_MUSE: &str = include_str!("fixtures/fake-muse.sh");
 
 struct Fake {
     t: PathBuf,
@@ -53,7 +54,7 @@ impl Fake {
         for d in ["bin", "a1", "a2", "cwd"] {
             std::fs::create_dir_all(t.join(d)).unwrap();
         }
-        for (name, text) in [("claude", FAKE), ("codex", FAKE_CODEX)] {
+        for (name, text) in [("claude", FAKE), ("codex", FAKE_CODEX), ("muse", FAKE_MUSE)] {
             let fake = t.join("bin").join(name);
             std::fs::write(&fake, text).unwrap();
             std::fs::set_permissions(&fake, std::fs::Permissions::from_mode(0o755)).unwrap();
@@ -210,7 +211,7 @@ impl System for Fake {
             ["systemd-run", "--scope", "--quiet", "--collect"]
         );
         assert!(argv[..at].contains(&"--slice=agents.slice".to_owned()));
-        assert!(["claude", "codex"].contains(&argv[at + 1].as_str()));
+        assert!(["claude", "codex", "muse"].contains(&argv[at + 1].as_str()));
         let unit = argv[..at]
             .iter()
             .find_map(|a| a.strip_prefix("--unit="))
@@ -3543,4 +3544,875 @@ fn rf1_the_text_holds_each_path_byte_for_byte_whatever_the_other_path_holds() {
     .concat();
     assert!(String::from_utf8_lossy(&want).contains(&format!("the file {}, and", f.p("{A}/p.md"))));
     assert_eq!(f.input(before + 2), want);
+}
+
+// ---- runtime muse: a stage on the Muse Code CLI (tests/fixtures/fake-muse.sh) -----------------
+
+const MUSE_MODEL: &str = "muse-wonder-1.0";
+/// A line of `muse exec --json` in the shape of the kept real ones: an envelope whose `payload`
+/// names the kind.
+fn m_line(payload: Value) -> Value {
+    json!({"schema_version":1,"stream":{"kind":"session","id":"5c4c0346-a668-4d09-8868-8df92c97bc38"},
+           "record_type":"event","durability":"durable","payload":payload})
+}
+/// A `task_lifecycle` line of the task kind `kind` (`tool.read_file`, `model.meta.response`).
+fn m_task(kind: &str) -> Value {
+    m_line(
+        json!({"command_id":"c1","kind":"task_lifecycle","task_id":"t1",
+        "event":{"kind":"proposed","task_id":"t1","task_kind":kind}}),
+    )
+}
+/// The status line that names the serving model in a `producer` facet (line 6 of the observed file).
+fn m_served(model: &Value) -> Value {
+    m_line(
+        json!({"command_id":"c1","kind":"task_lifecycle","task_id":"t1",
+        "event":{"kind":"status","task_id":"t1","message":"completed meta model stream attempt 1/10",
+        "details":{"phase":"stream_succeeded","facets":[
+            {"attempt":1,"error_kind":"stream_succeeded","kind":"external_attempt","operation":"model.response"},
+            {"kind":"producer","detail":{"kind":"provider","model":model,"provider":"meta","request_id":"r1"}}]}}}),
+    )
+}
+fn m_usage(calls: Value, models: Value, allowance: Value) -> Value {
+    let mut p = json!({"command_id":"c1","kind":"run_usage","calls":calls,"models":models,
+        "cancelled_calls":0,"children_included":false});
+    if !allowance.is_null() {
+        p["allowance"] = allowance;
+    }
+    m_line(p)
+}
+fn m_done(text: Value) -> Value {
+    m_line(
+        json!({"command_id":"c1","kind":"run_terminal","terminal":"completed","text":text,"reason":null}),
+    )
+}
+fn m_failed(reason: Value) -> Value {
+    m_line(
+        json!({"command_id":"c1","kind":"run_terminal","terminal":"failed","text":"","reason":reason}),
+    )
+}
+/// The usual lines of a completed run: a tool, the usage, the end.
+fn m_run(text: &str) -> Vec<Value> {
+    let models =
+        json!([{"model":MUSE_MODEL,"input_tokens":100,"cached_tokens":40,"output_tokens":7}]);
+    vec![
+        m_task("tool.read_file"),
+        m_usage(json!(3), models, Value::Null),
+        m_done(json!(text)),
+    ]
+}
+const MUSE_FLAGS: [&str; 6] = [
+    "--disable-reminders",
+    "--session-id",
+    "",
+    "--workspace",
+    "",
+    "--prompt-file",
+];
+impl Fake {
+    fn muse(&self, out: &str) -> Value {
+        for d in ["m1/muse", "m2/muse"] {
+            std::fs::create_dir_all(self.t.join(d)).unwrap();
+        }
+        json!({"role":"implementer","runtime":"muse","account":self.p("m1/muse"),"model":MUSE_MODEL,
+               "effort":"high","permission_mode":"bypassPermissions","cwd":self.p("cwd"),
+               "prompt":self.p("prompt.md"),"out":self.p(out)})
+    }
+    /// The lines the fake prints for the account `m1` (one object per line).
+    fn lines(&self, lines: &[Value]) {
+        let text: String = lines.iter().map(|l| format!("{l}\n")).collect();
+        std::fs::write(self.t.join("bin/lines-m1"), text).unwrap();
+    }
+    fn lines_then(&self, lines: &[Value], hang: bool, exit: i32) {
+        self.lines(lines);
+        if hang {
+            std::fs::write(self.t.join("bin/hang-m1"), "").unwrap();
+        }
+        std::fs::write(self.t.join("bin/exit-m1"), exit.to_string()).unwrap();
+    }
+    /// The arguments after `muse` that a Muse stage is started with.
+    fn muse_cli(&self, session: &str, prompt: &str) -> Vec<String> {
+        let (cwd, mut a) = (
+            self.p("cwd"),
+            vec!["muse", "exec", "--json", "--model", MUSE_MODEL],
+        );
+        a.extend(["--reasoning-effort", "high", "--contributor-mode", "off"]);
+        a.extend(MUSE_FLAGS);
+        let mut a: Vec<String> = a.iter().map(|s| s.to_string()).collect();
+        for (i, v) in [(a.len() - 4, session), (a.len() - 2, &*cwd)] {
+            a[i] = v.to_owned();
+        }
+        a.extend([prompt.to_owned(), "--yolo".to_owned()]);
+        a
+    }
+    /// A Muse stage that ended `ok` to resume from, with its out `first`.
+    fn muse_first(&mut self, first: &str) -> Value {
+        self.lines(&m_run("stage ok"));
+        self.run(&self.muse(first)).unwrap().0
+    }
+}
+
+#[test]
+fn m1_refusals_name_their_field_and_come_before_any_effect() {
+    let mut f = Fake::new();
+    f.lines(&m_run("stage ok"));
+    let set = |k: &str, v: Value| {
+        let k = k.to_owned();
+        move |r: &mut Value| r[k.as_str()] = v.clone()
+    };
+    type Edit = Box<dyn Fn(&mut Value)>;
+    let mut cases: Vec<(&str, Edit, &str)> = vec![
+        (
+            "runtime",
+            Box::new(set("runtime", json!("grok"))),
+            "invalid_input@runtime",
+        ),
+        (
+            "runtime",
+            Box::new(set("runtime", json!(["muse"]))),
+            "invalid_input@runtime",
+        ),
+        (
+            "next_accounts",
+            Box::new(set("next_accounts", json!([f.p("m2/muse")]))),
+            "invalid_input@next_accounts",
+        ),
+        (
+            "mcp_config",
+            Box::new(set("mcp_config", json!([f.p("prompt.md")]))),
+            "invalid_input@mcp_config",
+        ),
+        (
+            "skills",
+            Box::new(set("skills", json!(true))),
+            "invalid_input@skills",
+        ),
+        (
+            "skills",
+            Box::new(set("skills", json!(false))),
+            "invalid_input@skills",
+        ),
+        (
+            "memory",
+            Box::new(set("memory", json!(true))),
+            "invalid_input@memory",
+        ),
+        (
+            "integration",
+            Box::new(set("integration", json!(false))),
+            "invalid_input@integration",
+        ),
+        (
+            "answer_schema",
+            Box::new(set("answer_schema", json!(f.p("prompt.md")))),
+            "invalid_input@answer_schema",
+        ),
+        (
+            "compact_window",
+            Box::new(set("compact_window", json!(400_000))),
+            "invalid_input@compact_window",
+        ),
+        (
+            "mode",
+            Box::new(set("permission_mode", json!("auto"))),
+            "invalid_input@permission_mode",
+        ),
+        (
+            "mode",
+            Box::new(set("permission_mode", json!("acceptEdits"))),
+            "invalid_input@permission_mode",
+        ),
+        (
+            "mode",
+            Box::new(|r| {
+                r.as_object_mut().unwrap().remove("permission_mode");
+            }),
+            "invalid_input@permission_mode",
+        ),
+        (
+            "account",
+            Box::new(set("account", json!(f.p("a1")))),
+            "invalid_input@account",
+        ),
+        (
+            "account",
+            Box::new(set("account", json!(f.p("m1")))),
+            "invalid_input@account",
+        ),
+        (
+            "account",
+            Box::new(set("account", json!(f.p("m1/muse/..")))),
+            "invalid_input@account",
+        ),
+        (
+            "account",
+            Box::new(set("account", json!(f.p("m3/muse")))),
+            "account_missing@account",
+        ),
+    ];
+    for name in [
+        "CLAUDE_X",
+        "HERDR_X",
+        "ANTHROPIC_X",
+        "HOME",
+        "MUSE_X",
+        "MUSE_NO_AUTO_UPDATE",
+        "XDG_CONFIG_HOME",
+    ] {
+        let env = json!({ name: "1" });
+        cases.push(("env", Box::new(set("env", env)), "env_forbidden@env"));
+    }
+    for role in ["implementer", "fixer", "reviewer"] {
+        for (what, edit, want) in &cases {
+            let mut r = f.muse("x.md");
+            r["role"] = json!(role);
+            edit(&mut r);
+            assert_eq!(code(f.run(&r)), *want, "{role} {what}");
+        }
+    }
+    assert!(f.launches.is_empty() && f.calls().is_empty());
+    assert!(!Path::new(&f.p("x.md.run.json")).exists());
+    // What a Muse stage does admit: empty lists, the names of another CLI, all three roles.
+    for (i, role) in ["implementer", "fixer", "reviewer"].into_iter().enumerate() {
+        let mut r = f.muse(&format!("ok{i}.md"));
+        r["role"] = json!(role);
+        r["next_accounts"] = json!([]);
+        r["mcp_config"] = json!([]);
+        r["env"] = json!({"CODEX_HOME": "/x", "OPENAI_API_KEY": "k", "CARGO_TARGET_DIR": "/t"});
+        let (v, status) = f.run(&r).unwrap();
+        assert_eq!(
+            (status, v["state"].as_str(), v["runtime"].as_str()),
+            (0, Some("ok"), Some("muse")),
+            "{role} {v}"
+        );
+        assert_eq!(
+            std::fs::read(f.p(&format!("ok{i}.md"))).unwrap(),
+            b"stage ok"
+        );
+        assert_eq!(v["role"], role);
+    }
+}
+
+#[test]
+fn m2_a_fresh_stage_is_started_with_exactly_these_arguments_and_this_environment() {
+    let mut f = Fake::new();
+    f.env.push(("XDG_CONFIG_HOME".into(), "/elsewhere".into()));
+    f.env.push(("MUSE_API_KEY".into(), "not-a-key".into()));
+    f.lines(&m_run("stage ok"));
+    let mut r = f.muse("c.md");
+    r["env"] = json!({"CARGO_TARGET_DIR": "/x/target"});
+    let (v, status) = f.run(&r).unwrap();
+    assert_eq!((status, v["state"].as_str()), (0, Some("ok")), "{v}");
+    let launch = f.launches.last().unwrap();
+    let at = launch.iter().position(|a| a == "--").unwrap();
+    assert_eq!(launch[4], format!("--unit={}", v["unit"].as_str().unwrap()));
+    assert_eq!(
+        launch[at - 3..at],
+        ["RuntimeMaxSec=5410s", "-p", "TimeoutStopSec=10s"][..]
+            .iter()
+            .map(|s| s.to_string())
+            .collect::<Vec<_>>()[..]
+    );
+    let session = v["session"].as_str().unwrap();
+    assert_eq!(session.len(), 36);
+    assert_eq!(f.last_cli(), f.muse_cli(session, &f.p("prompt.md")));
+    // The prompt reaches the CLI as the path; its standard input is the null device.
+    assert_eq!(
+        std::fs::read(f.t.join("bin/prompt.1")).unwrap(),
+        b"review this\n"
+    );
+    assert_eq!(
+        std::fs::read_to_string(f.t.join("bin/stdin.1"))
+            .unwrap()
+            .trim(),
+        "/dev/null"
+    );
+    // The configuration directory is the account's parent, by XDG_CONFIG_HOME alone.
+    let env = f.env_of_last();
+    assert!(
+        env.contains(&format!("XDG_CONFIG_HOME={}", f.p("m1"))),
+        "{env:?}"
+    );
+    assert!(env.contains(&"MUSE_NO_AUTO_UPDATE=1".to_owned()));
+    assert!(env.contains(&"CARGO_TARGET_DIR=/x/target".to_owned()));
+    assert_eq!(
+        env.iter()
+            .filter(|l| l.starts_with("XDG_CONFIG_HOME="))
+            .count(),
+        1
+    );
+    for l in &env {
+        let n = l.split('=').next().unwrap();
+        assert!(
+            !n.starts_with("CLAUDE_") && !n.starts_with("HERDR_") && !n.starts_with("CODEX_"),
+            "{n}"
+        );
+        assert!(!n.starts_with("MUSE_") || n == "MUSE_NO_AUTO_UPDATE", "{n}");
+        assert!(n != "FOO", "{n}");
+    }
+    assert_eq!(v["runtime"], "muse");
+    // `ap run` writes no file under the account directory, nor beside it.
+    assert_eq!(std::fs::read_dir(f.t.join("m1/muse")).unwrap().count(), 0);
+    assert_eq!(std::fs::read_dir(f.t.join("m1")).unwrap().count(), 1);
+}
+
+#[test]
+fn m2_a_resumed_stage_is_the_same_launch_with_the_recorded_session() {
+    let mut f = Fake::new();
+    let first = f.muse_first("r1.md");
+    let session = first["session"].as_str().unwrap().to_owned();
+    std::fs::write(f.p("next.md"), "continue\n").unwrap();
+    f.lines(&m_run("second answer"));
+    let mut r = f.resume(f.muse("x"), "r2.md", "r1.md");
+    r["prompt"] = json!(f.p("next.md"));
+    let (v, status) = f.run(&r).unwrap();
+    assert_eq!((status, v["state"].as_str()), (0, Some("ok")), "{v}");
+    assert_eq!(f.last_cli(), f.muse_cli(&session, &f.p("next.md")));
+    assert_eq!(v["session"], session.as_str());
+    assert_eq!(v["resumes"], f.p("r1.md.run.json").as_str());
+    assert_eq!(
+        std::fs::read(f.t.join("bin/prompt.2")).unwrap(),
+        b"continue\n"
+    );
+    assert_eq!(
+        std::fs::read_to_string(f.t.join("bin/stdin.2"))
+            .unwrap()
+            .trim(),
+        "/dev/null"
+    );
+    let env = f.env_of_last();
+    assert!(env.contains(&format!("XDG_CONFIG_HOME={}", f.p("m1"))));
+    assert!(env.contains(&"MUSE_NO_AUTO_UPDATE=1".to_owned()));
+    assert!(
+        !env.iter().any(|l| l.starts_with("CLAUDE_CONFIG_DIR=")),
+        "{env:?}"
+    );
+    // The record's own rules hold: the same account, and the same working directory.
+    let mut r = f.resume(f.muse("x"), "r3.md", "r1.md");
+    r["account"] = json!(f.p("m2/muse"));
+    assert_eq!(code(f.run(&r)), "resume_account_differs@account");
+    assert_eq!(f.launches.len(), 2);
+}
+
+#[test]
+fn m2_the_session_is_in_the_record_before_the_launch() {
+    let mut f = Fake::new();
+    std::fs::write(f.t.join("bin/watch"), f.p("w.md.run.json")).unwrap();
+    f.lines(&m_run("stage ok"));
+    let (v, _) = f.run(&f.muse("w.md")).unwrap();
+    let seen: Value =
+        serde_json::from_slice(&std::fs::read(f.t.join("bin/seen.json")).unwrap()).unwrap();
+    assert_eq!(
+        (seen["state"].as_str(), seen["runtime"].as_str()),
+        (Some("running"), Some("muse"))
+    );
+    let session = seen["session"].as_str().unwrap();
+    assert_eq!(session.len(), 36);
+    assert_eq!(v["session"], session);
+    assert!(
+        f.calls()[0].contains(&format!(" --session-id {session} ")),
+        "{:?}",
+        f.calls()
+    );
+}
+
+#[test]
+fn m3_each_role_ends_ok_with_its_answer_in_out() {
+    let mut f = Fake::new();
+    for role in ["implementer", "fixer", "reviewer"] {
+        let answer = format!("{role} answer\nline «ü» two");
+        f.lines(&m_run(&answer));
+        let mut r = f.muse(&format!("{role}.md"));
+        r["role"] = json!(role);
+        let (v, status) = f.run(&r).unwrap();
+        assert_eq!((status, v["state"].as_str()), (0, Some("ok")), "{role} {v}");
+        assert_eq!(
+            std::fs::read(f.p(&format!("{role}.md"))).unwrap(),
+            answer.as_bytes()
+        );
+        assert_eq!(v, f.record(&format!("{role}.md")));
+        assert_eq!(v["answer"]["sha256"], f.sha(&format!("{role}.md")));
+        assert_eq!(
+            (v["results"].as_u64(), v["expect_met"].as_bool()),
+            (Some(1), Some(true))
+        );
+        assert_eq!(v["permission_denials"], json!([]));
+    }
+}
+
+#[test]
+fn m3_an_empty_answer_is_no_result_and_expect_judges_the_first_line() {
+    let mut f = Fake::new();
+    for text in [json!(""), json!(null), json!(5)] {
+        f.lines(&[m_task("tool.x"), m_done(text)]);
+        let (v, status) = f
+            .run(&f.muse(&format!("e{}.md", f.launches.len())))
+            .unwrap();
+        assert_eq!(
+            (status, v["state"].as_str(), v["unmet"].as_str()),
+            (3, Some("no_result"), Some("answer")),
+            "{v}"
+        );
+        assert!(v["answer"].is_null());
+    }
+    assert_eq!(
+        std::fs::read_dir(f.p(""))
+            .unwrap()
+            .filter(|e| e
+                .as_ref()
+                .unwrap()
+                .file_name()
+                .to_str()
+                .unwrap()
+                .ends_with(".md"))
+            .count(),
+        1
+    );
+    f.lines(&m_run("Verdict: accept\nbody"));
+    let mut r = f.muse("v1.md");
+    r["expect"] = json!({"first_line": "Verdict: *"});
+    let (v, status) = f.run(&r).unwrap();
+    assert_eq!(
+        (status, v["state"].as_str(), v["expect_met"].as_bool()),
+        (0, Some("ok"), Some(true))
+    );
+    f.lines(&m_run("Looks fine\nbody"));
+    let mut r = f.muse("v2.md");
+    r["expect"] = json!({"first_line": "Verdict: *"});
+    let (v, status) = f.run(&r).unwrap();
+    assert_eq!(
+        (status, v["state"].as_str(), v["unmet"].as_str()),
+        (3, Some("no_result"), Some("first_line")),
+        "{v}"
+    );
+    assert_eq!(std::fs::read(f.p("v2.md")).unwrap(), b"Looks fine\nbody");
+}
+
+#[test]
+fn m4_a_failed_run_is_failed_and_writes_no_answer() {
+    let mut f = Fake::new();
+    let reason =
+        "model `muse-nonexistent-9.9` does not exist or you lack access [request_id=99f7e09a]";
+    f.lines_then(&[m_failed(json!(reason))], false, 1);
+    let (v, status) = f.run(&f.muse("f.md")).unwrap();
+    assert_eq!(
+        (status, v["state"].as_str(), v["unmet"].as_str()),
+        (3, Some("failed"), None),
+        "{v}"
+    );
+    assert_eq!(
+        (v["results"].as_u64(), v["tokens"]["input"].clone()),
+        (Some(1), Value::Null)
+    );
+    assert!(!Path::new(&f.p("f.md")).exists());
+    // A reason that is no string counts as empty: failed, not cut.
+    f.lines_then(&[m_failed(json!(7))], false, 1);
+    let (v, status) = f.run(&f.muse("g.md")).unwrap();
+    assert_eq!((status, v["state"].as_str()), (3, Some("failed")), "{v}");
+    assert!(!Path::new(&f.p("g.md")).exists());
+}
+
+#[test]
+fn m4_a_failed_run_with_the_usage_limit_text_is_cut_and_never_moves() {
+    let mut f = Fake::new();
+    f.lines_then(
+        &[
+            m_task("tool.x"),
+            m_failed(json!("You've hit your usage limit. Try again at 6:30 PM.")),
+        ],
+        false,
+        1,
+    );
+    let (v, status) = f.run(&f.muse("c.md")).unwrap();
+    assert_eq!((status, v["state"].as_str()), (75, Some("cut")), "{v}");
+    assert!(!Path::new(&f.p("c.md")).exists());
+    // One account: no continuation and no move.
+    assert_eq!(
+        (f.launches.len(), v["attempts"].as_array().unwrap().len()),
+        (1, 1)
+    );
+    f.lines_then(&[m_failed(json!("usage limit reached"))], false, 1);
+    let (_, status) = f.run(&f.muse("c2.md")).unwrap();
+    assert_eq!((status, f.launches.len()), (75, 2));
+}
+
+#[test]
+fn m5_no_terminal_is_failed_after_the_exit_and_timeout_after_the_bound() {
+    let mut f = Fake::new();
+    f.lines_then(&[m_task("tool.x")], false, 0);
+    let (v, status) = f.run(&f.muse("n.md")).unwrap();
+    assert_eq!(
+        (status, v["state"].as_str(), v["unmet"].as_str()),
+        (3, Some("failed"), Some("result_event")),
+        "{v}"
+    );
+    assert_eq!(
+        (v["results"].as_u64(), v["turns"].clone()),
+        (Some(0), Value::Null)
+    );
+    f.lines_then(&[m_task("tool.x")], true, 0);
+    let mut r = f.muse("t.md");
+    r["timeout_seconds"] = json!(2);
+    let (v, status) = f.run(&r).unwrap();
+    assert_eq!(
+        (status, v["state"].as_str(), v["unmet"].as_str()),
+        (3, Some("timeout"), None),
+        "{v}"
+    );
+}
+
+#[test]
+fn m6_two_terminals_a_reviewer_ends_at_the_first_and_the_others_take_the_last_that_meets_expect() {
+    let mut f = Fake::new();
+    f.lines(&[
+        m_task("tool.x"),
+        m_done(json!("Verdict: accept\nfirst")),
+        m_done(json!("Verdict: repair\nsecond")),
+    ]);
+    let mut r = f.muse("rv.md");
+    r["role"] = json!("reviewer");
+    r["expect"] = json!({"first_line": "Verdict: *"});
+    let (v, _) = f.run(&r).unwrap();
+    assert_eq!(
+        (v["state"].as_str(), v["results"].as_u64()),
+        (Some("ok"), Some(1)),
+        "{v}"
+    );
+    assert_eq!(
+        std::fs::read(f.p("rv.md")).unwrap(),
+        b"Verdict: accept\nfirst"
+    );
+    // An implementer: the last result is the answer, unless an earlier one is the last to meet expect.
+    let mut r = f.muse("im1.md");
+    let (v, _) = f.run(&r).unwrap();
+    assert_eq!(
+        (v["state"].as_str(), v["results"].as_u64()),
+        (Some("ok"), Some(2)),
+        "{v}"
+    );
+    assert_eq!(
+        std::fs::read(f.p("im1.md")).unwrap(),
+        b"Verdict: repair\nsecond"
+    );
+    f.lines(&[
+        m_task("tool.x"),
+        m_done(json!("Verdict: accept\nfirst")),
+        m_done(json!("no verdict")),
+    ]);
+    r = f.muse("im2.md");
+    r["expect"] = json!({"first_line": "Verdict: *"});
+    let (v, status) = f.run(&r).unwrap();
+    assert_eq!(
+        (status, v["state"].as_str(), v["results"].as_u64()),
+        (0, Some("ok"), Some(2)),
+        "{v}"
+    );
+    assert_eq!(
+        std::fs::read(f.p("im2.md")).unwrap(),
+        b"Verdict: accept\nfirst"
+    );
+}
+
+#[test]
+fn m6_a_cli_that_outlives_its_terminal_is_timeout_with_the_answer_kept() {
+    let mut f = Fake::new();
+    let mut lines = m_run("Verdict: accept\nkept");
+    lines.push(m_task("tool.later"));
+    f.lines_then(&lines, true, 0);
+    let mut r = f.muse("h.md");
+    r["timeout_seconds"] = json!(2);
+    r["expect"] = json!({"first_line": "Verdict: *"});
+    let (v, status) = f.run(&r).unwrap();
+    assert_eq!(
+        (status, v["state"].as_str(), v["expect_met"].as_bool()),
+        (3, Some("timeout"), Some(true)),
+        "{v}"
+    );
+    assert_eq!(
+        std::fs::read(f.p("h.md")).unwrap(),
+        b"Verdict: accept\nkept"
+    );
+    // A reviewer ends at its first terminal and does not wait for the CLI.
+    let mut r = f.muse("hr.md");
+    r["role"] = json!("reviewer");
+    let (v, status) = f.run(&r).unwrap();
+    assert_eq!((status, v["state"].as_str()), (0, Some("ok")), "{v}");
+}
+
+#[test]
+fn m7_tokens_and_turns_come_from_the_last_usage_line() {
+    let mut f = Fake::new();
+    let models = json!([
+        {"model":"a","input_tokens":100,"cached_tokens":40,"output_tokens":7,"reasoning_tokens":2},
+        {"model":"b","input_tokens":10,"cached_tokens":30,"output_tokens":3,"reasoning_tokens":1}]);
+    let other = json!([{"model":"a","input_tokens":1,"cached_tokens":0,"output_tokens":1}]);
+    f.lines(&[
+        m_task("tool.x"),
+        m_usage(json!(1), other, Value::Null),
+        m_usage(json!(9), models, Value::Null),
+        m_done(json!("ok")),
+    ]);
+    let (v, _) = f.run(&f.muse("t.md")).unwrap();
+    // cached above input counts input 0; the sum of `input_tokens` less `cached_tokens` is 60.
+    assert_eq!(
+        v["tokens"],
+        json!({"input":60,"output":10,"cache_read":70,"cache_creation":0}),
+        "{v}"
+    );
+    assert_eq!(v["turns"], 9);
+    // Members that are no numbers count 0; a `calls` that is no number is null.
+    let odd = json!([{"input_tokens":"x","cached_tokens":5,"output_tokens":null},
+        {"input_tokens":50,"cached_tokens":"y","output_tokens":4.5}, "not an object"]);
+    f.lines(&[
+        m_usage(json!("many"), odd, Value::Null),
+        m_done(json!("ok")),
+    ]);
+    let (v, _) = f.run(&f.muse("u.md")).unwrap();
+    assert_eq!(
+        v["tokens"],
+        json!({"input":50,"output":0,"cache_read":5,"cache_creation":0}),
+        "{v}"
+    );
+    assert_eq!(v["turns"], Value::Null);
+    // No usage line: all five are null, a failed run included.
+    for lines in [
+        vec![m_task("tool.x"), m_done(json!("ok"))],
+        vec![m_failed(json!("boom"))],
+    ] {
+        f.lines(&lines);
+        let (v, _) = f
+            .run(&f.muse(&format!("n{}.md", f.launches.len())))
+            .unwrap();
+        assert_eq!(
+            v["tokens"],
+            json!({"input":null,"output":null,"cache_read":null,"cache_creation":null}),
+            "{v}"
+        );
+        assert_eq!(
+            (v["turns"].clone(), v["limit"].clone()),
+            (Value::Null, Value::Null)
+        );
+    }
+}
+
+#[test]
+fn m7_a_resume_holds_its_own_runs_numbers_as_the_cli_gives_them() {
+    let mut f = Fake::new();
+    f.muse_first("p1.md");
+    let models =
+        json!([{"model":MUSE_MODEL,"input_tokens":1000,"cached_tokens":600,"output_tokens":20}]);
+    f.lines(&[
+        m_task("tool.x"),
+        m_usage(json!(4), models, Value::Null),
+        m_done(json!("again")),
+    ]);
+    let (v, _) = f.run(&f.resume(f.muse("x"), "p2.md", "p1.md")).unwrap();
+    assert_eq!(
+        v["tokens"],
+        json!({"input":400,"output":20,"cache_read":600,"cache_creation":0}),
+        "{v}"
+    );
+    assert_eq!(v["turns"], 4);
+}
+
+#[test]
+fn m8_limit_is_made_from_the_allowance() {
+    let mut f = Fake::new();
+    let models = json!([]);
+    let mut limit = |allowance: Value| {
+        f.lines(&[
+            m_usage(json!(1), models.clone(), allowance),
+            m_done(json!("ok")),
+        ]);
+        let (v, _) = f
+            .run(&f.muse(&format!("l{}.md", f.launches.len())))
+            .unwrap();
+        v["limit"].clone()
+    };
+    let both = json!({"weekly":{"resets_at_ms":1795392000999u64,"used_percent":2},
+        "window":{"resets_at_ms":1794805703000u64,"used_percent":7.5},"tier":null});
+    assert_eq!(
+        limit(both),
+        json!({"status":null,"resets_at":null,"kind":null,"windows":{
+        "weekly":{"status":null,"resets_at":1795392000u64,"utilization":0.02},
+        "window":{"status":null,"resets_at":1794805703u64,"utilization":0.075}}})
+    );
+    let one = json!({"window":{"resets_at_ms":5000,"used_percent":100}});
+    assert_eq!(
+        limit(one),
+        json!({"status":null,"resets_at":null,"kind":null,"windows":{
+        "window":{"status":null,"resets_at":5,"utilization":1.0}}})
+    );
+    // A member of another shape: a window that is no object is left out; a part that is no
+    // number, a negative or a fractional time is null.
+    let odd = json!({"weekly":"x","window":{"resets_at_ms":-5000,"used_percent":"7"}});
+    assert_eq!(
+        limit(odd),
+        json!({"status":null,"resets_at":null,"kind":null,"windows":{
+        "window":{"status":null,"resets_at":null,"utilization":null}}})
+    );
+    let fraction = json!({"weekly":{"resets_at_ms":1500.5,"used_percent":0},"window":{}});
+    assert_eq!(
+        limit(fraction),
+        json!({"status":null,"resets_at":null,"kind":null,"windows":{
+        "weekly":{"status":null,"resets_at":null,"utilization":0.0},
+        "window":{"status":null,"resets_at":null,"utilization":null}}})
+    );
+    assert_eq!(
+        limit(json!({"other":{}})),
+        json!({"status":null,"resets_at":null,"kind":null,"windows":{}})
+    );
+    // No allowance, or one that is no object: null.
+    assert_eq!(limit(Value::Null), Value::Null);
+    assert_eq!(limit(json!(5)), Value::Null);
+}
+
+#[test]
+fn m9_work_is_seen_from_a_tool_task_only() {
+    let mut f = Fake::new();
+    let mut worked = |kind: Value| {
+        f.lines(&[
+            m_line(json!({"kind":"task_lifecycle","event":{"task_kind":kind}})),
+            m_done(json!("ok")),
+        ]);
+        let (v, _) = f
+            .run(&f.muse(&format!("w{}.md", f.launches.len())))
+            .unwrap();
+        v["attempts"][0]["worked"].clone()
+    };
+    assert_eq!(worked(json!("tool.read_file")), true);
+    assert_eq!(worked(json!("tool.")), true);
+    for other in [
+        json!("model.meta.response"),
+        json!("toolbox"),
+        json!("a.tool.x"),
+        json!(3),
+        json!(null),
+    ] {
+        assert_eq!(worked(other.clone()), false, "{other}");
+    }
+    // Nor does another kind of line with such a member.
+    f.lines(&[
+        m_line(json!({"kind":"run_usage","event":{"task_kind":"tool.x"}})),
+        m_done(json!("ok")),
+    ]);
+    let (v, _) = f.run(&f.muse("w9.md")).unwrap();
+    assert_eq!(v["attempts"][0]["worked"], false);
+}
+
+#[test]
+fn m10_a_line_that_names_another_serving_model_stops_the_stage() {
+    let mut f = Fake::new();
+    let served = format!("{MUSE_MODEL}-contributor");
+    // The request's model: nothing changes.
+    f.lines(&[
+        m_served(&json!(MUSE_MODEL)),
+        m_served(&json!(null)),
+        m_done(json!("fine")),
+    ]);
+    let (v, status) = f.run(&f.muse("a.md")).unwrap();
+    assert_eq!(
+        (status, v["state"].as_str(), v["unmet"].as_str()),
+        (0, Some("ok"), None),
+        "{v}"
+    );
+    // Another model: failed, `unmet: model`, no answer, wherever the line stands.
+    let lines = [
+        vec![m_served(&json!(served)), m_done(json!("answer"))],
+        vec![m_done(json!("answer")), m_served(&json!(served))],
+        vec![
+            m_served(&json!(MUSE_MODEL)),
+            m_done(json!("answer")),
+            m_served(&json!(served)),
+            m_done(json!("second")),
+        ],
+    ];
+    for (i, lines) in lines.iter().enumerate() {
+        f.lines(lines);
+        let out = format!("b{i}.md");
+        let (v, status) = f.run(&f.muse(&out)).unwrap();
+        assert_eq!(
+            (status, v["state"].as_str(), v["unmet"].as_str()),
+            (3, Some("failed"), Some("model")),
+            "{i} {v}"
+        );
+        assert!(!Path::new(&f.p(&out)).exists(), "{i}");
+        assert!(v["answer"].is_null());
+        assert!(
+            serde_json::to_string(&v).unwrap().contains(&served),
+            "{i}: the record names the model"
+        );
+        assert_eq!(v, f.record(&out));
+    }
+    // It stops the stage at once: a CLI that stays alive is not waited for to the bound.
+    f.lines_then(&[m_served(&json!(served))], true, 0);
+    let mut r = f.muse("c.md");
+    r["timeout_seconds"] = json!(600);
+    let began = Instant::now();
+    let (v, _) = f.run(&r).unwrap();
+    assert_eq!(
+        (v["state"].as_str(), v["unmet"].as_str()),
+        (Some("failed"), Some("model")),
+        "{v}"
+    );
+    assert!(began.elapsed().as_secs() < 20);
+}
+
+#[test]
+fn m11_a_resume_across_runtimes_is_refused_in_both_directions() {
+    let mut f = Fake::new();
+    let muse = f.muse_first("m.md");
+    assert_eq!(muse["runtime"], "muse");
+    let claude = f.run(&f.request("c.md")).unwrap().0;
+    assert_eq!(claude["runtime"], "claude");
+    let codex = f.run(&f.codex("x.md")).unwrap().0;
+    assert_eq!(codex["runtime"], "codex");
+    let before = f.launches.len();
+    for (earlier, request) in [
+        ("m.md", f.request("x")),
+        ("m.md", f.codex("x")),
+        ("c.md", f.muse("x")),
+        ("x.md", f.muse("x")),
+    ] {
+        let r = f.resume(request, "again.md", earlier);
+        assert_eq!(
+            code(f.run(&r)),
+            "resume_runtime_differs@runtime",
+            "{earlier}"
+        );
+    }
+    // A Claude record without the member counts as `claude`.
+    let mut rec = f.record("c.md");
+    rec.as_object_mut().unwrap().remove("runtime");
+    std::fs::write(f.p("old.md.run.json"), rec.to_string()).unwrap();
+    let r = f.resume(f.muse("x"), "again.md", "old.md");
+    assert_eq!(code(f.run(&r)), "resume_runtime_differs@runtime");
+    let r = f.resume(f.muse("x"), "again.md", "m.md");
+    assert_eq!(f.run(&r).unwrap().0["state"], "ok");
+    assert_eq!(f.launches.len(), before + 1);
+}
+
+#[test]
+fn m12_a_model_or_effort_that_looks_like_a_flag_is_refused_for_muse_only() {
+    let mut f = Fake::new();
+    f.lines(&m_run("stage ok"));
+    for member in ["model", "effort"] {
+        for value in ["--trust-workspace", "--yolo", "-h", "-"] {
+            let mut r = f.muse("x.md");
+            r[member] = json!(value);
+            assert_eq!(
+                code(f.run(&r)),
+                format!("invalid_input@{member}"),
+                "{member} {value}"
+            );
+        }
+    }
+    assert!(f.launches.is_empty() && !Path::new(&f.p("x.md.run.json")).exists());
+    // A value with a dash inside is still a name.
+    let mut r = f.muse("y.md");
+    r["model"] = json!("muse-ember-1.0");
+    assert_eq!(f.run(&r).unwrap().0["state"], "ok");
+    // The other runtimes keep their rules.
+    let mut r = f.request("c.md");
+    r["effort"] = json!("-x");
+    assert_eq!(f.run(&r).unwrap().0["state"], "ok");
 }
