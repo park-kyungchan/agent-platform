@@ -73,6 +73,11 @@ const SOURCES: &str = "user";
 /// What a launch after a launch that worked and was cut reads before the prompt: one line, one
 /// empty line.
 const CONTINUATION: &str = "A session of this stage on another account was cut by a usage limit after it had begun to work. This directory may hold its work, committed or not. First read the state it left: in a Git worktree `git status`, `git log --oneline origin/main..HEAD` and `git diff HEAD`. Keep what serves the task, do not start over, and go on until the task below is done.\n\n";
+/// What a launch that follows a cut launch of a resumed call reads before the prompt: one line, one
+/// empty line. `{P}` and `{A}` are the resumed record's prompt and answer paths; the last three
+/// sentences are for an implementer or a fixer only.
+const MOVED: &str = "This stage was to resume an earlier session, and a usage limit cut that session on its account. You are a new session and hold nothing of what it read or wrote: before anything else read completely the prompt it was given, the file {P}, and the answer it gave, the file {A}. The task below was written for that session: where it speaks of what you did, wrote or were told, it means that session, its answer and its prompt.";
+const MOVED_WORK: &str = " This directory holds its work, committed or not. Read the state it left: in a Git worktree `git status`, `git log --oneline origin/main..HEAD` and `git diff HEAD`. Keep what serves the task, do not start over, and go on until the task below is done.";
 /// The exit of a run whose stage may have run but whose answer or record could not be written.
 const WRITE_FAILED: u8 = 5;
 /// The states `systemctl is-active` answers while something of a unit may live.
@@ -102,6 +107,9 @@ struct Request {
     mcp: Vec<String>,
     /// The session, account and record path of the earlier run this one continues.
     resume: Option<(String, String, String)>,
+    /// The line a launch after a cut one of this resumed call reads first; None when the resumed
+    /// record's paths do not allow it (then a cut ends the call).
+    moved: Option<String>,
     /// The expected file as it was before the session's first launch.
     expect_before: Value,
     /// The environment of the CLI (and of `git`), without `CLAUDE_CONFIG_DIR`.
@@ -442,6 +450,20 @@ fn request_at(s: &mut impl System, r: &Value, at_cwd: bool) -> Result<Request, F
         }
         (Some(f), _) => snapshot(f),
     };
+    // A move names the resumed record's two paths: only strings that cannot steer the prompt, and
+    // that do not name the out file (as `out_named_in_prompt` for the prompt itself).
+    let moved = earlier.as_ref().and_then(|(rec, _)| {
+        let fit = |k: &'static str| {
+            let p = rec[k]["path"].as_str()?;
+            (!p.contains(name) && !p.chars().any(char::is_control)).then_some(p)
+        };
+        let (p, a) = (fit("prompt")?, fit("answer")?);
+        let work = if role == "reviewer" { "" } else { MOVED_WORK };
+        Some(format!(
+            "{}{work}\n\n",
+            MOVED.replace("{P}", p).replace("{A}", a)
+        ))
+    });
     let base_env = base_env(s, &env);
     require!(s.units() => "systemd_absent", "host");
     let bind = match r.get("bind") {
@@ -486,6 +508,7 @@ fn request_at(s: &mut impl System, r: &Value, at_cwd: bool) -> Result<Request, F
             _ => Some([0; 4]),
         },
         resume: earlier.map(|(_, r)| r),
+        moved,
         expect_before,
         base_env,
         bind,
@@ -1005,31 +1028,36 @@ fn mirror(record: &mut Value, worked: bool) {
         }
     }
 }
-/// What the launch reads on stdin: the prompt file, or after a launch that worked and was cut the
-/// continuation, an empty line and the file's bytes, through a pipe that a thread fills (no file).
-fn input(q: &Request, continued: bool) -> std::io::Result<File> {
+/// What the launch reads on stdin: the prompt file, or with a `lead` (the continuation, or the
+/// line of a move) that text, an empty line and the file's bytes, through a pipe that a thread
+/// fills (no file).
+fn input(q: &Request, lead: Option<&str>) -> std::io::Result<File> {
     let file = File::open(&q.prompt)?;
-    if !continued {
+    let Some(lead) = lead else {
         return Ok(file);
-    }
-    let mut bytes = CONTINUATION.as_bytes().to_vec();
+    };
+    let mut bytes = lead.as_bytes().to_vec();
     file.take(LIMIT + 1).read_to_end(&mut bytes)?;
     let (reader, mut writer) = std::io::pipe()?;
     // The write ends with the pipe: when the CLI is gone, the reader is closed and the write fails.
     std::thread::spawn(move || writer.write_all(&bytes));
     Ok(File::from(std::os::fd::OwnedFd::from(reader)))
 }
-/// One launch on one account, after the launches `earlier` (their entries of `attempts`); with
-/// `continued` its input holds the continuation. Returns the final record, whether the session did
+/// One launch on one account, after the launches `earlier` (their entries of `attempts`); with a
+/// `lead` its input holds that text first; a launch of a resumed call resumes the record's
+/// session only when `resumes`, else it is a new session. Returns the final record, whether the session did
 /// work, and whether every write after the first effect succeeded.
 fn attempt(
     s: &mut impl System,
     q: &Request,
     account: &str,
     (output, errs): &(File, File),
-    (earlier, continued): (&[Value], bool),
+    (earlier, lead, resumes): (&[Value], Option<&str>, bool),
 ) -> (Value, bool, bool) {
-    let resume = q.resume.as_ref().map(|(session, _, _)| session.as_str());
+    let resume = q.resume.as_ref().filter(|_| resumes);
+    let resume = resume.map(|(session, _, _)| session.as_str());
+    // The continuation is the text of a fresh call; a resumed call's text is a move's.
+    let continued = lead.is_some() && q.resume.is_none();
     let mut record = json!({
         "role": q.role, "runtime": if q.codex { "codex" } else { "claude" },
         "model": q.model, "effort": q.effort,
@@ -1078,8 +1106,7 @@ fn attempt(
         f.seek(SeekFrom::Start(0))?;
         f.try_clone()
     };
-    let (Ok(prompt), Ok(stdout), Ok(stderr)) = (input(q, continued), empty(output), empty(errs))
-    else {
+    let (Ok(prompt), Ok(stdout), Ok(stderr)) = (input(q, lead), empty(output), empty(errs)) else {
         return not_launched(record, "launch");
     };
     let reader = output;
@@ -1210,24 +1237,43 @@ pub fn execute(s: &mut impl System, r: &Value) -> Result<(Value, u8), Failure> {
     })?;
     let errors = format!("{}.err", q.out);
     let files = (create(&format!("{}.stream.jsonl", q.out)), create(&errors));
+    // A resumed call tries its record's account first, then the request's, each once.
     let accounts = match &q.resume {
-        Some((_, account, _)) => vec![account.clone()],
+        Some((_, account, _)) => {
+            let mut all = vec![account.clone()];
+            for a in &q.accounts {
+                if !all.contains(a) {
+                    all.push(a.clone());
+                }
+            }
+            all
+        }
         None => q.accounts.clone(),
     };
     let (mut last, mut clean, mut worked_before) = (Value::Null, true, false);
     if let (Ok(output), Ok(errs)) = files {
         let files = (output, errs);
         for (i, account) in accounts.iter().enumerate() {
-            // Once a launch of an implementer or a fixer has worked, every later one gets the text.
-            let continued = worked_before && q.role != "reviewer";
+            // Once a launch of an implementer or a fixer has worked, every later one gets the text;
+            // a launch of a resumed call after the first is a move and gets its own.
+            let lead = match &q.moved {
+                Some(text) if i > 0 => Some(text.as_str()),
+                _ if q.resume.is_none() && worked_before && q.role != "reviewer" => {
+                    Some(CONTINUATION)
+                }
+                _ => None,
+            };
             let earlier = last["attempts"].as_array().cloned().unwrap_or_default();
-            let (record, worked, saved) = attempt(s, &q, account, &files, (&earlier, continued));
+            let launch = (&earlier[..], lead, i == 0);
+            let (record, worked, saved) = attempt(s, &q, account, &files, launch);
             clean &= saved;
             worked_before |= worked;
-            // A fresh run cut at any point goes on at the next account: before any tool ran, and
-            // after (a reviewer changes no file; an implementer or a fixer is told to read the
-            // state its predecessor left).
-            let next = record["state"] == "cut" && q.resume.is_none() && i + 1 < accounts.len();
+            // A run cut at any point goes on at the next account: before any tool ran, and after
+            // (a reviewer changes no file; an implementer or a fixer is told to read the state its
+            // predecessor left). A resumed call goes on only when it can tell the new session
+            // which prompt and answer the cut one had.
+            let movable = q.resume.is_none() || q.moved.is_some();
+            let next = record["state"] == "cut" && movable && i + 1 < accounts.len();
             last = record;
             if !next || !saved {
                 break;
