@@ -209,5 +209,214 @@ class Readout(unittest.TestCase):
         self.assertEqual(readout.first_line(self.tmp / "work" / "t1" / "missing.md"), "unknown")
 
 
+
+NEW_LINES = ("lead session ", "lead state_bytes=", "stages runtime=", "uncounted outside stages", "units ")
+
+
+class Rb1(unittest.TestCase):
+    """The bookkeeping share of a Lead session, the stages of Muse Code and agy, the units by the Lead's model:
+    every record is written by the test, with invented ids."""
+
+    def setUp(self):
+        self.tmp = Path(tempfile.mkdtemp(prefix="readout-rb1-"))
+        self.addCleanup(shutil.rmtree, self.tmp, True)
+        self.work, self.acct = self.tmp / "work", self.tmp / "acct" / "projects" / "p"
+        (self.work / "lead").mkdir(parents=True)
+        self.acct.mkdir(parents=True)
+        (self.tmp / "prices.tsv").write_text((FIXTURES / "prices.tsv").read_text() + "muse-priced\tinput\t10\nmuse-priced\toutput\t20\nmuse-priced\tcache_read\t1\n"
+                                             "muse-priced\tcache_write_5m\t0\nmuse-priced\tcache_write_1h\t0\n")
+        readout.run_gh = lambda repo, since, until: []
+        self.seq = 0
+
+    def line(self, sid, ts, blocks, out=1000, cwd=None, mid=None, model="claude-opus-9-9"):
+        self.seq += 1
+        return json.dumps({"type": "assistant", "sessionId": sid, "timestamp": ts, "cwd": cwd or str(self.work / "lead"), "gitBranch": "main",
+                           "message": {"id": mid or f"m{self.seq}", "model": model, "usage": {"input_tokens": 1, "output_tokens": out},
+                                       "content": blocks}}) + "\n"
+
+    def use(self, uid, name, **inp):
+        return {"type": "tool_use", "id": uid, "name": name, "input": inp}
+
+    def session(self, fname, *lines):
+        with open(self.acct / fname, "a") as fh:
+            fh.writelines(lines)
+
+    def run_readout(self, *extra, lead=None):
+        out = io.StringIO()
+        args = ["--since", "2026-11-11", "--until", "2026-11-13", "--prices", str(self.tmp / "prices.tsv"), "--accounts", str(self.tmp / "acct"),
+                "--codex-dir", str(self.tmp / "codex"), "--work-root", str(self.work), "--platforms-root", str(self.tmp / "platforms"),
+                "--repo", "park-kyungchan/agent-platform", *(["--lead-cwd", str(lead or self.work / "lead")]), *extra]
+        with contextlib.redirect_stdout(out):
+            readout.main(args)
+        return out.getvalue()
+
+    def stage(self, name, **o):
+        d = self.work / "t" / "runs"
+        d.mkdir(parents=True, exist_ok=True)
+        rec = {"role": "implementer", "runtime": "muse", "model": "muse-priced", "session": "s-" + name, "cwd": str(self.work / "t"),
+               "start": "2026-11-12T08:00:00Z", "state": "ok", "tokens": {"input": 1, "output": 2, "cache_read": 3, "cache_creation": 4},
+               "resumes": None, "answer": None, **o}
+        (d / f"{name}.run.json").write_text(json.dumps(rec))
+        return d / f"{name}.run.json"
+
+    # point 1
+    def test_each_class_and_the_first_class_wins(self):
+        sid = "abcdefgh-1111"
+        big = "x" * 100
+        calls = [self.use("t1", "Write", file_path="/w/STATE.md", content=big),
+                 self.use("t2", "Edit", file_path="/w/HANDOVER.md", old_string="a", new_string="b"),
+                 self.use("t3", "Bash", command="cat /w/STATE.md"),  # a read: no class
+                 self.use("t4", "Bash", command="echo hi >> /w/STATE.md"),
+                 self.use("t5", "Bash", command="git commit -m 'msg'"),
+                 self.use("t6", "Bash", command="ont describe x"),
+                 self.use("t7", "Bash", command="ap row decide"),
+                 self.use("t8", "Bash", command="python3 -c 'record_decision'"),
+                 self.use("t9", "Bash", command="git commit -m x && echo y > /w/STATE.md"),  # state and commit: state
+                 self.use("t10", "Bash", command="git commit -m x && ont apply"),  # commit and store: commit
+                 self.use("t11", "Write", file_path="/w/other.md", content=big)]
+        size = lambda b: len(json.dumps(b["input"], ensure_ascii=False))
+        self.session("a.jsonl", *[self.line(sid, "2026-11-12T09:00:00Z", [c], out=0 if i else 4000, mid=f"x{i}") for i, c in enumerate(calls)])
+        text = self.run_readout()
+        cls = {"state": [calls[i] for i in (0, 1, 3, 8)], "commit": [calls[i] for i in (4, 9)], "store": [calls[i] for i in (5, 6, 7)]}
+        pct = {k: f"{sum(size(b) for b in v) / 4 / 4000 * 100:.1f}" for k, v in cls.items()}
+        total = f"{sum(size(b) for v in cls.values() for b in v) / 4 / 4000 * 100:.1f}"
+        self.assertIn(f"lead session abcdefgh family=opus output=4,000 bookkeeping={total} state={pct['state']} commit={pct['commit']} store={pct['store']}\n", text)
+        self.assertEqual(text.count("lead session "), 1)
+
+    def test_a_block_is_counted_once_across_lines_and_fork_files(self):
+        sid, call = "s-once-xyz", self.use("t1", "Write", file_path="/w/STATE.md", content="y" * 300)
+        one = self.line(sid, "2026-11-12T09:00:00Z", [call], out=1000, mid="same")
+        self.session("a.jsonl", one, one, self.line(sid, "2026-11-12T09:00:01Z", [call, self.use("t2", "Bash", command="ont x")], out=1000, mid="same"))
+        (self.tmp / "acct" / "projects" / "q").mkdir()
+        (self.tmp / "acct" / "projects" / "q" / "fork.jsonl").write_text(one)
+        size = len(json.dumps(call["input"], ensure_ascii=False)) / 4 / 1000 * 100
+        text = self.run_readout()
+        self.assertRegex(text, rf"lead session s-once-x family=opus output=1,000 bookkeeping=\S+ state={size:.1f} commit=0.0 store=")
+
+    def test_only_a_lead_session_with_a_message_in_the_window_has_a_line(self):
+        call = self.use("t1", "Write", file_path="/w/STATE.md", content="z")
+        self.session("a.jsonl", self.line("s-outside-1", "2026-11-12T09:00:00Z", [call], cwd=str(self.tmp / "elsewhere")),  # outside every --lead-cwd
+                     self.line("s-staged-01", "2026-11-12T09:00:00Z", [call]),  # inside one, with a stage record
+                     self.line("s-early-001", "2026-11-09T09:00:00Z", [call]))  # no message in the window
+        self.stage("w", session="s-staged-01", runtime="claude")
+        text = self.run_readout()
+        self.assertNotIn("lead session ", text)
+        self.assertIn("lead state_bytes=absent\n", text)
+
+    def test_state_bytes_with_and_without_the_file(self):
+        self.assertIn("lead state_bytes=absent\n", self.run_readout())
+        (self.work / "lead" / "STATE.md").write_text("12345678")
+        self.assertIn("lead state_bytes=8\n", self.run_readout())
+
+    def test_family_is_the_one_of_most_output_and_the_input_is_never_printed(self):
+        self.session("a.jsonl", self.line("s-fam-00001", "2026-11-12T09:00:00Z", [self.use("t", "Bash", command="echo SECRET-INPUT")], out=10),
+                     self.line("s-fam-00001", "2026-11-12T09:01:00Z", [], out=90, model="claude-haiku-9-9"))
+        text = self.run_readout()
+        self.assertIn("lead session s-fam-00 family=haiku output=100 bookkeeping=0.0", text)
+        self.assertNotIn("SECRET-INPUT", text)
+
+    # point 2
+    def test_stage_lines_per_runtime_and_model(self):
+        self.stage("a1")
+        self.stage("a2", tokens={"input": 10, "output": 20, "cache_read": 30, "cache_creation": 0})
+        self.stage("b1", model="muse-nopriced", runtime="agy", tokens=None, state="running")
+        self.stage("c1", runtime="claude")
+        self.stage("d1", start="2026-11-14T00:00:00Z")
+        text = self.run_readout()
+        self.assertIn("stages runtime=muse model=muse-priced n=2 input=11 output=22 cache_read=33 usd=0.00\n", text)
+        self.assertIn("stages runtime=agy model=muse-nopriced n=1 input=0 output=0 cache_read=0 usd=unknown\n", text)
+        self.assertEqual(text.count("stages runtime="), 2)
+        self.assertRegex(text, r"stages runtime=agy .*\nstages runtime=muse .*\nuncounted outside stages: agy muse\n")
+        self.assertRegex(text, r"(?m)^uncounted: agy \(no usage record exists under its state directory\)$")
+        self.stage("e1", tokens={"input": 1000000, "output": 1000000, "cache_read": 1000000, "cache_creation": 0})
+        self.assertIn("n=3 input=1,000,011 output=1,000,022 cache_read=1,000,033 usd=31.00\n", self.run_readout())
+
+    # point 3
+    def unit(self, name, start, state, repo="park-kyungchan/agent-platform", pr=5, page=None, **o):
+        d = self.work / "t" / "runs"
+        d.mkdir(parents=True, exist_ok=True)
+        rec = {"repository": repo, "pull_request": pr, "start": start, "state": state, "stopped_at": None, "page": {"path": page or "/pages/p.md"},
+               "verdict_file": None, "stages": {"implementer": None, "verifier": None}, **o}
+        (d / f"{name}.unit.json").write_text(json.dumps(rec))
+
+    def answer(self, name, first):
+        p = self.work / "t" / "runs" / f"{name}.verifier.md"
+        p.write_text(first + "\nrest\n")
+        rec = self.stage(f"{name}.verifier", role="reviewer", runtime="claude", model="sonnet", answer={"path": str(p)})
+        return str(rec)
+
+    def lead_writes(self, sid, ts, page, model="claude-opus-9-9", fname="u.jsonl"):
+        self.session(fname, self.line(sid, ts, [self.use(f"w{self.seq}", "Write", file_path=page, content="p")], model=model))
+
+    def test_units_chains_and_first_verdicts(self):
+        t = "2026-11-12T"
+        page = lambda n: str(self.work / "t" / f"{n}.md")
+        for n, sid, model in (("c1", "s-lead-opus", "claude-opus-9-9"), ("c2", "s-lead-opus", "claude-opus-9-9"), ("c3", "s-lead-haiku", "claude-haiku-9-9"),
+                              ("c4", "s-lead-haiku", "claude-haiku-9-9"), ("c5", "s-lead-opus", "claude-opus-9-9")):
+            self.lead_writes(sid, t + "07:00:00Z", page(n), model=model)
+        impl = str(self.stage("c1.impl", runtime="claude", model="opus-impl"))
+        # c1: three records, two verdict_repair then merged: repair_twice, first verdict repair
+        self.unit("c1-a", t + "08:00:00Z", "stopped", pr=1, page=page("c1"), cause="verdict_repair", stages={"implementer": impl, "verifier": self.answer("c1-a", "Verdict: repair")})
+        self.unit("c1-b", t + "09:00:00Z", "stopped", pr=1, page=page("c1"), cause="verdict_repair", verdict_file={"path": str(self.work / "t" / "runs" / "c1-a.verifier.md")})
+        self.unit("c1-c", t + "10:00:00Z", "merged", pr=1, page=page("c1"))
+        # c2: two records stopped at gate with other causes, then accepted: not repair_twice; first verdict accept
+        self.unit("c2-a", t + "08:00:00Z", "stopped", pr=2, page=page("c2"), cause="gate_failed", stages={"implementer": None, "verifier": self.answer("c2-a", "Verdict: accept")})
+        self.unit("c2-b", t + "09:00:00Z", "accepted", pr=2, page=page("c2"), cause="gate_failed")
+        # c3: the verifier's answer is gone: unknown
+        self.unit("c3-a", t + "08:00:00Z", "merged", pr=3, page=page("c3"), stages={"implementer": None, "verifier": str(self.work / "t" / "runs" / "gone.run.json")})
+        # c4: still running: not counted; and a record without a pull request, merged: a chain of its own, no verifier: none
+        self.unit("c4-a", t + "08:00:00Z", "running", pr=4, page=page("c4"))
+        self.unit("c5-a", t + "08:30:00Z", "merged", pr=None, page=page("c5"))
+        # a chain that began before the window
+        self.unit("old-a", "2026-11-09T08:00:00Z", "merged", pr=9, page=page("c1"))
+        text = self.run_readout("--detail")
+        chains = [l for l in text.splitlines() if l.startswith("units chain ")]
+        self.assertEqual(chains, [
+            "units chain park-kyungchan/agent-platform#1 lead_family=opus implementer=opus-impl first_verdict=repair repair_twice=yes",
+            "units chain park-kyungchan/agent-platform#2 lead_family=opus implementer=none first_verdict=accept repair_twice=no",
+            "units chain park-kyungchan/agent-platform#3 lead_family=haiku implementer=none first_verdict=unknown repair_twice=no",
+            "units chain park-kyungchan/agent-platform#none lead_family=opus implementer=none first_verdict=none repair_twice=no"])
+        self.assertIn("units lead_family=haiku chains=1 first_verdict accept=0 repair=0 unknown=1 none=0 repair_twice=0\n"
+                      "units lead_family=opus chains=3 first_verdict accept=1 repair=1 unknown=0 none=1 repair_twice=1\n", text)
+        self.assertNotIn("units chain", self.run_readout())
+
+    def test_the_writer_of_the_page_is_the_lead_and_without_one_the_latest_message_is(self):
+        t, page = "2026-11-12T", str(self.work / "t" / "p.md")
+        self.lead_writes("s-writer-opus", t + "06:00:00Z", page)
+        self.session("u.jsonl", self.line("s-later-haiku", t + "07:00:00Z", [], model="claude-haiku-9-9"),
+                     self.line("s-after-sonn", t + "09:30:00Z", [], model="claude-opus-9-9"))  # a message after the start counts for nobody
+        self.unit("a", t + "08:00:00Z", "merged", pr=1, page=page)
+        self.unit("b", t + "08:10:00Z", "merged", pr=2, page=str(self.work / "t" / "unwritten.md"))
+        text = self.run_readout("--detail")
+        self.assertIn("#1 lead_family=opus ", text)
+        self.assertIn("#2 lead_family=haiku ", text)
+
+    def test_a_chain_without_a_lead_session_before_it_is_unknown(self):
+        self.unit("a", "2026-11-12T08:00:00Z", "merged", pr=1)
+        self.session("u.jsonl", self.line("s-too-late-1", "2026-11-12T09:00:00Z", []))
+        self.assertIn("units lead_family=unknown chains=1 first_verdict accept=0 repair=0 unknown=0 none=1 repair_twice=0\n", self.run_readout())
+
+    # point 4
+    def test_the_old_fixture_is_unchanged_except_the_new_lines(self):
+        t = Readout("test_i5_second_run_is_identical")
+        t.setUp()
+        self.addCleanup(t.doCleanups)
+        text = t.run_readout("--calibrate", "--detail")
+        old = (FIXTURES / "expected-before.txt").read_text()
+        self.assertEqual("".join(l for l in text.splitlines(True) if not l.startswith(NEW_LINES)), old)
+        self.assertIn("uncounted outside stages: agy muse\n", text)
+        order = [text.index(x) for x in ("stages cut:", "lead session ", "lead state_bytes=", "uncounted outside stages", "lead calls first_tool")]
+        self.assertEqual(order, sorted(order))
+
+    def test_the_new_lines_print_no_path_and_the_run_writes_nothing(self):
+        self.lead_writes("s-lead-opus", "2026-11-12T07:00:00Z", str(self.work / "t" / "p.md"))
+        self.unit("a", "2026-11-12T08:00:00Z", "merged", pr=1, page=str(self.work / "t" / "p.md"))
+        self.stage("m1")
+        before = tree_digest(self.tmp)
+        text = self.run_readout("--detail")
+        self.assertEqual(before, tree_digest(self.tmp))
+        self.assertNotIn(str(self.tmp), text)
+
+
 if __name__ == "__main__":
     unittest.main()

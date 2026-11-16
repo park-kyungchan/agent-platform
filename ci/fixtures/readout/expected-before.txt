@@ -1,0 +1,36 @@
+readout window 2026-11-11..2026-11-13 (UTC, inclusive); weights evals/prices.tsv; weeks start on Monday
+input claude files=12 files_older_than_window=1 messages=16 other=4 read=24 repeat=3 unreadable=1 outside_window=1
+input codex events=2 files=1 other=2 read=5 repeat=1 outside_window=0
+input stages records=10 unreadable=1 without_session_record=7
+week 2026-11-09 route engineering TOTAL msgs=15 input=23,400,100 output=2,300,000 cache_read=3,000,000 cache_write_5m=100,000 cache_write_1h=200,000 usd=44.10
+  role=* family=unknown msgs=1 input=100 output=0 cache_read=0 cache_write_5m=0 cache_write_1h=0 usd=0.00
+  role=fixer family=opus msgs=1 input=1,000,000 output=0 cache_read=0 cache_write_5m=0 cache_write_1h=0 usd=1.00
+  role=implementer family=opus msgs=1 input=1,000,000 output=500,000 cache_read=2,000,000 cache_write_5m=100,000 cache_write_1h=200,000 usd=4.10
+  role=interactive family=gpt-9-x msgs=2 input=2,000,000 output=300,000 cache_read=1,000,000 cache_write_5m=0 cache_write_1h=0 usd=3.10
+  role=lead family=haiku msgs=2 input=2,400,000 output=0 cache_read=0 cache_write_5m=0 cache_write_1h=0 usd=15.90
+  role=lead family=opus msgs=5 input=4,000,000 output=1,500,000 cache_read=0 cache_write_5m=0 cache_write_1h=0 usd=7.00
+  role=reviewer family=opus msgs=1 input=2,000,000 output=0 cache_read=0 cache_write_5m=0 cache_write_1h=0 usd=2.00
+  role=worker, no record family=opus msgs=2 input=11,000,000 output=0 cache_read=0 cache_write_5m=0 cache_write_1h=0 usd=11.00
+week 2026-11-09 route lesson TOTAL msgs=1 input=3,000,000 output=0 cache_read=0 cache_write_5m=0 cache_write_1h=0 usd=3.00
+  role=interactive family=opus msgs=1 input=3,000,000 output=0 cache_read=0 cache_write_5m=0 cache_write_1h=0 usd=3.00
+week 2026-11-09 route other TOTAL msgs=1 input=4,000,000 output=0 cache_read=0 cache_write_5m=0 cache_write_1h=0 usd=4.00
+  role=interactive family=opus msgs=1 input=4,000,000 output=0 cache_read=0 cache_write_5m=0 cache_write_1h=0 usd=4.00
+route lesson session files in the window: claude=1 codex=0
+uncounted: agy (no usage record exists under its state directory)
+week 2026-11-09 merged pull requests 5 (agent-platform=4, ontology-platform=1) K1 engineering usd per merged pull request = 8.82; role lead usd=22.90 share of the route=51.9%
+K2 agent-platform#7 implementer=opus verifier=haiku first verdict=accept lines=15
+K2 agent-platform#8 implementer=unknown verifier=none first verdict=none lines=5
+K2 agent-platform#10 implementer=sonnet verifier=opus first verdict=repair lines=20
+K2 agent-platform#11 implementer=haiku verifier=none first verdict=none lines=2
+K2 ontology-platform#3 implementer=fable verifier=none first verdict=none lines=4
+K2 implementer=fable merged=1 lines=4: none n=1 lines=4; verifier tiers: none
+K2 implementer=haiku merged=1 lines=2: none n=1 lines=2; verifier tiers: none
+K2 implementer=opus merged=1 lines=15: accept n=1 lines=15; verifier tiers: haiku=1
+K2 implementer=sonnet merged=1 lines=20: repair n=1 lines=20; verifier tiers: opus=1
+K2 implementer=unknown merged=1 lines=5: none n=1 lines=5; verifier tiers: none
+K2 no reviewer stage: agent-platform=2, ontology-platform=1
+stages cut: implementer/sonnet=1; no date: integration/unknown=1
+lead calls first_tool=Bash calls=1 usd=15.00
+lead calls first_tool=none calls=5 usd=5.90
+lead calls first_tool=Read calls=1 usd=2.00
+calibrate family=haiku stages=1 median(readout/cli)=1.000 min=1.000 max=1.000

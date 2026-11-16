@@ -5,7 +5,11 @@ Reads records that already exist and nothing else; stores nothing, writes no fil
   Claude session records   <account>/projects/**/*.jsonl   keys: type, sessionId, cwd, gitBranch, timestamp,
                            message.id, message.model, message.usage (top-level members and cache_creation),
                            the name of a tool_use block
-  Stage records            <work>/*/**/*.run.json          role, model, session, state, start, answer.path, resumes, cut
+  Stage records            <work>/*/**/*.run.json          role, runtime, model, session, state, start, tokens, answer.path, resumes, cut
+  Unit records             <work>/*/runs/*.unit.json       repository, pull_request, start, state, cause, page.path, verdict_file.path,
+                           stages.implementer and stages.verifier (the stage records they name)
+  Lead sessions also       the tool_use blocks: id, name, and the size of the input and its file_path or command (to put each call
+                           in a class; never printed); the size of <lead-cwd>/STATE.md
   Codex session records    <dir>/**/*.jsonl                session_meta.id and cwd, turn_context.model, token_count totals
   Merged pull requests     gh pr list --state merged       number, headRefName, mergedAt
   Reviewer answers         the first line of the answer file of a reviewer stage
@@ -18,6 +22,7 @@ import bisect
 import collections
 import datetime
 import json
+import re
 import statistics
 import subprocess
 import sys
@@ -26,6 +31,11 @@ from pathlib import Path
 KINDS = ("input", "output", "cache_read", "cache_write_5m", "cache_write_1h")
 ROUTES = ("engineering", "lesson", "other")
 UNCOUNTED = (("agy", "no usage record exists under its state directory"),)  # CLIs whose sessions this command cannot count
+CLASSES = ("state", "commit", "store")
+STATE_FILE = r"(STATE|HANDOVER)\.md"
+WRITES = re.compile(rf">>?\s*\S*{STATE_FILE}|\b(tee|sed\s+-\S*i\S*|mv|cp|install)\b[^\n|;&]*{STATE_FILE}")
+PY_WRITE = re.compile(r"write_text|\.write\(|open\([^)]*,\s*['\"][wa]")
+STORE = re.compile(r"(^|[\s;&|(/])ont(\s|$)|\bap\s+row\b|record_decision|apply_action")
 REPOS = ("park-kyungchan/agent-platform", "park-kyungchan/ontology-platform", "park-kyungchan/education-platform")
 
 
@@ -74,6 +84,19 @@ def jsonl(path, lines):
                 lines["unreadable"] += 1
 
 
+def call_of(b):
+    """(class or None, size, name, file_path) of a tool_use block; the input is measured, never kept."""
+    inp, name = b.get("input"), b.get("name")
+    get = lambda k: inp[k] if isinstance(inp, dict) and isinstance(inp.get(k), str) else ""
+    fp, cmd = get("file_path"), get("command")
+    bash = name == "Bash"
+    cls = ("state" if (name in ("Edit", "Write") and fp.endswith(("/STATE.md", "/HANDOVER.md")))
+           or (bash and re.search(STATE_FILE, cmd) and (WRITES.search(cmd) or PY_WRITE.search(cmd))) else
+           "commit" if bash and "git" in cmd and "commit" in cmd and ("-m" in cmd or "-F" in cmd) else
+           "store" if bash and STORE.search(cmd) else None)
+    return cls, len(json.dumps(inp, ensure_ascii=False)), name, fp if name in ("Edit", "Write") else ""
+
+
 def read_claude(projects_dirs, since_epoch):
     """One message per message id (a message spans several lines, and a forked session's file repeats earlier ones).
     A message belongs to the earliest-started session that holds it, and a session has one cwd, its earliest line's:
@@ -109,13 +132,16 @@ def read_claude(projects_dirs, since_epoch):
                                    num(u.get("cache_read_input_tokens")), w5, w1)))
             tool = next((b["name"] for b in m["content"] if isinstance(b, dict) and b.get("type") == "tool_use"
                          and isinstance(b.get("name"), str)), None) if isinstance(m.get("content"), list) else None
+            calls = {b["id"]: call_of(b) for b in m["content"] if isinstance(b, dict) and b.get("type") == "tool_use"
+                     and isinstance(b.get("id"), str)} if isinstance(m.get("content"), list) else {}
             rec = msgs.get(m["id"])
             if rec is None:
-                msgs[m["id"]] = {"ts": ts, "model": m.get("model"), "sessions": {sid}, "cwd": str(o.get("cwd") or ""),
+                msgs[m["id"]] = {"calls": calls, "ts": ts, "model": m.get("model"), "sessions": {sid}, "cwd": str(o.get("cwd") or ""),
                                  "tool": tool or "none", "tok": tok, "src": "claude", "file": str(f)}
             else:
                 lines["repeat"] += 1
                 rec["tok"] = {k: max(rec["tok"][k], tok[k]) for k in KINDS}
+                rec["calls"].update(calls)
                 rec["sessions"].add(sid)
                 rec["file"], rec["ts"] = min(rec["file"], str(f)), min(rec["ts"], ts) if ts else rec["ts"]
                 if rec["tool"] == "none" and tool:
@@ -172,7 +198,7 @@ def read_stages(work_root):
             continue
         lines["records"] += 1
         a = o.get("answer")
-        stages.append({"role": str(o.get("role") or "unknown"), "model": str(o.get("model") or "unknown"), "session": o["session"], "cwd": str(o.get("cwd") or ""),
+        stages.append({"role": str(o.get("role") or "unknown"), "runtime": str(o.get("runtime") or "claude"), "tokens": o.get("tokens"), "model": str(o.get("model") or "unknown"), "session": o["session"], "cwd": str(o.get("cwd") or ""),
                        "state": "cut" if o.get("state") == "cut" or o.get("cut") is True else str(o.get("state")),
                        "start": str(o.get("start") or ""), "answer": a.get("path") if isinstance(a, dict) else None,
                        "ap": "tokens" in o and "resumes" in o, "first_run": o.get("resumes", "x") is None, "file": str(f)})
@@ -235,6 +261,124 @@ def aggregate(msgs, a):
             leads[name]["calls"] += 1
             leads[name]["usd"] += usd
     return totals, rows, leads, outside, session_usd, lesson_files
+
+
+def top_family(ms, rates):
+    out = collections.Counter()
+    for m in ms:
+        out[family(m["model"], rates)] += m["tok"]["output"]
+    return min(out, key=lambda f: (-out[f], f)) if out else "unknown"
+
+
+def lead_sessions(msgs, a):
+    """{session: its messages} for the Claude sessions in a --lead-cwd that have no stage record."""
+    staged, out = {s["session"] for s in a.stages}, collections.defaultdict(list)
+    for m in msgs:
+        if m["src"] == "claude" and m["session"] not in staged and role_without_stage(m["cwd"], a) == "lead":
+            out[m["session"]].append(m)
+    return out
+
+
+def print_bookkeeping(sessions, a):
+    """Per Lead session with a message in the window: the share of its output tokens that its bookkeeping calls stand for."""
+    for cwd in dict.fromkeys(a.lead_cwd):
+        mine = [(min(m["ts"] for m in w), sid, w) for sid, ms in sessions.items()
+                if (w := [m for m in ms if week_of(m["ts"], a.since, a.until)]) and w[0]["cwd"] == cwd]
+        for _, sid, ms in sorted(mine, key=lambda r: r[:2]):
+            calls, out, size = {}, sum(m["tok"]["output"] for m in ms), collections.Counter()
+            for m in ms:
+                calls.update(m["calls"])
+            for cls, n, _, _ in calls.values():
+                size[cls] += n
+            pct = lambda n: f"{100 * n / 4 / out if out else 0:.1f}"
+            print(f"lead session {sid[:8]} family={top_family(ms, a.rates)} output={out:,} bookkeeping={pct(sum(size[c] for c in CLASSES))} "
+                  + " ".join(f"{c}={pct(size[c])}" for c in CLASSES))
+        state = Path(cwd) / "STATE.md"
+        print(f"lead state_bytes={state.stat().st_size if state.is_file() else 'absent'}")
+
+
+def print_stages(a):
+    """The tokens of the Muse Code and agy stages that started in the window, per runtime and model (none enters K1)."""
+    rows = collections.defaultdict(collections.Counter)
+    for s in a.stages:
+        if s["runtime"] in ("muse", "agy") and a.since <= s["start"][:10] <= a.until:
+            t = s["tokens"] if isinstance(s["tokens"], dict) else {}
+            tok = {"input": num(t.get("input")), "output": num(t.get("output")), "cache_read": num(t.get("cache_read")),
+                   "cache_write_5m": num(t.get("cache_creation")), "cache_write_1h": 0}
+            r = rows[(s["runtime"], s["model"])]
+            r.update({"n": 1, **tok})
+            r["usd"] += cost(s["model"], tok, a.rates)
+    for (runtime, model), r in sorted(rows.items()):
+        usd = f"{r['usd']:.2f}" if model in a.rates else "unknown"
+        print(f"stages runtime={runtime} model={model} n={r['n']} input={r['input']:,} output={r['output']:,} cache_read={r['cache_read']:,} usd={usd}")
+    print("uncounted outside stages: agy muse")
+
+
+def read_units(work_root):
+    """The unit records in chains as `ap state` makes them: one per repository and non-null pull request, else one each."""
+    recs = []
+    for f in sorted(Path(work_root).glob("*/runs/*.unit.json")):
+        try:
+            o = json.loads(f.read_text(encoding="utf-8", errors="replace"))
+        except (ValueError, OSError):
+            continue
+        if isinstance(o, dict):
+            recs.append((str(o.get("start") or ""), str(f), o))
+    chains = collections.defaultdict(list)
+    for start, path, o in sorted(recs, key=lambda r: r[:2]):
+        pr = o.get("pull_request")
+        pr = pr if isinstance(pr, int) and not isinstance(pr, bool) and pr >= 0 else None
+        chains[(str(o.get("repository")), pr, path if pr is None else "")].append(o)
+    return chains
+
+
+def first_verdict(chain):
+    """The first line of the verifier's answer of the earliest record that names one."""
+    for r in chain:
+        v, st = r.get("verdict_file"), (r.get("stages") or {}).get("verifier") if isinstance(r.get("stages"), dict) else None
+        path = v.get("path") if isinstance(v, dict) else None
+        if not isinstance(path, str):
+            if not isinstance(st, str):
+                continue
+            try:
+                ans = json.loads(Path(st).read_text(encoding="utf-8", errors="replace")).get("answer")
+                path = ans.get("path") if isinstance(ans, dict) else None
+            except (ValueError, OSError, AttributeError):
+                path = None
+        word = bucket(first_line(path))
+        return word if word in ("accept", "repair") else "unknown"
+    return "none"
+
+
+def print_units(sessions, a):
+    """Finished chains that began in the window, by the model family of the Lead session that wrote the page."""
+    rows = []
+    for (repo, pr, _), chain in read_units(a.work_root).items():
+        first, start = chain[0], str(chain[0].get("start") or "")
+        if week_of(start, a.since, a.until) is None or chain[-1].get("state") not in ("merged", "accepted"):
+            continue
+        page = first.get("page", {}).get("path") if isinstance(first.get("page"), dict) else None
+        writes = [(m["ts"], sid) for sid, ms in sessions.items() for m in ms if m["ts"] <= start
+                  for _, _, name, fp in m["calls"].values() if name in ("Edit", "Write") and fp == page]
+        last = [(m["ts"], sid) for sid, ms in sessions.items() for m in ms if m["ts"] <= start]
+        sid = max(writes)[1] if writes else max(last)[1] if last else None
+        fam = top_family([m for m in sessions[sid] if week_of(m["ts"], a.since, a.until)] or sessions[sid], a.rates) if sid else "unknown"
+        impl = "none"
+        for r in chain:
+            try:
+                impl = str(json.loads(Path(r["stages"]["implementer"]).read_text(encoding="utf-8", errors="replace"))["model"])
+                break
+            except (ValueError, OSError, TypeError, KeyError):
+                continue
+        rows.append({"id": f"{repo}#{'none' if pr is None else pr}", "start": start, "family": fam, "impl": impl, "verdict": first_verdict(chain),
+                     "twice": sum(1 for r in chain if r.get("cause") == "verdict_repair") >= 2})
+    if a.detail:
+        for r in sorted(rows, key=lambda r: (r["id"], r["start"])):
+            print(f"units chain {r['id']} lead_family={r['family']} implementer={r['impl']} first_verdict={r['verdict']} repair_twice={'yes' if r['twice'] else 'no'}")
+    for fam in sorted({r["family"] for r in rows}):
+        mine = [r for r in rows if r["family"] == fam]
+        words = " ".join(f"{w}={sum(1 for r in mine if r['verdict'] == w)}" for w in ("accept", "repair", "unknown", "none"))
+        print(f"units lead_family={fam} chains={len(mine)} first_verdict {words} repair_twice={sum(1 for r in mine if r['twice'])}")
 
 
 def first_line(path):
@@ -395,6 +539,10 @@ def main(argv=None):
             cut[(s["role"], s["model"])] += 1
     show = lambda c: ", ".join(f"{r}/{m}={n}" for (r, m), n in sorted(c.items()))
     print("stages cut: " + (show(cut) or "none") + (f"; no date: {show(undated)}" if undated else ""))
+    sessions = lead_sessions(c_msgs, a)
+    print_bookkeeping(sessions, a)
+    print_stages(a)
+    print_units(sessions, a)
     ranked = sorted(leads.items(), key=lambda kv: (-kv[1]["usd"], kv[0]))
     for tool, c in ranked[:6]:
         print(f"lead calls first_tool={tool} calls={c['calls']} usd={c['usd']:.2f}")
