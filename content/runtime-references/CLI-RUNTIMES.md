@@ -118,7 +118,7 @@ This memory is private to one CLI and one directory, so no other agent sees it a
 ## 9. A stage or a unit of work on this host
 
 - A stage (one implementer, reviewer or fixer session of Claude Code, of the Codex CLI, or of Muse Code with `runtime: "muse"` in the request; `crates/ap/README.md`, "One stage", the part headed A stage on Muse Code) is started with `ap run < request.json`: one headless run in its own systemd scope, with a time bound (`timeout_seconds`), its record `<out>.run.json` that another command reads, and, for Claude Code, the flags of section 10 set for you (no MCP server of the account, no hook, no auto-memory, no skill unless asked). A unit (implementer, gate, verifier, acceptance) is started with `ap unit`. The contract of both: `agent-platform` `crates/ap/README.md`, sections "One stage" and "One unit".
-- The raw commands of sections 10 to 12 are for what those two commands do not cover: Muse Code, the Antigravity CLI, a probe of what a session loads, a reader of a test.
+- The raw commands of sections 10 to 12 are for what those two commands do not cover: a Muse Code run that is not a stage, the Antigravity CLI, a probe of what a session loads, a reader of a test.
 - A Claude stage states its compaction window in the request's `compact_window` (`crates/ap/README.md`, "One stage"): an integer from 100000 to 1000000, carried as `CLAUDE_CODE_AUTO_COMPACT_WINDOW` in the `env` of the CLI's `--settings` value; without it the account's settings decide, and a Codex stage refuses the member. A request's `env` still refuses a name beginning `CLAUDE_` (`env_forbidden`).
 
 ## 10. Claude Code without a terminal UI

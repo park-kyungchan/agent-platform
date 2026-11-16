@@ -57,18 +57,11 @@ def muse_argv(prompt, root, work, sid):
 
 def agy_argv(prompt, root, work, sid):
     # Run with HOME set to a new directory (agy_home) that holds no MCP configuration; no permission flag, so an
-    # action that needs approval is soft-denied. --settings (this session only, never saved) allows reading under
-    # the copy of the instructions, and the read-only search commands only on a command line whose path token is
-    # under that copy: no command is allowed on any path as before, so a command cannot be pointed at a file
-    # outside the root (the linked login token included) as its path. The model is the slug of the level the
-    # user calls Hydrogen.
+    # action that needs approval is soft-denied. --settings (this session only, never saved) allows only
+    # `read_file` under the copy of the instructions: no command is allowed at all, so no command can be pointed
+    # at a file outside the root (the linked login token included), with the root as a later argument or in any
+    # other position. The model is the slug of the level the user calls Hydrogen.
     allow = ["read_file(%s)" % root]
-    path = root.replace("\\", "\\\\").replace(".", "\\.") + ".*"
-    for cmd in ("rg", "grep"):
-        for middle in range(5):
-            allow.append("command(regex:%s)" % " ".join([cmd] + [".*"] * middle + [path]))
-    for cmd in ("cat", "head", "tail", "ls", "wc", "find"):
-        allow.append("command(regex:%s)" % " ".join([cmd, path]))
     return ["agy", "--print", prompt, "--output-format", "stream-json", "--model", "gemini-4-hydrogen-low",
             "--add-dir", root, "--settings", json.dumps({"permissions": {"allow": allow}})]
 
