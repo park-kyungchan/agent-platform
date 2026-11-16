@@ -508,6 +508,31 @@ fn a_malformed_request_is_refused_with_its_field_before_any_call() {
         (with(user(), "words_file", json!("/w/f")), "words_file"),
         (
             with(
+                without(user(), "words"),
+                "words_from",
+                json!({"record": "/r", "at": AT, "x": 1}),
+            ),
+            "words_from.x",
+        ),
+        (
+            with(without(user(), "words"), "words_from", json!({"at": AT})),
+            "words_from.record",
+        ),
+        (
+            with(
+                without(user(), "words"),
+                "words_from",
+                json!({"record": "/r"}),
+            ),
+            "words_from.at",
+        ),
+        (
+            with(without(user(), "words"), "words_from", json!("/r")),
+            "words_from",
+        ),
+        (with(user(), "form", json!(1)), "form"),
+        (
+            with(
                 with(user(), "words_from", json!({"record":"/r","at":AT})),
                 "words_file",
                 json!("/f"),
@@ -748,4 +773,69 @@ fn the_command_refuses_in_the_one_form_with_exit_2_before_any_call() {
             "{args:?}"
         );
     }
+}
+/// A fake `ont` alone on `PATH`: it keeps the body of the applied record in `FAKE_DIR`.
+const FAKE_ONT: &str = r#"#!/usr/bin/env python3
+import json, os, sys
+a, d, body = sys.argv[1:], os.environ["FAKE_DIR"], sys.stdin.read()
+rec = d + "/record"
+if a[0] == "search":
+    p = json.load(open(rec))["parameters"]
+    row = {k: {"kind": "value", "value": v} for k, v in p.items()}
+    row["status"] = {"kind": "value", "value": "current"}
+    obj = {"id": {"object_type": "decision", "native_key": "d1"}, "head": {"fields": row}}
+    out = {"status": "ok", "result": {"basis": {"qualified": True}, "objects": [obj], "continuation": None}}
+elif a[1] == "validate":
+    out = {"status": "ok", "result": {"valid": True, "criteria": []}}
+else:
+    done = os.path.exists(rec)
+    open(rec, "w").write(body)
+    out = {"status": "ok", "result": {"outcome": "already_applied" if done else "applied", "edits": []}}
+print(json.dumps(out))
+"#;
+#[test]
+fn a_success_is_one_line_on_stdout_with_exit_0_and_nothing_on_stderr() {
+    use std::{io::Write, os::unix::fs::PermissionsExt};
+    let dir = std::env::temp_dir().join(format!("ap-row-fake-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let ont = dir.join("ont");
+    std::fs::write(&ont, FAKE_ONT).unwrap();
+    std::fs::set_permissions(&ont, std::fs::Permissions::from_mode(0o755)).unwrap();
+    let mut seen = vec![];
+    for _ in 0..2 {
+        let mut child = std::process::Command::new(env!("CARGO_BIN_EXE_ap"))
+            .args(["row", "--store", "/scratch/store"])
+            .env("PATH", format!("{}:/usr/bin:/bin", dir.display()))
+            .env("FAKE_DIR", &dir)
+            .stdin(std::process::Stdio::piped())
+            .stdout(std::process::Stdio::piped())
+            .stderr(std::process::Stdio::piped())
+            .spawn()
+            .unwrap();
+        child
+            .stdin
+            .take()
+            .unwrap()
+            .write_all(lead().to_string().as_bytes())
+            .unwrap();
+        let out = child.wait_with_output().unwrap();
+        assert_eq!(
+            out.status.code(),
+            Some(0),
+            "{}",
+            String::from_utf8_lossy(&out.stderr)
+        );
+        assert!(out.stderr.is_empty());
+        let text = String::from_utf8(out.stdout).unwrap();
+        assert_eq!(text.lines().count(), 1, "{text}");
+        seen.push(serde_json::from_str::<Value>(&text).unwrap());
+    }
+    let _ = std::fs::remove_dir_all(&dir);
+    assert_eq!(
+        (seen[0]["record"].as_str(), seen[1]["record"].as_str()),
+        (Some("applied"), Some("already_applied"))
+    );
+    assert_eq!(seen[0]["topic"], "topic-two");
+    assert_eq!(seen[0]["triage"], Value::Null);
+    assert_eq!(seen[0]["words_bytes"], "the choice".len());
 }
