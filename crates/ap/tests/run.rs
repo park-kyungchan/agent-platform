@@ -4524,6 +4524,16 @@ impl Fake {
         );
         a.iter().map(|s| s.to_string()).collect()
     }
+    /// The home the stage of call `n` of the fake ran in, as its record names it.
+    fn agy_home_of(&self, record: &Value) -> PathBuf {
+        PathBuf::from(record["home"].as_str().unwrap())
+    }
+    /// The names under the account `name` that are not the stages' homes.
+    fn agy_account_tree(&self, name: &str) -> Vec<String> {
+        let mut names = tree(&self.t.join(name));
+        names.retain(|n| n != "homes" && !n.starts_with("homes/"));
+        names
+    }
     /// A stage that ended `ok` to resume from, with its out `first`.
     fn agy_first(&mut self, first: &str) -> Value {
         self.agy_lines(&g_run("stage ok"));
@@ -4745,7 +4755,7 @@ fn g2_a_fresh_stage_is_started_with_exactly_these_arguments_and_this_environment
     f.env.push(("GEMINI_API_KEY".into(), "not-a-key".into()));
     f.agy_lines(&g_run("stage ok"));
     f.agy_home("g1");
-    let before = tree(&f.t.join("g1"));
+    let before = f.agy_account_tree("g1");
     let mut r = f.agy("c.md");
     r["env"] = json!({"CARGO_HOME": "/x/cargo"});
     let (v, status) = f.run(&r).unwrap();
@@ -4797,7 +4807,11 @@ fn g2_a_fresh_stage_is_started_with_exactly_these_arguments_and_this_environment
             .cloned()
             .collect::<Vec<_>>()
     };
-    assert_eq!(named("HOME"), [format!("HOME={}", f.p("g1"))]);
+    // `HOME` is the home the record names: a new directory under the account, never the account.
+    let home = f.agy_home_of(&v);
+    assert_eq!(named("HOME"), [format!("HOME={}", home.display())]);
+    assert_eq!(home.parent().unwrap(), f.t.join("g1/homes"));
+    assert_eq!(home.file_name().unwrap().len(), 36);
     assert_eq!(
         named("AGY_CLI_DISABLE_AUTO_UPDATE"),
         ["AGY_CLI_DISABLE_AUTO_UPDATE=1"]
@@ -4816,8 +4830,64 @@ fn g2_a_fresh_stage_is_started_with_exactly_these_arguments_and_this_environment
         assert!(n != "FOO" && n != "XDG_CONFIG_HOME", "{n}");
     }
     assert_eq!(v["runtime"], "agy");
-    // `ap run` writes no file in the home.
-    assert_eq!(tree(&f.t.join("g1")), before);
+    // The account is a template: `ap run` writes nothing in it but the homes, and the CLI none.
+    assert_eq!(f.agy_account_tree("g1"), before);
+    assert!(!f.t.join("g1/.gemini/config").exists());
+}
+
+#[test]
+fn g9_a_fresh_stage_gets_a_new_home_of_three_links_and_the_record_names_it() {
+    let mut f = Fake::new();
+    f.agy_lines(&g_run("stage ok"));
+    f.agy_home("g1");
+    // The account holds the two instruction files the home links to.
+    std::fs::write(f.p("g1/.gemini/AGENTS.md"), "instructions").unwrap();
+    std::fs::write(f.p("g1/.gemini/GEMINI.md"), "instructions").unwrap();
+    let account = f.t.join("g1");
+    let (a, _) = f.run(&f.agy("h1.md")).unwrap();
+    let (b, _) = f.run(&f.agy("h2.md")).unwrap();
+    let (ha, hb) = (f.agy_home_of(&a), f.agy_home_of(&b));
+    // Two fresh stages, two homes; each is under `<account>/homes`, mode 0700, and is the record's.
+    assert_ne!(ha, hb);
+    for (n, h) in [(1, &ha), (2, &hb)] {
+        assert_eq!(h.parent().unwrap(), account.join("homes"));
+        assert_eq!(
+            std::fs::read_to_string(f.t.join(format!("bin/homemode.{n}")))
+                .unwrap()
+                .trim(),
+            "700"
+        );
+        // As the CLI found it: three links, with the directories that hold them, nothing else.
+        let token = account.join(".gemini/antigravity-cli/antigravity-oauth-token");
+        let want = format!(
+            ". d \n./.gemini d \n./.gemini/AGENTS.md l {a}/.gemini/AGENTS.md\n./.gemini/GEMINI.md l {a}/.gemini/GEMINI.md\n./.gemini/antigravity-cli d \n./.gemini/antigravity-cli/antigravity-oauth-token l {t}\n",
+            a = account.display(),
+            t = token.display()
+        );
+        let seen = std::fs::read_to_string(f.t.join(format!("bin/home.{n}"))).unwrap();
+        let mut got: Vec<&str> = seen.lines().collect();
+        got.sort();
+        let mut want: Vec<&str> = want.lines().collect();
+        want.sort();
+        assert_eq!(got, want, "{seen}");
+        assert_eq!(
+            std::fs::read_to_string(f.t.join(format!("bin/env.{n}")))
+                .unwrap()
+                .lines()
+                .filter(|l| l.starts_with("HOME="))
+                .collect::<Vec<_>>(),
+            [format!("HOME={}", h.display())]
+        );
+    }
+    // The fake wrote its `.gemini/config` in the home it was given, and so the account has none.
+    assert!(ha.join(".gemini/config/config.json").is_file());
+    assert!(ha.join(".gemini/config/projects").is_dir());
+    assert!(!account.join(".gemini/config").exists());
+    // Another request on the same account is admitted again.
+    assert_eq!(f.run(&f.agy("h3.md")).unwrap().0["state"], "ok");
+    // Three stages, three homes, none removed, none made outside `<account>/homes`.
+    assert_eq!(std::fs::read_dir(account.join("homes")).unwrap().count(), 3);
+    assert!(!f.t.join("cwd/homes").exists() && !f.t.join("cwd/.gemini").exists());
 }
 
 #[test]
@@ -4845,13 +4915,63 @@ fn g2_a_resumed_stage_adds_the_conversation_and_runs_in_the_records_cwd() {
         first["cwd"].as_str().unwrap()
     );
     let env = f.env_of_last();
-    assert!(env.contains(&format!("HOME={}", f.p("g1"))));
+    // A resume runs in the home of its record (the conversation lives there), made again by no one.
+    let home = f.agy_home_of(&first);
+    assert!(env.contains(&format!("HOME={}", home.display())));
+    assert_eq!(f.agy_home_of(&v), home);
+    assert_eq!(std::fs::read_dir(f.t.join("g1/homes")).unwrap().count(), 1);
     assert!(env.contains(&"AGY_CLI_DISABLE_AUTO_UPDATE=1".to_owned()));
     // The record's own rules hold: the same account.
     let mut r = f.resume(f.agy("x"), "r3.md", "r1.md");
     r["account"] = json!(f.agy_home("g2"));
     assert_eq!(code(f.run(&r)), "resume_account_differs@account");
     assert_eq!(f.launches.len(), 2);
+}
+
+#[test]
+fn g2_a_resume_refuses_a_home_that_is_absent_no_directory_or_not_under_the_account() {
+    let mut f = Fake::new();
+    let first = f.agy_first("r1.md");
+    let home = f.agy_home_of(&first);
+    let outside = f.t.join("a1");
+    let record = f.p("r1.md.run.json");
+    let original = std::fs::read_to_string(&record).unwrap();
+    std::fs::write(f.p("file"), "x").unwrap();
+    std::fs::create_dir_all(f.t.join("g1/other")).unwrap();
+    let homes = f.t.join("g1/homes");
+    let bad: Vec<(&str, Option<Value>)> = vec![
+        ("absent", None),
+        ("null", Some(Value::Null)),
+        ("number", Some(json!(3))),
+        ("no directory", Some(json!(f.p("file")))),
+        (
+            "missing",
+            Some(json!(homes.join("nowhere").to_str().unwrap())),
+        ),
+        ("outside", Some(json!(outside.to_str().unwrap()))),
+        ("the account", Some(json!(f.p("g1")))),
+        ("the homes", Some(json!(homes.to_str().unwrap()))),
+        ("beside", Some(json!(f.p("g1/other")))),
+        ("dots", Some(json!(format!("{}/../other", homes.display())))),
+    ];
+    for (what, value) in bad {
+        let mut rec: Value = serde_json::from_str(&original).unwrap();
+        match value {
+            None => drop(rec.as_object_mut().unwrap().remove("home")),
+            Some(v) => rec["home"] = v,
+        }
+        std::fs::write(&record, rec.to_string()).unwrap();
+        let r = f.resume(f.agy("x"), "again.md", "r1.md");
+        assert_eq!(code(f.run(&r)), "invalid_input@resume", "{what}");
+    }
+    // Nothing launched, and no home was made for the refused calls.
+    assert_eq!(f.launches.len(), 1);
+    assert_eq!(std::fs::read_dir(&homes).unwrap().count(), 1);
+    // The home as the CLI left it (a `.gemini/config` in it) is no refusal: only that stage ran there.
+    std::fs::write(&record, &original).unwrap();
+    assert!(home.join(".gemini/config").is_dir());
+    let r = f.resume(f.agy("x"), "again.md", "r1.md");
+    assert_eq!(f.run(&r).unwrap().0["state"], "ok");
 }
 
 #[test]
@@ -4966,9 +5086,10 @@ fn g4_a_result_with_an_answer_is_ok_and_its_response_is_saved_byte_for_byte() {
         "limit",
         "attempts",
         "compact_window",
+        "home",
     ];
     want.sort_unstable();
-    // No member `served_by`: the stream names no serving model.
+    // The member `home` is this runtime's own; no member `served_by`: the stream names no serving model.
     assert_eq!(keys, want);
     assert_eq!(
         (
@@ -4987,6 +5108,7 @@ fn g4_a_result_with_an_answer_is_ok_and_its_response_is_saved_byte_for_byte() {
         (Value::Null, json!([]))
     );
     assert_eq!(v["account"], f.p("g1").as_str());
+    assert!(v["home"].as_str().unwrap().starts_with(&f.p("g1/homes/")));
     // A reviewer's stage ends at the first result.
     let mut lines = g_run("first");
     lines.push(g_result(
@@ -5180,11 +5302,11 @@ fn g6_no_result_is_failed_after_the_exit_and_timeout_after_the_bound() {
 #[test]
 fn g7_tokens_are_the_usage_of_the_result_and_turns_its_num_turns() {
     let mut f = Fake::new();
-    // The lines of the real fresh run (the fake's own): 15025 input, 134 output and 81 thinking, 10724 read.
+    // The lines of the real fresh run (the fake's own): 15025 input, 134 output (thinking included), 10724 read.
     let (v, _) = f.run(&f.agy("real.md")).unwrap();
     assert_eq!(
         v["tokens"],
-        json!({"input":15025,"output":134 + 81,"cache_read":10724,"cache_creation":0}),
+        json!({"input":15025,"output":134,"cache_read":10724,"cache_creation":0}),
         "{v}"
     );
     assert_eq!(
@@ -5231,21 +5353,21 @@ fn g7_a_resumes_tokens_are_the_results_sums_less_every_earlier_record_of_the_cha
     let (v1, _) = f.run(&f.agy("c1.md")).unwrap();
     assert_eq!(
         v1["tokens"],
-        json!({"input":100,"output":25,"cache_read":40,"cache_creation":0}),
+        json!({"input":100,"output":20,"cache_read":40,"cache_creation":0}),
         "{v1}"
     );
     f.agy_lines(&step(160, 50, 9, 100, 2, "two"));
     let (v2, _) = f.run(&f.resume(f.agy("x"), "c2.md", "c1.md")).unwrap();
     assert_eq!(
         v2["tokens"],
-        json!({"input":60,"output":34,"cache_read":60,"cache_creation":0}),
+        json!({"input":60,"output":30,"cache_read":60,"cache_creation":0}),
         "{v2}"
     );
     f.agy_lines(&step(400, 90, 30, 300, 3, "three"));
     let (v3, _) = f.run(&f.resume(f.agy("x"), "c3.md", "c2.md")).unwrap();
     assert_eq!(
         v3["tokens"],
-        json!({"input":240,"output":61,"cache_read":200,"cache_creation":0}),
+        json!({"input":240,"output":40,"cache_read":200,"cache_creation":0}),
         "{v3}"
     );
     assert_eq!(v3["turns"], 3);
@@ -5258,7 +5380,7 @@ fn g7_a_resumes_tokens_are_the_results_sums_less_every_earlier_record_of_the_cha
     };
     assert_eq!(
         (sum("input"), sum("output"), sum("cache_read")),
-        (400, 120, 300)
+        (400, 90, 300)
     );
     // An earlier record of the chain that cannot be read: the tokens are null, the answer is kept.
     std::fs::remove_file(f.p("c1.md.run.json")).unwrap();

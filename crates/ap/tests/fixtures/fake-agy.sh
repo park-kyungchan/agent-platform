@@ -4,17 +4,21 @@
 # gemini-4-hydrogen-medium): a fresh one that ran one command, and a `--conversation` resume of it.
 # Every member is kept; only the conversation id is replaced by `@CID@` (the fake sets it to a new
 # id for a fresh run and to the id of `--conversation` for a resume) and the scratch working
-# directory by `/tmp/agy-evidence`. The home is `$HOME`; its directory holds the state, keyed by the
-# basename of `$HOME`: `mode-<base>` chooses the behaviour (`script`: the output of
+# directory by `/tmp/agy-evidence`. `$HOME` is a home `<account>/homes/<uuid>`; this directory holds
+# the state, keyed by the basename of the account: `mode-<base>` chooses the behaviour (`script`: the output of
 # `script-<base>.sh` in the cwd is the answer; otherwise the lines of `lines-<base>` when it
 # exists, else the real lines below), `hang-<base>` keeps the process alive after its lines,
 # `exit-<base>` is its exit code, `watch` names a file copied to `seen.json` when the process
 # starts. `calls.log` gets one line per call (the prompt shown as `<prompt>`), `env.<n>` the
 # environment, `stdin.<n>` what the standard input is, `prompt.<n>` the prompt argument, `cwd.<n>`
-# the working directory.
+# the working directory, `home.<n>` the names under `$HOME` (path, type, link target) and
+# `homemode.<n>` its mode, both as the call finds them. As the real CLI does at a fresh run, the fake creates in its `$HOME`
+# `.gemini/config/` (`config.json`, `mcp_config.json`, `.migrated`, `projects/`) and the conversation
+# file `.gemini/antigravity-cli/conversations/<id>.db`; a `--conversation` whose file its `$HOME`
+# lacks fails (stderr, exit 1, no line).
 here=$(cd "$(dirname "$0")" && pwd)
 n=$(( $(cat "$here/count" 2>/dev/null || echo 0) + 1 )); echo "$n" > "$here/count"
-base=$(basename "$HOME")
+base=$(basename "$(dirname "$(dirname "$HOME")")")
 cid=; prompt=; shown=(); prev=
 for a in "$@"; do
   case "$prev" in --conversation) cid=$a ;; --print) prompt=$a; a='<prompt>' ;; esac
@@ -25,7 +29,19 @@ env > "$here/env.$n"
 readlink "/proc/$$/fd/0" > "$here/stdin.$n"
 printf '%s' "$prompt" > "$here/prompt.$n"
 pwd > "$here/cwd.$n"
+(cd "$HOME" && find . -printf '%p %y %l\n' | sort) > "$here/home.$n"
+stat -c %a "$HOME" > "$here/homemode.$n"
 again=1; [ -n "$cid" ] || { again=0; cid=$(cat /proc/sys/kernel/random/uuid); }
+conv="$HOME/.gemini/antigravity-cli/conversations/$cid.db"
+if [ "$again" = 1 ]; then
+  [ -f "$conv" ] || { echo "conversation $cid not found" >&2; exit 1; }
+else
+  mkdir -p "$HOME/.gemini/config/projects" "$(dirname "$conv")"
+  printf '{"plugins":{"swarm":{"enabled":true}}}' > "$HOME/.gemini/config/config.json"
+  : > "$HOME/.gemini/config/mcp_config.json"; : > "$HOME/.gemini/config/.migrated"
+  printf '{}' > "$HOME/.gemini/config/projects/default-cli-project.json"
+  printf 'conversation' > "$conv"
+fi
 [ -f "$here/watch" ] && cp "$(cat "$here/watch")" "$here/seen.json"
 fresh=(
   '{"event":"init","conversation_id":"@CID@","init":{"model":"gemini-4-hydrogen-medium","cwd":"/tmp/agy-evidence","tools":["ask_custom_permission","ask_permission","ask_question","browser_click_element","browser_drag_pixel_to_pixel","browser_get_dom","browser_get_network_request","browser_input","browser_list_network_requests","browser_mouse_down","browser_mouse_up","browser_move_mouse","browser_press_key","browser_refresh_page","browser_resize_window","browser_scroll","browser_scroll_dom","browser_select_option","browser_subagent","call_mcp_tool","capture_browser_console_logs","capture_browser_screenshot","click_browser_pixel","command_status","define_subagent","delete_knowledge","execute_browser_javascript","find_by_name","finish","generate_image","grep_search","invoke_subagent","list_browser_pages","list_dir","list_permissions","list_plugin_accounts","list_resources","manage_inbox","manage_subagents","manage_task","multi_replace_file_content","notebook_edit","notebook_execution","open_browser_url","read_browser_page","read_resource","read_url_content","replace_file_content","run_command","run_workflow","schedule","search_marketplace","search_web","sed_file","send_command_input","send_message","view_file","wait","wait_5_seconds","write_to_file"],"permission_mode":"always-proceed"}}'

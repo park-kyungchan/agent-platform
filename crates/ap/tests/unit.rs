@@ -5572,9 +5572,9 @@ fn agy_request(u: &U) -> Value {
         "effort":"medium","permission_mode":"bypassPermissions","prompt":u.p("judge/verifier.md")});
     r
 }
-/// The calls of the fake `agy` (its home, then its arguments), in order.
+/// The calls of the fake `agy` (its home under the account `g1`, then its arguments), in order.
 fn agy_lines(u: &U) -> Vec<String> {
-    let home = format!("{}|", u.p("g1"));
+    let home = format!("{}/homes/", u.p("g1"));
     launch_lines(u)
         .into_iter()
         .filter(|l| l.starts_with(&home))
@@ -5673,4 +5673,11 @@ fn agy_the_second_look_of_an_agy_verifier_resumes_its_record() {
         "{}",
         lines[1]
     );
+    // The second look runs in the home of the first record (the fake fails a conversation its home
+    // lacks), which holds a `.gemini/config` as the CLI leaves it, while the account holds none.
+    let home = before["home"].as_str().unwrap();
+    assert_eq!(after["home"], home);
+    assert!(lines.iter().all(|l| l.starts_with(&format!("{home}|"))));
+    assert!(std::path::Path::new(home).join(".gemini/config").is_dir());
+    assert!(!u.t.join("g1/.gemini/config").exists());
 }

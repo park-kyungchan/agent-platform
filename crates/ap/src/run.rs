@@ -11,7 +11,7 @@ use std::{
     fs::File,
     io::{Read, Seek, SeekFrom, Write},
     os::unix::fs::{FileExt, MetadataExt},
-    path::Path,
+    path::{Path, PathBuf},
     process::{Child, ExitCode},
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
@@ -189,8 +189,9 @@ impl Runtime {
             Self::Agy => true,
         }
     }
-    /// A Muse account is a directory named `muse`; an `agy` account is a home with the login
-    /// token and without a `.gemini/config`, where the CLI reads what is registered for it.
+    /// A Muse account is a directory named `muse`; an `agy` account is the template of the stage's
+    /// homes: it holds the login token and no `.gemini/config`, where the CLI reads what is
+    /// registered for it.
     fn account_named(self, account: &str) -> bool {
         let (home, token) = (
             Path::new(account).join(".gemini"),
@@ -245,6 +246,8 @@ struct Request {
     compact_window: Option<u64>,
     /// An `agy` stage: the prompt's text, the one argument that carries it.
     argument: String,
+    /// An `agy` stage on a resume: the home of the record, where the conversation lives.
+    home: Option<String>,
 }
 
 fn path(r: &Value, key: &str) -> Result<String, Failure> {
@@ -522,6 +525,7 @@ fn request_at(s: &mut impl System, r: &Value, at_cwd: bool) -> Result<Request, F
         &format!("{out}.err"),
     ];
     require!(names.iter().all(|n| std::fs::symlink_metadata(n).is_err()) => "out_exists", "out");
+    let mut home = None;
     let earlier = match &resume {
         None => None,
         Some(file) => {
@@ -544,6 +548,11 @@ fn request_at(s: &mut impl System, r: &Value, at_cwd: bool) -> Result<Request, F
             // Whatever the record says (`failed` with `unmet: stop` too): nothing of its unit may live.
             if let Some(unit) = rec["unit"].as_str() {
                 require!(ended(s, unit) => "run_still_active", "resume");
+            }
+            if runtime == Runtime::Agy {
+                home = Some(
+                    resumed_home(&rec, account).ok_or_else(|| error("invalid_input", "resume"))?,
+                );
             }
             Some((
                 rec.clone(),
@@ -652,7 +661,41 @@ fn request_at(s: &mut impl System, r: &Value, at_cwd: bool) -> Result<Request, F
         argument: argument
             .filter(|_| runtime.prompt_argument())
             .unwrap_or_default(),
+        home,
     })
+}
+/// The `home` of an `agy` record that a resume runs in: a directory under `<account>/homes` (links
+/// and `..` resolved), the `homes` directory itself excluded. None otherwise.
+fn resumed_home(record: &Value, account: &str) -> Option<String> {
+    let named = record["home"].as_str()?;
+    let home = std::fs::canonicalize(named).ok()?;
+    let homes = std::fs::canonicalize(Path::new(account).join("homes")).ok()?;
+    (home.is_dir() && home.starts_with(&homes) && home != homes).then(|| named.to_owned())
+}
+/// A fresh `agy` stage's home: a new directory (mode 0700) under `<account>/homes` that holds three
+/// links and the directories that hold them: the account's token, `AGENTS.md` and `GEMINI.md`.
+fn make_home(account: &str, home: &Path) -> std::io::Result<()> {
+    use std::os::unix::fs::{DirBuilderExt, symlink};
+    let mut dirs = std::fs::DirBuilder::new();
+    dirs.mode(0o700);
+    if let Some(homes) = home.parent() {
+        match dirs.create(homes) {
+            Err(e) if e.kind() != std::io::ErrorKind::AlreadyExists => return Err(e),
+            _ => (),
+        }
+    }
+    for dir in ["", ".gemini", ".gemini/antigravity-cli"] {
+        dirs.create(home.join(dir))?;
+    }
+    let (from, to) = (Path::new(account).join(".gemini"), home.join(".gemini"));
+    for link in [
+        "antigravity-cli/antigravity-oauth-token",
+        "AGENTS.md",
+        "GEMINI.md",
+    ] {
+        symlink(from.join(link), to.join(link))?;
+    }
+    Ok(())
 }
 const TOKENS: [&str; 4] = ["input", "output", "cache_read", "cache_creation"];
 /// The tokens of a Codex or `agy` thread up to the end of the run of `file`: that record's and those of
@@ -854,7 +897,7 @@ impl Seen {
     /// An `agy` line, read into the shape of a `result`: `init` names the conversation, a `tool`
     /// step is work, the `result` line is one (its `response` the answer when its `status` is
     /// `SUCCESS`, its `error` the message otherwise). The usage is the conversation's, less what the
-    /// earlier records of it hold; `output` adds the thinking tokens.
+    /// earlier records of it hold; `output_tokens` already includes the thinking tokens.
     fn agy_line(&mut self, e: &Value) {
         match e["event"].as_str() {
             Some("init") => {
@@ -866,14 +909,13 @@ impl Seen {
                 let r = &e["result"];
                 let n = |k: &str| r["usage"][k].as_u64().unwrap_or(0);
                 let own = |v: u64, i: usize| self.spent.map(|s| v.saturating_sub(s[i]));
-                let output = n("output_tokens").saturating_add(n("thinking_tokens"));
                 let done = r["status"] == "SUCCESS";
                 self.results
                     .push(json!({"type": "result", "is_error": !done,
                     "result": if done { &r["response"] } else { &r["error"] },
                     "num_turns": r["num_turns"], "permission_denials": [],
                     "usage": {"input_tokens": own(n("input_tokens"), 0),
-                        "output_tokens": own(output, 1),
+                        "output_tokens": own(n("output_tokens"), 1),
                         "cache_read_input_tokens": own(n("cache_read_tokens"), 2),
                         "cache_creation_input_tokens": own(0, 3)}}));
             }
@@ -1401,6 +1443,14 @@ fn attempt(
     if !names_itself {
         record["session"] = json!(session);
     }
+    // An `agy` stage's home: the record's on a resume, else a new one named by the fresh id.
+    let home = (q.runtime == Runtime::Agy).then(|| match &q.home {
+        Some(home) => PathBuf::from(home),
+        None => Path::new(account).join("homes").join(&session),
+    });
+    if let Some(home) = &home {
+        record["home"] = json!(home);
+    }
     record["unit"] = json!(unit);
     mirror(&mut record, false);
     // The run's own stream and error files, emptied for a next account's attempt.
@@ -1416,6 +1466,11 @@ fn attempt(
     // The record names the session BEFORE the launch.
     if !persist(&q.out, &record) {
         return not_launched(record, "write");
+    }
+    if let (Some(home), None) = (&home, &q.home) {
+        if make_home(account, home).is_err() {
+            return not_launched(record, "launch");
+        }
     }
     let mut argv = args(&[
         "systemd-run",
@@ -1457,9 +1512,15 @@ fn attempt(
         }
         Runtime::Agy => {
             argv.extend(agy_args(q, resume));
-            // The account is the CLI's `HOME`, in place of the caller's.
+            // The stage's home is the CLI's `HOME`, in place of the caller's.
             env.retain(|(k, _)| k != "HOME");
-            env.push(("HOME".into(), account.into()));
+            env.push((
+                "HOME".into(),
+                home.as_deref()
+                    .and_then(Path::to_str)
+                    .unwrap_or_default()
+                    .into(),
+            ));
             env.push(("AGY_CLI_DISABLE_AUTO_UPDATE".into(), "1".into()));
         }
     }
