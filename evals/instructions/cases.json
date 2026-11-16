@@ -123,5 +123,41 @@
    ".local/share/muse/sessions": "A `muse exec` run of this unit wrote `~/.local/share/muse/sessions/<yyyy>/<mm>/<dd>/<session id>/session.jsonl`",
    ".gemini/antigravity-cli/conversations": "An `agy --print` run of this unit wrote `<home>/.gemini/antigravity-cli/conversations/<conversation id>.db`"
   }
+ },
+ {
+  "id": "s13",
+  "situation": "A Muse Code run without a terminal UI must run without the CLI's sandbox, but every tool call must still go through approval and the workspace must not become trusted. Which flag do you pass?",
+  "files": ["CLI-RUNTIMES.md"],
+  "tokens": ["--disable-sandbox"],
+  "evidence": {
+   "--disable-sandbox": "CLI-RUNTIMES.md section 11, row \"No approval prompts\": \"`--disable-sandbox` removes the sandbox and keeps approval. Unlike `--yolo`, these flags do not trust the workspace\""
+  }
+ },
+ {
+  "id": "s14",
+  "situation": "You are about to start an Antigravity CLI run without a terminal UI and need the exact model names it accepts. Which command prints them?",
+  "files": ["CLI-RUNTIMES.md"],
+  "tokens": ["agy models"],
+  "evidence": {
+   "agy models": "CLI-RUNTIMES.md section 12, row \"The run\": \"`agy models` lists the slugs; a name that is not a slug is refused\""
+  }
+ },
+ {
+  "id": "s15",
+  "situation": "An Antigravity CLI run without a terminal UI must end its output after at most 15 minutes. Which flag sets that bound?",
+  "files": ["CLI-RUNTIMES.md"],
+  "tokens": ["--print-timeout"],
+  "evidence": {
+   "--print-timeout": "CLI-RUNTIMES.md section 12, row \"A time bound\": \"`--print-timeout <duration>` (for example `15m`); without it there is none\""
+  }
+ },
+ {
+  "id": "s16",
+  "situation": "A Claude Code run without a terminal UI must load none of the account's skills and slash commands, but must still read CLAUDE.md. Which flag do you pass?",
+  "files": ["CLI-RUNTIMES.md"],
+  "tokens": ["--disable-slash-commands"],
+  "evidence": {
+   "--disable-slash-commands": "CLI-RUNTIMES.md section 10, row \"Keep skills and slash commands out\": \"`--disable-slash-commands`\"; the row below says `--safe-mode` skips CLAUDE.md"
+  }
  }
 ]
