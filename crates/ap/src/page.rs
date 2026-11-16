@@ -4,7 +4,8 @@ use crate::review::{self, DIFF_OPTIONS};
 use serde_json::{Map, Value, json};
 use std::{ffi::OsString, io::Write, process::ExitCode};
 
-const MEMBERS: &str = "unit write_set checks repository branch item tier merge";
+const MEMBERS: &str =
+    "unit write_set checks repository branch item tier merge implementer verifier";
 const KINDS: [&str; 4] = ["unchanged", "adds", "holds", "lines"];
 pub(crate) enum Hold {
     Text(String),
@@ -20,13 +21,15 @@ pub(crate) struct Checks {
 pub(crate) struct Block {
     pub write_set: Vec<String>,
     pub checks: Checks,
+    /// Every member of the block as parsed: `ap unit <page>` composes its request from them.
+    pub members: Map<String, Value>,
 }
 
-fn invalid(reason: &str, member: Option<&str>) -> Failure {
+pub(crate) fn invalid(reason: &str, member: Option<&str>) -> Failure {
     let detail = json!({"reason": reason, "member": member});
     fail("page_block_invalid", "page", detail)
 }
-fn shape(member: &str) -> Failure {
+pub(crate) fn shape(member: &str) -> Failure {
     invalid("shape", Some(member))
 }
 fn pattern(v: &Value) -> Option<String> {
@@ -54,6 +57,26 @@ fn repository(v: &Value) -> bool {
     let ok = |c: char| c.is_ascii_alphanumeric() || "._-".contains(c);
     let parts: Vec<_> = v.as_str().unwrap_or_default().split('/').collect();
     parts.len() == 2 && parts.iter().all(|p| !p.is_empty() && p.chars().all(ok))
+}
+/// A stage of the block: `model` and `effort`, optional `runtime`, `permission_mode`, `timeout_seconds`.
+fn stage(v: &Value) -> bool {
+    let known: Vec<_> = "model effort runtime permission_mode timeout_seconds"
+        .split(' ')
+        .collect();
+    let text = |k: &str| {
+        v.get(k)
+            .and_then(Value::as_str)
+            .is_some_and(|t| !t.is_empty())
+    };
+    let option = |k: &str| v.get(k).is_none() || text(k);
+    let seconds = v
+        .get("timeout_seconds")
+        .is_none_or(|n| n.as_u64() > Some(0));
+    let (ok, optional) = (
+        text("model") && text("effort") && seconds,
+        option("runtime"),
+    );
+    entry(v, &known).is_some() && ok && optional && option("permission_mode")
 }
 fn entry<'a>(v: &'a Value, keys: &[&str]) -> Option<&'a Map<String, Value>> {
     v.as_object()
@@ -176,6 +199,7 @@ pub(crate) fn block(text: &str) -> Result<Option<Block>, Failure> {
             ("branch", Some(v)) => v.as_str().is_some_and(branch),
             ("item", Some(v)) => v.as_str().is_some_and(|s| !s.is_empty() && s.len() <= 60),
             ("tier", Some(v)) => small(v, false),
+            ("implementer" | "verifier", Some(v)) => stage(v),
             (_, Some(v)) => v.is_boolean(),
         };
         if !ok {
@@ -187,6 +211,7 @@ pub(crate) fn block(text: &str) -> Result<Option<Block>, Failure> {
     Ok(Some(Block {
         write_set,
         checks: checks_of,
+        members: o.clone(),
     }))
 }
 /// The lines of the failed checks as `ap accept` prints them.
