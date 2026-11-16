@@ -459,10 +459,10 @@ fn request_at(s: &mut impl System, r: &Value, at_cwd: bool) -> Result<Request, F
         };
         let (p, a) = (fit("prompt")?, fit("answer")?);
         let work = if role == "reviewer" { "" } else { MOVED_WORK };
-        Some(format!(
-            "{}{work}\n\n",
-            MOVED.replace("{P}", p).replace("{A}", a)
-        ))
+        // One pass: a path that holds the literal `{A}` stays as the record has it.
+        let (head, rest) = MOVED.split_once("{P}")?;
+        let (middle, tail) = rest.split_once("{A}")?;
+        Some(format!("{head}{p}{middle}{a}{tail}{work}\n\n"))
     });
     let base_env = base_env(s, &env);
     require!(s.units() => "systemd_absent", "host");

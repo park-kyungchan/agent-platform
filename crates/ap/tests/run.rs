@@ -3346,3 +3346,27 @@ fn rf1_a_moved_record_is_resumed_on_its_new_session_and_account() {
     assert_eq!(f.input(before + 2), want);
     assert_eq!(v3["resumes"], f.p("r2.md.run.json"));
 }
+
+#[test]
+fn rf1_the_text_holds_each_path_byte_for_byte_whatever_the_other_path_holds() {
+    let mut f = Fake::new();
+    // An absolute path may hold the literal `{A}` that a naive substitution would replace again.
+    std::fs::create_dir_all(f.t.join("{A}")).unwrap();
+    std::fs::write(f.t.join("{A}/p.md"), "review this\n").unwrap();
+    let mut r = f.request("pa.md");
+    r["prompt"] = json!(f.p("{A}/p.md"));
+    let (v, status) = f.run(&r).unwrap();
+    assert_eq!((status, v["state"].as_str()), (0, Some("ok")), "{v}");
+    f.mode("a1", "limit1");
+    let before = f.count_now();
+    let r = f.resumed("reviewer", "pb.md", "pa.md", "a1", &["a2"]);
+    let (v, status) = f.run(&r).unwrap();
+    assert_eq!((status, v["state"].as_str()), (0, Some("ok")), "{v}");
+    let want = [
+        moved_text("reviewer", &f.p("{A}/p.md"), &f.p("pa.md")).as_bytes(),
+        AGAIN,
+    ]
+    .concat();
+    assert!(String::from_utf8_lossy(&want).contains(&format!("the file {}, and", f.p("{A}/p.md"))));
+    assert_eq!(f.input(before + 2), want);
+}

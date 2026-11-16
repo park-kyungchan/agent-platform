@@ -5264,3 +5264,42 @@ fn rf1_a_come_back_whose_resumed_verifier_is_cut_takes_its_verdict_from_the_new_
     assert_ne!(second["session"], attempts[0]["session"]);
     assert_eq!(u.merges().len(), 1);
 }
+
+#[test]
+fn rf1_a_fixer_over_an_implementer_that_ended_on_its_second_account_moves_to_the_blocks_account() {
+    let mut u = U::new();
+    std::fs::create_dir_all(u.t.join("a3")).unwrap();
+    // The implementer is cut before any work on its first account and ends on its second, a3; there
+    // the resumed fixer is cut, and the block's own account a1 (not the record's) is left to it.
+    std::fs::write(u.t.join("bin/mode-a1"), "limit1").unwrap();
+    std::fs::write(u.t.join("bin/mode-a3"), "script").unwrap();
+    let after = format!(
+        "printf script > {}; printf limit45 > {}",
+        u.p("bin/mode-a1"),
+        u.p("bin/mode-a3")
+    );
+    u.script("a3", &format!("{IMPLEMENT}; {after}"));
+    u.script("a1", FIX);
+    u.script("a2", VERIFY_AFTER_FIX);
+    let mut r = r4_request(&u);
+    r["implementer"]["next_accounts"] = json!([u.p("a3")]);
+    let (v, code) = u.run(&r).unwrap();
+    assert_eq!((v["state"].as_str(), code), (Some("merged"), 0), "{v}");
+    // The implementer's two launches, the verifier, the fixer's two, the come-back's verifier.
+    assert_eq!(u.launches, 6);
+    let first = u.record("u1");
+    let implementer = run_record(&first["stages"]["implementer"]);
+    assert_eq!(implementer["account"], u.p("a3"));
+    let fixer = run_record(&first["repair"]["fixer"]);
+    let accounts: Vec<&Value> = fixer["attempts"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|a| &a["account"])
+        .collect();
+    assert_eq!(accounts, [&json!(u.p("a3")), &json!(u.p("a1"))]);
+    assert_eq!(
+        (&fixer["account"], &fixer["state"]),
+        (&json!(u.p("a1")), &json!("ok"))
+    );
+}
