@@ -6,7 +6,7 @@ use serde::Serialize;
 const HELP: &str = "Usage: ap <verb> [< request.json]\n";
 /// Every verb the dispatch below knows: the verb, its request form, the heading of the section of
 /// `crates/ap/README.md` that documents it. `ap --help` prints one line of this table per verb.
-const VERBS: [(&str, &str, &str); 9] = [
+const VERBS: [(&str, &str, &str); 10] = [
     ("version", "version | --version", "The older verbs"),
     ("run", "run < request.json", "One stage"),
     ("gate", "gate < request.json", "The gate"),
@@ -28,6 +28,7 @@ const VERBS: [(&str, &str, &str); 9] = [
         "state <task directory> [--text]",
         "The task's state",
     ),
+    ("row", "row [--store <path>] < row.json", "One row"),
 ];
 fn verb_line(verb: &str, form: &str, heading: &str) -> String {
     format!("  {verb}: ap {form} (README \"{heading}\")\n")
@@ -77,12 +78,12 @@ fn main() -> ExitCode {
             fail("io_error", "stdout", 4)
         };
     }
-    // The verbs without a help of their own (`version`, `accept`) answer with their line of the table.
+    // The verbs without a help of their own (`version`, `accept`, `row`) answer with their line of the table.
     if args.len() == 2
         && args[1] == "--help"
         && let Some((verb, form, heading)) = VERBS
             .iter()
-            .find(|(verb, ..)| matches!(*verb, "version" | "accept") && args[0] == *verb)
+            .find(|(verb, ..)| matches!(*verb, "version" | "accept" | "row") && args[0] == *verb)
     {
         return match io::stdout()
             .lock()
@@ -133,6 +134,9 @@ fn main() -> ExitCode {
     }
     if args.first().is_some_and(|arg| arg == "accept") {
         return ap::page::cli(&args[1..]);
+    }
+    if args.first().is_some_and(|arg| arg == "row") {
+        return ap::row::cli(&args[1..]);
     }
     if args.first().is_some_and(|arg| arg == "deliver") {
         if args.len() == 2 && args[1] == "--help" {
