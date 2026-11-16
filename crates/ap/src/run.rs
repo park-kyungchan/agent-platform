@@ -1467,10 +1467,10 @@ fn attempt(
     if !persist(&q.out, &record) {
         return not_launched(record, "write");
     }
-    if let (Some(home), None) = (&home, &q.home) {
-        if make_home(account, home).is_err() {
-            return not_launched(record, "launch");
-        }
+    if let (Some(home), None) = (&home, &q.home)
+        && make_home(account, home).is_err()
+    {
+        return not_launched(record, "launch");
     }
     let mut argv = args(&[
         "systemd-run",
