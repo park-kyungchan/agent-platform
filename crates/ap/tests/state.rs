@@ -18,6 +18,12 @@ struct Fake {
     ps: Option<Vec<String>>,
     /// `systemctl` cannot reach its manager: exit 1, nothing on stdout.
     systemctl_fails: bool,
+    /// What `systemctl` answers for a unit instead of its `active`/`inactive`: exit success, stdout.
+    words: BTreeMap<String, (bool, String)>,
+    /// `systemctl` cannot be started at all.
+    systemctl_error: bool,
+    /// What `ps` answers instead of its rows: exit success, stdout.
+    ps_reply: Option<(bool, String)>,
     programs: Vec<(String, Vec<String>)>,
 }
 impl Fake {
@@ -26,6 +32,9 @@ impl Fake {
             active: BTreeSet::new(),
             ps: Some(vec!["/usr/lib/systemd/systemd --system".into()]),
             systemctl_fails: false,
+            words: BTreeMap::new(),
+            systemctl_error: false,
+            ps_reply: None,
             programs: vec![],
         }
     }
@@ -43,13 +52,23 @@ impl System for Fake {
         match program {
             "systemctl" => {
                 assert_eq!(args[0], "is-active");
+                if self.systemctl_error {
+                    return Err(ap_failure());
+                }
                 if self.systemctl_fails {
                     return reply(false, String::new());
+                }
+                if let Some((ok, word)) = self.words.get(args.last().unwrap()) {
+                    return reply(*ok, word.clone());
                 }
                 match self.active.contains(args.last().unwrap()) {
                     true => reply(true, "active\n".into()),
                     false => reply(false, "inactive\n".into()),
                 }
+            }
+            "ps" if self.ps_reply.is_some() => {
+                let (ok, text) = self.ps_reply.clone().unwrap();
+                reply(ok, text)
             }
             "ps" => match &self.ps {
                 Some(rows) => reply(true, rows.join("\n") + "\n"),
@@ -147,10 +166,10 @@ fn sr1_task_head_and_uncommitted_lines() {
     let d = Dir::new();
     let mut f = Fake::new();
     let v = state(&mut f, &d);
-    // Without Git: no head, nothing uncommitted.
+    // Without Git: no head, and no answer of `git status` to count.
     assert_eq!(
         (v["task"]["head"].clone(), v["task"]["uncommitted"].clone()),
-        (Value::Null, json!(0))
+        (Value::Null, Value::Null)
     );
     let at = v["at"].as_str().unwrap();
     assert!(
@@ -977,4 +996,239 @@ fn sr1_stale_of_a_stage_is_null_when_systemctl_cannot_be_read() {
     }
     // The call's own rule does not read `systemctl`: no `ap unit` lives, so it is stale.
     assert_eq!(v["units"][0]["calls"][0]["stale"], true);
+}
+
+/// The stamp of the time `ago` seconds before now, in the form of the records.
+fn stamp_ago(ago: u32) -> String {
+    let out = Command::new("date")
+        .args([
+            "-u",
+            "-d",
+            &format!("{ago} seconds ago"),
+            "+%Y-%m-%dT%H:%M:%SZ",
+        ])
+        .output()
+        .unwrap();
+    String::from_utf8(out.stdout).unwrap().trim().to_owned()
+}
+
+/// `stale` of every stage and call of the answer by record path.
+fn stale_of(v: &Value) -> BTreeMap<String, Value> {
+    let mut m = BTreeMap::new();
+    for s in v["stages"].as_array().unwrap() {
+        m.insert(s["record"].as_str().unwrap().to_owned(), s["stale"].clone());
+    }
+    for c in v["units"].as_array().unwrap() {
+        for c in c["calls"].as_array().unwrap() {
+            m.insert(c["record"].as_str().unwrap().to_owned(), c["stale"].clone());
+        }
+    }
+    m
+}
+
+/// A running call `U-<name>` that owns one open stage whose unit is `<name>.scope`, and the
+/// same stage alone as `<name>.run.json`.
+fn call_with_stage(d: &Dir, name: &str, start: &str) {
+    let unit_name = format!("{name}.scope");
+    d.json(
+        &format!("U-{name}.unit.json"),
+        &unit(Value::Null, "running", start, None),
+    );
+    for file in [
+        format!("U-{name}.implementer.md.run.json"),
+        format!("{name}.run.json"),
+    ] {
+        d.json(&file, &stage("implementer", "/a", start, None, &unit_name));
+    }
+}
+
+#[test]
+fn sr1_stale_follows_the_word_of_systemctl_and_not_its_exit() {
+    let d = Dir::new();
+    let words = [
+        ("active", true, "active"),
+        ("activating", true, "activating"),
+        ("deactivating", true, "deactivating"),
+        ("reloading", true, "reloading"),
+        ("refreshing", true, "refreshing"),
+        // A unit that does not exist: exit 4, `inactive`.
+        ("missing", false, "inactive"),
+        ("failed", false, "failed"),
+        ("strange", true, "something-new"),
+        // A word printed with a non-zero exit is still the word.
+        ("exit-with-alive-word", false, "activating"),
+        // No word: nothing to read, whatever the exit.
+        ("silent-ok", true, ""),
+        ("silent-fail", false, ""),
+    ];
+    let mut f = Fake::new();
+    for (name, ok, word) in words {
+        call_with_stage(&d, name, "2026-11-14T10:00:00Z");
+        f.words
+            .insert(format!("{name}.scope"), (ok, format!("{word}\n")));
+    }
+    f.words
+        .insert("silent-ok.scope".into(), (true, "\n".into()));
+    f.ps = Some(vec!["/usr/lib/systemd/systemd".into()]);
+    let m = stale_of(&state(&mut f, &d));
+    let alive = [
+        "active",
+        "activating",
+        "deactivating",
+        "reloading",
+        "refreshing",
+    ];
+    for (name, _, word) in words {
+        let (stage, call) = (
+            &m[&format!("runs/{name}.run.json")],
+            &m[&format!("runs/U-{name}.unit.json")],
+        );
+        let want = match name {
+            "silent-ok" | "silent-fail" => Value::Null,
+            "exit-with-alive-word" => json!(false),
+            _ => json!(!alive.contains(&word)),
+        };
+        assert_eq!(*stage, want, "stage of {name}");
+        // A call is false when its stage lives; with no word it is decided by `ps` (no `ap unit`).
+        let call_want = if want == json!(false) {
+            json!(false)
+        } else {
+            json!(true)
+        };
+        assert_eq!(*call, call_want, "call of {name}");
+    }
+    // The same with `ap unit` alive somewhere: a call no live stage decides is null.
+    f.ps = Some(vec!["ap unit".into()]);
+    let m = stale_of(&state(&mut f, &d));
+    assert_eq!(m["runs/U-missing.unit.json"], Value::Null);
+    assert_eq!(m["runs/U-activating.unit.json"], false);
+    // `systemctl` that cannot be started says nothing, for a stage and for a call.
+    let mut f = Fake::new();
+    f.systemctl_error = true;
+    f.ps = Some(vec!["ap unit".into()]);
+    let m = stale_of(&state(&mut f, &d));
+    for (name, _, _) in words {
+        assert_eq!(m[&format!("runs/{name}.run.json")], Value::Null, "{name}");
+        assert_eq!(
+            m[&format!("runs/U-{name}.unit.json")],
+            Value::Null,
+            "{name}"
+        );
+    }
+    f.ps = Some(vec!["/usr/lib/systemd/systemd".into()]);
+    let m = stale_of(&state(&mut f, &d));
+    assert_eq!(
+        m["runs/U-active.unit.json"], true,
+        "no live stage, no `ap unit`"
+    );
+    assert_eq!(m["runs/active.run.json"], Value::Null);
+}
+
+#[test]
+fn sr1_a_record_under_ten_seconds_old_is_never_stale() {
+    let d = Dir::new();
+    call_with_stage(&d, "young", &stamp_ago(3));
+    call_with_stage(&d, "old", &stamp_ago(60));
+    call_with_stage(&d, "young-alive", &stamp_ago(3));
+    let mut f = Fake::new();
+    f.active.insert("young-alive.scope".into());
+    // Nothing is active but `young-alive`: `ap run` has not started the unit of `young` yet.
+    f.ps = Some(vec!["ap unit".into()]);
+    let m = stale_of(&state(&mut f, &d));
+    assert_eq!(m["runs/young.run.json"], Value::Null);
+    assert_eq!(m["runs/old.run.json"], true);
+    assert_eq!(m["runs/young-alive.run.json"], false);
+    assert_eq!(m["runs/U-young.unit.json"], Value::Null);
+    assert_eq!(m["runs/U-young-alive.unit.json"], false);
+    // A call whose only stage is young is decided by the process table, as any call without a live stage.
+    f.ps = Some(vec!["/usr/lib/systemd/systemd".into()]);
+    assert_eq!(stale_of(&state(&mut f, &d))["runs/U-young.unit.json"], true);
+}
+
+#[test]
+fn sr1_stale_of_a_call_is_null_when_ps_was_not_read() {
+    let d = Dir::new();
+    d.json(
+        "U-gone.unit.json",
+        &unit(Value::Null, "running", "2026-11-14T10:00:00Z", None),
+    );
+    call_with_stage(&d, "live", "2026-11-14T11:00:00Z");
+    d.json(
+        "U-merged.unit.json",
+        &unit(
+            Value::Null,
+            "merged",
+            "2026-11-14T12:00:00Z",
+            Some("2026-11-14T12:10:00Z"),
+        ),
+    );
+    for reply in [
+        (false, String::new()),
+        (false, "ps: error\n".to_owned()),
+        (true, String::new()),
+        (true, "  \n".to_owned()),
+    ] {
+        let mut f = Fake::new();
+        f.active.insert("live.scope".into());
+        f.ps_reply = Some(reply.clone());
+        let m = stale_of(&state(&mut f, &d));
+        assert_eq!(m["runs/U-gone.unit.json"], Value::Null, "{reply:?}");
+        // A live stage decides without `ps`; a call that does not run is null.
+        assert_eq!(m["runs/U-live.unit.json"], false, "{reply:?}");
+        assert_eq!(m["runs/live.run.json"], false, "{reply:?}");
+        assert_eq!(m["runs/U-merged.unit.json"], Value::Null, "{reply:?}");
+    }
+    // A table that was read (exit 0, rows without `ap unit`) still says true.
+    let mut f = Fake::new();
+    f.ps_reply = Some((true, "bash\n".into()));
+    assert_eq!(stale_of(&state(&mut f, &d))["runs/U-gone.unit.json"], true);
+}
+
+#[test]
+fn sr1_git_runs_no_hook_of_the_repository_and_a_failed_status_is_null() {
+    let d = Dir::new();
+    d.git(&["init", "-q"]);
+    d.json(
+        "a.run.json",
+        &stage(
+            "implementer",
+            "/a",
+            "2026-11-14T10:00:00Z",
+            Some("2026-11-14T10:10:00Z"),
+            "u",
+        ),
+    );
+    d.git(&["add", "-A"]);
+    d.git(&["commit", "-qm", "a"]);
+    // A hook named by the repository's own configuration leaves a mark outside the tree.
+    let aside = std::env::temp_dir().join(format!("ap-state-hook-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&aside);
+    std::fs::create_dir_all(&aside).unwrap();
+    let (hook, mark) = (aside.join("hook.sh"), aside.join("ran"));
+    std::fs::write(
+        &hook,
+        format!("#!/bin/sh\ntouch {}\nexit 1\n", mark.display()),
+    )
+    .unwrap();
+    std::fs::set_permissions(&hook, std::os::unix::fs::PermissionsExt::from_mode(0o755)).unwrap();
+    d.git(&["config", "core.fsmonitor", hook.to_str().unwrap()]);
+    let mut f = Fake::new();
+    let v = state(&mut f, &d);
+    assert!(!mark.exists(), "the repository's fsmonitor hook ran");
+    assert_eq!(v["task"]["uncommitted"], 0);
+    for (_, args) in f.programs.iter().filter(|(p, _)| p == "git") {
+        let flags: Vec<_> = args.iter().map(String::as_str).collect();
+        assert!(
+            flags
+                .windows(2)
+                .any(|w| w == ["-c", "core.fsmonitor=false"]),
+            "{flags:?}"
+        );
+    }
+    let _ = std::fs::remove_dir_all(&aside);
+    // `git status` fails on a corrupt index: no count, the head is still read.
+    std::fs::write(d.0.join(".git/index"), "not an index").unwrap();
+    let v = state(&mut f, &d);
+    assert_eq!(v["task"]["uncommitted"], Value::Null);
+    assert_eq!(v["task"]["head"], d.git(&["rev-parse", "HEAD"]));
 }

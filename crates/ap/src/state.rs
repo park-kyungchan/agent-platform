@@ -5,8 +5,12 @@ use crate::host::{Failure, System, args, error};
 use crate::run::stamp;
 use serde_json::{Value, json};
 use std::{
-    collections::BTreeMap, ffi::OsString, io::Write, path::Path, process::ExitCode,
-    time::SystemTime,
+    collections::BTreeMap,
+    ffi::OsString,
+    io::Write,
+    path::Path,
+    process::ExitCode,
+    time::{Duration, SystemTime},
 };
 
 /// A record that parsed: its path relative to the task directory and its object.
@@ -55,7 +59,16 @@ fn records(runs: &Path, suffix: &str, bad: &mut Vec<String>) -> Vec<Rec> {
     out.sort_by(|a, b| (a.str("start"), &a.path).cmp(&(b.str("start"), &b.path)));
     out
 }
-/// Whether `systemctl is-active` answers `active` for the unit; None when it cannot be asked.
+/// The words of `systemctl is-active` while something of a unit may live.
+const ALIVE: [&str; 5] = [
+    "active",
+    "activating",
+    "deactivating",
+    "reloading",
+    "refreshing",
+];
+/// Whether the unit may live by `systemctl is-active`: the word on stdout decides and the exit is
+/// not read (a unit that does not exist answers `inactive` with exit 4); None when there is no word.
 fn active(s: &mut impl System, unit: &Value) -> Option<bool> {
     let unit = unit
         .as_str()
@@ -66,16 +79,18 @@ fn active(s: &mut impl System, unit: &Value) -> Option<bool> {
         &Value::Null,
         10_000,
     );
-    // An answer is a word on stdout; a call that printed none (no manager to ask) says nothing.
-    let reply = reply.ok()?;
-    let word = String::from_utf8_lossy(&reply.stdout);
-    (!word.trim().is_empty()).then(|| word.trim() == "active")
+    let word = String::from_utf8_lossy(&reply.ok()?.stdout)
+        .trim()
+        .to_owned();
+    (!word.is_empty()).then(|| ALIVE.contains(&word.as_str()))
 }
-/// Whether a process of `ap unit` lives; None when the process table cannot be read.
+/// Whether a process of `ap unit` lives; None when the process table was not read (a failed call,
+/// a non-zero exit or no output: `ps` lists at least itself).
 fn unit_lives(s: &mut impl System) -> Option<bool> {
     let table = s
         .call("ps", &args(&["-eo", "args="]), &Value::Null, 10_000)
-        .ok()?;
+        .ok()
+        .filter(|t| t.success && !t.stdout.trim_ascii().is_empty())?;
     let text = String::from_utf8_lossy(&table.stdout);
     Some(text.lines().any(|line| {
         let mut words = line.split_whitespace();
@@ -84,7 +99,13 @@ fn unit_lives(s: &mut impl System) -> Option<bool> {
     }))
 }
 fn git(s: &mut impl System, dir: &str, rest: &[&str]) -> Option<String> {
-    let mut a = args(&["--no-optional-locks", "-C", dir]);
+    let mut a = args(&[
+        "--no-optional-locks",
+        "-c",
+        "core.fsmonitor=false",
+        "-C",
+        dir,
+    ]);
     a.extend(args(rest));
     let reply = s.call("git", &a, &Value::Null, 30_000).ok()?;
     reply
@@ -114,19 +135,24 @@ pub fn execute(s: &mut impl System, argv: &[String]) -> Result<String, Failure> 
     }
     let root_text = root.to_string_lossy().into_owned();
     let head = git(s, &root_text, &["rev-parse", "HEAD"]).map(|h| h.trim().to_owned());
-    let uncommitted =
-        git(s, &root_text, &["status", "--porcelain"]).map_or(0, |o| o.lines().count());
+    let uncommitted = git(s, &root_text, &["status", "--porcelain"]).map(|o| o.lines().count());
 
     let mut unreadable = vec![];
     let calls = records(&runs, ".unit.json", &mut unreadable);
     let stage_records = records(&runs, ".run.json", &mut unreadable);
     unreadable.sort();
 
-    // The state of each stage record: live or not, for the ones that say they run.
+    // The state of each stage record: live or not, for the ones that say they run. `ap run` writes
+    // the record before it starts the unit: a record under 10 seconds old is never stale.
+    let now = SystemTime::now();
+    let young = stamp(now - Duration::from_secs(10));
     let mut stale: BTreeMap<&str, Option<bool>> = BTreeMap::new();
     for st in stage_records.iter().filter(|r| r.v["end"].is_null()) {
-        let live = active(s, &st.v["unit"]);
-        stale.insert(&st.path, live.map(|a| !a));
+        let gone = active(s, &st.v["unit"]).map(|a| !a);
+        stale.insert(
+            &st.path,
+            gone.filter(|g| !(*g && st.str("start") > &*young)),
+        );
     }
     let table = calls
         .iter()
@@ -243,7 +269,7 @@ pub fn execute(s: &mut impl System, argv: &[String]) -> Result<String, Failure> 
         .map(|(account, (_, r))| json!({"account": account, "record": r.path, "limit": r.get("limit")}))
         .collect();
 
-    let v = json!({"at": stamp(SystemTime::now()),
+    let v = json!({"at": stamp(now),
         "task": {"dir": root_text, "head": head, "uncommitted": uncommitted},
         "units": units, "stages": stages, "streams_without_record": streams,
         "limits": limits, "unreadable": unreadable});
