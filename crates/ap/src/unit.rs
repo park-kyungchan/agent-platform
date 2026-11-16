@@ -138,7 +138,7 @@ fn stage_request(r: &Value, which: &str, prompt: &str) -> Value {
     if which == "verifier" {
         req["expect"] = json!({"first_line": "Verdict: *"});
     }
-    // Only a stage on Claude Code has a default mode: a Codex or Muse stage states its own or is refused.
+    // Only a stage on Claude Code has a default mode: a stage on another runtime states its own or is refused.
     let claude = matches!(req["runtime"].as_str(), None | Some("claude"));
     if req.get("permission_mode").is_none() && claude {
         req["permission_mode"] = json!("auto");

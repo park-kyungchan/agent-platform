@@ -22,6 +22,7 @@ static NEXT: AtomicU32 = AtomicU32::new(0);
 const FAKE: &str = include_str!("fixtures/fake-claude.sh");
 const FAKE_CODEX: &str = include_str!("fixtures/fake-codex.sh");
 const FAKE_MUSE: &str = include_str!("fixtures/fake-muse.sh");
+const FAKE_AGY: &str = include_str!("fixtures/fake-agy.sh");
 const BRANCH: &str = "ap/unit-test";
 const IMPLEMENTER_PROMPT: &str = "Implement the page.\n";
 const VERIFIER_PROMPT: &str = "LEAD VERIFIER PROMPT: review the candidate under REVIEW.md.\n";
@@ -128,6 +129,7 @@ impl U {
         write_exec(&t.join("bin/claude"), FAKE);
         write_exec(&t.join("bin/codex"), FAKE_CODEX);
         write_exec(&t.join("bin/muse"), FAKE_MUSE);
+        write_exec(&t.join("bin/agy"), FAKE_AGY);
         std::fs::write(t.join("bin/mode-a1"), "script").unwrap();
         std::fs::write(t.join("bin/mode-a2"), "script").unwrap();
         std::fs::write(t.join("bin/script-a1.sh"), IMPLEMENT).unwrap();
@@ -780,7 +782,7 @@ impl System for U {
     ) -> std::io::Result<Child> {
         self.launches += 1;
         let at = argv.iter().position(|a| a == "--").unwrap();
-        assert!(["claude", "codex", "muse"].contains(&argv[at + 1].as_str()));
+        assert!(["claude", "codex", "muse", "agy"].contains(&argv[at + 1].as_str()));
         let unit = argv[..at]
             .iter()
             .find_map(|a| a.strip_prefix("--unit="))
@@ -5552,4 +5554,130 @@ fn rf1_a_fixer_over_an_implementer_that_ended_on_its_second_account_moves_to_the
         (&fixer["account"], &fixer["state"]),
         (&json!(u.p("a1")), &json!("ok"))
     );
+}
+
+// ---- runtime agy: a verifier block of a unit (tests/fixtures/fake-agy.sh) ----------------------
+
+/// A request whose verifier runs on the Antigravity CLI in the home `g1` (the fake's script of a
+/// home is keyed by its name); its implementer is the usual Claude one.
+fn agy_request(u: &U) -> Value {
+    let token = u.t.join("g1/.gemini/antigravity-cli");
+    std::fs::create_dir_all(&token).unwrap();
+    std::fs::write(u.t.join("token"), "not-a-token").unwrap();
+    let _ = std::os::unix::fs::symlink(u.t.join("token"), token.join("antigravity-oauth-token"));
+    std::fs::write(u.t.join("bin/mode-g1"), "script").unwrap();
+    u.script("g1", VERIFY_ACCEPT);
+    let mut r = u.request();
+    r["verifier"] = json!({"runtime":"agy","account":u.p("g1"),"model":"gemini-4-hydrogen-medium",
+        "effort":"medium","permission_mode":"bypassPermissions","prompt":u.p("judge/verifier.md")});
+    r
+}
+/// The calls of the fake `agy` (its home under the account `g1`, then its arguments), in order.
+fn agy_lines(u: &U) -> Vec<String> {
+    let home = format!("{}/homes/", u.p("g1"));
+    launch_lines(u)
+        .into_iter()
+        .filter(|l| l.starts_with(&home))
+        .collect()
+}
+
+#[test]
+fn agy_an_implementer_or_a_fixer_block_is_refused_before_any_effect() {
+    let mut u = U::new();
+    let mut r = agy_request(&u);
+    // The implementer block (and so the fixer, which is made from it) on `agy`: `ap run`'s error.
+    r["implementer"] = json!({"runtime":"agy","account":u.p("g1"),"model":"gemini-4-hydrogen-medium",
+        "effort":"medium","permission_mode":"bypassPermissions","prompt":u.p("judge/implementer.md")});
+    assert_eq!(code(u.run(&r)), "invalid_input@implementer.role");
+    // The verifier block's own refusals are the stage's, under its field.
+    let bad = [
+        ("permission_mode", json!("auto"), "permission_mode"),
+        ("account", json!(u.p("a1")), "account"),
+        ("effort", json!("high"), "effort"),
+        ("model", json!("-x"), "model"),
+        ("next_accounts", json!([u.p("g1")]), "next_accounts"),
+        ("compact_window", json!(400_000), "compact_window"),
+    ];
+    for (member, value, field) in bad {
+        let mut r = agy_request(&u);
+        r["verifier"][member] = value;
+        assert_eq!(
+            code(u.run(&r)),
+            format!("invalid_input@verifier.{field}"),
+            "{member}"
+        );
+    }
+    let mut r = agy_request(&u);
+    r["verifier"]
+        .as_object_mut()
+        .unwrap()
+        .remove("permission_mode");
+    assert_eq!(code(u.run(&r)), "invalid_input@verifier.permission_mode");
+    assert_eq!(names(&u.t.join("work/task")), ["TASK.md"]);
+    assert!(!u.wt().exists());
+    assert_eq!(branches(&u), "* main");
+    assert_eq!((u.launches, u.calls.len()), (0, 0));
+}
+
+#[test]
+fn agy_a_unit_whose_verifier_runs_on_agy_is_accepted() {
+    let mut u = U::new();
+    let (v, exit) = u.run(&agy_request(&u)).unwrap();
+    assert_eq!((v["state"].as_str(), exit), (Some("merged"), 0), "{v}");
+    let verifier = stage_record(&v["stages"]["verifier"]);
+    assert_eq!(
+        (
+            verifier["runtime"].as_str(),
+            verifier["role"].as_str(),
+            verifier["state"].as_str()
+        ),
+        (Some("agy"), Some("reviewer"), Some("ok"))
+    );
+    assert_eq!(verifier["model"], "gemini-4-hydrogen-medium");
+    assert_eq!(
+        stage_record(&v["stages"]["implementer"])["runtime"],
+        "claude"
+    );
+    let lines = agy_lines(&u);
+    assert_eq!(lines.len(), 1, "{lines:?}");
+    let tail = " --output-format stream-json --model gemini-4-hydrogen-medium --dangerously-skip-permissions --print-timeout 3300s";
+    assert!(lines[0].ends_with(tail), "{}", lines[0]);
+}
+
+#[test]
+fn agy_the_second_look_of_an_agy_verifier_resumes_its_record() {
+    let mut u = U::new();
+    let mut r = agy_request(&u);
+    let round = r4_request(&u);
+    r["repair"] = round["repair"].clone();
+    fixing(&u, FIX);
+    u.script("g1", VERIFY_AFTER_FIX);
+    let (v, exit) = u.run(&r).unwrap();
+    assert_eq!((v["state"].as_str(), exit), (Some("merged"), 0), "{v}");
+    let first = u.record("u1");
+    let before = run_record(&first["stages"]["verifier"]);
+    let after = run_record(&v["stages"]["verifier"]);
+    assert_eq!(
+        (before["runtime"].as_str(), after["runtime"].as_str()),
+        (Some("agy"), Some("agy"))
+    );
+    // The come-back's verifier continues the first verifier's conversation.
+    let session = before["session"].as_str().unwrap();
+    assert_eq!(session.len(), 36);
+    assert_eq!(after["session"], session);
+    let lines = agy_lines(&u);
+    assert_eq!(lines.len(), 2, "{lines:?}");
+    assert!(!lines[0].contains(" --conversation "), "{}", lines[0]);
+    assert!(
+        lines[1].ends_with(&format!(" --conversation {session}")),
+        "{}",
+        lines[1]
+    );
+    // The second look runs in the home of the first record (the fake fails a conversation its home
+    // lacks), which holds a `.gemini/config` as the CLI leaves it, while the account holds none.
+    let home = before["home"].as_str().unwrap();
+    assert_eq!(after["home"], home);
+    assert!(lines.iter().all(|l| l.starts_with(&format!("{home}|"))));
+    assert!(std::path::Path::new(home).join(".gemini/config").is_dir());
+    assert!(!u.t.join("g1/.gemini/config").exists());
 }
