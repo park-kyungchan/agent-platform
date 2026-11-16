@@ -565,7 +565,7 @@ fn a1_reviewer_cut_after_work_goes_to_the_next_account() {
     assert_eq!((status, v["state"].as_str()), (75, Some("cut")));
     assert_eq!(f.calls().len(), 2);
     assert_eq!(v["account"], f.p("a2"));
-    // A resume never changes account.
+    // A resume of a cut record, which holds no answer path, stays on its account (RF1 pins the move).
     f.reset_calls();
     let resume = f.resume(r, "rv3.md", "rv2.md");
     let (_, status) = f.run(&resume).unwrap();
@@ -732,7 +732,7 @@ fn a2_cut_before_work_tries_the_next_account() {
     let (v, status) = f.run(&f_request_with_next(&f, "x.md")).unwrap();
     assert_eq!((status, v["state"].as_str()), (75, Some("cut")));
     assert!(!Path::new(&f.p("x.md")).exists());
-    // A resume never goes to another account.
+    // A resume of a cut record, which holds no answer path, stays on its account (RF1 pins the move).
     f.reset_calls();
     let resume = f.resume(f_request_with_next(&f, "x.md"), "x2.md", "x.md");
     let (_, status) = f.run(&resume).unwrap();
@@ -2921,8 +2921,8 @@ fn cut1_a_resumed_stage_has_no_continuation_and_its_limit_says_what_cut_it() {
     let (v, status) = f.run(&r).unwrap();
     assert_eq!((status, v["state"].as_str()), (75, Some("cut")));
     assert_eq!(f.count(), "2");
-    // The record's account is the last launch's; the resume runs there alone, and its input is the
-    // prompt file's bytes, the text not given.
+    // The record's account is the last launch's and the record holds no answer path: the resume
+    // runs there alone, and its input is the prompt file's bytes, the text not given.
     let (v, status) = f.run(&f.resume(r, "c2.md", "c.md")).unwrap();
     assert_eq!((status, v["state"].as_str()), (75, Some("cut")));
     assert_eq!(f.count(), "3");
@@ -2989,4 +2989,384 @@ fn cut1_a_codex_stage_has_a_null_limit_and_one_entry() {
     assert!(attempts[0]["limit"].is_null());
     assert_eq!(attempts[0]["session"], v["session"]);
     assert_eq!(attempts[0]["worked"], true);
+}
+
+// ---- RF1: a resumed stage cut by a usage limit goes on as a new session on the next account -----
+
+/// What a launch after a cut launch of a resumed call reads before the prompt's bytes: one line and
+/// one empty line, `p` the resumed record's prompt path and `a` its answer path.
+fn moved_text(role: &str, p: &str, a: &str) -> String {
+    let mut t = format!(
+        "This stage was to resume an earlier session, and a usage limit cut that session on its account. You are a new session and hold nothing of what it read or wrote: before anything else read completely the prompt it was given, the file {p}, and the answer it gave, the file {a}. The task below was written for that session: where it speaks of what you did, wrote or were told, it means that session, its answer and its prompt."
+    );
+    if role != "reviewer" {
+        t += " This directory holds its work, committed or not. Read the state it left: in a Git worktree `git status`, `git log --oneline origin/main..HEAD` and `git diff HEAD`. Keep what serves the task, do not start over, and go on until the task below is done.";
+    }
+    t + "\n\n"
+}
+const AGAIN: &[u8] = b"go on\n";
+
+impl Fake {
+    /// A first run of `role` on `account` that ends ok: the record a resume names.
+    fn first(&mut self, role: &str, account: &str, out: &str) -> Value {
+        let mut r = self.request(out);
+        (r["role"], r["account"]) = (json!(role), json!(self.p(account)));
+        let (v, status) = self.run(&r).unwrap();
+        assert_eq!((status, v["state"].as_str()), (0, Some("ok")), "{v}");
+        v
+    }
+    /// The resumed call: `role`, the prompt file `again.md`, `account` and `next` as the request's.
+    fn resumed(&self, role: &str, out: &str, earlier: &str, account: &str, next: &[&str]) -> Value {
+        std::fs::write(self.t.join("again.md"), AGAIN).unwrap();
+        let mut r = self.with_next(role, out, next);
+        (r["account"], r["prompt"]) = (json!(self.p(account)), json!(self.p("again.md")));
+        self.resume(r, out, earlier)
+    }
+    /// The accounts the fake's calls ran on, in order.
+    fn accounts(&self) -> Vec<String> {
+        let dir = format!("{}/", self.t.display());
+        let on = |c: &str| c.split('|').next().unwrap().replace(&dir, "");
+        self.calls().iter().map(|c| on(c)).collect()
+    }
+    /// The record file of `out`, rewritten by `change`.
+    fn tamper(&self, out: &str, change: impl FnOnce(&mut Value)) {
+        let mut rec = self.record(out);
+        change(&mut rec);
+        std::fs::write(
+            self.p(&format!("{out}.run.json")),
+            serde_json::to_vec(&rec).unwrap(),
+        )
+        .unwrap();
+    }
+}
+
+#[test]
+fn rf1_the_accounts_of_a_resumed_call_are_the_records_then_the_requests_without_repetition() {
+    let mut f = Fake::new();
+    std::fs::create_dir_all(f.t.join("a3")).unwrap();
+    // The record's account is a2: first, then the request's `account` and `next_accounts` in order.
+    f.first("reviewer", "a2", "o1.md");
+    for a in ["a1", "a2", "a3"] {
+        f.mode(a, "limit1");
+    }
+    f.reset_calls();
+    let r = f.resumed(
+        "reviewer",
+        "o2.md",
+        "o1.md",
+        "a1",
+        &["a2", "a3", "a1", "a3"],
+    );
+    let (v, status) = f.run(&r).unwrap();
+    assert_eq!((status, v["state"].as_str()), (75, Some("cut")), "{v}");
+    assert_eq!(f.accounts(), ["a2", "a1", "a3"]);
+    assert_eq!(v["attempts"].as_array().unwrap().len(), 3);
+    // Whatever the order of the request.
+    f.reset_calls();
+    let r = f.resumed("reviewer", "o3.md", "o1.md", "a3", &["a1", "a2"]);
+    f.run(&r).unwrap();
+    assert_eq!(f.accounts(), ["a2", "a3", "a1"]);
+    f.reset_calls();
+    let r = f.resumed("reviewer", "o4.md", "o1.md", "a2", &["a3", "a1"]);
+    f.run(&r).unwrap();
+    assert_eq!(f.accounts(), ["a2", "a3", "a1"]);
+    // The record's account must still be one of the request's.
+    let r = f.resumed("reviewer", "o5.md", "o1.md", "a1", &["a3"]);
+    assert_eq!(code(f.run(&r)), "resume_account_differs@account");
+}
+
+#[test]
+fn rf1_a_resumed_launch_cut_goes_on_as_a_new_session_with_the_text_and_the_prompt() {
+    let mut f = Fake::new();
+    let cases = [
+        ("implementer", "fixer", "limit45"),
+        ("implementer", "fixer", "limit1"),
+        ("reviewer", "reviewer", "limit45"),
+        ("reviewer", "reviewer", "limit1"),
+    ];
+    for (n, (was, role, mode)) in cases.into_iter().enumerate() {
+        let (first, out) = (format!("f{n}.md"), format!("g{n}.md"));
+        f.clear("a1");
+        let rec = f.first(was, "a1", &first);
+        let session = rec["session"].as_str().unwrap().to_owned();
+        f.mode("a1", mode);
+        f.reset_calls();
+        let before = f.count_now();
+        let (v, status) = f
+            .run(&f.resumed(role, &out, &first, "a1", &["a2"]))
+            .unwrap();
+        let why = format!("{role} {mode} {v}");
+        assert_eq!((status, v["state"].as_str()), (0, Some("ok")), "{why}");
+        let calls = f.calls();
+        assert_eq!(calls.len(), 2, "{why}");
+        // The first launch resumes the record's session on its account, with the prompt file alone.
+        assert!(calls[0].starts_with(&format!("{}|", f.p("a1"))), "{why}");
+        assert!(calls[0].ends_with(&format!("--resume {session}")), "{why}");
+        assert_eq!(f.input(before + 1), AGAIN, "{why}");
+        // The next is a new session on the next account: no resume argument.
+        assert!(calls[1].starts_with(&format!("{}|", f.p("a2"))), "{why}");
+        assert!(!calls[1].contains("--resume"), "{why}");
+        let new = calls[1].split("--session-id ").nth(1).unwrap()[..36].to_owned();
+        assert_ne!(new, session, "{why}");
+        // Its input: the text (the record's two paths), an empty line, the prompt file's bytes.
+        let (p, a) = (f.p("prompt.md"), f.p(&first));
+        assert_eq!(
+            f.input(before + 2),
+            [moved_text(role, &p, &a).as_bytes(), AGAIN].concat(),
+            "{why}"
+        );
+        // The record: one entry per launch, the first with the resumed session, the last one's members.
+        let attempts = v["attempts"].as_array().unwrap();
+        assert_eq!(attempts.len(), 2, "{why}");
+        assert_eq!(attempts[0]["session"], session.as_str(), "{why}");
+        assert_eq!(attempts[0]["state"], "cut", "{why}");
+        assert_eq!(attempts[0]["worked"], mode == "limit45", "{why}");
+        assert_eq!(attempts[1]["session"], new.as_str(), "{why}");
+        assert_eq!(
+            (&attempts[0]["continued"], &attempts[1]["continued"]),
+            (&json!(false), &json!(false))
+        );
+        assert_eq!(
+            (&v["session"], &v["account"]),
+            (&json!(new), &json!(f.p("a2"))),
+            "{why}"
+        );
+        assert_eq!(v["resumes"], f.p(&format!("{first}.run.json")), "{why}");
+        assert_eq!(
+            v["prompt"],
+            json!({"path": f.p("again.md"), "sha256": f.sha("again.md")})
+        );
+        assert_eq!(f.record(&out), v, "{why}");
+        assert!(std::fs::metadata(f.p(&out)).unwrap().len() > 0, "{why}");
+    }
+}
+
+#[test]
+fn rf1_a_second_cut_goes_on_with_a_third_account_and_the_same_input() {
+    let mut f = Fake::new();
+    std::fs::create_dir_all(f.t.join("a3")).unwrap();
+    for (n, (was, role, mode)) in [
+        ("implementer", "fixer", "limit45"),
+        ("reviewer", "reviewer", "limit1"),
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        let (first, out) = (format!("s{n}.md"), format!("u{n}.md"));
+        for a in ["a1", "a2", "a3"] {
+            f.clear(a);
+        }
+        let session = f.first(was, "a1", &first)["session"].clone();
+        f.mode("a1", mode);
+        f.mode("a2", mode);
+        let before = f.count_now();
+        let (v, status) = f
+            .run(&f.resumed(role, &out, &first, "a1", &["a2", "a3"]))
+            .unwrap();
+        assert_eq!((status, v["state"].as_str()), (0, Some("ok")), "{role} {v}");
+        assert_eq!(f.count_now(), before + 3);
+        let want = [
+            moved_text(role, &f.p("prompt.md"), &f.p(&first)).as_bytes(),
+            AGAIN,
+        ]
+        .concat();
+        assert_eq!(f.input(before + 1), AGAIN);
+        assert_eq!(
+            (f.input(before + 2), f.input(before + 3)),
+            (want.clone(), want)
+        );
+        let attempts = v["attempts"].as_array().unwrap();
+        assert_eq!(attempts.len(), 3);
+        let sessions: Vec<&Value> = attempts.iter().map(|a| &a["session"]).collect();
+        assert_eq!(sessions[0], &session);
+        assert!(
+            sessions[1] != sessions[0] && sessions[2] != sessions[1] && sessions[2] != sessions[0]
+        );
+        assert!(attempts.iter().all(|a| a["continued"] == false));
+        assert_eq!(
+            (&v["account"], &v["session"]),
+            (&json!(f.p("a3")), sessions[2])
+        );
+        // With every account cut, the last launch's record ends the call as cut.
+        f.mode("a3", mode);
+        let before = f.count_now();
+        let r = f.resumed(role, &format!("w{n}.md"), &first, "a1", &["a2", "a3"]);
+        let (v, status) = f.run(&r).unwrap();
+        assert_eq!((status, v["state"].as_str()), (75, Some("cut")));
+        assert_eq!(f.count_now(), before + 3);
+        assert_eq!(v["attempts"].as_array().unwrap().len(), 3);
+    }
+}
+
+#[test]
+fn rf1_no_move_without_another_account() {
+    let mut f = Fake::new();
+    f.first("implementer", "a1", "n1.md");
+    f.mode("a1", "limit45");
+    // No `next_accounts`, one that names only the record's account, and one that repeats it.
+    for (n, next) in [vec![], vec!["a1"], vec!["a1", "a1"]]
+        .into_iter()
+        .enumerate()
+    {
+        let before = f.count_now();
+        let r = f.resumed("fixer", &format!("n{}.md", n + 2), "n1.md", "a1", &next);
+        let (v, status) = f.run(&r).unwrap();
+        assert_eq!((status, v["state"].as_str()), (75, Some("cut")), "{next:?}");
+        assert_eq!(f.count_now(), before + 1, "{next:?}");
+        assert_eq!(f.input(before + 1), AGAIN);
+        assert_eq!(v["attempts"].as_array().unwrap().len(), 1);
+        assert_eq!(v["limit"]["status"], "rejected");
+    }
+}
+
+#[test]
+fn rf1_no_move_when_the_record_lacks_a_path_or_a_path_is_unfit() {
+    let mut f = Fake::new();
+    type Change = Box<dyn Fn(&mut Value)>;
+    let cases: Vec<(&str, Change)> = vec![
+        ("no answer", Box::new(|r| r["answer"] = Value::Null)),
+        (
+            "answer path missing",
+            Box::new(|r| r["answer"] = json!({"sha256": "x"})),
+        ),
+        (
+            "answer path not a string",
+            Box::new(|r| r["answer"]["path"] = json!(7)),
+        ),
+        ("no prompt", Box::new(|r| r["prompt"] = Value::Null)),
+        (
+            "prompt path not a string",
+            Box::new(|r| r["prompt"]["path"] = json!(["/p.md"])),
+        ),
+        (
+            "newline",
+            Box::new(|r| r["prompt"]["path"] = json!("/p\n.md")),
+        ),
+        (
+            "escape",
+            Box::new(|r| r["answer"]["path"] = json!("/a\u{1b}[0m.md")),
+        ),
+        (
+            "delete",
+            Box::new(|r| r["answer"]["path"] = json!("/a\u{7f}.md")),
+        ),
+        ("tab", Box::new(|r| r["prompt"]["path"] = json!("/p\t.md"))),
+        (
+            "out named in the prompt path",
+            Box::new(|r| r["prompt"]["path"] = json!("/x/zz.md")),
+        ),
+        (
+            "out named in the answer path",
+            Box::new(|r| r["answer"]["path"] = json!("/x/zz.md.old")),
+        ),
+    ];
+    for (n, (what, change)) in cases.into_iter().enumerate() {
+        f.clear("a1");
+        let first = format!("m{n}.md");
+        f.first("fixer", "a1", &first);
+        f.tamper(&first, change);
+        f.mode("a1", "limit45");
+        let before = f.count_now();
+        let r = f.resumed("fixer", "zz.md", &first, "a1", &["a2"]);
+        let (v, status) = f.run(&r).unwrap();
+        assert_eq!((status, v["state"].as_str()), (75, Some("cut")), "{what}");
+        assert_eq!(f.count_now(), before + 1, "{what}");
+        assert_eq!(v["attempts"].as_array().unwrap().len(), 1, "{what}");
+        f.reset_calls();
+        f.clear("a1");
+        std::fs::remove_file(f.p("zz.md.run.json")).unwrap();
+        let _ = std::fs::remove_file(f.p("zz.md.stream.jsonl"));
+        let _ = std::fs::remove_file(f.p("zz.md.err"));
+    }
+}
+
+#[test]
+fn rf1_no_move_after_a_resumed_launch_that_did_not_end_cut() {
+    let mut f = Fake::new();
+    f.first("fixer", "a1", "k1.md");
+    let cases = [
+        ("ok", "", 0, "ok"),
+        ("failed", "noout", 3, "failed"),
+        ("no_result", "", 3, "no_result"),
+        ("timeout", "other", 3, "timeout"),
+    ];
+    for (n, (what, mode, want, state)) in cases.into_iter().enumerate() {
+        f.clear("a1");
+        if !mode.is_empty() {
+            f.mode("a1", mode);
+        }
+        let before = f.count_now();
+        let mut r = f.resumed("fixer", &format!("k{}.md", n + 2), "k1.md", "a1", &["a2"]);
+        match what {
+            "no_result" => r["expect"] = json!({"first_line": "Never *"}),
+            "timeout" => r["timeout_seconds"] = json!(2),
+            _ => (),
+        }
+        let (v, status) = f.run(&r).unwrap();
+        assert_eq!(
+            (status, v["state"].as_str()),
+            (want, Some(state)),
+            "{what} {v}"
+        );
+        assert_eq!(f.count_now(), before + 1, "{what}");
+        assert_eq!(v["attempts"].as_array().unwrap().len(), 1, "{what}");
+    }
+}
+
+#[test]
+fn rf1_a_moved_record_is_resumed_on_its_new_session_and_account() {
+    let mut f = Fake::new();
+    f.first("fixer", "a1", "r1.md");
+    f.mode("a1", "limit45");
+    let (v2, _) = f
+        .run(&f.resumed("fixer", "r2.md", "r1.md", "a1", &["a2"]))
+        .unwrap();
+    assert_eq!(
+        (v2["state"].as_str(), v2["account"].clone()),
+        (Some("ok"), json!(f.p("a2")))
+    );
+    // The next resume starts on a2 with the new session, never on a1 (still at its limit).
+    f.reset_calls();
+    f.mode("a2", "limit45");
+    f.clear("a1");
+    let before = f.count_now();
+    let r = f.resumed("fixer", "r3.md", "r2.md", "a1", &["a2"]);
+    let (v3, status) = f.run(&r).unwrap();
+    assert_eq!((status, v3["state"].as_str()), (0, Some("ok")), "{v3}");
+    let calls = f.calls();
+    assert_eq!(f.accounts(), ["a2", "a1"]);
+    assert!(calls[0].ends_with(&format!("--resume {}", v2["session"].as_str().unwrap())));
+    assert!(!calls[1].contains("--resume"));
+    // The paths are those of the record the request names (r2 resumed r1 and its prompt is again.md).
+    let want = [
+        moved_text("fixer", &f.p("again.md"), &f.p("r2.md")).as_bytes(),
+        AGAIN,
+    ]
+    .concat();
+    assert_eq!(f.input(before + 2), want);
+    assert_eq!(v3["resumes"], f.p("r2.md.run.json"));
+}
+
+#[test]
+fn rf1_the_text_holds_each_path_byte_for_byte_whatever_the_other_path_holds() {
+    let mut f = Fake::new();
+    // An absolute path may hold the literal `{A}` that a naive substitution would replace again.
+    std::fs::create_dir_all(f.t.join("{A}")).unwrap();
+    std::fs::write(f.t.join("{A}/p.md"), "review this\n").unwrap();
+    let mut r = f.request("pa.md");
+    r["prompt"] = json!(f.p("{A}/p.md"));
+    let (v, status) = f.run(&r).unwrap();
+    assert_eq!((status, v["state"].as_str()), (0, Some("ok")), "{v}");
+    f.mode("a1", "limit1");
+    let before = f.count_now();
+    let r = f.resumed("reviewer", "pb.md", "pa.md", "a1", &["a2"]);
+    let (v, status) = f.run(&r).unwrap();
+    assert_eq!((status, v["state"].as_str()), (0, Some("ok")), "{v}");
+    let want = [
+        moved_text("reviewer", &f.p("{A}/p.md"), &f.p("pa.md")).as_bytes(),
+        AGAIN,
+    ]
+    .concat();
+    assert!(String::from_utf8_lossy(&want).contains(&format!("the file {}, and", f.p("{A}/p.md"))));
+    assert_eq!(f.input(before + 2), want);
 }

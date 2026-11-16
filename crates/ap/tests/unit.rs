@@ -5166,3 +5166,140 @@ fn p8_without_acceptance_the_write_set_is_judged_by_its_own_step() {
     let log = std::fs::read_to_string(u.p("work/task/u1.accept.log")).unwrap();
     assert_eq!(log, "accept: ok\n");
 }
+
+// ---- RF1 a resumed stage of the round goes on at the next account when a usage limit cuts it ------
+
+#[test]
+fn rf1_a_fixer_cut_on_the_implementers_account_goes_on_at_the_next_account_of_its_block() {
+    let mut u = U::new();
+    std::fs::create_dir_all(u.t.join("a3")).unwrap();
+    std::fs::write(u.t.join("bin/mode-a3"), "script").unwrap();
+    // The implementer's account is at its limit once it has implemented: the resume is cut.
+    let limit = format!("printf limit45 > {}", u.p("bin/mode-a1"));
+    u.script(
+        "a1",
+        &format!("if [ -f src/a.rs ]; then false; else {IMPLEMENT}; {limit}; fi"),
+    );
+    u.script("a3", FIX);
+    u.script("a2", VERIFY_AFTER_FIX);
+    let mut r = r4_request(&u);
+    r["implementer"]["next_accounts"] = json!([u.p("a3")]);
+    let (v, code) = u.run(&r).unwrap();
+    assert_eq!((v["state"].as_str(), code), (Some("merged"), 0), "{v}");
+    // Implementer, verifier, the fixer's two launches, the come-back's verifier.
+    assert_eq!(u.launches, 5);
+    let first = u.record("u1");
+    assert_eq!(first["repair"]["state"], "ok");
+    let fixer = run_record(&first["repair"]["fixer"]);
+    let implementer = run_record(&first["stages"]["implementer"]);
+    // Runtime, model and effort are the implementer's; the accounts are the block's.
+    assert_eq!(fixer["resumes"], first["stages"]["implementer"]);
+    assert_eq!(implementer["account"], u.p("a1"));
+    let attempts = fixer["attempts"].as_array().unwrap();
+    assert_eq!(attempts.len(), 2);
+    assert_eq!(
+        (
+            &attempts[0]["account"],
+            &attempts[0]["state"],
+            &attempts[0]["session"]
+        ),
+        (&json!(u.p("a1")), &json!("cut"), &implementer["session"])
+    );
+    assert_eq!(fixer["account"], u.p("a3"));
+    assert_eq!(fixer["state"], "ok");
+    assert_ne!(fixer["session"], implementer["session"]);
+    for k in ["runtime", "model", "effort", "cwd"] {
+        assert_eq!(fixer[k], implementer[k], "{k}");
+    }
+    // The new session's input: the text with the implementer's two paths, then the fixer's prompt.
+    let input = std::fs::read(u.t.join("bin/prompt.4")).unwrap();
+    let input = String::from_utf8(input).unwrap();
+    let (p, a) = (
+        &implementer["prompt"]["path"],
+        &implementer["answer"]["path"],
+    );
+    let want = format!(
+        "the file {}, and the answer it gave, the file {}.",
+        p.as_str().unwrap(),
+        a.as_str().unwrap()
+    );
+    let (head, prompt) = input.split_once("\n\n").unwrap();
+    assert!(head.starts_with("This stage was to resume an earlier session, and a usage limit cut that session on its account."), "{head}");
+    assert!(
+        head.contains(&want) && head.contains("do not start over"),
+        "{head}"
+    );
+    assert_eq!(
+        prompt.as_bytes(),
+        std::fs::read(u.t.join("work/task/u1.fixer.prompt.md")).unwrap()
+    );
+    assert_eq!(u.merges().len(), 1);
+}
+
+#[test]
+fn rf1_a_come_back_whose_resumed_verifier_is_cut_takes_its_verdict_from_the_new_session() {
+    let mut u = U::new();
+    std::fs::create_dir_all(u.t.join("a3")).unwrap();
+    std::fs::write(u.t.join("bin/mode-a3"), "script").unwrap();
+    fixing(&u, FIX);
+    // The first look makes the verifier's account cut from then on.
+    let limit = format!("printf limit45 > {}", u.p("bin/mode-a2"));
+    u.script("a2", &format!("{limit}; {VERIFY_AFTER_FIX}"));
+    u.script("a3", VERIFY_AFTER_FIX);
+    let mut r = r4_request(&u);
+    r["verifier"]["next_accounts"] = json!([u.p("a3")]);
+    let (v, code) = u.run(&r).unwrap();
+    assert_eq!((v["state"].as_str(), code), (Some("merged"), 0), "{v}");
+    // Implementer, verifier, fixer, the second look's two launches.
+    assert_eq!(u.launches, 5);
+    let second = run_record(&v["stages"]["verifier"]);
+    let attempts = second["attempts"].as_array().unwrap();
+    assert_eq!(attempts.len(), 2);
+    assert_eq!(attempts[0]["account"], u.p("a2"));
+    assert_eq!(attempts[0]["state"], "cut");
+    assert_eq!(
+        (&second["account"], &second["state"]),
+        (&json!(u.p("a3")), &json!("ok"))
+    );
+    assert_ne!(second["session"], attempts[0]["session"]);
+    assert_eq!(u.merges().len(), 1);
+}
+
+#[test]
+fn rf1_a_fixer_over_an_implementer_that_ended_on_its_second_account_moves_to_the_blocks_account() {
+    let mut u = U::new();
+    std::fs::create_dir_all(u.t.join("a3")).unwrap();
+    // The implementer is cut before any work on its first account and ends on its second, a3; there
+    // the resumed fixer is cut, and the block's own account a1 (not the record's) is left to it.
+    std::fs::write(u.t.join("bin/mode-a1"), "limit1").unwrap();
+    std::fs::write(u.t.join("bin/mode-a3"), "script").unwrap();
+    let after = format!(
+        "printf script > {}; printf limit45 > {}",
+        u.p("bin/mode-a1"),
+        u.p("bin/mode-a3")
+    );
+    u.script("a3", &format!("{IMPLEMENT}; {after}"));
+    u.script("a1", FIX);
+    u.script("a2", VERIFY_AFTER_FIX);
+    let mut r = r4_request(&u);
+    r["implementer"]["next_accounts"] = json!([u.p("a3")]);
+    let (v, code) = u.run(&r).unwrap();
+    assert_eq!((v["state"].as_str(), code), (Some("merged"), 0), "{v}");
+    // The implementer's two launches, the verifier, the fixer's two, the come-back's verifier.
+    assert_eq!(u.launches, 6);
+    let first = u.record("u1");
+    let implementer = run_record(&first["stages"]["implementer"]);
+    assert_eq!(implementer["account"], u.p("a3"));
+    let fixer = run_record(&first["repair"]["fixer"]);
+    let accounts: Vec<&Value> = fixer["attempts"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|a| &a["account"])
+        .collect();
+    assert_eq!(accounts, [&json!(u.p("a3")), &json!(u.p("a1"))]);
+    assert_eq!(
+        (&fixer["account"], &fixer["state"]),
+        (&json!(u.p("a1")), &json!("ok"))
+    );
+}
