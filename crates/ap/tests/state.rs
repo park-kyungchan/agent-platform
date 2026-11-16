@@ -823,7 +823,7 @@ fn sr1_arguments_are_refused_with_a_usage_error() {
         &[missing],
     ];
     for args in refused {
-        let e = run(&mut Fake::new(), &args).unwrap_err();
+        let e = run(&mut Fake::new(), args).unwrap_err();
         assert_eq!((e.code, e.field.as_str()), ("usage", "args"), "{args:?}");
     }
     let _ = std::fs::remove_dir_all(&bare);
