@@ -3233,6 +3233,7 @@ fn x7_ap_unit_refuses_a_codex_verifier() {
 /// directory (the fake's script of an account is keyed by the directory above `muse`).
 fn muse_request(u: &U) -> Value {
     for base in ["m1", "m2"] {
+        std::fs::create_dir_all(u.t.join(base).join("muse")).unwrap();
         std::fs::write(u.t.join(format!("bin/mode-{base}")), "script").unwrap();
     }
     u.script("m1", IMPLEMENT);

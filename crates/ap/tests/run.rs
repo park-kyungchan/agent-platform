@@ -51,7 +51,7 @@ impl Fake {
             NEXT.fetch_add(1, Ordering::SeqCst)
         ));
         let _ = std::fs::remove_dir_all(&t);
-        for d in ["bin", "a1", "a2", "cwd", "m1/muse", "m2/muse"] {
+        for d in ["bin", "a1", "a2", "cwd"] {
             std::fs::create_dir_all(t.join(d)).unwrap();
         }
         for (name, text) in [("claude", FAKE), ("codex", FAKE_CODEX), ("muse", FAKE_MUSE)] {
@@ -3610,6 +3610,9 @@ const MUSE_FLAGS: [&str; 6] = [
 ];
 impl Fake {
     fn muse(&self, out: &str) -> Value {
+        for d in ["m1/muse", "m2/muse"] {
+            std::fs::create_dir_all(self.t.join(d)).unwrap();
+        }
         json!({"role":"implementer","runtime":"muse","account":self.p("m1/muse"),"model":MUSE_MODEL,
                "effort":"high","permission_mode":"bypassPermissions","cwd":self.p("cwd"),
                "prompt":self.p("prompt.md"),"out":self.p(out)})
