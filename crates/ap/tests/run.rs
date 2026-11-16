@@ -4390,3 +4390,29 @@ fn m11_a_resume_across_runtimes_is_refused_in_both_directions() {
     assert_eq!(f.run(&r).unwrap().0["state"], "ok");
     assert_eq!(f.launches.len(), before + 1);
 }
+
+#[test]
+fn m12_a_model_or_effort_that_looks_like_a_flag_is_refused_for_muse_only() {
+    let mut f = Fake::new();
+    f.lines(&m_run("stage ok"));
+    for member in ["model", "effort"] {
+        for value in ["--trust-workspace", "--yolo", "-h", "-"] {
+            let mut r = f.muse("x.md");
+            r[member] = json!(value);
+            assert_eq!(
+                code(f.run(&r)),
+                format!("invalid_input@{member}"),
+                "{member} {value}"
+            );
+        }
+    }
+    assert!(f.launches.is_empty() && !Path::new(&f.p("x.md.run.json")).exists());
+    // A value with a dash inside is still a name.
+    let mut r = f.muse("y.md");
+    r["model"] = json!("muse-ember-1.0");
+    assert_eq!(f.run(&r).unwrap().0["state"], "ok");
+    // The other runtimes keep their rules.
+    let mut r = f.request("c.md");
+    r["effort"] = json!("-x");
+    assert_eq!(f.run(&r).unwrap().0["state"], "ok");
+}

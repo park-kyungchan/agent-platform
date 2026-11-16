@@ -157,6 +157,13 @@ impl Runtime {
             Self::Muse => name.starts_with("MUSE_") || name == "XDG_CONFIG_HOME",
         }
     }
+    /// A value that reaches the CLI as an argument of its own must not read as a flag there.
+    fn argument_ok(self, value: &str) -> bool {
+        match self {
+            Self::Claude | Self::Codex => true,
+            Self::Muse => !value.starts_with('-'),
+        }
+    }
     fn account_named(self, account: &str) -> bool {
         match self {
             Self::Claude | Self::Codex => true,
@@ -366,6 +373,9 @@ fn request_at(s: &mut impl System, r: &Value, at_cwd: bool) -> Result<Request, F
         }
     };
     let (model, effort) = (word(r, "model", 40)?, word(r, "effort", 16)?);
+    for (key, value) in [("model", &model), ("effort", &effort)] {
+        require!(runtime.argument_ok(value) => "invalid_input", key);
+    }
     let mode = text(r, "permission_mode")?;
     require!(MODES.contains(&mode) => "invalid_input", "permission_mode");
     // No approval and no sandbox of the CLI's own: only when the request says so.
