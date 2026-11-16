@@ -1,4 +1,4 @@
-//! One stage of a unit: one headless Claude Code (or Codex CLI) session in a transient systemd
+//! One stage of a unit: one headless Claude Code (or Codex or Muse Code CLI) session in a transient systemd
 //! scope under `agents.slice`, ended at its time bound, its exit or (a reviewer only) its first
 //! `result` event, after which the whole scope is stopped. One record `<out>.run.json` per run; no
 //! other ledger, no store write.
@@ -90,6 +90,81 @@ const ALIVE: [&str; 5] = [
     "refreshing",
 ];
 
+/// The CLI a stage runs on. The only value of the request's `runtime` after it is read: every
+/// place that depends on it matches on it with one arm per variant.
+#[derive(Clone, Copy, Default, PartialEq)]
+enum Runtime {
+    #[default]
+    Claude,
+    Codex,
+    Muse,
+}
+impl Runtime {
+    fn of(word: Option<&Value>) -> Option<Self> {
+        match word.map(Value::as_str) {
+            None | Some(Some("claude")) => Some(Self::Claude),
+            Some(Some("codex")) => Some(Self::Codex),
+            Some(Some("muse")) => Some(Self::Muse),
+            Some(_) => None,
+        }
+    }
+    /// The word of the record, made here only.
+    fn word(self) -> &'static str {
+        match self {
+            Self::Claude => "claude",
+            Self::Codex => "codex",
+            Self::Muse => "muse",
+        }
+    }
+    /// The members of the request this runtime does not build (each refuses by its name).
+    fn unbuilt(self) -> &'static [&'static str] {
+        match self {
+            Self::Claude => &[],
+            Self::Codex => &["skills", "memory", "integration", "compact_window"],
+            Self::Muse => &[
+                "skills",
+                "memory",
+                "integration",
+                "compact_window",
+                "answer_schema",
+            ],
+        }
+    }
+    fn reviews(self) -> bool {
+        match self {
+            Self::Claude | Self::Muse => true,
+            Self::Codex => false,
+        }
+    }
+    fn typed_answer(self) -> bool {
+        match self {
+            Self::Claude => true,
+            Self::Codex | Self::Muse => false,
+        }
+    }
+    /// No approval and no sandbox of the CLI's own, one account and no MCP file.
+    fn bare(self) -> bool {
+        match self {
+            Self::Claude => false,
+            Self::Codex | Self::Muse => true,
+        }
+    }
+    /// The names `env` may not hold, so that the account named in the record is the one that answers.
+    fn reserved(self, name: &str) -> bool {
+        match self {
+            Self::Claude => false,
+            Self::Codex => name.starts_with("CODEX_") || name.starts_with("OPENAI_"),
+            Self::Muse => name.starts_with("MUSE_") || name == "XDG_CONFIG_HOME",
+        }
+    }
+    fn account_named(self, account: &str) -> bool {
+        match self {
+            Self::Claude | Self::Codex => true,
+            Self::Muse => Path::new(account).file_name().is_some_and(|n| n == "muse"),
+        }
+    }
+}
+
 struct Request {
     role: String,
     accounts: Vec<String>,
@@ -120,8 +195,8 @@ struct Request {
     /// The account's skills and slash commands, and its auto-memory, load only when asked.
     skills: bool,
     memory: bool,
-    /// The stage runs on the Codex CLI; on a resume, the thread's tokens before this run.
-    codex: bool,
+    runtime: Runtime,
+    /// A Codex stage on a resume: the thread's tokens before this run.
     spent: Option<[u64; 4]>,
     /// The compaction window the stated `CLAUDE_CODE_AUTO_COMPACT_WINDOW` gets (a Claude stage).
     compact_window: Option<u64>,
@@ -165,7 +240,7 @@ fn admit(s: &impl System, account: &str, field: &str) -> Result<(), Failure> {
         .map(|_| ())
         .map_err(|_| error("account_missing", field))
 }
-fn environment(r: &Value, codex: bool) -> Result<Vec<(String, String)>, Failure> {
+fn environment(r: &Value, runtime: Runtime) -> Result<Vec<(String, String)>, Failure> {
     let Some(v) = r.get("env") else {
         return Ok(vec![]);
     };
@@ -182,8 +257,7 @@ fn environment(r: &Value, codex: bool) -> Result<Vec<(String, String)>, Failure>
             // The account named in the record must be the account that answers.
             require!(!k.starts_with("HERDR_") && !k.starts_with("CLAUDE_")
                 && !k.starts_with("ANTHROPIC_") && k != "HOME" => "env_forbidden", "env");
-            let other = k.starts_with("CODEX_") || k.starts_with("OPENAI_");
-            require!(!(codex && other) => "env_forbidden", "env");
+            require!(!runtime.reserved(k) => "env_forbidden", "env");
             let v = v
                 .as_str()
                 .filter(|v| !v.contains('\0') && v.len() <= 4096)
@@ -268,19 +342,11 @@ fn request_at(s: &mut impl System, r: &Value, at_cwd: bool) -> Result<Request, F
     if let Some(k) = object.keys().find(|k| !MEMBERS.contains(&k.as_str())) {
         return Err(error("invalid_input", k));
     }
-    let codex = match r.get("runtime") {
-        None => false,
-        Some(v) if v == "claude" => false,
-        Some(v) if v == "codex" => true,
-        Some(_) => return Err(error("invalid_input", "runtime")),
-    };
+    let runtime = Runtime::of(r.get("runtime")).ok_or_else(|| error("invalid_input", "runtime"))?;
     let role = text(r, "role")?;
-    // Not built for a Codex stage: a reviewer (reviewers run on Claude Code) and these members.
-    require!(!codex || role != "reviewer" => "invalid_input", "role");
-    if let Some(k) = ["skills", "memory", "integration", "compact_window"]
-        .into_iter()
-        .find(|k| codex && r.get(*k).is_some())
-    {
+    // Not built for every runtime: a reviewer (Codex has none) and these members.
+    require!(runtime.reviews() || role != "reviewer" => "invalid_input", "role");
+    if let Some(k) = (runtime.unbuilt().iter()).find(|k| r.get(**k).is_some()) {
         return Err(error("invalid_input", k));
     }
     let default = ROLES
@@ -303,7 +369,7 @@ fn request_at(s: &mut impl System, r: &Value, at_cwd: bool) -> Result<Request, F
     let mode = text(r, "permission_mode")?;
     require!(MODES.contains(&mode) => "invalid_input", "permission_mode");
     // No approval and no sandbox of the CLI's own: only when the request says so.
-    require!(!codex || mode == "bypassPermissions" => "invalid_input", "permission_mode");
+    require!(!runtime.bare() || mode == "bypassPermissions" => "invalid_input", "permission_mode");
     let timeout = match r.get("timeout_seconds") {
         None => default,
         Some(v) => v
@@ -328,10 +394,10 @@ fn request_at(s: &mut impl System, r: &Value, at_cwd: bool) -> Result<Request, F
     );
     let mut accounts = vec![account];
     accounts.extend(paths(r, "next_accounts", 4)?);
-    require!(!codex || accounts.len() == 1 => "invalid_input", "next_accounts");
+    require!(!runtime.bare() || accounts.len() == 1 => "invalid_input", "next_accounts");
     let mcp = paths(r, "mcp_config", 8)?;
-    require!(!codex || mcp.is_empty() => "invalid_input", "mcp_config");
-    let env = environment(r, codex)?;
+    require!(!runtime.bare() || mcp.is_empty() => "invalid_input", "mcp_config");
+    let env = environment(r, runtime)?;
     let (mut expect_file, mut expect_line) = (None, None);
     if let Some(e) = r.get("expect") {
         let o = e
@@ -351,7 +417,7 @@ fn request_at(s: &mut impl System, r: &Value, at_cwd: bool) -> Result<Request, F
     let schema = match r.get("answer_schema") {
         None => None,
         Some(_) => {
-            require!(!codex && expect_line.is_none() => "invalid_input", "answer_schema");
+            require!(runtime.typed_answer() && expect_line.is_none() => "invalid_input", "answer_schema");
             let file = path(r, "answer_schema")?;
             let regular =
                 std::fs::metadata(&file).is_ok_and(|m| m.is_file() && m.len() <= SCHEMA_MAX);
@@ -370,6 +436,7 @@ fn request_at(s: &mut impl System, r: &Value, at_cwd: bool) -> Result<Request, F
     for (i, a) in accounts.iter().enumerate() {
         admit(s, a, if i == 0 { "account" } else { "next_accounts" })?;
     }
+    require!(runtime.account_named(&accounts[0]) => "invalid_input", "account");
     if at_cwd {
         s.directory(&cwd).map_err(|_| error("cwd_missing", "cwd"))?;
     }
@@ -410,8 +477,7 @@ fn request_at(s: &mut impl System, r: &Value, at_cwd: bool) -> Result<Request, F
                 .and_then(|b| serde_json::from_slice(&b).ok())
                 .ok_or_else(|| error("resume_record_missing", "resume"))?;
             let missing = |_| error("resume_record_missing", "resume");
-            let was_codex = rec["runtime"] == "codex";
-            require!(was_codex == codex => "resume_runtime_differs", "runtime");
+            require!(Runtime::of(rec.get("runtime")) == Some(runtime) => "resume_runtime_differs", "runtime");
             let (session, account) = (
                 text(&rec, "session").map_err(missing)?,
                 text(&rec, "account").map_err(missing)?,
@@ -515,9 +581,9 @@ fn request_at(s: &mut impl System, r: &Value, at_cwd: bool) -> Result<Request, F
         expect_line,
         schema,
         mcp,
-        spent: match (&earlier, codex) {
-            (Some((_, (_, _, file))), true) => spent(file),
-            _ => Some([0; 4]),
+        spent: match (runtime, &earlier) {
+            (Runtime::Codex, Some((_, (_, _, file)))) => spent(file),
+            (Runtime::Codex, None) | (Runtime::Claude | Runtime::Muse, _) => Some([0; 4]),
         },
         resume: earlier.map(|(_, r)| r),
         moved,
@@ -526,7 +592,7 @@ fn request_at(s: &mut impl System, r: &Value, at_cwd: bool) -> Result<Request, F
         bind,
         skills: flag(r, "skills")?,
         memory: flag(r, "memory")?,
-        codex,
+        runtime,
         compact_window,
     })
 }
@@ -649,13 +715,19 @@ struct Seen {
     rejected: bool,
     /// The rate-limit event `limit` is made from: the last rejected one, else the last one.
     limit: Option<Value>,
-    /// A Codex stream (with the thread's tokens before this run): its thread, the last agent
-    /// message of the turn running, and the items completed since the last turn end.
-    /// (Some(None): the tokens before this run are unknown, so this run's are too.)
-    codex: Option<Option<[u64; 4]>>,
+    /// The CLI the lines come from, with a Codex stream's thread tokens before this run (None: they
+    /// are unknown, so this run's are too) and a Muse stream's requested model.
+    runtime: Runtime,
+    spent: Option<[u64; 4]>,
+    model: String,
+    /// A Codex stream's thread, the last agent message of the turn running, and the items
+    /// completed since the last turn end.
     thread: Option<String>,
     message: Option<String>,
     items: u64,
+    /// A Muse stream: the last `run_usage` and the first other model that served the stage.
+    usage: Option<Value>,
+    served: Option<String>,
 }
 impl Seen {
     fn done(&self) -> bool {
@@ -668,9 +740,13 @@ impl Seen {
         let Ok(e) = serde_json::from_slice::<Value>(line) else {
             return;
         };
-        if let Some(spent) = self.codex {
-            return self.codex_line(&e, spent);
+        match self.runtime {
+            Runtime::Claude => self.claude_line(e),
+            Runtime::Codex => self.codex_line(&e, self.spent),
+            Runtime::Muse => self.muse_line(&e["payload"]),
         }
+    }
+    fn claude_line(&mut self, e: Value) {
         match e["type"].as_str() {
             Some("result") => self.results.push(e),
             Some("assistant") => {
@@ -683,6 +759,35 @@ impl Seen {
                     self.limit = Some(e);
                 }
                 self.rejected |= rejected;
+            }
+            _ => (),
+        }
+    }
+    /// A Muse Code line, read into the shape of a `result`: each `run_terminal` is one, its `text`
+    /// the answer when it completed, its `reason` the error's message otherwise. A tool task is
+    /// work; a facet that names another serving model than the request's is noted; the last
+    /// `run_usage` gives the tokens and the limit.
+    fn muse_line(&mut self, p: &Value) {
+        let text = |k: &str| p[k].as_str().unwrap_or("");
+        match p["kind"].as_str() {
+            Some("task_lifecycle") => {
+                let event = &p["event"];
+                let tool = event["task_kind"]
+                    .as_str()
+                    .is_some_and(|k| k.starts_with("tool."));
+                self.worked |= tool;
+                let facets = event["details"]["facets"].as_array().into_iter().flatten();
+                let mut other = facets.filter_map(|f| f["detail"]["model"].as_str());
+                let other = other.find(|m| *m != self.model);
+                self.served = self.served.take().or(other.map(str::to_owned));
+            }
+            Some("run_usage") => self.usage = Some(p.clone()),
+            Some("run_terminal") => {
+                let done = p["terminal"] == "completed";
+                self.results
+                    .push(json!({"type": "result", "is_error": !done,
+                    "result": if done { text("text") } else { text("reason") },
+                    "permission_denials": []}));
             }
             _ => (),
         }
@@ -760,6 +865,45 @@ fn limit_of(e: Option<&Value>) -> Value {
         })
         .collect();
     limit
+}
+/// A Muse stage's `turns` and `tokens` from its last `run_usage` line: the sums over its `models`,
+/// where `input` is each entry's `input_tokens` less its `cached_tokens` (never below 0) and a
+/// member that is no number counts 0; null without such a line.
+fn muse_tally(usage: Option<&Value>) -> (Value, Value) {
+    let Some(u) = usage else {
+        let none =
+            json!({"input": null, "output": null, "cache_read": null, "cache_creation": null});
+        return (Value::Null, none);
+    };
+    let (mut input, mut read, mut output) = (0u64, 0u64, 0u64);
+    for m in u["models"].as_array().into_iter().flatten() {
+        let n = |k: &str| m[k].as_u64().unwrap_or(0);
+        input += n("input_tokens").saturating_sub(n("cached_tokens"));
+        (read, output) = (read + n("cached_tokens"), output + n("output_tokens"));
+    }
+    let tokens = json!({"input": input, "output": output, "cache_read": read, "cache_creation": 0});
+    (json!(u["calls"].as_u64()), tokens)
+}
+/// A Muse stage's `limit`: the object of the Claude shape from the `allowance` of its last
+/// `run_usage` line, with one entry per window (`weekly`, `window`) that is an object.
+fn muse_limit(usage: Option<&Value>) -> Value {
+    let Some(a) = usage.map(|u| &u["allowance"]).filter(|a| a.is_object()) else {
+        return Value::Null;
+    };
+    let windows: serde_json::Map<String, Value> = ["weekly", "window"]
+        .into_iter()
+        .filter(|k| a[*k].is_object())
+        .map(|k| {
+            let w = &a[k];
+            let at = w["resets_at_ms"].as_u64().map(|ms| ms / 1000);
+            let used = w["used_percent"].as_f64().map(|p| p / 100.0);
+            (
+                k.to_owned(),
+                json!({"status": null, "resets_at": at, "utilization": used}),
+            )
+        })
+        .collect();
+    json!({"status": null, "resets_at": null, "kind": null, "windows": windows})
 }
 /// Reads what the CLI appended to its output since the last call, through the handle opened
 /// before the launch (`read_at` leaves the CLI's file offset alone); whole lines only.
@@ -1022,6 +1166,30 @@ fn codex_args(q: &Request, resume: Option<&str>) -> Vec<String> {
     a.push("-".into());
     a
 }
+/// The Muse Code CLI after `systemd-run … --`: one prompt from a file, headless, no approval and
+/// no sandbox (`--yolo`), the contributor mode off (README "A stage on Muse Code").
+fn muse_args(q: &Request, session: &str) -> Vec<String> {
+    args(&[
+        "--",
+        "muse",
+        "exec",
+        "--json",
+        "--model",
+        &q.model,
+        "--reasoning-effort",
+        &q.effort,
+        "--contributor-mode",
+        "off",
+        "--disable-reminders",
+        "--session-id",
+        session,
+        "--workspace",
+        &q.cwd,
+        "--prompt-file",
+        &q.prompt,
+        "--yolo",
+    ])
+}
 /// The session the Codex CLI named at the thread's start enters the record at once. False when
 /// that write of the record failed, which counts as every failed write of it after the launch.
 fn named(out: &str, record: &mut Value, seen: &Seen) -> bool {
@@ -1048,7 +1216,11 @@ fn mirror(record: &mut Value, worked: bool) {
 /// line of a move) that text, an empty line and the file's bytes, through a pipe that a thread
 /// fills (no file).
 fn input(q: &Request, lead: Option<&str>) -> std::io::Result<File> {
-    let file = File::open(&q.prompt)?;
+    // A Muse stage reads its prompt from the file the argument names, and nothing on stdin.
+    let file = match q.runtime {
+        Runtime::Muse => return File::open("/dev/null"),
+        Runtime::Claude | Runtime::Codex => File::open(&q.prompt)?,
+    };
     let Some(lead) = lead else {
         return Ok(file);
     };
@@ -1075,7 +1247,7 @@ fn attempt(
     // The continuation is the text of a fresh call; a resumed call's text is a move's.
     let continued = lead.is_some() && q.resume.is_none();
     let mut record = json!({
-        "role": q.role, "runtime": if q.codex { "codex" } else { "claude" },
+        "role": q.role, "runtime": q.runtime.word(),
         "model": q.model, "effort": q.effort,
         "account": account, "session": resume, "cwd": q.cwd, "unit": null,
         "prompt": {"path": q.prompt, "sha256": q.prompt_sha256},
@@ -1112,7 +1284,11 @@ fn attempt(
     };
     let unit = format!("ap-run-{unit}.scope");
     // The Codex CLI names a fresh session itself, at the thread's start.
-    if !q.codex || resume.is_some() {
+    let names_itself = match q.runtime {
+        Runtime::Codex => resume.is_none(),
+        Runtime::Claude | Runtime::Muse => false,
+    };
+    if !names_itself {
         record["session"] = json!(session);
     }
     record["unit"] = json!(unit);
@@ -1153,12 +1329,22 @@ fn attempt(
         ]));
     }
     let mut env = q.base_env.clone();
-    if q.codex {
-        argv.extend(codex_args(q, resume));
-        env.push(("CODEX_HOME".into(), account.into()));
-    } else {
-        claude_args(q, &mut argv, resume, &session);
-        env.push(("CLAUDE_CONFIG_DIR".into(), account.into()));
+    match q.runtime {
+        Runtime::Claude => {
+            claude_args(q, &mut argv, resume, &session);
+            env.push(("CLAUDE_CONFIG_DIR".into(), account.into()));
+        }
+        Runtime::Codex => {
+            argv.extend(codex_args(q, resume));
+            env.push(("CODEX_HOME".into(), account.into()));
+        }
+        Runtime::Muse => {
+            argv.extend(muse_args(q, &session));
+            // The CLI finds its configuration directory as `$XDG_CONFIG_HOME/muse`.
+            let home = Path::new(account).parent().and_then(Path::to_str);
+            env.push(("XDG_CONFIG_HOME".into(), home.unwrap_or_default().into()));
+            env.push(("MUSE_NO_AUTO_UPDATE".into(), "1".into()));
+        }
     }
     let started = s.now();
     let mut child = match s.launch(&argv, &env, &q.cwd, [prompt, stdout, stderr]) {
@@ -1170,7 +1356,9 @@ fn attempt(
     // CLI's exit or the bound, because a result is not final while a shell it started lives.
     let mut seen = Seen {
         first_only: q.role == "reviewer",
-        codex: q.codex.then_some(q.spent),
+        runtime: q.runtime,
+        spent: q.spent,
+        model: q.model.clone(),
         ..Seen::default()
     };
     let (mut offset, mut partial, mut kept) = (0, vec![], true);
@@ -1178,7 +1366,8 @@ fn attempt(
         let exited = !matches!(child.try_wait(), Ok(None));
         follow(reader, &mut offset, &mut partial, &mut seen);
         kept &= named(&q.out, &mut record, &seen);
-        if seen.done() {
+        // Another serving model stops the stage at once, as the bound does: nothing it says counts.
+        if seen.done() || seen.served.is_some() {
             break End::Result;
         }
         if exited {
@@ -1213,6 +1402,11 @@ fn attempt(
     record["results"] = json!(seen.results.len());
     let mut write_failed = false;
     let state = match chosen(q, &seen) {
+        _ if seen.served.is_some() => {
+            record["unmet"] = json!("model");
+            record["served_by"] = json!(seen.served);
+            "failed"
+        }
         None if timed_out => "timeout",
         None => {
             record["unmet"] = json!("result_event");
@@ -1226,12 +1420,19 @@ fn attempt(
         }
     };
     record["state"] = json!(state);
+    match q.runtime {
+        Runtime::Muse => (record["turns"], record["tokens"]) = muse_tally(seen.usage.as_ref()),
+        Runtime::Claude | Runtime::Codex => (),
+    }
     if !stopped {
         // Something of the stage may still live: never `ok`.
         record["state"] = json!("failed");
         record["unmet"] = json!("stop");
     }
-    record["limit"] = limit_of(seen.limit.as_ref());
+    record["limit"] = match q.runtime {
+        Runtime::Claude | Runtime::Codex => limit_of(seen.limit.as_ref()),
+        Runtime::Muse => muse_limit(seen.usage.as_ref()),
+    };
     mirror(&mut record, seen.worked);
     let saved = persist(&q.out, &record);
     (record, seen.worked, saved && kept && !write_failed)

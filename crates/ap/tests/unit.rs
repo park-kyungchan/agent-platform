@@ -21,6 +21,7 @@ use std::{
 static NEXT: AtomicU32 = AtomicU32::new(0);
 const FAKE: &str = include_str!("fixtures/fake-claude.sh");
 const FAKE_CODEX: &str = include_str!("fixtures/fake-codex.sh");
+const FAKE_MUSE: &str = include_str!("fixtures/fake-muse.sh");
 const BRANCH: &str = "ap/unit-test";
 const IMPLEMENTER_PROMPT: &str = "Implement the page.\n";
 const VERIFIER_PROMPT: &str = "LEAD VERIFIER PROMPT: review the candidate under REVIEW.md.\n";
@@ -112,11 +113,21 @@ impl U {
             NEXT.fetch_add(1, Ordering::SeqCst)
         ));
         let _ = std::fs::remove_dir_all(&t);
-        for d in ["bin", "a1", "a2", "home", "work/task", "judge"] {
+        for d in [
+            "bin",
+            "a1",
+            "a2",
+            "home",
+            "work/task",
+            "judge",
+            "m1/muse",
+            "m2/muse",
+        ] {
             std::fs::create_dir_all(t.join(d)).unwrap();
         }
         write_exec(&t.join("bin/claude"), FAKE);
         write_exec(&t.join("bin/codex"), FAKE_CODEX);
+        write_exec(&t.join("bin/muse"), FAKE_MUSE);
         std::fs::write(t.join("bin/mode-a1"), "script").unwrap();
         std::fs::write(t.join("bin/mode-a2"), "script").unwrap();
         std::fs::write(t.join("bin/script-a1.sh"), IMPLEMENT).unwrap();
@@ -769,7 +780,7 @@ impl System for U {
     ) -> std::io::Result<Child> {
         self.launches += 1;
         let at = argv.iter().position(|a| a == "--").unwrap();
-        assert!(["claude", "codex"].contains(&argv[at + 1].as_str()));
+        assert!(["claude", "codex", "muse"].contains(&argv[at + 1].as_str()));
         let unit = argv[..at]
             .iter()
             .find_map(|a| a.strip_prefix("--unit="))
@@ -3214,6 +3225,130 @@ fn x7_ap_unit_refuses_a_codex_verifier() {
     assert_eq!(code(u.run(&r)), "invalid_input@verifier.role");
     assert_eq!(names(&u.t.join("work/task")), ["TASK.md"]);
     assert_eq!((u.launches, u.calls.len()), (0, 0));
+}
+
+// ---- runtime muse: the stage blocks of a unit (tests/fixtures/fake-muse.sh) -------------------
+
+/// A request whose implementer and verifier run on Muse Code, each on its own configuration
+/// directory (the fake's script of an account is keyed by the directory above `muse`).
+fn muse_request(u: &U) -> Value {
+    for base in ["m1", "m2"] {
+        std::fs::write(u.t.join(format!("bin/mode-{base}")), "script").unwrap();
+    }
+    u.script("m1", IMPLEMENT);
+    u.script("m2", VERIFY_ACCEPT);
+    let mut r = u.request();
+    for (block, base) in [("implementer", "m1"), ("verifier", "m2")] {
+        r[block]["runtime"] = json!("muse");
+        r[block]["permission_mode"] = json!("bypassPermissions");
+        r[block]["model"] = json!("muse-wonder-1.0");
+        r[block]["account"] = json!(u.p(&format!("{base}/muse")));
+    }
+    r
+}
+
+#[test]
+fn muse_a_block_without_a_stated_mode_is_refused_before_any_effect() {
+    let mut u = U::new();
+    for block in ["implementer", "verifier"] {
+        let mut r = muse_request(&u);
+        r[block].as_object_mut().unwrap().remove("permission_mode");
+        let want = format!("invalid_input@{block}.permission_mode");
+        assert_eq!(code(u.run(&r)), want);
+        // `auto` is the default of a Claude block only: it is no mode a Muse block may state.
+        r[block]["permission_mode"] = json!("auto");
+        assert_eq!(code(u.run(&r)), want);
+    }
+    // Every other bad member is refused under the block's field.
+    let bad = [
+        ("compact_window", json!(400_000)),
+        ("skills", json!(true)),
+        ("next_accounts", json!([u.p("m2/muse")])),
+        ("account", json!(u.p("a1"))),
+    ];
+    for (member, value) in bad {
+        let mut r = muse_request(&u);
+        r["implementer"][member] = value;
+        assert_eq!(
+            code(u.run(&r)),
+            format!("invalid_input@implementer.{member}"),
+            "{member}"
+        );
+    }
+    assert_eq!(names(&u.t.join("work/task")), ["TASK.md"]);
+    assert!(!u.wt().exists());
+    assert_eq!(branches(&u), "* main");
+    assert_eq!((u.launches, u.calls.len()), (0, 0));
+    // A Claude block keeps its default mode.
+    let (v, exit) = u.run(&u.request()).unwrap();
+    assert_eq!((v["state"].as_str(), exit), (Some("merged"), 0), "{v}");
+}
+
+#[test]
+fn muse_a_unit_whose_implementer_and_verifier_run_on_muse_is_accepted() {
+    let mut u = U::new();
+    let (v, exit) = u.run(&muse_request(&u)).unwrap();
+    assert_eq!((v["state"].as_str(), exit), (Some("merged"), 0), "{v}");
+    for stage in ["implementer", "verifier"] {
+        let record = stage_record(&v["stages"][stage]);
+        assert_eq!(
+            (record["runtime"].as_str(), record["state"].as_str()),
+            (Some("muse"), Some("ok")),
+            "{stage}"
+        );
+        assert_eq!(record["model"], "muse-wonder-1.0");
+    }
+    assert_eq!(stage_record(&v["stages"]["verifier"])["role"], "reviewer");
+    let lines = launch_lines(&u);
+    assert_eq!(lines.len(), 2, "{lines:?}");
+    for (line, base) in lines.iter().zip(["m1", "m2"]) {
+        assert!(line.starts_with(&format!("{}|exec --json --model muse-wonder-1.0 --reasoning-effort high --contributor-mode off --disable-reminders --session-id ", u.p(base))), "{line}");
+        assert!(line.ends_with(" --yolo"), "{line}");
+    }
+}
+
+#[test]
+fn muse_a_round_fixer_gets_the_runtime_from_the_implementers_record() {
+    let mut u = U::new();
+    let r = r4_request(&u);
+    let mut m = muse_request(&u);
+    m["repair"] = r["repair"].clone();
+    u.script(
+        "m1",
+        &format!("if [ -f src/a.rs ]; then {FIX}; else {IMPLEMENT}; fi"),
+    );
+    u.script("m2", VERIFY_AFTER_FIX);
+    let (v, exit) = u.run(&m).unwrap();
+    assert_eq!((v["state"].as_str(), exit), (Some("merged"), 0), "{v}");
+    assert_eq!(u.launches, 4, "implementer, verifier, fixer, verifier");
+    let first = u.record("u1");
+    let fixer = run_record(&first["repair"]["fixer"]);
+    let implementer = run_record(&first["stages"]["implementer"]);
+    assert_eq!(
+        (fixer["runtime"].as_str(), fixer["state"].as_str()),
+        (Some("muse"), Some("ok"))
+    );
+    for k in ["session", "account", "model", "effort", "cwd"] {
+        assert_eq!(fixer[k], implementer[k], "{k}");
+    }
+    // The fixer's launch resumes the implementer's session; the come-back's verifier is on Muse too.
+    let lines = launch_lines(&u);
+    let session = implementer["session"].as_str().unwrap();
+    assert!(
+        lines[2].starts_with(&format!("{}|exec --json ", u.p("m1"))),
+        "{}",
+        lines[2]
+    );
+    assert!(
+        lines[2].contains(&format!(" --session-id {session} ")),
+        "{}",
+        lines[2]
+    );
+    assert!(
+        lines[3].starts_with(&format!("{}|exec --json ", u.p("m2"))),
+        "{}",
+        lines[3]
+    );
 }
 
 #[test]
