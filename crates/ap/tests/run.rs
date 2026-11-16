@@ -19,6 +19,7 @@ static NEXT: AtomicU32 = AtomicU32::new(0);
 const FAKE: &str = include_str!("fixtures/fake-claude.sh");
 const FAKE_CODEX: &str = include_str!("fixtures/fake-codex.sh");
 const FAKE_MUSE: &str = include_str!("fixtures/fake-muse.sh");
+const FAKE_AGY: &str = include_str!("fixtures/fake-agy.sh");
 
 struct Fake {
     t: PathBuf,
@@ -54,7 +55,12 @@ impl Fake {
         for d in ["bin", "a1", "a2", "cwd"] {
             std::fs::create_dir_all(t.join(d)).unwrap();
         }
-        for (name, text) in [("claude", FAKE), ("codex", FAKE_CODEX), ("muse", FAKE_MUSE)] {
+        for (name, text) in [
+            ("claude", FAKE),
+            ("codex", FAKE_CODEX),
+            ("muse", FAKE_MUSE),
+            ("agy", FAKE_AGY),
+        ] {
             let fake = t.join("bin").join(name);
             std::fs::write(&fake, text).unwrap();
             std::fs::set_permissions(&fake, std::fs::Permissions::from_mode(0o755)).unwrap();
@@ -211,7 +217,7 @@ impl System for Fake {
             ["systemd-run", "--scope", "--quiet", "--collect"]
         );
         assert!(argv[..at].contains(&"--slice=agents.slice".to_owned()));
-        assert!(["claude", "codex", "muse"].contains(&argv[at + 1].as_str()));
+        assert!(["claude", "codex", "muse", "agy"].contains(&argv[at + 1].as_str()));
         let unit = argv[..at]
             .iter()
             .find_map(|a| a.strip_prefix("--unit="))
@@ -4415,4 +4421,962 @@ fn m12_a_model_or_effort_that_looks_like_a_flag_is_refused_for_muse_only() {
     let mut r = f.request("c.md");
     r["effort"] = json!("-x");
     assert_eq!(f.run(&r).unwrap().0["state"], "ok");
+}
+
+// ---- runtime agy: a stage on the Antigravity CLI (tests/fixtures/fake-agy.sh) ------------------
+
+const AGY_MODEL: &str = "gemini-4-hydrogen-medium";
+fn g_usage(input: u64, output: u64, thinking: u64, cache: u64) -> Value {
+    json!({"input_tokens":input,"output_tokens":output,"thinking_tokens":thinking,
+           "cache_read_tokens":cache,"total_tokens":input + output})
+}
+/// The line `init` in the shape of the kept real one (`@CID@` becomes the conversation id).
+fn g_init() -> Value {
+    json!({"event":"init","conversation_id":"@CID@","init":{"model":AGY_MODEL,
+           "cwd":"/tmp/agy-evidence","tools":["run_command","view_file"],
+           "permission_mode":"always-proceed"}})
+}
+/// A line `step_update` of the step type `kind` (`user_input`, `agent_response`, `tool`).
+fn g_step(index: u64, kind: &str, state: &str) -> Value {
+    let mut step =
+        json!({"conversation_id":"@CID@","step_index":index,"state":state,"step_type":kind});
+    if kind == "tool" {
+        step["tool_name"] = json!("run_command");
+    }
+    json!({"event":"step_update","step_update":step})
+}
+fn g_result(status: &str, response: Value, usage: Value, turns: Value) -> Value {
+    json!({"event":"result","result":{"conversation_id":"@CID@","status":status,"response":response,
+           "duration_seconds":2.65,"num_turns":turns,"usage":usage}})
+}
+/// An error result in the shape of the kept real one: `error` in place of an answer.
+fn g_failure(status: &str, error: Value) -> Value {
+    json!({"event":"result","result":{"conversation_id":"@CID@","status":status,"response":"",
+           "error":error,"duration_seconds":0,"num_turns":0,"usage":g_usage(0, 0, 0, 0)}})
+}
+/// The usual lines of a stage that ran a command and answered.
+fn g_run(response: &str) -> Vec<Value> {
+    vec![
+        g_init(),
+        g_step(0, "user_input", "DONE"),
+        g_step(1, "tool", "DONE"),
+        g_result(
+            "SUCCESS",
+            json!(response),
+            g_usage(100, 20, 5, 40),
+            json!(1),
+        ),
+    ]
+}
+/// The names under `root` (symbolic links are not followed), sorted.
+fn tree(root: &Path) -> Vec<String> {
+    fn walk(dir: &Path, root: &Path, names: &mut Vec<String>) {
+        for e in std::fs::read_dir(dir).unwrap() {
+            let e = e.unwrap();
+            names.push(e.path().strip_prefix(root).unwrap().display().to_string());
+            if e.file_type().unwrap().is_dir() {
+                walk(&e.path(), root, names);
+            }
+        }
+    }
+    let mut names = vec![];
+    walk(root, root, &mut names);
+    names.sort();
+    names
+}
+impl Fake {
+    /// An Antigravity home: the login token is a link to a real file, as the host's homes are made.
+    fn agy_home(&self, name: &str) -> String {
+        let dir = self.t.join(name).join(".gemini/antigravity-cli");
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::write(self.t.join("token"), "not-a-token").unwrap();
+        let _ =
+            std::os::unix::fs::symlink(self.t.join("token"), dir.join("antigravity-oauth-token"));
+        self.p(name)
+    }
+    fn agy(&self, out: &str) -> Value {
+        json!({"role":"reviewer","runtime":"agy","account":self.agy_home("g1"),"model":AGY_MODEL,
+               "effort":"medium","permission_mode":"bypassPermissions","cwd":self.p("cwd"),
+               "prompt":self.p("prompt.md"),"out":self.p(out)})
+    }
+    /// The lines the fake prints for the home `g1` (one object per line).
+    fn agy_lines(&self, lines: &[Value]) {
+        let text: String = lines.iter().map(|l| format!("{l}\n")).collect();
+        std::fs::write(self.t.join("bin/lines-g1"), text).unwrap();
+    }
+    fn agy_lines_then(&self, lines: &[Value], hang: bool, exit: i32) {
+        self.agy_lines(lines);
+        if hang {
+            std::fs::write(self.t.join("bin/hang-g1"), "").unwrap();
+        }
+        std::fs::write(self.t.join("bin/exit-g1"), exit.to_string()).unwrap();
+    }
+    /// The arguments after `agy` that a stage is started with.
+    fn agy_cli(&self, prompt: &str, bound: &str, conversation: Option<&str>) -> Vec<String> {
+        let mut a = vec!["agy", "--print", prompt, "--output-format", "stream-json"];
+        a.extend(["--model", AGY_MODEL, "--dangerously-skip-permissions"]);
+        a.extend(["--print-timeout", bound]);
+        a.extend(
+            conversation
+                .map(|c| ["--conversation", c])
+                .into_iter()
+                .flatten(),
+        );
+        a.iter().map(|s| s.to_string()).collect()
+    }
+    /// A stage that ended `ok` to resume from, with its out `first`.
+    fn agy_first(&mut self, first: &str) -> Value {
+        self.agy_lines(&g_run("stage ok"));
+        self.run(&self.agy(first)).unwrap().0
+    }
+}
+
+#[test]
+fn g1_refusals_name_their_field_and_come_before_any_effect() {
+    let mut f = Fake::new();
+    f.agy_lines(&g_run("stage ok"));
+    let bare = f.t.join("g0");
+    std::fs::create_dir_all(&bare).unwrap();
+    let configured = f.agy_home("g3");
+    std::fs::create_dir_all(f.t.join("g3/.gemini/config")).unwrap();
+    let dangling = f.t.join("g4/.gemini/antigravity-cli");
+    std::fs::create_dir_all(&dangling).unwrap();
+    std::os::unix::fs::symlink(f.p("nowhere"), dangling.join("antigravity-oauth-token")).unwrap();
+    let other = f.agy_home("g2");
+    let set = |k: &str, v: Value| {
+        let k = k.to_owned();
+        move |r: &mut Value| r[k.as_str()] = v.clone()
+    };
+    type Edit = Box<dyn Fn(&mut Value)>;
+    let mut cases: Vec<(&str, Edit, &str)> = vec![
+        (
+            "role",
+            Box::new(set("role", json!("implementer"))),
+            "invalid_input@role",
+        ),
+        (
+            "role",
+            Box::new(set("role", json!("fixer"))),
+            "invalid_input@role",
+        ),
+        (
+            "role",
+            Box::new(set("role", json!("builder"))),
+            "invalid_input@role",
+        ),
+        (
+            "next",
+            Box::new(set("next_accounts", json!([other]))),
+            "invalid_input@next_accounts",
+        ),
+        (
+            "mcp",
+            Box::new(set("mcp_config", json!([f.p("prompt.md")]))),
+            "invalid_input@mcp_config",
+        ),
+        (
+            "skills",
+            Box::new(set("skills", json!(true))),
+            "invalid_input@skills",
+        ),
+        (
+            "skills",
+            Box::new(set("skills", json!(false))),
+            "invalid_input@skills",
+        ),
+        (
+            "memory",
+            Box::new(set("memory", json!(true))),
+            "invalid_input@memory",
+        ),
+        (
+            "integration",
+            Box::new(set("integration", json!(false))),
+            "invalid_input@integration",
+        ),
+        (
+            "schema",
+            Box::new(set("answer_schema", json!(f.p("prompt.md")))),
+            "invalid_input@answer_schema",
+        ),
+        (
+            "window",
+            Box::new(set("compact_window", json!(400_000))),
+            "invalid_input@compact_window",
+        ),
+        (
+            "mode",
+            Box::new(set("permission_mode", json!("auto"))),
+            "invalid_input@permission_mode",
+        ),
+        (
+            "mode",
+            Box::new(set("permission_mode", json!("acceptEdits"))),
+            "invalid_input@permission_mode",
+        ),
+        (
+            "mode",
+            Box::new(|r| {
+                r.as_object_mut().unwrap().remove("permission_mode");
+            }),
+            "invalid_input@permission_mode",
+        ),
+        (
+            "account",
+            Box::new(set("account", json!(f.p("g9")))),
+            "account_missing@account",
+        ),
+        (
+            "account",
+            Box::new(set("account", json!(f.p("prompt.md")))),
+            "account_missing@account",
+        ),
+        (
+            "account",
+            Box::new(set("account", json!(bare.to_str().unwrap()))),
+            "invalid_input@account",
+        ),
+        (
+            "account",
+            Box::new(set("account", json!(configured))),
+            "invalid_input@account",
+        ),
+        (
+            "account",
+            Box::new(set("account", json!(f.p("g4")))),
+            "invalid_input@account",
+        ),
+        (
+            "account",
+            Box::new(set("account", json!(f.p("a1")))),
+            "invalid_input@account",
+        ),
+        (
+            "model",
+            Box::new(set("model", json!("-x"))),
+            "invalid_input@model",
+        ),
+        (
+            "model",
+            Box::new(set("model", json!("--dangerously-skip-permissions"))),
+            "invalid_input@model",
+        ),
+        (
+            "effort",
+            Box::new(set("effort", json!("high"))),
+            "invalid_input@effort",
+        ),
+        (
+            "effort",
+            Box::new(set("effort", json!("max"))),
+            "invalid_input@effort",
+        ),
+        (
+            "effort",
+            Box::new(set("effort", json!("-x"))),
+            "invalid_input@effort",
+        ),
+        (
+            "effort",
+            Box::new(set("model", json!("gemini-pro-orchestrator-g1-pro"))),
+            "invalid_input@effort",
+        ),
+    ];
+    for name in [
+        "CLAUDE_X",
+        "HERDR_X",
+        "ANTHROPIC_X",
+        "HOME",
+        "AGY_X",
+        "AGY_CLI_DISABLE_AUTO_UPDATE",
+        "GEMINI_X",
+        "GEMINI_API_KEY",
+    ] {
+        let env = json!({ name: "1" });
+        cases.push(("env", Box::new(set("env", env)), "env_forbidden@env"));
+    }
+    for (what, edit, want) in &cases {
+        let mut r = f.agy("x.md");
+        edit(&mut r);
+        assert_eq!(code(f.run(&r)), *want, "{what}");
+    }
+    // A prompt that cannot be one argument: above 131071 bytes, with a NUL byte, or not text.
+    for (i, bytes) in [vec![b'a'; 131_072], b"a\0b".to_vec(), vec![0xff, 0xfe]]
+        .iter()
+        .enumerate()
+    {
+        std::fs::write(f.p(&format!("p{i}.md")), bytes).unwrap();
+        let mut r = f.agy("x.md");
+        r["prompt"] = json!(f.p(&format!("p{i}.md")));
+        assert_eq!(code(f.run(&r)), "invalid_input@prompt", "prompt {i}");
+    }
+    assert!(f.launches.is_empty() && f.calls().is_empty());
+    assert!(!Path::new(&f.p("x.md.run.json")).exists());
+    // What the runtime does admit: a prompt of 131071 bytes, empty lists, the names of other CLIs.
+    std::fs::write(f.p("big.md"), vec![b'a'; 131_071]).unwrap();
+    let mut r = f.agy("ok.md");
+    r["prompt"] = json!(f.p("big.md"));
+    r["next_accounts"] = json!([]);
+    r["mcp_config"] = json!([]);
+    r["env"] = json!({"CODEX_HOME": "/x", "MUSE_X": "1", "XDG_CONFIG_HOME": "/y", "CARGO_HOME": "/c",
+                      "GH_CONFIG_DIR": "/g", "RUSTUP_HOME": "/r"});
+    let (v, status) = f.run(&r).unwrap();
+    assert_eq!(
+        (status, v["state"].as_str(), v["runtime"].as_str()),
+        (0, Some("ok"), Some("agy")),
+        "{v}"
+    );
+    assert_eq!(
+        std::fs::read(f.t.join("bin/prompt.1")).unwrap().len(),
+        131_071
+    );
+    for level in ["low", "high", "xhigh"] {
+        let mut r = f.agy(&format!("l{level}.md"));
+        (r["model"], r["effort"]) = (json!(format!("gemini-4-hydrogen-{level}")), json!(level));
+        assert_eq!(f.run(&r).unwrap().0["state"], "ok", "{level}");
+    }
+}
+
+#[test]
+fn g2_a_fresh_stage_is_started_with_exactly_these_arguments_and_this_environment() {
+    let mut f = Fake::new();
+    f.env
+        .push(("AGY_CLI_DISABLE_AUTO_UPDATE".into(), "0".into()));
+    f.env.push(("GEMINI_API_KEY".into(), "not-a-key".into()));
+    f.agy_lines(&g_run("stage ok"));
+    f.agy_home("g1");
+    let before = tree(&f.t.join("g1"));
+    let mut r = f.agy("c.md");
+    r["env"] = json!({"CARGO_HOME": "/x/cargo"});
+    let (v, status) = f.run(&r).unwrap();
+    assert_eq!((status, v["state"].as_str()), (0, Some("ok")), "{v}");
+    let launch = f.launches.last().unwrap();
+    let at = launch.iter().position(|a| a == "--").unwrap();
+    assert_eq!(launch[4], format!("--unit={}", v["unit"].as_str().unwrap()));
+    assert_eq!(
+        launch[at - 3..at],
+        ["RuntimeMaxSec=3310s", "-p", "TimeoutStopSec=10s"]
+    );
+    assert_eq!(f.last_cli(), f.agy_cli("review this\n", "3300s", None));
+    // The stage's own bound is the CLI's print timeout.
+    let mut r = f.agy("d.md");
+    r["timeout_seconds"] = json!(90);
+    assert_eq!(f.run(&r).unwrap().0["state"], "ok");
+    assert_eq!(f.last_cli(), f.agy_cli("review this\n", "90s", None));
+    // The prompt is the argument; its standard input is the null device; the cwd is the request's.
+    assert_eq!(
+        std::fs::read(f.t.join("bin/prompt.1")).unwrap(),
+        b"review this\n"
+    );
+    assert_eq!(
+        std::fs::read_to_string(f.t.join("bin/stdin.1"))
+            .unwrap()
+            .trim(),
+        "/dev/null"
+    );
+    assert_eq!(
+        std::fs::read_to_string(f.t.join("bin/cwd.1"))
+            .unwrap()
+            .trim(),
+        f.p("cwd")
+    );
+    assert!(
+        f.calls()[0].contains("|--print <prompt> --output-format "),
+        "{:?}",
+        f.calls()
+    );
+    // The home is the account, replacing the caller's `HOME`, and the CLI never updates itself.
+    let env: Vec<String> = std::fs::read_to_string(f.t.join("bin/env.1"))
+        .unwrap()
+        .lines()
+        .map(str::to_owned)
+        .collect();
+    let named = |n: &str| {
+        env.iter()
+            .filter(|l| l.starts_with(&format!("{n}=")))
+            .cloned()
+            .collect::<Vec<_>>()
+    };
+    assert_eq!(named("HOME"), [format!("HOME={}", f.p("g1"))]);
+    assert_eq!(
+        named("AGY_CLI_DISABLE_AUTO_UPDATE"),
+        ["AGY_CLI_DISABLE_AUTO_UPDATE=1"]
+    );
+    assert_eq!(named("CARGO_HOME"), ["CARGO_HOME=/x/cargo"]);
+    for l in &env {
+        let n = l.split('=').next().unwrap();
+        assert!(
+            !n.starts_with("CLAUDE_") && !n.starts_with("HERDR_") && !n.starts_with("GEMINI_"),
+            "{n}"
+        );
+        assert!(
+            !n.starts_with("AGY_") || n == "AGY_CLI_DISABLE_AUTO_UPDATE",
+            "{n}"
+        );
+        assert!(n != "FOO" && n != "XDG_CONFIG_HOME", "{n}");
+    }
+    assert_eq!(v["runtime"], "agy");
+    // `ap run` writes no file in the home.
+    assert_eq!(tree(&f.t.join("g1")), before);
+}
+
+#[test]
+fn g2_a_resumed_stage_adds_the_conversation_and_runs_in_the_records_cwd() {
+    let mut f = Fake::new();
+    let first = f.agy_first("r1.md");
+    let session = first["session"].as_str().unwrap().to_owned();
+    assert_eq!(session.len(), 36);
+    std::fs::write(f.p("next.md"), "continue\n").unwrap();
+    f.agy_lines(&g_run("second answer"));
+    let mut r = f.resume(f.agy("x"), "r2.md", "r1.md");
+    r["prompt"] = json!(f.p("next.md"));
+    let (v, status) = f.run(&r).unwrap();
+    assert_eq!((status, v["state"].as_str()), (0, Some("ok")), "{v}");
+    assert_eq!(
+        f.last_cli(),
+        f.agy_cli("continue\n", "3300s", Some(&session))
+    );
+    assert_eq!(v["session"], session.as_str());
+    assert_eq!(v["resumes"], f.p("r1.md.run.json").as_str());
+    assert_eq!(
+        std::fs::read_to_string(f.t.join("bin/cwd.2"))
+            .unwrap()
+            .trim(),
+        first["cwd"].as_str().unwrap()
+    );
+    let env = f.env_of_last();
+    assert!(env.contains(&format!("HOME={}", f.p("g1"))));
+    assert!(env.contains(&"AGY_CLI_DISABLE_AUTO_UPDATE=1".to_owned()));
+    // The record's own rules hold: the same account.
+    let mut r = f.resume(f.agy("x"), "r3.md", "r1.md");
+    r["account"] = json!(f.agy_home("g2"));
+    assert_eq!(code(f.run(&r)), "resume_account_differs@account");
+    assert_eq!(f.launches.len(), 2);
+}
+
+#[test]
+fn g3_the_conversation_is_in_the_record_at_once_and_stays_in_every_state() {
+    let mut f = Fake::new();
+    std::fs::write(f.t.join("bin/watch"), f.p("w.md.run.json")).unwrap();
+    std::fs::write(f.t.join("bin/watch-late"), f.p("w.md.run.json")).unwrap();
+    f.agy_lines(&g_run("stage ok"));
+    let (v, _) = f.run(&f.agy("w.md")).unwrap();
+    let read = |name: &str| -> Value {
+        serde_json::from_slice(&std::fs::read(f.t.join(name)).unwrap()).unwrap()
+    };
+    // Before the launch the session is not known; a second after the line `init`, it is there.
+    let (early, late) = (read("bin/seen.json"), read("bin/seen-late.json"));
+    assert_eq!(
+        (early["state"].as_str(), early["session"].is_null()),
+        (Some("running"), true)
+    );
+    assert_eq!(
+        (late["state"].as_str(), late["runtime"].as_str()),
+        (Some("running"), Some("agy"))
+    );
+    assert_eq!(late["session"].as_str().map(str::len), Some(36));
+    assert_eq!(v["session"], late["session"]);
+    // Every end keeps it.
+    let ends: Vec<(&str, Vec<Value>, bool, Option<&str>)> = vec![
+        (
+            "no_result",
+            vec![
+                g_init(),
+                g_result("SUCCESS", json!(""), g_usage(1, 1, 1, 1), json!(1)),
+            ],
+            false,
+            None,
+        ),
+        (
+            "failed",
+            vec![g_init(), g_failure("ERROR", json!("boom"))],
+            false,
+            None,
+        ),
+        (
+            "cut",
+            vec![
+                g_init(),
+                g_failure("ERROR", json!("You've hit your usage limit.")),
+            ],
+            false,
+            None,
+        ),
+        ("failed", vec![g_init()], false, Some("result_event")),
+        ("timeout", vec![g_init()], true, None),
+    ];
+    for (i, (state, lines, hang, unmet)) in ends.into_iter().enumerate() {
+        f.agy_lines_then(&lines, hang, 0);
+        let mut r = f.agy(&format!("e{i}.md"));
+        r["timeout_seconds"] = json!(2);
+        let (v, _) = f.run(&r).unwrap();
+        assert_eq!(v["state"], state, "{i} {v}");
+        if let Some(unmet) = unmet {
+            assert_eq!(v["unmet"], unmet, "{i} {v}");
+        }
+        assert_eq!(v["session"].as_str().map(str::len), Some(36), "{i} {v}");
+        assert_eq!(v, f.record(&format!("e{i}.md")));
+    }
+    // A failure before any conversation (the real one has an empty id and no `init`): no session.
+    let mut bare = g_failure("ERROR", json!("invalid model selection"));
+    bare["result"]["conversation_id"] = json!("");
+    f.agy_lines_then(&[bare], false, 1);
+    let (v, status) = f.run(&f.agy("n.md")).unwrap();
+    assert_eq!(
+        (status, v["state"].as_str(), v["session"].is_null()),
+        (3, Some("failed"), true),
+        "{v}"
+    );
+}
+
+#[test]
+fn g4_a_result_with_an_answer_is_ok_and_its_response_is_saved_byte_for_byte() {
+    let mut f = Fake::new();
+    let answer = "Verdict: accept\nlíne «ü» \"quoted\" \\ back\ttab\r\nlast line, no newline";
+    f.agy_lines(&g_run(answer));
+    let (v, status) = f.run(&f.agy("x.md")).unwrap();
+    assert_eq!((status, v["state"].as_str()), (0, Some("ok")), "{v}");
+    assert_eq!(std::fs::read(f.p("x.md")).unwrap(), answer.as_bytes());
+    assert_eq!(v, f.record("x.md"));
+    assert_eq!(v["answer"]["sha256"], f.sha("x.md"));
+    let mut keys: Vec<&str> = v.as_object().unwrap().keys().map(String::as_str).collect();
+    keys.sort_unstable();
+    let mut want = vec![
+        "role",
+        "runtime",
+        "model",
+        "effort",
+        "account",
+        "session",
+        "cwd",
+        "unit",
+        "prompt",
+        "answer",
+        "start",
+        "end",
+        "state",
+        "turns",
+        "tokens",
+        "permission_denials",
+        "expect_file_before",
+        "results",
+        "expect_met",
+        "unmet",
+        "resumes",
+        "limit",
+        "attempts",
+        "compact_window",
+    ];
+    want.sort_unstable();
+    // No member `served_by`: the stream names no serving model.
+    assert_eq!(keys, want);
+    assert_eq!(
+        (
+            v["role"].as_str(),
+            v["model"].as_str(),
+            v["effort"].as_str()
+        ),
+        (Some("reviewer"), Some(AGY_MODEL), Some("medium"))
+    );
+    assert_eq!(
+        (v["results"].as_u64(), v["expect_met"].as_bool()),
+        (Some(1), Some(true))
+    );
+    assert_eq!(
+        (v["limit"].clone(), v["permission_denials"].clone()),
+        (Value::Null, json!([]))
+    );
+    assert_eq!(v["account"], f.p("g1").as_str());
+    // A reviewer's stage ends at the first result.
+    let mut lines = g_run("first");
+    lines.push(g_result(
+        "SUCCESS",
+        json!("second"),
+        g_usage(1, 1, 1, 1),
+        json!(1),
+    ));
+    f.agy_lines(&lines);
+    let (v, _) = f.run(&f.agy("y.md")).unwrap();
+    assert_eq!(
+        (v["results"].as_u64(), v["state"].as_str()),
+        (Some(1), Some("ok"))
+    );
+    assert_eq!(std::fs::read(f.p("y.md")).unwrap(), b"first");
+}
+
+#[test]
+fn g4_a_line_step_update_of_the_type_tool_shows_that_the_session_did_work() {
+    let mut f = Fake::new();
+    for (i, (steps, worked)) in [
+        (vec![g_step(1, "tool", "ACTIVE")], true),
+        (vec![g_step(1, "tool", "DONE")], true),
+        (
+            vec![
+                g_step(1, "agent_response", "DONE"),
+                g_step(2, "checkpoint", "DONE"),
+            ],
+            false,
+        ),
+        (vec![], false),
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        let mut lines = vec![g_init(), g_step(0, "user_input", "DONE")];
+        lines.extend(steps);
+        lines.push(g_result(
+            "SUCCESS",
+            json!("ok"),
+            g_usage(1, 1, 1, 1),
+            json!(1),
+        ));
+        f.agy_lines(&lines);
+        let (v, _) = f.run(&f.agy(&format!("w{i}.md"))).unwrap();
+        assert_eq!(v["attempts"][0]["worked"], worked, "{i}");
+    }
+}
+
+#[test]
+fn g5_an_empty_answer_is_no_result_and_expect_judges_the_first_line() {
+    let mut f = Fake::new();
+    for (i, response) in [json!(""), json!(null), json!(5)].into_iter().enumerate() {
+        f.agy_lines(&[
+            g_init(),
+            g_result("SUCCESS", response, g_usage(1, 1, 1, 1), json!(1)),
+        ]);
+        let (v, status) = f.run(&f.agy(&format!("e{i}.md"))).unwrap();
+        assert_eq!(
+            (status, v["state"].as_str(), v["unmet"].as_str()),
+            (3, Some("no_result"), Some("answer")),
+            "{v}"
+        );
+        assert!(v["answer"].is_null() && !Path::new(&f.p(&format!("e{i}.md"))).exists());
+    }
+    f.agy_lines(&g_run("Verdict: accept\nbody"));
+    let mut r = f.agy("v1.md");
+    r["expect"] = json!({"first_line": "Verdict: *"});
+    let (v, status) = f.run(&r).unwrap();
+    assert_eq!(
+        (status, v["state"].as_str(), v["expect_met"].as_bool()),
+        (0, Some("ok"), Some(true))
+    );
+    f.agy_lines(&g_run("Looks fine\nbody"));
+    let mut r = f.agy("v2.md");
+    r["expect"] = json!({"first_line": "Verdict: *"});
+    let (v, status) = f.run(&r).unwrap();
+    assert_eq!(
+        (status, v["state"].as_str(), v["unmet"].as_str()),
+        (3, Some("no_result"), Some("first_line")),
+        "{v}"
+    );
+    assert_eq!(std::fs::read(f.p("v2.md")).unwrap(), b"Looks fine\nbody");
+}
+
+#[test]
+fn g6_an_error_result_is_failed_and_one_with_the_usage_limit_text_is_cut() {
+    let mut f = Fake::new();
+    let reason = "invalid model selection: model gemini-4-nonexistent-low is not recognized";
+    for (i, status) in [
+        "ERROR",
+        "CANCELED",
+        "INTERRUPTED",
+        "INVALID",
+        "WAITING",
+        "RUNNING",
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        f.agy_lines_then(&[g_init(), g_failure(status, json!(reason))], false, 1);
+        let (v, exit) = f.run(&f.agy(&format!("f{i}.md"))).unwrap();
+        assert_eq!(
+            (exit, v["state"].as_str(), v["unmet"].as_str()),
+            (3, Some("failed"), None),
+            "{status} {v}"
+        );
+        assert!(!Path::new(&f.p(&format!("f{i}.md"))).exists(), "{status}");
+        assert_eq!(
+            (v["results"].as_u64(), v["tokens"]["input"].clone()),
+            (Some(1), json!(0))
+        );
+    }
+    // An error that is no string counts as empty: failed, not cut. A response of an error result is not read.
+    let mut odd = g_failure("ERROR", json!(7));
+    odd["result"]["response"] = json!("You've hit your usage limit.");
+    f.agy_lines_then(&[g_init(), odd], false, 1);
+    let (v, exit) = f.run(&f.agy("g.md")).unwrap();
+    assert_eq!((exit, v["state"].as_str()), (3, Some("failed")), "{v}");
+    for (i, text) in [
+        "You've hit your usage limit. Try again at 6:30 PM.",
+        "usage limit reached",
+        "You have hit your weekly limit · resets Nov 21",
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        f.agy_lines_then(
+            &[
+                g_init(),
+                g_step(1, "tool", "DONE"),
+                g_failure("ERROR", json!(text)),
+            ],
+            false,
+            1,
+        );
+        let launches = f.launches.len();
+        let (v, exit) = f.run(&f.agy(&format!("c{i}.md"))).unwrap();
+        assert_eq!((exit, v["state"].as_str()), (75, Some("cut")), "{text} {v}");
+        assert!(!Path::new(&f.p(&format!("c{i}.md"))).exists());
+        // One account: no move; the stream holds no quota.
+        assert_eq!(
+            (f.launches.len(), v["attempts"].as_array().unwrap().len()),
+            (launches + 1, 1)
+        );
+        assert_eq!(v["limit"], Value::Null);
+    }
+    // A finished answer is never read as a cut.
+    f.agy_lines(&[
+        g_init(),
+        g_result(
+            "SUCCESS",
+            json!("You've hit your usage limit."),
+            g_usage(1, 1, 1, 1),
+            json!(1),
+        ),
+    ]);
+    let (v, exit) = f.run(&f.agy("h.md")).unwrap();
+    assert_eq!((exit, v["state"].as_str()), (0, Some("ok")), "{v}");
+}
+
+#[test]
+fn g6_no_result_is_failed_after_the_exit_and_timeout_after_the_bound() {
+    let mut f = Fake::new();
+    f.agy_lines_then(&[g_init(), g_step(1, "tool", "DONE")], false, 0);
+    let (v, exit) = f.run(&f.agy("n.md")).unwrap();
+    assert_eq!(
+        (exit, v["state"].as_str(), v["unmet"].as_str()),
+        (3, Some("failed"), Some("result_event")),
+        "{v}"
+    );
+    assert_eq!(
+        (
+            v["results"].as_u64(),
+            v["turns"].clone(),
+            v["tokens"]["input"].clone()
+        ),
+        (Some(0), Value::Null, Value::Null)
+    );
+    f.agy_lines_then(&[g_init(), g_step(1, "tool", "DONE")], true, 0);
+    let mut r = f.agy("t.md");
+    r["timeout_seconds"] = json!(2);
+    let (v, exit) = f.run(&r).unwrap();
+    assert_eq!(
+        (exit, v["state"].as_str(), v["unmet"].as_str()),
+        (3, Some("timeout"), None),
+        "{v}"
+    );
+}
+
+#[test]
+fn g7_tokens_are_the_usage_of_the_result_and_turns_its_num_turns() {
+    let mut f = Fake::new();
+    // The lines of the real fresh run (the fake's own): 15025 input, 134 output and 81 thinking, 10724 read.
+    let (v, _) = f.run(&f.agy("real.md")).unwrap();
+    assert_eq!(
+        v["tokens"],
+        json!({"input":15025,"output":134 + 81,"cache_read":10724,"cache_creation":0}),
+        "{v}"
+    );
+    assert_eq!(
+        (v["turns"].clone(), v["state"].as_str()),
+        (json!(1), Some("ok"))
+    );
+    // Any other member that is no number counts 0; turns is null when num_turns is no number.
+    let usage = json!({"input_tokens":"x","output_tokens":7,"thinking_tokens":null,"cache_read_tokens":1.5});
+    f.agy_lines(&[
+        g_init(),
+        g_result("SUCCESS", json!("ok"), usage, json!("two")),
+    ]);
+    let (v, _) = f.run(&f.agy("odd.md")).unwrap();
+    assert_eq!(
+        v["tokens"],
+        json!({"input":0,"output":7,"cache_read":0,"cache_creation":0}),
+        "{v}"
+    );
+    assert_eq!(v["turns"], Value::Null);
+    f.agy_lines(&[
+        g_init(),
+        g_result("SUCCESS", json!("ok"), Value::Null, json!(4)),
+    ]);
+    let (v, _) = f.run(&f.agy("none.md")).unwrap();
+    assert_eq!(
+        v["tokens"],
+        json!({"input":0,"output":0,"cache_read":0,"cache_creation":0}),
+        "{v}"
+    );
+    assert_eq!(v["turns"], 4);
+}
+
+#[test]
+fn g7_a_resumes_tokens_are_the_results_sums_less_every_earlier_record_of_the_chain() {
+    let mut f = Fake::new();
+    // The CLI sums the usage over the conversation: each result holds the totals so far.
+    let step = |i: u64, o: u64, t: u64, c: u64, turns: u64, text: &str| {
+        vec![
+            g_init(),
+            g_result("SUCCESS", json!(text), g_usage(i, o, t, c), json!(turns)),
+        ]
+    };
+    f.agy_lines(&step(100, 20, 5, 40, 1, "one"));
+    let (v1, _) = f.run(&f.agy("c1.md")).unwrap();
+    assert_eq!(
+        v1["tokens"],
+        json!({"input":100,"output":25,"cache_read":40,"cache_creation":0}),
+        "{v1}"
+    );
+    f.agy_lines(&step(160, 50, 9, 100, 2, "two"));
+    let (v2, _) = f.run(&f.resume(f.agy("x"), "c2.md", "c1.md")).unwrap();
+    assert_eq!(
+        v2["tokens"],
+        json!({"input":60,"output":34,"cache_read":60,"cache_creation":0}),
+        "{v2}"
+    );
+    f.agy_lines(&step(400, 90, 30, 300, 3, "three"));
+    let (v3, _) = f.run(&f.resume(f.agy("x"), "c3.md", "c2.md")).unwrap();
+    assert_eq!(
+        v3["tokens"],
+        json!({"input":240,"output":61,"cache_read":200,"cache_creation":0}),
+        "{v3}"
+    );
+    assert_eq!(v3["turns"], 3);
+    // The three records sum to the last result's totals.
+    let sum = |k: &str| {
+        [&v1, &v2, &v3]
+            .iter()
+            .map(|v| v["tokens"][k].as_u64().unwrap())
+            .sum::<u64>()
+    };
+    assert_eq!(
+        (sum("input"), sum("output"), sum("cache_read")),
+        (400, 120, 300)
+    );
+    // An earlier record of the chain that cannot be read: the tokens are null, the answer is kept.
+    std::fs::remove_file(f.p("c1.md.run.json")).unwrap();
+    f.agy_lines(&step(500, 100, 30, 350, 4, "four"));
+    let (v4, status) = f.run(&f.resume(f.agy("x"), "c4.md", "c3.md")).unwrap();
+    assert_eq!((status, v4["state"].as_str()), (0, Some("ok")), "{v4}");
+    assert_eq!(
+        v4["tokens"],
+        json!({"input":null,"output":null,"cache_read":null,"cache_creation":null}),
+        "{v4}"
+    );
+    assert_eq!(std::fs::read(f.p("c4.md")).unwrap(), b"four");
+}
+
+#[test]
+fn g8_a_resume_across_runtimes_is_refused_in_both_directions() {
+    let mut f = Fake::new();
+    let agy = f.agy_first("a.md");
+    assert_eq!(agy["runtime"], "agy");
+    let claude = f.run(&f.request("c.md")).unwrap().0;
+    assert_eq!(claude["runtime"], "claude");
+    let before = f.launches.len();
+    for (earlier, request) in [
+        ("a.md", f.request("x")),
+        ("a.md", f.codex("x")),
+        ("a.md", f.muse("x")),
+        ("c.md", f.agy("x")),
+    ] {
+        let r = f.resume(request, "again.md", earlier);
+        assert_eq!(
+            code(f.run(&r)),
+            "resume_runtime_differs@runtime",
+            "{earlier}"
+        );
+    }
+    // A Claude record without the member counts as `claude`.
+    let mut rec = f.record("c.md");
+    rec.as_object_mut().unwrap().remove("runtime");
+    std::fs::write(f.p("old.md.run.json"), rec.to_string()).unwrap();
+    let r = f.resume(f.agy("x"), "again.md", "old.md");
+    assert_eq!(code(f.run(&r)), "resume_runtime_differs@runtime");
+    let r = f.resume(f.agy("x"), "again.md", "a.md");
+    assert_eq!(f.run(&r).unwrap().0["state"], "ok");
+    assert_eq!(f.launches.len(), before + 1);
+}
+
+// ---- notes of earlier verifiers on `ap run`, taken by unit AGY1 -------------------------------
+
+#[test]
+fn cut1_a_resets_at_in_float_form_is_null() {
+    let mut f = Fake::new();
+    let float = r#"{"type":"rate_limit_event","rate_limit_info":{"status":"allowed","resetsAt":1794772800.0,"unifiedWindows":{"five_hour":{"status":"allowed","utilization":0.5,"resetsAt":1794772800.0}}}}"#;
+    let limit = f.limit_of("fl.md", &[float]);
+    assert_eq!(
+        limit,
+        json!({"status": "allowed", "kind": null, "resets_at": null,
+            "windows": {"five_hour": {"status": "allowed", "utilization": 0.5, "resets_at": null}}})
+    );
+}
+
+#[test]
+fn cut1_the_record_on_disk_while_a_second_launch_runs_holds_both_attempts() {
+    let mut f = Fake::new();
+    f.mode("a1", "limit45");
+    f.mode("a2", "watch");
+    std::fs::write(f.t.join("bin/watch"), f.p("w.md.run.json")).unwrap();
+    let (v, status) = f.run(&f.with_next("implementer", "w.md", &["a2"])).unwrap();
+    assert_eq!((status, v["state"].as_str()), (0, Some("ok")), "{v}");
+    // The file as the second launch's CLI saw it, while the launch ran.
+    let seen: Value =
+        serde_json::from_slice(&std::fs::read(f.t.join("bin/seen.json")).unwrap()).unwrap();
+    assert_eq!(
+        (seen["state"].as_str(), seen["account"].clone()),
+        (Some("running"), json!(f.p("a2")))
+    );
+    assert!(seen["end"].is_null() && seen["answer"].is_null());
+    let attempts = seen["attempts"].as_array().unwrap();
+    assert_eq!(attempts.len(), 2);
+    assert_eq!(
+        (
+            attempts[0]["state"].as_str(),
+            attempts[0]["worked"].as_bool(),
+            attempts[0]["limit"]["status"].as_str()
+        ),
+        (Some("cut"), Some(true), Some("rejected"))
+    );
+    assert!(attempts[0]["end"].is_string());
+    assert_eq!(
+        (
+            attempts[1]["state"].as_str(),
+            attempts[1]["continued"].as_bool(),
+            attempts[1]["account"].clone()
+        ),
+        (Some("running"), Some(true), json!(f.p("a2")))
+    );
+    assert!(attempts[1]["end"].is_null() && attempts[1]["limit"].is_null());
+    assert_eq!(seen["session"], attempts[1]["session"]);
+    assert_ne!(attempts[0]["session"], attempts[1]["session"]);
+}
+
+#[test]
+fn rf1_an_implementer_resumed_over_an_implementers_record_moves_with_the_six_sentences() {
+    let mut f = Fake::new();
+    f.first("implementer", "a1", "i1.md");
+    f.mode("a1", "limit45");
+    f.reset_calls();
+    let before = f.count_now();
+    let r = f.resumed("implementer", "i2.md", "i1.md", "a1", &["a2"]);
+    let (v, status) = f.run(&r).unwrap();
+    assert_eq!((status, v["state"].as_str()), (0, Some("ok")), "{v}");
+    let (p, a) = (f.p("prompt.md"), f.p("i1.md"));
+    let text = moved_text("implementer", &p, &a);
+    assert_eq!(f.input(before + 2), [text.as_bytes(), AGAIN].concat());
+    // One line of six sentences (three of the move, three about the directory) and an empty line.
+    assert_eq!(
+        (text.matches(". ").count(), text.matches('\n').count()),
+        (5, 2)
+    );
+    assert!(text.ends_with("is done.\n\n") && text.contains("This directory holds its work"));
+    assert_eq!(f.accounts(), ["a1", "a2"]);
 }

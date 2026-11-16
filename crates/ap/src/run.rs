@@ -1,4 +1,4 @@
-//! One stage of a unit: one headless Claude Code (or Codex or Muse Code CLI) session in a transient systemd
+//! One stage of a unit: one headless Claude Code (or Codex, Muse Code or Antigravity CLI) session in a transient systemd
 //! scope under `agents.slice`, ended at its time bound, its exit or (a reviewer only) its first
 //! `result` event, after which the whole scope is stopped. One record `<out>.run.json` per run; no
 //! other ledger, no store write.
@@ -61,6 +61,10 @@ const MEMBERS: [&str; 22] = [
 ];
 /// The largest file of `answer_schema`, in bytes.
 const SCHEMA_MAX: u64 = 65_536;
+/// The longest prompt that is one argument of a program, in bytes: Linux takes 131072 with the NUL.
+const ARGUMENT_MAX: usize = 131_071;
+/// The levels an `agy` slug ends with: the `effort` of its stage.
+const LEVELS: [&str; 4] = ["low", "medium", "high", "xhigh"];
 /// The unit's own bound runs this long past the request's: `ap run` stops the unit first, and the
 /// bound still ends it when `ap run` is gone.
 const GRACE: u64 = 10;
@@ -98,6 +102,7 @@ enum Runtime {
     Claude,
     Codex,
     Muse,
+    Agy,
 }
 impl Runtime {
     fn of(word: Option<&Value>) -> Option<Self> {
@@ -105,6 +110,7 @@ impl Runtime {
             None | Some(Some("claude")) => Some(Self::Claude),
             Some(Some("codex")) => Some(Self::Codex),
             Some(Some("muse")) => Some(Self::Muse),
+            Some(Some("agy")) => Some(Self::Agy),
             Some(_) => None,
         }
     }
@@ -114,6 +120,7 @@ impl Runtime {
             Self::Claude => "claude",
             Self::Codex => "codex",
             Self::Muse => "muse",
+            Self::Agy => "agy",
         }
     }
     /// The members of the request this runtime does not build (each refuses by its name).
@@ -121,7 +128,7 @@ impl Runtime {
         match self {
             Self::Claude => &[],
             Self::Codex => &["skills", "memory", "integration", "compact_window"],
-            Self::Muse => &[
+            Self::Muse | Self::Agy => &[
                 "skills",
                 "memory",
                 "integration",
@@ -130,23 +137,26 @@ impl Runtime {
             ],
         }
     }
-    fn reviews(self) -> bool {
+    /// The roles this runtime builds: Codex has no reviewer, and an `agy` stage no other role (its
+    /// `HOME` is the account, so a writing stage's `git`, `gh` and `cargo` lose their files).
+    fn role_ok(self, role: &str) -> bool {
         match self {
             Self::Claude | Self::Muse => true,
-            Self::Codex => false,
+            Self::Codex => role != "reviewer",
+            Self::Agy => role == "reviewer",
         }
     }
     fn typed_answer(self) -> bool {
         match self {
             Self::Claude => true,
-            Self::Codex | Self::Muse => false,
+            Self::Codex | Self::Muse | Self::Agy => false,
         }
     }
     /// No approval and no sandbox of the CLI's own, one account and no MCP file.
     fn bare(self) -> bool {
         match self {
             Self::Claude => false,
-            Self::Codex | Self::Muse => true,
+            Self::Codex | Self::Muse | Self::Agy => true,
         }
     }
     /// The names `env` may not hold, so that the account named in the record is the one that answers.
@@ -155,19 +165,45 @@ impl Runtime {
             Self::Claude => false,
             Self::Codex => name.starts_with("CODEX_") || name.starts_with("OPENAI_"),
             Self::Muse => name.starts_with("MUSE_") || name == "XDG_CONFIG_HOME",
+            Self::Agy => name.starts_with("AGY_") || name.starts_with("GEMINI_"),
         }
     }
     /// A value that reaches the CLI as an argument of its own must not read as a flag there.
     fn argument_ok(self, value: &str) -> bool {
         match self {
             Self::Claude | Self::Codex => true,
-            Self::Muse => !value.starts_with('-'),
+            Self::Muse | Self::Agy => !value.starts_with('-'),
         }
     }
+    /// An `agy` slug carries the level of its stage, which the CLI is not given apart from it.
+    fn effort_ok(self, model: &str, effort: &str) -> bool {
+        match self {
+            Self::Claude | Self::Codex | Self::Muse => true,
+            Self::Agy => LEVELS.contains(&effort) && model.rsplit('-').next() == Some(effort),
+        }
+    }
+    /// The prompt reaches an `agy` stage as one argument of the program.
+    fn prompt_argument(self) -> bool {
+        match self {
+            Self::Claude | Self::Codex | Self::Muse => false,
+            Self::Agy => true,
+        }
+    }
+    /// A Muse account is a directory named `muse`; an `agy` account is a home with the login
+    /// token and without a `.gemini/config`, where the CLI reads what is registered for it.
     fn account_named(self, account: &str) -> bool {
+        let (home, token) = (
+            Path::new(account).join(".gemini"),
+            "antigravity-cli/antigravity-oauth-token",
+        );
         match self {
             Self::Claude | Self::Codex => true,
             Self::Muse => Path::new(account).file_name().is_some_and(|n| n == "muse"),
+            Self::Agy => {
+                let config = std::fs::symlink_metadata(home.join("config"));
+                home.join(token).metadata().is_ok_and(|m| m.is_file())
+                    && config.is_err_and(|e| e.kind() == std::io::ErrorKind::NotFound)
+            }
         }
     }
 }
@@ -207,6 +243,8 @@ struct Request {
     spent: Option<[u64; 4]>,
     /// The compaction window the stated `CLAUDE_CODE_AUTO_COMPACT_WINDOW` gets (a Claude stage).
     compact_window: Option<u64>,
+    /// An `agy` stage: the prompt's text, the one argument that carries it.
+    argument: String,
 }
 
 fn path(r: &Value, key: &str) -> Result<String, Failure> {
@@ -351,8 +389,8 @@ fn request_at(s: &mut impl System, r: &Value, at_cwd: bool) -> Result<Request, F
     }
     let runtime = Runtime::of(r.get("runtime")).ok_or_else(|| error("invalid_input", "runtime"))?;
     let role = text(r, "role")?;
-    // Not built for every runtime: a reviewer (Codex has none) and these members.
-    require!(runtime.reviews() || role != "reviewer" => "invalid_input", "role");
+    // Not built for every runtime: some roles (Codex has no reviewer, `agy` only one) and these members.
+    require!(runtime.role_ok(role) => "invalid_input", "role");
     if let Some(k) = (runtime.unbuilt().iter()).find(|k| r.get(**k).is_some()) {
         return Err(error("invalid_input", k));
     }
@@ -376,6 +414,7 @@ fn request_at(s: &mut impl System, r: &Value, at_cwd: bool) -> Result<Request, F
     for (key, value) in [("model", &model), ("effort", &effort)] {
         require!(runtime.argument_ok(value) => "invalid_input", key);
     }
+    require!(runtime.effort_ok(&model, &effort) => "invalid_input", "effort");
     let mode = text(r, "permission_mode")?;
     require!(MODES.contains(&mode) => "invalid_input", "permission_mode");
     // No approval and no sandbox of the CLI's own: only when the request says so.
@@ -454,6 +493,10 @@ fn request_at(s: &mut impl System, r: &Value, at_cwd: bool) -> Result<Request, F
         .read(&prompt)
         .map_err(|_| error("prompt_unreadable", "prompt"))?;
     require!(!bytes.is_empty() && bytes.len() as u64 <= LIMIT => "prompt_unreadable", "prompt");
+    // Whole and before any effect: an argument cannot hold a NUL byte or more than its limit.
+    let argument = String::from_utf8(bytes.clone()).ok();
+    let argument = argument.filter(|a| a.len() <= ARGUMENT_MAX && !a.contains('\0'));
+    require!(!runtime.prompt_argument() || argument.is_some() => "invalid_input", "prompt");
     let out_path = Path::new(&out);
     let name = out_path
         .file_name()
@@ -592,8 +635,10 @@ fn request_at(s: &mut impl System, r: &Value, at_cwd: bool) -> Result<Request, F
         schema,
         mcp,
         spent: match (runtime, &earlier) {
-            (Runtime::Codex, Some((_, (_, _, file)))) => spent(file),
-            (Runtime::Codex, None) | (Runtime::Claude | Runtime::Muse, _) => Some([0; 4]),
+            (Runtime::Codex | Runtime::Agy, Some((_, (_, _, file)))) => spent(file),
+            (Runtime::Codex | Runtime::Agy, None) | (Runtime::Claude | Runtime::Muse, _) => {
+                Some([0; 4])
+            }
         },
         resume: earlier.map(|(_, r)| r),
         moved,
@@ -604,10 +649,13 @@ fn request_at(s: &mut impl System, r: &Value, at_cwd: bool) -> Result<Request, F
         memory: flag(r, "memory")?,
         runtime,
         compact_window,
+        argument: argument
+            .filter(|_| runtime.prompt_argument())
+            .unwrap_or_default(),
     })
 }
 const TOKENS: [&str; 4] = ["input", "output", "cache_read", "cache_creation"];
-/// The tokens of a Codex thread up to the end of the run of `file`: that record's and those of
+/// The tokens of a Codex or `agy` thread up to the end of the run of `file`: that record's and those of
 /// every record it resumes (the CLI reports the thread's usage, a record its own part). None when
 /// the chain cannot be followed to its end: a record that cannot be read, a record met twice, or
 /// more than 256 records.
@@ -725,12 +773,12 @@ struct Seen {
     rejected: bool,
     /// The rate-limit event `limit` is made from: the last rejected one, else the last one.
     limit: Option<Value>,
-    /// The CLI the lines come from, with a Codex stream's thread tokens before this run (None: they
-    /// are unknown, so this run's are too) and a Muse stream's requested model.
+    /// The CLI the lines come from, with a Codex or `agy` stream's thread tokens before this run (None:
+    /// they are unknown, so this run's are too) and a Muse stream's requested model.
     runtime: Runtime,
     spent: Option<[u64; 4]>,
     model: String,
-    /// A Codex stream's thread, the last agent message of the turn running, and the items
+    /// A Codex stream's thread (an `agy` stream's conversation), the last agent message of the turn running, and the items
     /// completed since the last turn end.
     thread: Option<String>,
     message: Option<String>,
@@ -754,6 +802,7 @@ impl Seen {
             Runtime::Claude => self.claude_line(e),
             Runtime::Codex => self.codex_line(&e, self.spent),
             Runtime::Muse => self.muse_line(&e["payload"]),
+            Runtime::Agy => self.agy_line(&e),
         }
     }
     fn claude_line(&mut self, e: Value) {
@@ -798,6 +847,35 @@ impl Seen {
                     .push(json!({"type": "result", "is_error": !done,
                     "result": if done { text("text") } else { text("reason") },
                     "permission_denials": []}));
+            }
+            _ => (),
+        }
+    }
+    /// An `agy` line, read into the shape of a `result`: `init` names the conversation, a `tool`
+    /// step is work, the `result` line is one (its `response` the answer when its `status` is
+    /// `SUCCESS`, its `error` the message otherwise). The usage is the conversation's, less what the
+    /// earlier records of it hold; `output` adds the thinking tokens.
+    fn agy_line(&mut self, e: &Value) {
+        match e["event"].as_str() {
+            Some("init") => {
+                let id = e["conversation_id"].as_str().filter(|id| !id.is_empty());
+                self.thread = self.thread.take().or(id.map(str::to_owned));
+            }
+            Some("step_update") => self.worked |= e["step_update"]["step_type"] == "tool",
+            Some("result") => {
+                let r = &e["result"];
+                let n = |k: &str| r["usage"][k].as_u64().unwrap_or(0);
+                let own = |v: u64, i: usize| self.spent.map(|s| v.saturating_sub(s[i]));
+                let output = n("output_tokens").saturating_add(n("thinking_tokens"));
+                let done = r["status"] == "SUCCESS";
+                self.results
+                    .push(json!({"type": "result", "is_error": !done,
+                    "result": if done { &r["response"] } else { &r["error"] },
+                    "num_turns": r["num_turns"], "permission_denials": [],
+                    "usage": {"input_tokens": own(n("input_tokens"), 0),
+                        "output_tokens": own(output, 1),
+                        "cache_read_input_tokens": own(n("cache_read_tokens"), 2),
+                        "cache_creation_input_tokens": own(0, 3)}}));
             }
             _ => (),
         }
@@ -1200,7 +1278,28 @@ fn muse_args(q: &Request, session: &str) -> Vec<String> {
         "--yolo",
     ])
 }
-/// The session the Codex CLI named at the thread's start enters the record at once. False when
+/// The Antigravity CLI after `systemd-run … --`: the prompt as one argument, headless, no approval
+/// (README "A stage on the Antigravity CLI"); the stage's bound is the CLI's own.
+fn agy_args(q: &Request, resume: Option<&str>) -> Vec<String> {
+    let bound = format!("{}s", q.timeout);
+    let mut a = args(&["--", "agy", "--print", &q.argument]);
+    a.extend(args(&[
+        "--output-format",
+        "stream-json",
+        "--model",
+        &q.model,
+    ]));
+    a.extend(args(&[
+        "--dangerously-skip-permissions",
+        "--print-timeout",
+        &bound,
+    ]));
+    if let Some(conversation) = resume {
+        a.extend(args(&["--conversation", conversation]));
+    }
+    a
+}
+/// The session the Codex CLI named at the thread's start (or the `agy` conversation at its `init`) enters the record at once. False when
 /// that write of the record failed, which counts as every failed write of it after the launch.
 fn named(out: &str, record: &mut Value, seen: &Seen) -> bool {
     if let (true, Some(thread)) = (record["session"].is_null(), &seen.thread) {
@@ -1226,9 +1325,10 @@ fn mirror(record: &mut Value, worked: bool) {
 /// line of a move) that text, an empty line and the file's bytes, through a pipe that a thread
 /// fills (no file).
 fn input(q: &Request, lead: Option<&str>) -> std::io::Result<File> {
-    // A Muse stage reads its prompt from the file the argument names, and nothing on stdin.
+    // A Muse stage reads its prompt from the file the argument names, an `agy` stage has its text
+    // as an argument, and neither reads stdin.
     let file = match q.runtime {
-        Runtime::Muse => return File::open("/dev/null"),
+        Runtime::Muse | Runtime::Agy => return File::open("/dev/null"),
         Runtime::Claude | Runtime::Codex => File::open(&q.prompt)?,
     };
     let Some(lead) = lead else {
@@ -1293,9 +1393,9 @@ fn attempt(
         return not_launched(record, "launch");
     };
     let unit = format!("ap-run-{unit}.scope");
-    // The Codex CLI names a fresh session itself, at the thread's start.
+    // The Codex CLI names a fresh session itself, at the thread's start, and `agy` at its `init`.
     let names_itself = match q.runtime {
-        Runtime::Codex => resume.is_none(),
+        Runtime::Codex | Runtime::Agy => resume.is_none(),
         Runtime::Claude | Runtime::Muse => false,
     };
     if !names_itself {
@@ -1354,6 +1454,13 @@ fn attempt(
             let home = Path::new(account).parent().and_then(Path::to_str);
             env.push(("XDG_CONFIG_HOME".into(), home.unwrap_or_default().into()));
             env.push(("MUSE_NO_AUTO_UPDATE".into(), "1".into()));
+        }
+        Runtime::Agy => {
+            argv.extend(agy_args(q, resume));
+            // The account is the CLI's `HOME`, in place of the caller's.
+            env.retain(|(k, _)| k != "HOME");
+            env.push(("HOME".into(), account.into()));
+            env.push(("AGY_CLI_DISABLE_AUTO_UPDATE".into(), "1".into()));
         }
     }
     let started = s.now();
@@ -1432,7 +1539,7 @@ fn attempt(
     record["state"] = json!(state);
     match q.runtime {
         Runtime::Muse => (record["turns"], record["tokens"]) = muse_tally(seen.usage.as_ref()),
-        Runtime::Claude | Runtime::Codex => (),
+        Runtime::Claude | Runtime::Codex | Runtime::Agy => (),
     }
     if !stopped {
         // Something of the stage may still live: never `ok`.
@@ -1442,6 +1549,7 @@ fn attempt(
     record["limit"] = match q.runtime {
         Runtime::Claude | Runtime::Codex => limit_of(seen.limit.as_ref()),
         Runtime::Muse => muse_limit(seen.usage.as_ref()),
+        Runtime::Agy => Value::Null,
     };
     mirror(&mut record, seen.worked);
     let saved = persist(&q.out, &record);
@@ -1562,7 +1670,7 @@ pub(crate) fn cli_with(
 
 #[cfg(test)]
 mod tests {
-    use super::{glob, limit_text, stamp};
+    use super::{MOVED, MOVED_WORK, glob, limit_text, stamp};
     use std::time::{Duration, UNIX_EPOCH};
     #[test]
     fn stamps_are_utc_rfc3339() {
@@ -1582,6 +1690,16 @@ mod tests {
         assert!(!glob("a*b*c", "aXbY"));
         assert!(!glob("Verdict: *", "verdict: accept"));
         assert!(glob("*", ""));
+    }
+    #[test]
+    fn the_moved_text_holds_each_placeholder_once_and_in_order() {
+        // `split_once` on the constant turns a move off silently when a placeholder is lost.
+        assert_eq!(
+            (MOVED.matches("{P}").count(), MOVED.matches("{A}").count()),
+            (1, 1)
+        );
+        assert!(MOVED.find("{P}") < MOVED.find("{A}"));
+        assert!(!MOVED_WORK.contains('{'));
     }
     #[test]
     fn usage_limit_texts() {
