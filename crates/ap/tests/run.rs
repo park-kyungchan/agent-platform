@@ -296,6 +296,7 @@ fn a1_answer_is_saved_byte_for_byte_and_the_record_has_every_member() {
         "resumes",
         "limit",
         "attempts",
+        "compact_window",
     ];
     want.sort_unstable();
     assert_eq!(keys, want);
@@ -2968,6 +2969,179 @@ fn cut1_a_call_whose_files_cannot_be_opened_writes_the_record_without_the_two_me
     // The stream file exists after the record was claimed: the files cannot be opened.
     f.precreate = Some(f.p("h.md.stream.jsonl"));
     let (v, status) = f.run(&f.request("h.md")).unwrap();
+    assert_eq!(status, 5, "{v}");
+    assert_eq!(
+        v,
+        json!({"state": "failed", "unmet": "launch", "account": f.p("a1")})
+    );
+    assert_eq!(f.record("h.md"), v);
+    assert_eq!(f.count_now(), 0, "no CLI call");
+}
+
+// ---- The compaction window of a Claude stage (`compact_window`) ----------------------------------
+
+/// The `--settings` value of launch `n` (from 0), parsed.
+fn settings_at(f: &Fake, n: usize) -> Value {
+    let cli = f.cli_of(n);
+    let at = cli.iter().position(|a| a == "--settings").unwrap();
+    serde_json::from_str(&cli[at + 1]).unwrap()
+}
+
+#[test]
+fn compact_window_is_an_integer_from_100000_to_1000000() {
+    let mut f = Fake::new();
+    let refused = [
+        json!(99_999),
+        json!(1_000_001),
+        json!(0),
+        json!(-400_000),
+        json!(400_000.0),
+        json!(4e5),
+        json!("400000"),
+        json!(null),
+        json!(true),
+        json!([400_000]),
+    ];
+    for value in refused {
+        let mut r = f.request("w.md");
+        r["compact_window"] = value.clone();
+        assert_eq!(code(f.run(&r)), "invalid_input@compact_window", "{value}");
+    }
+    // A refusal comes before any effect: no record, no launch.
+    assert!(!f.t.join("w.md.run.json").exists());
+    assert_eq!(f.launches.len(), 0);
+    // Both bounds are admitted and reach the settings as decimal strings.
+    for (n, out) in [(100_000_u64, "lo.md"), (1_000_000, "hi.md")] {
+        let mut r = f.request(out);
+        r["compact_window"] = json!(n);
+        let (v, status) = f.run(&r).unwrap();
+        assert_eq!((status, v["state"].as_str()), (0, Some("ok")), "{v}");
+        assert_eq!(
+            settings_at(&f, f.launches.len() - 1)["env"]["CLAUDE_CODE_AUTO_COMPACT_WINDOW"],
+            json!(n.to_string())
+        );
+    }
+}
+
+#[test]
+fn compact_window_starts_a_claude_stage_in_its_settings_and_nothing_else() {
+    let mut f = Fake::new();
+    let mut r = f.request("s.md");
+    r["compact_window"] = json!(400_000);
+    let (v, _) = f.run(&r).unwrap();
+    assert_eq!(v["state"], "ok", "{v}");
+    assert_eq!(
+        settings_at(&f, 0),
+        json!({"autoMemoryEnabled": false, "disableAllHooks": true, "env": {
+            "BASH_DEFAULT_TIMEOUT_MS": "2700000", "BASH_MAX_TIMEOUT_MS": "2700000",
+            "CLAUDE_CODE_AUTO_COMPACT_WINDOW": "400000",
+            "CLAUDE_CODE_DISABLE_BACKGROUND_TASKS": "1"}})
+    );
+    let with = f.cli_of(0);
+    // Without the member: the settings of today, byte for byte.
+    let (v, _) = f.run(&f.request("t.md")).unwrap();
+    assert_eq!(v["state"], "ok", "{v}");
+    let call = f.calls().last().unwrap().clone();
+    assert!(
+        call.contains(
+            r#"--settings {"autoMemoryEnabled":false,"disableAllHooks":true,"env":{"BASH_DEFAULT_TIMEOUT_MS":"2700000","BASH_MAX_TIMEOUT_MS":"2700000","CLAUDE_CODE_DISABLE_BACKGROUND_TASKS":"1"}} --disallowedTools"#
+        ),
+        "{call}"
+    );
+    let without = f.cli_of(1);
+    // Apart from the session id (new in each launch), the arguments differ in the settings only.
+    let (with, without) = (&with[..with.len() - 1], &without[..without.len() - 1]);
+    assert_eq!(with.len(), without.len());
+    let differ: Vec<_> = with.iter().zip(without).filter(|(a, b)| a != b).collect();
+    assert_eq!(differ.len(), 1, "{differ:?}");
+    assert!(
+        differ[0].0.starts_with("{\"autoMemoryEnabled\""),
+        "{differ:?}"
+    );
+}
+
+#[test]
+fn compact_window_a_resume_and_a_next_account_get_their_own_request_value() {
+    let mut f = Fake::new();
+    let mut r = f.request("first.md");
+    r["compact_window"] = json!(400_000);
+    let (first, _) = f.run(&r).unwrap();
+    assert_eq!(first["state"], "ok", "{first}");
+    // The resumed launch is cut before any tool ran, so it moves to the next account as a new session.
+    f.mode("a1", "limit1");
+    let before = f.launches.len();
+    let mut r = f.with_next("reviewer", "second.md", &["a2"]);
+    r["compact_window"] = json!(600_000);
+    let (v, status) = f.run(&f.resume(r, "second.md", "first.md")).unwrap();
+    assert_eq!((status, v["state"].as_str()), (0, Some("ok")), "{v}");
+    assert_eq!(f.launches.len() - before, 2, "{v}");
+    let (resumed, moved) = (before, before + 1);
+    assert!(f.cli_of(resumed).contains(&"--resume".to_owned()));
+    assert!(f.cli_of(moved).contains(&"--session-id".to_owned()));
+    for n in [resumed, moved] {
+        assert_eq!(
+            settings_at(&f, n)["env"]["CLAUDE_CODE_AUTO_COMPACT_WINDOW"],
+            "600000",
+            "launch {n}"
+        );
+    }
+}
+
+#[test]
+fn compact_window_a_codex_stage_refuses_it_before_any_effect() {
+    let mut f = Fake::new();
+    let mut r = f.codex("c.md");
+    r["compact_window"] = json!(400_000);
+    assert_eq!(code(f.run(&r)), "invalid_input@compact_window");
+    assert!(!f.t.join("c.md.run.json").exists());
+    assert_eq!(f.launches.len(), 0);
+    // A Codex stage without the member runs as before.
+    let (v, _) = f.run(&f.codex("ok.md")).unwrap();
+    assert_eq!(v["state"], "ok", "{v}");
+}
+
+#[test]
+fn compact_window_the_record_names_it_or_null_for_every_runtime() {
+    let mut f = Fake::new();
+    let mut r = f.request("with.md");
+    r["compact_window"] = json!(600_000);
+    let (v, _) = f.run(&r).unwrap();
+    assert_eq!(v["compact_window"], 600_000);
+    assert_eq!(f.record("with.md")["compact_window"], 600_000);
+    let (v, _) = f.run(&f.request("none.md")).unwrap();
+    assert!(v["compact_window"].is_null());
+    assert!(f.record("none.md")["compact_window"].is_null());
+    let (v, _) = f.run(&f.codex("cx.md")).unwrap();
+    assert_eq!(v["state"], "ok", "{v}");
+    assert!(f.record("cx.md")["compact_window"].is_null());
+}
+
+#[test]
+fn compact_window_a_launch_that_could_not_start_names_it_in_its_record() {
+    let mut f = Fake::new();
+    // The first launch is cut after work and removes the program: the next launch cannot start.
+    f.mode("a1", "vanish");
+    let mut r = f.with_next("implementer", "g.md", &["a2"]);
+    r["compact_window"] = json!(400_000);
+    let (v, status) = f.run(&r).unwrap();
+    assert_eq!(
+        (status, v["state"].as_str(), v["unmet"].as_str()),
+        (3, Some("failed"), Some("launch")),
+        "{v}"
+    );
+    assert_eq!(v["attempts"].as_array().unwrap().len(), 2);
+    assert_eq!(v["compact_window"], 400_000);
+    assert_eq!(f.record("g.md"), v);
+}
+
+#[test]
+fn compact_window_a_call_whose_files_cannot_be_opened_keeps_three_members() {
+    let mut f = Fake::new();
+    // The stream file exists after the record was claimed: the files cannot be opened.
+    f.precreate = Some(f.p("h.md.stream.jsonl"));
+    let mut r = f.request("h.md");
+    r["compact_window"] = json!(400_000);
+    let (v, status) = f.run(&r).unwrap();
     assert_eq!(status, 5, "{v}");
     assert_eq!(
         v,

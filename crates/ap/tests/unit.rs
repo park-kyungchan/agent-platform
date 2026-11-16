@@ -1991,6 +1991,120 @@ fn i1_stage_members_are_judged_by_ap_run_before_any_effect() {
     assert_eq!((u.launches, u.calls.len()), (0, 0));
 }
 
+/// The lines of the fake's call log: one per launch, in order.
+fn launch_lines(u: &U) -> Vec<String> {
+    let calls = std::fs::read_to_string(u.t.join("bin/calls.log")).unwrap();
+    calls.lines().map(str::to_owned).collect()
+}
+
+#[test]
+fn compact_window_a_stage_block_states_its_own_window() {
+    let mut u = U::new();
+    let mut r = u.request();
+    r["implementer"]["compact_window"] = json!(400_000);
+    r["verifier"]["compact_window"] = json!(600_000);
+    let (v, code) = u.run(&r).unwrap();
+    assert_eq!((v["state"].as_str(), code), (Some("merged"), 0), "{v}");
+    assert_eq!(
+        stage_record(&v["stages"]["implementer"])["compact_window"],
+        400_000
+    );
+    assert_eq!(
+        stage_record(&v["stages"]["verifier"])["compact_window"],
+        600_000
+    );
+    let lines = launch_lines(&u);
+    assert_eq!(lines.len(), 2, "{lines:?}");
+    let window = |n: u64| format!(r#""CLAUDE_CODE_AUTO_COMPACT_WINDOW":"{n}""#);
+    assert!(lines[0].contains(&window(400_000)) && !lines[0].contains(&window(600_000)));
+    assert!(lines[1].contains(&window(600_000)) && !lines[1].contains(&window(400_000)));
+}
+
+#[test]
+fn compact_window_the_round_fixer_and_the_come_back_take_their_blocks_values() {
+    let mut u = U::new();
+    fixing(&u, FIX);
+    u.script("a2", VERIFY_AFTER_FIX);
+    let mut r = r4_request(&u);
+    r["implementer"]["compact_window"] = json!(400_000);
+    r["verifier"]["compact_window"] = json!(600_000);
+    let (v, code) = u.run(&r).unwrap();
+    assert_eq!((v["state"].as_str(), code), (Some("merged"), 0), "{v}");
+    assert_eq!(u.launches, 4, "implementer, verifier, fixer, verifier");
+    let lines = launch_lines(&u);
+    let window = |n: u64| format!(r#""CLAUDE_CODE_AUTO_COMPACT_WINDOW":"{n}""#);
+    for (n, want, other) in [
+        (0, 400_000, 600_000),
+        (1, 600_000, 400_000),
+        (2, 400_000, 600_000),
+        (3, 600_000, 400_000),
+    ] {
+        assert!(lines[n].contains(&window(want)), "launch {n}: {}", lines[n]);
+        assert!(
+            !lines[n].contains(&window(other)),
+            "launch {n}: {}",
+            lines[n]
+        );
+    }
+    assert!(
+        lines[2].contains("--resume"),
+        "the fixer resumes the implementer's session"
+    );
+}
+
+#[test]
+fn compact_window_a_bad_stage_block_value_is_refused_before_any_effect() {
+    let mut u = U::new();
+    let cases = [
+        (
+            "implementer",
+            json!(99_999),
+            "invalid_input@implementer.compact_window",
+        ),
+        (
+            "verifier",
+            json!(1_000_001),
+            "invalid_input@verifier.compact_window",
+        ),
+        (
+            "implementer",
+            json!("400000"),
+            "invalid_input@implementer.compact_window",
+        ),
+        (
+            "verifier",
+            json!(400_000.5),
+            "invalid_input@verifier.compact_window",
+        ),
+        (
+            "implementer",
+            json!(null),
+            "invalid_input@implementer.compact_window",
+        ),
+    ];
+    for (block, value, want) in cases {
+        let mut r = u.request();
+        r[block]["compact_window"] = value.clone();
+        assert_eq!(code(u.run(&r)), want, "{block} {value}");
+    }
+    // A Codex stage states no window: `ap run`'s refusal, under the block's field.
+    let mut r = u.request();
+    r["implementer"]["runtime"] = json!("codex");
+    r["implementer"]["permission_mode"] = json!("bypassPermissions");
+    r["implementer"]["compact_window"] = json!(400_000);
+    assert_eq!(code(u.run(&r)), "invalid_input@implementer.compact_window");
+    // Nothing exists afterwards: no worktree, no branch, no process, no call.
+    assert!(!u.wt().exists());
+    assert_eq!(branches(&u), "* main");
+    assert_eq!((u.launches, u.calls.len()), (0, 0));
+    // The stage block of a case call takes the member through the same list.
+    let c = case(&u);
+    let mut r = case_request(&u, &c);
+    r["implementer"]["compact_window"] = json!(1);
+    assert_eq!(code(u.run(&r)), "invalid_input@implementer.compact_window");
+    assert_eq!((u.launches, u.calls.len()), (0, 0));
+}
+
 #[test]
 fn i7_the_path_of_a_stage_record_is_on_disk_before_the_stage_starts() {
     let mut u = U::new();
