@@ -6,10 +6,78 @@ ont_binary=$(realpath -- "$1")
 export ONT_BIN="$ont_binary"
 repo=$(git -C "$(dirname -- "${BASH_SOURCE[0]}")" rev-parse --show-toplevel)
 rehearsal_root=$(mktemp -d)
+# The engine refuses a root reached through a symbolic link: the one root of every copy is a real path.
+rehearsal_root=$(realpath -- "$rehearsal_root")
 trap 'python3 -c '\''import shutil,sys; shutil.rmtree(sys.argv[1])'\'' "$rehearsal_root"' EXIT
-python3 - "$ont_binary" "$repo" "$rehearsal_root/store.sqlite" <<'PY'
+# The index sources of the schema name the host's work directory. The rehearsal indexes the fixture files of the
+# repository, copied once under its own root, and installs every schema file as a copy whose strings under the
+# host's work directory (the paths of `sources`, and the arguments of the transforms of the keys and properties of
+# the object types) begin with that root instead. The copies of the two Python steps share one directory.
+work_root="$rehearsal_root/work"
+mkdir -- "$work_root" "$rehearsal_root/copies" "$rehearsal_root/lib"
+cp -R -- "$repo/ontology/fixtures/work/." "$work_root/"
+cat > "$rehearsal_root/lib/redirect.py" <<'PY'
+import copy as _copy, json, pathlib, sys
+HOST = '/home/palantirkc/work/'
+def convert(value, change):
+    if isinstance(value, str): return change(value)
+    if isinstance(value, list): return [convert(v, change) for v in value]
+    if isinstance(value, dict): return {k: convert(v, change) for k, v in value.items()}
+    return value
+def groups(schema, change):
+    # Returns a copy of the schema in which `change` is applied to the strings of the two groups: those of `sources`
+    # (no description among them), and those of the `transform` of a primary_key or of a property of an object type.
+    out = _copy.deepcopy(schema)
+    out['sources'] = convert(out['sources'], change)
+    for kind in out['object_types'].values():
+        for holder in [kind.get('primary_key', {}), *kind.get('properties', {}).values()]:
+            if isinstance(holder.get('transform'), dict): holder['transform'] = convert(holder['transform'], change)
+    return out
+def strings(schema, begin):
+    found = {'sources': [], 'transforms': []}
+    def count(where):
+        def inner(s):
+            if s.startswith(begin): found[where].append(s)
+            return s
+        return inner
+    probe = _copy.deepcopy(schema)
+    convert(probe['sources'], count('sources'))
+    for kind in probe['object_types'].values():
+        for holder in [kind.get('primary_key', {}), *kind.get('properties', {}).values()]:
+            if isinstance(holder.get('transform'), dict): convert(holder['transform'], count('transforms'))
+    return len(found['sources']), len(found['transforms'])
+def make(path, root, copies, label=None, binaries=None):
+    # Writes the copy of one schema file, whose strings of both groups under the host's work directory begin with
+    # `root` (ending in a slash) instead; `binaries` replaces the paths of installed_binaries. Returns (path, copy).
+    original = json.loads(pathlib.Path(path).read_text())
+    assert root.endswith('/') and not root.startswith(HOST)
+    expected = strings(original, HOST)
+    copy = groups(original, lambda s: root + s[len(HOST):] if s.startswith(HOST) else s)
+    assert strings(copy, HOST) == (0, 0) and strings(copy, root) == expected, (path, expected)
+    restored = groups(copy, lambda s: HOST + s[len(root):] if s.startswith(root) else s)
+    if binaries is not None:
+        copy['sources']['installed_binaries']['paths'] = binaries
+        restored['sources']['installed_binaries']['paths'] = original['sources']['installed_binaries']['paths']
+    assert restored == original, path
+    out = pathlib.Path(copies, '%02d-%s' % (len(list(pathlib.Path(copies).iterdir())), label or pathlib.Path(path).name))
+    out.write_text(json.dumps(copy))
+    print('redirect_copy=' + out.name + ' version=' + str(copy['version']) + ' source_paths=' + str(expected[0]) + ' transform_arguments=' + str(expected[1]), file=sys.stderr)
+    return out, copy
+def trace(root, copies):
+    total = 0
+    for file in sorted(pathlib.Path(copies).iterdir()):
+        schema = json.loads(file.read_text())
+        assert strings(schema, HOST) == (0, 0), file.name
+        total += sum(strings(schema, root))
+    assert total > 0
+    print("rehearsal_sources=" + str(total) + " redirected, 0 under the host's work directory", file=sys.stderr)
+PY
+python3 - "$ont_binary" "$repo" "$rehearsal_root/store.sqlite" "$work_root/" "$rehearsal_root/copies" "$rehearsal_root/lib" <<'PY'
 import datetime, hashlib, json, pathlib, subprocess, sys
-binary, repo, store = sys.argv[1:]
+binary, repo, store, work, copies, lib = sys.argv[1:]
+sys.path.insert(0, lib)
+import redirect
+def redirected(path, label=None): return redirect.make(path, work, copies, label)[0]
 now = int(datetime.datetime(2026, 11, 11, 2, tzinfo=datetime.timezone.utc).timestamp())
 def call(args, request=None, code=0):
     p = subprocess.run([binary, '--store', store, '--now', str(now), *args], input=json.dumps(request) if request is not None else None, text=True, capture_output=True, timeout=60)
@@ -45,12 +113,12 @@ task = oid('task', 'workspace-strategy-reassessment-20261109'); packet = oid('pa
 v1 = subprocess.check_output(['git', '-C', repo, 'show', 'f2d1b030bd1a0a66928ef57d9365027526e664da:ontology/work.schema.json'], timeout=10)
 assert hashlib.sha256(v1).hexdigest() == '4573ab180f63889029ae98c892c996e810f9d8140cf26726ee6d5fffbfc10605'
 first = pathlib.Path(store).with_name('v1.json'); first.write_bytes(v1)
-call(['schema', 'install', str(first)]); call(['index', '--source', 'task_states', '--source', 'packets', '--source', 'reports'])
+call(['schema', 'install', str(redirected(first))]); call(['index', '--source', 'task_states', '--source', 'packets', '--source', 'reports'])
 revision = obj(task)['observations'][-1]['revision']; obj(packet); obj(report)
 v2 = subprocess.check_output(['git', '-C', repo, 'show', '2b9417c8bc96b0cbeb4ab7913aa44cb49ad8d604:ontology/work.schema.json'], timeout=10)
 assert hashlib.sha256(v2).hexdigest() == '27de5fd02c20299897720ab34543e04e6db685438c3dd7409691cb8ddae11f24'
 second = pathlib.Path(store).with_name('v2.json'); second.write_bytes(v2)
-call(['schema', 'install', str(second)])
+call(['schema', 'install', str(redirected(second))])
 probe = created(apply('set_hold', 'v2-probe', dict(task=task, effect='upgrade probe', until='schema v3')), 'hold')
 apply('lift_hold', 'v2-probe-lift', dict(hold=probe))
 # Versions 2 to 4 took a row of the user without words; such a row stays current and is triaged after version 9.
@@ -60,13 +128,13 @@ probe_revision = obj(probe)['head']
 # Preserve a real v5 flag-only review across the upgrade to v6.
 legacy = pathlib.Path(store).with_name('v5.json')
 legacy.write_bytes(subprocess.check_output(['git', '-C', repo, 'show', 'f46cdf49ba74e117ddaaf387416a0eac1d53f2af:ontology/work.schema.json'], timeout=10))
-call(['schema', 'install', str(legacy)])
+call(['schema', 'install', str(redirected(legacy))])
 legacy_thread = created(apply('open_thread', 'legacy-thread', dict(task=task, key='legacy-v5', consumer='fixture', consumer_kind='harness', first_use='upgrade')), 'thread')
 legacy_plan = created(apply('open_plan', 'legacy-plan', dict(thread=legacy_thread, first_lines=100, limit_lines=150, current_lines=151, amended_by_family='family-a')), 'plan')
 apply('record_scope_review', 'legacy-review', dict(plan=legacy_plan, reviewer_family='family-b', review_report='fixture/v5.md'))
 v6 = pathlib.Path(store).with_name('v6.json')
 v6.write_bytes(subprocess.check_output(['git', '-C', repo, 'show', '8ad36bf3cf10e19659965cc2d458a921533cdfae:ontology/work.schema.json'], timeout=10))
-call(['schema', 'install', str(v6)])
+call(['schema', 'install', str(redirected(v6))])
 assert obj(probe)['head'] == probe_revision
 assert obj(task)['observations'][-1]['revision'] == revision
 call(['describe'], {})
@@ -255,7 +323,7 @@ old_views = {view: call(['render'], dict(view=view, args={} if view == 'current_
 v7 = pathlib.Path(store).with_name('v7.json')
 v7.write_bytes(subprocess.check_output(['git', '-C', repo, 'show', 'ccb15142dbe19f2e04ad1c5d445048336db60d08:ontology/work.schema.json'], timeout=10))
 assert hashlib.sha256(v7.read_bytes()).hexdigest() == '6f6d2acc4a45ccc7e2f25268d458f9b6fabc5ab10fb85231d0fa81eaf68373f4'
-call(['schema', 'install', str(v7)])
+call(['schema', 'install', str(redirected(v7))])
 assert fields(plan) == old_plan and fields(w) == old_run
 for kind, retained in [('plan', plan), ('worker_run', w)]:
     assert retained in [o['id'] for o in call(['search'], dict(object_type=kind))['objects']]
@@ -378,7 +446,7 @@ for label, head in [('admitted', '8' * 40), ('revoked', '9' * 40)]:
 v8 = pathlib.Path(store).with_name('v8.json')
 v8.write_bytes(subprocess.check_output(['git', '-C', repo, 'show', '64fb1f59c6ff426807886d5a10397f5be3e496fa:ontology/work.schema.json'], timeout=10))
 assert hashlib.sha256(v8.read_bytes()).hexdigest() == '8b4b4236d9e5cff8ce3286211682cc977f4cdf1fdbfb36b42aefa08021e04d23'
-call(['schema', 'install', str(v8)])
+call(['schema', 'install', str(redirected(v8))])
 assert fields(next_review)['status'] == 'closed' and fields(next_review)['verdict'] == 'accept'
 gate('close_review', 'v8-upgrade-running-review-closes', dict(review=v7_running, verdict='abandoned'))
 assert fields(v7_running)['status'] == 'closed' and fields(v7_running).get('running_in') is None
@@ -427,7 +495,7 @@ v8_views = {view: call(['render'], dict(view=view, args={} if view in ('current_
 v9 = pathlib.Path(store).with_name('v9.json')
 v9.write_bytes(subprocess.check_output(['git', '-C', repo, 'show', '8379ae651929853d6fb2df79559ece4a98c5f551:ontology/work.schema.json'], timeout=10))
 assert hashlib.sha256(v9.read_bytes()).hexdigest() == 'faba52d93401384cdc6146a7f505c61dafc4a87662deb284dfc689f19a58d298'
-call(['schema', 'install', str(v9)])
+call(['schema', 'install', str(redirected(v9))])
 assert [obj(i) for i in v8_objects] == v8_before
 for view, before in v8_views.items():
     answer = call(['render'], dict(view=view, args={} if view in ('current_memory_records', 'installs') else dict(task=task['native_key'])))
@@ -442,18 +510,14 @@ for name in ('ont_describe', 'ont_action_list'):
     sizes.append(len(answer['content'][0]['text'].encode())); assert sizes[-1] <= 262144, (name, sizes[-1])
 print('gate_row=v9-mcp-sizes expected=admitted bytes=' + ','.join(map(str, sizes)))
 # installed_artifact is owned by a source of four paths under /usr/local/bin that need not exist where the
-# rehearsal runs. The rows from here on run on a copy of the repository's file that differs only in those
-# paths (two files of this store's directory); it keeps the file's own version, installed over version 9.
+# rehearsal runs. The rows from here on run on the repository's file, as the one copy that also moves those paths
+# (two files of this store's directory) and the host's work directory (see the top of this file); it keeps the
+# file's own version, installed over version 9.
 repository_schema = json.loads(pathlib.Path(repo, 'ontology/work.schema.json').read_text())
 binaries = [pathlib.Path(store).with_name(n) for n in ('installed-a', 'installed-b')]
 for b in binaries: b.write_bytes(b'fixture\n')
-copy = json.loads(json.dumps(repository_schema)); copy['version'] = repository_schema['version']
-assert copy['version'] > 9
-copy['sources']['installed_binaries']['paths'] = [str(b) for b in binaries]
-assert {k: v for k, v in copy.items() if k not in ('version', 'sources')} == {k: v for k, v in repository_schema.items() if k not in ('version', 'sources')}
-assert {k: v for k, v in copy['sources'].items() if k != 'installed_binaries'} == {k: v for k, v in repository_schema['sources'].items() if k != 'installed_binaries'}
-assert {k: v for k, v in copy['sources']['installed_binaries'].items() if k != 'paths'} == {k: v for k, v in repository_schema['sources']['installed_binaries'].items() if k != 'paths'}
-fixture = pathlib.Path(store).with_name('v8-installed-paths.json'); fixture.write_text(json.dumps(copy))
+fixture, copy = redirect.make(pathlib.Path(repo, 'ontology/work.schema.json'), work, copies, 'repository-installed-paths.json', [str(b) for b in binaries])
+assert copy['version'] == repository_schema['version'] > 9
 # Every object and view asserted under version 9 reads the same after the install of the repository's file.
 v9_objects = v8_objects + [after_v9]
 v9_before = [obj(i) for i in v9_objects]
@@ -774,9 +838,12 @@ PY
 # requests, intents and criteria, on version 10 pinned in Git. Then version 11, the repository's file, over the
 # objects made under version 10, and the walk of the units, runs and findings.
 mkdir -- "$rehearsal_root/v10"
-python3 - "$ont_binary" "$repo" "$rehearsal_root/v10/store.sqlite" <<'PY'
+python3 - "$ont_binary" "$repo" "$rehearsal_root/v10/store.sqlite" "$work_root/" "$rehearsal_root/copies" "$rehearsal_root/lib" <<'PY'
 import datetime, hashlib, json, os, pathlib, subprocess, sys
-binary, repo, store = sys.argv[1:]
+binary, repo, store, work, copies, lib = sys.argv[1:]
+sys.path.insert(0, lib)
+import redirect
+def redirected(path, label=None): return redirect.make(path, work, copies, label)[0]
 assert os.environ['ONT_BIN'] == binary
 now = int(datetime.datetime(2026, 11, 12, tzinfo=datetime.timezone.utc).timestamp())
 env = {k: v for k, v in os.environ.items() if k not in ('ONT_AGENT', 'ONT_ROLE')}
@@ -811,7 +878,7 @@ def install(commit, digest):
     pinned = subprocess.check_output(['git', '-C', repo, 'show', commit + ':ontology/work.schema.json'], timeout=10)
     assert hashlib.sha256(pinned).hexdigest() == digest
     path = pathlib.Path(store).with_name('pinned-' + commit + '.json'); path.write_bytes(pinned)
-    call(['schema', 'install', str(path)])
+    call(['schema', 'install', str(redirected(path))])
 # The store starts at version 2 with a row of the user without words, and is carried through the pinned versions to 9.
 install('2b9417c8bc96b0cbeb4ab7913aa44cb49ad8d604', '27de5fd02c20299897720ab34543e04e6db685438c3dd7409691cb8ddae11f24')
 call(['index', '--source', 'task_states'])
@@ -1032,7 +1099,8 @@ v10_views = [(view, args, call(['render'], dict(view=view, args=args))) for view
              ('requests_by_topic', dict(topic='v10-widget-colour')), ('requests_unrouted', {})]]
 schema = json.loads(pathlib.Path(repo, 'ontology/work.schema.json').read_text())
 assert schema['version'] == 11
-call(['schema', 'install', str(pathlib.Path(repo, 'ontology/work.schema.json'))])
+call(['schema', 'install', str(redirected(pathlib.Path(repo, 'ontology/work.schema.json'), 'repository.json'))])
+redirect.trace(work, copies)
 assert [obj(i) for i in v10_objects] == v10_before
 for view, args, before in v10_views:
     answer = call(['render'], dict(view=view, args=args))
