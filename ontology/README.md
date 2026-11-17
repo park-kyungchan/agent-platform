@@ -202,14 +202,38 @@ ontology/rehearsal.sh /path/to/ont
 ```
 
 It creates a store under `mktemp -d` (set `TMPDIR` to the authorized scratch
-root), checks the frozen v1 pin, installs v1, indexes task/packet/report files,
-installs v2, creates and lifts a v2 hold, then installs v4 and verifies the task
+root), checks the frozen v1 pin, installs v1, indexes the task, packet and report fixture files
+(below), installs v2, creates and lifts a v2 hold, then installs v4 and verifies the task
 and v2 hold revisions are unchanged. It exercises the version 2 action/time,
 retry, reference, escaping and optional-cell cases; prints six rendered blocks
 (one memory-index block and five program-state blocks); and invokes the
 exhaustive memory-index walk with two records. Its private stores are removed
 on exit. Output sizes and time-comparison answers go to stderr. A walk failure
 fails the rehearsal. Native calls must use the authorized disposable wrapper.
+
+The index sources of `ontology/work.schema.json` name the work directory of the host, and the rehearsal reads
+no file there. The directory `ontology/fixtures/work/` holds one-line files (`# <an invented title>`) at the
+paths the rehearsal reads or asserts, relative to the work root: two `STATE.md`, one `TASK-O13.md` and one
+`REPORT-O13.md`; no other file may lie there, because the rehearsal asserts other keys absent. The rehearsal
+copies them to `work/` under its own temporary root (taken through `realpath`, as the engine refuses a root
+reached through a symbolic link) before the first index, and installs every schema file of its first two stores
+(each pinned version read from Git, after the assertion of its digest, and the repository's file) as a copy in
+which every string that begins with `/home/palantirkc/work/` in two groups begins with that root instead: the
+paths of `sources` (`glob`, `exclude`) and the arguments of the `transform` of a `primary_key` or of a property
+of an object type (`replace_prefix`, `segment_after`), which form the keys of packets and reports. Descriptions
+and the paths of other directories are not touched, and a parameter that only holds a path as text stays as it
+is. For each copy the rehearsal asserts that replacing the root back gives the original file, but for the
+`paths` of `installed_binaries` where the install rows need them moved (below), and that the count of strings
+changed equals the count under the root in the copy; it prints `redirect_copy=` with the two counts of each
+copy (127 source paths and 5 transform arguments in every version so far), and after the last install of those
+two stores `rehearsal_sources=<n> redirected, 0 under the host's work directory`, `<n>` being the strings of both
+groups over all copies. A string of either group left under the host's work directory fails the rehearsal. This
+proves that the objects indexed from the fixtures have the keys they have on the host, and that the calls of the
+engine name no path of the host's work directory (`strace` of the run shows none beyond the repository
+checkout). The store of `ontology/memory-index-walk.py` installs the repository's file unchanged and indexes
+nothing: it is outside the redirect and the trace. The rehearsal does not index the `instructions` source; the paths of
+`installed_binaries` are moved to files of its own directory by the same copy. The schema file itself keeps the
+host's paths in its sources.
 
 Host installation is a separate authorized operation after review and merge:
 fetch this repository, then use `ont --store <authorized-store> schema install
@@ -500,9 +524,9 @@ file, closes the running review and revokes one closed review; it then installs
 version 9 (below) and later names the other review as the `review` of a
 forward attempt. `installed_artifact` is owned by a source of four
 paths under `/usr/local/bin` that need not exist where the rehearsal runs, so the
-install rows run on a copy that differs from this file only in those paths (two
-files of the rehearsal's own directory) and in its version (10, above the installed 9); the rehearsal
-asserts that every other member is equal. It prints the basis of the search of
+install rows run on the copy of this file that also moves those paths (two
+files of the rehearsal's own directory), the one copy of "Install and rehearse"; the rehearsal
+asserts that every other member is equal to the file's, whose version it keeps (above the installed 9). It prints the basis of the search of
 `ap unit` made before this change, for the review closed under version 7
 (`v8_upgrade_search_basis=`): on this engine a filter on an optional property
 (`repository`, `verdict`, `report_sha256`) answers `qualified: false` as soon as
@@ -848,7 +872,7 @@ added in between. The file is committed executable (mode `100755`): delivery ski
 
 ### Install over version 9 and the rehearsal
 The rehearsal now installs version 9 from Git by its commit and digest, and then the repository's file
-(as a copy that differs only in the paths of `installed_binaries`) over it; every object and view asserted
+(as the copy of "Install and rehearse", which also moves the paths of `installed_binaries`) over it; every object and view asserted
 under version 9 reads the same, and `ont_describe` and `ont_action_list` stay within the MCP limit of
 262,144 bytes. On a second store it starts at version 2 with a row of the user without words, installs the
 pinned versions up to 9, records two rows of the user with words (one triaged) and a Lead row, installs the
@@ -1065,7 +1089,12 @@ Every new type, property, parameter and action carries a description, every crit
 The engine bounds each description of a property or a parameter to 300 bytes; the MCP answers are bounded to
 262,144 bytes, and the rehearsal asserts both `ont_describe` and `ont_action_list` stay at or under it on both
 stores. Measured on this file at the engine of `ontology/ENGINE-PIN`: `ont_describe` 214,024 bytes (48,120
-left), `ont_action_list` 140,647 bytes. The texts that versions 10 and 11 add (the descriptions and messages
+left), `ont_action_list` 140,647 bytes. These sizes were measured on the repository's file, with the paths of the host. The
+rehearsal installs the redirected copy, whose `ont_describe` text is longer by the difference between the
+length of its temporary root and that of the host's work directory, once for each of the 132 redirected strings
+(with the default `/tmp`: 214,420 bytes on the second store, 396 more). The bytes that the rows `v9-mcp-sizes` and
+`v10-mcp-sizes` and the line `v11_mcp_bytes=` print are those of the copy, and the bound of 262,144 bytes is
+asserted on it. The texts that versions 10 and 11 add (the descriptions and messages
 of their new types, properties, parameters, actions and criteria) are 564 texts of 38,285 bytes, a mean of 68
 bytes; the bound this version keeps is a mean of at most 160. A later version that adds as much again does not
 fit: it shortens texts or splits the domain.
