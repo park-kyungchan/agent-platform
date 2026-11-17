@@ -91,6 +91,11 @@ pub trait System {
     fn units(&self) -> bool {
         Path::new("/run/systemd/system").is_dir()
     }
+    /// The host's policy file (`specs/ap/policy.md`): none unless the real host names one, so a
+    /// test fake that reads the real file system is never subject to the host's file.
+    fn policy_file(&self) -> Option<PathBuf> {
+        None
+    }
     /// This process's environment; `ap run` keeps only a fixed short list of it.
     fn environment(&self) -> Vec<(String, String)> {
         std::env::vars_os()
@@ -198,7 +203,17 @@ pub(crate) fn refused(v: &Value) -> bool {
     v.is_object() && (v["status"].as_str().is_some_and(|s| s != "ok") || v["code"].is_string())
 }
 pub struct Host;
+/// The policy file's path: the value of `AP_POLICY_FILE` when set and not empty, else the default.
+fn policy_path(value: Option<OsString>) -> PathBuf {
+    value.filter(|v| !v.is_empty()).map_or_else(
+        || PathBuf::from("/etc/agent-platform/policy.json"),
+        PathBuf::from,
+    )
+}
 impl System for Host {
+    fn policy_file(&self) -> Option<PathBuf> {
+        Some(policy_path(std::env::var_os("AP_POLICY_FILE")))
+    }
     fn call(&mut self, program: &str, args: &[String], input: &Value, ms: u64) -> Answer {
         let error = || fail("process_failed", program, Value::Null);
         let mut child = Command::new(program)
@@ -312,4 +327,21 @@ pub(crate) fn json_cli(
         return ExitCode::from(4);
     }
     ExitCode::from(status)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::policy_path;
+    use std::path::PathBuf;
+    // spec: specs/ap/policy.md#R1
+    #[test]
+    fn the_policy_path_is_the_variable_when_set_and_not_empty() {
+        let default = PathBuf::from("/etc/agent-platform/policy.json");
+        assert_eq!(policy_path(None), default);
+        assert_eq!(policy_path(Some("".into())), default);
+        assert_eq!(
+            policy_path(Some("/tmp/p.json".into())),
+            PathBuf::from("/tmp/p.json")
+        );
+    }
 }
