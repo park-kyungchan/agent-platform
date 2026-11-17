@@ -833,8 +833,10 @@ reason `carried from version 9`, followed by `, triage <word>` when the row was 
 `migrate-10-aside-<key>`). The carried requests are current, found by topic, and not in
 `requests_unrouted`: the triage of version 9 pointed at objectives and items, which have no counterpart here.
 A record that answers `already_applied` is still followed by its aside, so a run that was interrupted
-between the two completes it. A row is already done when both answered `already_applied`, or when the
-record ended `legacy_already_carried`. The script changes no decision, prints one line
+between the two completes it. A row is already done when both answered `already_applied`, when the
+record ended `legacy_already_carried`, or (since version 11) when the record answered `already_applied` and
+the aside was refused `request_id_reused`: the row was triaged with the old verb after an earlier run carried
+it and set it aside, so the reason differs under the same request id. The script changes no decision, prints one line
 `{"carried": n, "already": m}` and exits 0 only when every row ended applied or already done.
 
 The contract every later version keeps: the script stays in the tree; it names the highest version it knows
@@ -854,5 +856,231 @@ repository's file, and runs `ontology/migrate`: 9 10 twice (2 carried, then 2 al
 applied by hand without its aside (1 carried, 2 already), three unknown pairs (exit 2, the store unchanged),
 and the pair the repository's file names. Then every action of this section is applied and every refusal
 above is asserted, each before the action it guards. The rows that need the role of the actor
-(`assume_intent`, `confirm_intent_delegated`, `end_delegation`, and the read back with `ont log`) run with an
-engine that has the verb `log`; with another, they are skipped with one line on standard error.
+(`assume_intent`, `confirm_intent_delegated`, `end_delegation`, and the read back with `ont log`) run with the
+engine of `ontology/ENGINE-PIN`, which knows the role and has the verb `log`. Since version 11 the second store
+installs version 10 from Git instead of the repository's file (section "Version 11"), runs the migration
+again after a carried row was triaged with the old verb (0 carried, 3 already), and names the pairs it uses
+by number.
+
+## Version 11: units, runs, findings
+Version 10 remains pinned at
+`e8e0286d81a5020aed14d9232156cc8c1de0a5e4:ontology/work.schema.json`,
+sha256 `d10e4f5dec9aadcf3dbc9d4be63655196743c09e17adf4e3b3041d3d847af388`.
+Version 11 only adds to versions 9 and 10. Every value type, source, object type, link type, action type and
+view reads the same in canonical JSON, except: `review_kind` gains `page` and `plan`; `request_route` gains
+`unit` and `finding`; `review`, `hold` and `request` gain optional properties; `close_review` and
+`close_intent` gain one criterion each; `route_request` and `set_request_aside` also clear the new references
+`unit` and `finding`; the one grant gains the three new types (read and derive) and the new actions.
+
+The new types are the agents' side of the life cycle of work:
+
+1. A `unit` is one piece of work that ends alone (for code: one pull request). Its page is its properties.
+   It is added `draft` in a lane: `small` (one request of the user, one repository, class `plain`) or
+   `objective` (part of an open intent). It becomes `ready`, then `running` under the order the criteria
+   hold (reviews of the plan and of the page, dependencies merged, no active hold), is `accepted` on a head a
+   review accepted, and ends `merged` (with a repository) or `done` (without one), or `dropped`.
+2. A `run` is one stage of one agent: who ran, on what model, how long, how many tokens.
+3. A `finding` is something that should change the system: it is opened, seen again, planned into a unit or
+   an intent, dismissed or closed.
+4. A review of a page (kind `page`), of a plan (kind `plan`) and of a unit's head (kind `packet`) is the
+   `review` of version 7; a hold on a unit or an intent is the `hold` of version 2.
+
+All three new types are Ontology-owned and written only by these actions. `unit` and `finding` are keyed by
+the native key of a required reference parameter (`unit` of `add_unit`, `finding` of `open_finding`), as
+`intent` is; they have no `title` and are shown by that key. `run` is keyed by the action id, with the title
+`role`. A time is a stored UTC time of one-second resolution; "later" is strictly later. A scalar cannot be
+cleared, so a property said to be "valid only while" a state keeps its last value as history after it.
+
+### `unit`: one piece of work that ends alone
+The page, set by `add_unit` and changed only by `amend_unit`:
+
+| Property | Type | Meaning |
+| --- | --- | --- |
+| `lane` | `small`, `objective` | never changes |
+| `class` | `plain`, `contract`, `effect` | `contract` and `effect` need a page review before `ready` and the Lead's approval of the head before the end |
+| `intent` | `intent`, optional | required in the lane `objective`; never changes |
+| `origin` | `request`, optional | required in the lane `small`; never changes |
+| `objective` | string, 2,000 | the state after the merge, as sentences that can be checked |
+| `interface` (20,000), `invariants` (3,000), `not_built` (1,500), `notes` (3,000), `verifier_questions` (4,000), `report` (1,000) | string, optional | what the Lead fixes; what must stay true; what is not built; notes for the worker; the verifier's questions; what the worker's report holds |
+| `acceptance` | array of `{check, kind}`, optional | `check` nonempty; `kind` `fails_on_base` or `invariant` |
+| `write_set`, `read_first`, `specs` | array of string, optional | paths the unit may change; files read first; design sources |
+| `repository` (200), `branch` (200) | string, optional | `owner/name`; a unit without one is a document, a measurement or an effect on the host |
+| `implementer`, `verifier` | `{runtime, model, effort}`, optional | the tiers |
+| `estimate_lines` | integer, optional | |
+| `depends_on` | array of `unit`, optional | units that must be `merged` or `done` before this one starts |
+
+The state, set only by the actions below:
+
+| Property | Type | Meaning |
+| --- | --- | --- |
+| `state` | `draft`, `ready`, `running`, `accepted`, `stopped`, `merged`, `done`, `dropped` | |
+| `added_at`, `amended_at` | UTC time | `amended_at` is the time of `add_unit` or of the last `amend_unit`: a review counts only when it STARTED later |
+| `ready_at`, `started_at`, `ended_at` | UTC time, optional | `ended_at`: the stop, the merge, the close or the drop |
+| `pull_request` | integer, optional | |
+| `head`, `approved_head`, `merged_commit` | commit or digest, optional | `head` is a commit, or for a unit without a repository the SHA-256 of its evidence; `approved_head` is valid only while it equals `head` |
+| `rounds` | integer | 0 from `add_unit`; the caller of `record_head` passes the new number |
+| `writers` | array of string | the sessions that wrote to the unit's branch, empty from `add_unit` on; none of them closes a review of the unit |
+| `stop_cause` (100), `stop_detail` (1,000) | string, optional | valid only while `state` is `stopped` |
+| `waits_on` | string, 300, optional | the constraint a ready unit waits on, as the dispatch pass last saw it |
+| `evidence` | string, 1,500, optional | what shows a unit without a pull request is done |
+| `delivered_lines` | integer, optional | |
+| `drop_reason` | string, 600, optional | |
+
+The parameter `intent` of `ready_unit`, `start_unit`, `resume_unit`, `reopen_unit`, `merge_unit` and
+`close_unit` is the unit's own intent, given again because a criterion reads an intent's status and its
+reviews and holds only from a parameter. In the lane `objective` it is required (`intent_parameter_required`)
+and must be the unit's (`intent_differs`); in the lane `small` it is left out. "Held" means an `active` hold
+names the unit, or names the given intent.
+
+| Action | Parameters | Effect | Refusals |
+| --- | --- | --- | --- |
+| `add_unit` | `unit`, `lane`, `class`, `objective`; optional every other page property | a `draft` unit, `rounds` 0, `writers` empty, `added_at` and `amended_at` | lane `objective`: `intent_required`; `intent_not_open_for_units` (the intent is not `confirmed` or `assumed`). Lane `small`: `origin_required`; `origin_not_current`; `small_must_be_plain`; `small_needs_one_repository_and_a_write_set` (no or an empty `repository`, no or an empty `write_set`); `request_has_a_live_unit` (another unit of this origin is not `merged`, `done` or `dropped`). Both: `objective_empty`; `depends_on_itself`; a key used before: `revision_conflict` from the engine |
+| `amend_unit` | `unit`; optional every page property but `lane`, `intent` and `origin` | given members replace their values; `state` `draft`, `amended_at` | `unit_not_amendable` (not `draft`, `ready` or `stopped`); `objective_empty` (given and empty); `small_must_be_plain` (lane `small` and another class given); `depends_on_itself`; a member `lane`, `intent` or `origin`: `invalid_parameter` from the engine |
+| `ready_unit` | `unit`; optional `intent` | `draft` becomes `ready`, `ready_at` | `unit_not_draft`; `write_set_missing` (absent or empty); `acceptance_missing` (absent or empty); `tiers_missing` (no `implementer` or no `verifier`); `dependency_dropped`; `intent_not_open_for_units`; `intent_differs`; `intent_parameter_required`; `plan_not_reviewed` (lane `objective`: no review of kind `plan` of the intent is `closed` with verdict `accept`); `page_not_reviewed` (class `contract` or `effect`: no review of kind `page` of the unit is `closed` with verdict `accept` and STARTED later than `amended_at`) |
+| `start_unit` | `unit`; optional `intent` | `ready` becomes `running`, `started_at` | `unit_not_ready`; `intent_differs`; `intent_parameter_required`; `intent_not_open_for_units`; `dependency_not_merged` (a unit of `depends_on` is not `merged` or `done`); `held`; `intent_not_confirmed` (class `contract` or `effect` and the intent is not `confirmed`) |
+| `record_head` | `unit`, `head`, `writers`; optional `pull_request`, `rounds`, `delivered_lines` | sets them; `writers` is the whole new list | `unit_not_running` (not `running` or `stopped`) |
+| `stop_unit` | `unit`, `cause`; optional `detail` | `running` becomes `stopped`: `stop_cause`, `stop_detail`, `ended_at` | `unit_not_running`; `cause_empty` |
+| `resume_unit` | `unit`; optional `intent` | `stopped` becomes `running` on the same page (an amendment goes through `ready_unit` and `start_unit`) | `unit_not_stopped`; `intent_differs`; `intent_parameter_required`; `held`; `intent_not_confirmed` |
+| `accept_unit` | `unit`, `head` | `running` becomes `accepted` | `unit_not_running`; `head_differs` (not the unit's `head`); `head_not_reviewed` (no review of kind `packet` of the unit and of that head is `closed` with verdict `accept` and STARTED later than `amended_at`) |
+| `approve_unit` | `unit`, `head`, `reason` | `approved_head`; the reason stays in the action log | `unit_not_accepted`; `not_the_lead` (the actor's role is not `lead`); `head_differs`; `reason_empty` |
+| `merge_unit` | `unit`, `head`, `merged_commit`; optional `intent` | `accepted` becomes `merged`: `merged_commit`, `ended_at` | `unit_not_accepted`; `head_differs`; `head_not_reviewed`; `intent_differs`; `intent_parameter_required`; `held`; `not_approved` (class `contract` or `effect`, and `approved_head` is absent or not `head`); `no_repository` (it ends by `close_unit`) |
+| `close_unit` | `unit`, `evidence`; optional `intent` | a unit without a repository: `accepted` becomes `done`: `evidence`, `ended_at` | `unit_has_a_repository`; `unit_not_accepted`; `evidence_empty`; `head_not_reviewed` (read from the unit's own `head`, so a revoked review stops it); `intent_differs`; `intent_parameter_required`; `held`; `not_approved` |
+| `drop_unit` | `unit`, `reason` | any state but `merged`, `done` and `dropped` becomes `dropped`: `drop_reason`, `ended_at` | `unit_ended`; `reason_empty` |
+| `note_unit_wait` | `unit`, `waits_on` | `waits_on` | `unit_not_ready` |
+| `reopen_unit` | `unit`, `cause`; optional `intent` | `accepted` becomes `running`; the cause stays in the action log | `unit_not_accepted`; `cause_empty`; `intent_differs`; `intent_parameter_required`; `held`; `intent_not_confirmed` |
+
+`reopen_unit` is the way back when `main` moved under an accepted head, the merge on the hosting service
+failed, the Lead rejected the diff or the accepting review was revoked. The come-back is `record_head` of the
+new head, `carry_review` or a verifier's round, `accept_unit`, and for the classes `contract` and `effect` a new
+`approve_unit`. A unit that is `accepted` under an active hold stays so until the hold is lifted or the unit is
+dropped: `reopen_unit` is held too.
+
+Held by `ap` and not by this schema, each by the command named:
+- every unit of `depends_on` exists (`ap unit add`, `ap unit amend`): a reference to a unit that does not exist
+  is no candidate of `linked`, so the engine would let such a unit start;
+- `record_head` is given every writer (`ap unit run`);
+- the `evidence` given to `close_unit` is the text whose SHA-256 is the unit's `head` (`ap unit run`);
+- `merge_unit` and `close_unit` are validated (`ont action validate`) before the merge on the hosting service
+  or the effect, so that a hold stops the merge itself and not only its record (`ap unit run`): applied after
+  it, a refusal leaves the unit `accepted` until its cause is gone;
+- each `fails_on_base` check fails on the base (`ap unit run`);
+- the write set and the protected paths against the diff (`ap unit run`);
+- the required check on the hosting service (`ap unit run`);
+- no overlap of write sets between running units (`ap unit run`);
+- the host's limits (`ap unit run`);
+- the patch of a unit is unchanged between the two heads of a `carry_review` (`ap unit run`);
+- a `lane` `small` unit keeps a nonempty `repository` after an amendment (`ap unit amend`; the store holds the
+  write set again at `ready_unit`).
+
+### Reviews of units, pages and plans
+`review` gains the optional properties `unit` (`unit`), `intent` (`intent`), `round` (integer) and
+`carried_from` (`review`). Its property `task` stays required and is given by the caller: which task a command
+gives is that command's rule, not this schema's. `head` stays required too: for the kind `page` it is the
+SHA-256 of the rendered page, for the kind `plan` the SHA-256 of the plan as the command renders it. Delivery
+(`accepted` in `crates/ap/src/deliver.rs`) reads a review by `kind`, `head` and `status`, then `verdict`,
+`repository`, `report`, `report_sha256` and `closed_at`: a review made by the new actions has each of them.
+
+| Action | Parameters | Effect | Refusals |
+| --- | --- | --- | --- |
+| `close_review` (changed) | as before | as before | as before, and `review_names_a_unit` (the review has a `unit`: close it with `close_unit_review`) |
+| `start_unit_review` | the parameters of `start_review`; optional `unit`, `intent`, `round` | as `start_review`, with the three members | `unknown_task`; `duplicate_running_review`; `subject_required` (kind `page` without `unit`, kind `plan` without `intent`); `unknown_unit`; `unknown_intent` |
+| `close_unit_review` | the parameters of `close_review`; optional `unit` | as `close_review` | `review_not_running`; `report_required`; `unit_differs` (the review names a unit and the parameter is absent or another); `session_required` (a review of a unit names the closing session); `writer_cannot_review` (the session is one of the unit's `writers`) |
+| `carry_review` | `review`, `unit`, `head` | a `closed` review of kind `packet` of the new `head`, verdict `accept`, `started_at` and `closed_at` now, `carried_from` the given one, and its `task`, `model`, `effort`, `prompt`, `prompt_sha256`, `repository`, `unit`, `report`, `report_sha256` | `review_not_accepting` (not `closed`, verdict `accept`, kind `packet`); `review_incomplete` (no `repository`, `unit`, `report` or `report_sha256`); `review_older_than_amendment` (it did not start later than the unit's `amended_at`); `unit_differs`; `head_unchanged` |
+
+A review closed before this version, and one made by `start_review` and `close_review` after it, is read as
+before. The other members of a carried review (`pull_request`, `base`, `runs`, `account`, `session`) are read
+through `carried_from`: a rule cannot copy a member its source lacks.
+
+### `run`: one stage of one agent
+| Property | Type | Meaning |
+| --- | --- | --- |
+| `unit`, `intent` | `unit`, `intent`; optional | what the run worked on |
+| `role` (40), `runtime` (40), `model` (80) | string | |
+| `effort` (20), `account` (200), `session` (200) | string, optional | |
+| `status` | `running`, `closed` | |
+| `state` (40), `served_by` (80) | string, optional | the end state the run record names; the model that served, when it differs |
+| `started_at`, `ended_at` | UTC time; `ended_at` optional | |
+| `input_tokens`, `cache_read_tokens`, `cache_write_tokens`, `output_tokens` | integer, optional | the four counts of a run record, kept apart because the price table prices them apart |
+| `limit` | string, 300, optional | the limit reading as the run record holds it |
+| `record`, `stream` | file path, optional | the run record; the raw stream |
+| `running_in` | `unit`, optional | set while `running`, cleared at the close, as `review.running_in` is |
+
+| Action | Parameters | Effect | Refusals |
+| --- | --- | --- | --- |
+| `start_run` | `role`, `runtime`, `model`; optional `unit`, `intent`, `effort`, `account`, `session`, `record`, `stream` | a `running` run, `started_at`, `running_in` the unit | `unknown_unit`; `unknown_intent` |
+| `close_run` | `run`, `state`; optional `session`, `served_by`, the four token counts, `limit`, `record`, `stream` | `closed`, `ended_at`; `running_in` cleared | `run_not_running` |
+
+### `finding`: something that should change the system
+| Property | Type | Meaning |
+| --- | --- | --- |
+| `kind` | `incident`, `lesson`, `drift`, `security`, `note` | |
+| `detector` (60), `summary` (600) | string | what found it; what it is |
+| `evidence` | string, 2,000, optional | the last evidence |
+| `severity` | `info`, `act`, `urgent` | |
+| `state` | `open`, `planned`, `dismissed`, `closed` | |
+| `first_seen_at`, `last_seen_at` | UTC time | |
+| `unit`, `intent` | `unit`, `intent`; optional | what it was planned into |
+| `reason` (600), `ended_at` | optional | of a dismissal or a close |
+
+| Action | Parameters | Effect | Refusals |
+| --- | --- | --- | --- |
+| `open_finding` | `finding`, `kind`, `detector`, `summary`, `severity`; optional `evidence` | an `open` finding, both times now | a key used before: `revision_conflict` from the engine, after which the caller applies `see_finding_again` or `reopen_finding` (the command forms the key from the detector and a signature) |
+| `see_finding_again` | `finding`; optional `evidence`, `severity` | `last_seen_at` | `finding_not_live` (not `open` or `planned`) |
+| `reopen_finding` | `finding`, `evidence` | `dismissed` or `closed` becomes `open` | `finding_live` |
+| `plan_finding_as_unit` | `finding`, `unit` | `planned`, `unit`; `intent` cleared | `finding_not_open`; `unknown_unit` |
+| `plan_finding_as_intent` | `finding`, `intent` | `planned`, `intent`; `unit` cleared | `finding_not_open`; `unknown_intent` |
+| `dismiss_finding`, `close_finding` | `finding`, `reason` | `dismissed` or `closed`, `reason`, `ended_at` | `finding_not_live`; `reason_empty` |
+
+### Holds on a unit or an intent, and version 10's actions
+`hold` gains the optional properties `unit` (`unit`), `intent` (`intent`) and `scope` (string, 200).
+`set_hold` and `lift_hold` do not change. `set_hold_on` takes the parameters of `set_hold` (its `task` is given
+by the caller) and optionally `unit`, `intent`, `scope`; it is refused as `set_hold` is (`unknown_task`,
+`duplicate_active_hold`), and `unknown_unit`, `unknown_intent`.
+
+`request` gains the optional references `unit` and `finding`; `route_request` and `set_request_aside` also
+clear them.
+
+| Action | Parameters | Effect | Refusals |
+| --- | --- | --- | --- |
+| `close_intent` (changed) | as before | as before | as before, and `unit_not_ended` (a unit of the intent is not `merged`, `done` or `dropped`) |
+| `route_request_to_unit` | `request`, `unit` | `route` `unit`, `unit`, `routed_at`; `intent` and `finding` cleared | `request_not_current`; `request_confirms_an_intent`; `unknown_unit` |
+| `route_request_to_finding` | `request`, `finding` | `route` `finding`, `finding`, `routed_at`; `intent` and `unit` cleared | `request_not_current`; `request_confirms_an_intent`; `unknown_finding` |
+
+### Links, grants and views
+Links, each named forward and reverse: `unit_intent` / `intent_units`, `unit_origin` / `request_units`,
+`unit_depends_on` / `unit_dependents` (`many_to_many`: it is backed by an array), `review_unit` /
+`unit_reviews`, `review_intent` / `intent_reviews`, `review_carried_from` / `review_carries`, `run_unit` /
+`unit_runs`, `run_intent` / `intent_runs`, `run_running_in` / `unit_running_runs`, `finding_unit` /
+`unit_findings`, `finding_intent` / `intent_findings`, `hold_unit` / `unit_holds`, `hold_intent` /
+`intent_holds`, `request_unit` / `unit_requests`, `request_finding` / `finding_requests`.
+
+Views: `units_of_intent` (argument `intent`, the intent's key), `units_live` (`ready`, `running`, `accepted` or
+`stopped`), `runs_running`, `findings_open` (`open` or `planned`, newest `last_seen_at` first), `holds_on_work`
+(active holds that name a unit or an intent), `reviews_of_unit` and `runs_of_unit` (argument `unit`, the unit's
+key). A search of reviews by `unit` is not qualified on this engine (a filter on an optional property), so
+the commands read a unit's reviews and runs through these two views.
+
+### Size
+Every new type, property, parameter and action carries a description, every criterion a message.
+The engine bounds each description of a property or a parameter to 300 bytes; the MCP answers are bounded to
+262,144 bytes, and the rehearsal asserts both `ont_describe` and `ont_action_list` stay at or under it on both
+stores. Measured on this file at the engine of `ontology/ENGINE-PIN`: `ont_describe` 214,024 bytes (48,120
+left), `ont_action_list` 140,647 bytes. The texts that versions 10 and 11 add (the descriptions and messages
+of their new types, properties, parameters, actions and criteria) are 564 texts of 38,285 bytes, a mean of 68
+bytes; the bound this version keeps is a mean of at most 160. A later version that adds as much again does not
+fit: it shortens texts or splits the domain.
+
+### The migration and the rehearsal
+`ontology/migrate` knows version 11; its step is empty. The step of version 10 also counts a row as already
+done when its record answered `already_applied` and its aside was refused `request_id_reused`: the row was
+triaged with the old verb after its carry, so the reason of a second aside differs under the same request id.
+
+The second store of the rehearsal installs version 10 from Git by its commit and digest (above) and runs
+the walk of version 10 on it; then it installs the repository's file: every object read under version 10
+reads the same, `ontology/migrate` runs 10 11 (exit 0, the store unchanged), 9 11 (the carry of version 10:
+every row already done) and 11 12 (exit 2), and `confirm_intent`, `close_intent` and `route_request` act on
+objects made under version 10. Then the walk of version 11 applies every action of this section and asserts
+the refusals above, each before the action it guards, and shows that a review made by the new actions (and
+one made by `carry_review`) is found by the search delivery uses. `approve_unit` runs with the role `lead`;
+with an engine without the verb `log` in `ont --help` (which does not know the role), `approve_unit` and every
+later step on that unit are skipped, with one line on standard error that names them.

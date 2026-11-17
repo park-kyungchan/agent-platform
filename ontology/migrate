@@ -21,7 +21,7 @@ import os
 import subprocess
 import sys
 
-HIGHEST = 10
+HIGHEST = 11
 ONT = os.environ.get('ONT_BIN', 'ont')
 ENV = {k: v for k, v in os.environ.items() if k not in ('ONT_AGENT', 'ONT_ROLE')}
 
@@ -91,6 +91,11 @@ def step_10(store):
         reason = 'carried from version 9' + (', triage ' + fields['triage'] if fields.get('triage') else '')
         code, aside = ont(store, ['action', 'apply'], {'action_type': 'set_request_aside', 'request_id': 'migrate-10-aside-' + key,
                                                         'parameters': {'request': request, 'reason': reason}})
+        # The row was triaged with the old verb after an earlier run carried it: this aside's reason differs
+        # under the same request id. The earlier run applied the aside, and the record says it was done.
+        if code == 2 and aside.get('result', aside).get('code') == 'request_id_reused' and result['outcome'] == 'already_applied':
+            already += 1
+            continue
         if code != 0:
             failed += 1
             print('aside %s: %s' % (key, json.dumps(aside)[:300]), file=sys.stderr)
@@ -108,7 +113,7 @@ def empty_step(store):
 
 # One step per version: the step of version v carries a store from v - 1 to v.
 STEPS = {1: empty_step, 2: empty_step, 3: empty_step, 4: empty_step, 5: empty_step, 6: empty_step, 7: empty_step,
-         8: empty_step, 9: empty_step, 10: step_10}
+         8: empty_step, 9: empty_step, 10: step_10, 11: empty_step}
 assert sorted(STEPS) == list(range(1, HIGHEST + 1))
 
 
