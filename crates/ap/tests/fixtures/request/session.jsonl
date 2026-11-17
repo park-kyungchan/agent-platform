@@ -1,0 +1,10 @@
+{"type": "user", "timestamp": "2026-11-16T03:04:05.120Z", "sessionId": "00000000-0000-4000-8000-000000000000", "message": {"role": "user", "content": "Make the \"list\" show\nall of it, 가나다 \u0001 "}}
+{"type": "user", "timestamp": "2026-11-16T03:04:05.300Z", "sessionId": "00000000-0000-4000-8000-000000000000", "message": {"role": "user", "content": "<a harness note>"}, "isMeta": true}
+{"type": "assistant", "timestamp": "2026-11-16T03:04:05.400Z", "message": {"role": "assistant", "content": "an answer"}}
+{"type": "user", "timestamp": "2026-11-16T03:04:06.000Z", "sessionId": "00000000-0000-4000-8000-000000000000", "message": {"role": "user", "content": "A summary of the earlier turns."}, "isCompactSummary": true}
+{"type": "user", "timestamp": "2026-11-16T03:04:07.100Z", "sessionId": "00000000-0000-4000-8000-000000000000", "message": {"role": "user", "content": "same words twice"}}
+{"type": "queue-operation", "timestamp": "2026-11-16T03:04:07.200Z", "operation": "enqueue", "content": "same words twice"}
+{"type": "user", "timestamp": "2026-11-16T03:04:08.100Z", "sessionId": "00000000-0000-4000-8000-000000000000", "message": {"role": "user", "content": "first message"}}
+{"type": "user", "timestamp": "2026-11-16T03:04:08.500Z", "sessionId": "00000000-0000-4000-8000-000000000000", "message": {"role": "user", "content": "second message"}}
+{"type": "user", "timestamp": "2026-11-16T03:04:09.000Z", "sessionId": "00000000-0000-4000-8000-000000000000", "message": {"role": "user", "content": "a prompt of a sub-agent"}, "isSidechain": true}
+{"type": "user", "timestamp": "2026-11-16T03:04:10.000Z", "sessionId": "00000000-0000-4000-8000-000000000000", "message": {"role": "user", "content": [{"type": "tool_result", "content": "output"}]}}
