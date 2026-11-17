@@ -248,6 +248,8 @@ struct Request {
     argument: String,
     /// An `agy` stage on a resume: the home of the record, where the conversation lives.
     home: Option<String>,
+    /// The policy file as read: its path and digest (`specs/ap/policy.md`), None without one.
+    policy: Option<(String, String)>,
 }
 
 fn path(r: &Value, key: &str) -> Result<String, Failure> {
@@ -313,6 +315,151 @@ fn environment(r: &Value, runtime: Runtime) -> Result<Vec<(String, String)>, Fai
             Ok((k.clone(), v.to_owned()))
         })
         .collect()
+}
+/// The host's policy as read (`specs/ap/policy.md`).
+struct Policy {
+    path: String,
+    sha256: String,
+    allowed: Vec<String>,
+    never: Vec<String>,
+    accounts: Vec<(String, Vec<String>)>,
+}
+fn invalid(member: &str, why: &str) -> Failure {
+    fail("policy_invalid", "policy", json!(format!("{member} {why}")))
+}
+/// A model name, or with `star` a pattern of at most two `*`: what `word` takes for a model.
+fn model_name(n: &str, star: bool) -> bool {
+    let stars = n.matches('*').count();
+    !n.is_empty()
+        && n.len() <= 40
+        && stars <= if star { 2 } else { 0 }
+        && n.bytes()
+            .all(|c| c.is_ascii_alphanumeric() || b"._-[]*".contains(&c))
+}
+fn names(
+    v: Option<&Value>,
+    member: &str,
+    count: std::ops::RangeInclusive<usize>,
+    ok: impl Fn(&str) -> bool,
+) -> Result<Vec<String>, Failure> {
+    let list = v.and_then(Value::as_array);
+    let list = list.filter(|l| count.contains(&l.len()));
+    let list = list.ok_or_else(|| invalid(member, "is not an array of the allowed length"))?;
+    list.iter()
+        .map(|e| e.as_str().filter(|e| ok(e)).map(str::to_owned))
+        .collect::<Option<_>>()
+        .ok_or_else(|| invalid(member, "holds an entry of the wrong form"))
+}
+/// The policy file the host names, read once at admission. None: no path or no such file.
+fn policy(s: &impl System) -> Result<Option<Policy>, Failure> {
+    let Some(file) = s.policy_file() else {
+        return Ok(None);
+    };
+    // A path that is not text cannot be read through `read` or named in the record: no file there
+    // is no policy, a file there is a policy that cannot be used.
+    let Some(path) = file.to_str().map(str::to_owned) else {
+        let missing =
+            std::fs::metadata(&file).is_err_and(|e| e.kind() == std::io::ErrorKind::NotFound);
+        return if missing {
+            Ok(None)
+        } else {
+            Err(invalid("file", "path is not valid UTF-8"))
+        };
+    };
+    let bytes = match s.read(&path) {
+        Ok(b) => b,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(None),
+        Err(_) => return Err(invalid("file", "is unreadable")),
+    };
+    if bytes.len() as u64 > LIMIT {
+        return Err(invalid("file", "is too large"));
+    }
+    let sha256 = digest(&bytes);
+    let value: Value =
+        serde_json::from_slice(&bytes).map_err(|_| invalid("file", "is not JSON"))?;
+    let object = value.as_object();
+    let object = object.ok_or_else(|| invalid("file", "is not one JSON object"))?;
+    let models = object.get("models").and_then(Value::as_object);
+    let models =
+        models.filter(|m| m.len() == 2 && m.contains_key("allowed") && m.contains_key("never"));
+    let models =
+        models.ok_or_else(|| invalid("models", "is not an object of allowed and never"))?;
+    let allowed = names(models.get("allowed"), "models.allowed", 1..=64, |n| {
+        model_name(n, false)
+    })?;
+    let never = names(models.get("never"), "models.never", 0..=16, |n| {
+        model_name(n, true)
+    })?;
+    let map = object.get("accounts").and_then(Value::as_object);
+    let map = map.ok_or_else(|| invalid("accounts", "is not an object"))?;
+    let mut accounts = vec![];
+    for (key, list) in map {
+        let member = format!("accounts.{key}");
+        let (runtime, rest) = key
+            .split_once('/')
+            .map_or((key.as_str(), None), |(r, x)| (r, Some(x)));
+        let shaped = Runtime::of(Some(&json!(runtime))).is_some()
+            && rest.is_none_or(|x| ROLES.iter().any(|(r, _)| *r == x) || model_name(x, false));
+        if !shaped {
+            return Err(invalid(
+                &member,
+                "is not a runtime, runtime/role or runtime/model",
+            ));
+        }
+        let list = names(Some(list), &member, 1..=5, |p| {
+            Path::new(p).is_absolute() && !p.contains('\0')
+        })?;
+        accounts.push((key.clone(), list));
+    }
+    Ok(Some(Policy {
+        path,
+        sha256,
+        allowed,
+        never,
+        accounts,
+    }))
+}
+impl Policy {
+    /// The model rule and the account rule for every account the stage may start on.
+    fn admit(
+        &self,
+        runtime: Runtime,
+        role: &str,
+        model: &str,
+        accounts: &[String],
+    ) -> Result<(), Failure> {
+        let named = self.allowed.iter().any(|a| a == model);
+        let barred = self.never.iter().any(|p| glob(p, model));
+        require!(named && !barred => "model_not_allowed", "model");
+        let word = runtime.word();
+        let keys = [
+            format!("{word}/{role}"),
+            format!("{word}/{model}"),
+            word.to_owned(),
+        ];
+        let list = keys
+            .iter()
+            .find_map(|k| self.accounts.iter().find(|(name, _)| name == k))
+            .map(|(_, list)| list);
+        let list = list.ok_or_else(|| error("account_not_allowed", "account"))?;
+        let bare = |p: &str| {
+            if p.len() > 1 {
+                p.trim_end_matches('/').to_owned()
+            } else {
+                p.to_owned()
+            }
+        };
+        for (i, a) in accounts.iter().enumerate() {
+            let field = if i == 0 { "account" } else { "next_accounts" };
+            require!(list.iter().any(|l| bare(l) == bare(a)) => "account_not_allowed", field);
+        }
+        Ok(())
+    }
+}
+/// The record's `policy`: the file as read, or null.
+fn policy_member(q: &Request) -> Value {
+    let read = q.policy.as_ref();
+    json!(read.map(|(path, sha256)| json!({"path": path, "sha256": sha256})))
 }
 fn record_path(out: &str) -> String {
     format!("{out}.run.json")
@@ -628,6 +775,14 @@ fn request_at(s: &mut impl System, r: &Value, at_cwd: bool) -> Result<Request, F
             Some(unit.to_owned())
         }
     };
+    let (skills, memory) = (flag(r, "skills")?, flag(r, "memory")?);
+    // The host's policy is the last check of admission: after every refusal `ap run` had before it,
+    // the checks of the host's state included, and before any effect. A resumed call's record
+    // account is one of `accounts` (`resume_account_differs`).
+    let policy = policy(s)?;
+    if let Some(p) = &policy {
+        p.admit(runtime, role, &model, &accounts)?;
+    }
     Ok(Request {
         role: role.to_owned(),
         accounts,
@@ -654,14 +809,15 @@ fn request_at(s: &mut impl System, r: &Value, at_cwd: bool) -> Result<Request, F
         expect_before,
         base_env,
         bind,
-        skills: flag(r, "skills")?,
-        memory: flag(r, "memory")?,
+        skills,
+        memory,
         runtime,
         compact_window,
         argument: argument
             .filter(|_| runtime.prompt_argument())
             .unwrap_or_default(),
         home,
+        policy: policy.map(|p| (p.path, p.sha256)),
     })
 }
 /// The `home` of an `agy` record that a resume runs in: a directory under `<account>/homes` (links
@@ -1410,6 +1566,7 @@ fn attempt(
         "expect_file_before": q.expect_before, "unmet": null,
         "resumes": q.resume.as_ref().map(|(_, _, file)| file), "limit": null,
         "compact_window": q.compact_window,
+        "policy": policy_member(q),
     });
     let mut attempts = earlier.to_vec();
     attempts.push(json!({"continued": continued}));
