@@ -1,0 +1,741 @@
+#!/usr/bin/env -S python3 -I -B
+"""The routing suite: given an assignment, does a reader that starts at AGENTS.md of the shared instructions find the
+context the assignment needs? Several samples per case, scored by facts in the answer; no model judges.
+
+  run answers --root DIR --reader R --out DIR [--cases FILE ...] [--samples N] [--jobs N] [--case ID ...] [--deny GLOB ...]
+  run score --out DIR [--cases FILE ...]
+  run gate --baseline SCORE.json --candidate SCORE.json
+
+Every reader is started through `systemd-run` as a transient service in agents.slice that sees the host read-only
+but for /tmp and its own CLI's state, and to which the deny list is inaccessible; there is no other way to start one.
+Every refusal is one line {"status":"<code>"} with exit 2. Method and limits: evals/README.md, "The routing suite".
+"""
+import argparse
+import glob
+import hashlib
+import json
+import math
+import os
+import shutil
+import signal
+import statistics
+import subprocess
+import sys
+import tempfile
+import threading
+import time
+import uuid
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+SELF = os.path.abspath(__file__)
+REPO_CASES = os.path.join(HERE, "cases.json")
+HOST_DIGESTS = os.path.join(HERE, "host-cases.sha256")
+READER_NAMES = ("claude-sonnet", "claude-haiku", "muse-ember", "agy-hydrogen")
+TIME_BOUND = 600  # seconds per session: the unit's RuntimeMaxSec
+GRACE = 30  # seconds past the bound after which this program stops waiting for systemd-run
+SLICE = "agents.slice"
+KEEP = ("PATH", "HOME", "USER", "LOGNAME", "SHELL", "LANG", "LC_ALL", "TMPDIR", "TZ")
+# The command lines of the MCP servers registered in the homes of this host's CLIs; a process of a reader's unit whose
+# command line holds one of these is an MCP server the run must not start.
+MCP_MARKS = ("launcher.mjs", "mcp-server.js", "ont mcp")
+WITHHELD = "MCP startup withheld"
+ACTIVE = ("active", "activating", "deactivating", "reloading", "refreshing")
+PROMPT = ("You are an agent on this host. Your assignment: {situation}\n\nBefore you act, find the context you must "
+          "load for this assignment. For this test the shared instructions are the directory {root}, laid out as "
+          "/root/.agents: start at {root}/AGENTS.md and follow what it routes you to; read nothing under /root/.agents "
+          "unless {root} is that directory. For everything else (repositories under /home/palantirkc/platforms/, task "
+          "directories under /home/palantirkc/work/, the store) use the host as it is. Never open anything under "
+          "/home/palantirkc/work/edu-* or under context/, apps/, modules/ or migration/ of education-platform. Read, "
+          "search and run any reading command you need (for this test the host's files are read-only to you): change "
+          "nothing, use no web page. Do not do the assignment.\n\n"
+          "Answer with the context you would load before acting, as a list: for each item its path (with the "
+          "section or lines), and the exact rule, command, path or value from it that your assignment needs, "
+          "quoted as it stands there.")
+# The deny list: every path that exists when a session starts and matches one of these is inaccessible to it.
+# `~` is the caller's home, expanded at the start of each session.
+EDU = "/home/palantirkc/platforms/education-platform"
+EDU_WT = "/home/palantirkc/work/*/wt/education-platform*"
+DENY = (["/home/palantirkc/work/edu-*"]
+        + ["%s/%s" % (base, d) for base in (EDU, EDU_WT) for d in ("context", "apps", "modules", "migration")]
+        + ["~/.claude*/projects/*edu-*", "~/.claude*/projects/*education-platform*"])
+
+
+class Refuse(Exception):
+    pass
+
+
+def refuse(code):
+    raise Refuse(code)
+
+
+class Parser(argparse.ArgumentParser):
+    def error(self, message):
+        refuse("usage")
+
+
+def sha_file(path):
+    with open(path, "rb") as f:
+        return hashlib.sha256(f.read()).hexdigest()
+
+
+def norm(s):
+    """Backticks removed, each run of whitespace made one space."""
+    return " ".join(s.replace("`", "").split())
+
+
+def holds(fact, text):
+    """A fact holds when every one of its strings is in the (normalised) answer."""
+    return all(norm(x) in text for x in fact["fact"])
+
+
+def passes(case, answer):
+    t = norm(answer)
+    return all(holds(f, t) for f in case["must"]) and not any(holds(f, t) for f in case["wrong"])
+
+
+def read_json(path):
+    try:
+        with open(path, encoding="utf-8") as f:
+            return json.load(f)
+    except (OSError, ValueError):
+        return None
+
+
+def write_atomic(path, text):
+    """Written under another name in the same directory and renamed, so a reader never sees half of it."""
+    fd, tmp = tempfile.mkstemp(dir=os.path.dirname(path), prefix=".part-")
+    with os.fdopen(fd, "w", encoding="utf-8") as f:
+        f.write(text)
+    os.replace(tmp, path)
+
+
+# ---------------------------------------------------------------- cases
+
+def fact_list(v):
+    return isinstance(v, list) and all(
+        isinstance(f, dict) and isinstance(f.get("fact"), list) and f["fact"]
+        and all(isinstance(x, str) and norm(x) for x in f["fact"]) for f in v)
+
+
+def host_names():
+    """Digest to short name, from host-cases.sha256."""
+    names = {}
+    with open(HOST_DIGESTS, encoding="utf-8") as f:
+        for line in f:
+            parts = line.split()
+            if len(parts) == 2:
+                names[parts[0]] = parts[1]
+    return names
+
+
+def load_cases(extra):
+    """The repository's cases and those of each host file: (id -> case, short name -> SHA-256)."""
+    files = [("cases.json", REPO_CASES)]
+    known = host_names()
+    for path in extra:
+        if not os.path.isabs(path) or not os.path.isfile(path):
+            refuse("cases_unreadable")
+        digest = sha_file(path)
+        if digest not in known:
+            refuse("cases_digest_unknown")
+        files.append((known[digest], path))
+    cases, digests = {}, {}
+    for name, path in files:
+        digests[name] = sha_file(path)
+        data = read_json(path)
+        if not isinstance(data, list):
+            refuse("cases_invalid")
+        for c in data:
+            if not (isinstance(c, dict) and isinstance(c.get("id"), str) and c["id"] and "/" not in c["id"]
+                    and not c["id"].startswith(".") and isinstance(c.get("situation"), str)
+                    and fact_list(c.get("must")) and c["must"] and fact_list(c.get("wrong", []))):
+                refuse("cases_invalid")
+            if c["id"] in cases:
+                refuse("case_id_twice")
+            cases[c["id"]] = {"id": c["id"], "situation": c["situation"], "must": c["must"],
+                              "wrong": c.get("wrong", [])}
+    return cases, digests
+
+
+# ---------------------------------------------------------------- readers
+
+def claude_argv(model):
+    # The instructions suite's row with every tool (no --tools) and no prompt (bypassPermissions); no MCP server of
+    # the account (--strict-mcp-config), no hook, no auto-memory, no skill.
+    def argv(prompt, root, work, sid):
+        return ["claude", "--print", "--output-format", "stream-json", "--verbose", "--model", model,
+                "--strict-mcp-config", "--permission-mode", "bypassPermissions", "--permission-prompts", "none",
+                "--add-dir", root, "--settings", '{"disableAllHooks":true,"autoMemoryEnabled":false}',
+                "--disable-slash-commands", "--session-id", sid, prompt]
+    return argv
+
+
+def muse_argv(prompt, root, work, sid):
+    # A new workspace Muse Code does not trust (no --yolo, no --trust-workspace), so MCP startup is withheld; shell
+    # allowed and no approval asked, as a worker has them; no web.
+    return ["muse", "exec", "--json", "--model", "muse-ember-1.0", "--contributor-mode", "off", "--disable-reminders",
+            "--disable-web-tools", "--disable-request-user-input", "--session-id", sid, "--disable-approval",
+            "--workspace", work, prompt]
+
+
+def agy_argv(prompt, root, work, sid):
+    # HOME is a new directory without MCP configuration (agy_home); every action allowed.
+    allow = ["read_file(%s)" % root] + ["command(%s)" % c for c in ("rg", "grep", "cat", "sed", "head", "tail", "ls", "find", "wc")]
+    return ["agy", "--print", prompt, "--output-format", "stream-json", "--model", "gemini-4-hydrogen-low",
+            "--add-dir", root, "--settings", json.dumps({"permissions": {"allow": allow}}),
+            "--dangerously-skip-permissions"]
+
+
+def agy_home(home):
+    """A home for one agy run: links to the login token and the instruction pointers, no MCP, hook or skill file."""
+    real = os.path.expanduser("~")
+    os.makedirs(home + "/.gemini/antigravity-cli")
+    os.symlink(real + "/.gemini/antigravity-cli/antigravity-oauth-token", home + "/.gemini/antigravity-cli/antigravity-oauth-token")
+    for name in ("AGENTS.md", "GEMINI.md"):
+        os.symlink("/root/.agents/AGENTS.md", home + "/.gemini/" + name)
+
+
+def claude_state():
+    d = os.environ.get("CLAUDE_CONFIG_DIR")
+    return [os.path.abspath(d)] if d else [os.path.expanduser("~/.claude"), os.path.expanduser("~/.claude.json")]
+
+
+def muse_state():
+    return [os.path.expanduser(p) for p in ("~/.config/muse", "~/.local/share/muse", "~/.local/state/muse", "~/.cache")]
+
+
+def agy_state():
+    return [os.path.expanduser("~/.gemini/antigravity-cli")]
+
+
+# One row per reader: the CLI, its command line, its environment beyond KEEP, the state it writes.
+READERS = {
+    "claude-sonnet": {"cli": "claude", "argv": claude_argv("sonnet"), "env": ("CLAUDE_CONFIG_DIR",), "state": claude_state},
+    "claude-haiku": {"cli": "claude", "argv": claude_argv("haiku"), "env": ("CLAUDE_CONFIG_DIR",), "state": claude_state},
+    "muse-ember": {"cli": "muse", "argv": muse_argv, "env": (), "set": {"MUSE_NO_AUTO_UPDATE": "1"}, "state": muse_state},
+    "agy-hydrogen": {"cli": "agy", "argv": agy_argv, "env": (), "home": agy_home, "state": agy_state},
+}
+
+
+def events(stream):
+    for line in stream.splitlines():
+        try:
+            e = json.loads(line)
+        except ValueError:
+            continue
+        if isinstance(e, dict):
+            yield e
+
+
+def answer_of(reader, stream):
+    """The final answer from the saved stream of events, or None."""
+    text = None
+    for e in events(stream):
+        if reader.startswith("claude") and e.get("type") == "result" and isinstance(e.get("result"), str):
+            text = e["result"]
+        elif reader == "muse-ember" and (e.get("payload") or {}).get("kind") == "run_terminal":
+            text = e["payload"].get("text") if isinstance(e["payload"].get("text"), str) else text
+        elif reader == "agy-hydrogen" and e.get("event") == "result" and isinstance((e.get("result") or {}).get("response"), str):
+            text = e["result"]["response"]
+    return text
+
+
+def num(v):
+    return v if isinstance(v, (int, float)) and not isinstance(v, bool) else 0
+
+
+def usage_of(reader, stream):
+    """(input tokens, cached included; output tokens; the CLI's own session id) from the saved stream."""
+    tin = tout = sid = None
+    for e in events(stream):
+        if reader.startswith("claude") and e.get("type") == "result":
+            u = e.get("usage") if isinstance(e.get("usage"), dict) else {}
+            tin = sum(num(u.get(k)) for k in ("input_tokens", "cache_read_input_tokens", "cache_creation_input_tokens"))
+            tout = num(u.get("output_tokens"))
+        elif reader == "agy-hydrogen":
+            if sid is None and isinstance(e.get("session_id"), str) and e["session_id"]:
+                sid = e["session_id"]
+            if e.get("event") == "result":
+                r = e.get("result") if isinstance(e.get("result"), dict) else {}
+                u = r.get("usage") if isinstance(r.get("usage"), dict) else {}
+                tin = num(u.get("input_tokens")) + num(u.get("cache_read_tokens"))
+                tout = num(u.get("output_tokens"))
+        elif reader == "muse-ember" and (e.get("payload") or {}).get("kind") == "run_usage":
+            models = [m for m in e["payload"].get("models") or [] if isinstance(m, dict)]
+            tin = sum(num(m.get("input_tokens")) for m in models)
+            tout = sum(num(m.get("output_tokens")) for m in models)
+    return tin, tout, sid
+
+
+def muse_registered_servers():
+    """How many MCP servers the Muse Code configuration directory registers (0 when it cannot be read)."""
+    data = read_json(os.path.expanduser("~/.config/muse/settings.json"))
+    servers = data.get("mcpServers") if isinstance(data, dict) else None
+    return len(servers) if isinstance(servers, dict) else 0
+
+
+# ---------------------------------------------------------------- the unit
+
+def unit_of(base):
+    """The unit of one sample: named by the SHA-256 of the absolute path of the sample."""
+    return "routing-%s" % hashlib.sha256(os.path.abspath(base).encode()).hexdigest()[:16]
+
+
+def quoted(path):
+    """One path as a word of a unit property list (systemd unquotes it)."""
+    if any(c in path for c in " \t\"'\\"):
+        return '"%s"' % path.replace("\\", "\\\\").replace('"', '\\"')
+    return path
+
+
+def deny_paths(extra):
+    """Every existing path that matches the deny list or a --deny glob, computed now."""
+    found = set()
+    for pattern in list(DENY) + list(extra):
+        for p in glob.glob(os.path.expanduser(pattern), include_hidden=True):
+            if "\n" not in p:
+                found.add(os.path.abspath(p))
+    return sorted(found)
+
+
+def unit_argv(tool, unit, description, work, writable, deny, env):
+    argv = [tool, "--wait", "--pipe", "--quiet", "--collect", "--unit=" + unit, "--slice=" + SLICE,
+            "--description=" + description, "--expand-environment=no", "--working-directory=" + work,
+            "-p", "ProtectSystem=strict", "-p", "ProtectHome=read-only", "-p", "RuntimeMaxSec=%d" % TIME_BOUND]
+    for w in writable:
+        argv += ["-p", "ReadWritePaths=" + quoted("-" + w)]
+    for d in deny:
+        argv += ["-p", "InaccessiblePaths=" + quoted("-" + d)]
+    return argv + ["--setenv=%s=%s" % (k, v) for k, v in sorted(env.items())]
+
+
+def started_argv(mark, argv):
+    """The command of the unit: leave the mark that the unit started, then become the CLI."""
+    return ["/bin/sh", "-c", 'printf started > "$0" && exec "$@"', mark] + argv
+
+
+class Sandbox:
+    def __init__(self, reader, deny_extra):
+        self.run = shutil.which("systemd-run")
+        self.ctl = shutil.which("systemctl")
+        if not self.run or not self.ctl:
+            refuse("sandbox_unavailable")
+        self.reader = reader
+        self.deny_extra = deny_extra
+        self.writable = ["/tmp"] + READERS[reader]["state"]()
+
+    def active(self, units):
+        """The units of the list that are active now."""
+        found = []
+        for i in range(0, len(units), 50):
+            part = [u + ".service" for u in units[i:i + 50]]
+            r = subprocess.run([self.ctl, "is-active", "--"] + part, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
+                               stderr=subprocess.DEVNULL, text=True)
+            lines = r.stdout.split()
+            if len(lines) != len(part):
+                refuse("sandbox_unavailable")
+            found += [u for u, s in zip(units[i:i + 50], lines) if s in ACTIVE]
+        return found
+
+    def control_group(self, unit):
+        r = subprocess.run([self.ctl, "show", "-p", "ControlGroup", "--value", "--", unit + ".service"],
+                           stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True)
+        cg = r.stdout.strip()
+        return cg if r.returncode == 0 and cg.startswith("/") else None
+
+    def probe(self, out):
+        """A unit of the same properties whose command only leaves the mark: no reader starts unless it does."""
+        tmp = tempfile.mkdtemp(prefix="routing-")
+        try:
+            mark = os.path.join(tmp, "started")
+            unit = unit_of(os.path.join(out, ".probe-" + uuid.uuid4().hex))
+            argv = unit_argv(self.run, unit, "routing-%s-probe" % self.reader, tmp, self.writable,
+                             deny_paths(self.deny_extra), {"PATH": "/usr/bin:/bin"})
+            try:
+                subprocess.run(argv + ["--", "/bin/sh", "-c", 'printf started > "$0"', mark], stdin=subprocess.DEVNULL,
+                               stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=120)
+            except (OSError, subprocess.TimeoutExpired):
+                pass
+            if not os.path.isfile(mark):
+                refuse("sandbox_unavailable")
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
+
+def pids_below(root_pid):
+    parent = {}
+    for d in os.listdir("/proc"):
+        if d.isdigit():
+            try:
+                with open("/proc/%s/stat" % d) as f:
+                    parent[int(d)] = int(f.read().rsplit(")", 1)[1].split()[1])
+            except (OSError, IndexError, ValueError):
+                continue
+    found = []
+    for pid in parent:
+        p, seen = pid, set()
+        while p in parent and p not in seen and p > 1:
+            seen.add(p)
+            p = parent[p]
+            if p == root_pid:
+                found.append(pid)
+                break
+    return found
+
+
+def pids_of_group(cg):
+    found = []
+    for d, _, files in os.walk("/sys/fs/cgroup" + cg):
+        if "cgroup.procs" in files:
+            try:
+                with open(os.path.join(d, "cgroup.procs")) as f:
+                    found += [int(x) for x in f.read().split()]
+            except (OSError, ValueError):
+                continue
+    return found
+
+
+def with_marks(pids):
+    found = []
+    for pid in pids:
+        try:
+            with open("/proc/%d/cmdline" % pid, "rb") as f:
+                line = f.read().replace(b"\0", b" ").decode(errors="replace")
+        except OSError:
+            continue
+        if any(m in line for m in MCP_MARKS):
+            found.append(pid)
+    return found
+
+
+# ---------------------------------------------------------------- answers
+
+def done(base):
+    """A sample is done when its usage file says answered and its answer is not empty."""
+    meta = read_json(base + ".json")
+    if not (isinstance(meta, dict) and meta.get("answered") is True):
+        return False
+    try:
+        return os.path.getsize(base + ".md") > 0
+    except OSError:
+        return False
+
+
+def run_sample(a, sandbox, case, n, base):
+    """One session in its own unit; its files are <base>.md, .json, .jsonl, .err. Returns the usage record."""
+    row = READERS[a.reader]
+    for suffix in (".json", ".md"):
+        try:
+            os.unlink(base + suffix)
+        except FileNotFoundError:
+            pass
+    tmp = tempfile.mkdtemp(prefix="routing-")
+    work, mark = os.path.join(tmp, "work"), os.path.join(tmp, "started")
+    os.mkdir(work)
+    sid = str(uuid.uuid4())
+    unit = unit_of(base)
+    meta = {"reader": a.reader, "case": case["id"], "sample": n, "unit": unit, "session": sid, "state": None,
+            "exit": None, "seconds": None, "input_tokens": None, "output_tokens": None, "answered": False,
+            "mcp_processes": []}
+    try:
+        env = {k: os.environ[k] for k in KEEP + row["env"] if k in os.environ}
+        env.update(row.get("set", {}))
+        env["TERM"] = "dumb"
+        if row.get("home"):
+            home = os.path.join(tmp, "home")
+            row["home"](home)
+            env["HOME"] = home
+        prompt = PROMPT.format(situation=case["situation"], root=a.root)
+        cli = row["argv"](prompt, a.root, work, sid)
+        cli[0] = shutil.which(cli[0]) or cli[0]
+        argv = unit_argv(sandbox.run, unit, "routing-%s-%s-s%d" % (a.reader, case["id"], n), work,
+                         sandbox.writable, deny_paths(a.deny), env)
+        argv += ["--"] + started_argv(mark, cli)
+        start = time.time()
+        with open(base + ".jsonl", "wb") as so, open(base + ".err", "wb") as se:
+            try:
+                p = subprocess.Popen(argv, stdin=subprocess.DEVNULL, stdout=so, stderr=se, start_new_session=True)
+            except OSError:
+                meta["state"] = "sandbox_unavailable"
+                return meta
+            seen, stop = set(), threading.Event()
+
+            def watch():
+                cg, asked = None, 0.0
+                while not stop.is_set():
+                    if cg is None and time.time() - asked >= 1.0:
+                        asked = time.time()
+                        cg = sandbox.control_group(unit)
+                    seen.update(with_marks(pids_of_group(cg) if cg else pids_below(p.pid)))
+                    stop.wait(0.2)
+            t = threading.Thread(target=watch, daemon=True)
+            t.start()
+            try:
+                meta["exit"] = p.wait(timeout=TIME_BOUND + GRACE)
+            except subprocess.TimeoutExpired:
+                os.killpg(p.pid, signal.SIGKILL)
+                p.wait()
+                meta["state"] = "timeout"
+            stop.set()
+            t.join()
+        meta["seconds"] = round(time.time() - start, 1)
+        meta["mcp_processes"] = sorted(seen)
+        if not os.path.isfile(mark):
+            meta["state"] = "sandbox_unavailable"
+            return meta
+        with open(base + ".jsonl", encoding="utf-8", errors="replace") as f:
+            stream = f.read()
+        answer = answer_of(a.reader, stream)
+        meta["input_tokens"], meta["output_tokens"], own = usage_of(a.reader, stream)
+        if own:
+            meta["session"] = own
+        if answer:
+            write_atomic(base + ".md", answer)
+        if a.reader == "muse-ember":
+            records = glob.glob(os.path.expanduser("~/.local/share/muse/sessions/*/*/*/%s/session.jsonl" % sid))
+            text = ""
+            for r in records:
+                with open(r, encoding="utf-8", errors="replace") as f:
+                    text += f.read()
+            # With no registered server the CLI never prints the withheld text: the process watch is the rule then.
+            meta["mcp_registered"] = muse_registered_servers()
+            meta["mcp_withheld"] = (WITHHELD in text) if meta["mcp_registered"] else None
+        if meta["state"] is None and meta["seconds"] >= TIME_BOUND:
+            meta["state"] = "timeout"
+        if meta["state"] is None:
+            meta["state"] = "ok" if meta["exit"] == 0 and answer else "failed"
+        meta["answered"] = meta["state"] == "ok"
+        return meta
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+        if meta["state"] is not None:
+            write_atomic(base + ".json", json.dumps(meta, indent=1) + "\n")
+
+
+def cmd_answers(a):
+    if a.reader not in READERS:
+        refuse("usage")
+    if not 1 <= a.samples <= 9 or not 1 <= a.jobs <= 4:
+        refuse("usage")
+    a.root = os.path.abspath(a.root)
+    if not os.path.isfile(os.path.join(a.root, "AGENTS.md")):
+        refuse("root_invalid")
+    cases, digests = load_cases(a.cases)
+    if [c for c in a.case if c not in cases]:
+        refuse("case_unknown")
+    ids = sorted(set(a.case) if a.case else cases)
+    sandbox = Sandbox(a.reader, a.deny)
+    if not shutil.which(READERS[a.reader]["cli"]):
+        refuse("cli_missing")
+    out = os.path.join(os.path.abspath(a.out), a.reader)
+    record = {"samples": a.samples, "cases": ids, "case_files": digests, "suite": sha_file(SELF)}
+    old = read_json(os.path.join(out, "run.json")) if os.path.exists(os.path.join(out, "run.json")) else None
+    if os.path.exists(os.path.join(out, "run.json")):
+        if not isinstance(old, dict) or any(old.get(k) != record[k] for k in ("cases", "case_files", "suite")) \
+                or not isinstance(old.get("samples"), int) or old["samples"] > a.samples:
+            refuse("run_differs")
+    todo = [(cases[cid], n) for n in range(1, a.samples + 1) for cid in ids]
+    states = {}
+    for c, n in todo:
+        if done(os.path.join(out, "%s__s%d" % (c["id"], n))):
+            states["%s__s%d" % (c["id"], n)] = "done"
+    todo = [(c, n) for c, n in todo if "%s__s%d" % (c["id"], n) not in states]
+    if sandbox.active([unit_of(os.path.join(out, "%s__s%d" % (c["id"], n))) for c, n in todo]):
+        refuse("run_still_active")
+    os.makedirs(out, exist_ok=True)
+    if todo:
+        sandbox.probe(out)
+    if old is None or old.get("samples") != a.samples:
+        write_atomic(os.path.join(out, "run.json"), json.dumps(record, indent=1) + "\n")
+    broke, lost, lock = [], [], threading.Lock()
+
+    def worker():
+        while True:
+            with lock:
+                if not todo or broke or lost:
+                    return
+                c, n = todo.pop(0)
+            key = "%s__s%d" % (c["id"], n)
+            try:
+                m = run_sample(a, sandbox, c, n, os.path.join(out, key))
+            except Exception:  # an error of this program for one sample: the sample stays unanswered
+                m = {"state": "failed", "mcp_processes": []}
+            with lock:
+                states[key] = m["state"]
+                if m["state"] == "sandbox_unavailable":
+                    lost.append(key)
+                if m["mcp_processes"] or m.get("mcp_withheld") is False:
+                    broke.append(key)  # the MCP rule did not hold: start no further session
+    # Daemon threads: a stopped call ends at once; a unit it started runs on, and no answer of it is written.
+    threads = [threading.Thread(target=worker, daemon=True) for _ in range(a.jobs)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+    if lost:
+        refuse("sandbox_unavailable")
+    for c, n in todo:
+        states["%s__s%d" % (c["id"], n)] = "not_run"
+    print(json.dumps({"reader": a.reader, "samples": dict(sorted(states.items())), "mcp_rule_broken": sorted(broke)},
+                     indent=1))
+    return 2 if broke else 0
+
+
+# ---------------------------------------------------------------- score
+
+def score_reader(d, record, cases):
+    n, ids = record["samples"], record["cases"]
+    passed = {cid: 0 for cid in ids}
+    per_sample = [0] * n
+    unanswered, tokens = 0, []
+    for cid in ids:
+        for s in range(1, n + 1):
+            base = os.path.join(d, "%s__s%d" % (cid, s))
+            if not done(base):
+                unanswered += 1
+                continue
+            meta = read_json(base + ".json")
+            with open(base + ".md", encoding="utf-8", errors="replace") as f:
+                text = f.read()
+            if isinstance(meta.get("input_tokens"), int):
+                tokens.append(meta["input_tokens"])
+            if passes(cases[cid], text):
+                passed[cid] += 1
+                per_sample[s - 1] += 1
+    return {"n": n, "passes": passed, "samples": per_sample, "mean": round(sum(per_sample) / n, 4),
+            "majority": sorted(cid for cid in ids if passed[cid] > n / 2), "unanswered": unanswered,
+            "tokens_median": statistics.median(tokens) if tokens else None}
+
+
+def sheet(result):
+    lines = ["# Routing suite: score", "", "Suite (SHA-256 of `run`): `%s`" % result["suite"], "", "Case files:", ""]
+    lines += ["- `%s`: `%s`" % (k, v) for k, v in sorted(result["case_files"].items())]
+    readers = list(result["readers"])
+    lines += ["", "| Reader | n | mean | passed cases per sample | majority | unanswered | input tokens (median) | parity |",
+              "| --- | --- | --- | --- | --- | --- | --- | --- |"]
+    for r in readers:
+        x = result["readers"][r]
+        par = result["parity"].get(r)
+        lines.append("| %s | %d | %s | %s | %d of %d | %d | %s | %s |" % (
+            r, x["n"], x["mean"], " ".join(str(v) for v in x["samples"]), len(x["majority"]), len(x["passes"]),
+            x["unanswered"], "-" if x["tokens_median"] is None else x["tokens_median"],
+            "-" if par is None else par))
+    ids = sorted({cid for r in readers for cid in result["readers"][r]["passes"]})
+    lines += ["", "Passed samples per case:", "", "| Case | " + " | ".join(readers) + " |",
+              "| --- |" + " --- |" * len(readers)]
+    for cid in ids:
+        cells = []
+        for r in readers:
+            x = result["readers"][r]
+            cells.append("%d/%d" % (x["passes"][cid], x["n"]) if cid in x["passes"] else "-")
+        lines.append("| %s | %s |" % (cid, " | ".join(cells)))
+    return "\n".join(lines) + "\n"
+
+
+def cmd_score(a):
+    out = os.path.abspath(a.out)
+    readers = [r for r in READER_NAMES if os.path.isdir(os.path.join(out, r))]
+    if not readers:
+        refuse("no_reader")
+    records = {}
+    for r in readers:
+        rec = read_json(os.path.join(out, r, "run.json"))
+        if not (isinstance(rec, dict) and isinstance(rec.get("samples"), int) and rec["samples"] >= 1
+                and isinstance(rec.get("cases"), list) and isinstance(rec.get("case_files"), dict)):
+            refuse("run_record_missing")
+        records[r] = rec
+    first = records[readers[0]]
+    if any(rec.get("suite") != first.get("suite") or rec["case_files"] != first["case_files"] for rec in records.values()):
+        refuse("run_differs")
+    cases, digests = load_cases(a.cases)
+    if digests != first["case_files"] or any(cid not in cases for rec in records.values() for cid in rec["cases"]):
+        refuse("case_sets_differ")
+    result = {"suite": first.get("suite"), "case_files": digests,
+              "readers": {r: score_reader(os.path.join(out, r), records[r], cases) for r in readers}}
+    sonnet = result["readers"].get("claude-sonnet", {}).get("majority")
+    result["parity"] = {r: (round(len(set(sonnet) & set(x["majority"])) / len(sonnet), 4) if sonnet else None)
+                        for r, x in result["readers"].items() if r != "claude-sonnet"}
+    text = json.dumps(result, indent=1)
+    write_atomic(os.path.join(out, "score.json"), text + "\n")
+    write_atomic(os.path.join(out, "sheet.md"), sheet(result))
+    print(text)
+    return 0
+
+
+# ---------------------------------------------------------------- gate
+
+def judged(x):
+    return (isinstance(x, dict) and isinstance(x.get("n"), int) and isinstance(x.get("passes"), dict)
+            and isinstance(x.get("unanswered"), int) and isinstance(x.get("majority"), list)
+            and all(isinstance(v, int) for v in x["passes"].values()))
+
+
+def cmd_gate(a):
+    base, cand = read_json(a.baseline), read_json(a.candidate)
+    if not (isinstance(base, dict) and isinstance(cand, dict) and isinstance(base.get("readers"), dict)
+            and isinstance(cand.get("readers"), dict)
+            and all(judged(x) for s in (base, cand) for x in s["readers"].values())):
+        refuse("score_unreadable")
+    B, C = base["readers"], cand["readers"]
+    every = list(B.values()) + list(C.values())
+    if any(x["n"] < 3 for x in every):
+        refuse("samples_too_few")
+    if any(x["unanswered"] * 20 > len(x["passes"]) * x["n"] for x in every):
+        refuse("run_incomplete")
+    if base.get("case_files") != cand.get("case_files") or any(set(B[r]["passes"]) != set(C[r]["passes"]) for r in B if r in C):
+        refuse("case_sets_differ")
+    readers, ok = {}, True
+    for r, b in B.items():
+        bm = sum(b["passes"].values()) / b["n"]
+        if r not in C:
+            readers[r] = {"baseline_mean": round(bm, 3), "candidate_mean": None, "drop": None, "noise": None,
+                          "ok": False, "lost": sorted(b["majority"])}
+            ok = False
+            continue
+        c = C[r]
+        nb, nc = b["n"], c["n"]
+        cm = sum(c["passes"].values()) / nc
+        drop = bm - cm
+        var = 0.0
+        for cid, bi in b["passes"].items():
+            p = (bi + c["passes"][cid]) / (nb + nc)
+            var += p * (1 - p)
+        noise = math.sqrt(var * (1 / nb + 1 / nc))
+        good = drop <= 2 * noise
+        ok = ok and good
+        readers[r] = {"baseline_mean": round(bm, 3), "candidate_mean": round(cm, 3), "drop": round(drop, 3),
+                      "noise": round(noise, 3), "ok": good,
+                      "lost": sorted(set(b["majority"]) - set(c["majority"]))}
+    print(json.dumps({"status": "pass" if ok else "fail", "readers": readers}, indent=1))
+    return 0 if ok else 1
+
+
+def main():
+    signal.signal(signal.SIGTERM, lambda *_: sys.exit(143))
+    p = Parser(prog="run", allow_abbrev=False)
+    sub = p.add_subparsers(dest="verb", required=True, parser_class=Parser)
+    an = sub.add_parser("answers", allow_abbrev=False)
+    an.add_argument("--root", required=True)
+    an.add_argument("--reader", required=True)
+    an.add_argument("--out", required=True)
+    an.add_argument("--cases", action="append", default=[])
+    an.add_argument("--samples", type=int, default=3)
+    an.add_argument("--jobs", type=int, default=2)
+    an.add_argument("--case", action="append", default=[])
+    an.add_argument("--deny", action="append", default=[])
+    sc = sub.add_parser("score", allow_abbrev=False)
+    sc.add_argument("--out", required=True)
+    sc.add_argument("--cases", action="append", default=[])
+    ga = sub.add_parser("gate", allow_abbrev=False)
+    ga.add_argument("--baseline", required=True)
+    ga.add_argument("--candidate", required=True)
+    try:
+        a = p.parse_args()
+        return {"answers": cmd_answers, "score": cmd_score, "gate": cmd_gate}[a.verb](a)
+    except Refuse as e:
+        print(json.dumps({"status": e.args[0]}, separators=(",", ":")))
+        return 2
+
+
+if __name__ == "__main__":
+    sys.exit(main())
