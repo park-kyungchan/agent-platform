@@ -18,7 +18,7 @@ The engine knows no domain. A domain or the harness uses the engine through a sc
 
 ## 2. Repositories and crates
 
-Main checkouts are under `/home/palantirkc/platforms/<repository>/` unless a path is given. A main checkout can be behind `origin/main` and can hold someone's uncommitted edits: read source at a named commit in a task worktree (`work/<scope>-<topic>/wt/<repo>/`) or with `git show <commit>:<path>`, and edit only in a task worktree.
+Main checkouts are under `/home/palantirkc/platforms/<repository>/` unless a path is given. A main checkout can be behind `origin/main` and can hold someone's uncommitted edits, so its files are not the current source: read source with `git -C /home/palantirkc/platforms/<repository> show origin/main:<path>` (after `git -C /home/palantirkc/platforms/<repository> fetch -q origin`) or in a task worktree (`work/<scope>-<topic>/wt/<repo>/`), and edit only in a task worktree. Each repository's own `AGENTS.md` (read at `origin/main`) says what is in it and its check.
 
 | Repository | Crate or directory | What it is | Start reading at |
 | --- | --- | --- | --- |
@@ -26,11 +26,11 @@ Main checkouts are under `/home/palantirkc/platforms/<repository>/` unless a pat
 | | `crates/ont-store` | The SQLite store: schema installation, edits, the action log, candidates for queries | `src/lib.rs` |
 | | `crates/ont` | The library and command `ont`: `get`, `search`, `around`, `aggregate`, `action`, `render`, `index`, `schema`, `backup`, `mcp` | `README.md`, then `src/lib.rs` and the file named after the command |
 | | `crates/ont-daemon` | An older service form of the engine; not installed on the host | its `Cargo.toml` |
-| `agent-platform` | `crates/ap` | The command `ap`: `unit` (one unit of work from its page in one call), `run` (one stage), `gate`, `review`, `deliver` (the install of an accepted merge of `main`); `ap --help` lists them | `README.md`, then the file named after the verb under `src/` |
+| `agent-platform` | `crates/ap` | The command `ap`: `unit` (one unit of work in one call, from its page or a request), `run` (one stage), `gate`, `review`, `accept`, `deliver` (the install of an accepted merge of `main`), `backlog` (the board), `state` (a task directory's runs and holds), `row` (one user's row), `version`; `ap --help` names the README section of each | `README.md` (by section; it is long), then the file named after the verb under `src/` |
 | | `content/` | Source of `/root/.agents/`: `AGENTS.md`, `runtime-references/`, `skills/`, with `SHA256SUMS` | `content/README.md` |
 | | `ontology/` | `work.schema.json`: the store's object and action types for tasks (holds, decisions, KPIs and measurements, reviews, install attempts, worker runs); the file is the list | `ontology/README.md` |
 | | `memory/` | Engineering memory: checked originals and their publisher | `memory/README.md` |
-| | `evals/` | The suites and the cost read-out: `engineering/` (cases cut from merged units, judged by an executable), `lead/` (frozen situations of a Lead, scored by a model against a rubric), `readout.py` | `evals/README.md` |
+| | `evals/` | The suites and the cost read-out: `instructions/` (weak readers route from the shared instructions, against a reference reader), `engineering/` (cases cut from merged units, judged by an executable), `lead/` (frozen situations of a Lead, scored by a model against a rubric), `readout.py` | `evals/README.md` |
 | | `deploy/` | The systemd units and the request file of the delivery timer | `deploy/README.md` |
 | `education-platform` | `crates/edu-academy-core` | Domain rules and the lesson workflow: intake, review, decision, approval, save, reconciliation and their records | `src/lib.rs`; `src/workflow/` |
 | | `crates/edu-academy-sources` | Reads and writes against the Academy server's pages and scripts; the qualification tool `academy-live-driver` | `src/lib.rs` |
@@ -50,11 +50,10 @@ Every platform repository has one workflow, `.github/workflows/rust.yml`, with t
 | Looking for | Entry |
 | --- | --- |
 | Any task | `/home/palantirkc/work/<scope>-<topic>/STATE.md` |
-| Directory standard and where an old path went | `/home/palantirkc/work/ws-layout-standard/LAYOUT.md` and `PATH-MAP.tsv` beside it |
+| Directory roles and names | `NAMING.md`; an old path that is gone: `/home/palantirkc/archive/INDEX.md` |
 | Whole-host improvement program (the whole view, the order of work) | `/home/palantirkc/work/ws-program/STATE.md`, with `LENS.md` beside it |
 | The Academy lesson route on the Rust programs and the Ontology store (it replaced the Rust migration plan and tool-by-tool parity) | `/home/palantirkc/work/ws-program/DESIGN-LESSON-ROUTE.md` |
 | Academy lessons | `/home/palantirkc/work/edu-lessons/STATE.md` |
-| Memory selection and evaluation | `/home/palantirkc/work/mem-host-memory/STATE.md` |
 | Recovery archives | `/home/palantirkc/archive/INDEX.md`. An archive is for recovery; it carries no current rule |
 
 A task's current holds, decisions, KPI values and worker runs are in the Ontology store when its STATE says so (`ONTOLOGY-USE.md`).

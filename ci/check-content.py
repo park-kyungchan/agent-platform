@@ -3,10 +3,13 @@
 
 Fails the build when (1) SHA256SUMS and the files disagree, (2) always-loaded text
 (AGENTS.md, skill frontmatter) carries a value that changes over time, (3) any owned
-file names a model, or (4) a file that content/ routes a reader to does not exist.
-Reads only the repository. Run: python3 -I -B ci/check-content.py
+file names a model, (4) a file that content/ routes a reader to does not exist, (5) a path
+is elided or points into a main checkout's files, or (6) on a host that has the corpus of
+design sources, a line range of OFFICIAL-DOCS.md section 4 falls outside its file.
+Reads the repository, and the corpus when it is present. Run: python3 -I -B ci/check-content.py
 """
 import hashlib
+import os
 import re
 import sys
 from pathlib import Path
@@ -44,8 +47,10 @@ for name in listed:
         fail("sha256sums_names_missing_file", name, "remove the line or restore the file")
 
 texts = {name: (ROOT / name).read_text(encoding="utf-8") for name in owned if name.endswith((".md", ".json"))}
+# A file name of the corpus of design sources is a citation, not a model assignment.
+CORPUS_PATH = re.compile(r"`docs/[^`\s]+`")
 for name, text in texts.items():
-    for m in MODEL.finditer(text):
+    for m in MODEL.finditer(CORPUS_PATH.sub("``", text)):
         fail("model_name_in_content", name, f"'{m.group(0)}' belongs in a task STATE, not in shared instructions")
     always = text if name == "AGENTS.md" else ""
     if name.endswith("/SKILL.md"):
@@ -167,6 +172,48 @@ for name, text in texts.items():
             for quoted in re.finditer(QUOTED, m.group(1)):
                 if quoted.group(1) not in headings:
                     fail("unknown_readme_section", f"{name}:{line_of(m.start(1) + quoted.start())}", f'"{quoted.group(1)}"; the headings of crates/ap/README.md: {", ".join(sorted(headings))}')
+
+# Paths a reader can open as written: never elided, never into the files of a main checkout (they lag origin/main).
+PATHLIKE = re.compile(r"`((?:/|~/|\$[A-Z_]+/|\./|docs/|content/|crates/)[^`\n]*)`")
+MAIN_CHECKOUT_FILE = re.compile(r"/home/palantirkc/platforms/([A-Za-z0-9][\w.-]*)/([A-Za-z0-9._-][^\s`)|,;]*)")
+for name, text in texts.items():
+    line_of = lambda at: text.count("\n", 0, at) + 1
+    for m in PATHLIKE.finditer(text):
+        if "\u2026" in m.group(1) or "..." in m.group(1):
+            fail("elided_path", f"{name}:{line_of(m.start())}", f"`{m.group(1)}`: write the path in full or as a <pattern>")
+    for m in MAIN_CHECKOUT_FILE.finditer(text):
+        fail("main_checkout_path", f"{name}:{line_of(m.start())}", f"{m.group(0)}: read it as `git -C /home/palantirkc/platforms/{m.group(1)} show origin/main:{m.group(2)}`")
+
+# The route table of the design sources (OFFICIAL-DOCS.md section 4): every line range inside its file. The corpus is on
+# the host only, so this runs where it is present (./check on the host) and is skipped in GitHub's CI.
+CORPUS = Path(os.environ.get("CONTENT_CHECK_CORPUS", "/home/palantirkc/external/reference-docs"))
+ROUTES = "runtime-references/OFFICIAL-DOCS.md"
+section = texts.get(ROUTES, "").split("\n## 4. ", 1)
+if CORPUS.is_dir() and len(section) == 2:
+    checked = 0
+    body = section[1].split("\n## ", 1)[0]
+    for row in body.splitlines():
+        if not row.startswith("| ") or row.startswith(("| Question", "| ---")):
+            continue
+        current = None
+        for m in re.finditer(r"`(docs/[^`:\s]+\.md)?(?::(\d+)(?:-(\d+))?)?`|`(:\d+(?:-\d+)?)`", row):
+            if m.group(1):
+                current = m.group(1)
+                first, last = m.group(2), m.group(3) or m.group(2)
+            elif m.group(4):
+                first, _, last = m.group(4)[1:].partition("-")
+                last = last or first
+            else:
+                continue
+            if not current or not (CORPUS / current).is_file():
+                fail("design_route_missing_file", ROUTES, f"{current or m.group(0)}")
+                continue
+            if first:
+                lines = (CORPUS / current).read_text(encoding="utf-8", errors="replace").count("\n") + 1
+                checked += 1
+                if not (1 <= int(first) <= int(last) <= lines):
+                    fail("design_route_out_of_range", ROUTES, f"{current}:{first}-{last} (the file has {lines} lines)")
+    print(f"design routes: {checked} line ranges checked against {CORPUS}")
 
 for e in errors:
     print(e)

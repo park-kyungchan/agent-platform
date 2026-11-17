@@ -32,7 +32,7 @@ Every platform has one long name and one short name, and no third form. The long
 | Branch | `<short>/<topic>-<YYYYMMDD>` |
 | File of a task or an instruction | Upper-case words joined by hyphens, extension `.md`; a packet is `TASK-<id>.md`, its report `REPORT-<id>.md`, a review `REVIEW-<what>.md`, a design note `DESIGN-<topic>.md` |
 | Shared skill | Lower case, hyphen, no date |
-| Top-level directory of `/home/palantirkc` | One lower-case word from `/home/palantirkc/work/ws-layout-standard/LAYOUT.md`, plus `tools` |
+| Top-level directory of `/home/palantirkc` | One of `platforms` (main checkouts), `work` (tasks), `external` (pinned outside source), `tools`, `scratch` (disposable), `archive` (recovery only), `private` (custody), `projects` (kept repositories); no new one without the user |
 | Installed first-party | `/usr/local/bin/<binary>`; state and previous binaries under `/var/lib/<long name>/` |
 | Other files in a repository | That repository's own convention |
 

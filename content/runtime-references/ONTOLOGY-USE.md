@@ -19,8 +19,8 @@ Read this when you need a task's holds, decisions, KPI values or worker runs fro
 | I need | Read |
 | --- | --- |
 | The form of a command | `ont help` |
-| The installed object types, and each view with its arguments | `ont describe` (empty standard input reads as `{}`) |
-| An action's parameters, byte limits, allowed values and criteria | `ont action list` (empty standard input reads as `{}`) |
+| The installed object types, and each view with its arguments | `ont describe < /dev/null` (`result.views`). Empty input reads as `{}`; without `< /dev/null` the command waits on an open standard input |
+| Every action, with its parameters, byte limits, allowed values and criteria | `ont action list < /dev/null` (the same rule on standard input) |
 | The source of the work schema | `agent-platform` `ontology/work.schema.json` and `ontology/README.md` |
 | The engine's contract, its bounds, and how to write a schema | `ontology-platform` `crates/ont/README.md` |
 
@@ -30,7 +30,7 @@ An Id is JSON with `object_type`, `namespace` and `native_key`. Use the Id that 
 
 | Object type | Native key |
 | --- | --- |
-| `task` | The task directory's name below `/home/palantirkc/work/`, for example `ws-example` |
+| `task` | The key the task's STATE names; by default the task directory's name below `/home/palantirkc/work/`, for example `ws-example`. A renamed task keeps its older key, so take it from STATE, never from the directory |
 | `packet`, `report` | The file path relative to that work root, for example `ws-example/TASK-example.md` |
 | `installed_artifact`, `instruction_file` | The absolute file path |
 | `hold`, `decision`, `kpi`, `measurement`, `worker_run`, `thread`, `plan`, `review` | Generated at creation: in the apply answer it is the `id` of the `result.edits[]` entry whose `change` is `initial`; later take `result.objects[].id` from `search`. Do not invent a key |
@@ -46,14 +46,15 @@ TASK_ID='{"object_type":"task","namespace":{"instance":"vps://palantirkc","accou
 printf '{"object_type":"hold","where":{"all":[{"eq":["task",%s]},{"eq":["status","active"]}]}}\n' "$TASK_ID" | ont search
 # Current decisions: topic, text, decided_by, reason and undo.
 printf '{"object_type":"decision","where":{"all":[{"eq":["task",%s]},{"eq":["status","current"]}]}}\n' "$TASK_ID" | ont search
-# KPIs with their latest measurement: name, target, value, observed_at and evidence.
+# KPIs with their latest recorded measurement: name, target, value, observed_at and evidence.
+# A stored value is as new as its last record_measurement; agent-platform evals/readout.py computes the current one.
 printf '{"object_type":"kpi","where":{"all":[{"eq":["task",%s]}]}}\n' "$TASK_ID" | ont search
 # Running workers: name, tier, runtime, session, packet, started_at and last_note.
 printf '{"object_type":"worker_run","where":{"all":[{"eq":["task",%s]},{"eq":["status","running"]}]}}\n' "$TASK_ID" | ont search
 # One object by Id, with its observation history.
 printf '{"id":%s}\n' "$TASK_ID" | ont get
-# The text of a view. Views of the work schema, each with the argument task:
-# active_holds, current_decisions, kpi_board, live_workers, closed_workers.
+# The text of a view. The views and their arguments: ont describe < /dev/null (result.views);
+# active_holds, current_decisions, kpi_board, live_workers, closed_workers and reviews take task; installs takes none.
 printf '%s\n' '{"view":"active_holds","args":{"task":"ws-example"}}' | ont render
 # A count without fetching fields.
 printf '%s\n' '{"object_type":"worker_run","where":{"eq":["status","running"]},"metrics":["count"]}' | ont aggregate
@@ -77,6 +78,8 @@ printf '%s\n' '{"object_type":"worker_run","where":{"eq":["status","running"]},"
 ## 5. Lead writes
 
 Send JSON on standard input to `ont action apply`: `action_type`, `parameters`, a stable `request_id`, and optionally `agent` and `session`; the client is the option `--client NAME`. `ont action validate` takes the same body. Take every parameter name, limit and criterion from `ont action list`, not from memory.
+
+The table below covers only the actions with a rule that is easy to miss; it is not the list of actions (`ont action list < /dev/null` is).
 
 | Action | Records | Rule that is easy to miss |
 | --- | --- | --- |

@@ -6,7 +6,7 @@ The Lead writes on this page nothing about types, functions or line numbers. A f
 
 ## A unit that changes product code
 
-One pull request that can merge alone. The line `Write set:` starts at the first column, once: `ap unit` reads it (comma-separated paths, a directory as `dir/**`).
+One pull request that can merge alone. The page carries its write set in ONE of two forms, never both (`write_set_twice`): the typed block (three backticks and `unit`), which `ap unit <page>` requires and from which it composes the request (`crates/ap/README.md` sections "The page's block" and "One unit"); or, for a call `ap unit < request.json`, the line `Write set:` at the first column, once (comma-separated paths, a directory as `dir/**`).
 
 ```markdown
 # TASK: <the unit in one line>
@@ -19,7 +19,7 @@ Invariants: <what must hold before and after, each a sentence a test can break>
 Acceptance checks: <executables only: the test that fails on the base and passes on the head, a differential script, a measurement with its bound; then the repository's check command>
 Not built: <neighbouring things left out on purpose>
 Exact targets: <repository, worktree, branch, base revision>
-Write set: <the area: crates and directories>
+Write set: <the area: crates and directories; leave this line out when the page has the typed block>
 Allowed effects: <reads, writes, local commits, push, pull request, build slot>
 Forbidden effects: <holds, other paths, host, domain and remote boundaries>
 Plan: before the first edit, write into the pull request description the files you change, the order, the risks and how each acceptance check is met.
