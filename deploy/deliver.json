@@ -3,5 +3,9 @@
   "url": "https://github.com/park-kyungchan/agent-platform.git",
   "state": "/var/lib/agent-platform/deliver",
   "build_lock": "/var/lib/agent-platform/build.lock",
-  "build_wait_seconds": 480
+  "build_wait_seconds": 480,
+  "engine": {
+    "repository": "park-kyungchan/ontology-platform",
+    "url": "https://github.com/park-kyungchan/ontology-platform.git"
+  }
 }

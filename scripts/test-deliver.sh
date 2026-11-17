@@ -7,8 +7,13 @@
 # a scratch origin repository, a scratch store reached through a wrapper named `ont` first on PATH, every
 # installer variable and AP_DELIVER_LOCK. It never calls systemctl. The origin's install-content.sh is
 # this repository's file unchanged; its install-ap.sh differs only in the build lock's path; a `cargo`
-# shim writes a file that answers --version with the commit it is built from.
-# One line `walk pass=<a..h> k=<k> pair=<commit or neither> outcome=<outcome>` per case, then
+# shim writes a file that answers --version with the commit it is built from. Passes i and j give the
+# request the member `engine`: a scratch engine repository whose `scripts/install-ont.sh` is a fake (the
+# real script's own `git fetch origin` and ancestor check, then a file that answers --version with the
+# pin), and a merged higher version of the work schema with an `ontology/migrate` that records its call,
+# installed on the scratch store. The engine file and the store lie under ONT_INSTALL_BIN_DIR and
+# ONT_INSTALL_STATE_DIR of that directory.
+# One line `walk pass=<a..j> k=<k> pair=<commit or neither> outcome=<outcome>` per case, then
 # `deliver-walk: ok`. Under CI=true it is skipped: the engine there has no object for the target's key.
 set -euo pipefail
 [ "$#" -eq 2 ] || { echo "usage: scripts/test-deliver.sh <ont binary> <ap binary>" >&2; exit 2; }
@@ -32,11 +37,14 @@ export TMPDIR=$W/tmp GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1
 export GIT_AUTHOR_NAME=walk GIT_AUTHOR_EMAIL=walk@example.invalid GIT_COMMITTER_NAME=walk GIT_COMMITTER_EMAIL=walk@example.invalid
 export AP_INSTALL_DIR=$W/install AP_BACKUP_DIR=$W/backup AP_INSTALL_LOCK=$W/install.lock
 export AP_CONTENT_DST=$W/agents AP_CONTENT_BACKUP_DIR=$W/content-backup AP_DELIVER_LOCK=$W/deliver.lock
+export ONT_INSTALL_BIN_DIR=$W/ont-bin ONT_INSTALL_STATE_DIR=$W/ont-state
+STORE=$ONT_INSTALL_STATE_DIR/ont/ontology.sqlite
+mkdir -p "$ONT_INSTALL_BIN_DIR" "$ONT_INSTALL_STATE_DIR/ont"
 unset INVOCATION_ID CARGO_TARGET_DIR
 export WALK=$W WALK_MV=$MV
 
 # The wrapper `ont`: the built ap has no other way to a scratch store.
-printf '#!/bin/sh\nexec %q --store %q "$@"\n' "$ONT" "$W/store/store.sqlite" > "$W/bin/ont"
+printf '#!/bin/sh\nexec %q --store %q "$@"\n' "$ONT" "$STORE" > "$W/bin/ont"
 # The cargo shim: the build of install-ap.sh, one second at least so that the content installer's
 # tarball is stamped after the attempt's start; with $WALK/slow it lasts until $WALK/release exists.
 cat > "$W/bin/cargo" <<'EOF'
@@ -103,34 +111,43 @@ merge() {
   local n; n=$(git -C "$O" rev-list --first-parent --count main)
   git -C "$O" checkout -q -b "b$n" main
   content "$n"
-  git -C "$O" commit -q -am "change $n"
+  # A move of the pin, a schema, a migration: the files $W/next-* name, when they exist.
+  [ ! -e "$W/next-pin" ] || cp "$W/next-pin" "$O/ontology/ENGINE-PIN"
+  [ ! -e "$W/next-schema" ] || cp "$W/next-schema" "$O/ontology/work.schema.json"
+  [ ! -e "$W/next-migrate" ] || install -m 0755 "$W/next-migrate" "$O/ontology/migrate"
+  git -C "$O" add -A && git -C "$O" commit -q -m "change $n"
   local head; head=$(git -C "$O" rev-parse HEAD)
   git -C "$O" checkout -q main
   git -C "$O" merge -q --no-ff -m "merge $n" "b$n"
-  printf 'Verdict: accept\n%s\n' "$head" > "$W/reports/$head.md"
-  python3 -I - "$head" "$W" <<'PY'
+  accept "$head" walk/origin
+  git -C "$O" rev-parse HEAD
+}
+# An accepting review of the head $1 in the repository $2.
+accept() {
+  printf 'Verdict: accept\n%s\n' "$1" > "$W/reports/$1.md"
+  python3 -I - "$1" "$W" "$2" <<'PY'
 import hashlib, json, subprocess, sys
-head, w = sys.argv[1:]
+head, w, repository = sys.argv[1:]
 def apply(action, rid, p):
     body = dict(action_type=action, request_id=rid, agent='walk', parameters=p)
     out = subprocess.run(['ont', 'action', 'apply', '--client', 'walk'], input=json.dumps(body), capture_output=True, text=True, check=True).stdout
     v = json.loads(out); assert v['result']['outcome'] == 'applied', v
     return v['result']['edits'][0]['id']
 task = dict(object_type='task', namespace=dict(instance='vps://palantirkc', account='root'), native_key='walk')
-review = apply('start_review', 'rv-' + head, dict(task=task, kind='packet', repository='walk/origin', head=head, model='walk', effort='walk', prompt=w + '/reports/prompt.md', prompt_sha256='b' * 64))
+review = apply('start_review', 'rv-' + head, dict(task=task, kind='packet', repository=repository, head=head, model='walk', effort='walk', prompt=w + '/reports/prompt.md', prompt_sha256='b' * 64))
 report = w + '/reports/' + head + '.md'
 apply('close_review', 'rv-' + head + '-close', dict(review=review, verdict='accept', report=report, report_sha256=hashlib.sha256(open(report, 'rb').read()).hexdigest()))
 PY
-  git -C "$O" rev-parse HEAD
 }
 
-# The requests: a Lead's install, a Lead's rollback.
+# The requests: a Lead's install, a Lead's rollback, a Lead's install with `engine`.
 request() {
   python3 -I -c 'import json, sys; w = sys.argv[1]; r = dict(repository="walk/origin", url=w + "/origin", state=w + "/state", build_lock=w + "/build.lock", by="walk", reason="the walk")
 if sys.argv[2] == "rollback": r["rollback"] = True
+if sys.argv[2] == "engine": r["engine"] = dict(repository="walk/engine", url=w + "/engine-origin")
 print(json.dumps(r))' "$W" "$1" > "$W/$1.json"
 }
-request lead; request rollback
+request lead; request rollback; request engine
 CLONE=$W/state/origin
 
 # One call of the built ap in a process group of its own; RC its exit, $W/out.json its record.
@@ -316,6 +333,76 @@ call lead
 [ "$RC" = 0 ] && [ "$(member 'r["end"]')" = installed ] && [ "$(pair)" = "$M" ] && [ "$(attempts)" = 1 ] || fail "pass h k=3: call after killed waiter"
 [ ! -s "$W/err" ] || fail "pass h k=3: free lock printed a waiting line"
 line h 3 "$(pair)" installed
+
+# (i) The engine: a scratch engine repository at E0 (its fake installer) and one accepted merge E1; the
+# engine file answers E0. A merge moves ontology/ENGINE-PIN to E1; one call installs the engine and ends,
+# the next installs the pair.
+E=$W/engine-origin
+mkdir -p "$E/scripts"
+cat > "$E/scripts/install-ont.sh" <<'EOF'
+#!/bin/bash
+# The walk's engine installer: the real script's fetch and ancestor check, then the file answers the pin.
+set -euo pipefail
+REPO_ROOT=$(cd -- "$(dirname -- "$0")/.." && pwd -P)
+BIN=$ONT_INSTALL_BIN_DIR/ont; KEEP=$ONT_INSTALL_STATE_DIR/install
+case ${1:-} in
+  install)
+    git -C "$REPO_ROOT" fetch origin +refs/heads/main:refs/remotes/origin/main --refmap= || { echo "refused: git_unavailable: fetch origin failed" >&2; exit 2; }
+    git -C "$REPO_ROOT" merge-base --is-ancestor "$2" refs/remotes/origin/main || { echo "refused: commit_not_merged" >&2; exit 2; }
+    mkdir -p "$KEEP"; sha=$(sha256sum "$BIN" | awk '{print $1}')
+    cp "$BIN" "$KEEP/ont.before-${sha:0:12}"; echo "$sha" > "$KEEP/previous"
+    sed "s/^REV=.*/REV=$2/" "$BIN" > "$BIN.new"; chmod 0755 "$BIN.new"; mv "$BIN.new" "$BIN" ;;
+  rollback)
+    sha=$(cat "$KEEP/previous"); install -m 0755 "$KEEP/ont.before-${sha:0:12}" "$BIN.new"; mv "$BIN.new" "$BIN" ;;
+  *) exit 2 ;;
+esac
+EOF
+git -C "$E" init -q -b main
+git -C "$E" add -A && git -C "$E" commit -q -m "engine 0"
+E0=$(git -C "$E" rev-parse HEAD)
+git -C "$E" checkout -q -b e1 && echo 1 > "$E/VERSION" && git -C "$E" add -A && git -C "$E" commit -q -m "engine change"
+EH=$(git -C "$E" rev-parse HEAD)
+git -C "$E" checkout -q main && git -C "$E" merge -q --no-ff -m "engine merge" e1
+E1=$(git -C "$E" rev-parse HEAD)
+accept "$EH" walk/engine
+printf '#!/bin/sh\nREV=%s\nif [ "$1" = --version ]; then echo "ont 0.1.0 $REV"; exit 0; fi\nexec %q --store %q "$@"\n' "$E0" "$ONT" "$STORE" > "$ONT_INSTALL_BIN_DIR/ont"
+chmod 0755 "$ONT_INSTALL_BIN_DIR/ont"
+echo "$E1" > "$W/next-pin"; M=$(merge); rm "$W/next-pin"
+BEFORE=$(pair)
+call engine
+[ "$RC" = 0 ] && [ "$(member 'r["target"]')" = /usr/local/bin/ont ] && [ "$(member 'r["end"]')" = installed ] &&
+  [ "$(member 'r["to"]')" = "$E1" ] && [ "$("$ONT_INSTALL_BIN_DIR/ont" --version)" = "ont 0.1.0 $E1" ] &&
+  [ "$(pair)" = "$BEFORE" ] || fail "pass i: the engine (exit $RC)"
+printf '{"object_type":"install","where":{"all":[{"eq":["commit","%s"]}]},"limit":10}\n' "$E1" | ont search |
+  python3 -I -c 'import json, sys; o = json.load(sys.stdin)["result"]["objects"]; f = {k: v.get("value") for k, v in o[0]["head"]["fields"].items()}
+assert len(o) == 1 and f["target"]["native_key"] == "/usr/local/bin/ont" and f["outcome"] == "installed" and f["repository"] == "walk/engine", f' ||
+  fail "pass i: the engine's attempt"
+# The engine's clone has the remote origin: the installer's own fetch, run again here, answers.
+CE=$W/state/engine
+[ "$(git -C "$CE" remote get-url origin)" = "$E" ] || fail "pass i: the clone's remote"
+git -C "$CE" fetch origin +refs/heads/main:refs/remotes/origin/main --refmap= || fail "pass i: the installer's fetch"
+line i 0 "$(pair)" "$(member 'r["outcome"]')"
+call engine
+[ "$RC" = 0 ] && [ "$(member 'r["target"]')" = /usr/local/bin/ap ] && [ "$(pair)" = "$M" ] || fail "pass i: the pair after the engine (exit $RC)"
+line i 1 "$(pair)" "$(member 'r["outcome"]')"
+
+# (j) A merged higher version of the work schema with an `ontology/migrate`: one call backs the store up,
+# installs the schema, runs the migration with the store's path and the two versions, installs the pair.
+python3 -I -c 'import json, sys; d = json.load(open(sys.argv[1])); d["version"] += 1; open(sys.argv[2], "w").write(json.dumps(d, indent=1) + "\n")' \
+  "$O/ontology/work.schema.json" "$W/next-schema"
+printf '#!/bin/sh\n[ "$#" = 3 ] || exit 2\n[ -e "$WALK/state/migrate.pending" ] || exit 3\nprintf "%%s %%s %%s\\n" "$1" "$2" "$3" >> "$WALK/migrated"\n' > "$W/next-migrate"
+version() { printf '{"object_type":"install","limit":1}\n' | ont search | python3 -I -c 'import json, sys; print(json.load(sys.stdin)["schema"]["work"]["version"])'; }
+V0=$(version)
+M=$(merge); rm "$W/next-schema" "$W/next-migrate"
+call engine
+[ "$RC" = 0 ] && [ "$(member 'r["end"]')" = installed ] && [ "$(pair)" = "$M" ] || fail "pass j: exit $RC"
+[ "$(version)" = $((V0 + 1)) ] || fail "pass j: the store's version"
+[ "$(cat "$W/migrated")" = "$STORE $V0 $((V0 + 1))" ] || fail "pass j: the migration's arguments"
+[ ! -e "$W/state/migrate.pending" ] || fail "pass j: the marker stayed"
+python3 -I -c 'import json, os, sys; s = json.load(open(sys.argv[1]))["schema"]; v = int(sys.argv[2])
+assert s["from"] == v and s["to"] == v + 1 and s["migrate"] == "ok" and os.path.isfile(s["backup"]), s' "$W/out.json" "$V0" ||
+  fail "pass j: the record's schema"
+line j 0 "$(pair)" "$(member 'r["schema"]["migrate"]')"
 
 [ "$(host_count)" = "$host_before" ] || fail "the host store's install objects changed"
 echo "deliver-walk: ok"

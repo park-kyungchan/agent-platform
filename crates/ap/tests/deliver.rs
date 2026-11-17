@@ -144,6 +144,29 @@ struct W {
     /// Every `rollback-check` asked, in order: (script, tarball). It is no installer and no row of
     /// `calls`.
     checks: Vec<(String, String)>,
+    /// The engine (README "The engine and the schema"): whether the request carries `engine`, the
+    /// engine repository's chain and heads, whether the pin is under its `origin/main`, and its
+    /// fetch.
+    engine: bool,
+    echain: Vec<Commit>,
+    eheads: BTreeMap<String, String>,
+    e_ancestor: bool,
+    efetch_fails: bool,
+    /// What `install-ont.sh install` and `rollback` leave the engine at (None: unchanged), and
+    /// their exits.
+    ont_install: (Option<String>, i32),
+    ont_rollback: (Option<String>, i32),
+    /// The mode of `ontology/migrate` at the tip (None: absent), its exit, and each run: its
+    /// arguments and the marker as it was then.
+    migrate_mode: Option<&'static str>,
+    migrate_exit: i32,
+    migrates: Vec<(Vec<String>, Option<String>)>,
+    backup_fails: bool,
+    schema_install_fails: bool,
+    /// The install answers ok and the store's version stays.
+    schema_noop: bool,
+    /// The marker as it was at each `ont schema install`.
+    marker_at_install: Vec<Option<String>>,
 }
 
 impl W {
@@ -210,6 +233,20 @@ impl W {
             refused: vec![],
             old_script: false,
             checks: vec![],
+            engine: false,
+            echain: vec![],
+            eheads: BTreeMap::new(),
+            e_ancestor: true,
+            efetch_fails: false,
+            ont_install: (None, 0),
+            ont_rollback: (None, 0),
+            migrate_mode: None,
+            migrate_exit: 0,
+            migrates: vec![],
+            backup_fails: false,
+            schema_install_fails: false,
+            schema_noop: false,
+            marker_at_install: vec![],
         };
         w.lock = w.p("deliver.lock");
         for n in 1..=k {
@@ -295,8 +332,12 @@ impl W {
             .clone()
     }
     fn request(&self) -> Value {
-        json!({"repository":"o/r","url":"https://example.invalid/o/r.git","state":self.p("state"),
-            "build_lock":self.p("build.lock"),"by":"session-1","reason":"after a merge"})
+        let mut r = json!({"repository":"o/r","url":"https://example.invalid/o/r.git","state":self.p("state"),
+            "build_lock":self.p("build.lock"),"by":"session-1","reason":"after a merge"});
+        if self.engine {
+            r["engine"] = json!({"repository": "o/engine", "url": EURL});
+        }
+        r
     }
     fn run(&mut self) -> (Value, u8) {
         let r = self.request();
@@ -345,10 +386,15 @@ impl W {
     fn launched(&self) -> Vec<String> {
         self.calls
             .iter()
-            .filter(|(p, _, _)| p == "bash")
-            .map(|(_, a, _)| {
+            .filter(|(p, _, _)| p == "bash" || p.ends_with("/ontology/migrate"))
+            .map(|(p, a, _)| {
+                if p != "bash" {
+                    return "migrate".to_owned();
+                }
                 let script = if a[0].ends_with("install-ap.sh") {
                     "ap"
+                } else if a[0].ends_with("install-ont.sh") {
+                    "ont"
                 } else {
                     "content"
                 };
@@ -413,9 +459,17 @@ impl W {
     }
     fn git(&mut self, a: &[String]) -> Answer {
         let clone = self.p("state/r");
+        let eclone = self.p("state/engine");
+        if a[0] == "init" && a[2] == eclone {
+            assert_eq!(a, args(&["init", "--quiet", &eclone]));
+            return Self::text(real_git(a), "");
+        }
         if a[0] == "init" {
             assert_eq!(a, args(&["init", "--quiet", &clone]));
             return Self::text(true, "");
+        }
+        if a[..2] == ["-C", eclone.as_str()] {
+            return self.egit(a);
         }
         assert_eq!(&a[..2], ["-C", clone.as_str()], "{a:?}");
         let rest: Vec<&str> = a[2..].iter().map(String::as_str).collect();
@@ -427,6 +481,13 @@ impl W {
                 Self::text(!self.fetch_fails, &format!("{origin}\n"))
             }
             ["checkout", "--quiet", "--force", "--detach", _] => Self::text(true, ""),
+            ["ls-tree", tip, "--", "ontology/migrate"] => {
+                assert_eq!(*tip, self.tip());
+                let entry = self.migrate_mode.map_or(String::new(), |m| {
+                    format!("{m} blob {}\tontology/migrate\n", "a".repeat(40))
+                });
+                Self::text(true, &entry)
+            }
             ["show", spec] => {
                 let (commit, path) = spec.split_once(':').unwrap();
                 match path {
@@ -469,6 +530,29 @@ impl W {
         let schema = json!({"work": {"sha256": "f".repeat(64), "version": self.schema}});
         match a[0].as_str() {
             "--version" => Self::text(true, &format!("ont 0.1.0 {}\n", self.ont)),
+            "backup" => {
+                assert_eq!(a, args(&["backup"]));
+                let path = self.p("ont-state/ont/backup/ontology-20261117T000000Z.sqlite");
+                let status = if self.backup_fails { "refused" } else { "ok" };
+                Self::ok(json!({"status": status, "result": {"path": path}, "schema": schema}))
+            }
+            "schema" => {
+                let (clone, tip) = (self.p("state/r"), self.tip());
+                let want = ["schema", "install", "--from", &clone, "--commit", &tip];
+                assert_eq!(
+                    a,
+                    args(&[&want[..], &["--path", "ontology/work.schema.json"]].concat())
+                );
+                let marker = std::fs::read_to_string(self.p("state/migrate.pending")).ok();
+                self.marker_at_install.push(marker);
+                if self.schema_install_fails {
+                    return Self::ok(json!({"status": "refused", "code": "schema_invalid"}));
+                }
+                if !self.schema_noop {
+                    self.schema = self.tip_schema;
+                }
+                Self::ok(json!({"status": "ok", "result": {"version": self.schema}}))
+            }
             "index" => {
                 assert_eq!(a, args(&["index", "--source", "installed_binaries"]));
                 let status = if self.index_fails { "refused" } else { "ok" };
@@ -613,6 +697,10 @@ impl System for W {
             return Self::text(!self.old_script && !self.refused.contains(&a[2]), "");
         }
         self.calls.push((program.into(), a.to_vec(), body.clone()));
+        if program == self.p("ont-bin/ont") {
+            assert_eq!(a, ["--version"]);
+            return Self::text(true, &format!("ont 0.1.0 {}\n", self.ont));
+        }
         if program == self.p("bin/ap") {
             assert_eq!(a, ["--version"]);
             return match &self.file {
@@ -646,6 +734,9 @@ impl System for W {
         }
     }
     fn read(&self, path: &str) -> std::io::Result<Vec<u8>> {
+        if path == self.p("ont-bin/ont") {
+            return Ok(engine_binary(&self.ont));
+        }
         if path == self.p("bin/ap") {
             return match self.file {
                 Some(_) => Ok(self.bytes.clone()),
@@ -678,6 +769,9 @@ impl System for W {
             argv[1..].to_vec(),
             json!({"cwd": cwd, "env": env_map}),
         ));
+        if argv[0].ends_with("/ontology/migrate") || argv[1].ends_with("/scripts/install-ont.sh") {
+            return self.launch_engine(argv, files);
+        }
         assert_eq!(argv[0], "bash");
         let script = if argv[1].ends_with("/scripts/install-ap.sh") {
             "ap"
@@ -734,6 +828,8 @@ impl System for W {
             ("AP_CONTENT_DST".into(), self.p("agents")),
             ("AP_CONTENT_BACKUP_DIR".into(), self.p("content-backup")),
             ("AP_DELIVER_LOCK".into(), self.lock.clone()),
+            ("ONT_INSTALL_BIN_DIR".into(), self.p("ont-bin")),
+            ("ONT_INSTALL_STATE_DIR".into(), self.p("ont-state")),
         ]
         .into_iter()
         .chain(self.invocation.clone().map(|v| ("INVOCATION_ID".into(), v)))
@@ -2882,4 +2978,862 @@ fn w2_waiting_line_only_when_the_call_waits() {
             assert!(err.is_empty(), "{err}");
         }
     }
+}
+
+// ---- E the engine and the schema (README "The engine and the schema") ---------------------------
+
+const ENGINE: &str = "/usr/local/bin/ont";
+const EURL: &str = "https://example.invalid/o/engine.git";
+/// A commit of the engine's chain: `ec(0)` is installed, `ec(2)` the pin.
+fn ec(n: u32) -> String {
+    format!("{:040}", 500 + n)
+}
+fn eh(n: u32) -> String {
+    format!("{:040}", 600 + n)
+}
+fn engine_binary(commit: &str) -> Vec<u8> {
+    format!("ont binary of {commit}").into_bytes()
+}
+fn etarget() -> Value {
+    oid("installed_artifact", ENGINE)
+}
+/// Real `git` for the engine clone's `init` and `config`, so that its configuration is a file a
+/// test reads back.
+fn real_git(a: &[String]) -> bool {
+    Command::new("git")
+        .args(a)
+        .env("GIT_CONFIG_GLOBAL", "/dev/null")
+        .env("GIT_CONFIG_NOSYSTEM", "1")
+        .output()
+        .is_ok_and(|o| o.status.success())
+}
+fn git_config(clone: &str, key: &str) -> Option<String> {
+    let out = Command::new("git")
+        .args(["-C", clone, "config", "--get", key])
+        .env("GIT_CONFIG_GLOBAL", "/dev/null")
+        .env("GIT_CONFIG_NOSYSTEM", "1")
+        .output()
+        .ok()?;
+    out.status
+        .success()
+        .then(|| String::from_utf8_lossy(&out.stdout).trim().to_owned())
+}
+const MAIN: &str = "+refs/heads/main:refs/remotes/origin/main";
+
+impl W {
+    /// A request with `engine`; the engine at ec(0), the pin ec(2), two accepted merges of the
+    /// engine's repository between them.
+    fn engine() -> Self {
+        let mut w = W::new();
+        w.engine = true;
+        for d in ["ont-bin", "ont-state/install"] {
+            std::fs::create_dir_all(w.t.join(d)).unwrap();
+        }
+        (w.ont, w.pin) = (ec(0), ec(2));
+        w.echain = vec![Commit {
+            id: ec(0),
+            parents: vec![],
+            tree: tree(50),
+        }];
+        for n in 1..=2 {
+            w.echain.push(Commit {
+                id: ec(n),
+                parents: vec![ec(n - 1), eh(n)],
+                tree: tree(50 + n),
+            });
+            w.eheads.insert(eh(n), tree(50 + n));
+            w.ereview(n);
+        }
+        w.ont_install = (Some(ec(2)), 0);
+        w.ont_rollback = (Some(ec(0)), 0);
+        w
+    }
+    /// The engine already at the pin: only the schema and the pair may move.
+    fn at_pin() -> Self {
+        let mut w = W::engine();
+        w.ont = ec(2);
+        w
+    }
+    fn ereview(&mut self, n: u32) -> Value {
+        let key = format!("rv-{}", self.reviews.len() + 1);
+        let report = self.p(&format!("reports/{key}.md"));
+        let bytes = format!("Verdict: accept\n{}\n", eh(n));
+        std::fs::write(&report, &bytes).unwrap();
+        let row = json!({"id": oid("review", &key), "kind": "packet", "head": eh(n), "status": "closed",
+            "verdict": "accept", "repository": "o/engine", "report": report,
+            "report_sha256": sha(bytes.as_bytes()), "closed_at": "2026-11-13T00:01:00Z"});
+        self.reviews.push(row.clone());
+        row["id"].clone()
+    }
+    fn eclosed(&mut self, kind: &str, commit: &str, from: &str, outcome: &str) -> Value {
+        let id = self.closed(kind, commit, from, outcome, "timer:1");
+        let row = self.installs.last_mut().unwrap();
+        (row["target"], row["repository"]) = (etarget(), json!("o/engine"));
+        id
+    }
+    fn marker_present(&self) -> bool {
+        self.t.join("state/migrate.pending").exists()
+    }
+    fn marker(&self) -> Option<Value> {
+        let bytes = std::fs::read(self.p("state/migrate.pending")).ok()?;
+        Some(serde_json::from_slice(&bytes).unwrap())
+    }
+    fn set_marker(&self, from: u64, to: u64) {
+        std::fs::create_dir_all(self.p("state")).unwrap();
+        let m = json!({"from": from, "to": to}).to_string();
+        std::fs::write(self.p("state/migrate.pending"), m).unwrap();
+    }
+    /// The index in `calls` of the first call whose program or first argument ends with `what`.
+    fn at(&self, what: &str) -> Option<usize> {
+        self.calls.iter().position(|(p, a, b)| {
+            p.ends_with(what)
+                || a.first().is_some_and(|x| x.ends_with(what))
+                || b["action_type"] == what
+        })
+    }
+    fn egit(&mut self, a: &[String]) -> Answer {
+        let rest: Vec<&str> = a[2..].iter().map(String::as_str).collect();
+        match rest.as_slice() {
+            ["config", _, _] => Self::text(real_git(a), ""),
+            ["fetch", "--quiet", "--no-tags", "origin", refspec] => {
+                assert_eq!(*refspec, MAIN);
+                // A fetch by the remote's name finds nothing without the remote.
+                let url = git_config(&a[1], "remote.origin.url");
+                Self::text(!self.efetch_fails && url.as_deref() == Some(EURL), "")
+            }
+            [
+                "merge-base",
+                "--is-ancestor",
+                pin,
+                "refs/remotes/origin/main",
+            ] => {
+                assert_eq!(*pin, self.pin);
+                Self::text(self.e_ancestor, "")
+            }
+            ["checkout", "--quiet", "--force", "--detach", pin] => {
+                assert_eq!(*pin, self.pin);
+                Self::text(true, "")
+            }
+            ["rev-list", "--first-parent", "--parents", range] => {
+                let (from, to) = range.split_once("..").unwrap();
+                assert_eq!(to, self.pin);
+                let mut lines = vec![];
+                for commit in self.echain.iter().rev() {
+                    if commit.id == from {
+                        break;
+                    }
+                    let mut words = vec![commit.id.clone()];
+                    words.extend(commit.parents.iter().cloned());
+                    lines.push(words.join(" "));
+                }
+                Self::text(true, &format!("{}\n", lines.join("\n")))
+            }
+            ["rev-parse", own, _] => {
+                let commit = own.strip_suffix("^{tree}").unwrap();
+                let c = self.echain.iter().find(|c| c.id == commit).unwrap();
+                match c.parents.get(1).and_then(|p| self.eheads.get(p)) {
+                    Some(t) => Self::text(true, &format!("{}\n{t}\n", c.tree)),
+                    None => Self::text(false, ""),
+                }
+            }
+            _ => panic!("unexpected engine git call {a:?}"),
+        }
+    }
+    /// `install-ont.sh` (it keeps the file it replaces as `ont.before-<12 hex>`) and
+    /// `ontology/migrate`.
+    fn launch_engine(
+        &mut self,
+        argv: &[String],
+        files: [std::fs::File; 3],
+    ) -> std::io::Result<Child> {
+        let exit = if argv[0].ends_with("/ontology/migrate") {
+            let marker = std::fs::read_to_string(self.p("state/migrate.pending")).ok();
+            self.migrates.push((argv[1..].to_vec(), marker));
+            self.migrate_exit
+        } else {
+            let (after, exit) = if argv[2] == "install" {
+                let old = engine_binary(&self.ont);
+                let kept = format!("ont-state/install/ont.before-{}", &sha(&old)[..12]);
+                std::fs::write(self.p(&kept), old).unwrap();
+                self.ont_install.clone()
+            } else {
+                self.ont_rollback.clone()
+            };
+            if let Some(v) = after {
+                self.ont = v;
+            }
+            exit
+        };
+        let [stdin, stdout, stderr] = files;
+        Command::new("sh")
+            .args(["-c", "exit \"$1\"", "sh", &exit.to_string()])
+            .env_clear()
+            .stdin(stdin)
+            .stdout(stdout)
+            .stderr(stderr)
+            .spawn()
+    }
+}
+fn ekept(w: &W) -> String {
+    let old = engine_binary(&ec(0));
+    w.p(&format!(
+        "ont-state/install/ont.before-{}",
+        &sha(&old)[..12]
+    ))
+}
+
+#[test]
+fn e_engine_at_the_pin_after_the_installer_is_installed_and_the_call_ends() {
+    let mut w = W::engine();
+    let (v, exit) = w.run();
+    assert_eq!((end(&v), exit), (("installed", ""), 0), "{v}");
+    let (pin, from) = (ec(2), ec(0));
+    let want = json!({"target": ENGINE, "tip": c(2), "from": from, "to": pin, "outcome": "installed",
+        "install": oid("install", &format!("act-ont.{pin}.1")), "attempt": 1, "rollback_binary": ekept(&w),
+        "rollback_content": null, "index": {"before": "ok", "after": "ok"}, "schema": null});
+    for (k, value) in want.as_object().unwrap() {
+        assert_eq!(&v[k], value, "{k}");
+    }
+    assert_eq!(rows(&v), [row("ont", 0, None)]);
+    assert_eq!(w.launched(), ["ont"]);
+    // The attempt: target, kind, the engine's repository, the pin, from, the digest, the walk.
+    let start = &w.applies("start_install")[0];
+    assert_eq!(start["request_id"], format!("ont.{pin}.1"));
+    let review = |n: u32| {
+        let r = w.reviews.iter().find(|r| r["head"] == eh(n)).unwrap();
+        r["id"].clone()
+    };
+    assert_eq!(
+        start["parameters"],
+        json!({"target": etarget(), "kind": "forward", "repository": "o/engine", "commit": pin,
+            "attempt": 1, "from": from, "from_sha256": sha(&engine_binary(&from)), "by": "session-1",
+            "reason": "after a merge", "head": eh(2), "review": review(2), "reviews": [review(1), review(2)]})
+    );
+    let close = &w.applies("close_install")[0];
+    assert_eq!(close["request_id"], format!("ont.{pin}.1.close"));
+    // The installer: the clone's own script, `install <pin>`, in the clone, with the command's
+    // environment and nothing added.
+    let eclone = w.p("state/engine");
+    let launch = w.calls.iter().find(|(p, _, _)| p == "bash").unwrap();
+    assert_eq!(
+        launch.1,
+        args(&[&format!("{eclone}/scripts/install-ont.sh"), "install", &pin])
+    );
+    let env: serde_json::Map<String, Value> = w
+        .environment()
+        .into_iter()
+        .map(|(k, v)| (k, json!(v)))
+        .collect();
+    assert_eq!(launch.2, json!({"cwd": eclone, "env": env}));
+    assert_eq!(w.lock_inherited, [true]);
+    // The next call finds the engine at the pin and installs the pair.
+    let (v, exit) = w.run();
+    assert_eq!(
+        (end(&v), exit, v["target"].clone()),
+        (("installed", ""), 0, json!(TARGET)),
+        "{v}"
+    );
+    assert_eq!(rows(&v), [row("ap", 0, None), row("content", 0, None)]);
+}
+
+#[test]
+fn e_engine_clone_has_the_remote_origin() {
+    let mut w = W::engine();
+    let (v, _) = w.run();
+    assert_eq!(v["outcome"], "installed", "{v}");
+    let eclone = w.p("state/engine");
+    assert_eq!(
+        git_config(&eclone, "remote.origin.url").as_deref(),
+        Some(EURL)
+    );
+    assert_eq!(
+        git_config(&eclone, "remote.origin.fetch").as_deref(),
+        Some(MAIN)
+    );
+    // The repository's own clone is fetched by URL and has no remote.
+    let fetch = w
+        .calls
+        .iter()
+        .find(|(p, a, _)| p == "git" && a[1] == eclone && a[2] == "fetch")
+        .unwrap();
+    assert_eq!(
+        fetch.1[2..],
+        args(&["fetch", "--quiet", "--no-tags", "origin", MAIN])
+    );
+    assert!(w.calls.iter().any(|(p, a, _)| p == "git"
+        && a[1] == w.p("state/r")
+        && a[2..]
+            == args(&[
+                "fetch",
+                "--quiet",
+                "--no-tags",
+                "https://example.invalid/o/r.git",
+                MAIN
+            ])));
+}
+
+#[test]
+fn e_engine_at_from_after_the_installer_is_failed_restored() {
+    let mut w = W::engine();
+    w.ont_install = (None, 2);
+    let (v, exit) = w.run();
+    assert_eq!(
+        (end(&v), exit),
+        (("failed_restored", "engine_refused"), 3),
+        "{v}"
+    );
+    assert_eq!(
+        (v["to"].clone(), v["target"].clone()),
+        (json!(ec(0)), json!(ENGINE))
+    );
+    assert_eq!(rows(&v), [row("ont", 2, Some("engine_refused"))]);
+    assert_eq!(w.launched(), ["ont"]);
+}
+
+#[test]
+fn e_engine_at_neither_is_rolled_back_once() {
+    let mut w = W::engine();
+    w.ont_install = (Some("f".repeat(40)), 1);
+    let (v, exit) = w.run();
+    assert_eq!(
+        (end(&v), exit),
+        (("failed_restored", "engine_exit_1"), 3),
+        "{v}"
+    );
+    assert_eq!(
+        rows(&v),
+        [
+            row("ont", 1, Some("engine_exit_1")),
+            row("ont-rollback", 0, None)
+        ]
+    );
+    assert_eq!(v["to"], ec(0));
+    // A rollback that leaves it at neither: failed, exit 4.
+    let mut w = W::engine();
+    w.ont_install = (Some("f".repeat(40)), 0);
+    w.ont_rollback = (None, 2);
+    let (v, exit) = w.run();
+    assert_eq!(
+        (end(&v), exit, v["to"].clone()),
+        (("failed", "engine_refused"), 4, json!("neither")),
+        "{v}"
+    );
+    assert_eq!(w.launched(), ["ont", "ont-rollback"]);
+}
+
+#[test]
+fn e_engine_chain_not_accepted_installs_nothing() {
+    // The pin not under the engine's origin/main.
+    let mut w = W::engine();
+    w.e_ancestor = false;
+    let (v, exit) = w.run();
+    refused(&w, &v, exit, "engine_not_accepted");
+    assert_eq!(v["detail"], json!({"commit": ec(2), "why": "not_on_chain"}));
+    assert_eq!(v["target"], ENGINE);
+    // A merge with no accepting review in the engine's repository; the request's `past` is of T's
+    // chain only.
+    for past in [false, true] {
+        let mut w = W::engine();
+        let row = w.reviews.iter_mut().find(|r| r["head"] == eh(1)).unwrap();
+        row["repository"] = json!("o/r");
+        let mut r = w.request();
+        if past {
+            r["past"] = json!([c(1)]);
+        }
+        let (v, exit) = w.run_with(&r);
+        refused(&w, &v, exit, "engine_not_accepted");
+        assert_eq!(
+            v["detail"],
+            json!({"commit": ec(1), "why": "no_accepting_review"})
+        );
+    }
+    // A pin behind the installed engine is not on the chain either.
+    let mut w = W::engine();
+    (w.ont, w.pin) = (ec(2), ec(1));
+    let (v, exit) = w.run();
+    refused(&w, &v, exit, "engine_not_accepted");
+    assert_eq!(v["detail"], json!({"commit": ec(2), "why": "not_on_chain"}));
+    // The tip's chain is still walked first.
+    let mut w = W::engine();
+    w.chain[2].tree = tree(5);
+    let (v, exit) = w.run();
+    refused(&w, &v, exit, "not_accepted");
+    assert!(
+        !w.calls
+            .iter()
+            .any(|(_, a, _)| a.contains(&w.p("state/engine")))
+    );
+}
+
+#[test]
+fn e_engine_refusals_before_the_first_effect() {
+    // The engine unreadable, or a pin that is not 40 hex: engine_differs, as without `engine`.
+    let mut w = W::engine();
+    w.pin = "not a pin".into();
+    let (v, exit) = w.run();
+    refused(&w, &v, exit, "engine_differs");
+    let mut w = W::engine();
+    w.efetch_fails = true;
+    let (v, exit) = w.run();
+    refused(&w, &v, exit, "fetch_failed");
+    assert_eq!(v["detail"], json!({"repository": "o/engine"}));
+    for setup in [|w: &mut W| w.free = 1, |w: &mut W| w.build_busy = true] {
+        let mut w = W::engine();
+        setup(&mut w);
+        let (v, exit) = w.run();
+        assert_eq!((end(&v).0, exit), ("refused", 2));
+        assert!(w.launched().is_empty() && w.applies("start_install").is_empty());
+        assert!(
+            !w.calls
+                .iter()
+                .any(|(_, a, _)| a.contains(&w.p("state/engine")))
+        );
+    }
+}
+
+#[test]
+fn e_engine_limits_of_the_timer() {
+    let pin = ec(2);
+    // Three not_started attempts of one pin stop further ones; two do not.
+    let mut w = W::engine();
+    for _ in 0..2 {
+        w.eclosed("forward", &pin, &ec(0), "not_started");
+    }
+    let third = w.eclosed("forward", &pin, &ec(0), "not_started");
+    let (v, exit) = tick(&mut w);
+    limited(&w, &v, exit, "attempts_exhausted", 3, &third);
+    assert_eq!(v["target"], ENGINE);
+    let mut w = W::engine();
+    for _ in 0..2 {
+        w.eclosed("forward", &pin, &ec(0), "not_started");
+    }
+    let (v, exit) = tick(&mut w);
+    assert_eq!(
+        (end(&v), exit, v["attempt"].clone()),
+        (("installed", ""), 0, json!(3)),
+        "{v}"
+    );
+    // A failed attempt suppresses; a rollback holds; a pin installed once is not installed again.
+    let cases: [(&str, &str, &str, u8); 4] = [
+        ("forward", "failed_restored", "suppressed", 3),
+        ("forward", "failed", "suppressed", 3),
+        ("rollback", "installed", "held_by_rollback", 2),
+        ("forward", "installed", "attempt_exists", 2),
+    ];
+    for (kind, outcome, code, want) in cases {
+        let mut w = W::engine();
+        let commit = if kind == "rollback" {
+            ec(0)
+        } else {
+            pin.clone()
+        };
+        let id = w.eclosed(kind, &commit, &ec(0), outcome);
+        let (v, exit) = tick(&mut w);
+        limited(&w, &v, exit, code, want, &id);
+        // A Lead's request has none of them.
+        let (v, exit) = w.run();
+        assert_eq!(
+            (end(&v), exit, v["target"].clone()),
+            (("installed", ""), 0, json!(ENGINE)),
+            "{v}"
+        );
+    }
+}
+
+#[test]
+fn e_dead_engine_attempt_is_closed_by_a_read() {
+    let dead = |w: &mut W| {
+        let id = oid("install", "act-dead-ont");
+        w.installs.push(json!({"id": id, "target": etarget(), "kind": "forward", "repository": "o/engine",
+            "commit": ec(2), "attempt": 1, "from": ec(0), "from_sha256": sha(&engine_binary(&ec(0))),
+            "by": "dead", "status": "running", "started_at": STARTED, "running_in": etarget()}));
+        id
+    };
+    // At its commit: installed, and the call goes on to the pair.
+    let mut w = W::at_pin();
+    let id = dead(&mut w);
+    let (v, exit) = w.run();
+    assert_eq!((end(&v), exit), (("installed", ""), 0), "{v}");
+    assert_eq!(v["closed"], json!({"install": id, "outcome": "installed"}));
+    // At its from: not_started with dead_call; the call goes on and installs the engine.
+    let mut w = W::engine();
+    let id = dead(&mut w);
+    let (v, _) = w.run();
+    assert_eq!(
+        v["closed"],
+        json!({"install": id, "outcome": "not_started"})
+    );
+    let closed = w.installs.iter().find(|i| i["id"] == id).unwrap();
+    assert_eq!(closed["code"], "dead_call");
+    assert_eq!(
+        (v["target"].clone(), v["outcome"].clone()),
+        (json!(ENGINE), json!("installed"))
+    );
+    // At neither: the engine's rollback once; back at from the call goes on, else it ends failed.
+    for (back, want) in [(Some(ec(0)), "failed_restored"), (None, "failed")] {
+        let mut w = W::engine();
+        let id = dead(&mut w);
+        w.ont = "f".repeat(40);
+        w.ont_rollback = (back, 0);
+        let script = w.p("state/engine/scripts/install-ont.sh");
+        std::fs::create_dir_all(w.p("state/engine/scripts")).unwrap();
+        std::fs::write(&script, "#!/bin/sh\n").unwrap();
+        let (v, exit) = w.run();
+        let row = w.installs.iter().find(|i| i["id"] == id).unwrap();
+        assert_eq!(row["outcome"], want, "{v}");
+        if want == "failed" {
+            assert_eq!(
+                (end(&v), exit, v["target"].clone()),
+                (("failed", ""), 4, json!(ENGINE))
+            );
+            assert_eq!(w.launched(), ["ont-rollback"]);
+        } else {
+            assert_eq!(w.launched()[0], "ont-rollback");
+            assert_eq!(v["closed"], json!({"install": id, "outcome": want}));
+        }
+    }
+    // A clone without its installer cannot repair it: attempt_running.
+    let mut w = W::engine();
+    let id = dead(&mut w);
+    w.ont = "f".repeat(40);
+    let (v, exit) = w.run();
+    refused(&w, &v, exit, "attempt_running");
+    assert_eq!(v["detail"], json!({ "install": id }));
+}
+
+#[test]
+fn e_schema_higher_is_backed_up_then_installed_and_the_pair_follows() {
+    let mut w = W::at_pin();
+    w.tip_schema = 9;
+    let (v, exit) = w.run();
+    assert_eq!(
+        (end(&v), exit, v["target"].clone()),
+        (("installed", ""), 0, json!(TARGET)),
+        "{v}"
+    );
+    let backup = w.p("ont-state/ont/backup/ontology-20261117T000000Z.sqlite");
+    assert_eq!(
+        v["schema"],
+        json!({"from": 8, "to": 9, "backup": backup, "migrate": "none"})
+    );
+    assert_eq!(w.schema, 9);
+    let (b, i) = (w.at("backup").unwrap(), w.at("schema").unwrap());
+    assert!(
+        b < i && i < w.at("start_install").unwrap(),
+        "{:#?}",
+        w.calls
+    );
+    assert_eq!(w.marker_at_install, [None]);
+    assert_eq!(rows(&v), [row("ap", 0, None), row("content", 0, None)]);
+    // No `install` object stands for the schema.
+    assert_eq!(w.applies("start_install").len(), 1);
+}
+
+#[test]
+fn e_schema_equal_goes_on_and_lower_is_refused() {
+    let mut w = W::at_pin();
+    let (v, exit) = w.run();
+    assert_eq!(
+        (end(&v), exit, v["schema"].clone()),
+        (("installed", ""), 0, Value::Null)
+    );
+    assert!(w.at("backup").is_none() && w.at("schema").is_none());
+    let mut w = W::at_pin();
+    w.tip_schema = 7;
+    let (v, exit) = w.run();
+    refused(&w, &v, exit, "schema_differs");
+    assert_eq!(v["detail"], json!({"tip": 7, "installed": 8}));
+    assert!(w.at("backup").is_none());
+    // A higher version waits for the engine: the call that installs the engine ends there.
+    let mut w = W::engine();
+    w.tip_schema = 9;
+    let (v, _) = w.run();
+    assert_eq!((v["target"].clone(), w.schema), (json!(ENGINE), 8));
+    assert!(w.at("backup").is_none());
+}
+
+#[test]
+fn e_schema_install_failed_installs_nothing_else() {
+    let setups: [fn(&mut W); 3] = [
+        |w| w.schema_install_fails = true,
+        |w| w.schema_noop = true,
+        |w| w.backup_fails = true,
+    ];
+    for (n, setup) in setups.into_iter().enumerate() {
+        let mut w = W::at_pin();
+        w.tip_schema = 9;
+        setup(&mut w);
+        let (v, exit) = w.run();
+        assert_eq!(
+            (end(&v), exit),
+            (("failed", "schema_install_failed"), 4),
+            "{v}"
+        );
+        assert_eq!(v["outcome"], Value::Null);
+        assert!(w.launched().is_empty() && w.applies("start_install").is_empty());
+        assert_eq!(v["detail"]["from"], 8);
+        assert_eq!(w.at("schema").is_some(), n < 2, "{v}");
+    }
+}
+
+#[test]
+fn e_migrate_present_runs_after_the_install_and_clears_the_marker() {
+    let mut w = W::at_pin();
+    (w.tip_schema, w.migrate_mode) = (9, Some("100755"));
+    let (v, exit) = w.run();
+    assert_eq!((end(&v), exit), (("installed", ""), 0), "{v}");
+    assert_eq!(v["schema"]["migrate"], "ok");
+    // The marker is there before the install and while the migration runs; it is gone after.
+    let marker = Some(json!({"from": 8, "to": 9}).to_string());
+    assert_eq!(w.marker_at_install, std::slice::from_ref(&marker));
+    let store = w.p("ont-state/ont/ontology.sqlite");
+    assert_eq!(w.migrates, [(args(&[&store, "8", "9"]), marker)]);
+    assert_eq!(w.marker(), None);
+    assert_eq!(w.launched(), ["migrate", "ap", "content"]);
+    assert!(w.at("/ontology/migrate").unwrap() > w.at("schema").unwrap());
+    // A file that is not executable is no migration.
+    let mut w = W::at_pin();
+    (w.tip_schema, w.migrate_mode) = (9, Some("100644"));
+    let (v, _) = w.run();
+    assert_eq!(
+        (v["schema"]["migrate"].clone(), w.marker_at_install.clone()),
+        (json!("none"), vec![None])
+    );
+    assert!(w.migrates.is_empty());
+}
+
+#[test]
+fn e_migrate_failing_leaves_the_marker_and_the_next_call_retries_first() {
+    let mut w = W::at_pin();
+    (w.tip_schema, w.migrate_mode, w.migrate_exit) = (9, Some("100755"), 1);
+    let (v, exit) = w.run();
+    assert_eq!((end(&v), exit), (("failed", "migrate_failed"), 4), "{v}");
+    assert_eq!(v["detail"], json!({"from": 8, "to": 9, "store": 9}));
+    assert_eq!(v["schema"]["migrate"], "failed");
+    assert_eq!(rows(&v), [row("migrate", 1, Some("migrate_exit_1"))]);
+    assert_eq!(w.schema, 9, "the schema stays installed");
+    assert_eq!(w.marker(), Some(json!({"from": 8, "to": 9})));
+    assert!(w.applies("start_install").is_empty());
+    // The next call, with the engine moved on as well: the migration first, then the engine.
+    (w.calls, w.migrate_exit, w.pin) = (vec![], 0, ec(2));
+    w.ont = ec(0);
+    let (v, exit) = w.run();
+    assert_eq!(
+        (end(&v), exit, v["target"].clone()),
+        (("installed", ""), 0, json!(ENGINE)),
+        "{v}"
+    );
+    assert_eq!(w.launched(), ["migrate", "ont"]);
+    assert_eq!(w.marker(), None);
+    assert!(w.at("/ontology/migrate").unwrap() < w.at("start_install").unwrap());
+    // And the one after it installs the pair, with nothing owed.
+    w.calls.clear();
+    let (v, _) = w.run();
+    assert_eq!(
+        (v["target"].clone(), w.launched()),
+        (json!(TARGET), vec!["ap".to_owned(), "content".to_owned()])
+    );
+}
+
+#[test]
+fn e_marker_with_the_store_at_to_is_migrated_first() {
+    // A call killed between the schema install and the migration: the marker, the store at `to`.
+    let mut w = W::at_pin();
+    (w.schema, w.tip_schema, w.migrate_mode) = (9, 9, Some("100755"));
+    w.set_marker(8, 9);
+    let (v, exit) = w.run();
+    assert_eq!((end(&v), exit), (("installed", ""), 0), "{v}");
+    let store = w.p("ont-state/ont/ontology.sqlite");
+    assert_eq!(w.migrates[0].0, args(&[&store, "8", "9"]));
+    assert_eq!(w.launched(), ["migrate", "ap", "content"]);
+    assert_eq!(
+        v["schema"],
+        json!({"from": 8, "to": 9, "backup": null, "migrate": "ok"})
+    );
+    assert_eq!(w.marker(), None);
+    assert!(w.at("backup").is_none());
+}
+
+#[test]
+fn e_marker_with_the_store_at_from_is_removed_and_the_schema_step_runs() {
+    let mut w = W::at_pin();
+    (w.tip_schema, w.migrate_mode) = (9, Some("100755"));
+    w.set_marker(8, 9);
+    let (v, exit) = w.run();
+    assert_eq!((end(&v), exit), (("installed", ""), 0), "{v}");
+    // Written again before the install, by the schema step, then cleared by its migration.
+    assert_eq!(
+        w.marker_at_install,
+        [Some(json!({"from": 8, "to": 9}).to_string())]
+    );
+    assert_eq!(w.migrates.len(), 1);
+    assert_eq!(w.marker(), None);
+    // Without a migration at the tip the marker goes and none is written.
+    let mut w = W::at_pin();
+    w.tip_schema = 9;
+    w.set_marker(8, 9);
+    let (v, _) = w.run();
+    assert_eq!(
+        (v["outcome"].clone(), w.marker_at_install.clone()),
+        (json!("installed"), vec![None])
+    );
+    assert_eq!(w.marker(), None);
+}
+
+#[test]
+fn e_marker_that_cannot_be_acted_on_is_migrate_failed() {
+    // The tip holds no `ontology/migrate`; the store at a third version; a marker unreadable.
+    let cases: [(u64, Option<&'static str>, Value); 3] = [
+        (9, None, json!({"from": 8, "to": 9, "store": 9})),
+        (10, Some("100755"), json!({"from": 8, "to": 9, "store": 10})),
+        (
+            9,
+            Some("100755"),
+            json!({"from": null, "to": null, "store": 9}),
+        ),
+    ];
+    for (n, (store, mode, detail)) in cases.into_iter().enumerate() {
+        let mut w = W::at_pin();
+        (w.schema, w.tip_schema, w.migrate_mode) = (store, store, mode);
+        w.set_marker(8, 9);
+        if n == 2 {
+            std::fs::write(w.p("state/migrate.pending"), "{").unwrap();
+        }
+        let (v, exit) = w.run();
+        assert_eq!((end(&v), exit), (("failed", "migrate_failed"), 4), "{v}");
+        assert_eq!(v["detail"], detail);
+        assert!(w.launched().is_empty() && w.applies("start_install").is_empty());
+        assert!(w.marker_present());
+    }
+}
+
+#[test]
+fn e_marker_waits_for_the_refusals_before_an_effect() {
+    type Setup = fn(&mut W) -> Value;
+    let cases: [(&str, Setup); 4] = [
+        ("not_accepted", |w| {
+            w.chain[2].tree = tree(5);
+            w.request()
+        }),
+        ("suppressed", |w| {
+            w.closed("forward", &c(2), &c(0), "failed", "timer:1");
+            w.timer()
+        }),
+        ("disk_low", |w| {
+            w.free = 1;
+            w.request()
+        }),
+        ("build_busy", |w| {
+            w.build_busy = true;
+            w.request()
+        }),
+    ];
+    for (code, setup) in cases {
+        let mut w = W::at_pin();
+        (w.schema, w.tip_schema, w.migrate_mode) = (9, 9, Some("100755"));
+        w.set_marker(8, 9);
+        let r = setup(&mut w);
+        let (v, _) = w.run_with(&r);
+        assert_eq!(end(&v), ("refused", code), "{v}");
+        assert!(w.migrates.is_empty() && w.marker_present(), "{code}");
+    }
+}
+
+#[test]
+fn e_marker_with_the_pair_at_the_tip_is_acted_on_before_current() {
+    let mut w = W::at_pin();
+    (w.file, w.tree, w.bytes) = (Some(c(2)), Some(c(2)), binary(&c(2)));
+    (w.schema, w.tip_schema, w.migrate_mode) = (9, 9, Some("100755"));
+    w.set_marker(8, 9);
+    let (v, exit) = w.run();
+    assert_eq!((end(&v), exit), (("current", ""), 0), "{v}");
+    assert_eq!(
+        (w.launched(), w.marker()),
+        (vec!["migrate".to_owned()], None)
+    );
+    // A failing migration does not end current.
+    let mut w = W::at_pin();
+    (w.file, w.tree, w.bytes) = (Some(c(2)), Some(c(2)), binary(&c(2)));
+    (w.schema, w.tip_schema, w.migrate_mode, w.migrate_exit) = (9, 9, Some("100755"), 3);
+    w.set_marker(8, 9);
+    let (v, exit) = w.run();
+    assert_eq!((end(&v), exit), (("failed", "migrate_failed"), 4), "{v}");
+    // The timer's limits that are about T do not stop it; those that are not, and the room, do.
+    let mut w = W::at_pin();
+    (w.file, w.tree, w.bytes) = (Some(c(2)), Some(c(2)), binary(&c(2)));
+    (w.schema, w.tip_schema, w.migrate_mode) = (9, 9, Some("100755"));
+    w.closed("forward", &c(2), &c(0), "installed", "timer:1");
+    w.set_marker(8, 9);
+    let (v, _) = tick(&mut w);
+    assert_eq!(end(&v), ("current", ""), "{v}");
+    assert_eq!(w.migrates.len(), 1);
+    let mut w = W::at_pin();
+    (w.file, w.tree, w.bytes) = (Some(c(2)), Some(c(2)), binary(&c(2)));
+    (w.schema, w.tip_schema, w.migrate_mode, w.build_busy) = (9, 9, Some("100755"), true);
+    w.set_marker(8, 9);
+    let (v, _) = w.run();
+    assert_eq!(end(&v), ("refused", "build_busy"), "{v}");
+    assert!(w.migrates.is_empty());
+    // Without a marker the pair at T ends current at once, as without `engine`.
+    let mut w = W::at_pin();
+    (w.file, w.tree, w.bytes) = (Some(c(2)), Some(c(2)), binary(&c(2)));
+    let (v, _) = w.run();
+    assert_eq!(end(&v), ("current", ""));
+    assert!(!w.calls.iter().any(|(p, _, _)| p == "df"));
+}
+
+#[test]
+fn e_rollback_request_is_not_subject_to_the_marker() {
+    let mut w = W::at_pin();
+    let a = installed_by_a(&mut w);
+    let _ = a;
+    (w.schema, w.tip_schema, w.migrate_mode) = (9, 9, Some("100755"));
+    w.set_marker(8, 9);
+    let (v, exit) = rolls(&mut w);
+    assert_eq!((end(&v), exit), (("installed", ""), 0), "{v}");
+    assert!(w.migrates.is_empty() && w.marker_present());
+}
+
+#[test]
+fn e_without_engine_the_marker_is_not_read_and_the_record_is_unchanged() {
+    let mut w = W::new();
+    (w.schema, w.tip_schema, w.migrate_mode) = (8, 8, Some("100755"));
+    w.set_marker(7, 8);
+    let (v, exit) = w.run();
+    assert_eq!((end(&v), exit), (("installed", ""), 0), "{v}");
+    assert!(w.migrates.is_empty() && w.marker_present());
+    assert_eq!(members(&v), sorted());
+    // With `engine` the record has one more member, `schema`.
+    let mut w = W::at_pin();
+    let (v, _) = w.run();
+    let mut want = sorted();
+    want.push("schema".into());
+    want.sort();
+    assert_eq!(members(&v), want);
+    assert_eq!(w.last(), Some(v));
+}
+
+#[test]
+fn e_engine_member_is_checked() {
+    let w = W::engine();
+    let bad = [
+        json!({"repository": "o/engine"}),
+        json!({"repository": "o/engine", "url": EURL, "x": 1}),
+        json!({"repository": "o/r", "url": EURL}),
+        json!({"repository": "o/migrate.pending", "url": EURL}),
+        json!({"repository": "o/target", "url": EURL}),
+        json!({"repository": "o/engine", "url": "-x"}),
+        json!("o/engine"),
+    ];
+    for e in bad {
+        let mut r = w.request();
+        r["engine"] = e.clone();
+        let (v, exit) = execute(&mut W::new(), &r);
+        assert_eq!((end(&v), exit), (("refused", "invalid_input"), 2), "{e}");
+        assert_eq!(v["detail"], json!({"field": "engine"}), "{e}");
+    }
+    let mut r = w.request();
+    r["repository"] = json!("o/migrate.pending");
+    let (v, _) = execute(&mut W::new(), &r);
+    assert_eq!(v["detail"], json!({"field": "repository"}));
 }
