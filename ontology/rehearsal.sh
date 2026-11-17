@@ -1126,7 +1126,9 @@ apply('ready_unit', 'contract-again', dict(unit=contract, intent=gadget), 'unit_
 # An amendment returns the unit to draft; a page review counts only when it started after the last amendment.
 tick(); apply('amend_unit', 'contract-objective-empty', dict(unit=contract, objective=''), 'objective_empty')
 apply('amend_unit', 'contract-itself', dict(unit=contract, depends_on=[contract]), 'depends_on_itself')
-apply('amend_unit', 'contract-1', dict(unit=contract, invariants='The board keeps its order.'))
+# depends_on (an array of units) sorts before unit; the rule changes the unit named by unit, and only it.
+r = apply('amend_unit', 'contract-1', dict(unit=contract, invariants='The board keeps its order.', depends_on=[dep]))
+assert r['edits'] and all(e['id'] == contract for e in r['edits']) and fields(dep)['state'] == 'draft' and fields(contract)['depends_on'] == [dep], r
 f = fields(contract); assert f['state'] == 'draft' and f['amended_at'] == stamp() and f['invariants'] == 'The board keeps its order.' and f['objective'] == page['objective'], f
 apply('ready_unit', 'contract-page-older', dict(unit=contract, intent=gadget), 'page_not_reviewed')
 tick(); early = review('page-2', 'page', digest('page 2'), unit=contract, close=False)
