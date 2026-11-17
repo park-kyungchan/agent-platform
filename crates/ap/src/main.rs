@@ -6,7 +6,7 @@ use serde::Serialize;
 const HELP: &str = "Usage: ap <verb> [< request.json]\n";
 /// Every verb the dispatch below knows: the verb, its request form, the heading of the section of
 /// `crates/ap/README.md` that documents it. `ap --help` prints one line of this table per verb.
-const VERBS: [(&str, &str, &str); 10] = [
+const VERBS: [(&str, &str, &str); 11] = [
     ("version", "version | --version", "The older verbs"),
     ("run", "run < request.json", "One stage"),
     ("gate", "gate < request.json", "The gate"),
@@ -29,6 +29,11 @@ const VERBS: [(&str, &str, &str); 10] = [
         "The task's state",
     ),
     ("row", "row [--store <path>] < row.json", "One row"),
+    (
+        "request",
+        "request [--store <path>] [--text] < request.json",
+        "One request",
+    ),
 ];
 fn verb_line(verb: &str, form: &str, heading: &str) -> String {
     format!("  {verb}: ap {form} (README \"{heading}\")\n")
@@ -39,6 +44,7 @@ const UNIT_HELP: &str = "Usage: ap unit < request.json | ap unit [--compose-only
 const DELIVER_HELP: &str = "Usage: ap deliver < request.json\nInstalls the accepted tip of main (ap and content) and records the attempt in the store; one JSON record.\n";
 const BACKLOG_HELP: &str = "Usage: ap backlog <task key> [--text] [--store <path>]\nPrints the board of a task: its order, each item's refusal, the unplaced items and the untriaged rows; reads only.\n";
 const STATE_HELP: &str = "Usage: ap state <task directory> [--text]\nPrints the unit calls, stages, limits and streams of a task directory from its records and Git; reads only.\n";
+const REQUEST_HELP: &str = "Usage: ap request [--store <path>] [--text] < request.json\nRecords a message of the user as a request of the store with its words, routes it, or lists the current requests of a topic; one JSON answer.\n";
 const BUILD_REVISION: &str = match option_env!("AP_BUILD_REVISION") {
     Some(value) => value,
     None => "unknown",
@@ -137,6 +143,15 @@ fn main() -> ExitCode {
     }
     if args.first().is_some_and(|arg| arg == "row") {
         return ap::row::cli(&args[1..]);
+    }
+    if args.first().is_some_and(|arg| arg == "request") {
+        if args.len() == 2 && args[1] == "--help" {
+            return match io::stdout().lock().write_all(REQUEST_HELP.as_bytes()) {
+                Ok(()) => ExitCode::SUCCESS,
+                Err(_) => fail("io_error", "stdout", 4),
+            };
+        }
+        return ap::request::cli(&args[1..]);
     }
     if args.first().is_some_and(|arg| arg == "deliver") {
         if args.len() == 2 && args[1] == "--help" {
