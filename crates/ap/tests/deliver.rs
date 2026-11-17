@@ -3074,6 +3074,16 @@ impl W {
         (row["target"], row["repository"]) = (etarget(), json!("o/engine"));
         id
     }
+    /// Waits until the host lock is free before a further call: a child that another test of this
+    /// process started while this call's lock was inheritable may hold it a moment (as in
+    /// `d9_second_call_is_busy`). No new holder can appear once the call ended.
+    fn settle(&self) {
+        let free = Command::new("flock")
+            .args(["-w", "30", &self.lock, "true"])
+            .status()
+            .is_ok_and(|s| s.success());
+        assert!(free, "the host lock stayed held");
+    }
     fn marker_present(&self) -> bool {
         self.t.join("state/migrate.pending").exists()
     }
@@ -3230,6 +3240,7 @@ fn e_engine_at_the_pin_after_the_installer_is_installed_and_the_call_ends() {
     assert_eq!(launch.2, json!({"cwd": eclone, "env": env}));
     assert_eq!(w.lock_inherited, [true]);
     // The next call finds the engine at the pin and installs the pair.
+    w.settle();
     let (v, exit) = w.run();
     assert_eq!(
         (end(&v), exit, v["target"].clone()),
@@ -3434,6 +3445,7 @@ fn e_engine_limits_of_the_timer() {
         let (v, exit) = tick(&mut w);
         limited(&w, &v, exit, code, want, &id);
         // A Lead's request has none of them.
+        w.settle();
         let (v, exit) = w.run();
         assert_eq!(
             (end(&v), exit, v["target"].clone()),
@@ -3620,6 +3632,7 @@ fn e_migrate_failing_leaves_the_marker_and_the_next_call_retries_first() {
     // The next call, with the engine moved on as well: the migration first, then the engine.
     (w.calls, w.migrate_exit, w.pin) = (vec![], 0, ec(2));
     w.ont = ec(0);
+    w.settle();
     let (v, exit) = w.run();
     assert_eq!(
         (end(&v), exit, v["target"].clone()),
@@ -3631,6 +3644,7 @@ fn e_migrate_failing_leaves_the_marker_and_the_next_call_retries_first() {
     assert!(w.at("/ontology/migrate").unwrap() < w.at("start_install").unwrap());
     // And the one after it installs the pair, with nothing owed.
     w.calls.clear();
+    w.settle();
     let (v, _) = w.run();
     assert_eq!(
         (v["target"].clone(), w.launched()),
@@ -3859,6 +3873,7 @@ fn e_schema_with_an_unreadable_migrate_entry_installs_nothing() {
     assert!(w.launched().is_empty() && w.applies("start_install").is_empty());
     assert_eq!(w.marker(), None);
     w.ls_tree_fails = false;
+    w.settle();
     let (v, exit) = w.run();
     assert_eq!((end(&v), exit), (("installed", ""), 0), "{v}");
     assert_eq!((w.schema, v["schema"]["migrate"].clone()), (9, json!("ok")));
