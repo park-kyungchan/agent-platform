@@ -34,7 +34,7 @@ fn verb_line(verb: &str, form: &str, heading: &str) -> String {
     format!("  {verb}: ap {form} (README \"{heading}\")\n")
 }
 const RUN_HELP: &str = "Usage: ap run < request.json\nOne headless Claude Code stage in a transient scope of agents.slice; one record <out>.run.json.\n";
-const GATE_HELP: &str = "Usage: ap gate < request.json\nWaits on a pull request's head for its required checks and the automatic review; one JSON answer.\n";
+const GATE_HELP: &str = "Usage: ap gate < request.json\nWaits on a pull request's head for its required checks, and for an automatic review when the request names its reviewer; one JSON answer.\n";
 const UNIT_HELP: &str = "Usage: ap unit < request.json | ap unit [--compose-only] <page>\nOne unit of work once from its page to the merge; one record <out>.unit.json. With a page, the request and prompts are composed from it and units.json; --compose-only prints them only.\n";
 const DELIVER_HELP: &str = "Usage: ap deliver < request.json\nInstalls the accepted tip of main (ap and content) and records the attempt in the store; one JSON record.\n";
 const BACKLOG_HELP: &str = "Usage: ap backlog <task key> [--text] [--store <path>]\nPrints the board of a task: its order, each item's refusal, the unplaced items and the untriaged rows; reads only.\n";

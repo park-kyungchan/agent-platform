@@ -1,13 +1,12 @@
-//! The gate: waits on a pull request's head until its required checks and the automatic review are
-//! done, and prints one answer of what GitHub reported. It decides nothing a person decides: it
+//! The gate: waits on a pull request's head until its required checks are done, and the automatic
+//! review too when the request names its reviewer, and prints one answer of what GitHub reported.
+//! No reviewer is waited for unless named: the review of a unit is its own `verifier` stage. It decides nothing a person decides: it
 //! resolves no thread, posts no status, merges nothing and calls no store. Its only writes are the
 //! ready mark of a draft and the one toggle of draft and ready that asks for a review of the head.
 use crate::host::{Failure, System, args, error, fail, require, text};
 use serde_json::{Value, json};
 use std::{ffi::OsString, io::Read, io::Write, process::ExitCode, time::Duration};
 
-/// The login of the automatic reviewer whose summary comment carries the marker.
-const LOGIN: &str = "chatgpt-codex-connector[bot]";
 const LEAD_REVIEW: &str = "lead-review";
 const MARKER: &str = "codex-review-state:v1";
 const POLL: Duration = Duration::from_secs(30);
@@ -87,8 +86,7 @@ fn request(r: &Value) -> Result<Request, Failure> {
     };
     require!(head.as_ref().is_none_or(hex) => "invalid_input", "head");
     let login = match r.get("autoreview") {
-        None => Some(LOGIN.to_owned()),
-        Some(Value::Bool(false)) => None,
+        None | Some(Value::Bool(false)) => None,
         Some(Value::String(l)) if !l.is_empty() && l.len() <= 100 => Some(l.clone()),
         Some(_) => return Err(error("invalid_input", "autoreview")),
     };
