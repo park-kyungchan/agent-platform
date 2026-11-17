@@ -1186,7 +1186,7 @@ fn i4_a_failed_check_or_an_unresolved_thread_or_finding_stops_at_the_gate() {
         "body":format!("<!-- codex-review-state:v1 {state} -->")}),
     ];
     let mut r = u.request();
-    r["gate"] = json!({"autoreview_minutes":1});
+    r["gate"] = json!({"autoreview":"chatgpt-codex-connector[bot]","autoreview_minutes":1});
     u.stop(&r, "gate", "unresolved_findings");
     assert!(u.accept_calls().is_empty());
 }
@@ -1227,7 +1227,7 @@ fn finding_on_the_head() -> (U, Value, String) {
         "body":format!("<!-- codex-review-state:v1 {state} -->")}),
     ];
     let mut r = u.request();
-    r["gate"] = json!({"autoreview_minutes":1});
+    r["gate"] = json!({"autoreview":"chatgpt-codex-connector[bot]","autoreview_minutes":1});
     (u, r, head)
 }
 
@@ -3975,7 +3975,10 @@ fn given(id: &str, line: u64) -> Value {
 /// at its bound on the fake clock.
 fn r5_request(u: &U) -> Value {
     let mut r = u.request();
-    (r["gate"], r["judge_threads"]) = (json!({"autoreview_minutes":1}), json!(true));
+    (r["gate"], r["judge_threads"]) = (
+        json!({"autoreview":"chatgpt-codex-connector[bot]","autoreview_minutes":1}),
+        json!(true),
+    );
     r
 }
 /// The verifier accepts the head; `lines` (with `\\n` between them) follow.
@@ -4292,7 +4295,10 @@ fn r5_the_round_judges_the_threads_of_the_new_head() {
     );
     u.threads = vec![given("T1", 1)];
     let mut r = r4_request(&u);
-    (r["gate"], r["judge_threads"]) = (json!({"autoreview_minutes":1}), json!(true));
+    (r["gate"], r["judge_threads"]) = (
+        json!({"autoreview":"chatgpt-codex-connector[bot]","autoreview_minutes":1}),
+        json!(true),
+    );
     let (v, code) = u.run(&r).unwrap();
     assert_eq!((v["state"].as_str(), code), (Some("merged"), 0), "{v}");
     assert_eq!(v, u.record("u1-2"));
@@ -4548,7 +4554,10 @@ fn r5_no_cause_of_the_threads_starts_a_round() {
         accepting(&u, lines);
         u.thread_change_on_close = change;
         let mut r = r4_request(&u);
-        (r["gate"], r["judge_threads"]) = (json!({"autoreview_minutes":1}), json!(true));
+        (r["gate"], r["judge_threads"]) = (
+            json!({"autoreview":"chatgpt-codex-connector[bot]","autoreview_minutes":1}),
+            json!(true),
+        );
         let v = u.stop(&r, step, cause);
         assert_eq!(u.launches, 2, "no fixer stage: {cause}");
         let keys: Vec<_> = v["repair"].as_object().unwrap().keys().collect();

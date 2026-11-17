@@ -172,7 +172,8 @@ fn green(comments: Vec<Value>) -> Value {
     )
 }
 fn gate(gh: &mut Gh, extra: Value) -> (Value, u8) {
-    let mut r = json!({"repository":"o/r","pull_request":7,"head":H});
+    let mut r = json!({"repository":"o/r","pull_request":7,"head":H,
+        "autoreview":"chatgpt-codex-connector[bot]"});
     for (k, v) in extra.as_object().unwrap() {
         r[k] = v.clone();
     }
@@ -833,4 +834,23 @@ fn lead_review_does_not_stand_for_a_required_check() {
         (Some("check_timeout"), 11),
         "{v}"
     );
+}
+
+/// The default since 2026-11-17: a request that names no reviewer waits for none. The passed check
+/// ends the gate at once, with no toggle and no read of a marker, even where a reviewer comments.
+#[test]
+fn no_reviewer_named_waits_for_none() {
+    let r = json!({"repository":"o/r","pull_request":7,"head":H});
+    let mut gh = Gh::new(vec![green(vec![bot(
+        "0000000000000000000000000000000000000000",
+        "running",
+    )])]);
+    let (v, code) = execute(&mut gh, &r).unwrap();
+    assert_eq!((v["end"].as_str(), code), (Some("passed"), 0), "{v}");
+    assert_eq!(
+        v["autoreview"],
+        json!({"login":null,"state":"off","commit":null,"has_unresolved_findings":null,
+        "toggled":false,"threads_on_head":null})
+    );
+    assert!(gh.readies().is_empty() && gh.clock.is_zero());
 }
