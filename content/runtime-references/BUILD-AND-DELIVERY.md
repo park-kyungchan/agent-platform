@@ -19,7 +19,10 @@ Each stage is a separate fact with its own evidence. A later stage does not show
 
 ## 2. Building on the host
 
-One Cargo build or test runs on the host at a time. Every Cargo command of every task takes the same lock:
+One Cargo build or test runs on the host at a time, under the lock `/var/lib/agent-platform/build.lock`.
+
+- In `agent-platform`, `ontology-platform` and `education-platform` the one check is `./check` at the worktree's root; the CI job `rust` runs the same script. Run it bare from the worktree: it takes the lock itself, sets the build limits and stops under 10,240 MiB free (`disk_floor@check`). Wrapped in `flock` it waits on its own lock and never runs. It builds into the worktree's `target/` unless `CARGO_TARGET_DIR` is set. In `agent-platform`, `./check content` runs only the steps that need no Rust build.
+- Every other Cargo command takes the lock like this:
 
 ```sh
 flock /var/lib/agent-platform/build.lock env \
@@ -31,16 +34,16 @@ flock /var/lib/agent-platform/build.lock env \
 | If | Then |
 | --- | --- |
 | The packet or STATE names a target root | Use exactly that `CARGO_TARGET_DIR`. A target root belongs to one repository; it is outside the worktree and is never a main checkout's `target` |
-| No target root is named | Stop and ask the Lead. A new target root costs gigabytes |
+| No target root is named, for a Cargo command other than `./check` | Stop and ask the Lead. A new target root costs gigabytes |
 | You hold the lock | Read free space (`df -BM --output=avail /`) before the build and stop under the floor the task's STATE states |
 | Another build holds the lock | Wait. Never delete the lock file, a target root or a Cargo cache to get past it |
-| You run `scripts/install-ap.sh` or `scripts/install-ont.sh` | Do not wrap it in `flock`: the script takes the lock itself |
+| You run `./check`, `scripts/install-ap.sh` or `scripts/install-ont.sh` | Do not wrap it in `flock`: the script takes the lock itself |
 | A test needs a private directory | Use the root the packet names |
 | A workspace test run left a synthetic root behind | Remove it when the part is accepted, after checking that no process has a file open in it |
 
 - Each repository pins its toolchain in `rust-toolchain.toml`; do not install or select another one.
 - Run the checks the packet names; without such a line, the checks your change affects. A check the packet leaves to CI is read on the pushed head, not rerun on the host.
-- Before a push run what CI runs first and fails on most often: `cargo fmt --all -- --check` and `cargo clippy --workspace --all-targets --locked -- -D warnings`.
+- Before a push run `./check`. In a repository without one, run what CI fails on most often first: `cargo fmt --all -- --check` and `cargo clippy --workspace --all-targets --locked -- -D warnings`.
 
 ## 3. What CI runs
 
@@ -48,10 +51,9 @@ Every platform repository has one workflow, `.github/workflows/rust.yml`, with o
 
 | Repository | Steps of the job `rust` |
 | --- | --- |
-| All | `cargo fmt --all -- --check`; `cargo clippy --workspace --all-targets --locked -- -D warnings`; `cargo test --workspace --locked`. A change that touches only documentation skips the Rust steps inside the job, and the job still reports |
-| `agent-platform` | Also `python3 -I -B ci/check-content.py` (always), `bash scripts/test-install-ap.sh` and the memory record checks |
-| `ontology-platform` | Also the test of its install script |
-| `education-platform` | Also the offline teacher harness and `cargo build --workspace --bins --examples --locked`. The job does not run on a draft pull request: it runs when the pull request is made ready |
+| `agent-platform`, `ontology-platform`, `education-platform` | `./check`, the same script an agent runs before a push: `cargo fmt`, `cargo clippy -D warnings`, `cargo test` and the repository's own steps (`agent-platform`: the content check, the memory record checks, the suite tests; `ontology-platform`: the test of its install script; `education-platform`: the offline teacher harness and the build of its binaries). In `education-platform` the job does not run on a draft pull request: it runs when the pull request is made ready |
+| `agent-vps-operations`, `education-dc-gang-a` | `cargo fmt --all -- --check`; `cargo clippy --workspace --all-targets --locked -- -D warnings`; `cargo test --workspace --locked` |
+| All | A change that touches only documentation skips the Rust steps inside the job (`agent-platform` runs `./check content`), and the job still reports |
 
 - CI minutes are limited per month. Push when a packet is complete, not after every commit.
 - A workflow file, a required check and a ruleset are shared files with one integrator (`CONCURRENT-WORK.md` section 1). Do not change one to get a change through.

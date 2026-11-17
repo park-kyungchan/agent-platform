@@ -5,6 +5,7 @@ Each test copies what the check reads into a scratch directory, changes one file
 Run: python3 -I -B -m unittest discover -s ci -p 'test_check_content.py'
 """
 import hashlib
+import os
 import shutil
 import subprocess
 import sys
@@ -22,12 +23,13 @@ READ_BY_THE_CHECK = (
 TARGET = "runtime-references/NAMING.md"
 
 
-def run_check(root):
-    done = subprocess.run([sys.executable, "-I", "-B", str(root / "ci/check-content.py")], capture_output=True, text=True, timeout=120)
+def run_check(root, corpus=None):
+    env = dict(os.environ, CONTENT_CHECK_CORPUS=str(corpus or (root / "no-corpus")))
+    done = subprocess.run([sys.executable, "-I", "-B", str(root / "ci/check-content.py")], capture_output=True, text=True, timeout=120, env=env)
     return done.returncode, done.stdout
 
 
-class CheckContent(unittest.TestCase):
+class Scratch:
     def fixture(self):
         scratch = Path(tempfile.mkdtemp(prefix="check-content-test."))
         self.addCleanup(shutil.rmtree, scratch, True)
@@ -52,6 +54,8 @@ class CheckContent(unittest.TestCase):
         sums.write_text("".join(f"{digest}  {TARGET}\n" if l.endswith("  " + TARGET) else l + "\n" for l in sums.read_text().splitlines()))
         return text.count("\n") + 1
 
+
+class CheckContent(Scratch, unittest.TestCase):
     def test_the_repository_passes(self):
         code, out = run_check(REPO)
         self.assertEqual((code, out.splitlines()[-1].endswith(" 0 errors")), (0, True), out)
@@ -84,6 +88,98 @@ class CheckContent(unittest.TestCase):
         self.assertEqual(code, 1, out)
         self.assertIn(f'unknown_readme_section@content/{TARGET}:{line}: "Gone"', out)
 
+
+class PathsAndDesignRoutes(Scratch, unittest.TestCase):
+    """An elided path, a path into a main checkout's files, and the line ranges of OFFICIAL-DOCS.md section 4."""
+
+    ROUTES = "runtime-references/OFFICIAL-DOCS.md"
+
+    def add_route(self, root, row):
+        path = root / "content" / self.ROUTES
+        head = path.read_text(encoding="utf-8").split("\n## 4. ", 1)[0]
+        path.write_text(head + "\n## 4. Local copies of the design sources\n\n| Question | Start | Also |\n| --- | --- | --- |\n" + row + "\n", encoding="utf-8")
+        sums = root / "content/SHA256SUMS"
+        digest = hashlib.sha256(path.read_bytes()).hexdigest()
+        sums.write_text("".join(f"{digest}  {self.ROUTES}\n" if l.endswith("  " + self.ROUTES) else l + "\n" for l in sums.read_text().splitlines()))
+
+    def corpus(self, root):
+        corpus = root / "corpus"
+        (corpus / "docs/area").mkdir(parents=True)
+        (corpus / "docs/area/one.md").write_text("".join(f"line {n}\n" for n in range(1, 10)), encoding="utf-8")
+        return corpus
+
+    def test_an_elided_path_fails(self):
+        root = self.fixture()
+        line = self.append(root, "Read `/home/palantirkc/work/ws-example/\u2026/REPORT.md` first.")
+        code, out = run_check(root)
+        self.assertEqual(code, 1, out)
+        self.assertIn(f"elided_path@content/{TARGET}:{line}", out)
+
+    def test_a_path_into_a_main_checkout_fails_and_a_pattern_passes(self):
+        root = self.fixture()
+        line = self.append(root, "Read `/home/palantirkc/platforms/agent-platform/crates/ap/src/run.rs`.")
+        self.append(root, "Read `git -C /home/palantirkc/platforms/<repo> show origin/main:<path>`.")
+        code, out = run_check(root)
+        self.assertEqual(code, 1, out)
+        self.assertIn(f"main_checkout_path@content/{TARGET}:{line}", out)
+        self.assertEqual(out.count("main_checkout_path@"), 1, out)
+
+    def test_a_corpus_file_name_is_no_model_name(self):
+        root = self.fixture()
+        self.append(root, "Cite `docs/area/10-anthropic-claude-fable-and-mythos-5-2.md:1-9`.")
+        code, out = run_check(root)
+        self.assertEqual(code, 0, out)
+
+    def test_design_routes_inside_their_file_pass(self):
+        root = self.fixture()
+        self.add_route(root, "| A question | `docs/area/one.md:2-5` | `:7`; `:1-9` |")
+        code, out = run_check(root, self.corpus(root))
+        self.assertEqual(code, 0, out)
+        self.assertIn("design routes:", out)
+
+    def test_a_design_route_past_its_file_or_to_no_file_fails(self):
+        root = self.fixture()
+        self.add_route(root, "| A question | `docs/area/one.md:2-50` | `docs/area/none.md:1-2` |")
+        code, out = run_check(root, self.corpus(root))
+        self.assertEqual(code, 1, out)
+        self.assertIn("design_route_out_of_range@content/runtime-references/OFFICIAL-DOCS.md: docs/area/one.md:2-50", out)
+        self.assertIn("design_route_missing_file@content/runtime-references/OFFICIAL-DOCS.md: docs/area/none.md", out)
+
+    def test_without_the_corpus_the_routes_are_not_read(self):
+        root = self.fixture()
+        self.add_route(root, "| A question | `docs/area/one.md:2-50` | — |")
+        code, out = run_check(root)
+        self.assertEqual(code, 0, out)
+        self.assertNotIn("design routes:", out)
+
+    def test_bare_ranges_and_several_ranges_in_a_cell_are_checked(self):
+        root = self.fixture()
+        self.add_route(root, "| A question | `docs/area/one.md:2-5, :7, :8-99` | `:12`; `:1-9` |")
+        code, out = run_check(root, self.corpus(root))
+        self.assertEqual(code, 1, out)
+        self.assertIn("design_route_out_of_range@content/runtime-references/OFFICIAL-DOCS.md: docs/area/one.md:8-99", out)
+        self.assertIn("design_route_out_of_range@content/runtime-references/OFFICIAL-DOCS.md: docs/area/one.md:12-12", out)
+        self.assertEqual(out.count("design_route_out_of_range@"), 2, out)
+        self.assertIn("design routes: 5 line ranges checked", out)
+
+    def test_a_range_with_no_path_before_it_fails(self):
+        root = self.fixture()
+        self.add_route(root, "| A question | `:3-4` | `docs/area/one.md:1-2` |")
+        code, out = run_check(root, self.corpus(root))
+        self.assertEqual(code, 1, out)
+        self.assertIn("design_route_missing_file@content/runtime-references/OFFICIAL-DOCS.md: :3-4 (a range with no path before it)", out)
+
+
+    def test_a_missing_route_section_fails_where_the_corpus_is(self):
+        root = self.fixture()
+        path = root / "content" / self.ROUTES
+        path.write_text(path.read_text(encoding="utf-8").replace("\n## 4. ", "\n## 9. "), encoding="utf-8")
+        sums = root / "content/SHA256SUMS"
+        digest = hashlib.sha256(path.read_bytes()).hexdigest()
+        sums.write_text("".join(f"{digest}  {self.ROUTES}\n" if l.endswith("  " + self.ROUTES) else l + "\n" for l in sums.read_text().splitlines()))
+        code, out = run_check(root, self.corpus(root))
+        self.assertEqual(code, 1, out)
+        self.assertIn("design_routes_section_missing@content/runtime-references/OFFICIAL-DOCS.md", out)
 
 if __name__ == "__main__":
     unittest.main()
