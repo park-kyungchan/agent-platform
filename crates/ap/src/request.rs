@@ -1,9 +1,9 @@
 //! `ap request`: one message of the user recorded as a `request` of the store with its words, routed,
 //! and the current requests of a topic listed (README "One request", `specs/ap/request.md`).
-use crate::host::{Failure, Host, LIMIT, System, error, fail, id};
-use crate::store::{self, Actor, Applied, Found, REFUSED};
+use crate::host::{Failure, Host, System, error, fail, id};
+use crate::store::{self, Actor, Applied, Found, at, bad, only, shaped, sized};
 use serde_json::{Value, json};
-use std::{ffi::OsString, io::Read, io::Write, process::ExitCode};
+use std::{ffi::OsString, io::Write, process::ExitCode};
 
 /// A refusal of the call: `after` is `record` once this call recorded the request, `request` its key.
 pub struct Refusal {
@@ -27,29 +27,6 @@ const KINDS: [&str; 7] = [
 const MAX_WORDS: usize = 24_000;
 const MAX_JSON: usize = 48_000;
 const CUT: usize = 4_000;
-fn bad(f: &str) -> Failure {
-    error("invalid_input", f)
-}
-fn only(v: &Value, allowed: &str, at: &str) -> Result<(), Failure> {
-    let obj = v.as_object().ok_or_else(|| bad(at.trim_end_matches('.')))?;
-    let other = obj.keys().find(|k| !allowed.split(' ').any(|a| a == *k));
-    other.map_or(Ok(()), |k| Err(bad(&format!("{at}{k}"))))
-}
-/// A string of 1 to `max` bytes of ASCII letters, digits and the bytes of `extra`.
-fn shaped<'a>(r: &'a Value, k: &str, max: usize, extra: &str) -> Result<&'a str, Failure> {
-    let ok = |c: u8| c.is_ascii_alphanumeric() || extra.as_bytes().contains(&c);
-    r[k].as_str()
-        .filter(|v| (1..=max).contains(&v.len()) && v.bytes().all(ok))
-        .ok_or_else(|| bad(k))
-}
-/// A string of 1 to `max` bytes; one too long says its size.
-fn sized<'a>(v: &'a Value, f: &str, max: usize) -> Result<&'a str, Failure> {
-    let t = v.as_str().filter(|t| !t.is_empty()).ok_or_else(|| bad(f))?;
-    let detail = json!({"bytes": t.len(), "limit": max});
-    (t.len() <= max)
-        .then_some(t)
-        .ok_or_else(|| fail("invalid_input", f, detail))
-}
 /// `YYYY-MM-DDTHH:MM:SS`, with a final `Z` when `z`.
 fn utc(t: &str, z: bool) -> bool {
     let form = &"dddd-dd-ddTdd:dd:ddZ"[..19 + z as usize];
@@ -61,15 +38,6 @@ fn utc(t: &str, z: bool) -> bool {
                 f == c
             }
         })
-}
-/// The failure of a step, named by the step when it came from the store.
-fn at<T>(r: Result<T, Failure>, step: &str) -> Result<T, Failure> {
-    r.map_err(|mut f| {
-        if f.code == REFUSED || f.code.starts_with("store_answer") {
-            f.field = step.into();
-        }
-        f
-    })
 }
 struct Words {
     text: String,
@@ -461,21 +429,13 @@ fn run(
     }
 }
 fn refusal(f: Failure, done: Option<String>) -> Refusal {
-    let store = f.code == REFUSED;
-    let first = f.detail["failed"][0]
-        .as_str()
-        .filter(|_| f.detail["code"] == "submission_criteria");
-    let code = if store {
-        first.or(f.detail["code"].as_str()).unwrap_or(REFUSED)
-    } else {
-        f.code
-    };
-    let after = done.as_ref().map(|_| match code {
+    let code = store::code(&f);
+    let after = done.as_ref().map(|_| match code.as_str() {
         "route_unknown" => "supersede",
         _ => "record",
     });
     Refusal {
-        code: code.into(),
+        code,
         field: f.field,
         detail: f.detail,
         after,
@@ -487,33 +447,8 @@ pub fn execute(s: &mut impl System, store: Option<&str>, r: &Value) -> Result<Va
     let mut done = None;
     run(s, store, r, &mut done).map_err(|f| refusal(f, done))
 }
-/// `--store <path>` and `--text`, each at most once, and the request of stdin.
-fn input(argv: &[OsString]) -> Result<(Option<String>, bool, Value), Failure> {
-    let (mut store, mut text) = (None, false);
-    let mut args = argv.iter().map(|a| a.to_str());
-    while let Some(arg) = args.next() {
-        match (arg, &store) {
-            (Some("--text"), _) if !text => text = true,
-            (Some("--store"), None) => match args.next() {
-                Some(Some(p)) if p.starts_with('/') => store = Some(p.to_owned()),
-                _ => return Err(error("usage", "args")),
-            },
-            _ => return Err(error("usage", "args")),
-        }
-    }
-    let mut bytes = vec![];
-    let read = std::io::stdin().take(LIMIT + 1).read_to_end(&mut bytes);
-    if read.is_err() || bytes.len() as u64 > LIMIT {
-        return Err(error("input_too_large", "stdin"));
-    }
-    let r: Value = serde_json::from_slice(&bytes).map_err(|_| bad("stdin"))?;
-    if text && r["op"] != "list" {
-        return Err(error("usage", "args"));
-    }
-    Ok((store, text, r))
-}
 pub fn cli(argv: &[OsString]) -> ExitCode {
-    let called = input(argv).map_err(|f| refusal(f, None));
+    let called = store::input(argv, "list").map_err(|f| refusal(f, None));
     let result = called.and_then(|(store, text, r)| {
         let v = execute(&mut Host, store.as_deref(), &r)?;
         Ok(if text {
