@@ -1,0 +1,9 @@
+[Unit]
+Description=Hourly backup of the Ontology store
+
+[Timer]
+OnCalendar=hourly
+Persistent=true
+
+[Install]
+WantedBy=timers.target

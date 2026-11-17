@@ -17,6 +17,7 @@ python3 -I -B ci/check-memory-records.py
 python3 -I -B scripts/evaluate-memory.py --check-corpus memory/evaluation/questions.json
 python3 -I -B -m unittest discover -s ci -p 'test_*memory*.py'
 bash scripts/test-install-content.sh
+bash scripts/test-backup-store.sh
 python3 -I -B -m unittest discover -s ci -p 'test_readout*.py'
 python3 -I -B -m unittest discover -s ci -p 'test_evaluate_case.py'
 python3 -I -B -m unittest discover -s ci -p 'test_lead_suite.py'

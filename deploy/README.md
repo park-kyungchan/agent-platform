@@ -114,3 +114,47 @@ rm -f /etc/agent-platform/deliver.json
 ```
 
 The state directory `/var/lib/agent-platform/deliver` (the clone, the build directory, `last.json`) stays; remove it by hand when no call will run again.
+
+## The store's backup
+
+`scripts/backup-store.sh` backs up the Ontology store with `ont backup` (a verified copy under the store's `backup/` directory; the engine keeps the newest three) and copies each new backup to an `rclone` remote. `ont-backup.timer` starts `ont-backup.service` every hour (`Persistent=true`: a run missed while the host was off happens at the next boot). The service is a `Type=oneshot` in `agents.slice` that runs the installed script; `SuccessExitStatus` is not set, so a failed remote copy shows as a failed unit.
+
+Install, from a clean checkout of the merged commit, as root:
+
+```sh
+install -d -m 0755 /usr/local/lib/agent-platform
+install -m 0755 scripts/backup-store.sh /usr/local/lib/agent-platform/backup-store.sh
+install -m 0644 deploy/ont-backup.service deploy/ont-backup.timer /etc/systemd/system/
+systemctl daemon-reload
+systemctl enable --now ont-backup.timer
+```
+
+The settings are the JSON file `/etc/agent-platform/backup.json` (another path: the variable `AP_BACKUP_CONFIG`). A missing file means the defaults and no remote; an invalid file ends the run with exit 2 before anything is done. Members, all optional:
+
+| Member | Meaning | Default |
+| --- | --- | --- |
+| `store` | the store's file (an absolute path) | `/var/lib/ontology-platform/ont/ontology.sqlite` |
+| `state` | a directory (absolute) for the lock and `last.json` | `/var/lib/agent-platform/backup` |
+| `remote` | an `rclone` path `name:dir/sub` (letters, digits, `_`, `.`, `-`, `/`; no `..`); absent or `""` means no remote. The `rclone` configuration of root names `name` | none |
+| `keep` | how many files stay on the remote, 1 to 60 | 14 |
+
+Each run writes `<state>/last.json` (`at`, `store`, `backup`, `sha256`, `bytes`, `retention_failure`, `remote`, `remote_name`, `deleted`, `code`) by a rename and prints one line `backup: <code or ok> <backup path or ->`. The exit is 0 (backup made, remote `copied`, `unchanged` or `none`; also `backup: busy` when a run holds the lock), 3 (backup made, a remote step failed: `code` is `remote_copy_failed`, `remote_list_failed` or `remote_prune_failed`; the local backup stays) or 4 (`backup_failed`: nothing is copied or deleted). A backup whose digest equals the one the previous run copied is not copied again (`remote: unchanged`). The script deletes from the remote only names it wrote (`<YYYYMMDDTHHMMSSZ>-<12 hex of the digest>.sqlite`), oldest first, beyond `keep`; `rclone`'s own output is discarded, so a journal line never holds credentials. Read the state:
+
+```sh
+systemctl list-timers ont-backup.timer
+systemctl is-failed ont-backup.service       # failed: the last run exited 3 or 4
+python3 -m json.tool /var/lib/agent-platform/backup/last.json
+```
+
+There is no restore command: a copy of a remote file is read with `ont --store <copy> describe` (the engine admits one uid, so run it as root on a scratch copy).
+
+Undo: disable the timer, wait until a run that is going on has ended, remove the three files.
+
+```sh
+systemctl disable --now ont-backup.timer
+systemctl is-active ont-backup.service       # until it answers inactive or failed, not activating
+rm -f /etc/systemd/system/ont-backup.service /etc/systemd/system/ont-backup.timer /usr/local/lib/agent-platform/backup-store.sh
+systemctl daemon-reload
+```
+
+`/etc/agent-platform/backup.json`, the state directory and the files already on the remote stay; remove them by hand when no run will happen again.
