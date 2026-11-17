@@ -17,8 +17,13 @@ use std::{
     time::SystemTime,
 };
 
-const MEMBERS: &str = "repository url state build_lock build_wait_seconds by reason past rollback";
+const MEMBERS: &str =
+    "repository url state build_lock build_wait_seconds by reason past rollback engine";
 const TARGET: &str = "/usr/local/bin/ap";
+const ENGINE: &str = "/usr/local/bin/ont";
+const MARKER: &str = "migrate.pending";
+const SCHEMA: &str = "ontology/work.schema.json";
+const MAIN: &str = "+refs/heads/main:refs/remotes/origin/main";
 const CLIENT: [&str; 4] = ["action", "apply", "--client", "ap-deliver"];
 const FREE_MIB: u64 = 10_240;
 
@@ -46,6 +51,9 @@ struct Call<'a> {
     lock: Option<File>,
     /// `content/SHA256SUMS` of each commit read so far: a commit's file never changes.
     sums: RefCell<HashMap<String, String>>,
+    /// With `engine`: its clone, and the engine installer's two directories (README "The engine
+    /// and the schema").
+    engine: Option<(String, String, String)>,
 }
 /// What one installer did: its exit (128 plus the signal for a signal), its code, and for the
 /// content installer the tarball it printed.
@@ -74,12 +82,24 @@ fn check(r: &Value) -> Result<(), String> {
             && p.bytes()
                 .all(|c| c.is_ascii_alphanumeric() || b"._-".contains(&c))
     };
-    let name = text("repository", 200).and_then(|v| v.split_once('/'));
-    let named = name.is_some_and(|(o, n)| {
-        part(o) && part(n) && ![".", "..", "target", "last.json"].contains(&n)
+    fn named_by(v: &Value, part: impl Fn(&str) -> bool) -> Option<(&str, &str)> {
+        let name = v.as_str().filter(|v| !v.is_empty() && v.len() <= 200);
+        name.and_then(|v| v.split_once('/'))
+            .filter(|(o, n)| part(o) && part(n) && ![".", "..", "target", "last.json"].contains(n))
+    }
+    let url_of = |v: &Value| {
+        let u = v.as_str().filter(|v| !v.is_empty() && v.len() <= 4096);
+        u.is_some_and(|u| !u.starts_with('-') && !u.chars().any(char::is_control))
+    };
+    let named = named_by(&r["repository"], part).is_some();
+    let url = url_of(&r["url"]);
+    // The engine's clone lies beside the repository's and the marker in `<state>`.
+    let own = named_by(&r["repository"], part).map_or("", |(_, n)| n);
+    let engine = r.get("engine").is_none_or(|e| {
+        let members = e.as_object().is_some_and(|o| o.len() == 2);
+        let name = named_by(&e["repository"], part).map(|(_, n)| n);
+        members && url_of(&e["url"]) && name.is_some_and(|n| n != own && n != MARKER)
     });
-    let url =
-        text("url", 4096).is_some_and(|u| !u.starts_with('-') && !u.chars().any(char::is_control));
     // Three forms: a Lead's install, a Lead's rollback (no `past`), the timer's (none of the four).
     let lead = ["by", "reason", "past", "rollback"]
         .iter()
@@ -106,6 +126,8 @@ fn check(r: &Value) -> Result<(), String> {
                     })
             }),
         ),
+        ("repository", r.get("engine").is_none() || own != MARKER),
+        ("engine", engine),
     ];
     match checks.iter().find(|(_, ok)| !ok) {
         Some((k, _)) => Err((*k).to_owned()),
@@ -148,7 +170,10 @@ fn run(s: &mut impl System, program: &str, argv: Vec<String>, ms: u64) -> Option
 }
 /// `git -C <clone>`; a fetch may take ten minutes, anything else one.
 fn git(s: &mut impl System, c: &Call, words: &[&str]) -> Option<String> {
-    let mut argv = args(&["-C", &c.clone]);
+    git_at(s, &c.clone, words)
+}
+fn git_at(s: &mut impl System, clone: &str, words: &[&str]) -> Option<String> {
+    let mut argv = args(&["-C", clone]);
     argv.extend(args(words));
     let ms = if words[0] == "fetch" { 600_000 } else { 60_000 };
     run(s, "git", argv, ms)
@@ -531,19 +556,33 @@ fn repair(s: &mut impl System, c: &mut Call, a: &Value, request: &str) -> bool {
     }
     ends
 }
+/// The chain of a clone: its first-parent commits after `from` up to `tip`, the commits of `past`
+/// stepped over, the refusal's code.
+struct Chain<'a> {
+    clone: &'a str,
+    repository: &'a str,
+    past: Vec<&'a str>,
+    code: &'static str,
+}
 /// Step 6: the head of the tip, its accepting review, and the accepting reviews oldest first.
 fn accepted(
     s: &mut impl System,
     c: &Call,
+    w: &Chain,
     from: &str,
     tip: &str,
 ) -> Step<(String, Value, Vec<Value>)> {
-    let past = strs(&c.r["past"]);
+    let (past, repository) = (&w.past, w.repository);
     let range = format!("{from}..{tip}");
-    let lines = git(s, c, &["rev-list", "--first-parent", "--parents", &range]).unwrap_or_default();
+    let lines = git_at(
+        s,
+        w.clone,
+        &["rev-list", "--first-parent", "--parents", &range],
+    );
+    let lines = lines.unwrap_or_default();
     let mut chain: Vec<Vec<&str>> = lines.lines().map(|l| l.split(' ').collect()).collect();
     chain.reverse();
-    let no = |commit: &str, why: &str| No("not_accepted", json!({"commit": commit, "why": why}));
+    let no = |commit: &str, why: &str| No(w.code, json!({"commit": commit, "why": why}));
     if chain.first().and_then(|l| l.get(1)) != Some(&from)
         || chain.last().map(|l| l[0]) != Some(tip)
     {
@@ -552,7 +591,6 @@ fn accepted(
     if let Some(p) = past.iter().find(|p| !chain.iter().any(|l| l[0] == **p)) {
         return Err(No("past_not_on_chain", json!({ "commit": p })));
     }
-    let repository = c.r["repository"].as_str().unwrap_or_default();
     let (mut reviews, mut last) = (vec![], (String::new(), Value::Null));
     for l in &chain {
         let commit = l[0];
@@ -563,7 +601,7 @@ fn accepted(
             return Err(no(commit, "not_a_merge"));
         }
         let trees = [format!("{commit}^{{tree}}"), format!("{commit}^2^{{tree}}")];
-        let trees = git(s, c, &["rev-parse", &trees[0], &trees[1]]).unwrap_or_default();
+        let trees = git_at(s, w.clone, &["rev-parse", &trees[0], &trees[1]]).unwrap_or_default();
         let trees: Vec<&str> = trees.split_whitespace().collect();
         if trees.len() != 2 || trees[0] != trees[1] {
             return Err(no(commit, "tree_differs"));
@@ -591,21 +629,35 @@ fn accepted(
 }
 /// One installer from the clone, with the command's environment (and so its lock) and the build
 /// directory; its stdout and stderr go to unlinked files of `<state>`.
+/// The engine's installer and `ontology/migrate` get the command's environment unchanged, from
+/// their own clone.
 fn installer(s: &mut impl System, c: &mut Call, name: &str, words: &[&str]) -> Ran {
-    let script = if name.starts_with("ap") {
-        "install-ap.sh"
-    } else {
-        "install-content.sh"
+    let kind = name.split('-').next().unwrap_or_default();
+    let eclone = c.engine.as_ref().map_or("", |e| e.0.as_str()).to_owned();
+    let (mut argv, cwd, mut env) = match kind {
+        "ont" => {
+            let script = format!("{eclone}/scripts/install-ont.sh");
+            (args(&["bash", &script]), eclone, c.env.clone())
+        }
+        "migrate" => {
+            let argv = vec![format!("{}/ontology/migrate", c.clone)];
+            (argv, c.clone.clone(), c.env.clone())
+        }
+        _ => {
+            let script = if kind == "ap" {
+                "install-ap.sh"
+            } else {
+                "install-content.sh"
+            };
+            let argv = args(&["bash", &format!("{}/scripts/{script}", c.clone)]);
+            let env = c.env.iter().filter(|(k, _)| k != "CARGO_TARGET_DIR");
+            (argv, c.clone.clone(), env.cloned().collect())
+        }
     };
-    let mut argv = args(&["bash", &format!("{}/scripts/{script}", c.clone)]);
     argv.extend(args(words));
-    let mut env: Vec<_> = c
-        .env
-        .iter()
-        .filter(|(k, _)| k != "CARGO_TARGET_DIR")
-        .cloned()
-        .collect();
-    env.push(("CARGO_TARGET_DIR".into(), format!("{}/target", c.state)));
+    if !matches!(kind, "ont" | "migrate") {
+        env.push(("CARGO_TARGET_DIR".into(), format!("{}/target", c.state)));
+    }
     let scratch = || {
         (0..8).find_map(|n| {
             let p = format!("{}/.deliver-{}-{n}.tmp", c.state, std::process::id());
@@ -633,7 +685,7 @@ fn installer(s: &mut impl System, c: &mut Call, name: &str, words: &[&str]) -> R
         // The installer inherits the lock: it stays held while one lives.
         let fd = |flags| c.lock.as_ref().map(|l| rustix::io::fcntl_setfd(l, flags));
         fd(rustix::io::FdFlags::empty());
-        let child = s.launch(&argv, &env, &c.clone, files);
+        let child = s.launch(&argv, &env, &cwd, files);
         fd(rustix::io::FdFlags::CLOEXEC);
         let status = child.ok()?.wait().ok()?;
         let exit = status.code().or_else(|| status.signal().map(|n| 128 + n))?;
@@ -653,12 +705,15 @@ fn installer(s: &mut impl System, c: &mut Call, name: &str, words: &[&str]) -> R
             (word_ok && rest.starts_with("install-ap.sh:")).then(|| json!(word))
         })
     };
-    let code = match (name.starts_with("ap"), exit) {
+    let code = match (kind, exit) {
         (_, Some(0) | None) => Value::Null,
-        (true, _) => ap_code().unwrap_or(Value::Null),
-        (false, Some(2)) => json!("content_refused"),
-        (false, Some(1)) => json!("content_failed_restored"),
-        (false, Some(n)) => json!(format!("content_exit_{n}")),
+        ("ap", _) => ap_code().unwrap_or(Value::Null),
+        ("ont", Some(2)) => json!("engine_refused"),
+        ("ont", Some(n)) => json!(format!("engine_exit_{n}")),
+        ("migrate", Some(n)) => json!(format!("migrate_exit_{n}")),
+        (_, Some(2)) => json!("content_refused"),
+        (_, Some(1)) => json!("content_failed_restored"),
+        (_, Some(n)) => json!(format!("content_exit_{n}")),
     };
     let after = |text: &str, marker: &str| {
         let path = text
@@ -697,6 +752,9 @@ fn deliver(s: &mut impl System, c: &mut Call) -> Step<()> {
     {
         return Ok(());
     }
+    if c.engine.is_some() && engine_dead(s, c)? {
+        return Ok(());
+    }
     if c.r.get("rollback").is_some() {
         return rollback(s, c, &target);
     }
@@ -724,6 +782,14 @@ fn deliver(s: &mut impl System, c: &mut Call) -> Step<()> {
     let file = version(s, c);
     let from = match file.filter(|v| tree_at(s, c, v)) {
         Some(v) if v == tip => {
+            // An owed migration is acted on first; the empty chain counts as accepted.
+            if c.engine.is_some() && marked(c) {
+                if c.r.get("by").is_none() {
+                    limits(s, c, &target, None)?;
+                }
+                room(s, c)?;
+                marker(s, c, &tip)?;
+            }
             c.rec["end"] = json!("current");
             return Ok(());
         }
@@ -734,30 +800,64 @@ fn deliver(s: &mut impl System, c: &mut Call) -> Step<()> {
     // 5. The engine and the schema the tip names.
     let pin =
         git(s, c, &["show", &format!("{tip}:ontology/ENGINE-PIN")]).map(|p| p.trim().to_owned());
-    let engine = run(s, "ont", args(&["--version"]), 10_000);
-    let engine = engine.and_then(|l| l.split_whitespace().nth(2).map(str::to_owned));
-    if pin.is_none() || pin != engine {
-        return Err(No(
-            "engine_differs",
-            json!({"tip": pin, "installed": engine}),
-        ));
+    let engine = match c.engine {
+        Some(_) => engine_at(s, c),
+        None => run(s, "ont", args(&["--version"]), 10_000)
+            .and_then(|l| l.split_whitespace().nth(2).map(str::to_owned)),
+    };
+    let differ = |tip: &Value, installed: &Value| {
+        let what = json!({"tip": tip, "installed": installed});
+        move |code| No(code, what)
+    };
+    let pin_ok = pin.as_deref().is_some_and(hex40) && engine.is_some();
+    let engine_moves = c.engine.is_some() && pin_ok && pin != engine;
+    if !engine_moves && (pin.is_none() || pin != engine) {
+        return Err(differ(&json!(pin), &json!(engine))("engine_differs"));
     }
-    let tip_schema = git(s, c, &["show", &format!("{tip}:ontology/work.schema.json")]);
+    let tip_schema = git(s, c, &["show", &format!("{tip}:{SCHEMA}")]);
     let tip_schema = tip_schema
         .and_then(|t| serde_json::from_str::<Value>(&t).ok())
         .map(|v| v["version"].clone());
     let tip_schema = tip_schema.unwrap_or(Value::Null);
-    if tip_schema.is_null() || tip_schema != schema {
-        return Err(No(
-            "schema_differs",
-            json!({"tip": tip_schema, "installed": schema}),
-        ));
+    // With `engine` a higher version is installed below; a lower or unreadable one stays refused.
+    let (to_v, from_v) = (tip_schema.as_u64(), schema.as_u64());
+    let higher = c.engine.is_some() && to_v.zip(from_v).is_some_and(|(t, f)| t > f);
+    if tip_schema.is_null() || (tip_schema != schema && !higher) {
+        return Err(differ(&tip_schema, &schema)("schema_differs"));
     }
     // 6. Accepted; the timer's limits; 7. room and the build lock.
-    let (head, review, reviews) = accepted(s, c, &from, &tip)?;
+    let repository = c.r["repository"].as_str().unwrap_or_default();
+    let own = Chain {
+        clone: &c.clone,
+        repository,
+        past: strs(&c.r["past"]),
+        code: "not_accepted",
+    };
+    let (head, review, reviews) = accepted(s, c, &own, &from, &tip)?;
+    let pin = pin.unwrap_or_default();
     if c.r.get("by").is_none() {
-        limits(s, c, &target, &tip)?;
+        limits(s, c, &target, Some(&tip))?;
+        if engine_moves {
+            c.rec["target"] = json!(ENGINE);
+            limits(s, c, &id("installed_artifact", ENGINE), Some(&pin))?;
+            c.rec["target"] = json!(TARGET);
+        }
     }
+    room(s, c)?;
+    if c.engine.is_some() {
+        marker(s, c, &tip)?;
+    }
+    if engine_moves {
+        return engine_install(s, c, &pin, &engine.unwrap_or_default());
+    }
+    if let (true, Some(to_v), Some(from_v)) = (higher, to_v, from_v) {
+        schema_step(s, c, &tip, from_v, to_v)?;
+    }
+    // 8. The attempt, applied before any installer.
+    deliver_pair(s, c, &target, &tip, &from, (head, review, reviews))
+}
+/// Step 7: room where `<state>` lies, and the build lock free or freed within the bound.
+fn room(s: &mut impl System, c: &mut Call) -> Step<()> {
     let free = run(s, "df", args(&["-BM", "--output=avail", &c.state]), 10_000);
     let free = free.and_then(|o| {
         o.lines()
@@ -788,7 +888,18 @@ fn deliver(s: &mut impl System, c: &mut Call) -> Step<()> {
         )
         .ok_or(No("build_busy", Value::Null))?;
     }
-    // 8. The attempt, applied before any installer.
+    Ok(())
+}
+/// Steps 8 to 12: the attempt of the pair, its installers, the reads, the close.
+fn deliver_pair(
+    s: &mut impl System,
+    c: &mut Call,
+    target: &Value,
+    tip: &str,
+    from: &str,
+    (head, review, reviews): (String, Value, Vec<Value>),
+) -> Step<()> {
+    let (tip, from) = (tip.to_owned(), from.to_owned());
     c.rec["index"] = json!({"before": index(s, c), "after": null});
     let (same, _) = search(
         s,
@@ -799,7 +910,7 @@ fn deliver(s: &mut impl System, c: &mut Call) -> Step<()> {
     let attempt = same.len() + 1;
     let from_sha256 = s.read(&format!("{}/ap", c.dir)).map(|b| digest(&b));
     let Ok(from_sha256) = from_sha256 else {
-        return Err(differs(s, c, &target));
+        return Err(differs(s, c, target));
     };
     let mut p = json!({"target": target, "kind": "forward", "repository": c.r["repository"], "commit": tip,
         "attempt": attempt, "from": from, "from_sha256": from_sha256, "by": c.by, "reason": c.r["reason"],
@@ -891,7 +1002,8 @@ fn differs(s: &mut impl System, c: &Call, target: &Value) -> No {
     let newest = all.iter().find(ended).map(|a| json!({"install": a["id"]}));
     No("pair_differs", newest.unwrap_or(Value::Null))
 }
-fn limits(s: &mut impl System, c: &Call, target: &Value, tip: &str) -> Step<()> {
+/// With no `tip` (the pair is at T already) only the two limits that are not about T.
+fn limits(s: &mut impl System, c: &Call, target: &Value, tip: Option<&str>) -> Step<()> {
     let all = attempts(s, c, target)?;
     let is = |a: &Value, k: &str, v: &[&str]| v.contains(&prop(a, k).as_str());
     let no = |code, a: &Value| Err(No(code, json!({"install": a["id"]})));
@@ -904,6 +1016,9 @@ fn limits(s: &mut impl System, c: &Call, target: &Value, tip: &str) -> Step<()> 
             return no("held_by_rollback", a);
         }
     }
+    let Some(tip) = tip else {
+        return Ok(());
+    };
     let on_tip: Vec<&Value> = all
         .iter()
         .filter(|a| is(a, "kind", &["forward"]) && is(a, "commit", &[tip]))
@@ -1009,6 +1124,255 @@ fn rollback(s: &mut impl System, c: &mut Call, target: &Value) -> Step<()> {
     c.rec["index"]["after"] = json!(index(s, c));
     Ok(())
 }
+/// The commit `<ONT_INSTALL_BIN_DIR>/ont --version` names (README "The engine and the schema").
+fn engine_at(s: &mut impl System, c: &Call) -> Option<String> {
+    let dir = &c.engine.as_ref()?.1;
+    let out = run(s, &format!("{dir}/ont"), args(&["--version"]), 10_000)?;
+    let words: Vec<&str> = out.lines().next()?.split_whitespace().collect();
+    (words.len() == 3 && words[0] == "ont" && hex40(words[2])).then(|| words[2].to_owned())
+}
+/// The copy of the engine file whose digest is `sha` that `install-ont.sh` keeps, when it is one.
+fn engine_kept(s: &impl System, c: &Call, sha: &str) -> Option<String> {
+    let state = &c.engine.as_ref()?.2;
+    let copy = format!("{state}/install/ont.before-{}", sha.get(..12)?);
+    let same = s.read(&copy).is_ok_and(|b| digest(&b) == sha);
+    same.then_some(copy)
+}
+/// Step 2 for the engine target: its running attempt, of a dead call, closed by a read of the
+/// engine; at neither of its commits the engine's `rollback` once. True when the call ends here.
+fn engine_dead(s: &mut impl System, c: &mut Call) -> Step<bool> {
+    let target = id("installed_artifact", ENGINE);
+    let filter = [("target", target), ("status", json!("running"))];
+    let (running, _) = search(s, c, "install", &filter)?;
+    let Some(a) = running.iter().max_by_key(|o| prop(o, "started_at")) else {
+        return Ok(false);
+    };
+    let f = |k: &str| prop(a, k);
+    let (commit, from) = (f("commit"), f("from"));
+    let request = format!("ont.{commit}.{}", field(a, "attempt"));
+    let running = || No("attempt_running", json!({"install": a["id"]}));
+    let now = engine_at(s, c);
+    let kept = engine_kept(s, c, &f("from_sha256"));
+    let mut p = json!({"install": a["id"], "to": now});
+    if now.as_deref() == Some(&commit) {
+        (p["outcome"], p["rollback_binary"]) = (json!("installed"), json!(kept));
+        drop_nulls(&mut p);
+    } else if now.as_deref() == Some(&from) {
+        (p["outcome"], p["code"]) = (json!("not_started"), json!("dead_call"));
+    } else {
+        let eclone = c.engine.as_ref().map_or("", |e| e.0.as_str());
+        if s.read(&format!("{eclone}/scripts/install-ont.sh")).is_err() {
+            return Err(running());
+        }
+        c.rec["target"] = json!(ENGINE);
+        let ran = vec![installer(s, c, "ont-rollback", &["rollback"])];
+        let now = engine_at(s, c);
+        let (outcome, to) = match now.as_deref() {
+            Some(v) if v == from => ("failed_restored", from.as_str()),
+            Some(v) if v == commit => ("failed", commit.as_str()),
+            _ => ("failed", "neither"),
+        };
+        let p = json!({"install": a["id"], "outcome": outcome, "to": to, "code": first_code(&ran)});
+        close(s, c, &request, p, (kept, None));
+        (c.rec["closed"], c.rec["attempt"], c.rec["from"]) = (
+            json!({"install": a["id"], "outcome": outcome}),
+            field(a, "attempt").clone(),
+            json!(from),
+        );
+        c.rec["index"] = json!({"before": null, "after": index(s, c)});
+        let ends = c.rec["end"] != "failed_restored";
+        if !ends {
+            for k in [
+                "target", "install", "attempt", "from", "outcome", "to", "code",
+            ] {
+                c.rec[k] = record()[k].clone();
+            }
+            for k in ["rollback_binary", "rollback_content", "end"] {
+                c.rec[k] = record()[k].clone();
+            }
+        }
+        return Ok(ends);
+    }
+    apply(s, c, "close_install", format!("{request}.close"), p.clone()).map_err(|_| running())?;
+    c.rec["closed"] = json!({"install": a["id"], "outcome": p["outcome"]});
+    Ok(false)
+}
+/// The engine at the pin (README "The engine and the schema"): its clone with the remote `origin`,
+/// its chain accepted, the attempt, `install-ont.sh install <pin>`, the read, the close. The call
+/// ends here.
+fn engine_install(s: &mut impl System, c: &mut Call, pin: &str, from: &str) -> Step<()> {
+    let target = id("installed_artifact", ENGINE);
+    (c.rec["target"], c.rec["from"]) = (json!(ENGINE), json!(from));
+    let e = &c.r["engine"];
+    let (repository, url) = (e["repository"].as_str(), e["url"].as_str());
+    let (repository, url) = (repository.unwrap_or_default(), url.unwrap_or_default());
+    let eclone = c.engine.as_ref().map_or("", |e| e.0.as_str()).to_owned();
+    let fetched = run(s, "git", args(&["init", "--quiet", &eclone]), 30_000).is_some()
+        && git_at(s, &eclone, &["config", "remote.origin.url", url]).is_some()
+        && git_at(s, &eclone, &["config", "remote.origin.fetch", MAIN]).is_some()
+        && git_at(
+            s,
+            &eclone,
+            &["fetch", "--quiet", "--no-tags", "origin", MAIN],
+        )
+        .is_some();
+    let fetch_failed = || No("fetch_failed", json!({ "repository": repository }));
+    if !fetched {
+        return Err(fetch_failed());
+    }
+    let origin = "refs/remotes/origin/main";
+    if git_at(s, &eclone, &["merge-base", "--is-ancestor", pin, origin]).is_none() {
+        let why = json!({"commit": pin, "why": "not_on_chain"});
+        return Err(No("engine_not_accepted", why));
+    }
+    git_at(
+        s,
+        &eclone,
+        &["checkout", "--quiet", "--force", "--detach", pin],
+    )
+    .ok_or_else(fetch_failed)?;
+    let chain = Chain {
+        clone: &eclone,
+        repository,
+        past: vec![],
+        code: "engine_not_accepted",
+    };
+    let (head, review, reviews) = accepted(s, c, &chain, from, pin)?;
+    c.rec["index"] = json!({"before": index(s, c), "after": null});
+    let filter = [("target", target.clone()), ("commit", json!(pin))];
+    let attempt = search(s, c, "install", &filter)?.0.len() + 1;
+    let dir = c.engine.as_ref().map_or("", |e| e.1.as_str());
+    let from_sha256 = s.read(&format!("{dir}/ont")).map(|b| digest(&b));
+    let from_sha256 =
+        from_sha256.map_err(|_| No("engine_differs", json!({"tip": pin, "installed": from})))?;
+    let p = json!({"target": target, "kind": "forward", "repository": repository, "commit": pin,
+        "attempt": attempt, "from": from, "from_sha256": from_sha256, "by": c.by, "reason": c.r["reason"],
+        "head": head, "review": review, "reviews": reviews});
+    let request = format!("ont.{pin}.{attempt}");
+    start(s, c, request.clone(), p, attempt)?;
+    let mut ran = vec![installer(s, c, "ont", &["install", pin])];
+    let (outcome, to) = match engine_at(s, c) {
+        Some(v) if v == pin => ("installed", pin),
+        Some(v) if v == from => ("failed_restored", from),
+        _ => {
+            ran.push(installer(s, c, "ont-rollback", &["rollback"]));
+            match engine_at(s, c) {
+                Some(v) if v == from => ("failed_restored", from),
+                Some(v) if v == pin => ("failed", pin),
+                _ => ("failed", "neither"),
+            }
+        }
+    };
+    let p = json!({"install": c.rec["install"], "outcome": outcome, "to": to, "code": first_code(&ran)});
+    let kept = engine_kept(s, c, &from_sha256);
+    close(s, c, &request, p, (kept, None));
+    c.rec["index"]["after"] = json!(index(s, c));
+    Ok(())
+}
+/// The installed version of the work schema, as a store's answer names it.
+fn store_version(s: &mut impl System, c: &Call) -> Step<Value> {
+    let filter = [
+        ("target", id("installed_artifact", TARGET)),
+        ("status", json!("running")),
+    ];
+    let (_, answer) = search(s, c, "install", &filter)?;
+    Ok(answer["schema"]["work"]["version"].clone())
+}
+/// Whether T holds `ontology/migrate` as an executable file.
+/// None when the entry cannot be read: that is no answer "absent".
+fn executable(s: &mut impl System, c: &Call, tip: &str) -> Option<bool> {
+    let entry = git(s, c, &["ls-tree", tip, "--", "ontology/migrate"])?;
+    Some(entry.starts_with("100755 blob ") && entry.trim_end().ends_with("\tontology/migrate"))
+}
+/// The answer of an `ont` command that answered `ok`; a schema install may take ten minutes.
+fn ont_ok(s: &mut impl System, words: &[&str]) -> Option<Value> {
+    let reply = s.call("ont", &args(words), &Value::Null, 600_000).ok()?;
+    let v: Value = serde_json::from_slice(&reply.stdout).ok()?;
+    (reply.success && v["status"] == "ok").then_some(v)
+}
+fn marked(c: &Call) -> bool {
+    std::fs::symlink_metadata(format!("{}/{MARKER}", c.state)).is_ok()
+}
+/// `ontology/migrate` of T from `from` to `to`: true when it exited 0, and the marker is gone.
+fn migrate(s: &mut impl System, c: &mut Call, from: u64, to: u64) -> bool {
+    let store = c.engine.as_ref().map_or(String::new(), |e| e.2.clone());
+    let store = format!("{store}/ont/ontology.sqlite");
+    let ran = installer(
+        s,
+        c,
+        "migrate",
+        &[&store, &from.to_string(), &to.to_string()],
+    );
+    let ok = ran.exit == Some(0) && std::fs::remove_file(format!("{}/{MARKER}", c.state)).is_ok();
+    c.rec["schema"]["migrate"] = json!(if ok { "ok" } else { "failed" });
+    ok
+}
+/// Acting on the marker (README "The engine and the schema"); no marker, nothing to do.
+fn marker(s: &mut impl System, c: &mut Call, tip: &str) -> Step<()> {
+    if !marked(c) {
+        return Ok(());
+    }
+    let path = format!("{}/{MARKER}", c.state);
+    let m: Value = std::fs::read(&path)
+        .ok()
+        .and_then(|b| serde_json::from_slice(&b).ok())
+        .unwrap_or(Value::Null);
+    let store = store_version(s, c)?;
+    let failed = No(
+        "migrate_failed",
+        json!({"from": m["from"], "to": m["to"], "store": store}),
+    );
+    match (m["from"].as_u64(), m["to"].as_u64(), store.as_u64()) {
+        (Some(from), Some(_), Some(v)) if v == from => {
+            std::fs::remove_file(&path).map_err(|_| failed)
+        }
+        (Some(from), Some(to), Some(v))
+            if v == to && from < to && executable(s, c, tip) == Some(true) =>
+        {
+            c.rec["schema"] = json!({"from": from, "to": to, "backup": null, "migrate": "none"});
+            if migrate(s, c, from, to) {
+                Ok(())
+            } else {
+                Err(failed)
+            }
+        }
+        _ => Err(failed),
+    }
+}
+/// The schema from `from` up to T's `to`: the marker when T holds `ontology/migrate`, the backup,
+/// the install, the read back, the migration.
+fn schema_step(s: &mut impl System, c: &mut Call, tip: &str, from: u64, to: u64) -> Step<()> {
+    c.rec["schema"] = json!({"from": from, "to": to, "backup": null, "migrate": "none"});
+    let failed = |store: Value| {
+        No(
+            "schema_install_failed",
+            json!({"from": from, "to": to, "store": store}),
+        )
+    };
+    // Whether a migration is owed is read before any effect: unreadable is not "absent".
+    let owed = executable(s, c, tip).ok_or_else(|| failed(json!(from)))?;
+    let backup = ont_ok(s, &["backup"]);
+    let backup = backup.and_then(|v| v["result"]["path"].as_str().map(str::to_owned));
+    c.rec["schema"]["backup"] = json!(backup.ok_or_else(|| failed(json!(from)))?);
+    let pending = json!({"from": from, "to": to}).to_string();
+    if owed && write(&format!("{}/{MARKER}", c.state), pending.as_bytes()).is_err() {
+        return Err(failed(json!(from)));
+    }
+    let clone = c.clone.clone();
+    let words = [
+        "schema", "install", "--from", &clone, "--commit", tip, "--path", SCHEMA,
+    ];
+    let installed = ont_ok(s, &words).is_some();
+    let store = store_version(s, c).unwrap_or(Value::Null);
+    if !installed || store != to {
+        return Err(failed(store));
+    }
+    if owed && !migrate(s, c, from, to) {
+        let detail = json!({"from": from, "to": to, "store": store});
+        return Err(No("migrate_failed", detail));
+    }
+    Ok(())
+}
 fn record() -> Value {
     json!({"at": stamp(SystemTime::now()), "by": null, "repository": null, "target": TARGET, "tip": null,
         "from": null, "end": "refused", "outcome": null, "code": null, "detail": null, "install": null,
@@ -1054,8 +1418,23 @@ pub fn execute(s: &mut impl System, r: &Value) -> (Value, u8) {
         }),
         lock: None,
         sums: RefCell::default(),
+        engine: None,
         env,
     };
+    if let Some(e) = r.get("engine") {
+        let name = e["repository"].as_str().and_then(|v| v.split_once('/'));
+        let name = name.map_or("", |(_, n)| n);
+        c.engine = Some((
+            format!("{}/{name}", c.state),
+            var(&c.env, "ONT_INSTALL_BIN_DIR", "/usr/local/bin"),
+            var(
+                &c.env,
+                "ONT_INSTALL_STATE_DIR",
+                "/var/lib/ontology-platform",
+            ),
+        ));
+        c.rec["schema"] = Value::Null;
+    }
     (c.rec["by"], c.rec["repository"]) = (c.by.clone(), r["repository"].clone());
     let made = std::fs::create_dir_all(&c.state).is_ok();
     c.lock = take(&var(&c.env, "AP_DELIVER_LOCK", "/run/lock/ap-deliver.lock"));
@@ -1064,11 +1443,14 @@ pub fn execute(s: &mut impl System, r: &Value) -> (Value, u8) {
         None => Err(No("busy", Value::Null)),
     };
     if let Err(No(code, detail)) = result {
-        (c.rec["end"], c.rec["code"], c.rec["detail"]) = (json!("refused"), json!(code), detail);
+        // The two ends of the schema step come after an effect: a person acts.
+        let after = ["schema_install_failed", "migrate_failed"].contains(&code);
+        let end = if after { "failed" } else { "refused" };
+        (c.rec["end"], c.rec["code"], c.rec["detail"]) = (json!(end), json!(code), detail);
     }
     let code = c.rec["code"].as_str().unwrap_or_default();
     let exit = match (c.rec["end"].as_str(), c.rec["outcome"] == "failed") {
-        (_, true) => 4,
+        (_, true) | (Some("failed"), _) => 4,
         (Some("installed" | "current"), _) => 0,
         (Some("refused"), _) if ["suppressed", "attempts_exhausted"].contains(&code) => 3,
         (Some("refused"), _)
