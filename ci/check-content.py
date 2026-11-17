@@ -189,6 +189,8 @@ for name, text in texts.items():
 CORPUS = Path(os.environ.get("CONTENT_CHECK_CORPUS", "/home/palantirkc/external/reference-docs"))
 ROUTES = "runtime-references/OFFICIAL-DOCS.md"
 section = texts.get(ROUTES, "").split("\n## 4. ", 1)
+if CORPUS.is_dir() and len(section) != 2:
+    fail("design_routes_section_missing", ROUTES, "no section '## 4. ' to check against the corpus")
 if CORPUS.is_dir() and len(section) == 2:
     checked = 0
     body = section[1].split("\n## ", 1)[0]

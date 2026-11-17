@@ -170,5 +170,16 @@ class PathsAndDesignRoutes(Scratch, unittest.TestCase):
         self.assertIn("design_route_missing_file@content/runtime-references/OFFICIAL-DOCS.md: :3-4 (a range with no path before it)", out)
 
 
+    def test_a_missing_route_section_fails_where_the_corpus_is(self):
+        root = self.fixture()
+        path = root / "content" / self.ROUTES
+        path.write_text(path.read_text(encoding="utf-8").replace("\n## 4. ", "\n## 9. "), encoding="utf-8")
+        sums = root / "content/SHA256SUMS"
+        digest = hashlib.sha256(path.read_bytes()).hexdigest()
+        sums.write_text("".join(f"{digest}  {self.ROUTES}\n" if l.endswith("  " + self.ROUTES) else l + "\n" for l in sums.read_text().splitlines()))
+        code, out = run_check(root, self.corpus(root))
+        self.assertEqual(code, 1, out)
+        self.assertIn("design_routes_section_missing@content/runtime-references/OFFICIAL-DOCS.md", out)
+
 if __name__ == "__main__":
     unittest.main()

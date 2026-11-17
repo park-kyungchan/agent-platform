@@ -6,8 +6,8 @@ Read this when you must decide which context to load for a task, above all a kin
 
 Stop at the first step that answers; each step names the next one.
 
-1. The packet's `Read first:` line (full paths, a passage as `path:a-b`), when you were given one: read exactly that, before anything else.
-2. The task's STATE: owner, holds, the next action.
+1. The task's STATE: owner, holds, the next action (`AGENTS.md` section 1).
+2. The packet's `Read first:` line (full paths, a passage as `path:a-b`), when you were given one: read exactly that before anything it does not name.
 3. The row of `/root/.agents/AGENTS.md` section 3 for your situation: one reference or one skill.
 4. The area that owns the thing: `CODEBASE-ORIENTATION.md` sections 1 and 2; then that repository's `AGENTS.md` at `origin/main` (`git -C /home/palantirkc/platforms/<repo> show origin/main:AGENTS.md`, after `git -C /home/palantirkc/platforms/<repo> fetch -q origin`); then the start file the table names.
 5. A search in that repository only, at `origin/main`: `git -C /home/palantirkc/platforms/<repo> grep -n '<words>' origin/main -- <directory>`; then read the lines it found.
@@ -42,7 +42,7 @@ A weak model routes as well as a strong one only where a route asks for no judgm
 - At most three steps lead from `AGENTS.md` to a line: a row of its section 3, a table of the reference, a `path:a-b`.
 - Paths are written in full, never shortened or elided; a table is keyed by the situation, in the words an assignment uses.
 - A stale copy is taken off the path, not warned about.
-- A change of a route is accepted on the instructions suite (`agent-platform` `evals/README.md`, section "The instructions suite"), where weak readers are measured against a reference reader.
+- A change of a route is accepted on the instructions suite (`agent-platform` `evals/README.md`, section "The instructions suite"); its cases today cover how each CLI runs without a terminal UI, not the routes of this file or of `OFFICIAL-DOCS.md` section 4, so such a change also names the reads it was tried on.
 
 ## 5. A task kind no row covers
 
