@@ -8,6 +8,10 @@ use std::time::Duration;
 pub const REFUSED: &str = "store_refused";
 const RETRIES: usize = 5;
 const WAIT: Duration = Duration::from_millis(200);
+/// Objects asked per search page. Every answer of `ont` must fit `host::LIMIT` (1 MiB): one head is
+/// at most the engine's 65,536 canonical bytes plus about 1.1 KB of field wrappers and metadata, so
+/// 15 heads (about 1,000,000 bytes) fit with the envelope; a larger page fails once requests are long.
+pub const PAGE: u64 = 15;
 
 /// Who applies: the request's `agent` and `session`, with the client `ap`.
 pub struct Actor<'a> {
@@ -162,7 +166,7 @@ pub fn search(
     kind: &str,
     all: Vec<Value>,
 ) -> Result<Vec<Found>, Failure> {
-    let mut q = json!({"object_type": kind, "where": {"all": all}, "limit": 200});
+    let mut q = json!({"object_type": kind, "where": {"all": all}, "limit": PAGE});
     let mut found = vec![];
     loop {
         let v = call(s, store, &["search"], &q)?;

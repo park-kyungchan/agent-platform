@@ -39,8 +39,13 @@ struct F {
     /// The next apply of this action is refused with this answer.
     refuse: Option<(&'static str, Value)>,
     unqualified: bool,
-    page: usize,
+    /// Each object of a search answer is padded to the size of the largest head the engine answers.
+    heavy: bool,
 }
+/// The bound of `Host::call`: an answer over 1 MiB is `process_failed`.
+const LIMIT: usize = 1_048_576;
+/// The largest object of an engine search answer: a head of 65,536 canonical bytes, its wrappers and metadata.
+const HEAD: usize = 66_700;
 fn reply(success: bool, v: Value) -> Answer {
     let bytes = serde_json::to_vec(&v).unwrap();
     Ok(Reply {
@@ -69,7 +74,7 @@ impl F {
             cut: None,
             refuse: None,
             unqualified: false,
-            page: 100,
+            heavy: false,
         };
         f.files.insert(PATH.into(), RECORD.to_vec());
         for (key, status) in [("open", "draft"), ("met", "met"), ("gone", "retired")] {
@@ -234,11 +239,20 @@ impl F {
         let found: Vec<_> = (self.objects.iter())
             .filter(|(_, o)| matches(o))
             .map(|(k, o)| json!({"id": oid("request", k), "head": {"fields": Self::fields(o)}}))
+            .map(|mut o| {
+                if self.heavy {
+                    let size = o.to_string().len();
+                    o["padding"] = json!("p".repeat(HEAD.saturating_sub(size + 14)));
+                }
+                o
+            })
             .collect();
         let from: usize = body["continuation"]
             .as_str()
             .map_or(0, |c| c.parse().unwrap());
-        let to = (from + self.page).min(found.len());
+        let page = body["limit"].as_u64().unwrap() as usize;
+        assert!((1..=1000).contains(&page), "the engine's bound of limit");
+        let to = (from + page).min(found.len());
         let next = (to < found.len()).then(|| to.to_string());
         ok(
             json!({"basis": {"qualified": !self.unqualified}, "objects": found[from..to],
@@ -270,6 +284,14 @@ impl System for F {
             "search" => self.search(input),
             other => panic!("ont {other}"),
         }
+        .and_then(|r| match r.bytes.len() > LIMIT {
+            true => Err(Failure {
+                code: "process_failed",
+                field: "ont".into(),
+                detail: Value::Null,
+            }),
+            false => Ok(r),
+        })
     }
     fn read(&self, path: &str) -> std::io::Result<Vec<u8>> {
         self.files
@@ -1101,7 +1123,7 @@ fn r19_list_searches_every_page_qualified_and_writes_nothing() {
     f.calls.clear();
     let v = run(&mut f, &json!({"op": "list", "topic": "big"}));
     assert_eq!(v["requests"].as_array().unwrap().len(), 250);
-    assert_eq!(f.names(), ["search request"; 3]);
+    assert_eq!(f.names(), ["search request"; 17]);
     let filter = &f.calls[0].1["where"]["all"];
     assert_eq!(
         *filter,
@@ -1109,7 +1131,7 @@ fn r19_list_searches_every_page_qualified_and_writes_nothing() {
     );
     assert_eq!(
         (&f.calls[1].1["continuation"], &f.calls[2].1["continuation"]),
-        (&json!("100"), &json!("200"))
+        (&json!("15"), &json!("30"))
     );
     f.calls.clear();
     run(&mut f, &json!({"op": "list"}));
@@ -1123,6 +1145,23 @@ fn r19_list_searches_every_page_qualified_and_writes_nothing() {
     assert_eq!(
         (e.code.as_str(), e.field.as_str(), e.after),
         ("store_answer_unqualified", "list", None)
+    );
+}
+// spec: specs/ap/request.md#R19
+#[test]
+fn r19_list_pages_fit_the_bound_of_one_answer_with_the_largest_heads() {
+    let mut f = F::new();
+    f.heavy = true;
+    many(&mut f, 40, "long");
+    f.calls.clear();
+    let v = run(&mut f, &json!({"op": "list", "topic": "long"}));
+    assert_eq!(v["requests"].as_array().unwrap().len(), 40);
+    let v = run(&mut f, &json!({"op": "list"}));
+    assert_eq!(v["requests"].as_array().unwrap().len(), 40);
+    assert!(
+        f.calls
+            .iter()
+            .all(|c| c.1["limit"].as_u64().unwrap() as usize * HEAD + 1_000 <= LIMIT)
     );
 }
 // spec: specs/ap/request.md#R20
