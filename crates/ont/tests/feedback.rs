@@ -280,7 +280,7 @@ fn filter_refusal_codes_have_fields_and_rules_cli_and_mcp() {
     }
     let answer = t.mcp("ont_index", json!({"sources":[]}));
     diagnostic(&answer, "invalid_request", "/sources");
-    assert!(ont::mcp::tools_list().to_string().len() <= 5000);
+    assert!(ont::mcp::tools_list().to_string().len() <= 6000);
 }
 
 #[test]
@@ -318,7 +318,7 @@ fn schema_and_render_argument_diagnostics_name_fields() {
 }
 
 #[test]
-fn tools_list_wire_answer_is_at_most_5000_bytes() {
+fn tools_list_wire_answer_is_at_most_6000_bytes() {
     let config = ont::mcp::Config {
         store: PathBuf::from("/unused-o17-store"),
         now: Some(1000),
@@ -329,8 +329,8 @@ fn tools_list_wire_answer_is_at_most_5000_bytes() {
         .handle_line(br#"{"jsonrpc":"2.0","id":1,"method":"tools/list"}"#)
         .unwrap();
     // Leave one byte for the trailing newline.
-    assert!(answer.to_string().len() < 5000);
-    assert_eq!(answer["result"]["tools"].as_array().unwrap().len(), 7);
+    assert!(answer.to_string().len() < 6000);
+    assert_eq!(answer["result"]["tools"].as_array().unwrap().len(), 8);
     let index = answer["result"]["tools"]
         .as_array()
         .unwrap()

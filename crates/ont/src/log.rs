@@ -192,6 +192,12 @@ impl Filter {
     }
 }
 
+/// Whether the installed schema defines the action type in its domain.
+fn defines(set: &SchemaSet, domain: &str, action_type: &str) -> bool {
+    set.schema(domain)
+        .is_some_and(|s| s.action_types.contains_key(action_type))
+}
+
 /// The admission of one row (README "Reading the action log").
 fn admits(
     set: &SchemaSet,
@@ -200,10 +206,7 @@ fn admits(
     action_type: &str,
     edits: &[Value],
 ) -> bool {
-    let defined = set
-        .schema(domain)
-        .is_some_and(|s| s.action_types.contains_key(action_type));
-    if defined
+    if defines(set, domain, action_type)
         && !view
             .entries
             .iter()
@@ -521,6 +524,15 @@ fn read_refused(
         if !admits(set, view, &domain, &action_type, &[]) {
             page.withheld += 1;
             continue;
+        }
+        let mut row = row;
+        // A refused row of a type the schema no longer defines has no edits
+        // to judge its parameters by: they are never returned.
+        if !defines(set, &domain, &action_type)
+            && let Some(row) = row.as_object_mut()
+        {
+            row.remove("parameters");
+            row.insert("parameters_withheld".into(), json!(true));
         }
         page.rows.push(row);
     }

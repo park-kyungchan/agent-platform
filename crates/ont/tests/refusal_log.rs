@@ -722,6 +722,18 @@ fn log_withholds_rows_outside_the_grants_and_keeps_removed_types_readable() {
     let refused = log(&t, json!({"outcome":"refused"}));
     assert_eq!(kinds(&refused), ["check_probe_kind", "create_tag"]);
     assert_eq!(refused["withheld"], 0);
+    // B1 amended: the refused row of the removed type never carries its
+    // parameters; the row of a defined type does when asked.
+    let refused = log(&t, json!({"outcome":"refused","parameters":true}));
+    let rows = refused["rows"].as_array().unwrap();
+    assert_eq!(rows[1]["action_type"], "create_tag");
+    assert!(rows[1].get("parameters").is_none(), "{}", rows[1]);
+    assert_eq!(rows[1]["parameters_withheld"], true);
+    assert_eq!(rows[0]["parameters"], json!({"probe":id}));
+    assert!(rows[0].get("parameters_withheld").is_none());
+    let plain = log(&t, json!({"outcome":"refused"}));
+    assert_eq!(plain["rows"][1]["parameters_withheld"], true);
+    assert!(plain["rows"][1].get("parameters").is_none());
 }
 
 // B1 bound: one call reads at most 10,000 lines of the file.
