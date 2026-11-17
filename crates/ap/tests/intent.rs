@@ -445,8 +445,8 @@ impl F {
         let all = body["where"]["all"].as_array().unwrap();
         let on = |c: &Value| c["eq"][0].as_str().unwrap().to_owned();
         // As on the engine: a filter on the optional reference `intent` of a request is not qualified.
-        let qualified =
-            !self.unqualified && !(kind == "request" && all.iter().any(|c| on(c) == "intent"));
+        let by_intent = kind == "request" && all.iter().any(|c| on(c) == "intent");
+        let qualified = !(self.unqualified || by_intent);
         let matches =
             |o: &Value| o["object_type"] == kind && all.iter().all(|c| o[on(c)] == c["eq"][1]);
         let found: Vec<_> = (self.objects.iter())
