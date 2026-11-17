@@ -11,7 +11,7 @@ Publication takes reviewed-main originals, pins exact projected bytes/full deriv
 tags, and leaves consumers unavailable until qualified evaluation/readback passes.
 Reconcile uncertain effects at the target; never resend on elapsed time alone.
 The private Academy archive keeps its separate owner and `education-platform`
-`content/skills/academy-student-context/references/lesson-archive.md` contract.
+`docs/academy-lesson-archive.md` contract.
 Preserve genuine historical/plugin attribution; do not forge it or copy private
 bodies into engineering. No credential value belongs in source, argv or logs.
 

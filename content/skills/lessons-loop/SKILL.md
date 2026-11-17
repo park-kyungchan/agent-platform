@@ -32,7 +32,7 @@ parent task both close. Capture a concise L0 incident or L1 candidate only when
 something durable was learned; retain allowed source locators/hashes, no raw
 student/exam/lesson/operational payload. The Academy lesson archive is a separate
 record kind owned by education-platform
-`content/skills/academy-student-context/references/lesson-archive.md`, not a lesson.
+`docs/academy-lesson-archive.md`, not a lesson.
 Unknown cause or metrics remain unknown.
 In a no-write task, leave an allowed task-local handoff for the curator instead.
 

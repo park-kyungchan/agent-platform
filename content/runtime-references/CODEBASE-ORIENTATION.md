@@ -36,7 +36,7 @@ Main checkouts are under `/home/palantirkc/platforms/<repository>/` unless a pat
 | | `crates/edu-academy-sources` | Reads and writes against the Academy server's pages and scripts; the qualification tool `academy-live-driver` | `src/lib.rs` |
 | | `crates/edu-academy-teacher` | The teacher's draft records and their checks | `src/lib.rs` |
 | | `crates/edu-academy-mcp` | The Academy MCP server in Rust and its launcher | `src/bin/` |
-| | `content/skills/` | Skills `academy-runtime-routing`, `academy-student-context` | each `SKILL.md` |
+| | `content/skills/` | Skills `academy-lesson-day`, `academy-dailyrecord-authoring`, `academy-prestudy-review` | each `SKILL.md` |
 | | `modules/academy-workbench/` | Source of the Academy MCP server the teacher uses today (Bun) | its `README.md` |
 | `education-dc-gang-a` | `crates/edu-dc-gang-a` | Module of one academy | `README.md` |
 | `agent-vps-operations` | `crates/vps-ops` | The command `vps-ops` | `README.md` |
