@@ -2,6 +2,8 @@
 set -euo pipefail
 [[ $# == 1 ]] || { echo 'usage: rehearsal.sh /path/to/ont' >&2; exit 2; }
 ont_binary=$(realpath -- "$1")
+# ontology/migrate runs the engine that $ONT_BIN names.
+export ONT_BIN="$ont_binary"
 repo=$(git -C "$(dirname -- "${BASH_SOURCE[0]}")" rev-parse --show-toplevel)
 rehearsal_root=$(mktemp -d)
 trap 'python3 -c '\''import shutil,sys; shutil.rmtree(sys.argv[1])'\'' "$rehearsal_root"' EXIT
@@ -421,13 +423,17 @@ assert to_revoke not in [o['id'] for o in call(['search'], dict(object_type='rev
 v8_objects = [task, packet, report, h, d, successor, early_user, k, w, thread, plan, first_review, next_review, running8, accepting, to_revoke, v7_running, v7_closed['admitted'], v7_closed['revoked']]
 v8_before = [obj(i) for i in v8_objects]
 v8_views = {view: call(['render'], dict(view=view, args={} if view in ('current_memory_records', 'installs') else dict(task=task['native_key']))) for view in json.loads(v8.read_text())['views']}
-call(['schema', 'install', str(pathlib.Path(repo, 'ontology/work.schema.json'))])
+# Version 9 is pinned in Git: its rows run on it, then the repository's file is installed over the store they leave.
+v9 = pathlib.Path(store).with_name('v9.json')
+v9.write_bytes(subprocess.check_output(['git', '-C', repo, 'show', '8379ae651929853d6fb2df79559ece4a98c5f551:ontology/work.schema.json'], timeout=10))
+assert hashlib.sha256(v9.read_bytes()).hexdigest() == 'faba52d93401384cdc6146a7f505c61dafc4a87662deb284dfc689f19a58d298'
+call(['schema', 'install', str(v9)])
 assert [obj(i) for i in v8_objects] == v8_before
 for view, before in v8_views.items():
     answer = call(['render'], dict(view=view, args={} if view in ('current_memory_records', 'installs') else dict(task=task['native_key'])))
     assert answer['rows'] == before['rows'] and answer['markdown'] == before['markdown'].replace('schema=work@8', 'schema=work@9'), view
 print('gate_row=v9-v8-objects-and-views-unchanged expected=admitted objects=' + str(len(v8_objects)) + ' views=' + str(len(v8_views)))
-gate('record_decision', 'v9-record-decision', dict(dp, topic='after-v9'))
+after_v9 = created(gate('record_decision', 'v9-record-decision', dict(dp, topic='after-v9')), 'decision')
 gate('start_review', 'v9-duplicate-of-v8-review', dict(rp8, head='5' * 40), 'duplicate_running_review')
 sizes = []
 for name in ('ont_describe', 'ont_action_list'):
@@ -436,18 +442,36 @@ for name in ('ont_describe', 'ont_action_list'):
     sizes.append(len(answer['content'][0]['text'].encode())); assert sizes[-1] <= 262144, (name, sizes[-1])
 print('gate_row=v9-mcp-sizes expected=admitted bytes=' + ','.join(map(str, sizes)))
 # installed_artifact is owned by a source of four paths under /usr/local/bin that need not exist where the
-# rehearsal runs. The rows run on a copy that differs only in those paths (two files of this store's
-# directory) and in its version.
-schema9 = json.loads(pathlib.Path(repo, 'ontology/work.schema.json').read_text())
+# rehearsal runs. The rows from here on run on a copy of the repository's file that differs only in those
+# paths (two files of this store's directory); it keeps the file's own version, installed over version 9.
+repository_schema = json.loads(pathlib.Path(repo, 'ontology/work.schema.json').read_text())
 binaries = [pathlib.Path(store).with_name(n) for n in ('installed-a', 'installed-b')]
 for b in binaries: b.write_bytes(b'fixture\n')
-copy = json.loads(json.dumps(schema9)); copy['version'] = 10
+copy = json.loads(json.dumps(repository_schema)); copy['version'] = repository_schema['version']
+assert copy['version'] > 9
 copy['sources']['installed_binaries']['paths'] = [str(b) for b in binaries]
-assert {k: v for k, v in copy.items() if k not in ('version', 'sources')} == {k: v for k, v in schema9.items() if k not in ('version', 'sources')}
-assert {k: v for k, v in copy['sources'].items() if k != 'installed_binaries'} == {k: v for k, v in schema9['sources'].items() if k != 'installed_binaries'}
-assert {k: v for k, v in copy['sources']['installed_binaries'].items() if k != 'paths'} == {k: v for k, v in schema9['sources']['installed_binaries'].items() if k != 'paths'}
+assert {k: v for k, v in copy.items() if k not in ('version', 'sources')} == {k: v for k, v in repository_schema.items() if k not in ('version', 'sources')}
+assert {k: v for k, v in copy['sources'].items() if k != 'installed_binaries'} == {k: v for k, v in repository_schema['sources'].items() if k != 'installed_binaries'}
+assert {k: v for k, v in copy['sources']['installed_binaries'].items() if k != 'paths'} == {k: v for k, v in repository_schema['sources']['installed_binaries'].items() if k != 'paths'}
 fixture = pathlib.Path(store).with_name('v8-installed-paths.json'); fixture.write_text(json.dumps(copy))
-call(['schema', 'install', str(fixture)]); call(['index', '--source', 'installed_binaries'])
+# Every object and view asserted under version 9 reads the same after the install of the repository's file.
+v9_objects = v8_objects + [after_v9]
+v9_before = [obj(i) for i in v9_objects]
+v9_views = {view: call(['render'], dict(view=view, args={} if view in ('current_memory_records', 'installs') else dict(task=task['native_key']))) for view in json.loads(v9.read_text())['views']}
+call(['schema', 'install', str(fixture)])
+assert [obj(i) for i in v9_objects] == v9_before
+for view, before in v9_views.items():
+    answer = call(['render'], dict(view=view, args={} if view in ('current_memory_records', 'installs') else dict(task=task['native_key'])))
+    assert answer['rows'] == before['rows'] and answer['markdown'] == before['markdown'].replace('schema=work@9', 'schema=work@' + str(copy['version'])), view
+print('gate_row=v10-v9-objects-and-views-unchanged expected=admitted objects=' + str(len(v9_objects)) + ' views=' + str(len(v9_views)))
+sizes = []
+for name in ('ont_describe', 'ont_action_list'):
+    wire = subprocess.run([binary, '--store', store, 'mcp'], input=json.dumps(dict(jsonrpc='2.0', id=1, method='tools/call', params=dict(name=name, arguments={}))) + '\n', text=True, capture_output=True, timeout=60)
+    answer = json.loads(wire.stdout.splitlines()[0])['result']; assert wire.returncode == 0 and not answer['isError'], answer
+    sizes.append(len(answer['content'][0]['text'].encode())); assert sizes[-1] <= 262144, (name, sizes[-1])
+print('gate_row=v10-mcp-sizes expected=admitted bytes=' + ','.join(map(str, sizes)))
+print('v10_mcp_bytes=' + ','.join(map(str, sizes)), file=sys.stderr)
+call(['index', '--source', 'installed_binaries'])
 ta, tb = (oid('installed_artifact', str(b)) for b in binaries)
 obj(ta); obj(tb)
 ip = {'target': ta, 'kind': 'forward', 'repository': repo8, 'commit': '2' * 40, 'attempt': 1, 'from': '4' * 40, 'by': 'rehearsal-timer', 'head': head8, 'review': accepting, 'reviews': [accepting]}
@@ -744,6 +768,259 @@ gate('close_item', 'multiline-evidence', dict(item=i7, evidence='ran it\nthen: o
 assert fields(i7)['state'] == 'done' and fields(i7)['evidence'] == 'ran it\nthen: ok \u00e9'
 gate('add_item', 'multiline-title', dict(item_params, key='k-multiline', title='two words\nand \u00e9'))
 print('v9_gate_rows_complete')
+PY
+
+# Version 10 on a second store: the user's rows of version 9 carried by ontology/migrate, then the walk of the
+# requests, intents and criteria.
+mkdir -- "$rehearsal_root/v10"
+python3 - "$ont_binary" "$repo" "$rehearsal_root/v10/store.sqlite" <<'PY'
+import datetime, hashlib, json, os, pathlib, subprocess, sys
+binary, repo, store = sys.argv[1:]
+assert os.environ['ONT_BIN'] == binary
+now = int(datetime.datetime(2026, 11, 12, tzinfo=datetime.timezone.utc).timestamp())
+env = {k: v for k, v in os.environ.items() if k not in ('ONT_AGENT', 'ONT_ROLE')}
+def call(args, request=None, code=0, client=None, role=None):
+    p = subprocess.run([binary, '--store', store, '--now', str(now), *(['--client', client] if client else []), *args], input=json.dumps(request) if request is not None else None,
+                       text=True, capture_output=True, timeout=60, env=dict(env, ONT_ROLE=role) if role else env)
+    assert p.returncode == code, (args, request, p.returncode, p.stdout, p.stderr)
+    data = json.loads(p.stdout); assert data['status'] == ('refused' if code else 'ok'), data
+    return data.get('result', data)
+def oid(kind, key): return dict(object_type=kind, namespace=dict(instance='vps://palantirkc', account='root'), native_key=key)
+def obj(i): return call(['get'], dict(id=i))['objects'][0]
+def fields(i): return {k: v.get('value') for k, v in obj(i)['observations'][-1]['fields'].items()}
+def created(r, kind): return next(e['id'] for e in r['edits'] if e['id']['object_type'] == kind and e['change'] == 'initial')
+def stamp(at=None): return datetime.datetime.fromtimestamp(now if at is None else at, datetime.timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
+def tick():
+    global now
+    now += 1
+def fingerprint(): return [(p.name, hashlib.sha256(p.read_bytes()).hexdigest() if p.exists() else None) for p in [pathlib.Path(store), pathlib.Path(store).with_name('edits.jsonl')]]
+def apply(action, rid, parameters, failure=None, role=None):
+    before = fingerprint()
+    r = call(['action', 'apply'], dict(action_type=action, request_id='v10-' + action + '-' + rid, parameters=parameters), 2 if failure else 0, role=role)
+    if failure:
+        expected = {failure} if isinstance(failure, str) else set(failure)
+        actual = set(r['failed']) if r['code'] == 'submission_criteria' else {r['code']}
+        assert actual == expected, (action, rid, expected, r)
+        assert fingerprint() == before
+    else: assert r['outcome'] == 'applied', r
+    print('gate_row=v10-' + action + '-' + rid + ' expected=' + (','.join(sorted(expected)) if failure else 'admitted'))
+    return r
+def install(commit, digest):
+    pinned = subprocess.check_output(['git', '-C', repo, 'show', commit + ':ontology/work.schema.json'], timeout=10)
+    assert hashlib.sha256(pinned).hexdigest() == digest
+    path = pathlib.Path(store).with_name('pinned-' + commit + '.json'); path.write_bytes(pinned)
+    call(['schema', 'install', str(path)])
+# The store starts at version 2 with a row of the user without words, and is carried through the pinned versions to 9.
+install('2b9417c8bc96b0cbeb4ab7913aa44cb49ad8d604', '27de5fd02c20299897720ab34543e04e6db685438c3dd7409691cb8ddae11f24')
+call(['index', '--source', 'task_states'])
+task = oid('task', 'ontology-operational-base')
+no_words = created(apply('record_decision', 'v2-without-words', dict(task=task, topic='v10-approval', text='an approval', decided_by='user', undo='supersede')), 'decision')
+for commit, digest in [('f46cdf49ba74e117ddaaf387416a0eac1d53f2af', 'f1573b514c1bb2591e525b502dfb1c37e22cea0f4588c67281afdc41df10adc5'),
+                       ('8ad36bf3cf10e19659965cc2d458a921533cdfae', '8467bd2984f77e5d81fe4efeca5d583a98cf754e100f7829aac2645a146bb414'),
+                       ('ccb15142dbe19f2e04ad1c5d445048336db60d08', '6f6d2acc4a45ccc7e2f25268d458f9b6fabc5ab10fb85231d0fa81eaf68373f4'),
+                       ('64fb1f59c6ff426807886d5a10397f5be3e496fa', '8b4b4236d9e5cff8ce3286211682cc977f4cdf1fdbfb36b42aefa08021e04d23'),
+                       ('8379ae651929853d6fb2df79559ece4a98c5f551', 'faba52d93401384cdc6146a7f505c61dafc4a87662deb284dfc689f19a58d298')]:
+    install(commit, digest)
+call(['index', '--source', 'task_states'])
+def row(rid, topic, words=None, who='user'):
+    tick()
+    extra = dict(user_words=words, user_form='decision') if words else {}
+    return created(apply('record_decision', rid, dict(task=task, topic=topic, text='v10 ' + topic, decided_by=who, undo='supersede', **extra)), 'decision')
+with_words = row('v9-words', 'v10-widget-colour', '"Make the invented widgets green."')
+with_triage = row('v9-triaged', 'v10-widget-size', '"Keep the invented widgets small."')
+apply('triage_decision', 'v9-triaged', dict(decision=with_triage, triage='none', reason='a preference, kept'))
+lead_row = row('v9-lead', 'v10-lead-order', who='lead')
+decisions = [no_words, with_words, with_triage, lead_row]
+v9_before = [obj(i) for i in [task, *decisions]]
+schema = json.loads(pathlib.Path(repo, 'ontology/work.schema.json').read_text())
+call(['schema', 'install', str(pathlib.Path(repo, 'ontology/work.schema.json'))])
+assert [obj(i) for i in [task, *decisions]] == v9_before
+print('gate_row=v10-v9-rows-unchanged expected=admitted objects=' + str(len(v9_before)))
+# The migration, run as itself: delivery skips a file that is not executable.
+assert subprocess.check_output(['git', '-C', repo, 'ls-files', '-s', 'ontology/migrate'], text=True, timeout=10).startswith('100755')
+def migrate(before, after, code=0, extra=None):
+    p = subprocess.run([str(pathlib.Path(repo, 'ontology/migrate')), store, str(before), str(after)], text=True, capture_output=True, timeout=600, env=dict(env, **(extra or {})))
+    assert p.returncode == code, (before, after, p.returncode, p.stdout, p.stderr)
+    print('migrate ' + str(before) + ' ' + str(after) + ' -> ' + p.stdout.strip())
+    return json.loads(p.stdout)
+def carried(d): return [o['id'] for o in call(['search'], dict(object_type='request', where={'eq': ['legacy_decision', d]}))['objects']]
+decided = [obj(i) for i in decisions]
+assert migrate(9, 10) == dict(carried=2, already=0)
+for d, reason in [(with_words, 'carried from version 9'), (with_triage, 'carried from version 9, triage none')]:
+    [request] = carried(d); f, df = fields(request), fields(d)
+    assert f['words'] == df['user_words'] and f['words_verified'] is False and f['reading'] == df['text'] and f['kind'] == 'decision' and f['topic'] == df['topic'], f
+    assert f['said_at'] == df['decided_at'] and f['status'] == 'current' and f['route'] == 'aside' and f['route_reason'] == reason and f.get('intent') is None and f['legacy_decision'] == d, f
+assert carried(no_words) == [] and carried(lead_row) == [] and [obj(i) for i in decisions] == decided
+unchanged = fingerprint()
+assert migrate(9, 10, extra=dict(ONT_AGENT='another-agent', ONT_ROLE='lead')) == dict(carried=0, already=2)
+assert fingerprint() == unchanged
+# A record that an interrupted run left without its aside: the run sets it aside.
+third = row('v10-old-verb', 'v10-widget-name', '"Call it the invented widget board."'); tf = fields(third)
+call(['action', 'apply'], dict(action_type='record_request', request_id='migrate-10-' + third['native_key'], parameters=dict(
+    words=tf['user_words'], words_verified=False, reading=tf['text'], kind='decision', topic=tf['topic'], said_at=tf['decided_at'], legacy_decision=third)), client='migrate')
+[third_request] = carried(third); assert fields(third_request)['route'] == 'unrouted'
+assert migrate(9, 10) == dict(carried=1, already=2)
+assert fields(third_request)['route'] == 'aside' and fields(third_request)['route_reason'] == 'carried from version 9'
+unchanged = fingerprint()
+for before, after in [(9, schema['version'] + 1), (10, 10), (10, 9)]:
+    assert migrate(before, after, 2) == dict(status='unknown_pair')
+assert fingerprint() == unchanged
+assert migrate(schema['version'] - 1, schema['version']) == dict(carried=0, already=3)
+assert [obj(i) for i in decisions] == decided
+print('v10_migration_rows_complete')
+# The walk. Each refusal row is before the action it guards; a refusal writes nothing.
+def request(rid, kind, said=None, topic='v10-walk'):
+    return created(apply('record_request', rid, dict(words='Invented words of ' + rid + '.', words_verified=True, record='fixture/session.jsonl', reading='The user says ' + rid + '.',
+                                                     kind=kind, topic=topic, said_at=said or stamp(), session='fixture-session', runtime='fixture-cli')), 'request')
+tick()
+rp = dict(words='Build the invented widget board.', words_verified=True, reading='The user orders a widget board.', kind='order', topic='v10-widget-board', said_at=stamp())
+apply('record_request', 'words-empty', dict(rp, words=''), 'words_empty')
+apply('record_request', 'future', dict(rp, said_at=stamp(now + 1)), 'said_in_the_future')
+apply('record_request', 'legacy-lead-row', dict(rp, legacy_decision=lead_row), 'legacy_not_a_user_row')
+apply('record_request', 'legacy-absent', dict(rp, legacy_decision=oid('decision', 'absent-v10-decision')), 'legacy_not_a_user_row')
+apply('record_request', 'legacy-carried', dict(rp, legacy_decision=with_words), 'legacy_already_carried')
+r0 = created(apply('record_request', 'r0', rp), 'request')
+f = fields(r0); assert f['status'] == 'current' and f['route'] == 'unrouted' and f['recorded_at'] == stamp() and f['words'] == rp['words'] and f.get('intent') is None, f
+unrouted = call(['render'], dict(view='requests_unrouted', args={})); assert unrouted['rows'] == 1 and rp['reading'] in unrouted['markdown'], unrouted
+intent = oid('intent', 'widget-board')
+dp = dict(intent=intent, outcome='The invented widget board lists every widget.', first_user='The fixture reader, in its first run.', origin=r0,
+          questions=[dict(question='Which colour?', default='green', answer='')], directory='fixture/widget-board')
+apply('draft_intent', 'origin-absent', dict(dp, origin=oid('request', 'absent-v10-request')), 'origin_not_current')
+apply('draft_intent', 'outcome-empty', dict(dp, outcome=''), 'outcome_empty')
+apply('draft_intent', 'first-user-empty', dict(dp, first_user=''), 'first_user_empty')
+apply('draft_intent', 'draft', dp)
+f = fields(intent); assert f['status'] == 'draft' and f['amended_at'] == stamp() and f['origin'] == r0 and f['questions'] == dp['questions'] and f.get('confirmed_by') is None, f
+f = fields(r0); assert f['route'] == 'intent' and f['intent'] == intent and f['routed_at'] == stamp(), f
+apply('draft_intent', 'same-key', dict(dp, outcome='Another outcome.'), 'revision_conflict')
+tick(); r1 = request('r1', 'answer')
+apply('route_request', 'r1', dict(request=r1, intent=intent)); assert fields(r1)['intent'] == intent
+apply('confirm_intent', 'no-criterion', dict(intent=intent, by=r1), 'no_criterion')
+cp = dict(intent=intent, statement='The board lists 3 widgets.', check='fixture-check --count 3', baseline='0 widgets, fixture, 2026-11-12')
+apply('add_criterion', 'statement-empty', dict(cp, statement=''), 'statement_empty')
+apply('add_criterion', 'check-empty', dict(cp, check=''), 'check_empty')
+c1 = created(apply('add_criterion', 'c1', cp), 'criterion')
+f = fields(c1); assert f['state'] == 'open' and f['intent'] == intent and f['added_at'] == stamp() and f['baseline'] == cp['baseline'], f
+c2 = created(apply('add_criterion', 'c2', dict(intent=intent, statement='The board is green.', check='look at it')), 'criterion')
+tick(); r2 = request('r2', 'decision')
+apply('confirm_intent', 'unrouted', dict(intent=intent, by=r2), 'by_not_routed_here')
+preference = request('preference', 'preference'); apply('route_request', 'preference', dict(request=preference, intent=intent))
+apply('confirm_intent', 'preference', dict(intent=intent, by=preference), 'by_not_the_users_word')
+tick(); apply('amend_intent', 'why', dict(intent=intent, why='The fixture needs a board.'))
+apply('confirm_intent', 'said-before-amendment', dict(intent=intent, by=r1), 'by_older_than_amendment')
+tick(); r3 = request('r3', 'decision'); apply('route_request', 'r3', dict(request=r3, intent=intent))
+apply('confirm_intent', 'r3', dict(intent=intent, by=r3))
+f = fields(intent); assert f['status'] == 'confirmed' and f['confirmed_by'] == r3 and f['confirmed_at'] == stamp() and f['confirmed_delegated'] is False and f['why'] == 'The fixture needs a board.', f
+apply('confirm_intent', 'confirmed', dict(intent=intent, by=r3), 'intent_not_open')
+apply('route_request', 'confirming', dict(request=r3, intent=intent), 'request_confirms_an_intent')
+apply('set_request_aside', 'confirming', dict(request=r3, reason='a remark'), 'request_confirms_an_intent')
+apply('supersede_request', 'confirming', dict(rp, request=r3), 'request_confirms_an_intent')
+apply('draft_intent', 'origin-confirms', dict(dp, intent=oid('intent', 'widget-other'), origin=r3), 'origin_confirms_an_intent')
+apply('amend_intent', 'outcome-empty', dict(intent=intent, outcome=''), 'outcome_empty')
+apply('amend_intent', 'first-user-empty', dict(intent=intent, first_user=''), 'first_user_empty')
+tick(); apply('amend_intent', 'outcome', dict(intent=intent, outcome='The invented widget board lists every widget, in order.'))
+f = fields(intent)
+assert f['status'] == 'draft' and f.get('confirmed_by') is None and f['confirmed_delegated'] is False and f['amended_at'] == stamp() and f['first_user'] == dp['first_user'] and f['why'] == 'The fixture needs a board.' and f['questions'] == dp['questions'], f
+apply('route_request', 'after-amendment', dict(request=r3, intent=intent))
+apply('name_lead', 'unrouted', dict(intent=intent, session='fixture-lead', by=r2), 'by_not_routed_here')
+apply('name_lead', 'preference', dict(intent=intent, session='fixture-lead', by=preference), 'by_not_the_users_word')
+apply('name_lead', 'r0', dict(intent=intent, session='fixture-lead', by=r0)); f = fields(intent); assert f['lead_session'] == 'fixture-lead' and f['lead_named_by'] == r0, f
+apply('note_intent', 'notes', dict(intent=intent, notes='Next: run the count.')); assert fields(intent)['notes'] == 'Next: run the count.'
+apply('waive_criterion', 'unrouted', dict(criterion=c2, by=r2, reason='not needed'), 'by_not_routed_here')
+apply('waive_criterion', 'preference', dict(criterion=c2, by=preference, reason='not needed'), 'by_not_the_users_word')
+apply('waive_criterion', 'reason-empty', dict(criterion=c2, by=r3, reason=''), 'reason_empty')
+apply('waive_criterion', 'c2', dict(criterion=c2, by=r3, reason='The user does not need it.'))
+f = fields(c2); assert f['state'] == 'waived' and f['waived_by'] == r3 and f['evidence'] == 'The user does not need it.', f
+apply('check_criterion', 'waived', dict(criterion=c2, state='pass', evidence='seen'), 'criterion_waived')
+apply('close_intent', 'draft', dict(intent=intent, reason='fixture-check passed'), ('intent_not_confirmed', 'criterion_not_passed'))
+tick(); r4 = request('r4', 'answer'); apply('route_request', 'r4', dict(request=r4, intent=intent)); apply('confirm_intent', 'r4', dict(intent=intent, by=r4))
+apply('close_intent', 'open-criterion', dict(intent=intent, reason='fixture-check passed'), 'criterion_not_passed')
+for state in ['open', 'waived']: apply('check_criterion', 'state-' + state, dict(criterion=c1, state=state, evidence='seen'), 'state_not_a_result')
+apply('check_criterion', 'evidence-empty', dict(criterion=c1, state='pass', evidence=''), 'evidence_empty')
+apply('check_criterion', 'fail', dict(criterion=c1, state='fail', evidence='fixture-check: 2 widgets'))
+apply('close_intent', 'failed-criterion', dict(intent=intent, reason='fixture-check passed'), 'criterion_not_passed')
+tick(); apply('check_criterion', 'pass', dict(criterion=c1, state='pass', evidence='fixture-check: 3 widgets'))
+f = fields(c1); assert f['state'] == 'pass' and f['evidence'] == 'fixture-check: 3 widgets' and f['checked_at'] == stamp(), f
+apply('close_intent', 'met', dict(intent=intent, reason='fixture-check passed'))
+f = fields(intent); assert f['status'] == 'met' and f['closed_at'] == stamp() and f['closed_reason'] == 'fixture-check passed', f
+for action, params in [('amend_intent', dict(intent=intent, why='later')), ('note_intent', dict(intent=intent, notes='later')), ('name_lead', dict(intent=intent, session='fixture-lead', by=r0)),
+                       ('add_criterion', cp), ('retire_intent', dict(intent=intent, reason='later'))]:
+    apply(action, 'met', params, 'intent_closed')
+apply('route_request', 'met', dict(request=r2, intent=intent), 'intent_closed')
+apply('route_request', 'unknown-intent', dict(request=r2, intent=oid('intent', 'absent-v10-intent')), 'unknown_intent')
+apply('close_intent', 'closed', dict(intent=intent, reason='again'), 'intent_not_confirmed')
+apply('confirm_intent', 'met', dict(intent=intent, by=r4), 'intent_not_open')
+tick(); retired = oid('intent', 'widget-retire'); apply('draft_intent', 'retire', dict(dp, intent=retired, origin=request('o-retire', 'order')))
+apply('retire_intent', 'reason-empty', dict(intent=retired, reason=''), 'reason_empty')
+apply('retire_intent', 'retired', dict(intent=retired, reason='replaced by widget-board'))
+f = fields(retired); assert f['status'] == 'retired' and f['closed_reason'] == 'replaced by widget-board' and f['closed_at'] == stamp(), f
+apply('retire_intent', 'again', dict(intent=retired, reason='again'), 'intent_closed')
+tick(); sp = dict(rp, request=r2, words='Corrected invented words.', reading='The user corrects r2.', kind='correction', said_at=stamp())
+apply('supersede_request', 'words-empty', dict(sp, words=''), 'words_empty')
+apply('supersede_request', 'future', dict(sp, said_at=stamp(now + 1)), 'said_in_the_future')
+words2 = fields(r2)['words']
+successor = created(apply('supersede_request', 'r2', sp), 'request')
+f = fields(r2); assert f['status'] == 'superseded' and f['words'] == words2, f
+f = fields(successor); assert f['status'] == 'current' and f['route'] == 'unrouted' and f['supersedes'] == r2 and f['words'] == sp['words'] and f['kind'] == 'correction' and f['said_at'] == stamp(), f
+apply('supersede_request', 'again', sp, 'request_not_current')
+apply('route_request', 'superseded', dict(request=r2, intent=oid('intent', 'absent-v10-intent')), ('request_not_current', 'unknown_intent'))
+apply('set_request_aside', 'superseded', dict(request=r2, reason='a remark'), 'request_not_current')
+apply('set_request_aside', 'reason-empty', dict(request=r1, reason=''), 'reason_empty')
+tick(); apply('set_request_aside', 'r1', dict(request=r1, reason='a question answered at once'))
+f = fields(r1); assert f['route'] == 'aside' and f['route_reason'] == 'a question answered at once' and f.get('intent') is None and f['routed_at'] == stamp() and f['words'] == 'Invented words of r1.', f
+print('v10_walk_rows_complete')
+# The role of the actor: an engine that knows it ships the verb log.
+if 'log' in [c['command'] for c in json.loads(subprocess.check_output([binary, '--help'], text=True, timeout=10))['commands']]:
+    tick(); assumed = oid('intent', 'widget-assume'); apply('draft_intent', 'assume', dict(dp, intent=assumed, origin=request('o-assume', 'order')))
+    apply('add_criterion', 'assume', dict(cp, intent=assumed))
+    apply('assume_intent', 'no-role', dict(intent=assumed, reason='the user is away'), 'not_the_lead')
+    apply('assume_intent', 'reason-empty', dict(intent=assumed, reason=''), 'reason_empty', role='lead')
+    apply('assume_intent', 'lead', dict(intent=assumed, reason='the user is away'), role='lead')
+    f = fields(assumed); assert f['status'] == 'assumed' and f['assumed_reason'] == 'the user is away', f
+    apply('assume_intent', 'again', dict(intent=assumed, reason='again'), 'intent_not_draft', role='lead')
+    tick(); order, delegation = request('not-a-delegation', 'order'), request('delegation', 'delegation')
+    apply('set_request_aside', 'delegation', dict(request=delegation, reason='it covers the widget intents'))
+    covered = oid('intent', 'widget-delegated'); apply('draft_intent', 'delegated', dict(dp, intent=covered, origin=request('o-delegated', 'order')))
+    dlp = dict(intent=assumed, delegation=delegation, reason='the delegation covers widget intents')
+    apply('confirm_intent_delegated', 'order', dict(dlp, delegation=order), 'not_a_delegation', role='lead')
+    apply('confirm_intent_delegated', 'no-role', dlp, 'not_the_lead')
+    apply('confirm_intent_delegated', 'reason-empty', dict(dlp, reason=''), 'reason_empty', role='lead')
+    apply('confirm_intent_delegated', 'no-criterion', dict(dlp, intent=covered), 'no_criterion', role='lead')
+    apply('confirm_intent_delegated', 'assumed', dlp, role='lead')
+    f = fields(assumed); assert f['status'] == 'confirmed' and f['confirmed_by'] == delegation and f['confirmed_delegated'] is True and f['confirmed_at'] == stamp(), f
+    apply('confirm_intent_delegated', 'confirmed', dlp, 'intent_not_open', role='lead')
+    apply('route_request', 'delegation-used', dict(request=delegation, intent=covered), 'request_confirms_an_intent')
+    apply('add_criterion', 'delegated', dict(cp, intent=covered))
+    early_stop = request('early-stop', 'stop', said=stamp(now - 10))
+    tick(); stop, later_preference = request('stop', 'stop'), request('later-preference', 'preference')
+    apply('end_delegation', 'not-a-delegation', dict(request=order, stopped_by=stop), 'not_a_delegation')
+    apply('end_delegation', 'preference', dict(request=delegation, stopped_by=later_preference), 'by_not_the_users_word')
+    apply('end_delegation', 'earlier', dict(request=delegation, stopped_by=early_stop), 'by_not_later')
+    ended = apply('end_delegation', 'ended', dict(request=delegation, stopped_by=stop))
+    # The action changed the delegation and nothing else: the user's later word stays current.
+    assert [(e['id'], e['change']) for e in ended['edits']] == [(delegation, 'update')], ended
+    assert fields(delegation)['status'] == 'superseded' and fields(stop)['status'] == 'current' and fields(assumed)['confirmed_by'] == delegation
+    apply('confirm_intent_delegated', 'ended', dict(dlp, intent=covered), 'not_a_delegation', role='lead')
+    apply('end_delegation', 'again', dict(request=delegation, stopped_by=stop), 'not_a_delegation')
+    refused = call(['log'], dict(outcome='refused', action_type='confirm_intent', parameters=True))['rows']
+    assert any(r['code'] == 'submission_criteria' and r.get('failed') == ['by_not_routed_here'] and r['parameters']['by'] == r2 for r in refused), refused
+    led = call(['log'], dict(action_type='assume_intent', actor=dict(role='lead')))['rows']
+    assert len(led) == 1 and led[0]['actor']['role'] == 'lead', led
+    print('v10_role_rows_complete')
+else:
+    print('rehearsal: skipped without the role of the actor: assume_intent, confirm_intent_delegated, end_delegation, ont log', file=sys.stderr)
+# The four views.
+open_keys = sorted(o['id']['native_key'] for o in call(['search'], dict(object_type='intent', where={'in': ['status', ['draft', 'assumed', 'confirmed']]}))['objects'])
+view = call(['render'], dict(view='intents_open', args={}))
+assert view['rows'] == len(open_keys) > 0 and all('| ' + k + ' |' in view['markdown'] for k in open_keys) and '| widget-board |' not in view['markdown'], view
+view = call(['render'], dict(view='criteria_of_intent', args=dict(intent='widget-board')))
+assert view['rows'] == 2 and '| pass |' in view['markdown'] and '| waived |' in view['markdown'], view
+view = call(['render'], dict(view='requests_by_topic', args=dict(topic='v10-widget-colour')))
+assert view['rows'] == 1 and '| aside |' in view['markdown'], view
+unrouted = [o['id'] for o in call(['search'], dict(object_type='request', where={'all': [{'eq': ['status', 'current']}, {'eq': ['route', 'unrouted']}]}))['objects']]
+view = call(['render'], dict(view='requests_unrouted', args={}))
+assert view['rows'] == len(unrouted) > 0 and 'v10 v10-widget-colour' not in view['markdown'] and 'The user corrects r2.' in view['markdown'], view
+print(view['markdown'])
+print('v10_gate_rows_complete')
 PY
 
 python3 -I -B "$repo/ontology/memory-index-walk.py" "$ont_binary" "$rehearsal_root/memory-walk" --records 2
