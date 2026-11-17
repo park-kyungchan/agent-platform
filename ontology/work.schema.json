@@ -1,7 +1,7 @@
 {
   "format": "ontology-schema/v1",
   "domain": "work",
-  "version": 9,
+  "version": 10,
   "namespace": {
     "instance": "vps://palantirkc",
     "account": "root"
@@ -96,7 +96,12 @@
     "nonempty_text": {"base": "string", "pattern": "^[\\s\\S]+$"},
     "objective_status": {"base": "string", "enum": ["stated", "confirmed", "retired"]},
     "item_state": {"base": "string", "enum": ["queued", "in_work", "done", "dropped"]},
-    "triage_kind": {"base": "string", "enum": ["item", "intent", "not_adopted", "none"]}
+    "triage_kind": {"base": "string", "enum": ["item", "intent", "not_adopted", "none"]},
+    "request_kind": {"base": "string", "enum": ["order", "decision", "preference", "correction", "stop", "answer", "delegation"]},
+    "request_status": {"base": "string", "enum": ["current", "superseded"]},
+    "request_route": {"base": "string", "enum": ["unrouted", "intent", "aside"]},
+    "intent_status": {"base": "string", "enum": ["draft", "assumed", "confirmed", "met", "retired"]},
+    "criterion_state": {"base": "string", "enum": ["open", "pass", "fail", "waived"]}
   },
   "sources": {
     "task_states": {
@@ -1087,6 +1092,75 @@
         "reason": {"type": "string", "required": true, "max_bytes": 600},
         "set_at": {"type": {"value_type": "utc_time"}, "required": true, "max_bytes": 40}
       }
+    },
+    "request": {
+      "description": "One message of the user that orders, decides, prefers, corrects, stops, answers or delegates, in the user's own words. Record it with record_request, then route it to an intent or set it aside; correct it with supersede_request.",
+      "owner": "ontology",
+      "primary_key": {"from": "$action_id"},
+      "title": "topic",
+      "properties": {
+        "words": {"type": "string", "required": true, "max_bytes": 24000, "description": "The user's own text in the user's language, unchanged. No action changes it: a correction is a new request (supersede_request)."},
+        "words_verified": {"type": "boolean", "required": true, "description": "True when a program read the words from a session record; false when an agent wrote them otherwise. Set once: verified words replace unverified ones only through supersede_request."},
+        "truncated": {"type": "boolean", "required": false, "description": "True when the words were cut to fit 24,000 bytes; the record holds the whole message."},
+        "record": {"type": "string", "required": false, "max_bytes": 400, "description": "The session record the words were read from (a path, with a line or id), so a reader can check them."},
+        "reading": {"type": "string", "required": true, "max_bytes": 1000, "description": "What the agent took the message to mean, in English: the order, decision or answer in a sentence or two."},
+        "kind": {"type": {"value_type": "request_kind"}, "required": true, "description": "order, decision, preference, correction, stop, answer, or delegation: the user hands the confirmation of named intents to the Lead for a time the user does not step in."},
+        "topic": {"type": "string", "required": true, "max_bytes": 120, "description": "A short label that groups related requests (view requests_by_topic); not unique."},
+        "said_at": {"type": {"value_type": "utc_time"}, "required": true, "description": "When the user said it, UTC (YYYY-MM-DDTHH:MM:SSZ); never later than the time of recording."},
+        "recorded_at": {"type": {"value_type": "utc_time"}, "required": true, "description": "When the request was recorded, from the action clock."},
+        "session": {"type": "string", "required": false, "max_bytes": 120, "description": "The session in which the user said it."},
+        "runtime": {"type": "string", "required": false, "max_bytes": 40, "description": "The CLI that held the session, such as claude or codex."},
+        "status": {"type": {"value_type": "request_status"}, "required": true, "description": "current, or superseded: replaced by a correction (supersede_request) or ended by the user (end_delegation)."},
+        "supersedes": {"type": {"ref": "request"}, "required": false, "description": "The request this one corrects."},
+        "route": {"type": {"value_type": "request_route"}, "required": true, "description": "unrouted (not handled yet), intent (part of the intent named by intent) or aside (part of no intent; route_reason says why)."},
+        "intent": {"type": {"ref": "intent"}, "required": false, "description": "The intent the request is part of while route is intent; cleared by set_request_aside."},
+        "route_reason": {"type": "string", "required": false, "max_bytes": 600, "description": "Why the request was set aside. Valid only while route is aside: no rule clears a scalar, so the reason of an earlier aside stays after a later route."},
+        "routed_at": {"type": {"value_type": "utc_time"}, "required": false, "description": "When the request was last routed or set aside."},
+        "legacy_decision": {"type": {"ref": "decision"}, "required": false, "description": "The user's decision row of version 9 this request was carried from (ontology/migrate)."}
+      }
+    },
+    "intent": {
+      "description": "One objective of the user, keyed by a short name. Draft it from the request that started it, add criteria, have the user confirm it, check the criteria, then close it met or retire it.",
+      "owner": "ontology",
+      "primary_key": {"from": "/native_key"},
+      "properties": {
+        "outcome": {"type": "string", "required": true, "max_bytes": 1200, "description": "What is true when the intent is met, as sentences that can each be checked true or false."},
+        "why": {"type": "string", "required": false, "max_bytes": 800, "description": "Why the user wants it: the need behind the outcome."},
+        "first_user": {"type": "string", "required": true, "max_bytes": 600, "description": "Who or what uses the result first, and the real run that shows it working."},
+        "not_included": {"type": "string", "required": false, "max_bytes": 800, "description": "What the user does not want done under this intent."},
+        "constraints": {"type": "string", "required": false, "max_bytes": 800, "description": "Limits the work keeps: tools, data, cost, time, places not to touch."},
+        "questions": {"type": {"array": {"struct": {"question": {"value_type": "nonempty_text"}, "default": {"value_type": "nonempty_text"}, "answer": "string"}}}, "required": false, "description": "Open questions to the user, at most five: each with the default the Lead assumes until the user answers, and the answer (empty until answered). Given whole; replaces the list."},
+        "origin": {"type": {"ref": "request"}, "required": true, "description": "The request that started the intent."},
+        "status": {"type": {"value_type": "intent_status"}, "required": true, "description": "draft (being written), assumed (the Lead proceeds unconfirmed), confirmed (by the user's word or a delegation), met (closed with its criteria passed) or retired."},
+        "amended_at": {"type": {"value_type": "utc_time"}, "required": true, "description": "Time of draft_intent or of the last amend_intent: a confirming request is said later."},
+        "confirmed_by": {"type": {"ref": "request"}, "required": false, "description": "The request that confirmed the intent: the user's word, or a delegation when confirmed_delegated is true. Cleared by amend_intent."},
+        "confirmed_at": {"type": {"value_type": "utc_time"}, "required": false, "description": "When it was confirmed. Valid only while status is confirmed or met: it cannot be cleared and stays after an amendment."},
+        "confirmed_delegated": {"type": "boolean", "required": false, "description": "True when the Lead confirmed it under a delegation of the user, not by the user's own word."},
+        "assumed_reason": {"type": "string", "required": false, "max_bytes": 600, "description": "Why the Lead proceeds without the user's confirmation. Valid only while status is assumed."},
+        "lead_session": {"type": "string", "required": false, "max_bytes": 120, "description": "The session that leads the work of this intent."},
+        "lead_named_by": {"type": {"ref": "request"}, "required": false, "description": "The user's request that named the Lead."},
+        "directory": {"type": "string", "required": false, "max_bytes": 300, "description": "The task directory of the work for this intent."},
+        "notes": {"type": "string", "required": false, "max_bytes": 4000, "description": "The Lead's free text for the next Lead: the state, the next step, where things are. Replaced whole by note_intent."},
+        "closed_at": {"type": {"value_type": "utc_time"}, "required": false, "description": "When the intent was closed met or retired."},
+        "closed_reason": {"type": "string", "required": false, "max_bytes": 600, "description": "Why it was closed: how the outcome was shown, or why it was retired."}
+      }
+    },
+    "criterion": {
+      "description": "One success criterion of an intent: a statement checkable true or false and how to check it. An intent is confirmed only with one that is not waived, and closed only when none is open or failed.",
+      "owner": "ontology",
+      "primary_key": {"from": "$action_id"},
+      "title": "statement",
+      "properties": {
+        "intent": {"type": {"ref": "intent"}, "required": true, "description": "The intent this criterion belongs to."},
+        "statement": {"type": "string", "required": true, "max_bytes": 600, "description": "What must be true, checkable as true or false."},
+        "check": {"type": "string", "required": true, "max_bytes": 800, "description": "How to check it: the command, the test, the eval with its threshold, or the real run to observe."},
+        "baseline": {"type": "string", "required": false, "max_bytes": 300, "description": "For a number: its value before the work, with its source and time."},
+        "state": {"type": {"value_type": "criterion_state"}, "required": true, "description": "open (not checked yet), pass, fail, or waived by the user."},
+        "evidence": {"type": "string", "required": false, "max_bytes": 1000, "description": "What showed the state: the command and its result, or the reason of a waiver."},
+        "checked_at": {"type": {"value_type": "utc_time"}, "required": false, "description": "When check_criterion last set the state."},
+        "waived_by": {"type": {"ref": "request"}, "required": false, "description": "The user's request that waived the criterion."},
+        "added_at": {"type": {"value_type": "utc_time"}, "required": true, "description": "When the criterion was added."}
+      }
     }
   },
   "link_types": {
@@ -1278,7 +1352,15 @@
     "board_task": {"from": "board", "via": "task", "to": "task", "cardinality": "many_to_one", "names": {"forward": "board_task", "reverse": "boards"}},
     "board_order": {"from": "board", "via": "order", "to": "item", "cardinality": "many_to_many", "names": {"forward": "board_order", "reverse": "ordering_boards"}},
     "decision_triage_item": {"from": "decision", "via": "triage_item", "to": "item", "cardinality": "many_to_one", "names": {"forward": "decision_triage_item", "reverse": "triaged_rows"}},
-    "decision_triage_objective": {"from": "decision", "via": "triage_objective", "to": "objective", "cardinality": "many_to_one", "names": {"forward": "decision_triage_objective", "reverse": "intent_rows"}}
+    "decision_triage_objective": {"from": "decision", "via": "triage_objective", "to": "objective", "cardinality": "many_to_one", "names": {"forward": "decision_triage_objective", "reverse": "intent_rows"}},
+    "request_intent": {"from": "request", "via": "intent", "to": "intent", "cardinality": "many_to_one", "names": {"forward": "request_intent", "reverse": "intent_requests"}},
+    "intent_origin": {"from": "intent", "via": "origin", "to": "request", "cardinality": "many_to_one", "names": {"forward": "intent_origin", "reverse": "request_started_intents"}},
+    "criterion_intent": {"from": "criterion", "via": "intent", "to": "intent", "cardinality": "many_to_one", "names": {"forward": "criterion_intent", "reverse": "intent_criteria"}},
+    "request_supersedes": {"from": "request", "via": "supersedes", "to": "request", "cardinality": "many_to_one", "names": {"forward": "request_supersedes", "reverse": "request_successors"}},
+    "request_legacy_decision": {"from": "request", "via": "legacy_decision", "to": "decision", "cardinality": "many_to_one", "names": {"forward": "request_legacy_decision", "reverse": "decision_carried_requests"}},
+    "intent_confirmed_by": {"from": "intent", "via": "confirmed_by", "to": "request", "cardinality": "many_to_one", "names": {"forward": "intent_confirmed_by", "reverse": "request_confirmed_intents"}},
+    "intent_lead_named_by": {"from": "intent", "via": "lead_named_by", "to": "request", "cardinality": "many_to_one", "names": {"forward": "intent_lead_named_by", "reverse": "request_named_leads"}},
+    "criterion_waived_by": {"from": "criterion", "via": "waived_by", "to": "request", "cardinality": "many_to_one", "names": {"forward": "criterion_waived_by", "reverse": "request_waived_criteria"}}
   },
   "action_types": {
     "set_hold": {
@@ -2962,6 +3044,306 @@
           }
         }
       ]
+    },
+    "record_request": {
+      "description": "Record one message of the user that orders, decides, prefers, corrects, stops, answers or delegates, in the user's own words. It starts current and unrouted; then route it to an intent (route_request, draft_intent) or set it aside.",
+      "parameters": {
+        "words": {"type": "string", "required": true, "max_bytes": 24000, "description": "The user's own text in the user's language, unchanged. No action changes it: a correction is a new request (supersede_request)."},
+        "words_verified": {"type": "boolean", "required": true, "description": "True when a program read the words from a session record; false when an agent wrote them otherwise. Set once: verified words replace unverified ones only through supersede_request."},
+        "truncated": {"type": "boolean", "required": false, "description": "True when the words were cut to fit 24,000 bytes; the record holds the whole message."},
+        "record": {"type": "string", "required": false, "max_bytes": 400, "description": "The session record the words were read from (a path, with a line or id), so a reader can check them."},
+        "reading": {"type": "string", "required": true, "max_bytes": 1000, "description": "What the agent took the message to mean, in English: the order, decision or answer in a sentence or two."},
+        "kind": {"type": {"value_type": "request_kind"}, "required": true, "description": "order, decision, preference, correction, stop, answer, or delegation: the user hands the confirmation of named intents to the Lead for a time the user does not step in."},
+        "topic": {"type": "string", "required": true, "max_bytes": 120, "description": "A short label that groups related requests (view requests_by_topic); not unique."},
+        "said_at": {"type": {"value_type": "utc_time"}, "required": true, "description": "When the user said it, UTC (YYYY-MM-DDTHH:MM:SSZ); never later than the time of recording."},
+        "session": {"type": "string", "required": false, "max_bytes": 120, "description": "The session in which the user said it."},
+        "runtime": {"type": "string", "required": false, "max_bytes": 40, "description": "The CLI that held the session, such as claude or codex."},
+        "legacy_decision": {"type": {"ref": "decision"}, "required": false, "description": "Only when carrying a user's decision row of version 9: that row. Omit it for a new message."}
+      },
+      "submission_criteria": [
+        {"code": "words_empty", "message": "Give the user's words; an empty text is no message.", "all": [{"ne": ["$words", ""]}]},
+        {"code": "said_in_the_future", "message": "said_at is after now: give the UTC time the user said it. A local time written with Z can lie in the future.", "all": [{"le": ["$said_at", "$now"]}]},
+        {"code": "legacy_not_a_user_row", "message": "legacy_decision must be a decision with decided_by user; omit it for a new message.", "none": [{"all": [{"present": "$legacy_decision"}, {"none": [{"all": [{"exists": "$legacy_decision"}, {"eq": ["$legacy_decision.decided_by", "user"]}]}]}]}]},
+        {"code": "legacy_already_carried", "message": "A request already carries this decision; find it (view requests_by_topic) instead of recording it again.", "none": [{"all": [{"present": "$legacy_decision"}, {"linked": {"from": "$legacy_decision", "link": "decision_carried_requests"}}]}]}
+      ],
+      "rules": [
+        {"create_object": "request", "set": {"words": "$words", "words_verified": "$words_verified", "truncated": "$truncated", "record": "$record", "reading": "$reading", "kind": "$kind", "topic": "$topic", "said_at": "$said_at", "session": "$session", "runtime": "$runtime", "status": "current", "route": "unrouted", "recorded_at": "$now", "legacy_decision": "$legacy_decision"}}
+      ]
+    },
+    "supersede_request": {
+      "description": "Correct a current request: it becomes superseded and a new current, unrouted request carries the corrected words. A request that confirmed an intent is corrected after amend_intent of that intent, which clears the confirmation.",
+      "parameters": {
+        "request": {"type": {"ref": "request"}, "required": true, "description": "The current request to correct."},
+        "words": {"type": "string", "required": true, "max_bytes": 24000, "description": "The user's own text in the user's language, unchanged. No action changes it: a correction is a new request (supersede_request)."},
+        "words_verified": {"type": "boolean", "required": true, "description": "True when a program read the words from a session record; false when an agent wrote them otherwise. Set once: verified words replace unverified ones only through supersede_request."},
+        "truncated": {"type": "boolean", "required": false, "description": "True when the words were cut to fit 24,000 bytes; the record holds the whole message."},
+        "record": {"type": "string", "required": false, "max_bytes": 400, "description": "The session record the words were read from (a path, with a line or id), so a reader can check them."},
+        "reading": {"type": "string", "required": true, "max_bytes": 1000, "description": "What the agent took the message to mean, in English: the order, decision or answer in a sentence or two."},
+        "kind": {"type": {"value_type": "request_kind"}, "required": true, "description": "order, decision, preference, correction, stop, answer, or delegation: the user hands the confirmation of named intents to the Lead for a time the user does not step in."},
+        "topic": {"type": "string", "required": true, "max_bytes": 120, "description": "A short label that groups related requests (view requests_by_topic); not unique."},
+        "said_at": {"type": {"value_type": "utc_time"}, "required": true, "description": "When the user said it, UTC (YYYY-MM-DDTHH:MM:SSZ); never later than the time of recording."},
+        "session": {"type": "string", "required": false, "max_bytes": 120, "description": "The session in which the user said it."},
+        "runtime": {"type": "string", "required": false, "max_bytes": 40, "description": "The CLI that held the session, such as claude or codex."}
+      },
+      "submission_criteria": [
+        {"code": "request_not_current", "message": "Name a current request; a superseded one was replaced: use the request that supersedes it.", "all": [{"exists": "$request"}, {"eq": ["$request.status", "current"]}]},
+        {"code": "words_empty", "message": "Give the user's words; an empty text is no message.", "all": [{"ne": ["$words", ""]}]},
+        {"code": "said_in_the_future", "message": "said_at is after now: give the UTC time the user said it. A local time written with Z can lie in the future.", "all": [{"le": ["$said_at", "$now"]}]},
+        {"code": "request_confirms_an_intent", "message": "This request confirmed an intent: amend_intent of that intent first (it clears the confirmation), then act on the request.", "none": [{"linked": {"from": "$request", "link": "request_confirmed_intents"}}]}
+      ],
+      "rules": [
+        {"modify_object": "request", "set": {"status": "superseded"}},
+        {"create_object": "request", "set": {"words": "$words", "words_verified": "$words_verified", "truncated": "$truncated", "record": "$record", "reading": "$reading", "kind": "$kind", "topic": "$topic", "said_at": "$said_at", "session": "$session", "runtime": "$runtime", "status": "current", "route": "unrouted", "recorded_at": "$now", "supersedes": "$request"}}
+      ]
+    },
+    "route_request": {
+      "description": "Route a current request to an open intent it is part of. Only a request routed to an intent confirms it, names its Lead or waives one of its criteria.",
+      "parameters": {
+        "request": {"type": {"ref": "request"}, "required": true, "description": "The current request to route."},
+        "intent": {"type": {"ref": "intent"}, "required": true, "description": "The intent: its full Id, with the intent's key as native_key."}
+      },
+      "submission_criteria": [
+        {"code": "request_not_current", "message": "Name a current request; a superseded one was replaced: use the request that supersedes it.", "all": [{"exists": "$request"}, {"eq": ["$request.status", "current"]}]},
+        {"code": "unknown_intent", "message": "Name an existing intent (search intent), or draft it with draft_intent from this request.", "all": [{"exists": "$intent"}]},
+        {"code": "intent_closed", "message": "The intent is met or retired; route the request to an open intent or draft a new one.", "none": [{"all": [{"exists": "$intent"}, {"in": ["$intent.status", ["met", "retired"]]}]}]},
+        {"code": "request_confirms_an_intent", "message": "This request confirmed an intent: amend_intent of that intent first (it clears the confirmation), then act on the request.", "none": [{"linked": {"from": "$request", "link": "request_confirmed_intents"}}]}
+      ],
+      "rules": [
+        {"modify_object": "request", "set": {"route": "intent", "intent": "$intent", "routed_at": "$now"}}
+      ]
+    },
+    "set_request_aside": {
+      "description": "Set a current request aside: it is part of no intent (a remark, a question answered at once). Give the reason; the reference intent is cleared.",
+      "parameters": {
+        "request": {"type": {"ref": "request"}, "required": true, "description": "The current request to set aside."},
+        "reason": {"type": "string", "required": true, "max_bytes": 600, "description": "Why the request is part of no intent."}
+      },
+      "submission_criteria": [
+        {"code": "request_not_current", "message": "Name a current request; a superseded one was replaced: use the request that supersedes it.", "all": [{"exists": "$request"}, {"eq": ["$request.status", "current"]}]},
+        {"code": "reason_empty", "message": "Give the reason in words.", "all": [{"ne": ["$reason", ""]}]},
+        {"code": "request_confirms_an_intent", "message": "This request confirmed an intent: amend_intent of that intent first (it clears the confirmation), then act on the request.", "none": [{"linked": {"from": "$request", "link": "request_confirmed_intents"}}]}
+      ],
+      "rules": [
+        {"modify_object": "request", "set": {"route": "aside", "route_reason": "$reason", "routed_at": "$now"}},
+        {"clear_reference": {"object_type": "request", "property": "intent"}}
+      ]
+    },
+    "end_delegation": {
+      "description": "The user ends a delegation: the delegation becomes superseded and confirm_intent_delegated refuses it from then on; the intents it confirmed keep it. stopped_by is the user's later word that ended it.",
+      "parameters": {
+        "request": {"type": {"ref": "request"}, "required": true, "description": "The current request of kind delegation that the user ends."},
+        "stopped_by": {"type": {"ref": "request"}, "required": true, "description": "The user's current order, decision, correction or stop, said after the delegation, that ends it."}
+      },
+      "submission_criteria": [
+        {"code": "not_a_delegation", "message": "Name a current request of kind delegation; a delegation the user ended is superseded.", "all": [{"exists": "$request"}, {"eq": ["$request.status", "current"]}, {"eq": ["$request.kind", "delegation"]}]},
+        {"code": "by_not_the_users_word", "message": "stopped_by must be a current request of kind order, decision, correction or stop: record the user's word that ends the delegation.", "all": [{"exists": "$stopped_by"}, {"eq": ["$stopped_by.status", "current"]}, {"in": ["$stopped_by.kind", ["order", "decision", "correction", "stop"]]}]},
+        {"code": "by_not_later", "message": "stopped_by must be said after the delegation it ends.", "all": [{"exists": "$request"}, {"exists": "$stopped_by"}, {"gt": ["$stopped_by.said_at", "$request.said_at"]}]}
+      ],
+      "rules": [
+        {"modify_object": "request", "set": {"status": "superseded"}}
+      ]
+    },
+    "draft_intent": {
+      "description": "Draft an intent from the request that started it; that request is routed to it. The key is the native key of the parameter intent (lower-case letters, digits and -, at most 60 bytes); a used key is refused by the engine (revision_conflict).",
+      "parameters": {
+        "intent": {"type": {"ref": "intent"}, "required": true, "description": "The new intent: an Id of type intent whose native_key is the new key."},
+        "outcome": {"type": "string", "required": true, "max_bytes": 1200, "description": "What is true when the intent is met, as sentences that can each be checked true or false."},
+        "first_user": {"type": "string", "required": true, "max_bytes": 600, "description": "Who or what uses the result first, and the real run that shows it working."},
+        "origin": {"type": {"ref": "request"}, "required": true, "description": "The current request that started the intent; it is routed to the intent."},
+        "why": {"type": "string", "required": false, "max_bytes": 800, "description": "Why the user wants it: the need behind the outcome."},
+        "not_included": {"type": "string", "required": false, "max_bytes": 800, "description": "What the user does not want done under this intent."},
+        "constraints": {"type": "string", "required": false, "max_bytes": 800, "description": "Limits the work keeps: tools, data, cost, time, places not to touch."},
+        "questions": {"type": {"array": {"struct": {"question": {"value_type": "nonempty_text"}, "default": {"value_type": "nonempty_text"}, "answer": "string"}}}, "required": false, "description": "Open questions to the user, at most five: each with the default the Lead assumes until the user answers, and the answer (empty until answered). Given whole; replaces the list."},
+        "directory": {"type": "string", "required": false, "max_bytes": 300, "description": "The task directory of the work for this intent."}
+      },
+      "submission_criteria": [
+        {"code": "origin_not_current", "message": "Name a current request as origin; record the message first (record_request).", "all": [{"exists": "$origin"}, {"eq": ["$origin.status", "current"]}]},
+        {"code": "origin_confirms_an_intent", "message": "That request confirmed an intent; record the message that starts this intent as its own request.", "none": [{"linked": {"from": "$origin", "link": "request_confirmed_intents"}}]},
+        {"code": "outcome_empty", "message": "State the outcome: what is true when the intent is met.", "all": [{"ne": ["$outcome", ""]}]},
+        {"code": "first_user_empty", "message": "Name who or what uses the result first and the real run that shows it.", "all": [{"ne": ["$first_user", ""]}]}
+      ],
+      "rules": [
+        {"create_object": "intent", "set": {"outcome": "$outcome", "first_user": "$first_user", "origin": "$origin", "why": "$why", "not_included": "$not_included", "constraints": "$constraints", "questions": "$questions", "directory": "$directory", "status": "draft", "amended_at": "$now"}},
+        {"modify_object": "request", "set": {"route": "intent", "intent": "$intent", "routed_at": "$now"}}
+      ]
+    },
+    "amend_intent": {
+      "description": "Change the substance of an open intent: a member given replaces its value, one not given keeps it. The intent returns to draft and its confirmation is cleared: the user confirms it again.",
+      "parameters": {
+        "intent": {"type": {"ref": "intent"}, "required": true, "description": "The intent: its full Id, with the intent's key as native_key."},
+        "outcome": {"type": "string", "required": false, "max_bytes": 1200, "description": "What is true when the intent is met, as sentences that can each be checked true or false."},
+        "first_user": {"type": "string", "required": false, "max_bytes": 600, "description": "Who or what uses the result first, and the real run that shows it working."},
+        "why": {"type": "string", "required": false, "max_bytes": 800, "description": "Why the user wants it: the need behind the outcome."},
+        "not_included": {"type": "string", "required": false, "max_bytes": 800, "description": "What the user does not want done under this intent."},
+        "constraints": {"type": "string", "required": false, "max_bytes": 800, "description": "Limits the work keeps: tools, data, cost, time, places not to touch."},
+        "questions": {"type": {"array": {"struct": {"question": {"value_type": "nonempty_text"}, "default": {"value_type": "nonempty_text"}, "answer": "string"}}}, "required": false, "description": "Open questions to the user, at most five: each with the default the Lead assumes until the user answers, and the answer (empty until answered). Given whole; replaces the list."},
+        "directory": {"type": "string", "required": false, "max_bytes": 300, "description": "The task directory of the work for this intent."}
+      },
+      "submission_criteria": [
+        {"code": "intent_closed", "message": "Name an intent that exists and is neither met nor retired; for new work draft a new intent.", "all": [{"exists": "$intent"}, {"none": [{"in": ["$intent.status", ["met", "retired"]]}]}]},
+        {"code": "outcome_empty", "message": "An outcome given is not empty; omit it to keep the outcome.", "none": [{"all": [{"present": "$outcome"}, {"eq": ["$outcome", ""]}]}]},
+        {"code": "first_user_empty", "message": "A first_user given is not empty; omit it to keep it.", "none": [{"all": [{"present": "$first_user"}, {"eq": ["$first_user", ""]}]}]}
+      ],
+      "rules": [
+        {"modify_object": "intent", "set": {"outcome": "$outcome", "first_user": "$first_user", "why": "$why", "not_included": "$not_included", "constraints": "$constraints", "questions": "$questions", "directory": "$directory", "status": "draft", "amended_at": "$now", "confirmed_delegated": false}},
+        {"clear_reference": {"object_type": "intent", "property": "confirmed_by"}}
+      ]
+    },
+    "note_intent": {
+      "description": "Replace the Lead's notes of an open intent for the next Lead; nothing else changes.",
+      "parameters": {
+        "intent": {"type": {"ref": "intent"}, "required": true, "description": "The intent: its full Id, with the intent's key as native_key."},
+        "notes": {"type": "string", "required": true, "max_bytes": 4000, "description": "The whole new notes: the state, the next step, where things are."}
+      },
+      "submission_criteria": [
+        {"code": "intent_closed", "message": "Name an intent that exists and is neither met nor retired; for new work draft a new intent.", "all": [{"exists": "$intent"}, {"none": [{"in": ["$intent.status", ["met", "retired"]]}]}]}
+      ],
+      "rules": [
+        {"modify_object": "intent", "set": {"notes": "$notes"}}
+      ]
+    },
+    "name_lead": {
+      "description": "Record the session that leads an open intent, named by the user's request routed to it.",
+      "parameters": {
+        "intent": {"type": {"ref": "intent"}, "required": true, "description": "The intent: its full Id, with the intent's key as native_key."},
+        "session": {"type": "string", "required": true, "max_bytes": 120, "description": "The session that leads the work."},
+        "by": {"type": {"ref": "request"}, "required": true, "description": "The user's current order, decision or delegation, routed to this intent, that names the Lead."}
+      },
+      "submission_criteria": [
+        {"code": "intent_closed", "message": "Name an intent that exists and is neither met nor retired; for new work draft a new intent.", "all": [{"exists": "$intent"}, {"none": [{"in": ["$intent.status", ["met", "retired"]]}]}]},
+        {"code": "by_not_the_users_word", "message": "by must be a current request of kind order, decision or delegation: the user's word that names the Lead.", "all": [{"exists": "$by"}, {"eq": ["$by.status", "current"]}, {"in": ["$by.kind", ["order", "decision", "delegation"]]}]},
+        {"code": "by_not_routed_here", "message": "Route the request to this intent first (route_request), then name the Lead with it.", "all": [{"exists": "$by"}, {"eq": ["$by.route", "intent"]}, {"present": "$by.intent"}, {"eq": ["$by.intent", "$intent"]}]}
+      ],
+      "rules": [
+        {"modify_object": "intent", "set": {"lead_session": "$session", "lead_named_by": "$by"}}
+      ]
+    },
+    "assume_intent": {
+      "description": "The Lead proceeds on a draft intent without the user's confirmation, giving the reason; only an actor with the role lead. The user can still confirm or amend it.",
+      "parameters": {
+        "intent": {"type": {"ref": "intent"}, "required": true, "description": "The intent: its full Id, with the intent's key as native_key."},
+        "reason": {"type": "string", "required": true, "max_bytes": 600, "description": "Why the Lead proceeds without the user's confirmation."}
+      },
+      "submission_criteria": [
+        {"code": "intent_not_draft", "message": "Only a draft intent is assumed; amend_intent returns an intent to draft.", "all": [{"exists": "$intent"}, {"eq": ["$intent.status", "draft"]}]},
+        {"code": "not_the_lead", "message": "Only the Lead does this: apply it with the role lead (ONT_ROLE=lead or the request member role).", "all": [{"actor": {"role": "lead"}}]},
+        {"code": "reason_empty", "message": "Give the reason in words.", "all": [{"ne": ["$reason", ""]}]}
+      ],
+      "rules": [
+        {"modify_object": "intent", "set": {"status": "assumed", "assumed_reason": "$reason"}}
+      ]
+    },
+    "confirm_intent": {
+      "description": "Confirm a draft or assumed intent by the user's word: a current order, decision or answer routed to it and said after its last amendment. The intent needs a criterion that is not waived.",
+      "parameters": {
+        "intent": {"type": {"ref": "intent"}, "required": true, "description": "The intent: its full Id, with the intent's key as native_key."},
+        "by": {"type": {"ref": "request"}, "required": true, "description": "The user's current order, decision or answer, routed to this intent, that confirms it."}
+      },
+      "submission_criteria": [
+        {"code": "intent_not_open", "message": "Only a draft or assumed intent is confirmed; a confirmed one is amended first, a closed one stays closed.", "all": [{"exists": "$intent"}, {"in": ["$intent.status", ["draft", "assumed"]]}]},
+        {"code": "by_not_the_users_word", "message": "by must be a current request of kind order, decision or answer: the user's own word.", "all": [{"exists": "$by"}, {"eq": ["$by.status", "current"]}, {"in": ["$by.kind", ["order", "decision", "answer"]]}]},
+        {"code": "by_not_routed_here", "message": "Route the request to this intent first (route_request), then confirm with it.", "all": [{"exists": "$by"}, {"eq": ["$by.route", "intent"]}, {"present": "$by.intent"}, {"eq": ["$by.intent", "$intent"]}]},
+        {"code": "by_older_than_amendment", "message": "The request was said before the last amendment: the user confirms the intent as it now stands, with a later message.", "all": [{"exists": "$by"}, {"exists": "$intent"}, {"gt": ["$by.said_at", "$intent.amended_at"]}]},
+        {"code": "no_criterion", "message": "Add a success criterion first (add_criterion): an intent is confirmed only with one that is not waived.", "all": [{"linked": {"from": "$intent", "link": "intent_criteria", "where": {"all": [{"ne": ["state", "waived"]}]}}}]}
+      ],
+      "rules": [
+        {"modify_object": "intent", "set": {"status": "confirmed", "confirmed_by": "$by", "confirmed_at": "$now", "confirmed_delegated": false}}
+      ]
+    },
+    "confirm_intent_delegated": {
+      "description": "The Lead confirms a draft or assumed intent under a current delegation of the user. Route the delegation or set it aside BEFORE its first use: after it, neither is possible. The reason stays in the action log.",
+      "parameters": {
+        "intent": {"type": {"ref": "intent"}, "required": true, "description": "The intent: its full Id, with the intent's key as native_key."},
+        "delegation": {"type": {"ref": "request"}, "required": true, "description": "The user's current request of kind delegation that covers this intent."},
+        "reason": {"type": "string", "required": true, "max_bytes": 600, "description": "Why the delegation covers this intent."}
+      },
+      "submission_criteria": [
+        {"code": "intent_not_open", "message": "Only a draft or assumed intent is confirmed; a confirmed one is amended first, a closed one stays closed.", "all": [{"exists": "$intent"}, {"in": ["$intent.status", ["draft", "assumed"]]}]},
+        {"code": "not_the_lead", "message": "Only the Lead does this: apply it with the role lead (ONT_ROLE=lead or the request member role).", "all": [{"actor": {"role": "lead"}}]},
+        {"code": "not_a_delegation", "message": "Name a current request of kind delegation; a delegation the user ended is superseded.", "all": [{"exists": "$delegation"}, {"eq": ["$delegation.status", "current"]}, {"eq": ["$delegation.kind", "delegation"]}]},
+        {"code": "reason_empty", "message": "Give the reason in words.", "all": [{"ne": ["$reason", ""]}]},
+        {"code": "no_criterion", "message": "Add a success criterion first (add_criterion): an intent is confirmed only with one that is not waived.", "all": [{"linked": {"from": "$intent", "link": "intent_criteria", "where": {"all": [{"ne": ["state", "waived"]}]}}}]}
+      ],
+      "rules": [
+        {"modify_object": "intent", "set": {"status": "confirmed", "confirmed_by": "$delegation", "confirmed_at": "$now", "confirmed_delegated": true}}
+      ]
+    },
+    "close_intent": {
+      "description": "Close a confirmed intent as met once every criterion passed or is waived.",
+      "parameters": {
+        "intent": {"type": {"ref": "intent"}, "required": true, "description": "The intent: its full Id, with the intent's key as native_key."},
+        "reason": {"type": "string", "required": true, "max_bytes": 600, "description": "How the outcome was shown: the run or the evidence."}
+      },
+      "submission_criteria": [
+        {"code": "intent_not_confirmed", "message": "Only a confirmed intent closes as met: have it confirmed first.", "all": [{"exists": "$intent"}, {"eq": ["$intent.status", "confirmed"]}]},
+        {"code": "criterion_not_passed", "message": "Check each open or failed criterion until it passes (check_criterion), or have the user waive it.", "none": [{"linked": {"from": "$intent", "link": "intent_criteria", "where": {"all": [{"in": ["state", ["open", "fail"]]}]}}}]}
+      ],
+      "rules": [
+        {"modify_object": "intent", "set": {"status": "met", "closed_at": "$now", "closed_reason": "$reason"}}
+      ]
+    },
+    "retire_intent": {
+      "description": "Retire an intent that is neither met nor retired: the user no longer wants it, or another intent replaces it.",
+      "parameters": {
+        "intent": {"type": {"ref": "intent"}, "required": true, "description": "The intent: its full Id, with the intent's key as native_key."},
+        "reason": {"type": "string", "required": true, "max_bytes": 600, "description": "Why the intent is retired; name a replacing intent when there is one."}
+      },
+      "submission_criteria": [
+        {"code": "intent_closed", "message": "Name an intent that exists and is neither met nor retired; for new work draft a new intent.", "all": [{"exists": "$intent"}, {"none": [{"in": ["$intent.status", ["met", "retired"]]}]}]},
+        {"code": "reason_empty", "message": "Give the reason in words.", "all": [{"ne": ["$reason", ""]}]}
+      ],
+      "rules": [
+        {"modify_object": "intent", "set": {"status": "retired", "closed_at": "$now", "closed_reason": "$reason"}}
+      ]
+    },
+    "add_criterion": {
+      "description": "Add a success criterion to an open intent: a statement checkable true or false and the check that shows it. It starts open.",
+      "parameters": {
+        "intent": {"type": {"ref": "intent"}, "required": true, "description": "The intent: its full Id, with the intent's key as native_key."},
+        "statement": {"type": "string", "required": true, "max_bytes": 600, "description": "What must be true, checkable as true or false."},
+        "check": {"type": "string", "required": true, "max_bytes": 800, "description": "How to check it: the command, the test, the eval with its threshold, or the real run to observe."},
+        "baseline": {"type": "string", "required": false, "max_bytes": 300, "description": "For a number: its value before the work, with its source and time."}
+      },
+      "submission_criteria": [
+        {"code": "intent_closed", "message": "Name an intent that exists and is neither met nor retired; for new work draft a new intent.", "all": [{"exists": "$intent"}, {"none": [{"in": ["$intent.status", ["met", "retired"]]}]}]},
+        {"code": "statement_empty", "message": "State what must be true.", "all": [{"ne": ["$statement", ""]}]},
+        {"code": "check_empty", "message": "Say how the statement is checked.", "all": [{"ne": ["$check", ""]}]}
+      ],
+      "rules": [
+        {"create_object": "criterion", "set": {"intent": "$intent", "statement": "$statement", "check": "$check", "baseline": "$baseline", "state": "open", "added_at": "$now"}}
+      ]
+    },
+    "check_criterion": {
+      "description": "Record the result of a criterion's check: pass or fail, with the evidence. A later check replaces it.",
+      "parameters": {
+        "criterion": {"type": {"ref": "criterion"}, "required": true, "description": "The criterion checked."},
+        "state": {"type": {"value_type": "criterion_state"}, "required": true, "description": "pass or fail."},
+        "evidence": {"type": "string", "required": true, "max_bytes": 1000, "description": "The command and its result, or what was observed."}
+      },
+      "submission_criteria": [
+        {"code": "state_not_a_result", "message": "state is pass or fail; a criterion is waived only by waive_criterion.", "all": [{"in": ["$state", ["pass", "fail"]]}]},
+        {"code": "evidence_empty", "message": "Give the evidence: the command and its result.", "all": [{"ne": ["$evidence", ""]}]},
+        {"code": "criterion_waived", "message": "Name an existing criterion that is not waived; a waived criterion keeps its state.", "all": [{"exists": "$criterion"}, {"ne": ["$criterion.state", "waived"]}]}
+      ],
+      "rules": [
+        {"modify_object": "criterion", "set": {"state": "$state", "evidence": "$evidence", "checked_at": "$now"}}
+      ]
+    },
+    "waive_criterion": {
+      "description": "The user waives a criterion: name the user's request, routed to the criterion's intent, that says so, and the reason. The reason becomes the evidence.",
+      "parameters": {
+        "criterion": {"type": {"ref": "criterion"}, "required": true, "description": "The criterion waived."},
+        "by": {"type": {"ref": "request"}, "required": true, "description": "The user's current decision, order or answer, routed to the criterion's intent, that waives it."},
+        "reason": {"type": "string", "required": true, "max_bytes": 1000, "description": "Why the criterion no longer has to pass."}
+      },
+      "submission_criteria": [
+        {"code": "by_not_the_users_word", "message": "by must be a current request of kind decision, order or answer: the user's own word.", "all": [{"exists": "$by"}, {"eq": ["$by.status", "current"]}, {"in": ["$by.kind", ["decision", "order", "answer"]]}]},
+        {"code": "by_not_routed_here", "message": "Route the request to the criterion's intent first (route_request), then waive with it.", "all": [{"exists": "$by"}, {"exists": "$criterion"}, {"eq": ["$by.route", "intent"]}, {"present": "$by.intent"}, {"eq": ["$by.intent", "$criterion.intent"]}]},
+        {"code": "reason_empty", "message": "Give the reason in words.", "all": [{"ne": ["$reason", ""]}]}
+      ],
+      "rules": [
+        {"modify_object": "criterion", "set": {"state": "waived", "waived_by": "$by", "evidence": "$reason"}}
+      ]
     }
   },
   "functions": {},
@@ -2987,7 +3369,10 @@
         "install",
         "objective",
         "item",
-        "board"
+        "board",
+        "request",
+        "intent",
+        "criterion"
       ],
       "derive": [
         "hold",
@@ -2999,7 +3384,10 @@
         "install",
         "objective",
         "item",
-        "board"
+        "board",
+        "request",
+        "intent",
+        "criterion"
       ],
       "actions": [
         "set_hold",
@@ -3039,7 +3427,24 @@
         "close_item",
         "drop_item",
         "set_order",
-        "triage_decision"
+        "triage_decision",
+        "record_request",
+        "supersede_request",
+        "route_request",
+        "set_request_aside",
+        "end_delegation",
+        "draft_intent",
+        "amend_intent",
+        "note_intent",
+        "name_lead",
+        "assume_intent",
+        "confirm_intent",
+        "confirm_intent_delegated",
+        "close_intent",
+        "retire_intent",
+        "add_criterion",
+        "check_criterion",
+        "waive_criterion"
       ]
     }
   ],
@@ -3355,6 +3760,57 @@
         {"header": "Outcome", "property": "outcome"},
         {"header": "To", "property": "to"},
         {"header": "By", "property": "by"}
+      ]
+    },
+    "requests_unrouted": {
+      "object_type": "request",
+      "args": [],
+      "filter": {"all": [{"eq": ["status", "current"]}, {"eq": ["route", "unrouted"]}]},
+      "order": [{"property": "said_at", "direction": "asc"}],
+      "columns": [
+        {"header": "Topic", "property": "topic"},
+        {"header": "Kind", "property": "kind"},
+        {"header": "Said at", "property": "said_at"},
+        {"header": "Verified", "property": "words_verified"},
+        {"header": "Reading", "property": "reading"}
+      ]
+    },
+    "requests_by_topic": {
+      "object_type": "request",
+      "args": ["topic"],
+      "filter": {"all": [{"eq": ["topic", "$topic"]}, {"eq": ["status", "current"]}]},
+      "order": [{"property": "said_at", "direction": "desc"}],
+      "columns": [
+        {"header": "Said at", "property": "said_at"},
+        {"header": "Kind", "property": "kind"},
+        {"header": "Route", "property": "route"},
+        {"header": "Intent", "property": "intent"},
+        {"header": "Reading", "property": "reading"}
+      ]
+    },
+    "intents_open": {
+      "object_type": "intent",
+      "args": [],
+      "filter": {"all": [{"in": ["status", ["draft", "assumed", "confirmed"]]}]},
+      "order": [{"property": "amended_at", "direction": "asc"}],
+      "columns": [
+        {"header": "Key", "property": "$key"},
+        {"header": "Status", "property": "status"},
+        {"header": "Delegated", "property": "confirmed_delegated"},
+        {"header": "Outcome", "property": "outcome"},
+        {"header": "Lead", "property": "lead_session"}
+      ]
+    },
+    "criteria_of_intent": {
+      "object_type": "criterion",
+      "args": ["intent"],
+      "filter": {"all": [{"eq": ["intent", "$intent"]}]},
+      "order": [{"property": "added_at", "direction": "asc"}],
+      "columns": [
+        {"header": "Statement", "property": "statement"},
+        {"header": "State", "property": "state"},
+        {"header": "Check", "property": "check"},
+        {"header": "Evidence", "property": "evidence"}
       ]
     }
   }
