@@ -355,8 +355,17 @@ fn policy(s: &impl System) -> Result<Option<Policy>, Failure> {
     let Some(file) = s.policy_file() else {
         return Ok(None);
     };
-    let path = (file.to_str()).ok_or_else(|| invalid("file", "path is not valid UTF-8"))?;
-    let path = path.to_owned();
+    // A path that is not text cannot be read through `read` or named in the record: no file there
+    // is no policy, a file there is a policy that cannot be used.
+    let Some(path) = file.to_str().map(str::to_owned) else {
+        let missing =
+            std::fs::metadata(&file).is_err_and(|e| e.kind() == std::io::ErrorKind::NotFound);
+        return if missing {
+            Ok(None)
+        } else {
+            Err(invalid("file", "path is not valid UTF-8"))
+        };
+    };
     let bytes = match s.read(&path) {
         Ok(b) => b,
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(None),

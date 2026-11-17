@@ -5835,7 +5835,7 @@ fn policy_the_built_binary_reads_the_file_the_variable_names() {
         eprintln!("skipped: systemd is not this host's init");
         return;
     }
-    use std::os::unix::ffi::OsStrExt;
+    use std::os::unix::ffi::{OsStrExt, OsStringExt};
     let f = Fake::new();
     std::fs::create_dir(f.t.join("empty")).unwrap();
     let ask = |file: &Path, out: &str| {
@@ -5881,9 +5881,18 @@ fn policy_the_built_binary_reads_the_file_the_variable_names() {
         refused(ask(&write("bad.json", &json!({})), "b.md")),
         (Some(2), "policy_invalid".into())
     );
-    let odd = Path::new(std::ffi::OsStr::from_bytes(b"/tmp/\xff-policy.json"));
+    let mut odd = f.t.as_os_str().as_bytes().to_vec();
+    odd.extend_from_slice(b"/\xff-policy.json");
+    let odd = PathBuf::from(std::ffi::OsString::from_vec(odd));
+    // No file at a path that is not text: no policy. A file there: invalid.
+    let (status, record) = ask(&odd, "n2.md");
     assert_eq!(
-        refused(ask(odd, "o.md")),
+        (status, record["state"].as_str(), record["policy"].clone()),
+        (Some(3), Some("failed"), Value::Null)
+    );
+    std::fs::write(&odd, "{}").unwrap();
+    assert_eq!(
+        refused(ask(&odd, "o.md")),
         (Some(2), "policy_invalid".into())
     );
     for out in ["d.md", "b.md", "o.md"] {
@@ -5994,15 +6003,20 @@ fn policy_refusals_come_after_the_refusals_that_ask_the_host() {
     );
 }
 
+// spec: specs/ap/policy.md#R2
 // spec: specs/ap/policy.md#R3
 #[test]
-fn policy_a_path_that_is_not_utf8_is_policy_invalid() {
+fn policy_a_path_that_is_not_utf8_is_no_policy_without_a_file_and_invalid_with_one() {
     use std::os::unix::ffi::OsStringExt;
     let mut f = Fake::new();
-    f.policy = Some(PathBuf::from(std::ffi::OsString::from_vec(vec![
-        b'/', 0xff, 0xfe,
-    ])));
-    let refused = f.run(&f.request("x.md")).unwrap_err();
+    let mut name = f.t.as_os_str().to_owned().into_vec();
+    name.extend_from_slice(b"/\xff-policy.json");
+    let odd = PathBuf::from(std::ffi::OsString::from_vec(name));
+    f.policy = Some(odd.clone());
+    let (v, status) = f.run(&f.request("x.md")).unwrap();
+    assert_eq!((status, v["policy"].clone()), (0, Value::Null), "{v}");
+    std::fs::write(&odd, "{}").unwrap();
+    let refused = f.run(&f.request("y.md")).unwrap_err();
     assert_eq!(
         (refused.code, refused.field.as_str()),
         ("policy_invalid", "policy")

@@ -4,9 +4,9 @@ Purpose: one file of the host states which models a stage may run on and which C
 
 ## Requirements
 
-- R1: The real host takes the policy file's path from the environment variable `AP_POLICY_FILE` when it is set and not empty, else `/etc/agent-platform/policy.json`, and from no other source; a value that is set, not empty and not valid UTF-8 is `policy_invalid` (`R3`), not "no policy".
-- R2: When the host names no path or the file does not exist, admission is what it is without a policy and the record's `policy` is null.
-- R3: A policy file that is unreadable, whose path is not valid UTF-8, is not one JSON object, or holds a malformed member refuses every stage with `policy_invalid` (field `policy`, the reason naming the member).
+- R1: The real host takes the policy file's path from the environment variable `AP_POLICY_FILE` when it is set and not empty, else `/etc/agent-platform/policy.json`, and from no other source.
+- R2: When the host names no path or no file exists at the path, whatever its bytes, admission is what it is without a policy and the record's `policy` is null.
+- R3: A policy file that is unreadable, is not one JSON object, holds a malformed member, or exists at a path that is not valid UTF-8 (so the record cannot name it) refuses every stage with `policy_invalid` (field `policy`, the reason naming the member).
 - R4: The request's `model` must equal an entry of `models.allowed`, else the stage is refused `model_not_allowed` (field `model`).
 - R5: The request's `model` must match no pattern of `models.never`, else the stage is refused `model_not_allowed` (field `model`).
 - R6: The accounts a stage may use are the list of the first key present among `<runtime>/<role>`, `<runtime>/<model>` and `<runtime>`, in that order.
