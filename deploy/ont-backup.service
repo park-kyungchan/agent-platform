@@ -1,0 +1,9 @@
+[Unit]
+Description=Back up the Ontology store and copy the new backup off the host
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/lib/agent-platform/backup-store.sh
+Slice=agents.slice
+Nice=10
+Environment=HOME=/root
