@@ -64,16 +64,10 @@ if [ -z "$ont_bin" ] || [ "$("$ont_bin" --version 2>/dev/null)" != "ont 0.1.0 $p
     --root "$root" --target-dir "$root/build" ont
   ont_bin=$root/bin/ont
 fi
-# The engine admits only uid 0, and the index sources of the schema name absolute
-# paths of the host. On the host the rehearsal reads the real task files. In CI the
-# four files it reads are created at those paths and it runs through sudo.
+# The engine admits only uid 0, so in CI the rehearsal runs through sudo. The index sources of the schema name
+# the host's work directory; the rehearsal reads fixture files of the repository (ontology/fixtures/work) that it
+# copies under its own temporary root, and makes nothing under /home/palantirkc/work.
 if [ "${CI:-}" = true ] && [ "$(id -u)" != 0 ]; then
-  for f in workspace-strategy-reassessment-20261109/STATE.md ontology-operational-base/STATE.md \
-           ontology-operational-base/TASK-O13.md ontology-operational-base/REPORT-O13.md; do
-    sudo install -d "/home/palantirkc/work/$(dirname "$f")"
-    sudo test -e "/home/palantirkc/work/$f" ||
-      printf '# fixture for ontology/rehearsal.sh\n' | sudo tee "/home/palantirkc/work/$f" > /dev/null
-  done
   sudo env "PATH=$PATH" GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=safe.directory "GIT_CONFIG_VALUE_0=$PWD" \
     bash ontology/rehearsal.sh "$ont_bin" > /dev/null
 else
@@ -88,4 +82,9 @@ fi
 # The walk of `ap deliver` on the real installer scripts, with the built ap and a scratch store of the same
 # engine; it kills real processes under one temporary directory. Skipped, saying so, under CI=true.
 bash scripts/test-deliver.sh "$ont_bin" "${CARGO_TARGET_DIR:-$PWD/target}/debug/ap" | grep -v '^walk pass='
+# In CI no step has made the host's work directory: the rehearsal and every step after it ran without it.
+if [ "${CI:-}" = true ] && { [ -e /home/palantirkc/work ] || [ -L /home/palantirkc/work ]; }; then
+  echo "work_directory_exists@check: /home/palantirkc/work was made during the check" >&2
+  exit 1
+fi
 echo "check: ok"
