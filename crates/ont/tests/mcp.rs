@@ -274,16 +274,16 @@ fn initialize_notification_and_ping() {
 }
 
 #[test]
-fn tools_list_is_constant_small_and_has_seven_tools() {
+fn tools_list_is_constant_small_and_has_eight_tools() {
     let t = Temp::new();
     let mut p = Peer::spawn(&t.store("absent.sqlite"));
     p.send_raw(br#"{"jsonrpc":"2.0","id":7,"method":"tools/list"}"#);
     let line = p.recv_line();
-    assert!(line.len() <= 5000, "tools/list wire: {}", line.len());
+    assert!(line.len() <= 6000, "tools/list wire: {}", line.len());
     let r: Value = serde_json::from_str(&line).unwrap();
     let result = r["result"].to_string();
     eprintln!("tools/list result bytes: {}", result.len());
-    assert!(result.len() <= 5000, "{}", result.len());
+    assert!(result.len() <= 6000, "{}", result.len());
     let tools = r["result"]["tools"].as_array().unwrap();
     let names: Vec<&str> = tools.iter().map(|t| t["name"].as_str().unwrap()).collect();
     assert_eq!(
@@ -295,7 +295,8 @@ fn tools_list_is_constant_small_and_has_seven_tools() {
             "ont_index",
             "ont_action_list",
             "ont_action_validate",
-            "ont_action_apply"
+            "ont_action_apply",
+            "ont_log"
         ]
     );
     for tool in tools {
