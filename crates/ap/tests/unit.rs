@@ -5936,6 +5936,22 @@ fn pc1_a_block_member_sets_the_stage_and_a_task_value_fills_the_rest() {
         json!(u.p("a2")),
         "sonnet by the runtime"
     );
+    // Deny by default: the runtime key holds the safe list and only named models leave it, so a
+    // model no key names composes onto the runtime's list.
+    let mut units = pc_units(&u);
+    units["accounts"]["claude"] = json!([u.p("a1")]);
+    units["accounts"]["claude/sonnet"] = json!([u.p("a2"), u.p("a1")]);
+    b["implementer"]["model"] = json!("claude-opus-5-5");
+    b["verifier"]["model"] = json!("sonnet");
+    pc_write(&u, &units, &pc_text(&b));
+    let r = ap::unit::compose(&page).unwrap()["request"].clone();
+    assert_eq!(
+        r["implementer"]["account"],
+        json!(u.p("a1")),
+        "an unnamed model"
+    );
+    assert!(r["implementer"].get("next_accounts").is_none());
+    assert_eq!(r["verifier"]["account"], json!(u.p("a2")), "a named model");
 }
 
 #[test]
@@ -6009,6 +6025,11 @@ fn pc1_each_refusal_of_the_composition_is_before_any_effect() {
     with(
         "the fixer's key",
         &|v| v["accounts"]["claude/fixer"] = json!([p]),
+        "units.accounts",
+    );
+    with(
+        "the reviewer's key",
+        &|v| v["accounts"]["claude/reviewer"] = json!([p]),
         "units.accounts",
     );
     with(

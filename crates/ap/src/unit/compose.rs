@@ -56,13 +56,14 @@ fn check(units: &Value) -> Result<(), Failure> {
     let seconds = |v: &Value| v.as_u64().is_some_and(|n| (1..=86_400).contains(&n));
     // A key is a runtime, or `<runtime>/<role or model>`: `claude/verifier`, `claude/opus`. The
     // name takes the characters `ap run` takes in a model; `fixer` is refused, the fixer having the
-    // implementer's accounts.
+    // implementer's accounts, and `reviewer`, the verifier's key being `verifier`.
     let accounts = |key: &str, v: &Value| {
         let (runtime, rest) = key.split_once('/').unwrap_or((key, ""));
         let name = |r: &str| {
             !r.is_empty()
                 && r.len() <= 40
                 && r != "fixer"
+                && r != "reviewer"
                 && r.bytes()
                     .all(|c| c.is_ascii_alphanumeric() || b"._-[]".contains(&c))
         };
