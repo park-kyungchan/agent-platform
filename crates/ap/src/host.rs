@@ -148,11 +148,21 @@ pub(crate) fn ont(
     command: &[&str],
     body: &Value,
 ) -> Result<Reply, Failure> {
+    ont_within(s, r, command, body, 30_000)
+}
+/// One call of `ont` bound to `ms` milliseconds.
+pub(crate) fn ont_within(
+    s: &mut impl System,
+    r: &Value,
+    command: &[&str],
+    body: &Value,
+    ms: u64,
+) -> Result<Reply, Failure> {
     let mut a = args(command);
     if let Some(store) = r["store"].as_str() {
         a.extend(args(&["--store", store]));
     }
-    s.call("ont", &a, body, 30_000)
+    s.call("ont", &a, body, ms)
 }
 macro_rules! require {
     ($condition:expr => $code:expr, $field:expr) => {

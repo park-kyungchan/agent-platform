@@ -5,6 +5,7 @@
 use crate::host::{
     Failure, LIMIT, System, args, digest, error, fail, new_session_id, require, text,
 };
+use crate::store;
 use serde_json::{Value, json};
 use std::{
     ffi::OsString,
@@ -35,7 +36,7 @@ const MODES: [&str; 6] = [
 const KEEP: [&str; 10] = [
     "PATH", "HOME", "USER", "LOGNAME", "SHELL", "LANG", "LC_ALL", "TERM", "TMPDIR", "TZ",
 ];
-const MEMBERS: [&str; 22] = [
+const MEMBERS: [&str; 27] = [
     "role",
     "runtime",
     "account",
@@ -58,6 +59,11 @@ const MEMBERS: [&str; 22] = [
     "memory",
     "answer_schema",
     "compact_window",
+    "unit",
+    "intent",
+    "store",
+    "git_author",
+    "ont_role",
 ];
 /// The largest file of `answer_schema`, in bytes.
 const SCHEMA_MAX: u64 = 65_536;
@@ -250,6 +256,11 @@ struct Request {
     home: Option<String>,
     /// The policy file as read: its path and digest (`specs/ap/policy.md`), None without one.
     policy: Option<(String, String)>,
+    /// `unit` or `intent` and its key (`specs/ap/run-object.md`); the store its calls name.
+    target: Option<(&'static str, String)>,
+    store: Option<String>,
+    /// The stage's role as the actor's claim: `verifier` for a reviewer that says so.
+    actor_role: String,
 }
 
 fn path(r: &Value, key: &str) -> Result<String, Failure> {
@@ -308,6 +319,8 @@ fn environment(r: &Value, runtime: Runtime) -> Result<Vec<(String, String)>, Fai
             require!(!k.starts_with("HERDR_") && !k.starts_with("CLAUDE_")
                 && !k.starts_with("ANTHROPIC_") && k != "HOME" => "env_forbidden", "env");
             require!(!runtime.reserved(k) => "env_forbidden", "env");
+            require!(!["ONT_ROLE", "ONT_AGENT", "GIT_AUTHOR_NAME", "GIT_AUTHOR_EMAIL"].contains(&k.as_str())
+                => "env_forbidden", "env");
             let v = v
                 .as_str()
                 .filter(|v| !v.contains('\0') && v.len() <= 4096)
@@ -315,6 +328,53 @@ fn environment(r: &Value, runtime: Runtime) -> Result<Vec<(String, String)>, Fai
             Ok((k.clone(), v.to_owned()))
         })
         .collect()
+}
+/// `unit` or `intent` with its key, at most one of the two (`specs/ap/run-object.md` R1).
+fn target(r: &Value) -> Result<Option<(&'static str, String)>, Failure> {
+    let key = |name: &'static str| match r.get(name) {
+        None => Ok(None),
+        Some(v) => v
+            .as_str()
+            .filter(|k| {
+                (1..=64).contains(&k.len())
+                    && k.bytes()
+                        .all(|c| c.is_ascii_alphanumeric() || b"._-".contains(&c))
+            })
+            .map(|k| Some((name, k.to_owned())))
+            .ok_or_else(|| error("invalid_input", name)),
+    };
+    match (key("unit")?, key("intent")?) {
+        (Some(_), Some(_)) => Err(error("invalid_input", "intent")),
+        (a, b) => Ok(a.or(b)),
+    }
+}
+/// What every stage's environment gets: its role and agent as the actor's claim (R3, R4) and, with
+/// `git_author`, the author of its commits (R5).
+fn identity(
+    runtime: Runtime,
+    (role, model): (&str, &str),
+    git_author: bool,
+) -> Vec<(String, String)> {
+    let clean = |text: String, kept: &str| -> String {
+        let keep = |c: &char| c.is_ascii_alphanumeric() || kept.contains(*c);
+        text.chars()
+            .map(|c| if keep(&c) { c } else { '-' })
+            .collect()
+    };
+    let agent: String = clean(format!("{}:{model}", runtime.word()), "._:-")
+        .chars()
+        .take(64)
+        .collect();
+    let mut env = vec![
+        ("ONT_ROLE".into(), role.into()),
+        ("ONT_AGENT".into(), agent),
+    ];
+    if git_author {
+        env.push(("GIT_AUTHOR_NAME".into(), format!("{role} {model}")));
+        let email = clean(format!("{role}.{model}"), ".-");
+        env.push(("GIT_AUTHOR_EMAIL".into(), format!("{email}@agents.invalid")));
+    }
+    env
 }
 /// The host's policy as read (`specs/ap/policy.md`).
 struct Policy {
@@ -597,6 +657,22 @@ fn request_at(s: &mut impl System, r: &Value, at_cwd: bool) -> Result<Request, F
     let mcp = paths(r, "mcp_config", 8)?;
     require!(!runtime.bare() || mcp.is_empty() => "invalid_input", "mcp_config");
     let env = environment(r, runtime)?;
+    let target = target(r)?;
+    let store = match r.get("store") {
+        None => None,
+        Some(_) => {
+            require!(target.is_some() => "invalid_input", "store");
+            Some(path(r, "store")?)
+        }
+    };
+    let git_author = flag(r, "git_author")?;
+    let actor_role = match r.get("ont_role") {
+        None => role,
+        Some(v) => {
+            require!(v == "verifier" && role == "reviewer" => "invalid_input", "ont_role");
+            "verifier"
+        }
+    };
     let (mut expect_file, mut expect_line) = (None, None);
     if let Some(e) = r.get("expect") {
         let o = e
@@ -751,7 +827,8 @@ fn request_at(s: &mut impl System, r: &Value, at_cwd: bool) -> Result<Request, F
         let (middle, tail) = rest.split_once("{A}")?;
         Some(format!("{head}{p}{middle}{a}{tail}{work}\n\n"))
     });
-    let base_env = base_env(s, &env);
+    let mut base_env = base_env(s, &env);
+    base_env.extend(identity(runtime, (actor_role, &model), git_author));
     require!(s.units() => "systemd_absent", "host");
     let bind = match r.get("bind") {
         None => None,
@@ -818,6 +895,9 @@ fn request_at(s: &mut impl System, r: &Value, at_cwd: bool) -> Result<Request, F
             .unwrap_or_default(),
         home,
         policy: policy.map(|p| (p.path, p.sha256)),
+        target,
+        store,
+        actor_role: actor_role.to_owned(),
     })
 }
 /// The `home` of an `agy` record that a resume runs in: a directory under `<account>/homes` (links
@@ -1549,6 +1629,7 @@ fn attempt(
     account: &str,
     (output, errs): &(File, File),
     (earlier, lead, resumes): (&[Value], Option<&str>, bool),
+    object: &Object,
 ) -> (Value, bool, bool) {
     let resume = q.resume.as_ref().filter(|_| resumes);
     let resume = resume.map(|(session, _, _)| session.as_str());
@@ -1567,6 +1648,7 @@ fn attempt(
         "resumes": q.resume.as_ref().map(|(_, _, file)| file), "limit": null,
         "compact_window": q.compact_window,
         "policy": policy_member(q),
+        "run_object": object.member(),
     });
     let mut attempts = earlier.to_vec();
     attempts.push(json!({"continued": continued}));
@@ -1585,8 +1667,12 @@ fn attempt(
         let saved = persist(&q.out, &record);
         (record, false, saved)
     };
+    // The session `start_run` named is the first launch's.
+    let before = object.session.as_deref().filter(|_| earlier.is_empty());
     let (Ok(session), Ok(unit)) = (
-        resume.map_or_else(|| new_session_id(s), |r| Ok(r.to_owned())),
+        resume
+            .or(before)
+            .map_or_else(|| new_session_id(s), |r| Ok(r.to_owned())),
         new_session_id(s),
     ) else {
         return not_launched(record, "launch");
@@ -1773,9 +1859,151 @@ fn attempt(
     let saved = persist(&q.out, &record);
     (record, seen.worked, saved && kept && !write_failed)
 }
+/// The `run` object of a stage that names a `unit` or an `intent` (`specs/ap/run-object.md`).
+#[derive(Default)]
+struct Object {
+    target: Option<(&'static str, String)>,
+    key: Option<String>,
+    start: Option<String>,
+    close: Option<String>,
+    /// The id and the parameters of the first `start_run`, kept for its repeat.
+    request: String,
+    parameters: Value,
+    /// The start gave no answer, so it may have been applied.
+    unanswered: bool,
+    /// The session known before the first launch.
+    session: Option<String>,
+}
+impl Object {
+    fn member(&self) -> Value {
+        match self.target {
+            None => Value::Null,
+            Some(_) => json!({"key": self.key, "start": self.start, "close": self.close}),
+        }
+    }
+    fn reference(&self) -> Value {
+        let (kind, key) = self.target.as_ref().map_or(("", ""), |(k, v)| (*k, v));
+        json!({ kind: crate::host::id(kind, key) })
+    }
+    /// The start: after admission and the claim, before the first launch. `account` is the first
+    /// launch's; the paths and the session are as the stage will hold them.
+    fn begin(&mut self, s: &mut impl System, q: &Request, account: &str) {
+        self.session = match (&q.resume, q.runtime) {
+            (Some((session, _, _)), _) => Some(session.clone()),
+            (None, Runtime::Claude | Runtime::Muse) => new_session_id(s).ok(),
+            (None, Runtime::Codex | Runtime::Agy) => None,
+        };
+        let fits = |p: String| {
+            (p.len() <= 400 && p.bytes().all(|c| (b'!'..=b'~').contains(&c))).then_some(p)
+        };
+        let component = Path::new(account).file_name().and_then(|n| n.to_str());
+        let mut p = self.reference();
+        p["role"] = json!(q.actor_role);
+        p["runtime"] = json!(q.runtime.word());
+        p["model"] = json!(q.model);
+        p["effort"] = json!(q.effort);
+        p["account"] = json!(component.filter(|n| n.len() <= 200));
+        p["session"] = json!(self.session);
+        p["record"] = json!(fits(record_path(&q.out)));
+        p["stream"] = json!(fits(format!("{}.stream.jsonl", q.out)));
+        p.as_object_mut()
+            .into_iter()
+            .for_each(|o| o.retain(|_, v| !v.is_null()));
+        self.request = format!("run-{}", &digest(q.out.as_bytes())[..32]);
+        self.parameters = p;
+        self.apply(s, q, true);
+    }
+    /// One `start_run` with the kept id and parameters (the first call, or its repeat after the end).
+    fn apply(&mut self, s: &mut impl System, q: &Request, first: bool) {
+        let call = (format!("{}-start", self.request), &self.parameters);
+        let done = store::start_run(s, q.store.as_deref(), (&call.0, &q.actor_role, call.1));
+        match done {
+            Ok(a) => {
+                self.key = a
+                    .created_of("run")
+                    .and_then(|i| i["native_key"].as_str())
+                    .map(str::to_owned);
+                let late = !first && a.outcome == "applied";
+                self.start = Some(match (self.key.is_some(), late) {
+                    (false, _) => "store_answer_unreadable".to_owned(),
+                    (true, true) => "applied_late".to_owned(),
+                    (true, false) => a.outcome,
+                });
+            }
+            Err(f) if first => {
+                self.unanswered = f.code != store::REFUSED;
+                self.start = Some(store::code_of(&f));
+            }
+            Err(_) => (),
+        }
+    }
+    /// After the stage ended: the repeat of a start that gave no answer, then the close.
+    fn finish(&mut self, s: &mut impl System, q: &Request, last: &Value) {
+        if self.target.is_none() {
+            return;
+        }
+        if self.unanswered {
+            self.apply(s, q, false);
+        }
+        let Some(key) = &self.key else {
+            return;
+        };
+        let text =
+            |k: &str, max: usize| last[k].as_str().filter(|v| !v.is_empty() && v.len() <= max);
+        let mut p = json!({"run": crate::host::id("run", key), "state": last["state"],
+            "session": text("session", 200), "served_by": text("served_by", 80),
+            "limit": limit_text_of(&last["limit"])});
+        for (to, from) in [
+            ("input_tokens", "input"),
+            ("cache_read_tokens", "cache_read"),
+            ("cache_write_tokens", "cache_creation"),
+            ("output_tokens", "output"),
+        ] {
+            p[to] = last["tokens"][from].clone();
+        }
+        p.as_object_mut()
+            .into_iter()
+            .for_each(|o| o.retain(|_, v| !v.is_null()));
+        let id = format!("{}-close", self.request);
+        let done = store::close_run(s, q.store.as_deref(), (&id, &q.actor_role, &p));
+        self.close = Some(done.map_or_else(|f| store::code_of(&f), |a| a.outcome));
+    }
+}
+/// The record's limit reading as the `limit` of `close_run`: compact JSON of at most 300 bytes, else
+/// its window of the highest utilization, else nothing.
+fn limit_text_of(limit: &Value) -> Option<String> {
+    let fits = |t: String| (t.len() <= 300).then_some(t);
+    let whole = serde_json::to_string(limit)
+        .ok()
+        .filter(|_| limit.is_object());
+    whole.clone().and_then(fits).or_else(|| {
+        let windows = limit["windows"].as_object()?;
+        let (name, w) = windows
+            .iter()
+            .filter_map(|(n, w)| Some((n, w, w["utilization"].as_f64()?)))
+            .max_by(|a, b| a.2.total_cmp(&b.2))
+            .map(|(n, w, _)| (n, w))?;
+        let one = json!({"window": name, "utilization": w["utilization"], "status": w["status"],
+            "resets_at": w["resets_at"]});
+        fits(one.to_string())
+    })
+}
 /// One `ap run` request. A refusal (exit 2) comes before any effect and writes no file.
 pub fn execute(s: &mut impl System, r: &Value) -> Result<(Value, u8), Failure> {
     let q = request(s, r)?;
+    // A unit or an intent the store does not have refuses the call, before any effect.
+    if let Some((kind, key)) = &q.target
+        && store::absent(s, q.store.as_deref(), kind, key)
+    {
+        return Err(error(
+            if *kind == "unit" {
+                "unknown_unit"
+            } else {
+                "unknown_intent"
+            },
+            kind,
+        ));
+    }
     // The claim: the record is created exclusively, so of two requests on one `out` started at
     // the same instant only one passes. Every effect comes after it.
     let create = |p: &str| {
@@ -1805,8 +2033,15 @@ pub fn execute(s: &mut impl System, r: &Value) -> Result<(Value, u8), Failure> {
         None => q.accounts.clone(),
     };
     let (mut last, mut clean, mut worked_before) = (Value::Null, true, false);
+    let mut object = Object {
+        target: q.target.clone(),
+        ..Object::default()
+    };
     if let (Ok(output), Ok(errs)) = files {
         let files = (output, errs);
+        if q.target.is_some() {
+            object.begin(s, &q, &accounts[0]);
+        }
         for (i, account) in accounts.iter().enumerate() {
             // Once a launch of an implementer or a fixer has worked, every later one gets the text;
             // a launch of a resumed call after the first is a move and gets its own.
@@ -1819,7 +2054,7 @@ pub fn execute(s: &mut impl System, r: &Value) -> Result<(Value, u8), Failure> {
             };
             let earlier = last["attempts"].as_array().cloned().unwrap_or_default();
             let launch = (&earlier[..], lead, i == 0);
-            let (record, worked, saved) = attempt(s, &q, account, &files, launch);
+            let (record, worked, saved) = attempt(s, &q, account, &files, launch, &object);
             clean &= saved;
             worked_before |= worked;
             // A run cut at any point goes on at the next account: before any tool ran, and after
@@ -1837,6 +2072,12 @@ pub fn execute(s: &mut impl System, r: &Value) -> Result<(Value, u8), Failure> {
         last = json!({"state": "failed", "unmet": "launch", "account": accounts[0]});
         let _ = persist(&q.out, &last);
         clean = false;
+    }
+    if object.start.is_some() {
+        // Whatever the store answers, the stage's state, exit code and answer stand: only the record's member changes.
+        object.finish(s, &q, &last);
+        last["run_object"] = object.member();
+        let _ = persist(&q.out, &last);
     }
     if std::fs::metadata(&errors).is_ok_and(|m| m.len() == 0) {
         let _ = std::fs::remove_file(&errors);

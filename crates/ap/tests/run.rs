@@ -45,6 +45,120 @@ struct Fake {
     precreate: Option<String>,
     /// The policy file the host names (`policy_file()`); none unless a test sets one.
     policy: Option<PathBuf>,
+    /// The store engine the stage runner calls: a call to `ont` without one is a failed test.
+    ont: Option<FakeOnt>,
+    /// The launches and the calls to `ont`, in the order they happened.
+    events: Vec<String>,
+}
+/// What one call of the fake `ont` does, in place of the engine's answer.
+#[derive(Clone)]
+enum Way {
+    /// The engine refuses with this code, as `{"status":"refused","code":..}`.
+    Refuse(&'static str),
+    /// The call applies nothing and gives no answer (its bound, or a failure).
+    Lost,
+    /// The call applies and then gives no answer (the engine locks after its commit).
+    Silent,
+}
+/// The engine as the stage runner meets it: `get` of a unit or an intent, `start_run`, `close_run`,
+/// the replay of a request id (`already_applied`, or `request_id_reused` for other parameters).
+#[derive(Default)]
+struct FakeOnt {
+    /// The `kind:key` of the objects that exist.
+    exist: Vec<String>,
+    /// Every call: its arguments, its input and its bound in milliseconds.
+    calls: Vec<(Vec<String>, Value, u64)>,
+    /// The next ways, by action (`get` for the read), one for each call, then the engine's own.
+    script: BTreeMap<String, Vec<Way>>,
+    /// The request ids applied, with their parameters and edits.
+    applied: BTreeMap<String, (Value, Value)>,
+    /// The runs and their status.
+    runs: BTreeMap<String, String>,
+}
+impl FakeOnt {
+    fn with(exist: &[&str]) -> Self {
+        Self {
+            exist: exist.iter().map(|e| (*e).to_owned()).collect(),
+            ..Self::default()
+        }
+    }
+    fn bodies(&self, action: &str) -> Vec<Value> {
+        let name = |c: &(Vec<String>, Value, u64)| match c.0[0].as_str() {
+            "action" => c.1["action_type"].as_str().unwrap_or_default().to_owned(),
+            other => other.to_owned(),
+        };
+        let all = self.calls.iter();
+        all.filter(|c| name(c) == action)
+            .map(|c| c.1.clone())
+            .collect()
+    }
+    fn answer(&mut self, args: &[String], input: &Value) -> Result<(bool, Value), ()> {
+        let action = match args[0].as_str() {
+            "action" => input["action_type"].as_str().unwrap_or_default().to_owned(),
+            other => other.to_owned(),
+        };
+        let way = self
+            .script
+            .get_mut(&action)
+            .filter(|w| !w.is_empty())
+            .map(|w| w.remove(0));
+        let refuse = |code: &str| Ok((false, json!({"status": "refused", "code": code})));
+        if let Some(Way::Refuse(code)) = way {
+            return refuse(code);
+        }
+        if action == "get" {
+            if matches!(way, Some(Way::Lost)) {
+                return Err(());
+            }
+            let id = &input["id"];
+            let known = format!(
+                "{}:{}",
+                id["object_type"].as_str().unwrap(),
+                id["native_key"].as_str().unwrap()
+            );
+            return match self.exist.contains(&known) {
+                true => Ok((true, json!({"status": "ok", "result": {"objects": []}}))),
+                false => refuse("unavailable"),
+            };
+        }
+        assert_eq!(args[..4], ["action", "apply", "--client", "ap"], "{args:?}");
+        let (rid, params) = (
+            input["request_id"].as_str().unwrap().to_owned(),
+            input["parameters"].clone(),
+        );
+        if let Some((before, edits)) = self.applied.get(&rid) {
+            return match *before == params {
+                true => Ok((
+                    true,
+                    json!({"status": "ok", "result": {"outcome": "already_applied", "edits": edits}}),
+                )),
+                false => refuse("request_id_reused"),
+            };
+        }
+        if matches!(way, Some(Way::Lost)) {
+            return Err(());
+        }
+        let mut edits = json!([]);
+        if action == "start_run" {
+            let key = format!("run-{}", self.runs.len() + 1);
+            edits = json!([{"change": "initial", "id": {"object_type": "run", "native_key": key}}]);
+            self.runs.insert(key, "running".into());
+        } else if action == "close_run" {
+            let key = params["run"]["native_key"].as_str().unwrap().to_owned();
+            if self.runs.get(&key).map(String::as_str) != Some("running") {
+                return refuse("run_not_running");
+            }
+            self.runs.insert(key, "closed".into());
+        }
+        self.applied.insert(rid, (params, edits.clone()));
+        if matches!(way, Some(Way::Silent)) {
+            return Err(());
+        }
+        Ok((
+            true,
+            json!({"status": "ok", "result": {"outcome": "applied", "edits": edits}}),
+        ))
+    }
 }
 impl Fake {
     fn new() -> Self {
@@ -93,6 +207,8 @@ impl Fake {
             dirs: BTreeMap::new(),
             precreate: None,
             policy: None,
+            ont: None,
+            events: vec![],
         }
     }
     fn p(&self, rel: &str) -> String {
@@ -169,6 +285,35 @@ impl System for Fake {
                 });
             }
         }
+        if program == "ont" {
+            let ont = self
+                .ont
+                .as_mut()
+                .expect("a stage reached ont without a fake store");
+            ont.calls.push((args.to_vec(), input.clone(), ms));
+            let name = ont.calls.last().map(|c| match c.0[0].as_str() {
+                "action" => c.1["action_type"].as_str().unwrap_or_default().to_owned(),
+                other => other.to_owned(),
+            });
+            self.events
+                .push(format!("ont {}", name.unwrap_or_default()));
+            let ont = self.ont.as_mut().unwrap();
+            return match ont.answer(args, input) {
+                Ok((success, v)) => {
+                    let bytes = serde_json::to_vec(&v).unwrap();
+                    Ok(Reply {
+                        success,
+                        bytes: bytes.clone(),
+                        stdout: bytes,
+                    })
+                }
+                Err(()) => Err(Failure {
+                    code: "process_failed",
+                    field: "ont".into(),
+                    detail: Value::Null,
+                }),
+            };
+        }
         if program != "systemctl" {
             return Host.call(program, args, input, ms);
         }
@@ -214,6 +359,7 @@ impl System for Fake {
         files: [std::fs::File; 3],
     ) -> std::io::Result<Child> {
         self.launches.push(argv.to_vec());
+        self.events.push("launch".into());
         let at = argv.iter().position(|a| a == "--").unwrap();
         assert_eq!(
             &argv[..4],
@@ -311,6 +457,7 @@ fn a1_answer_is_saved_byte_for_byte_and_the_record_has_every_member() {
         "attempts",
         "compact_window",
         "policy",
+        "run_object",
     ];
     want.sort_unstable();
     assert_eq!(keys, want);
@@ -5095,6 +5242,7 @@ fn g4_a_result_with_an_answer_is_ok_and_its_response_is_saved_byte_for_byte() {
         "compact_window",
         "home",
         "policy",
+        "run_object",
     ];
     want.sort_unstable();
     // The member `home` is this runtime's own; no member `served_by`: the stream names no serving model.
@@ -6022,4 +6170,631 @@ fn policy_a_path_that_is_not_utf8_is_no_policy_without_a_file_and_invalid_with_o
         ("policy_invalid", "policy")
     );
     assert!(refused.detail.as_str().unwrap().starts_with("file "));
+}
+
+// ---- A stage that belongs to a unit or an intent (specs/ap/run-object.md) --------------------------
+
+impl Fake {
+    /// Gives the fake store with these objects; its path is an invented directory of the test.
+    fn store_with(&mut self, exist: &[&str]) -> String {
+        self.ont = Some(FakeOnt::with(exist));
+        self.p("scratch-store")
+    }
+    /// A reviewer request for the unit `u-1` on `out`, its calls to the store naming the fake store.
+    fn for_unit(&mut self, out: &str) -> Value {
+        let store = self.store_with(&["unit:u-1", "intent:i-1"]);
+        let mut r = self.request(out);
+        r["unit"] = json!("u-1");
+        r["store"] = json!(store);
+        r
+    }
+    fn store(&self) -> &FakeOnt {
+        self.ont.as_ref().unwrap()
+    }
+    fn way(&mut self, action: &str, ways: Vec<Way>) {
+        self.ont
+            .as_mut()
+            .unwrap()
+            .script
+            .insert(action.into(), ways);
+    }
+    /// The environment of the last launch as a map.
+    fn stage_env(&self) -> BTreeMap<String, String> {
+        let lines = self.env_of_last().into_iter();
+        lines
+            .filter_map(|l| l.split_once('=').map(|(k, v)| (k.to_owned(), v.to_owned())))
+            .collect()
+    }
+    fn rid(&self, out: &str, end: &str) -> String {
+        let sha = format!("{:x}", sha2::Sha256::digest(self.p(out).as_bytes()));
+        format!("run-{}-{end}", &sha[..32])
+    }
+}
+
+// spec: specs/ap/run-object.md#R1
+#[test]
+fn run_object_r1_the_members_are_checked_before_any_effect() {
+    let mut f = Fake::new();
+    let store = f.p("scratch-store");
+    let cases = [
+        (
+            json!({"unit": "u-1", "intent": "i-1"}),
+            "invalid_input@intent",
+        ),
+        (json!({"store": store}), "invalid_input@store"),
+        (
+            json!({"unit": "u-1", "store": "relative/store"}),
+            "invalid_input@store",
+        ),
+        (json!({"unit": "u 1"}), "invalid_input@unit"),
+        (json!({"unit": ""}), "invalid_input@unit"),
+        (json!({"intent": "i".repeat(65)}), "invalid_input@intent"),
+        (json!({"unit": 7}), "invalid_input@unit"),
+        (json!({"git_author": "true"}), "invalid_input@git_author"),
+        (json!({"ont_role": "fixer"}), "invalid_input@ont_role"),
+        (json!({"ont_role": "lead"}), "invalid_input@ont_role"),
+        (
+            json!({"ont_role": "verifier", "role": "implementer"}),
+            "invalid_input@ont_role",
+        ),
+    ];
+    for (extra, want) in cases {
+        let mut r = f.request("x.md");
+        for (k, v) in extra.as_object().unwrap() {
+            r[k] = v.clone();
+        }
+        assert_eq!(code(f.run(&r)), want, "{extra}");
+        f.untouched("x.md");
+    }
+    // Accepted: a unit with a store, and `git_author` false as absence.
+    let mut r = f.for_unit("y.md");
+    r["git_author"] = json!(false);
+    assert_eq!(f.run(&r).unwrap().1, 0);
+    assert!(f.stage_env().keys().all(|k| !k.starts_with("GIT_")));
+}
+
+// spec: specs/ap/run-object.md#R2
+#[test]
+fn run_object_r2_env_may_not_name_the_actor_or_the_author() {
+    let mut f = Fake::new();
+    for name in [
+        "ONT_ROLE",
+        "ONT_AGENT",
+        "GIT_AUTHOR_NAME",
+        "GIT_AUTHOR_EMAIL",
+    ] {
+        let mut r = f.request("x.md");
+        r["env"] = json!({name: "lead"});
+        assert_eq!(code(f.run(&r)), "env_forbidden@env", "{name}");
+        f.untouched("x.md");
+    }
+    // Another name of the same families stays a request's own business.
+    let mut r = f.request("y.md");
+    r["env"] = json!({"ONT_PROBE": "1", "GIT_COMMITTER_NAME": "c"});
+    assert_eq!(f.run(&r).unwrap().1, 0);
+}
+
+// spec: specs/ap/run-object.md#R3
+#[test]
+fn run_object_r3_every_stage_gets_its_role_and_never_lead() {
+    let mut f = Fake::new();
+    // A caller that is a Lead: its variables never reach the stage.
+    f.env.push(("ONT_ROLE".into(), "lead".into()));
+    f.env.push(("ONT_AGENT".into(), "someone".into()));
+    f.env.push(("GIT_AUTHOR_NAME".into(), "caller".into()));
+    for (role, ont_role, want) in [
+        ("implementer", None, "implementer"),
+        ("fixer", None, "fixer"),
+        ("reviewer", None, "reviewer"),
+        ("reviewer", Some("verifier"), "verifier"),
+    ] {
+        let mut r = f.request("x.md");
+        r["role"] = json!(role);
+        if let Some(o) = ont_role {
+            r["ont_role"] = json!(o);
+        }
+        let _ = std::fs::remove_file(f.p("x.md.run.json"));
+        for suffix in ["", ".stream.jsonl", ".err"] {
+            let _ = std::fs::remove_file(f.p(&format!("x.md{suffix}")));
+        }
+        assert_eq!(f.run(&r).unwrap().1, 0);
+        let env = f.stage_env();
+        assert_eq!(env["ONT_ROLE"], want);
+        assert!(
+            !env.contains_key("GIT_AUTHOR_NAME"),
+            "the caller's author is not inherited"
+        );
+        assert_eq!(env.keys().filter(|k| k.starts_with("ONT_")).count(), 2);
+    }
+}
+
+// spec: specs/ap/run-object.md#R4
+#[test]
+fn run_object_r4_the_agent_is_a_form_the_engine_accepts() {
+    let mut f = Fake::new();
+    let long = format!("{}[1m]", "m".repeat(34));
+    for (model, want) in [
+        ("sonnet", "claude:sonnet".to_owned()),
+        ("opus[1m]", "claude:opus-1m-".to_owned()),
+        ("gpt-6.1_x", "claude:gpt-6.1_x".to_owned()),
+        (long.as_str(), format!("claude:{}-1m-", "m".repeat(34))),
+    ] {
+        let mut r = f.request(&format!("{}.md", model.len()));
+        r["model"] = json!(model);
+        assert_eq!(f.run(&r).unwrap().1, 0, "{model}");
+        let agent = f.stage_env()["ONT_AGENT"].clone();
+        assert_eq!(agent, want);
+        assert!((1..=64).contains(&agent.len()));
+        assert!(
+            agent
+                .bytes()
+                .all(|c| c.is_ascii_alphanumeric() || b"._:-".contains(&c))
+        );
+    }
+    // Another runtime: its own name before the colon.
+    let r = f.codex("c.md");
+    assert_eq!(f.run(&r).unwrap().1, 0);
+    assert_eq!(f.stage_env()["ONT_AGENT"], "codex:gpt-6.1-terra");
+}
+
+// spec: specs/ap/run-object.md#R5
+#[test]
+fn run_object_r5_git_author_names_the_stage_and_leaves_the_committer() {
+    let mut f = Fake::new();
+    let mut r = f.request("a.md");
+    r["model"] = json!("opus[1m]");
+    r["git_author"] = json!(true);
+    assert_eq!(f.run(&r).unwrap().1, 0);
+    let env = f.stage_env();
+    assert_eq!(env["GIT_AUTHOR_NAME"], "reviewer opus[1m]");
+    assert_eq!(env["GIT_AUTHOR_EMAIL"], "reviewer.opus-1m-@agents.invalid");
+    assert!(env.keys().all(|k| !k.starts_with("GIT_COMMITTER")));
+    // The finer role names the author too.
+    let mut r = f.request("b.md");
+    r["ont_role"] = json!("verifier");
+    r["git_author"] = json!(true);
+    assert_eq!(f.run(&r).unwrap().1, 0);
+    let env = f.stage_env();
+    assert_eq!(env["GIT_AUTHOR_NAME"], "verifier sonnet");
+    assert_eq!(env["GIT_AUTHOR_EMAIL"], "verifier.sonnet@agents.invalid");
+    // Without the member nothing of Git's environment is set.
+    assert_eq!(f.run(&f.request("c.md")).unwrap().1, 0);
+    assert!(f.stage_env().keys().all(|k| !k.starts_with("GIT_")));
+}
+
+// spec: specs/ap/run-object.md#R6
+#[test]
+fn run_object_r6_a_unit_or_an_intent_the_store_lacks_refuses_before_any_effect() {
+    let mut f = Fake::new();
+    let store = f.store_with(&["unit:u-1"]);
+    for (member, key, want) in [
+        ("unit", "u-9", "unknown_unit@unit"),
+        ("intent", "i-9", "unknown_intent@intent"),
+    ] {
+        let mut r = f.request("x.md");
+        r[member] = json!(key);
+        r["store"] = json!(store);
+        assert_eq!(code(f.run(&r)), want);
+        assert!(f.launches.is_empty() && f.calls().is_empty());
+        assert!(!Path::new(&f.p("x.md.run.json")).exists());
+        assert_eq!(f.store().bodies("start_run").len(), 0);
+    }
+    let read = &f.store().calls[0];
+    assert_eq!(read.0, ["get", "--store", store.as_str()]);
+    assert_eq!(read.1["id"]["native_key"], "u-9");
+    // Any other answer or failure of the read does not refuse: the stage goes on.
+    for (n, way) in [
+        Way::Refuse("store_not_found"),
+        Way::Lost,
+        Way::Refuse("store_busy"),
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        let mut r = f.request(&format!("y{n}.md"));
+        r["unit"] = json!("u-9");
+        f.way("get", vec![way]);
+        let (v, status) = f.run(&r).unwrap();
+        assert_eq!((status, v["state"].as_str()), (0, Some("ok")), "{v}");
+        assert_eq!(v["run_object"]["start"], "applied");
+    }
+}
+
+fn object_id(kind: &str, key: &str) -> Value {
+    json!({"object_type": kind, "namespace": {"instance": "vps://palantirkc", "account": "root"}, "native_key": key})
+}
+
+// spec: specs/ap/run-object.md#R7
+#[test]
+fn run_object_r7_the_start_comes_after_admission_and_before_the_first_launch() {
+    let mut f = Fake::new();
+    let r = f.for_unit("a.md");
+    let store = f.p("scratch-store");
+    let (v, status) = f.run(&r).unwrap();
+    assert_eq!(status, 0, "{v}");
+    assert_eq!(
+        f.events,
+        ["ont get", "ont start_run", "launch", "ont close_run"]
+    );
+    let calls = &f.store().calls;
+    assert_eq!(
+        calls[1].0,
+        [
+            "action",
+            "apply",
+            "--client",
+            "ap",
+            "--store",
+            store.as_str()
+        ]
+    );
+    let start = &calls[1].1;
+    assert_eq!(
+        (start["action_type"].as_str(), start["agent"].as_str()),
+        (Some("start_run"), Some("ap-run"))
+    );
+    assert_eq!(start["request_id"], f.rid("a.md", "start"));
+    assert_eq!(start["role"], "reviewer");
+    assert_eq!(
+        start["parameters"],
+        json!({"unit": object_id("unit", "u-1"), "role": "reviewer", "runtime": "claude", "model": "sonnet",
+            "effort": "high", "account": "a1", "session": v["attempts"][0]["session"],
+            "record": f.p("a.md.run.json"), "stream": f.p("a.md.stream.jsonl")})
+    );
+    // The finer role is the object's and the actor's; an intent takes the place of a unit.
+    let mut r = f.for_unit("b.md");
+    r["ont_role"] = json!("verifier");
+    r["intent"] = json!("i-1");
+    r.as_object_mut().unwrap().remove("unit");
+    assert_eq!(f.run(&r).unwrap().1, 0);
+    let start = &f.store().bodies("start_run")[0];
+    assert_eq!(
+        (start["role"].clone(), start["parameters"]["role"].clone()),
+        (json!("verifier"), json!("verifier"))
+    );
+    assert!(start["parameters"].get("unit").is_none());
+    assert_eq!(start["parameters"]["intent"], object_id("intent", "i-1"));
+    // A resume names its session before the launch; a Codex stage's id is its own, given at the close.
+    let mut r = f.for_unit("e.md");
+    r["unit"] = json!("u-1");
+    let earlier = f.run(&f.request("p.md")).unwrap().0;
+    let r = f.resume(r, "e.md", "p.md");
+    assert_eq!(f.run(&r).unwrap().1, 0);
+    assert_eq!(
+        f.store().bodies("start_run")[0]["parameters"]["session"],
+        earlier["session"]
+    );
+    let mut r = f.codex("c.md");
+    r["unit"] = json!("u-1");
+    f.store_with(&["unit:u-1"]);
+    assert_eq!(f.run(&r).unwrap().1, 0);
+    assert!(
+        f.store().bodies("start_run")[0]["parameters"]
+            .get("session")
+            .is_none()
+    );
+    // A path that is no `file_path` of the schema is left out, not sent.
+    let mut r = f.for_unit("with space.md");
+    r["unit"] = json!("u-1");
+    assert_eq!(f.run(&r).unwrap().1, 0);
+    let parameters = &f.store().bodies("start_run")[0]["parameters"];
+    assert!(
+        parameters.get("record").is_none() && parameters.get("stream").is_none(),
+        "{parameters}"
+    );
+    // A move to another account applies nothing.
+    let mut f = Fake::new();
+    let mut r = f.for_unit("m.md");
+    r["next_accounts"] = json!([f.p("a2")]);
+    f.mode("a1", "limit1");
+    let (v, _) = f.run(&r).unwrap();
+    assert_eq!(v["attempts"].as_array().unwrap().len(), 2, "{v}");
+    assert_eq!(f.store().bodies("start_run").len(), 1);
+    assert_eq!(
+        f.store().bodies("start_run")[0]["parameters"]["account"],
+        "a1"
+    );
+    // The policy step is the last check of admission: a stage it refuses touches no store.
+    let mut f = Fake::new();
+    let r = f.for_unit("n.md");
+    f.policy_is(&json!({"models": {"allowed": ["haiku"], "never": []}, "accounts": {"claude": [f.p("a1")]}}));
+    assert_eq!(code(f.run(&r)), "model_not_allowed@model");
+    assert!(f.store().calls.is_empty() && f.launches.is_empty());
+}
+
+// spec: specs/ap/run-object.md#R8
+#[test]
+fn run_object_r8_the_record_holds_the_key_before_the_launch() {
+    let mut f = Fake::new();
+    std::fs::write(f.t.join("bin/watch"), f.p("w.md.run.json")).unwrap();
+    f.mode("a1", "watch");
+    let r = f.for_unit("w.md");
+    let (v, _) = f.run(&r).unwrap();
+    let seen: Value =
+        serde_json::from_slice(&std::fs::read(f.t.join("bin/seen.json")).unwrap()).unwrap();
+    assert_eq!(seen["state"], "running");
+    assert_eq!(
+        seen["run_object"],
+        json!({"key": "run-1", "start": "applied", "close": null})
+    );
+    assert_eq!(
+        v["run_object"],
+        json!({"key": "run-1", "start": "applied", "close": "applied"})
+    );
+    assert_eq!(f.record("w.md"), v);
+    // Without a unit and an intent: null, before the launch and after the end.
+    let mut f = Fake::new();
+    std::fs::write(f.t.join("bin/watch"), f.p("n.md.run.json")).unwrap();
+    f.mode("a1", "watch");
+    let (v, _) = f.run(&f.request("n.md")).unwrap();
+    let seen: Value =
+        serde_json::from_slice(&std::fs::read(f.t.join("bin/seen.json")).unwrap()).unwrap();
+    assert_eq!(
+        (seen["run_object"].clone(), v["run_object"].clone()),
+        (Value::Null, Value::Null)
+    );
+    assert_eq!(f.record("n.md"), v);
+}
+
+// spec: specs/ap/run-object.md#R9
+#[test]
+fn run_object_r9_the_close_takes_the_end_state_the_tokens_and_the_last_session() {
+    let mut f = Fake::new();
+    let r = f.for_unit("a.md");
+    let (v, _) = f.run(&r).unwrap();
+    let close = &f.store().calls[2];
+    assert_eq!(close.0[..4], ["action", "apply", "--client", "ap"]);
+    assert_eq!(close.1["request_id"], f.rid("a.md", "close"));
+    assert_eq!(
+        (
+            close.1["action_type"].as_str(),
+            close.1["agent"].as_str(),
+            close.1["role"].as_str()
+        ),
+        (Some("close_run"), Some("ap-run"), Some("reviewer"))
+    );
+    assert_eq!(
+        close.1["parameters"],
+        json!({"run": object_id("run", "run-1"), "state": "ok", "session": v["session"],
+            "input_tokens": 2, "cache_read_tokens": 9064, "cache_write_tokens": 14047, "output_tokens": 4})
+    );
+    // A stage that moved is one object and the close holds the last account's session.
+    let mut f = Fake::new();
+    let mut r = f.for_unit("m.md");
+    r["next_accounts"] = json!([f.p("a2")]);
+    f.mode("a1", "limit1");
+    let (v, _) = f.run(&r).unwrap();
+    assert_ne!(v["attempts"][0]["session"], v["attempts"][1]["session"]);
+    let close = &f.store().bodies("close_run");
+    assert_eq!((close.len(), f.store().bodies("start_run").len()), (1, 1));
+    assert_eq!(
+        close[0]["parameters"]["session"],
+        v["attempts"][1]["session"]
+    );
+    assert_eq!(close[0]["parameters"]["session"], v["session"]);
+    // A stage that failed is closed with that state; a count the record holds as null is left out.
+    let mut f = Fake::new();
+    f.mode("a1", "noout");
+    let r = f.for_unit("f.md");
+    let (v, status) = f.run(&r).unwrap();
+    assert_eq!((status, v["state"].as_str()), (3, Some("failed")), "{v}");
+    let close = &f.store().bodies("close_run")[0]["parameters"];
+    assert_eq!(close["state"], "failed");
+    assert!(close.get("input_tokens").is_none() && close.get("limit").is_none());
+    // The limit reading: compact JSON when it fits in 300 bytes, else the window of the highest
+    // utilization, else nothing.
+    let mut f = Fake::new();
+    f.stream("a1", &[ALLOWED]);
+    let r = f.for_unit("l.md");
+    let (v, _) = f.run(&r).unwrap();
+    let sent = f.store().bodies("close_run")[0]["parameters"]["limit"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+    assert_eq!(serde_json::from_str::<Value>(&sent).unwrap(), v["limit"]);
+    assert!(sent.len() <= 300 && !sent.contains(' '));
+    let event = |status: &str| {
+        let windows: serde_json::Map<String, Value> = (1..=8)
+            .map(|n| (format!("window_{n}_of_the_unified_limit"), json!({"utilization": n as f64 / 10.0, "resetsAt": 1794772800, "status": status})))
+            .collect();
+        json!({"type": "rate_limit_event", "rate_limit_info": {"status": "allowed", "resetsAt": 1794772800,
+            "rateLimitType": "five_hour", "unifiedWindows": windows}}).to_string()
+    };
+    for (n, (status, kept)) in [("allowed", true), (&"x".repeat(400), false)]
+        .into_iter()
+        .enumerate()
+    {
+        let mut f = Fake::new();
+        f.stream("a1", &[&event(status)]);
+        let r = f.for_unit(&format!("w{n}.md"));
+        let (v, status) = f.run(&r).unwrap();
+        assert_eq!(status, 0, "{v}");
+        assert!(v["limit"].to_string().len() > 300);
+        let sent = f.store().bodies("close_run")[0]["parameters"]["limit"].clone();
+        match kept {
+            true => {
+                let sent: Value = serde_json::from_str(sent.as_str().unwrap()).unwrap();
+                assert_eq!(
+                    sent,
+                    json!({"window": "window_8_of_the_unified_limit", "utilization": 0.8,
+                    "status": "allowed", "resets_at": 1794772800_u64})
+                );
+            }
+            false => assert!(sent.is_null()),
+        }
+    }
+}
+
+// spec: specs/ap/run-object.md#R10
+#[test]
+fn run_object_r10_the_store_never_stops_changes_or_delays_a_stage_beyond_its_bounds() {
+    let mut f = Fake::new();
+    let r = f.for_unit("ref.md");
+    let (plain, plain_status) = f.run(&f.request("plain.md")).unwrap();
+    let (with, status) = f.run(&r).unwrap();
+    assert_eq!(
+        (status, with["state"].clone()),
+        (plain_status, plain["state"].clone())
+    );
+    assert_eq!(
+        std::fs::read(f.p("ref.md")).unwrap(),
+        std::fs::read(f.p("plain.md")).unwrap()
+    );
+    // Refused start, refused close, and a store that cannot be reached at all.
+    let cases: [(&str, Vec<Way>, Vec<Way>, Vec<Way>, Value); 3] = [
+        (
+            "start",
+            vec![],
+            vec![Way::Refuse("store_busy")],
+            vec![],
+            json!({"key": null, "start": "store_busy", "close": null}),
+        ),
+        (
+            "close",
+            vec![],
+            vec![],
+            vec![Way::Refuse("store_busy")],
+            json!({"key": "run-1", "start": "applied", "close": "store_busy"}),
+        ),
+        (
+            "lost",
+            vec![Way::Lost],
+            vec![Way::Lost, Way::Lost],
+            vec![],
+            json!({"key": null, "start": "process_failed", "close": null}),
+        ),
+    ];
+    for (name, read, start, close, want) in cases {
+        let mut f = Fake::new();
+        let r = f.for_unit(&format!("{name}.md"));
+        f.way("get", read);
+        f.way("start_run", start);
+        f.way("close_run", close);
+        let (v, status) = f.run(&r).unwrap();
+        assert_eq!((status, v["state"].as_str()), (0, Some("ok")), "{name} {v}");
+        assert_eq!(v["run_object"], want, "{name}");
+        // One attempt for each call, each bound to 15 seconds; a busy answer is not asked again.
+        assert!(f.store().calls.iter().all(|c| c.2 == 15_000), "{name}");
+        assert_eq!(
+            f.store().bodies("start_run").len(),
+            if name == "lost" { 2 } else { 1 },
+            "{name}"
+        );
+        assert_eq!(
+            f.store().bodies("close_run").len(),
+            usize::from(name == "close"),
+            "{name}"
+        );
+        let before: Vec<_> = f.events.iter().take_while(|e| *e != "launch").collect();
+        assert!(
+            before.len() <= 2,
+            "at most the read and the start before the launch: {before:?}"
+        );
+        assert_eq!(f.events.iter().filter(|e| *e == "launch").count(), 1);
+    }
+    // A stage that ends badly is judged by itself.
+    let mut f = Fake::new();
+    f.mode("a1", "noout");
+    let r = f.for_unit("bad.md");
+    f.way("close_run", vec![Way::Lost]);
+    let (v, status) = f.run(&r).unwrap();
+    assert_eq!((status, v["state"].as_str()), (3, Some("failed")), "{v}");
+    assert_eq!(v["run_object"]["close"], "process_failed");
+    assert_eq!(f.record("bad.md"), v);
+}
+
+// spec: specs/ap/run-object.md#R11
+#[test]
+fn run_object_r11_a_start_without_an_answer_is_repeated_after_the_end_with_the_same_content() {
+    // The first start was not applied: the repeat applies it, late; the stage moved on meanwhile, so
+    // the final record's account and session are not the first call's.
+    let mut f = Fake::new();
+    let mut r = f.for_unit("a.md");
+    r["next_accounts"] = json!([f.p("a2")]);
+    f.mode("a1", "limit1");
+    f.way("start_run", vec![Way::Lost]);
+    let (v, status) = f.run(&r).unwrap();
+    assert_eq!(status, 0, "{v}");
+    assert_eq!(
+        f.events,
+        [
+            "ont get",
+            "ont start_run",
+            "launch",
+            "launch",
+            "ont start_run",
+            "ont close_run"
+        ]
+    );
+    let starts = f.store().bodies("start_run");
+    assert_eq!(starts[0], starts[1]);
+    assert_eq!(starts[0]["parameters"]["account"], "a1");
+    assert_eq!(
+        starts[0]["parameters"]["session"],
+        v["attempts"][0]["session"]
+    );
+    assert_eq!(
+        v["run_object"],
+        json!({"key": "run-1", "start": "applied_late", "close": "applied"})
+    );
+    // The first start was applied and its answer lost: the repeat is `already_applied`.
+    let mut f = Fake::new();
+    let r = f.for_unit("b.md");
+    f.way("start_run", vec![Way::Silent]);
+    let (v, _) = f.run(&r).unwrap();
+    assert_eq!(
+        v["run_object"],
+        json!({"key": "run-1", "start": "already_applied", "close": "applied"})
+    );
+    assert_eq!(f.store().runs.len(), 1);
+    // A refusal is an answer: nothing is repeated. A repeat that fails leaves the first code.
+    let mut f = Fake::new();
+    let r = f.for_unit("c.md");
+    f.way("start_run", vec![Way::Refuse("unknown_unit")]);
+    let (v, _) = f.run(&r).unwrap();
+    assert_eq!(
+        (
+            f.store().bodies("start_run").len(),
+            v["run_object"]["start"].clone()
+        ),
+        (1, json!("unknown_unit"))
+    );
+}
+
+// spec: specs/ap/run-object.md#R12
+#[test]
+fn run_object_r12_a_second_call_on_the_same_out_is_refused_before_the_store() {
+    let mut f = Fake::new();
+    let r = f.for_unit("o.md");
+    let (first, _) = f.run(&r).unwrap();
+    let (calls, applied, runs) = (
+        f.store().calls.len(),
+        f.store().applied.clone(),
+        f.store().runs.clone(),
+    );
+    assert_eq!(code(f.run(&r)), "out_exists@out");
+    assert_eq!(f.store().calls.len(), calls);
+    assert_eq!((&f.store().applied, &f.store().runs), (&applied, &runs));
+    assert_eq!(f.record("o.md"), first);
+}
+
+// spec: specs/ap/run-object.md#R13
+#[test]
+fn run_object_r13_a_request_without_the_members_never_reaches_the_store() {
+    let mut f = Fake::new();
+    let (v, status) = f.run(&f.request("x.md")).unwrap();
+    assert_eq!((status, v["run_object"].clone()), (0, Value::Null));
+    assert_eq!(f.events, ["launch"]);
+    // The fallback record keeps its three members and nothing is started.
+    let mut f = Fake::new();
+    let r = f.for_unit("h.md");
+    f.precreate = Some(f.p("h.md.stream.jsonl"));
+    let (v, status) = f.run(&r).unwrap();
+    assert_eq!(status, 5, "{v}");
+    assert_eq!(
+        v,
+        json!({"state": "failed", "unmet": "launch", "account": f.p("a1")})
+    );
+    assert_eq!(f.record("h.md"), v);
+    assert!(f.store().bodies("start_run").is_empty() && f.store().bodies("close_run").is_empty());
 }

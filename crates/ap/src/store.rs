@@ -1,6 +1,6 @@
 //! Every call of `ap request` to the store engine `ont`: one function per action it applies and one
 //! per read. An answer `store_busy` is asked again up to five times after a short wait; nothing else is.
-use crate::host::{Failure, System, error, fail, id, ont};
+use crate::host::{Failure, System, error, fail, id, ont_within};
 use serde_json::{Map, Value, json};
 use std::time::Duration;
 
@@ -18,20 +18,30 @@ pub struct Actor<'a> {
     pub agent: &'a str,
     pub session: &'a str,
 }
-/// One call; a `store_busy` answer is called again, at most five more times.
+/// One call bound to 30 seconds; a `store_busy` answer is called again, at most five more times.
 fn call(
     s: &mut impl System,
     store: Option<&str>,
     command: &[&str],
     body: &Value,
 ) -> Result<Value, Failure> {
+    call_in(s, store, command, body, (RETRIES, 30_000))
+}
+/// One call with its own `(retries, milliseconds)`: the stage runner makes one attempt of 15 seconds.
+fn call_in(
+    s: &mut impl System,
+    store: Option<&str>,
+    command: &[&str],
+    body: &Value,
+    (retries, ms): (usize, u64),
+) -> Result<Value, Failure> {
     let ctx = json!({ "store": store });
     let mut tries = 0;
     loop {
-        let reply = ont(s, &ctx, command, body)?;
+        let reply = ont_within(s, &ctx, command, body, ms)?;
         let v: Value = serde_json::from_slice(&reply.bytes)
             .map_err(|_| error("store_answer_unreadable", command[0]))?;
-        if v["code"] == "store_busy" && tries < RETRIES {
+        if v["code"] == "store_busy" && tries < retries {
             tries += 1;
             s.pause(WAIT);
             continue;
@@ -54,9 +64,13 @@ pub struct Applied {
 impl Applied {
     /// The id of the request the action created.
     pub fn created(&self) -> Option<&Value> {
+        self.created_of("request")
+    }
+    /// The id of the object of `kind` the action created.
+    pub fn created_of(&self, kind: &str) -> Option<&Value> {
         self.edits
             .iter()
-            .find(|e| e["change"] == "initial" && e["id"]["object_type"] == "request")
+            .find(|e| e["change"] == "initial" && e["id"]["object_type"] == kind)
             .map(|e| &e["id"])
     }
 }
@@ -71,6 +85,9 @@ fn apply(
     let body = json!({"action_type": action, "request_id": request_id, "agent": actor.agent,
         "session": actor.session, "parameters": parameters});
     let v = call(s, store, &["action", "apply", "--client", "ap"], &body)?;
+    applied(&v)
+}
+fn applied(v: &Value) -> Result<Applied, Failure> {
     let outcome = v["result"]["outcome"].as_str().unwrap_or_default();
     let edits = v["result"]["edits"].as_array();
     match (outcome, edits) {
@@ -79,6 +96,55 @@ fn apply(
             edits: edits.clone(),
         }),
         _ => Err(error("store_answer_unreadable", "action")),
+    }
+}
+/// The stage runner's own action (`specs/ap/run-object.md`): one attempt bound to 15 seconds, as the
+/// agent `ap-run` with the stage's `role`.
+fn once(
+    s: &mut impl System,
+    store: Option<&str>,
+    action: &str,
+    (rid, role, parameters): (&str, &str, &Value),
+) -> Result<Applied, Failure> {
+    let body = json!({"action_type": action, "request_id": rid, "agent": "ap-run", "role": role,
+        "parameters": parameters});
+    let v = call_in(
+        s,
+        store,
+        &["action", "apply", "--client", "ap"],
+        &body,
+        (0, 15_000),
+    )?;
+    applied(&v)
+}
+/// Schema version 11 on: a `running` run of a stage.
+pub fn start_run(
+    s: &mut impl System,
+    store: Option<&str>,
+    call: (&str, &str, &Value),
+) -> Result<Applied, Failure> {
+    once(s, store, "start_run", call)
+}
+/// Schema version 11 on: the run closed with the stage's end.
+pub fn close_run(
+    s: &mut impl System,
+    store: Option<&str>,
+    call: (&str, &str, &Value),
+) -> Result<Applied, Failure> {
+    once(s, store, "close_run", call)
+}
+/// True only when one `ont get` of the object answers `unavailable`; any other answer or failure of
+/// that read (one attempt of 15 seconds) is not an absence.
+pub fn absent(s: &mut impl System, store: Option<&str>, kind: &str, key: &str) -> bool {
+    let body = json!({ "id": id(kind, key) });
+    let reply = call_in(s, store, &["get"], &body, (0, 15_000));
+    matches!(reply, Err(f) if f.code == REFUSED && f.detail["code"] == "unavailable")
+}
+/// The code of a failed call: the engine's for a refusal, else the failure's own.
+pub fn code_of(f: &Failure) -> String {
+    match f.code == REFUSED {
+        true => f.detail["code"].as_str().unwrap_or(REFUSED).to_owned(),
+        false => f.code.to_owned(),
     }
 }
 pub fn record_request(
