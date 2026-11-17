@@ -14,6 +14,7 @@ pub(crate) enum Command {
     Search,
     Around,
     Aggregate,
+    Log,
     Render,
     ActionList,
     ActionValidate,
@@ -56,7 +57,7 @@ const SPECS: &[Spec] = &[
         ],
         stdin: false,
         fields: "",
-        example: "ont schema install --from /repo --commit <40-lowercase-hex> --path ontology/work.schema.json",
+        example: "ont schema install --from /repo --commit <sha> --path work.schema.json",
     },
     Spec {
         command: Describe,
@@ -139,6 +140,16 @@ const SPECS: &[Spec] = &[
         example: "echo '{\"object_type\":\"hold\",\"group_by\":[\"status\"],\"metrics\":[\"count\"]}' | ont aggregate",
     },
     Spec {
+        command: Log,
+        words: &["log"],
+        files: &[0],
+        form: "log",
+        options: &[],
+        stdin: true,
+        fields: "outcome?: applied|refused; action_type?; since?,until?: UTC; actor?: object; parameters?: bool; limit?: 1-1000; continuation?",
+        example: "echo {} | ont log",
+    },
+    Spec {
         command: Render,
         words: &["render"],
         files: &[0],
@@ -172,7 +183,7 @@ const SPECS: &[Spec] = &[
         form: "action validate",
         options: &["--client"],
         stdin: true,
-        fields: "op?: validate_action|null; action_type: string; parameters: object (names/types from action list); agent?,session?: null or 1-64 of ASCII letters,digits,._:-; request_id?: null or 1-64 of ASCII letters,digits,._-; expected?: null or [{id,revision:string}]",
+        fields: "op?: validate_action|null; action_type: string; parameters: object (names/types from action list); agent?,session?: null or 1-64 of [A-Za-z0-9._:-]; request_id?: null or 1-64 of [A-Za-z0-9._-]; expected?: null or [{id,revision:string}]",
         example: "echo '{\"action_type\":\"create_tag\",\"parameters\":{\"label\":\"demo\"},\"request_id\":\"demo-1\"}' | ont action validate",
     },
     Spec {
@@ -182,7 +193,7 @@ const SPECS: &[Spec] = &[
         form: "action apply",
         options: &["--client"],
         stdin: true,
-        fields: "op?: apply_action|null; action_type: string; parameters: object (action list); agent?,session?: null or 1-64 of ASCII letters,digits,._:-; request_id?: null or 1-64 of ASCII letters,digits,._- (reuse unchanged on retry); expected?: null or [{id,revision:string}] from validate basis; id form as get",
+        fields: "op?: apply_action|null; action_type: string; parameters: object (action list); agent?,session?: null or 1-64 of [A-Za-z0-9._:-]; request_id?: null or 1-64 of [A-Za-z0-9._-] (reuse unchanged on retry); expected?: null or [{id,revision:string}] from validate basis; id form as get",
         example: "echo '{\"action_type\":\"create_tag\",\"parameters\":{\"label\":\"demo\"},\"request_id\":\"demo-1\"}' | ont action apply",
     },
     Spec {

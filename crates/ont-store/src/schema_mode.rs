@@ -328,6 +328,22 @@ impl SchemaRead<'_> {
     ) -> Result<Option<SchemaHead>, StoreRefusal> {
         head_after_access_in(self.tx, access)
     }
+    /// At most `limit` action-log rows with `seq` below `before` (every row
+    /// when `None`), newest first, inside this read snapshot.
+    pub fn action_log_before(
+        &self,
+        before: Option<i64>,
+        limit: usize,
+    ) -> Result<Vec<(i64, ActionLogEntry)>, StoreRefusal> {
+        let mut stmt = map_db(self.tx.prepare("SELECT seq,action_id,action_type,domain,schema_domain,schema_version,actor,submitted_at,parameters,basis,edits,outcome FROM action_log WHERE seq<?1 ORDER BY seq DESC LIMIT ?2"))?;
+        let limit = i64::try_from(limit).unwrap_or(i64::MAX);
+        let mut rows = map_db(stmt.query(params![before.unwrap_or(i64::MAX), limit]))?;
+        let mut out = Vec::new();
+        while let Some(row) = map_db(rows.next())? {
+            out.push(action_log_row(row)?);
+        }
+        Ok(out)
+    }
 }
 
 /// One public write transaction in mode `Schema` (see `Store::write`).

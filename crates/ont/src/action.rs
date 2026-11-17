@@ -273,17 +273,21 @@ fn check_actor_bounds(
         ("/client", Some(client.as_str())),
         ("/agent", agent.as_deref()),
         ("/session", session.as_deref()),
+        ("/role", ctx.role.as_deref()),
     ] {
         if value.is_some_and(|v| !valid_actor_field(v)) {
-            return Err(Refusal::input(
-                "invalid_request",
-                field,
-                "1 to 64 ASCII characters: letters, digits, '.', '_', ':', '-'",
-            )
-            .into());
+            return Err(invalid_actor_field(field).into());
         }
     }
     Ok(())
+}
+/// The refusal of an actor member (`/client`, `/agent`, `/session`, `/role`).
+pub(crate) fn invalid_actor_field(field: &str) -> Refusal {
+    Refusal::input(
+        "invalid_request",
+        field,
+        "1 to 64 ASCII characters: letters, digits, '.', '_', ':', '-'",
+    )
 }
 fn check_parameters_size(params: &Value) -> Result<(), Failure> {
     if serde_json::to_string(&canonical(params)).is_ok_and(|s| s.len() > crate::MAX_REQUEST) {
@@ -309,6 +313,9 @@ fn actor_json(ctx: &Context, agent: &Option<String>, session: &Option<String>) -
     }
     if let Some(s) = session {
         m.insert("session".into(), json!(s));
+    }
+    if let Some(r) = &ctx.role {
+        m.insert("role".into(), json!(r));
     }
     Value::Object(m)
 }
@@ -1625,6 +1632,19 @@ fn utc_stamp_now() -> String {
         .unwrap_or(0);
     utc_stamp(secs)
 }
+/// `secs` as `YYYY-MM-DDTHH:MM:SSZ`.
+pub(crate) fn utc_string(secs: u64) -> String {
+    let stamp = utc_stamp(secs);
+    format!(
+        "{}-{}-{}T{}:{}:{}Z",
+        &stamp[..stamp.len() - 12],
+        &stamp[stamp.len() - 12..stamp.len() - 10],
+        &stamp[stamp.len() - 10..stamp.len() - 8],
+        &stamp[stamp.len() - 7..stamp.len() - 5],
+        &stamp[stamp.len() - 5..stamp.len() - 3],
+        &stamp[stamp.len() - 3..stamp.len() - 1]
+    )
+}
 fn utc_stamp(secs: u64) -> String {
     let days = (secs / 86_400) as i64;
     let tod = secs % 86_400;
@@ -2690,7 +2710,55 @@ fn submission_hint(codes: &[String]) -> String {
     format!("Resolve the submission criteria: {}.", hints.join("; "))
 }
 
+/// Refusal codes of the store or of a failure, never recorded in
+/// `refusals.jsonl`; `unknown_action` and `invalid_request` arise before the
+/// action type is known except `invalid_request` at `/parameters`.
+fn records_refusal(code: &str) -> bool {
+    !code.starts_with("store_")
+        && !matches!(
+            code,
+            "unknown_action"
+                | "projection_stale"
+                | "action_domain_mismatch"
+                | "action_schema_mismatch"
+                | "duplicate_action_id"
+                | "schema_pin_mismatch"
+                | "authority_failure"
+        )
+}
+
+/// Apply one action. A refusal raised after the action type was found also
+/// appends one line to `refusals.jsonl` (README "Refusal records"); the
+/// answer is the same whether or not the append succeeds.
 pub fn apply_action(ctx: &Context, req: &ApplyActionRequest) -> Result<Answer, Failure> {
+    let mut found: Option<(String, u64)> = None;
+    let result = apply_found(ctx, req, &mut found);
+    if let (Err(Failure::Refused(refusal)), Some((domain, version))) = (&result, found)
+        && records_refusal(refusal.code)
+    {
+        let mut line = json!({
+            "action_type":req.action_type,"actor":actor_json(ctx, &req.agent, &req.session),
+            "code":refusal.code,"domain":domain,"outcome":"refused",
+            "parameters":canonical(&req.parameters),"schema_version":version,"submitted_at":ctx.now
+        });
+        if let Some(r) = &req.request_id {
+            line["request_id"] = json!(r);
+        }
+        if refusal.code == "submission_criteria"
+            && let Some(failed) = refusal.extra.get("failed")
+        {
+            line["failed"] = failed.clone();
+        }
+        crate::log::append_refusal(&ctx.store, &canonical_string(&line));
+    }
+    result
+}
+
+fn apply_found(
+    ctx: &Context,
+    req: &ApplyActionRequest,
+    found: &mut Option<(String, u64)>,
+) -> Result<Answer, Failure> {
     if let Some(r) = &req.request_id
         && !valid_request_id(r)
     {
@@ -2715,6 +2783,10 @@ pub fn apply_action(ctx: &Context, req: &ApplyActionRequest) -> Result<Answer, F
         ))
     })?;
     let (schema, at) = (schema.clone(), at.clone());
+    *found = Some((
+        schema.domain.clone(),
+        set.pin(&schema.domain).map(|p| p.version).unwrap_or(0),
+    ));
     if !principal
         .view()
         .action_types(&schema.domain)
@@ -2805,7 +2877,14 @@ pub fn apply_action(ctx: &Context, req: &ApplyActionRequest) -> Result<Answer, F
         };
         match run(tx) {
             Ok(o) => { outcome = Some(o); Ok(()) }
-            Err(f) => { captured = Some(f); Err(ont_store::schema_mode::StoreRefusal::new("action_refused")) }
+            Err(f) => {
+                // The record names the domain and version this transaction read.
+                if let Some((tschema, _)) = find_action_type(&tx_set, &req.action_type) {
+                    *found = Some((tschema.domain.clone(), tx_set.pin(&tschema.domain).map(|p| p.version).unwrap_or(0)));
+                }
+                captured = Some(f);
+                Err(ont_store::schema_mode::StoreRefusal::new("action_refused"))
+            }
         }
     });
     if let Some(f) = captured {

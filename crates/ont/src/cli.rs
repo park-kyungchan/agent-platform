@@ -9,6 +9,7 @@ use crate::compact::{CompactRequest, compact};
 use crate::describe::{DescribeRequest, describe};
 use crate::get::{GetRequest, get};
 use crate::index::{IndexRequest, index};
+use crate::log::{LogRequest, log};
 use crate::schema::{
     CheckRequest, CommitInstallRequest, InstallRequest, check, install, install_commit,
 };
@@ -242,7 +243,33 @@ pub fn execute(op: Op, request: &[u8], ctx: &Context) -> Result<Answer, Failure>
             }
         }
         Op::Index => index(ctx, &IndexRequest::parse(request)?),
+        Op::Log => log(ctx, &LogRequest::parse(request)?),
     }
+}
+
+/// Take the member `role` out of an action request object before the
+/// request struct parses the rest: the role is a [`Context`] member. A
+/// request that is not a strict JSON object is returned unchanged, so its
+/// parse refuses it as before; `null` is no role.
+pub(crate) fn take_role(bytes: Vec<u8>) -> Result<(Vec<u8>, Option<String>), Refusal> {
+    let Ok(Value::Object(mut object)) = parse_request::<Value>(&bytes) else {
+        return Ok((bytes, None));
+    };
+    let role = match object.remove("role") {
+        None => return Ok((bytes, None)),
+        Some(Value::Null) => None,
+        Some(Value::String(role)) => Some(role),
+        Some(_) => return Err(crate::action::invalid_actor_field("/role")),
+    };
+    Ok((Value::Object(object).to_string().into_bytes(), role))
+}
+
+/// `validate` and `apply` with the request's `role` (else the context's).
+fn action_request(stdin: impl Read, ctx: &Context) -> Result<(Vec<u8>, Context), Failure> {
+    let (bytes, role) = take_role(read_request(stdin)?)?;
+    let mut ctx = ctx.clone();
+    ctx.role = role.or(ctx.role);
+    Ok((bytes, ctx))
 }
 
 /// An operation that takes a JSON request.
@@ -255,6 +282,7 @@ pub enum Op {
     Aggregate,
     SetRead,
     Index,
+    Log,
 }
 
 fn dispatch(cli: &Cli, stdin: impl Read, ctx: &Context) -> Result<Answer, Failure> {
@@ -358,6 +386,7 @@ fn dispatch(cli: &Cli, stdin: impl Read, ctx: &Context) -> Result<Answer, Failur
         Search => execute(Op::Search, &read_request(stdin)?, ctx),
         Aggregate => execute(Op::Aggregate, &read_request(stdin)?, ctx),
         Around => execute(Op::Around, &read_request(stdin)?, ctx),
+        Log => execute(Op::Log, &read_request(stdin)?, ctx),
         Render => {
             use crate::render::{RenderRequest, write_file};
             let opts = &cli.render_options;
@@ -412,9 +441,13 @@ fn dispatch(cli: &Cli, stdin: impl Read, ctx: &Context) -> Result<Answer, Failur
         }
         ActionList => list_actions(ctx, &ListActionsRequest::parse(&read_request(stdin)?)?),
         ActionValidate => {
-            validate_action(ctx, &ValidateActionRequest::parse(&read_request(stdin)?)?)
+            let (request, ctx) = action_request(stdin, ctx)?;
+            validate_action(&ctx, &ValidateActionRequest::parse(&request)?)
         }
-        ActionApply => apply_action(ctx, &ApplyActionRequest::parse(&read_request(stdin)?)?),
+        ActionApply => {
+            let (request, ctx) = action_request(stdin, ctx)?;
+            apply_action(&ctx, &ApplyActionRequest::parse(&request)?)
+        }
         Mcp => Err(invalid_argument("command").into()),
     }
 }
@@ -542,6 +575,7 @@ pub fn run(args: &[String], stdin: impl Read, real_uid: u32, effective_uid: u32)
     let mut ctx = Context::new(cli.store.clone(), now);
     ctx.client = client;
     ctx.agent = std::env::var("ONT_AGENT").ok().filter(|s| !s.is_empty());
+    ctx.role = std::env::var("ONT_ROLE").ok().filter(|s| !s.is_empty());
     render(dispatch(&cli, stdin, &ctx), now)
 }
 

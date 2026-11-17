@@ -1,5 +1,5 @@
 //! `ont mcp`: a Model Context Protocol server over stdio for `describe`,
-//! `get`, `search`, `index` and actions.
+//! `get`, `search`, `index`, actions and the action log (`ont_log`).
 //!
 //! Wire: newline-delimited JSON-RPC 2.0, one request per line on stdin, one
 //! JSON line per response on stdout (nothing else is ever written there).
@@ -203,7 +203,7 @@ fn tools() -> Vec<Tool> {
                 "name":"ont_action_validate",
                 "description":"Preview without writing. Use the body that will be applied, with the same request_id. action_type/parameters: ont_action_list; reference values: objects[].id from ont_search. If result.valid, apply the same arguments with result.basis as expected; otherwise fix failed criteria. agent/session are optional.",
                 "inputSchema":{"type":"object","additionalProperties":false,"required":["action_type","parameters"],
-                    "properties":{"action_type":s,"parameters":{"type":"object"},"request_id":request_id,"agent":actor,"session":actor,"expected":expected}}
+                    "properties":{"action_type":s,"parameters":{"type":"object"},"request_id":request_id,"agent":actor,"session":actor,"role":actor,"expected":expected}}
             }),
         },
         Tool {
@@ -212,7 +212,18 @@ fn tools() -> Vec<Tool> {
                 "name":"ont_action_apply",
                 "description":"Apply action_type/parameters from ont_action_list; reference values: objects[].id from ont_search; expected: validate result.basis. Every edits_log value means the change was made. On applied or already_applied continue; on refusal fix its code.",
                 "inputSchema":{"type":"object","additionalProperties":false,"required":["action_type","parameters","request_id"],
-                    "properties":{"action_type":s,"parameters":{"type":"object"},"request_id":request_id,"agent":actor,"session":actor,"expected":expected}}
+                    "properties":{"action_type":s,"parameters":{"type":"object"},"request_id":request_id,"agent":actor,"session":actor,"role":actor,"expected":expected}}
+            }),
+        },
+        Tool {
+            op: ToolOp::Read(Op::Log),
+            spec: json!({
+                "name":"ont_log",
+                "description":"Applied actions (outcome applied, default) or recorded refusals (outcome refused, with code and failed criteria), newest first. Filters: action_type, since/until (UTC 2026-11-17T00:00:00Z), actor members e.g. {\"role\":\"verifier\"}; parameters:true adds parameters; limit 1-1000 (default 100); continuation pages. Rows outside your grants count in withheld.",
+                "inputSchema":{"type":"object","additionalProperties":false,
+                    "properties":{"outcome":{"enum":["applied","refused"]},"action_type":s,"since":s,"until":s,
+                        "actor":{"type":"object","additionalProperties":s},"parameters":{"type":"boolean"},
+                        "limit":{"type":"integer","minimum":1,"maximum":1000},"continuation":s}}
             }),
         },
     ]
@@ -416,6 +427,28 @@ impl<'a> Server<'a> {
             .get("session")
             .and_then(Value::as_str)
             .map(str::to_string);
+        // `role` is a `Context` member: taken out of an action's arguments
+        // before the request struct parses the rest (`Err` for a wrong type).
+        let mut arguments = arguments.clone();
+        let role = match (op, arguments.as_object_mut()) {
+            (ToolOp::Validate | ToolOp::Apply, Some(object)) => match object.remove("role") {
+                None | Some(Value::Null) => Ok(None),
+                Some(Value::String(role)) => Ok(Some(role)),
+                Some(_) => Err(()),
+            },
+            _ => Ok(None),
+        };
+        ctx.role = role
+            .clone()
+            .ok()
+            .flatten()
+            .or_else(|| std::env::var("ONT_ROLE").ok().filter(|s| !s.is_empty()));
+        let check_role = || {
+            role.clone()
+                .map(|_| ())
+                .map_err(|()| Failure::from(crate::action::invalid_actor_field("/role")))
+        };
+        let arguments = &arguments;
         let request = arguments.to_string();
         let guard = InCall::enter();
         let ran = catch_unwind(AssertUnwindSafe(|| {
@@ -425,6 +458,7 @@ impl<'a> Server<'a> {
                     .map_err(Failure::from)
                     .and_then(|req| crate::action::list_actions(&ctx, &req)),
                 ToolOp::Validate => check_request_id(arguments, false)
+                    .and_then(|()| check_role())
                     .and_then(|()| {
                         crate::action::ValidateActionRequest::parse(request.as_bytes())
                             .map_err(Failure::from)
@@ -434,15 +468,17 @@ impl<'a> Server<'a> {
                         req.session = None;
                         crate::action::validate_action(&ctx, &req)
                     }),
-                ToolOp::Apply => check_request_id(arguments, true).and_then(|()| {
-                    crate::action::ApplyActionRequest::parse(request.as_bytes())
-                        .map_err(Failure::from)
-                        .and_then(|mut req| {
-                            req.agent = None;
-                            req.session = None;
-                            crate::action::apply_action(&ctx, &req)
-                        })
-                }),
+                ToolOp::Apply => check_request_id(arguments, true)
+                    .and_then(|()| check_role())
+                    .and_then(|()| {
+                        crate::action::ApplyActionRequest::parse(request.as_bytes())
+                            .map_err(Failure::from)
+                            .and_then(|mut req| {
+                                req.agent = None;
+                                req.session = None;
+                                crate::action::apply_action(&ctx, &req)
+                            })
+                    }),
             };
             render(result, now)
         }));
@@ -476,7 +512,7 @@ impl<'a> Server<'a> {
                     }
                 }
             }
-            if matches!(op, ToolOp::Read(Op::SetRead)) {
+            if matches!(op, ToolOp::Read(Op::SetRead | Op::Log)) {
                 refusal = refusal.with("retry_with_smaller_limit", json!(true));
             }
             let outcome = render(Err(Failure::Refused(refusal)), now);

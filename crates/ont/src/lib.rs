@@ -35,6 +35,7 @@ pub mod get;
 pub mod gitread;
 pub mod index;
 mod input;
+pub mod log;
 pub mod mcp;
 pub mod principal;
 pub mod refusal;
@@ -69,7 +70,8 @@ pub fn check_uid(real: u32, effective: u32) -> Result<(), &'static str> {
 /// What an operation needs besides its request: the store path, `now` and
 /// the self-reported attribution of the caller. `client` is the command's
 /// `--client` value (default `cli`); `agent` comes from the request field
-/// or `ONT_AGENT`; `session` is given per request. All three are
+/// or `ONT_AGENT`; `session` is given per request; `role` comes from the
+/// request field `role` of an action or `ONT_ROLE`. All four are
 /// self-reported, as DESIGN section 7 states.
 #[derive(Debug, Clone)]
 #[non_exhaustive]
@@ -79,6 +81,9 @@ pub struct Context {
     pub client: String,
     pub agent: Option<String>,
     pub session: Option<String>,
+    /// The actor's self-reported role: the member `role` of the logged
+    /// actor, read by criteria; never part of a derived action id.
+    pub role: Option<String>,
     /// Snapshot paging for action evaluation (test-only tuning via
     /// [`Context::with_snapshot_bounds`]); `Context::new` is the supported
     /// constructor.
@@ -113,6 +118,7 @@ impl Context {
             client: "cli".to_string(),
             agent: None,
             session: None,
+            role: None,
             snapshot_page_size: page,
             snapshot_max_heads: max,
         }
