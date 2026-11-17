@@ -54,10 +54,21 @@ fn check(units: &Value) -> Result<(), Failure> {
             .is_some_and(|o| o.iter().all(|(k, v)| ok(k, v)))
     };
     let seconds = |v: &Value| v.as_u64().is_some_and(|n| (1..=86_400).contains(&n));
-    let accounts = |runtime: &str, v: &Value| {
+    // A key is a runtime, or `<runtime>/<role or model>`: `claude/verifier`, `claude/opus`.
+    let accounts = |key: &str, v: &Value| {
+        let (runtime, rest) = key.split_once('/').unwrap_or((key, ""));
+        let name = |r: &str| {
+            !r.is_empty()
+                && r.len() <= 64
+                && r.bytes()
+                    .all(|c| c.is_ascii_alphanumeric() || b"-._".contains(&c))
+        };
         let list = v.as_array().filter(|l| !l.is_empty() && l.iter().all(path));
         let one = !matches!(runtime, "codex" | "muse") || list.is_some_and(|l| l.len() == 1);
-        ["claude", "codex", "muse", "agy"].contains(&runtime) && list.is_some() && one
+        ["claude", "codex", "muse", "agy"].contains(&runtime)
+            && (!key.contains('/') || name(rest))
+            && list.is_some()
+            && one
     };
     for k in UNITS.split(' ') {
         let ok = o.get(k).is_some_and(|v| match k {
@@ -160,9 +171,16 @@ pub(super) fn compose(page: &str) -> Result<Composed, Failure> {
     let stage = |which: &str, file: &str| -> Result<Value, Failure> {
         let b = &m[which];
         let runtime = b["runtime"].as_str().unwrap_or("claude");
-        let list = units["accounts"][runtime]
-            .as_array()
-            .ok_or_else(|| bad("accounts"))?;
+        let model = b["model"].as_str().unwrap_or_default();
+        // The accounts of the stage's role, else of its model, else of its runtime.
+        let list = [
+            format!("{runtime}/{which}"),
+            format!("{runtime}/{model}"),
+            runtime.to_owned(),
+        ]
+        .iter()
+        .find_map(|k| units["accounts"][k.as_str()].as_array())
+        .ok_or_else(|| bad("accounts"))?;
         let mut s = json!({"model": b["model"], "effort": b["effort"], "runtime": runtime,
             "account": list[0], "prompt": format!("{out}{file}"),
             "timeout_seconds": b.get("timeout_seconds").unwrap_or(&units["timeouts"][which])});
