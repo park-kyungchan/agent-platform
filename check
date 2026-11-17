@@ -21,6 +21,7 @@ bash scripts/test-backup-store.sh
 python3 -I -B -m unittest discover -s ci -p 'test_readout*.py'
 python3 -I -B -m unittest discover -s ci -p 'test_evaluate_case.py'
 python3 -I -B -m unittest discover -s ci -p 'test_lead_suite.py'
+python3 -I -B -m unittest discover -s ci -p 'test_routing_suite.py'
 if [ "$mode" = content ]; then echo "check: ok (content)"; exit 0; fi
 
 if [ "${CI:-}" != true ] && [ -z "${CHECK_LOCKED:-}" ]; then
