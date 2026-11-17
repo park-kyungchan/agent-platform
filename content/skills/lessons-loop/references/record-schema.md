@@ -26,5 +26,5 @@ Preserve existing genuine `source:*`, `harness:*`, `project:*`, `plan:*`, offici
 
 That preservation rule concerns historical/private-owner material; new engineering
 tags are derived by the publisher. The Academy lesson archive follows the separate
-`education-platform` `content/skills/academy-student-context/references/lesson-archive.md`
+`education-platform` `docs/academy-lesson-archive.md`
 contract, never this engineering schema. No private body enters these originals.

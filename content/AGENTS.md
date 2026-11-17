@@ -40,7 +40,7 @@ Read one of these only when its situation applies. References are in `/root/.age
 | I need official documentation of a CLI or another tool | `OFFICIAL-DOCS.md` |
 | I design, plan or review the life cycle, an Ontology store, Rust, Spec-Driven Development or context governance, and need what the design sources say | `OFFICIAL-DOCS.md` section 4: only the lines its row names |
 | I change a shared instruction, a skill or a reference | Section 7 below, then `BUILD-AND-DELIVERY.md` section 6 |
-| I use the Academy tools or prepare a lesson | skill `academy-runtime-routing` for the tools; skill `academy-student-context` for lesson preparation and student status |
+| I do Academy lesson work | skill `academy-lesson-day`; a DailyRecord: `academy-dailyrecord-authoring`; pre-study: `academy-prestudy-review` |
 | A word in an instruction, a packet or the user's message is unclear, or I use a new term | Section 8 below, then `GLOSSARY.md` |
 | I answer or report to the user | skill `explain-precisely` |
 | STATE names me Lead | skill `lead` |
