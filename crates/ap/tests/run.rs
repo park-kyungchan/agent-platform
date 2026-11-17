@@ -6641,7 +6641,9 @@ fn run_object_r10_the_store_never_stops_changes_or_delays_a_stage_beyond_its_bou
         std::fs::read(f.p("plain.md")).unwrap()
     );
     // Refused start, refused close, and a store that cannot be reached at all.
-    let cases: [(&str, Vec<Way>, Vec<Way>, Vec<Way>, Value); 3] = [
+    // (name, ways of the read, of the start, of the close, the record's `run_object`)
+    type Case = (&'static str, Vec<Way>, Vec<Way>, Vec<Way>, Value);
+    let cases: [Case; 3] = [
         (
             "start",
             vec![],
