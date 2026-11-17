@@ -1279,11 +1279,10 @@ fn store_version(s: &mut impl System, c: &Call) -> Step<Value> {
     Ok(answer["schema"]["work"]["version"].clone())
 }
 /// Whether T holds `ontology/migrate` as an executable file.
-fn executable(s: &mut impl System, c: &Call, tip: &str) -> bool {
-    let entry = git(s, c, &["ls-tree", tip, "--", "ontology/migrate"]);
-    entry.is_some_and(|e| {
-        e.starts_with("100755 blob ") && e.trim_end().ends_with("\tontology/migrate")
-    })
+/// None when the entry cannot be read: that is no answer "absent".
+fn executable(s: &mut impl System, c: &Call, tip: &str) -> Option<bool> {
+    let entry = git(s, c, &["ls-tree", tip, "--", "ontology/migrate"])?;
+    Some(entry.starts_with("100755 blob ") && entry.trim_end().ends_with("\tontology/migrate"))
 }
 /// The answer of an `ont` command that answered `ok`; a schema install may take ten minutes.
 fn ont_ok(s: &mut impl System, words: &[&str]) -> Option<Value> {
@@ -1327,7 +1326,9 @@ fn marker(s: &mut impl System, c: &mut Call, tip: &str) -> Step<()> {
         (Some(from), Some(_), Some(v)) if v == from => {
             std::fs::remove_file(&path).map_err(|_| failed)
         }
-        (Some(from), Some(to), Some(v)) if v == to && from < to && executable(s, c, tip) => {
+        (Some(from), Some(to), Some(v))
+            if v == to && from < to && executable(s, c, tip) == Some(true) =>
+        {
             c.rec["schema"] = json!({"from": from, "to": to, "backup": null, "migrate": "none"});
             if migrate(s, c, from, to) {
                 Ok(())
@@ -1348,10 +1349,11 @@ fn schema_step(s: &mut impl System, c: &mut Call, tip: &str, from: u64, to: u64)
             json!({"from": from, "to": to, "store": store}),
         )
     };
+    // Whether a migration is owed is read before any effect: unreadable is not "absent".
+    let owed = executable(s, c, tip).ok_or_else(|| failed(json!(from)))?;
     let backup = ont_ok(s, &["backup"]);
     let backup = backup.and_then(|v| v["result"]["path"].as_str().map(str::to_owned));
     c.rec["schema"]["backup"] = json!(backup.ok_or_else(|| failed(json!(from)))?);
-    let owed = executable(s, c, tip);
     let pending = json!({"from": from, "to": to}).to_string();
     if owed && write(&format!("{}/{MARKER}", c.state), pending.as_bytes()).is_err() {
         return Err(failed(json!(from)));

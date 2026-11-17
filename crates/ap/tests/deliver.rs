@@ -167,6 +167,8 @@ struct W {
     schema_noop: bool,
     /// The marker as it was at each `ont schema install`.
     marker_at_install: Vec<Option<String>>,
+    /// `git ls-tree` of the tip fails.
+    ls_tree_fails: bool,
 }
 
 impl W {
@@ -247,6 +249,7 @@ impl W {
             schema_install_fails: false,
             schema_noop: false,
             marker_at_install: vec![],
+            ls_tree_fails: false,
         };
         w.lock = w.p("deliver.lock");
         for n in 1..=k {
@@ -486,7 +489,7 @@ impl W {
                 let entry = self.migrate_mode.map_or(String::new(), |m| {
                     format!("{m} blob {}\tontology/migrate\n", "a".repeat(40))
                 });
-                Self::text(true, &entry)
+                Self::text(!self.ls_tree_fails, &entry)
             }
             ["show", spec] => {
                 let (commit, path) = spec.split_once(':').unwrap();
@@ -3836,4 +3839,29 @@ fn e_engine_member_is_checked() {
     r["repository"] = json!("o/migrate.pending");
     let (v, _) = execute(&mut W::new(), &r);
     assert_eq!(v["detail"], json!({"field": "repository"}));
+}
+
+#[test]
+fn e_schema_with_an_unreadable_migrate_entry_installs_nothing() {
+    // Whether the tip owes a migration cannot be read: no backup, no install, no marker; the next
+    // call, which can read it, installs the schema under the marker and migrates.
+    let mut w = W::at_pin();
+    (w.tip_schema, w.migrate_mode, w.ls_tree_fails) = (9, Some("100755"), true);
+    let (v, exit) = w.run();
+    assert_eq!(
+        (end(&v), exit),
+        (("failed", "schema_install_failed"), 4),
+        "{v}"
+    );
+    assert_eq!(v["detail"], json!({"from": 8, "to": 9, "store": 8}));
+    assert_eq!(w.schema, 8);
+    assert!(w.at("backup").is_none() && w.at("schema").is_none());
+    assert!(w.launched().is_empty() && w.applies("start_install").is_empty());
+    assert_eq!(w.marker(), None);
+    w.ls_tree_fails = false;
+    let (v, exit) = w.run();
+    assert_eq!((end(&v), exit), (("installed", ""), 0), "{v}");
+    assert_eq!((w.schema, v["schema"]["migrate"].clone()), (9, json!("ok")));
+    assert_eq!(w.migrates.len(), 1);
+    assert_eq!(w.marker(), None);
 }
