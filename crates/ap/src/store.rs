@@ -1,8 +1,9 @@
-//! Every call of `ap request` to the store engine `ont`: one function per action it applies and one
-//! per read. An answer `store_busy` is asked again up to five times after a short wait; nothing else is.
-use crate::host::{Failure, System, error, fail, id, ont_within};
+//! Every call of `ap request` and `ap intent` to the store engine `ont`: one function per action they
+//! apply and one per read. An answer `store_busy` is asked again up to five times after a short wait;
+//! nothing else is. Also the request form both verbs share: the arguments, the members and their shapes.
+use crate::host::{Failure, LIMIT, System, error, fail, id, ont_within};
 use serde_json::{Map, Value, json};
-use std::time::Duration;
+use std::{ffi::OsString, io::Read, time::Duration};
 
 /// The code of a refusal of the store; the refusal object is the failure's `detail`.
 pub const REFUSED: &str = "store_refused";
@@ -17,6 +18,12 @@ pub const PAGE: u64 = 15;
 pub struct Actor<'a> {
     pub agent: &'a str,
     pub session: &'a str,
+}
+/// The role `lead` of an apply, with the revision of the intent it was decided on: the apply passes it
+/// as `expected`, so an intent changed since (a Lead renamed) ends `revision_conflict`.
+pub struct Lead {
+    pub intent: Value,
+    pub revision: String,
 }
 /// One call bound to 30 seconds; a `store_busy` answer is called again, at most five more times.
 fn call(
@@ -64,10 +71,10 @@ pub struct Applied {
 impl Applied {
     /// The id of the request the action created.
     pub fn created(&self) -> Option<&Value> {
-        self.created_of("request")
+        self.made("request")
     }
-    /// The id of the object of `kind` the action created.
-    pub fn created_of(&self, kind: &str) -> Option<&Value> {
+    /// The id of the object of type `kind` the action created.
+    pub fn made(&self, kind: &str) -> Option<&Value> {
         self.edits
             .iter()
             .find(|e| e["change"] == "initial" && e["id"]["object_type"] == kind)
@@ -82,8 +89,24 @@ fn apply(
     request_id: String,
     parameters: Value,
 ) -> Result<Applied, Failure> {
-    let body = json!({"action_type": action, "request_id": request_id, "agent": actor.agent,
+    apply_as(s, store, actor, action, request_id, parameters, None)
+}
+/// An apply; with `lead`, the role `lead` and the intent's revision as `expected`.
+fn apply_as(
+    s: &mut impl System,
+    store: Option<&str>,
+    actor: &Actor,
+    action: &str,
+    request_id: String,
+    parameters: Value,
+    lead: Option<&Lead>,
+) -> Result<Applied, Failure> {
+    let mut body = json!({"action_type": action, "request_id": request_id, "agent": actor.agent,
         "session": actor.session, "parameters": parameters});
+    if let Some(lead) = lead {
+        body["role"] = json!("lead");
+        body["expected"] = json!([{"id": lead.intent, "revision": lead.revision}]);
+    }
     let v = call(s, store, &["action", "apply", "--client", "ap"], &body)?;
     applied(&v)
 }
@@ -203,6 +226,62 @@ pub fn route_request_to_finding(
 ) -> Result<Applied, Failure> {
     apply(s, store, actor, "route_request_to_finding", rid, p)
 }
+/// The actions of `ap intent` that carry no role.
+macro_rules! actions {
+    ($($action:ident),*) => {$(
+        pub fn $action(
+            s: &mut impl System,
+            store: Option<&str>,
+            actor: &Actor,
+            rid: String,
+            p: Value,
+        ) -> Result<Applied, Failure> {
+            apply(s, store, actor, stringify!($action), rid, p)
+        }
+    )*};
+}
+actions!(
+    draft_intent,
+    amend_intent,
+    note_intent,
+    name_lead,
+    confirm_intent,
+    add_criterion,
+    check_criterion,
+    waive_criterion,
+    close_intent,
+    retire_intent,
+    end_delegation
+);
+/// The Lead proceeds on a draft: the only actions that carry the role `lead`.
+pub fn assume_intent(
+    s: &mut impl System,
+    store: Option<&str>,
+    actor: &Actor,
+    rid: String,
+    p: Value,
+    lead: &Lead,
+) -> Result<Applied, Failure> {
+    apply_as(s, store, actor, "assume_intent", rid, p, Some(lead))
+}
+pub fn confirm_intent_delegated(
+    s: &mut impl System,
+    store: Option<&str>,
+    actor: &Actor,
+    rid: String,
+    p: Value,
+    lead: &Lead,
+) -> Result<Applied, Failure> {
+    apply_as(
+        s,
+        store,
+        actor,
+        "confirm_intent_delegated",
+        rid,
+        p,
+        Some(lead),
+    )
+}
 /// The fields of the head of one object (`kind`, `key`) by `ont get`, each the value or null; `None`
 /// when the store does not have the object (its answer `unavailable`).
 pub fn get(
@@ -211,6 +290,15 @@ pub fn get(
     kind: &str,
     key: &str,
 ) -> Result<Option<Value>, Failure> {
+    Ok(head(s, store, kind, key)?.map(|(_, fields)| fields))
+}
+/// The revision of the head of one object and its fields, as `get` reads them.
+pub fn head(
+    s: &mut impl System,
+    store: Option<&str>,
+    kind: &str,
+    key: &str,
+) -> Result<Option<(String, Value)>, Failure> {
     let object = id(kind, key);
     let v = match call(s, store, &["get"], &json!({ "id": object })) {
         Err(f) if f.code == REFUSED && f.detail["code"] == "unavailable" => return Ok(None),
@@ -232,7 +320,7 @@ pub fn get(
         .find(|ob| ob["revision"] == head)
         .ok_or_else(unreadable)?;
     let fields = observation["fields"].as_object().ok_or_else(unreadable)?;
-    Ok(Some(values(fields)))
+    Ok(Some((head.to_owned(), values(fields))))
 }
 /// The fields as one object, each the value or null.
 fn values(fields: &Map<String, Value>) -> Value {
@@ -277,4 +365,75 @@ pub fn search(
             c => q["continuation"] = c.clone(),
         }
     }
+}
+pub fn bad(f: &str) -> Failure {
+    error("invalid_input", f)
+}
+/// The members of `v` are among `allowed`; another is `invalid_input` with its name after `at`.
+pub fn only(v: &Value, allowed: &str, at: &str) -> Result<(), Failure> {
+    let obj = v.as_object().ok_or_else(|| bad(at.trim_end_matches('.')))?;
+    let other = obj.keys().find(|k| !allowed.split(' ').any(|a| a == *k));
+    other.map_or(Ok(()), |k| Err(bad(&format!("{at}{k}"))))
+}
+/// A string of 1 to `max` bytes of ASCII letters, digits and the bytes of `extra`.
+pub fn shaped<'a>(r: &'a Value, k: &str, max: usize, extra: &str) -> Result<&'a str, Failure> {
+    let ok = |c: u8| c.is_ascii_alphanumeric() || extra.as_bytes().contains(&c);
+    r[k].as_str()
+        .filter(|v| (1..=max).contains(&v.len()) && v.bytes().all(ok))
+        .ok_or_else(|| bad(k))
+}
+/// A string of 1 to `max` bytes; one too long says its size.
+pub fn sized<'a>(v: &'a Value, f: &str, max: usize) -> Result<&'a str, Failure> {
+    let t = v.as_str().filter(|t| !t.is_empty()).ok_or_else(|| bad(f))?;
+    let detail = json!({"bytes": t.len(), "limit": max});
+    (t.len() <= max)
+        .then_some(t)
+        .ok_or_else(|| fail("invalid_input", f, detail))
+}
+/// The failure of a step, named by the step when it came from the store.
+pub fn at<T>(r: Result<T, Failure>, step: &str) -> Result<T, Failure> {
+    r.map_err(|mut f| {
+        if f.code == REFUSED || f.code.starts_with("store_answer") {
+            f.field = step.into();
+        }
+        f
+    })
+}
+/// The code a refusal says: the store's own (the first failed criterion's for `submission_criteria`),
+/// else the failure's.
+pub fn code(f: &Failure) -> String {
+    let first = f.detail["failed"][0]
+        .as_str()
+        .filter(|_| f.detail["code"] == "submission_criteria");
+    match f.code == REFUSED {
+        true => first.or(f.detail["code"].as_str()).unwrap_or(REFUSED),
+        false => f.code,
+    }
+    .to_owned()
+}
+/// `--store <path>` and `--text`, each at most once, and the request of stdin; `--text` only with the
+/// `op` `text_op`.
+pub fn input(argv: &[OsString], text_op: &str) -> Result<(Option<String>, bool, Value), Failure> {
+    let (mut store, mut text) = (None, false);
+    let mut args = argv.iter().map(|a| a.to_str());
+    while let Some(arg) = args.next() {
+        match (arg, &store) {
+            (Some("--text"), _) if !text => text = true,
+            (Some("--store"), None) => match args.next() {
+                Some(Some(p)) if p.starts_with('/') => store = Some(p.to_owned()),
+                _ => return Err(error("usage", "args")),
+            },
+            _ => return Err(error("usage", "args")),
+        }
+    }
+    let mut bytes = vec![];
+    let read = std::io::stdin().take(LIMIT + 1).read_to_end(&mut bytes);
+    if read.is_err() || bytes.len() as u64 > LIMIT {
+        return Err(error("input_too_large", "stdin"));
+    }
+    let r: Value = serde_json::from_slice(&bytes).map_err(|_| bad("stdin"))?;
+    if text && r["op"] != text_op {
+        return Err(error("usage", "args"));
+    }
+    Ok((store, text, r))
 }

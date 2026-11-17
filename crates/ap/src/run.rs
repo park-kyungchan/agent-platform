@@ -1920,7 +1920,7 @@ impl Object {
         match done {
             Ok(a) => {
                 self.key = a
-                    .created_of("run")
+                    .made("run")
                     .and_then(|i| i["native_key"].as_str())
                     .map(str::to_owned);
                 let late = !first && a.outcome == "applied";
