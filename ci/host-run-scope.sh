@@ -6,7 +6,9 @@
 # still ends at its own bound and the record on disk says `running` with the session id; no
 # HERDR_* or inherited CLAUDE_* variable reaches the CLI; a fresh request while the unit of a killed
 # runner lives is refused (by existence; its resume by the live unit); a stage bound to a unit stops when
-# that unit is stopped or its main process is killed. Skipped, saying so, where `systemctl` is
+# that unit is stopped or its main process is killed; the policy file of the host is replaced through
+# AP_POLICY_FILE by one of this script's directory that allows its model and its account, and a
+# stage on another model is refused. Skipped, saying so, where `systemctl` is
 # absent or this caller cannot start a transient unit in the system manager.
 set -uo pipefail
 ap=$(realpath -- "${1:-${CARGO_TARGET_DIR:-$(cd "$(dirname "$0")/.." && pwd -P)/target}/debug/ap}")
@@ -36,13 +38,15 @@ wait
 FAKE
 chmod 0755 "$t/bin/claude"
 printf 'Print the word ready and stop.\n' > "$t/prompt.md"
+# The host's policy (specs/ap/policy.md) is the file of this directory, never /etc/agent-platform/policy.json.
+printf '{"models":{"allowed":["haiku"],"never":[]},"accounts":{"claude":["%s"]}}' "$t/acct" > "$t/policy.json"
 req() { printf '{"role":"reviewer","account":"%s","model":"haiku","effort":"low","permission_mode":"auto","cwd":"%s","prompt":"%s","out":"%s"%s}' \
   "$t/acct" "$t/cwd" "$t/prompt.md" "$t/$1" "${2:-}"; }
 field() { python3 -I -c 'import json,sys; v=json.load(open(sys.argv[1])); print(v.get(sys.argv[2]))' "$1" "$2"; }
 alive() { [ -e "/proc/$1" ] && [ "$(awk '{print $3}' "/proc/$1/stat" 2> /dev/null)" != Z ]; }
 fails=0; ok() { echo "ok   $1"; }; bad() { echo "FAIL $1"; fails=$((fails+1)); }
 apr() { env -i PATH="$t/bin:$PATH" HOME="${HOME:-/root}" LANG=C.UTF-8 HERDR_ENV=1 HERDR_PANE_ID=w0:p0 \
-  CLAUDE_CODE_ENTRYPOINT=cli CLAUDE_CONFIG_DIR=/root/.claude "$ap" run; }
+  CLAUDE_CODE_ENTRYPOINT=cli CLAUDE_CONFIG_DIR=/root/.claude AP_POLICY_FILE="$t/policy.json" "$ap" run; }
 
 # 1. An answer with a forked sleeper left behind: the run ends at the answer, in agents.slice, and
 #    nothing of it remains.
@@ -59,6 +63,14 @@ grep -q "^0::/agents.slice/$unit\$" "$t/bin/cgroup" && ok "the CLI ran in $unit 
 sleeper=$(cat "$t/bin/sleeper.pid"); ! alive "$sleeper" && ok "the forked sleeper $sleeper is gone" || bad "sleeper $sleeper alive"
 { ! grep -q '^HERDR_' "$t/bin/env" && [ "$(grep '^CLAUDE_' "$t/bin/env")" = "CLAUDE_CONFIG_DIR=$t/acct" ]; } \
   && ok "no HERDR_* and no inherited CLAUDE_* reached the CLI" || bad "environment: $(grep -E '^(HERDR|CLAUDE)_' "$t/bin/env")"
+
+# The record names the policy file this run was admitted under; a model the file does not allow is
+# refused before any effect.
+[ "$(python3 -I -c 'import json,sys; print(json.load(open(sys.argv[1]))["policy"]["path"])' "$t/a.md.run.json")" = "$t/policy.json" ] \
+  && ok "the record names the policy file of AP_POLICY_FILE" || bad "policy member: $(field "$t/a.md.run.json" policy)"
+req p.md | sed 's/"haiku"/"opus"/' | apr > "$t/p.out" 2> "$t/p.err"; rc=$?
+{ [ "$rc" -eq 2 ] && grep -q '"code":"model_not_allowed"' "$t/p.err" && [ ! -e "$t/p.md.run.json" ]; } \
+  && ok "a model the policy does not allow is refused model_not_allowed, no file written" || bad "policy refusal: rc=$rc $(cat "$t/p.err")"
 
 # 2. No answer: timeout_seconds 5 gives state timeout, and nothing remains.
 echo silent > "$t/bin/mode"; rm -f "$t/bin/sleeper.pid"; s0=$(date +%s)

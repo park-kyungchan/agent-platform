@@ -248,6 +248,8 @@ struct Request {
     argument: String,
     /// An `agy` stage on a resume: the home of the record, where the conversation lives.
     home: Option<String>,
+    /// The policy file as read: its path and digest (`specs/ap/policy.md`), None without one.
+    policy: Option<(String, String)>,
 }
 
 fn path(r: &Value, key: &str) -> Result<String, Failure> {
@@ -313,6 +315,140 @@ fn environment(r: &Value, runtime: Runtime) -> Result<Vec<(String, String)>, Fai
             Ok((k.clone(), v.to_owned()))
         })
         .collect()
+}
+/// The host's policy as read (`specs/ap/policy.md`).
+struct Policy {
+    path: String,
+    sha256: String,
+    allowed: Vec<String>,
+    never: Vec<String>,
+    accounts: Vec<(String, Vec<String>)>,
+}
+fn invalid(member: &str, why: &str) -> Failure {
+    fail("policy_invalid", "policy", json!(format!("{member} {why}")))
+}
+/// A model name, or with `star` a pattern of at most two `*`: what `word` takes for a model.
+fn model_name(n: &str, star: bool) -> bool {
+    let stars = n.matches('*').count();
+    !n.is_empty()
+        && n.len() <= 40
+        && stars <= if star { 2 } else { 0 }
+        && n.bytes()
+            .all(|c| c.is_ascii_alphanumeric() || b"._-[]*".contains(&c))
+}
+fn names(
+    v: Option<&Value>,
+    member: &str,
+    count: std::ops::RangeInclusive<usize>,
+    ok: impl Fn(&str) -> bool,
+) -> Result<Vec<String>, Failure> {
+    let list = v.and_then(Value::as_array);
+    let list = list.filter(|l| count.contains(&l.len()));
+    let list = list.ok_or_else(|| invalid(member, "is not an array of the allowed length"))?;
+    list.iter()
+        .map(|e| e.as_str().filter(|e| ok(e)).map(str::to_owned))
+        .collect::<Option<_>>()
+        .ok_or_else(|| invalid(member, "holds an entry of the wrong form"))
+}
+/// The policy file the host names, read once at admission. None: no path or no such file.
+fn policy(s: &impl System) -> Result<Option<Policy>, Failure> {
+    let Some(path) = s.policy_file().and_then(|p| p.to_str().map(str::to_owned)) else {
+        return Ok(None);
+    };
+    let bytes = match s.read(&path) {
+        Ok(b) => b,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(None),
+        Err(_) => return Err(invalid("file", "is unreadable")),
+    };
+    if bytes.len() as u64 > LIMIT {
+        return Err(invalid("file", "is too large"));
+    }
+    let sha256 = digest(&bytes);
+    let value: Value =
+        serde_json::from_slice(&bytes).map_err(|_| invalid("file", "is not JSON"))?;
+    let object = value.as_object();
+    let object = object.ok_or_else(|| invalid("file", "is not one JSON object"))?;
+    let models = object.get("models").and_then(Value::as_object);
+    let models =
+        models.filter(|m| m.len() == 2 && m.contains_key("allowed") && m.contains_key("never"));
+    let models =
+        models.ok_or_else(|| invalid("models", "is not an object of allowed and never"))?;
+    let allowed = names(models.get("allowed"), "models.allowed", 1..=64, |n| {
+        model_name(n, false)
+    })?;
+    let never = names(models.get("never"), "models.never", 0..=16, |n| {
+        model_name(n, true)
+    })?;
+    let map = object.get("accounts").and_then(Value::as_object);
+    let map = map.ok_or_else(|| invalid("accounts", "is not an object"))?;
+    let mut accounts = vec![];
+    for (key, list) in map {
+        let member = format!("accounts.{key}");
+        let (runtime, rest) = key
+            .split_once('/')
+            .map_or((key.as_str(), None), |(r, x)| (r, Some(x)));
+        let shaped = Runtime::of(Some(&json!(runtime))).is_some()
+            && rest.is_none_or(|x| ROLES.iter().any(|(r, _)| *r == x) || model_name(x, false));
+        if !shaped {
+            return Err(invalid(
+                &member,
+                "is not a runtime, runtime/role or runtime/model",
+            ));
+        }
+        let list = names(Some(list), &member, 1..=5, |p| {
+            Path::new(p).is_absolute() && !p.contains('\0')
+        })?;
+        accounts.push((key.clone(), list));
+    }
+    Ok(Some(Policy {
+        path,
+        sha256,
+        allowed,
+        never,
+        accounts,
+    }))
+}
+impl Policy {
+    /// The model rule and the account rule for every account the stage may start on.
+    fn admit(
+        &self,
+        runtime: Runtime,
+        role: &str,
+        model: &str,
+        accounts: &[String],
+    ) -> Result<(), Failure> {
+        let named = self.allowed.iter().any(|a| a == model);
+        let barred = self.never.iter().any(|p| glob(p, model));
+        require!(named && !barred => "model_not_allowed", "model");
+        let word = runtime.word();
+        let keys = [
+            format!("{word}/{role}"),
+            format!("{word}/{model}"),
+            word.to_owned(),
+        ];
+        let list = keys
+            .iter()
+            .find_map(|k| self.accounts.iter().find(|(name, _)| name == k))
+            .map(|(_, list)| list);
+        let list = list.ok_or_else(|| error("account_not_allowed", "account"))?;
+        let bare = |p: &str| {
+            if p.len() > 1 {
+                p.trim_end_matches('/').to_owned()
+            } else {
+                p.to_owned()
+            }
+        };
+        for (i, a) in accounts.iter().enumerate() {
+            let field = if i == 0 { "account" } else { "next_accounts" };
+            require!(list.iter().any(|l| bare(l) == bare(a)) => "account_not_allowed", field);
+        }
+        Ok(())
+    }
+}
+/// The record's `policy`: the file as read, or null.
+fn policy_member(q: &Request) -> Value {
+    let read = q.policy.as_ref();
+    json!(read.map(|(path, sha256)| json!({"path": path, "sha256": sha256})))
 }
 fn record_path(out: &str) -> String {
     format!("{out}.run.json")
@@ -545,10 +681,6 @@ fn request_at(s: &mut impl System, r: &Value, at_cwd: bool) -> Result<Request, F
             require!(rec["cwd"] == cwd.as_str() => "resume_cwd_differs", "cwd");
             let fixes = role == "fixer" && (rec["role"] == "implementer" || rec["role"] == "fixer");
             require!(rec["role"] == role || fixes => "resume_role_differs", "role");
-            // Whatever the record says (`failed` with `unmet: stop` too): nothing of its unit may live.
-            if let Some(unit) = rec["unit"].as_str() {
-                require!(ended(s, unit) => "run_still_active", "resume");
-            }
             if runtime == Runtime::Agy {
                 home = Some(
                     resumed_home(&rec, account).ok_or_else(|| error("invalid_input", "resume"))?,
@@ -560,6 +692,33 @@ fn request_at(s: &mut impl System, r: &Value, at_cwd: bool) -> Result<Request, F
             ))
         }
     };
+    // A bind is a unit name; whether that unit is active is asked after the policy.
+    let bind = match r.get("bind") {
+        None => None,
+        Some(v) => {
+            let unit = v.as_str().filter(|u| {
+                u.len() <= 200
+                    && u.contains('.')
+                    && !u.starts_with('-')
+                    && u.bytes()
+                        .all(|c| c.is_ascii_alphanumeric() || b":_.@-".contains(&c))
+            });
+            Some(
+                unit.ok_or_else(|| error("invalid_input", "bind"))?
+                    .to_owned(),
+            )
+        }
+    };
+    // The host's policy: after every refusal of the request's own shape, before any call or effect.
+    // A resumed call's record account is one of `accounts` (`resume_account_differs`).
+    let policy = policy(s)?;
+    if let Some(p) = &policy {
+        p.admit(runtime, role, &model, &accounts)?;
+    }
+    // Whatever the record says (`failed` with `unmet: stop` too): nothing of its unit may live.
+    if let Some(unit) = earlier.as_ref().and_then(|(rec, _)| rec["unit"].as_str()) {
+        require!(ended(s, unit) => "run_still_active", "resume");
+    }
     if at_cwd && earlier.is_none() && role == "implementer" {
         // Fails closed: only "not a repository" lets an implementer start without the check. Git
         // gets the fixed short list only: the request's `env` (a `GIT_DIR`) cannot skip it.
@@ -606,28 +765,16 @@ fn request_at(s: &mut impl System, r: &Value, at_cwd: bool) -> Result<Request, F
     });
     let base_env = base_env(s, &env);
     require!(s.units() => "systemd_absent", "host");
-    let bind = match r.get("bind") {
-        None => None,
-        Some(v) => {
-            let unit = v.as_str().filter(|u| {
-                u.len() <= 200
-                    && u.contains('.')
-                    && !u.starts_with('-')
-                    && u.bytes()
-                        .all(|c| c.is_ascii_alphanumeric() || b":_.@-".contains(&c))
-            });
-            let unit = unit.ok_or_else(|| error("invalid_input", "bind"))?;
-            // A unit that is not active now would stop the stage at its launch.
-            let state = s.call(
-                "systemctl",
-                &args(&["is-active", unit]),
-                &Value::Null,
-                10_000,
-            );
-            require!(state.is_ok_and(|r| r.stdout == b"active\n") => "bind_inactive", "bind");
-            Some(unit.to_owned())
-        }
-    };
+    // A unit that is not active now would stop the stage at its launch.
+    if let Some(unit) = &bind {
+        let state = s.call(
+            "systemctl",
+            &args(&["is-active", unit]),
+            &Value::Null,
+            10_000,
+        );
+        require!(state.is_ok_and(|r| r.stdout == b"active\n") => "bind_inactive", "bind");
+    }
     Ok(Request {
         role: role.to_owned(),
         accounts,
@@ -662,6 +809,7 @@ fn request_at(s: &mut impl System, r: &Value, at_cwd: bool) -> Result<Request, F
             .filter(|_| runtime.prompt_argument())
             .unwrap_or_default(),
         home,
+        policy: policy.map(|p| (p.path, p.sha256)),
     })
 }
 /// The `home` of an `agy` record that a resume runs in: a directory under `<account>/homes` (links
@@ -1410,6 +1558,7 @@ fn attempt(
         "expect_file_before": q.expect_before, "unmet": null,
         "resumes": q.resume.as_ref().map(|(_, _, file)| file), "limit": null,
         "compact_window": q.compact_window,
+        "policy": policy_member(q),
     });
     let mut attempts = earlier.to_vec();
     attempts.push(json!({"continued": continued}));
@@ -1677,7 +1826,7 @@ pub fn execute(s: &mut impl System, r: &Value) -> Result<(Value, u8), Failure> {
             }
         }
     } else {
-        last = json!({"state": "failed", "unmet": "launch", "account": accounts[0]});
+        last = json!({"state": "failed", "unmet": "launch", "account": accounts[0], "policy": policy_member(&q)});
         let _ = persist(&q.out, &last);
         clean = false;
     }
