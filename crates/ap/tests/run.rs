@@ -5094,6 +5094,7 @@ fn g4_a_result_with_an_answer_is_ok_and_its_response_is_saved_byte_for_byte() {
         "attempts",
         "compact_window",
         "home",
+        "policy",
     ];
     want.sort_unstable();
     // The member `home` is this runtime's own; no member `served_by`: the stream names no serving model.
@@ -5908,4 +5909,37 @@ fn policy_the_built_binary_reads_the_file_the_variable_names() {
         "{refusal}"
     );
     assert!(!f.t.join("x.md.run.json").exists());
+}
+
+// spec: specs/ap/policy.md#R12
+#[test]
+fn policy_refusals_come_before_the_refusals_that_ask_the_host() {
+    let mut f = Fake::new();
+    let mut p = f.open_policy();
+    p["models"]["allowed"] = json!(["haiku"]);
+    let mut open = f.open_policy();
+    open["models"]["allowed"] = json!(["sonnet"]);
+    // `systemd_absent`, `bind_inactive` and `worktree_unreadable` each hide behind the policy.
+    let mut bound = f.request("b.md");
+    bound["bind"] = json!("ap-policy-test.service");
+    let mut work = f.request("w.md");
+    work["role"] = json!("implementer");
+    f.rev_parse = Some((false, b"fatal: broken".to_vec()));
+    f.units = false;
+    for (r, then) in [
+        (&f.request("s.md"), "systemd_absent@host"),
+        (&bound, "systemd_absent@host"),
+        (&work, "worktree_unreadable@cwd"),
+    ] {
+        f.policy_is(&p);
+        assert_eq!(code(f.run(r)), "model_not_allowed@model", "{then}");
+        f.untouched(r["out"].as_str().unwrap().rsplit('/').next().unwrap());
+        f.policy_is(&open);
+        assert_eq!(code(f.run(r)), then);
+    }
+    f.units = true;
+    f.policy_is(&p);
+    assert_eq!(code(f.run(&bound)), "model_not_allowed@model");
+    f.policy_is(&open);
+    assert_eq!(code(f.run(&bound)), "bind_inactive@bind");
 }

@@ -1826,7 +1826,7 @@ pub fn execute(s: &mut impl System, r: &Value) -> Result<(Value, u8), Failure> {
             }
         }
     } else {
-        last = json!({"state": "failed", "unmet": "launch", "account": accounts[0], "policy": policy_member(&q)});
+        last = json!({"state": "failed", "unmet": "launch", "account": accounts[0]});
         let _ = persist(&q.out, &last);
         clean = false;
     }

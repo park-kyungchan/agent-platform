@@ -14,7 +14,8 @@ Purpose: one file of the host states which models a stage may run on and which C
 - R8: The request's `account` and each entry of `next_accounts` must be in the stage's list, compared as paths without a trailing `/`, else the stage is refused `account_not_allowed` (field `account` or `next_accounts`).
 - R9: A resumed call applies the same account rule to the account its record names.
 - R10: The policy's refusals come after every refusal of the request's own shape and before any effect: no claim of `out`, no scope, no file written.
-- R11: The record `<out>.run.json` holds `policy`, `{"path", "sha256"}` of the file as read, or null when no file was read.
+- R11: The record `<out>.run.json` holds `policy`, `{"path", "sha256"}` of the file as read, or null when no file was read; the fallback record of a call whose files cannot be opened has no `policy` (it keeps its three members).
+- R12: The refusals that ask the host (`run_still_active`, `worktree_dirty`, `worktree_unreadable`, `systemd_absent` and `bind_inactive`) come after the policy's refusals, so a stage the policy refuses is refused for the policy whatever else is wrong with the host's state.
 
 ## Interface
 
