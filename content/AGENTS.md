@@ -5,7 +5,7 @@ Every coding CLI on this host loads this one file through its own pointer file. 
 ## 1. Start of a task
 
 1. Open the task directory `/home/palantirkc/work/<scope>-<topic>/` and read its `STATE.md` before any effect. Read `TASK.md` too if you were handed one. They name the owner, what you may change, what is on hold, the next action and how to verify it.
-2. If you were given a list of files to read first (a packet's `Read:` list of `path:a-b`), read exactly those with your file tool and name them in your first output.
+2. If you were given a list of files to read first (a packet's `Read first:` line), read exactly those with your file tool and name them in your first output.
 3. Do the next action. When the work changes, update `STATE.md` by replacing the old value.
 
 No task directory yet: create `work/<scope>-<topic>/STATE.md`; its Git worktrees go in `wt/<repo>/` beside it.

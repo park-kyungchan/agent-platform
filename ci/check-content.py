@@ -195,20 +195,22 @@ if CORPUS.is_dir() and len(section) == 2:
     for row in body.splitlines():
         if not row.startswith("| ") or row.startswith(("| Question", "| ---")):
             continue
-        current = None
-        for m in re.finditer(r"`(docs/[^`:\s]+\.md)?(?::(\d+)(?:-(\d+))?)?`|`(:\d+(?:-\d+)?)`", row):
-            if m.group(1):
-                current = m.group(1)
+        current, present = None, False
+        for span in re.findall(r"`([^`]*)`", row):
+            # A path `docs/<file>.md`, then any number of ranges `:a` or `:a-b` (after the path, or alone after a space,
+            # a comma or a semicolon): each range belongs to the newest path of the row.
+            for m in re.finditer(r"(?<![\w.-])(docs/[^\s`:,;]+\.md)|(?:(?<=\.md)|(?<![^\s,;(]))(?::(\d+)(?:-(\d+))?)(?!\d)", span):
+                if m.group(1):
+                    current, present = m.group(1), (CORPUS / m.group(1)).is_file()
+                    if not present:
+                        fail("design_route_missing_file", ROUTES, current)
+                    continue
+                if not current:
+                    fail("design_route_missing_file", ROUTES, f"{m.group(0)} (a range with no path before it)")
+                    continue
+                if not present:
+                    continue
                 first, last = m.group(2), m.group(3) or m.group(2)
-            elif m.group(4):
-                first, _, last = m.group(4)[1:].partition("-")
-                last = last or first
-            else:
-                continue
-            if not current or not (CORPUS / current).is_file():
-                fail("design_route_missing_file", ROUTES, f"{current or m.group(0)}")
-                continue
-            if first:
                 lines = (CORPUS / current).read_text(encoding="utf-8", errors="replace").count("\n") + 1
                 checked += 1
                 if not (1 <= int(first) <= int(last) <= lines):

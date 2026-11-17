@@ -15,7 +15,7 @@ One word for one thing. Read this when a word in an instruction, a packet or the
 
 | Term | Meaning | Example on this host | Do not write |
 | --- | --- | --- | --- |
-| board | A task's items with their state, its holds and decisions, printed from the store; where the store is not in use, an optional file that holds no value a command can produce (`/root/.agents/skills/lead/references/program-board.md`) | `ap backlog <task key> --text` | `dashboard file` |
+| board | A task's items with their state, its objectives and order, printed from the store (its holds: the view `active_holds`); where the store is not in use, an optional file that holds no value a command can produce (`/root/.agents/skills/lead/references/program-board.md`) | `ap backlog <task key> --text` | `dashboard file` |
 | lens file | The one file of a task, about two pages, in which the Lead keeps the whole view: target structure and open decisions | `/home/palantirkc/work/<scope>-<topic>/LENS.md` | `architecture overview` |
 | design note | The Lead's written design of a store format, the schema of an authoritative store, or the order of record and effect on a real target: use, decision, invariants as executables, pull requests, undo | `/root/.agents/skills/lead/references/design.md` | `design doc` |
 | checkpoint | The content of STATE at a moment, complete enough for a new session to continue from it | A STATE whose header carries the time it was written | `snapshot file` |

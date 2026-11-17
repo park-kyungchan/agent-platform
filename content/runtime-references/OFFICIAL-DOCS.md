@@ -64,7 +64,7 @@ When you verify a correction to this file, change it in the `agent-platform` sou
 
 - Paths below are under `/home/palantirkc/external/reference-docs/`, written in full; `:a-b` alone is the same file as the path before it. Read only the lines a row names: `sed -n '<a>,<b>p' /home/palantirkc/external/reference-docs/<path>`. "Start" answers most questions; "Also" adds a second view. Cite what you use as `path:line`.
 - Never read a file of the corpus whole, and never read `text/` or `sources/` (the same text with other line numbers, and raw downloads).
-- `docs/rust/00-AGENTIC-RUST-MIGRATION-PLAYBOOK.md` and `docs/spec-driven-development/00-SPEC-DRIVEN-DEVELOPMENT-PLAYBOOK.md` are syntheses written on this host: use them as maps and cite the primary lines they cite.
+- To design or review the whole life cycle, read `docs/00-LIFE-CYCLE-DESIGN-PLAYBOOK.md` first: the passages of every area by design decision (its section 1 is the index), with where the sources agree, disagree and fall silent; an independent session checked its quotations against the lines. It and `docs/rust/00-AGENTIC-RUST-MIGRATION-PLAYBOOK.md` and `docs/spec-driven-development/00-SPEC-DRIVEN-DEVELOPMENT-PLAYBOOK.md` are syntheses written on this host: use them as maps and cite the primary lines they cite, never the synthesis.
 - A question no row answers: the catalog `/home/palantirkc/external/reference-docs/llms.txt` (one line per file), then `grep -rn '<words>' /home/palantirkc/external/reference-docs/docs/`. A route you had to find that way is reported for this table (`CONTEXT-GOVERNANCE.md` section 5).
 
 ### Context governance: which context an agent loads, from which one source, in what order
@@ -136,7 +136,7 @@ When you verify a correction to this file, change it in the `agent-platform` sou
 | A derived store against an authoritative one; indexing | `docs/palantir/16-object-backend-overview.md:17-77` | `docs/palantir/extra/06-object-indexing-funnel-batch-pipelines.md:16-133` |
 | Query limits, paging, search around | `docs/palantir/extra/07-object-set-service-limitations.md:18-118` | — |
 | Types generated from the schema; the schema as code in the repository | `docs/palantir/19-ontology-sdk-overview.md:23-40` | `docs/palantir/extra/08-superrepo-core-concepts-osdk.md:21-86` |
-| Anything else of Palantir (search, never read whole) | `grep -n '<words>' docs/palantir/00-official-docs-routing.md` | `docs/palantir/extra/00-foundry-platform-summary-llm.md:23-760` |
+| Anything else of Palantir (search, never read whole) | `grep -n '<words>' /home/palantirkc/external/reference-docs/docs/palantir/00-official-docs-routing.md` | `docs/palantir/extra/00-foundry-platform-summary-llm.md:23-760` |
 
 ### Rust
 

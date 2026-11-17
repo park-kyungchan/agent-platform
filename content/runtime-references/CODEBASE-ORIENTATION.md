@@ -30,7 +30,7 @@ Main checkouts are under `/home/palantirkc/platforms/<repository>/` unless a pat
 | | `content/` | Source of `/root/.agents/`: `AGENTS.md`, `runtime-references/`, `skills/`, with `SHA256SUMS` | `content/README.md` |
 | | `ontology/` | `work.schema.json`: the store's object and action types for tasks (holds, decisions, KPIs and measurements, reviews, install attempts, worker runs); the file is the list | `ontology/README.md` |
 | | `memory/` | Engineering memory: checked originals and their publisher | `memory/README.md` |
-| | `evals/` | The suites and the cost read-out: `instructions/` (weak readers route from the shared instructions, against a reference reader), `engineering/` (cases cut from merged units, judged by an executable), `lead/` (frozen situations of a Lead, scored by a model against a rubric), `readout.py` | `evals/README.md` |
+| | `evals/` | The suites and the cost read-out: `instructions/` (weak readers route from the shared instructions, against a reference reader), `engineering/` (cases cut from merged units, judged by an executable), `lead/` (frozen situations of a Lead, scored by a model against a rubric), `lesson/` (the lesson replay: recorded daily-record reads against the read store), `readout.py` | `evals/README.md` |
 | | `deploy/` | The systemd units and the request file of the delivery timer | `deploy/README.md` |
 | `education-platform` | `crates/edu-academy-core` | Domain rules and the lesson workflow: intake, review, decision, approval, save, reconciliation and their records | `src/lib.rs`; `src/workflow/` |
 | | `crates/edu-academy-sources` | Reads and writes against the Academy server's pages and scripts; the qualification tool `academy-live-driver` | `src/lib.rs` |

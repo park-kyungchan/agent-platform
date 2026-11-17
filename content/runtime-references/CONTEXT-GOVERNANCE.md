@@ -6,7 +6,7 @@ Read this when you must decide which context to load for a task, above all a kin
 
 Stop at the first step that answers; each step names the next one.
 
-1. The packet's `Read:` list (`path:a-b`), when you were given one: read exactly that, before anything else.
+1. The packet's `Read first:` line (full paths, a passage as `path:a-b`), when you were given one: read exactly that, before anything else.
 2. The task's STATE: owner, holds, the next action.
 3. The row of `/root/.agents/AGENTS.md` section 3 for your situation: one reference or one skill.
 4. The area that owns the thing: `CODEBASE-ORIENTATION.md` sections 1 and 2; then that repository's `AGENTS.md` at `origin/main` (`git -C /home/palantirkc/platforms/<repo> show origin/main:AGENTS.md`, after `git -C /home/palantirkc/platforms/<repo> fetch -q origin`); then the start file the table names.
@@ -16,7 +16,7 @@ Stop at the first step that answers; each step names the next one.
 ## 2. How to read without waste
 
 - Read by line range: `sed -n '<a>,<b>p' <file>`. A file over about 300 lines, or with very long lines, is searched first (`grep -n`) and read where the search lands. A directory is listed, never read whole.
-- Ask a command for a fact instead of reading a file that copies it: `ap state <task directory> --text`, `ap backlog <task key> --text` (items, holds, the board), `ont describe`, `ont action list`, a command's `--help`.
+- Ask a command for a fact instead of reading a file that copies it: `ap state <task directory> --text`, `ap backlog <task key> --text` (the board: items, objectives, the order; no holds), the view `active_holds` for holds (`ONTOLOGY-USE.md` section 2), `ont describe`, `ont action list`, a command's `--help`.
 - Read a user's row or decision with its words, never from its key alone.
 - A map or an index names where to read; it is not the answer. Cite the file it points to, not the map.
 - A tool result too large to show means the read was too wide: narrow it with a line range, a `grep` or a command's own filter instead of paging through it.
@@ -38,7 +38,7 @@ When two copies disagree, current source wins. Name the stale copy in your repor
 
 A weak model routes as well as a strong one only where a route asks for no judgment.
 
-- The strong model routes once: the Lead writes a packet's `Read:` list as full `path:a-b`, each with what it is for, so that a stage reads instead of searching. Most of what a stage reads before its first edit is code and records, not instructions.
+- The strong model routes once: the Lead writes a packet's `Read first:` line as full paths and `path:a-b`, each with what it is for, so that a stage reads instead of searching. Most of what a stage reads before its first edit is code and records, not instructions.
 - At most three steps lead from `AGENTS.md` to a line: a row of its section 3, a table of the reference, a `path:a-b`.
 - Paths are written in full, never shortened or elided; a table is keyed by the situation, in the words an assignment uses.
 - A stale copy is taken off the path, not warned about.
@@ -57,7 +57,7 @@ The kinds are the rows of `/root/.agents/AGENTS.md` section 6, plus a session's 
 | A session's conversation and a CLI's private memory | That CLI | Resume only the exact session you need. Never import another agent's transcript |
 | Short-term: the task's STATE, packets, the files STATE points to | The assigned owner, replacing old values | On entry, after a reset, at a handoff, and before an effect when it changed |
 | A rule or contract: source, schemas, tests, KPI definitions | The owner of the implementation, through review | Read the current revision. Do not rely on a remembered implementation |
-| Mid- and long-term: decisions with reasons, lessons, corrections, preferences, explained terms | The task owner, only with the task's authority, by the route of section 9 | Search and read as section 3 says; verify against current source and STATE |
+| Mid- and long-term: decisions with reasons, lessons, corrections, preferences, explained terms | The task owner, only with the task's authority, by the route of section 9 | Search and read as section 8 says; verify against current source and STATE |
 | An operational fact: deployed state, a KPI value, a domain record, an action and its result | The owner of the domain or the task; the Lead for the object types its STATE names in use in the Ontology store (`ONTOLOGY-USE.md`) | A fresh authorized read. Memory is only a pointer to it |
 
 - A decision another agent needs must not stay only in one CLI's private memory.

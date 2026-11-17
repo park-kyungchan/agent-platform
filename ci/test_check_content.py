@@ -29,7 +29,7 @@ def run_check(root, corpus=None):
     return done.returncode, done.stdout
 
 
-class CheckContent(unittest.TestCase):
+class Scratch:
     def fixture(self):
         scratch = Path(tempfile.mkdtemp(prefix="check-content-test."))
         self.addCleanup(shutil.rmtree, scratch, True)
@@ -54,6 +54,8 @@ class CheckContent(unittest.TestCase):
         sums.write_text("".join(f"{digest}  {TARGET}\n" if l.endswith("  " + TARGET) else l + "\n" for l in sums.read_text().splitlines()))
         return text.count("\n") + 1
 
+
+class CheckContent(Scratch, unittest.TestCase):
     def test_the_repository_passes(self):
         code, out = run_check(REPO)
         self.assertEqual((code, out.splitlines()[-1].endswith(" 0 errors")), (0, True), out)
@@ -87,10 +89,7 @@ class CheckContent(unittest.TestCase):
         self.assertIn(f'unknown_readme_section@content/{TARGET}:{line}: "Gone"', out)
 
 
-if __name__ == "__main__":
-    unittest.main()
-
-class PathsAndDesignRoutes(CheckContent):
+class PathsAndDesignRoutes(Scratch, unittest.TestCase):
     """An elided path, a path into a main checkout's files, and the line ranges of OFFICIAL-DOCS.md section 4."""
 
     ROUTES = "runtime-references/OFFICIAL-DOCS.md"
@@ -153,3 +152,23 @@ class PathsAndDesignRoutes(CheckContent):
         self.assertEqual(code, 0, out)
         self.assertNotIn("design routes:", out)
 
+    def test_bare_ranges_and_several_ranges_in_a_cell_are_checked(self):
+        root = self.fixture()
+        self.add_route(root, "| A question | `docs/area/one.md:2-5, :7, :8-99` | `:12`; `:1-9` |")
+        code, out = run_check(root, self.corpus(root))
+        self.assertEqual(code, 1, out)
+        self.assertIn("design_route_out_of_range@content/runtime-references/OFFICIAL-DOCS.md: docs/area/one.md:8-99", out)
+        self.assertIn("design_route_out_of_range@content/runtime-references/OFFICIAL-DOCS.md: docs/area/one.md:12-12", out)
+        self.assertEqual(out.count("design_route_out_of_range@"), 2, out)
+        self.assertIn("design routes: 5 line ranges checked", out)
+
+    def test_a_range_with_no_path_before_it_fails(self):
+        root = self.fixture()
+        self.add_route(root, "| A question | `:3-4` | `docs/area/one.md:1-2` |")
+        code, out = run_check(root, self.corpus(root))
+        self.assertEqual(code, 1, out)
+        self.assertIn("design_route_missing_file@content/runtime-references/OFFICIAL-DOCS.md: :3-4 (a range with no path before it)", out)
+
+
+if __name__ == "__main__":
+    unittest.main()

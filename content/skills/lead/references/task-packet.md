@@ -12,7 +12,7 @@ One pull request that can merge alone. The page carries its write set in ONE of 
 # TASK: <the unit in one line>
 Owner: <Lead>; State: <absolute STATE.md>
 Tier: <mechanical | bounded judgment | open judgment>
-Read first: <this file>, <absolute STATE.md>, <absolute path of each needed SKILL.md, reference or contract>
+Read first: <this file>, <absolute STATE.md>, <absolute path of each needed SKILL.md, reference or contract, or `path:a-b` of the passage, each with what it is for>
 First output after reading: one line listing the exact files read
 Objective: <the state to reach, as a sentence that is true or false; who uses it first and the real run that shows it>
 Invariants: <what must hold before and after, each a sentence a test can break>

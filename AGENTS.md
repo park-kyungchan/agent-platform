@@ -10,7 +10,7 @@ Shared rules of this host: `/root/.agents/AGENTS.md` (its source is `content/AGE
 | `crates/ap` | The command `ap`: `unit`, `run`, `gate`, `review`, `accept`, `deliver`, `backlog`, `state`, `row`, `version` (`ap --help` names the README section of each) | Its tests; `crates/ap/README.md` is the contract |
 | `ontology/work.schema.json` | The schema of the Lead's own records in the Ontology store. Frozen: no new version without a decision of the Lead | `ontology/rehearsal.sh` installs it into a disposable store of the engine revision in `ontology/ENGINE-PIN` and asserts every action answer that `ap` parses |
 | `memory/` | Originals of engineering memory records | `ci/check-memory-records.py` and its tests |
-| `evals/` | The suites: `instructions/` (weak readers route from the shared instructions), `lead/`, `engineering/`, and the cost read-out `readout.py` | `evals/README.md` |
+| `evals/` | The suites: `instructions/` (weak readers route from the shared instructions), `lead/`, `engineering/`, `lesson/` (the lesson replay), and the cost read-out `readout.py` | `evals/README.md` |
 | `scripts/install-ap.sh`, `scripts/install-content.sh` | The steps `ap deliver` calls; by hand only for the repairs `deploy/README.md` names, with the timer stopped | `scripts/test-install-ap.sh`, `scripts/test-install-content.sh` |
 
 ## The check

@@ -47,14 +47,15 @@ printf '{"object_type":"hold","where":{"all":[{"eq":["task",%s]},{"eq":["status"
 # Current decisions: topic, text, decided_by, reason and undo.
 printf '{"object_type":"decision","where":{"all":[{"eq":["task",%s]},{"eq":["status","current"]}]}}\n' "$TASK_ID" | ont search
 # KPIs with their latest recorded measurement: name, target, value, observed_at and evidence.
-# A stored value is as new as its last record_measurement; agent-platform evals/readout.py computes the current one.
+# A stored value is as new as its last record_measurement; agent-platform evals/readout.py computes the current K1 and K2.
 printf '{"object_type":"kpi","where":{"all":[{"eq":["task",%s]}]}}\n' "$TASK_ID" | ont search
 # Running workers: name, tier, runtime, session, packet, started_at and last_note.
 printf '{"object_type":"worker_run","where":{"all":[{"eq":["task",%s]},{"eq":["status","running"]}]}}\n' "$TASK_ID" | ont search
 # One object by Id, with its observation history.
 printf '{"id":%s}\n' "$TASK_ID" | ont get
 # The text of a view. The views and their arguments: ont describe < /dev/null (result.views);
-# active_holds, current_decisions, kpi_board, live_workers, closed_workers and reviews take task; installs takes none.
+# active_holds, current_decisions, kpi_board, live_workers, closed_workers and reviews take task;
+# installs and current_memory_records take none.
 printf '%s\n' '{"view":"active_holds","args":{"task":"ws-example"}}' | ont render
 # A count without fetching fields.
 printf '%s\n' '{"object_type":"worker_run","where":{"eq":["status","running"]},"metrics":["count"]}' | ont aggregate
