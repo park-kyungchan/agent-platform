@@ -352,9 +352,11 @@ fn names(
 }
 /// The policy file the host names, read once at admission. None: no path or no such file.
 fn policy(s: &impl System) -> Result<Option<Policy>, Failure> {
-    let Some(path) = s.policy_file().and_then(|p| p.to_str().map(str::to_owned)) else {
+    let Some(file) = s.policy_file() else {
         return Ok(None);
     };
+    let path = (file.to_str()).ok_or_else(|| invalid("file", "path is not valid UTF-8"))?;
+    let path = path.to_owned();
     let bytes = match s.read(&path) {
         Ok(b) => b,
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(None),
@@ -681,6 +683,10 @@ fn request_at(s: &mut impl System, r: &Value, at_cwd: bool) -> Result<Request, F
             require!(rec["cwd"] == cwd.as_str() => "resume_cwd_differs", "cwd");
             let fixes = role == "fixer" && (rec["role"] == "implementer" || rec["role"] == "fixer");
             require!(rec["role"] == role || fixes => "resume_role_differs", "role");
+            // Whatever the record says (`failed` with `unmet: stop` too): nothing of its unit may live.
+            if let Some(unit) = rec["unit"].as_str() {
+                require!(ended(s, unit) => "run_still_active", "resume");
+            }
             if runtime == Runtime::Agy {
                 home = Some(
                     resumed_home(&rec, account).ok_or_else(|| error("invalid_input", "resume"))?,
@@ -692,33 +698,6 @@ fn request_at(s: &mut impl System, r: &Value, at_cwd: bool) -> Result<Request, F
             ))
         }
     };
-    // A bind is a unit name; whether that unit is active is asked after the policy.
-    let bind = match r.get("bind") {
-        None => None,
-        Some(v) => {
-            let unit = v.as_str().filter(|u| {
-                u.len() <= 200
-                    && u.contains('.')
-                    && !u.starts_with('-')
-                    && u.bytes()
-                        .all(|c| c.is_ascii_alphanumeric() || b":_.@-".contains(&c))
-            });
-            Some(
-                unit.ok_or_else(|| error("invalid_input", "bind"))?
-                    .to_owned(),
-            )
-        }
-    };
-    // The host's policy: after every refusal of the request's own shape, before any call or effect.
-    // A resumed call's record account is one of `accounts` (`resume_account_differs`).
-    let policy = policy(s)?;
-    if let Some(p) = &policy {
-        p.admit(runtime, role, &model, &accounts)?;
-    }
-    // Whatever the record says (`failed` with `unmet: stop` too): nothing of its unit may live.
-    if let Some(unit) = earlier.as_ref().and_then(|(rec, _)| rec["unit"].as_str()) {
-        require!(ended(s, unit) => "run_still_active", "resume");
-    }
     if at_cwd && earlier.is_none() && role == "implementer" {
         // Fails closed: only "not a repository" lets an implementer start without the check. Git
         // gets the fixed short list only: the request's `env` (a `GIT_DIR`) cannot skip it.
@@ -765,15 +744,35 @@ fn request_at(s: &mut impl System, r: &Value, at_cwd: bool) -> Result<Request, F
     });
     let base_env = base_env(s, &env);
     require!(s.units() => "systemd_absent", "host");
-    // A unit that is not active now would stop the stage at its launch.
-    if let Some(unit) = &bind {
-        let state = s.call(
-            "systemctl",
-            &args(&["is-active", unit]),
-            &Value::Null,
-            10_000,
-        );
-        require!(state.is_ok_and(|r| r.stdout == b"active\n") => "bind_inactive", "bind");
+    let bind = match r.get("bind") {
+        None => None,
+        Some(v) => {
+            let unit = v.as_str().filter(|u| {
+                u.len() <= 200
+                    && u.contains('.')
+                    && !u.starts_with('-')
+                    && u.bytes()
+                        .all(|c| c.is_ascii_alphanumeric() || b":_.@-".contains(&c))
+            });
+            let unit = unit.ok_or_else(|| error("invalid_input", "bind"))?;
+            // A unit that is not active now would stop the stage at its launch.
+            let state = s.call(
+                "systemctl",
+                &args(&["is-active", unit]),
+                &Value::Null,
+                10_000,
+            );
+            require!(state.is_ok_and(|r| r.stdout == b"active\n") => "bind_inactive", "bind");
+            Some(unit.to_owned())
+        }
+    };
+    let (skills, memory) = (flag(r, "skills")?, flag(r, "memory")?);
+    // The host's policy is the last check of admission: after every refusal `ap run` had before it,
+    // the checks of the host's state included, and before any effect. A resumed call's record
+    // account is one of `accounts` (`resume_account_differs`).
+    let policy = policy(s)?;
+    if let Some(p) = &policy {
+        p.admit(runtime, role, &model, &accounts)?;
     }
     Ok(Request {
         role: role.to_owned(),
@@ -801,8 +800,8 @@ fn request_at(s: &mut impl System, r: &Value, at_cwd: bool) -> Result<Request, F
         expect_before,
         base_env,
         bind,
-        skills: flag(r, "skills")?,
-        memory: flag(r, "memory")?,
+        skills,
+        memory,
         runtime,
         compact_window,
         argument: argument

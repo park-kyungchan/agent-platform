@@ -4,18 +4,17 @@ Purpose: one file of the host states which models a stage may run on and which C
 
 ## Requirements
 
-- R1: The real host takes the policy file's path from the environment variable `AP_POLICY_FILE` when it is set and not empty, else `/etc/agent-platform/policy.json`, and from no other source.
+- R1: The real host takes the policy file's path from the environment variable `AP_POLICY_FILE` when it is set and not empty, else `/etc/agent-platform/policy.json`, and from no other source; a value that is set, not empty and not valid UTF-8 is `policy_invalid` (`R3`), not "no policy".
 - R2: When the host names no path or the file does not exist, admission is what it is without a policy and the record's `policy` is null.
-- R3: A policy file that is unreadable, is not one JSON object, or holds a malformed member refuses every stage with `policy_invalid` (field `policy`, the reason naming the member).
+- R3: A policy file that is unreadable, whose path is not valid UTF-8, is not one JSON object, or holds a malformed member refuses every stage with `policy_invalid` (field `policy`, the reason naming the member).
 - R4: The request's `model` must equal an entry of `models.allowed`, else the stage is refused `model_not_allowed` (field `model`).
 - R5: The request's `model` must match no pattern of `models.never`, else the stage is refused `model_not_allowed` (field `model`).
 - R6: The accounts a stage may use are the list of the first key present among `<runtime>/<role>`, `<runtime>/<model>` and `<runtime>`, in that order.
 - R7: A stage for which none of those keys is present is refused `account_not_allowed` (field `account`).
 - R8: The request's `account` and each entry of `next_accounts` must be in the stage's list, compared as paths without a trailing `/`, else the stage is refused `account_not_allowed` (field `account` or `next_accounts`).
 - R9: A resumed call applies the same account rule to the account its record names.
-- R10: The policy's refusals come after every refusal of the request's own shape and before any effect: no claim of `out`, no scope, no file written.
+- R10: The policy step is the last check of admission: its refusals come after every refusal `ap run` had without a policy (the request's own members and the checks of the host's state, which only read) and before any effect, so nothing is claimed, launched or written before one.
 - R11: The record `<out>.run.json` holds `policy`, `{"path", "sha256"}` of the file as read, or null when no file was read; the fallback record of a call whose files cannot be opened has no `policy` (it keeps its three members).
-- R12: The refusals that ask the host (`run_still_active`, `worktree_dirty`, `worktree_unreadable`, `systemd_absent` and `bind_inactive`) come after the policy's refusals, so a stage the policy refuses is refused for the policy whatever else is wrong with the host's state.
 
 ## Interface
 

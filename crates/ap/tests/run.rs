@@ -5805,34 +5805,6 @@ fn policy_a_resumed_call_meets_the_rule_with_the_account_of_its_record() {
     assert_eq!((status, v["state"].as_str()), (0, Some("ok")), "{v}");
 }
 
-// spec: specs/ap/policy.md#R10
-#[test]
-fn policy_refusals_come_after_the_shape_refusals_and_before_every_effect() {
-    let mut f = Fake::new();
-    let mut p = f.open_policy();
-    p["models"]["allowed"] = json!(["haiku"]);
-    f.policy_is(&p);
-    // A request of the wrong shape is refused as before, whatever the policy says.
-    let mut r = f.request("a.md");
-    r["prompt"] = json!(f.p("none.md"));
-    assert_eq!(code(f.run(&r)), "prompt_unreadable@prompt");
-    let mut r = f.request("b.md");
-    r["bind"] = json!("-x.service");
-    assert_eq!(code(f.run(&r)), "invalid_input@bind");
-    f.policy_text("not json");
-    let mut r = f.request("c.md");
-    r["cwd"] = json!(f.p("no-cwd"));
-    assert_eq!(code(f.run(&r)), "cwd_missing@cwd");
-    // Then the policy, before a Git call, a `systemctl` call, a claim or a launch.
-    let mut r = f.request("d.md");
-    r["role"] = json!("implementer");
-    r["bind"] = json!("ap-policy-test.service");
-    assert_eq!(code(f.run(&r)), "policy_invalid@policy");
-    f.policy_is(&p);
-    assert_eq!(code(f.run(&r)), "model_not_allowed@model");
-    f.untouched("d.md");
-}
-
 // spec: specs/ap/policy.md#R11
 #[test]
 fn policy_the_record_names_the_file_as_it_was_read() {
@@ -5854,17 +5826,25 @@ fn policy_the_record_names_the_file_as_it_was_read() {
 
 // spec: specs/ap/policy.md#R1
 /// The built binary with the default path replaced only through `AP_POLICY_FILE`: a host file at
-/// `/etc/agent-platform/policy.json` cannot change these answers.
+/// `/etc/agent-platform/policy.json` cannot change these answers. The policy is the last check of
+/// admission, so a request it admits goes on to its launch: here `PATH` holds no `systemd-run`, so
+/// the launch fails and the record says so, with nothing started.
 #[test]
 fn policy_the_built_binary_reads_the_file_the_variable_names() {
+    if !Path::new("/run/systemd/system").is_dir() {
+        eprintln!("skipped: systemd is not this host's init");
+        return;
+    }
+    use std::os::unix::ffi::OsStrExt;
     let f = Fake::new();
-    let mut r = f.request("x.md");
-    // Never launched: a bound unit that is not active is refused after the policy.
-    r["bind"] = json!("ap-policy-test-absent.service");
-    let ask = |file: &Path| {
+    std::fs::create_dir(f.t.join("empty")).unwrap();
+    let ask = |file: &Path, out: &str| {
+        let mut r = f.request(out);
+        r["account"] = json!(f.p("a1"));
         let mut child = Command::new(env!("CARGO_BIN_EXE_ap"))
             .arg("run")
             .env_clear()
+            .env("PATH", f.t.join("empty"))
             .env("AP_POLICY_FILE", file)
             .stdin(std::process::Stdio::piped())
             .stdout(std::process::Stdio::piped())
@@ -5874,10 +5854,15 @@ fn policy_the_built_binary_reads_the_file_the_variable_names() {
         std::io::Write::write_all(&mut child.stdin.take().unwrap(), r.to_string().as_bytes())
             .unwrap();
         let out = child.wait_with_output().unwrap();
-        let err: Value = serde_json::from_slice(&out.stderr).unwrap();
+        let (error, record) = (out.stderr, out.stdout);
+        let body: Value =
+            serde_json::from_slice(if record.is_empty() { &error } else { &record }).unwrap();
+        (out.status.code(), body)
+    };
+    let refused = |answer: (Option<i32>, Value)| {
         (
-            out.status.code(),
-            err["error"]["code"].as_str().unwrap().to_owned(),
+            answer.0,
+            answer.1["error"]["code"].as_str().unwrap_or("").to_owned(),
         )
     };
     let write = |name: &str, v: &Value| {
@@ -5887,59 +5872,140 @@ fn policy_the_built_binary_reads_the_file_the_variable_names() {
     };
     let mut p = f.open_policy();
     p["models"]["allowed"] = json!(["haiku"]);
+    let deny = write("deny.json", &p);
     assert_eq!(
-        ask(&write("deny.json", &p)),
+        refused(ask(&deny, "d.md")),
         (Some(2), "model_not_allowed".into())
     );
     assert_eq!(
-        ask(&write("bad.json", &json!({}))),
+        refused(ask(&write("bad.json", &json!({})), "b.md")),
         (Some(2), "policy_invalid".into())
     );
-    // Past the policy: this host's own refusal of the bound unit (or of a host without systemd).
-    let (status, refusal) = ask(&write("open.json", &f.open_policy()));
-    assert_eq!(status, Some(2));
-    assert!(
-        ["bind_inactive", "systemd_absent"].contains(&refusal.as_str()),
-        "{refusal}"
+    let odd = Path::new(std::ffi::OsStr::from_bytes(b"/tmp/\xff-policy.json"));
+    assert_eq!(
+        refused(ask(odd, "o.md")),
+        (Some(2), "policy_invalid".into())
     );
-    let (status, refusal) = ask(&f.t.join("absent.json"));
-    assert_eq!(status, Some(2));
-    assert!(
-        ["bind_inactive", "systemd_absent"].contains(&refusal.as_str()),
-        "{refusal}"
+    for out in ["d.md", "b.md", "o.md"] {
+        assert!(!f.t.join(format!("{out}.run.json")).exists());
+    }
+    // Admitted: the launch fails, and the record names the file that was read.
+    let open = write("open.json", &f.open_policy());
+    let (status, record) = ask(&open, "a.md");
+    assert_eq!(
+        (status, record["state"].as_str(), record["unmet"].as_str()),
+        (Some(3), Some("failed"), Some("launch"))
     );
-    assert!(!f.t.join("x.md.run.json").exists());
+    assert_eq!(record["policy"]["path"], json!(open.to_str().unwrap()));
+    // A file that does not exist is no policy, whatever this host holds at the default path.
+    let (status, record) = ask(&f.t.join("absent.json"), "n.md");
+    assert_eq!(
+        (status, record["state"].as_str(), record["policy"].clone()),
+        (Some(3), Some("failed"), Value::Null)
+    );
 }
 
-// spec: specs/ap/policy.md#R12
+// spec: specs/ap/policy.md#R10
 #[test]
-fn policy_refusals_come_before_the_refusals_that_ask_the_host() {
+fn policy_refusals_come_after_every_refusal_of_the_request_and_nothing_starts_before_one() {
     let mut f = Fake::new();
     let mut p = f.open_policy();
     p["models"]["allowed"] = json!(["haiku"]);
-    let mut open = f.open_policy();
-    open["models"]["allowed"] = json!(["sonnet"]);
-    // `systemd_absent`, `bind_inactive` and `worktree_unreadable` each hide behind the policy.
+    f.policy_is(&p);
+    // Every member of the request is read first, `skills` and `memory` among them.
+    for (key, value) in [
+        ("skills", json!("yes")),
+        ("memory", json!("yes")),
+        ("bind", json!("-bad")),
+    ] {
+        let mut r = f.request("m.md");
+        r[key] = value;
+        assert_eq!(code(f.run(&r)), format!("invalid_input@{key}"));
+    }
+    let mut r = f.request("a.md");
+    r["prompt"] = json!(f.p("none.md"));
+    assert_eq!(code(f.run(&r)), "prompt_unreadable@prompt");
+    f.policy_text("not json");
+    let mut r = f.request("c.md");
+    r["cwd"] = json!(f.p("no-cwd"));
+    assert_eq!(code(f.run(&r)), "cwd_missing@cwd");
+    // Then the policy, with nothing claimed, asked of Git or of `systemctl`, or launched after it.
+    let mut r = f.request("d.md");
+    r["role"] = json!("implementer");
+    assert_eq!(code(f.run(&r)), "policy_invalid@policy");
+    f.policy_is(&p);
+    f.git_calls.clear();
+    assert_eq!(code(f.run(&r)), "model_not_allowed@model");
+    assert!(f.launches.is_empty() && f.calls().is_empty());
+    for suffix in ["", ".run.json", ".stream.jsonl", ".err"] {
+        assert!(
+            !Path::new(&f.p(&format!("d.md{suffix}"))).exists(),
+            "{suffix}"
+        );
+    }
+}
+
+// spec: specs/ap/policy.md#R10
+#[test]
+fn policy_refusals_come_after_the_refusals_that_ask_the_host() {
+    let mut f = Fake::new();
+    let mut p = f.open_policy();
+    p["models"]["allowed"] = json!(["haiku"]);
+    f.policy_is(&p);
     let mut bound = f.request("b.md");
     bound["bind"] = json!("ap-policy-test.service");
     let mut work = f.request("w.md");
     work["role"] = json!("implementer");
     f.rev_parse = Some((false, b"fatal: broken".to_vec()));
-    f.units = false;
-    for (r, then) in [
-        (&f.request("s.md"), "systemd_absent@host"),
-        (&bound, "systemd_absent@host"),
-        (&work, "worktree_unreadable@cwd"),
-    ] {
-        f.policy_is(&p);
-        assert_eq!(code(f.run(r)), "model_not_allowed@model", "{then}");
-        f.untouched(r["out"].as_str().unwrap().rsplit('/').next().unwrap());
-        f.policy_is(&open);
-        assert_eq!(code(f.run(r)), then);
-    }
-    f.units = true;
-    f.policy_is(&p);
-    assert_eq!(code(f.run(&bound)), "model_not_allowed@model");
-    f.policy_is(&open);
+    assert_eq!(code(f.run(&work)), "worktree_unreadable@cwd");
+    f.rev_parse = None;
     assert_eq!(code(f.run(&bound)), "bind_inactive@bind");
+    f.units = false;
+    assert_eq!(code(f.run(&f.request("s.md"))), "systemd_absent@host");
+    f.units = true;
+    // A dirty worktree, and a bind of the wrong shape after it: the order is the one without a policy.
+    let git = |args: &[&str]| {
+        let status = Command::new("git")
+            .args(args)
+            .current_dir(f.p("cwd"))
+            .status();
+        assert!(status.unwrap().success());
+    };
+    git(&["init", "-q"]);
+    std::fs::write(f.p("cwd/dirty"), "x").unwrap();
+    let mut dirty = f.request("g.md");
+    dirty["role"] = json!("implementer");
+    dirty["bind"] = json!("-bad");
+    assert_eq!(code(f.run(&dirty)), "worktree_dirty@cwd");
+    f.policy = None;
+    assert_eq!(code(f.run(&dirty)), "worktree_dirty@cwd");
+    f.policy_is(&p);
+    // A resume whose unit still lives.
+    f.policy = None;
+    f.mode("a1", "limit45");
+    f.run(&f.request("v.md")).unwrap();
+    f.clear("a1");
+    let unit = f.record("v.md")["unit"].as_str().unwrap().to_owned();
+    f.alive.insert(unit);
+    f.policy_is(&p);
+    assert_eq!(
+        code(f.run(&f.resume(f.request("x"), "v2.md", "v.md"))),
+        "run_still_active@resume"
+    );
+}
+
+// spec: specs/ap/policy.md#R3
+#[test]
+fn policy_a_path_that_is_not_utf8_is_policy_invalid() {
+    use std::os::unix::ffi::OsStringExt;
+    let mut f = Fake::new();
+    f.policy = Some(PathBuf::from(std::ffi::OsString::from_vec(vec![
+        b'/', 0xff, 0xfe,
+    ])));
+    let refused = f.run(&f.request("x.md")).unwrap_err();
+    assert_eq!(
+        (refused.code, refused.field.as_str()),
+        ("policy_invalid", "policy")
+    );
+    assert!(refused.detail.as_str().unwrap().starts_with("file "));
 }
