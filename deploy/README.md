@@ -6,11 +6,11 @@ The files of this directory make `ap deliver` run with no session in the path. T
 | --- | --- | --- |
 | `ap-deliver.service` | One run of `/usr/local/bin/ap deliver` with the host's request on stdin (`Type=oneshot`, in `agents.slice`, which holds the host's CPU and memory limits; `Nice=10`; at most an hour). `SuccessExitStatus=2`: a refusal (exit 2, nothing installed) is no failure of the unit; the exits 3, 4 and 5 fail it | `/etc/systemd/system/ap-deliver.service` |
 | `ap-deliver.timer` | Starts the service ten minutes after boot and ten minutes after each run ended | `/etc/systemd/system/ap-deliver.timer` |
-| `deliver.json` | The timer's request of this host: `repository`, `url`, `state` (`/var/lib/agent-platform/deliver`), `build_lock` (the build lock `scripts/install-ap.sh` names), and `build_wait_seconds: 480` (wait up to eight minutes for that lock). It has no `by` and no `reason`: that is the timer's form | `/etc/agent-platform/deliver.json` |
+| `deliver.json` | The timer's request of this host: `repository`, `url`, `state` (`/var/lib/agent-platform/deliver`), `build_lock` (the build lock `scripts/install-ap.sh` names), `build_wait_seconds: 480` (wait up to eight minutes for that lock), and `engine` (the engine's repository `park-kyungchan/ontology-platform` and its URL: delivery also installs the engine at `ontology/ENGINE-PIN` and a higher version of `ontology/work.schema.json`). It has no `by` and no `reason`: that is the timer's form | `/etc/agent-platform/deliver.json` |
 
 The build lock is one file for every repository of the host, `/var/lib/agent-platform/build.lock`: the `check` of each repository and the installers that build (`scripts/install-ap.sh` here, `scripts/install-ont.sh` of `ontology-platform`) take it. The `check` of `education-platform` also makes its fixture directory beside the lock, so a directory `edu-check.*` under `/var/lib/agent-platform` belongs to a running check of that repository and is removed when it ends.
 
-`ap deliver` installs `ap` and `content/`; it never installs a file of this directory. The service relies on systemd's default search path for `cargo`, `git`, `flock` and `ont` (on the host these files are written for, `/usr/bin/cargo`, the rustup proxy, answers in a system service with only `HOME=/root`); on a host where `cargo` lies elsewhere, add the drop-in `/etc/systemd/system/ap-deliver.service.d/path.conf` with the lines `[Service]` and `Environment=PATH=<the directory of cargo>:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin`. A change of `deploy/` reaches the host only when a Lead copies it again as below.
+`ap deliver` installs `ap` and `content/`, and with the member `engine` the engine `ont` and the work schema; it never installs a file of this directory. The service relies on systemd's default search path for `cargo`, `git`, `flock` and `ont` (on the host these files are written for, `/usr/bin/cargo`, the rustup proxy, answers in a system service with only `HOME=/root`); on a host where `cargo` lies elsewhere, add the drop-in `/etc/systemd/system/ap-deliver.service.d/path.conf` with the lines `[Service]` and `Environment=PATH=<the directory of cargo>:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin`. A change of `deploy/` reaches the host only when a Lead copies it again as below.
 
 ## Enable
 
@@ -43,6 +43,20 @@ printf '{"view":"installs","args":{}}' | ont render   # the first row is the new
 A run that exited 3 because of `attempt_running` (an attempt is `running` that a call could not settle: a dead rollback at neither commit, a clone that cannot answer, a close the store did not apply) keeps the service failed until a call settled that attempt; a Lead's own request ends the same way with exit 2.
 
 `last.json` is the record of the last call (`end`, `code`, `detail`, `at`, `by`); what each end asks of a Lead is in `crates/ap/README.md`, "What a Lead does after each end".
+
+## The engine and the schema
+
+With `engine` in the request (`crates/ap/README.md`, "The engine and the schema"), a merged move of `ontology/ENGINE-PIN` is followed by a run that fetches the engine's repository into `/var/lib/agent-platform/deliver/ontology-platform` (a clone with the remote `origin`), checks that every merge from the installed engine to the pin was accepted, records the attempt as an `install` object of the target `/usr/local/bin/ont`, runs that clone's `scripts/install-ont.sh install <pin>` and ends; the next run installs `ap` and `content/`. A merged higher version of `ontology/work.schema.json` is followed by a run that takes `ont backup`, installs the schema from the clone of this repository and, when the tip holds an executable `ontology/migrate`, runs it with the store's path and the two versions, guarded by the marker `/var/lib/agent-platform/deliver/migrate.pending`. The engine's build is a cold one: such a run lasts up to the service's hour.
+
+```sh
+python3 -I -c 'import json; r = json.load(open("/var/lib/agent-platform/deliver/last.json")); print(r["target"], r["end"], r["code"], r.get("schema"))'
+cat /var/lib/agent-platform/deliver/migrate.pending 2>/dev/null   # an owed migration, when the file exists
+ont --version                                                      # the engine's revision
+```
+
+`schema_install_failed` and `migrate_failed` end a run with exit 4 and keep the service failed. A marker that cannot clear: stop the timer, run the corrected `ontology/migrate` by hand with the store's path and the marker's two versions, read the result, remove the marker, start the timer.
+
+Undo: remove the member `engine` from `/etc/agent-platform/deliver.json`; delivery then stops on a difference of the engine or the schema as before (`engine_differs`, `schema_differs`) and reads no marker. An installed engine goes back with the engine's own rollback, with the timer stopped: `bash /var/lib/agent-platform/deliver/ontology-platform/scripts/install-ont.sh rollback`. A schema is repaired by a higher version, installed forward; delivery never restores the store from a backup.
 
 ## A Lead's call
 
