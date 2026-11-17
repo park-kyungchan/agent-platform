@@ -1,0 +1,141 @@
+#!/usr/bin/env python3
+"""Carry the rows of a store from one version of the schema `work` to a later one.
+
+Usage: ontology/migrate <store path> <version before> <version after>
+
+Delivery calls it after it installed `after` over `before` (ontology/README.md, "The migration").
+The contract every later version keeps: the script names the highest version it knows and holds
+one step per version (a version without work is an empty step); for a pair it runs the steps of
+every version above `before` up to `after`; on a pair it does not know (`after` above the highest
+version, or `before` not below `after`) it changes nothing, prints {"status":"unknown_pair"} and
+exits 2; it carries no row twice, so a second run with the same arguments changes nothing but for
+rows the old actions added in between.
+
+The engine is $ONT_BIN (default `ont`), always with --store; every `action apply` runs with the
+fixed --client migrate and without ONT_AGENT and ONT_ROLE, so the action id derived from a request
+id is the same whoever runs it. It prints one line of JSON, {"carried": n, "already": m}, and exits
+0 only when every row ended applied or already done.
+"""
+import json
+import os
+import subprocess
+import sys
+
+HIGHEST = 10
+ONT = os.environ.get('ONT_BIN', 'ont')
+ENV = {k: v for k, v in os.environ.items() if k not in ('ONT_AGENT', 'ONT_ROLE')}
+
+
+class Stop(Exception):
+    """A read that does not allow the step to go on; nothing was applied."""
+
+
+def ont(store, args, request):
+    command = [ONT, '--store', store, *args]
+    if args[0] == 'action':
+        command[3:3] = ['--client', 'migrate']
+    done = subprocess.run(command, input=json.dumps(request), text=True, capture_output=True, env=ENV, timeout=300)
+    try:
+        answer = json.loads(done.stdout)
+    except ValueError:
+        raise Stop('ont %s exited %d without an answer: %s' % (' '.join(args), done.returncode, done.stderr.strip()[:300]))
+    return done.returncode, answer
+
+
+def read(store, args, request):
+    code, answer = ont(store, args, request)
+    if code != 0 or answer.get('status') != 'ok':
+        raise Stop('ont %s refused: %s' % (args[0], json.dumps(answer)[:300]))
+    return answer['result']
+
+
+def step_10(store):
+    """Each current decision of the user with words becomes a request, set aside."""
+    where = {'all': [{'eq': ['status', 'current']}, {'eq': ['decided_by', 'user']}]}
+    found, continuation = [], None
+    while True:
+        query = {'object_type': 'decision', 'where': where}
+        if continuation:
+            query['continuation'] = continuation
+        result = read(store, ['search'], query)
+        if result['basis'].get('qualified') is not True:
+            raise Stop('search not qualified: %s' % json.dumps(result['basis']))
+        found += [o['id'] for o in result['objects']]
+        continuation = result.get('continuation')
+        if not continuation:
+            break
+    counted = sum(g['count'] for g in read(store, ['aggregate'], {'object_type': 'decision', 'where': where, 'metrics': ['count']})['groups'])
+    if counted != len(found):
+        raise Stop('search read %d rows, aggregate counts %d' % (len(found), counted))
+    rows = []
+    for decision in found:
+        head = read(store, ['get'], {'id': decision})['objects'][0]['observations'][-1]['fields']
+        fields = {name: value.get('value') for name, value in head.items()}
+        if fields.get('user_words'):
+            rows.append((decision, fields))
+    carried = already = failed = 0
+    for decision, fields in rows:
+        key = decision['native_key']
+        code, answer = ont(store, ['action', 'apply'], {'action_type': 'record_request', 'request_id': 'migrate-10-' + key, 'parameters': {
+            'words': fields['user_words'], 'words_verified': False, 'reading': fields['text'], 'kind': 'decision',
+            'topic': fields['topic'], 'said_at': fields['decided_at'], 'legacy_decision': decision}})
+        result = answer.get('result', answer)
+        if code == 2 and result.get('code') == 'submission_criteria' and result.get('failed') == ['legacy_already_carried']:
+            already += 1
+            continue
+        if code != 0:
+            failed += 1
+            print('record %s: %s' % (key, json.dumps(answer)[:300]), file=sys.stderr)
+            continue
+        request = next(e['id'] for e in result['edits'] if e['id']['object_type'] == 'request' and e['change'] == 'initial')
+        reason = 'carried from version 9' + (', triage ' + fields['triage'] if fields.get('triage') else '')
+        code, aside = ont(store, ['action', 'apply'], {'action_type': 'set_request_aside', 'request_id': 'migrate-10-aside-' + key,
+                                                        'parameters': {'request': request, 'reason': reason}})
+        if code != 0:
+            failed += 1
+            print('aside %s: %s' % (key, json.dumps(aside)[:300]), file=sys.stderr)
+            continue
+        if result['outcome'] == 'already_applied' and aside['result']['outcome'] == 'already_applied':
+            already += 1
+        else:
+            carried += 1
+    return carried, already, failed
+
+
+def empty_step(store):
+    return 0, 0, 0
+
+
+# One step per version: the step of version v carries a store from v - 1 to v.
+STEPS = {1: empty_step, 2: empty_step, 3: empty_step, 4: empty_step, 5: empty_step, 6: empty_step, 7: empty_step,
+         8: empty_step, 9: empty_step, 10: step_10}
+assert sorted(STEPS) == list(range(1, HIGHEST + 1))
+
+
+def main(argv):
+    if len(argv) != 4:
+        print('usage: ontology/migrate <store path> <version before> <version after>', file=sys.stderr)
+        return 2
+    store = argv[1]
+    try:
+        before, after = int(argv[2]), int(argv[3])
+    except ValueError:
+        before, after = 0, 0
+    if after > HIGHEST or before >= after:
+        print(json.dumps({'status': 'unknown_pair'}))
+        return 2
+    carried = already = failed = 0
+    try:
+        for version in range(max(before, 0) + 1, after + 1):
+            c, a, f = STEPS[version](store)
+            carried, already, failed = carried + c, already + a, failed + f
+    except Stop as stop:
+        print('migrate: %s' % stop, file=sys.stderr)
+        print(json.dumps({'carried': carried, 'already': already}))
+        return 1
+    print(json.dumps({'carried': carried, 'already': already}))
+    return 0 if failed == 0 else 1
+
+
+if __name__ == '__main__':
+    sys.exit(main(sys.argv))

@@ -691,3 +691,168 @@ The rows of version 9 run after the rows of version 8, each refusal before the
 action it guards, with the answer's code asserted (a row of several failed
 criteria asserts the whole set). They are in `ontology/rehearsal.sh` under the
 comment "Version 9".
+
+## Version 10: requests, intents, criteria
+Version 9 remains pinned at
+`8379ae651929853d6fb2df79559ece4a98c5f551:ontology/work.schema.json`,
+sha256 `faba52d93401384cdc6146a7f505c61dafc4a87662deb284dfc689f19a58d298`.
+Version 10 only adds: every value type, source, object type, link type, action type and view of version 9
+reads the same, byte for byte in canonical JSON, and the one grant gains the three new types (read and
+derive) and the seventeen new actions. The new types are the user's side of the life cycle of work:
+
+1. Every message of the user that orders, decides, prefers, corrects, stops, answers or delegates is a
+   `request`, recorded in the user's own words (`record_request`). It starts `unrouted`.
+2. A request is routed to the `intent` it is part of (`draft_intent` routes the request that started the
+   intent, `route_request` any other), or set aside as part of no intent (`set_request_aside`).
+3. An intent is drafted, gains its success criteria (`add_criterion`), and is confirmed by the user's own
+   word routed to it (`confirm_intent`), or by the Lead under a delegation of the user
+   (`confirm_intent_delegated`). The Lead may proceed on a draft before that (`assume_intent`).
+4. Each `criterion` is checked (`check_criterion`) or waived by the user (`waive_criterion`); the intent
+   closes `met` when none is `open` or `fail` (`close_intent`), or is retired (`retire_intent`).
+
+All three types are Ontology-owned and written only by these actions. `request` and `criterion` are keyed by
+the action id; `intent` is keyed by the native key of the parameter `intent` of `draft_intent` (the engine's
+`/native_key` form, as `board` is), has no `title` and is shown by that key. A time below is a stored UTC
+time of one-second resolution; "later" is strictly later: a request said in the same second as the
+intent's last amendment does not confirm it (the rehearsal moves its clock by one second).
+
+### `request`: one message of the user
+| Property | Type | Meaning |
+| --- | --- | --- |
+| `words` | string, 24,000 bytes | the user's own text, in the user's language; no action changes it |
+| `words_verified` | boolean | true when a program read the words from a session record; set once, and unverified words become verified only by a `supersede_request` that carries the verified ones |
+| `truncated`, `record` (400) | boolean, string; optional | the words were cut; the session record they were read from |
+| `reading` | string, 1,000 | what the agent took the message to mean, in English |
+| `kind` | `order`, `decision`, `preference`, `correction`, `stop`, `answer`, `delegation` | a `delegation` hands the confirmation of named intents to the Lead for a time the user does not step in |
+| `topic` | string, 120 | a label, not unique (view `requests_by_topic`) |
+| `said_at`, `recorded_at` | UTC time | when the user said it (never after the recording); when it was recorded (`$now`) |
+| `session` (120), `runtime` (40) | string, optional | where it was said |
+| `status` | `current`, `superseded` | superseded by a correction or, for a delegation, by `end_delegation` |
+| `supersedes` | `request`, optional | the request this one corrects |
+| `route` | `unrouted`, `intent`, `aside` | |
+| `intent` | `intent`, optional | the intent while `route` is `intent`; cleared by `set_request_aside` |
+| `route_reason` | string, 600, optional | valid only while `route` is `aside`: a scalar cannot be cleared, so the reason of an earlier aside stays as history |
+| `routed_at` | UTC time, optional | the last route or aside |
+| `legacy_decision` | `decision`, optional | the row of version 9 this request was carried from |
+
+| Action | Parameters | Effect | Refusals |
+| --- | --- | --- | --- |
+| `record_request` | `words`, `words_verified`, `reading`, `kind`, `topic`, `said_at`; optional `truncated`, `record`, `session`, `runtime`, `legacy_decision` | a `current`, `unrouted` request | `words_empty`; `said_in_the_future` (`said_at` after now: a local time written with `Z`); `legacy_not_a_user_row` (a `legacy_decision` is given and is not a decision decided by the user); `legacy_already_carried` (a request already carries that decision) |
+| `supersede_request` | `request` and the parameters of `record_request` but `legacy_decision` | the old request `superseded`; a new `current`, `unrouted` one with `supersedes` | `request_not_current`; `words_empty`; `said_in_the_future`; `request_confirms_an_intent` (the request is the `confirmed_by` of an intent: amend that intent first, which clears the confirmation) |
+| `route_request` | `request`, `intent` | `route` `intent`, the reference, `routed_at` | `request_not_current`; `unknown_intent`; `intent_closed` (`met` or `retired`); `request_confirms_an_intent` |
+| `set_request_aside` | `request`, `reason` | `route` `aside`, `route_reason`, `routed_at`; the reference `intent` cleared | `request_not_current`; `reason_empty`; `request_confirms_an_intent` |
+| `end_delegation` | `request`, `stopped_by` | the delegation `superseded`; the intents it confirmed keep it as their history | `not_a_delegation` (not a current request of kind `delegation`); `by_not_the_users_word` (`stopped_by` is not a current `order`, `decision`, `correction` or `stop`); `by_not_later` (`stopped_by` was not said later than the delegation) |
+
+The second parameter of `end_delegation` is `stopped_by`, not `by`: a rule that modifies an object, sets or
+clears a reference changes the first parameter, in name order, that refers to the rule's type, and both
+parameters refer to `request`. The rehearsal asserts that the action changed the delegation and nothing
+else.
+
+### `intent`: one objective of the user
+| Property | Type | Meaning |
+| --- | --- | --- |
+| `outcome` | string, 1,200 | what is true when it is met, as sentences that can be checked |
+| `why` (800), `not_included` (800), `constraints` (800) | string, optional | the need; what is not wanted; the limits the work keeps |
+| `first_user` | string, 600 | who or what uses the result first, and the real run that shows it |
+| `questions` | array of `{question, default, answer}`, optional | open questions; `question` and `default` are nonempty, `answer` is empty until answered: each question has a default by its type |
+| `origin` | `request` | the request that started it |
+| `status` | `draft`, `assumed`, `confirmed`, `met`, `retired` | |
+| `amended_at` | UTC time | the time of `draft_intent` or of the last `amend_intent` |
+| `confirmed_by`, `confirmed_at`, `confirmed_delegated` | `request`, UTC time, boolean; optional | the confirming request (a delegation when `confirmed_delegated`); `confirmed_at` is valid only while `status` is `confirmed` or `met` |
+| `assumed_reason` | string, 600, optional | valid only while `status` is `assumed` |
+| `lead_session` (120), `lead_named_by` | string, `request`; optional | the session that leads it and the user's word that named it |
+| `directory` (300), `notes` (4,000) | string, optional | the task directory; the Lead's free text for the next Lead |
+| `closed_at`, `closed_reason` (600) | optional | the close as `met` or `retired` |
+
+| Action | Parameters | Effect | Refusals |
+| --- | --- | --- | --- |
+| `draft_intent` | `intent`, `outcome`, `first_user`, `origin`; optional `why`, `not_included`, `constraints`, `questions`, `directory` | a `draft` with `amended_at`; the origin's `route` `intent`, its `intent` and `routed_at` | `origin_not_current`; `origin_confirms_an_intent`; `outcome_empty`; `first_user_empty`; a key used before: `revision_conflict` from the engine |
+| `amend_intent` | `intent`; optional `outcome`, `first_user`, `why`, `not_included`, `constraints`, `questions`, `directory` | given members replace their values; `status` `draft`, `amended_at`, `confirmed_delegated` false, `confirmed_by` cleared | `intent_closed`; `outcome_empty` and `first_user_empty` (given and empty) |
+| `note_intent` | `intent`, `notes` | `notes` only | `intent_closed` |
+| `name_lead` | `intent`, `session`, `by` | `lead_session`, `lead_named_by` | `intent_closed`; `by_not_the_users_word` (not a current `order`, `decision` or `delegation`); `by_not_routed_here` (`by` is not routed to this intent) |
+| `assume_intent` | `intent`, `reason` | `draft` becomes `assumed` with `assumed_reason` | `intent_not_draft`; `not_the_lead` (the actor's role is not `lead`); `reason_empty` |
+| `confirm_intent` | `intent`, `by` | `draft` or `assumed` becomes `confirmed`: `confirmed_by`, `confirmed_at`, `confirmed_delegated` false | `intent_not_open`; `by_not_the_users_word` (not a current `order`, `decision` or `answer`); `by_not_routed_here`; `by_older_than_amendment` (`by` was not said later than `amended_at`); `no_criterion` (no criterion of the intent is in a state other than `waived`) |
+| `confirm_intent_delegated` | `intent`, `delegation`, `reason` | `draft` or `assumed` becomes `confirmed` by the delegation, `confirmed_delegated` true; the reason stays in the action log | `intent_not_open`; `not_the_lead`; `not_a_delegation`; `reason_empty`; `no_criterion` |
+| `close_intent` | `intent`, `reason` | `confirmed` becomes `met`, `closed_at`, `closed_reason` | `intent_not_confirmed`; `criterion_not_passed` (a criterion is `open` or `fail`) |
+| `retire_intent` | `intent`, `reason` | any status but `met` and `retired` becomes `retired` | `intent_closed`; `reason_empty` |
+
+A delegation may confirm several intents, so it need not be routed to each. Once it confirmed one, it can no
+longer be routed, set aside or superseded (`request_confirms_an_intent`): route it or set it aside before its
+first use. `end_delegation` is how the user ends it.
+
+### `criterion`: one success criterion of an intent
+| Property | Type | Meaning |
+| --- | --- | --- |
+| `intent` | `intent` | |
+| `statement` | string, 600 | checkable true or false |
+| `check` | string, 800 | the command, test, eval with its threshold, or the real run to observe |
+| `baseline` | string, 300, optional | for a number: its value before, with source and time |
+| `state` | `open`, `pass`, `fail`, `waived` | |
+| `evidence` (1,000), `checked_at` | optional | the output of the last check, or the reason of the waiver |
+| `waived_by` | `request`, optional | the user's word that waived it |
+| `added_at` | UTC time | |
+
+| Action | Parameters | Effect | Refusals |
+| --- | --- | --- | --- |
+| `add_criterion` | `intent`, `statement`, `check`; optional `baseline` | an `open` criterion | `intent_closed`; `statement_empty`; `check_empty` |
+| `check_criterion` | `criterion`, `state`, `evidence` | `state` (`pass` or `fail`), `evidence`, `checked_at` | `state_not_a_result` (`open` or `waived`); `evidence_empty`; `criterion_waived` |
+| `waive_criterion` | `criterion`, `by`, `reason` | `waived`, `waived_by`, the reason as `evidence` | `by_not_the_users_word` (not a current `decision`, `order` or `answer`); `by_not_routed_here` (not routed to the criterion's intent); `reason_empty` |
+
+### Links, grants and views
+Links, each named forward and reverse: `request_intent` / `intent_requests`, `intent_origin` /
+`request_started_intents`, `criterion_intent` / `intent_criteria`, `request_supersedes` /
+`request_successors`, `request_legacy_decision` / `decision_carried_requests`, `intent_confirmed_by` /
+`request_confirmed_intents`, `intent_lead_named_by` / `request_named_leads`, `criterion_waived_by` /
+`request_waived_criteria`. The refusals `request_confirms_an_intent`, `origin_confirms_an_intent`,
+`legacy_already_carried`, `no_criterion` and `criterion_not_passed` read them in reverse.
+
+Views: `requests_unrouted` (current requests not routed yet, oldest first), `requests_by_topic` (argument
+`topic`: its current requests, newest first, with their route), `intents_open` (`draft`, `assumed` or
+`confirmed`, by key), `criteria_of_intent` (argument `intent`, the intent's key).
+
+### What the store does not check
+- At most five questions per intent: an array has no length bound in the schema language. `ap` holds it.
+- The form of an intent's key (lower-case letters, digits and `-`, at most 60 bytes): the engine checks
+  only that a native key is 1 to 512 bytes. `ap` holds it.
+- That a request's words are the user's: the engine does not know who calls. `words_verified` says whether
+  a program read them from a session record.
+
+### The migration
+`ontology/migrate <store> <before> <after>` is the script delivery runs after it installed a new version.
+It runs `$ONT_BIN` (default `ont`) with `--store`, every `action apply` with `--client migrate` and without
+`ONT_AGENT` and `ONT_ROLE`, so that the action id of a request id is the same whoever runs it.
+
+The step of version 10 carries every current decision of the user with nonempty `user_words` into a
+request: it searches decisions by `status` `current` and `decided_by` `user`, following `continuation` and
+requiring `basis.qualified`, reads each row with `get` (a search answer carries no property), and stops
+with a non-zero exit, having applied nothing, unless the rows it read equal the `aggregate` count of the same
+filter. For each row with words: `record_request` (`words` the user's words, `words_verified` false,
+`reading` the decision's `text`, `kind` `decision`, its `topic`, `said_at` its `decided_at`,
+`legacy_decision` the row; request id `migrate-10-<key of the row>`), then `set_request_aside` with the
+reason `carried from version 9`, followed by `, triage <word>` when the row was triaged (request id
+`migrate-10-aside-<key>`). The carried requests are current, found by topic, and not in
+`requests_unrouted`: the triage of version 9 pointed at objectives and items, which have no counterpart here.
+A record that answers `already_applied` is still followed by its aside, so a run that was interrupted
+between the two completes it. A row is already done when both answered `already_applied`, or when the
+record ended `legacy_already_carried`. The script changes no decision, prints one line
+`{"carried": n, "already": m}` and exits 0 only when every row ended applied or already done.
+
+The contract every later version keeps: the script stays in the tree; it names the highest version it knows
+and holds one step per version (a version without work is an empty step); for a pair it runs the steps of
+every version above `before` up to `after`; on a pair it does not know (`after` above the highest version, or
+`before` not below `after`) it changes nothing, prints `{"status":"unknown_pair"}` and exits 2; and it
+carries no row twice: a second run with the same arguments changes nothing but for rows the old actions
+added in between. The file is committed executable (mode `100755`): delivery skips one that is not.
+
+### Install over version 9 and the rehearsal
+The rehearsal now installs version 9 from Git by its commit and digest, and then the repository's file
+(as a copy that differs only in the paths of `installed_binaries`) over it; every object and view asserted
+under version 9 reads the same, and `ont_describe` and `ont_action_list` stay within the MCP limit of
+262,144 bytes. On a second store it starts at version 2 with a row of the user without words, installs the
+pinned versions up to 9, records two rows of the user with words (one triaged) and a Lead row, installs the
+repository's file, and runs `ontology/migrate`: 9 10 twice (2 carried, then 2 already), again after a record
+applied by hand without its aside (1 carried, 2 already), three unknown pairs (exit 2, the store unchanged),
+and the pair the repository's file names. Then every action of this section is applied and every refusal
+above is asserted, each before the action it guards. The rows that need the role of the actor
+(`assume_intent`, `confirm_intent_delegated`, `end_delegation`, and the read back with `ont log`) run with an
+engine that has the verb `log`; with another, they are skipped with one line on standard error.
