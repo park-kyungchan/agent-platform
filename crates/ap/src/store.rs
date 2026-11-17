@@ -25,13 +25,21 @@ pub struct Lead {
     pub intent: Value,
     pub revision: String,
 }
-/// One call; a `store_busy` answer is called again, at most five more times.
-fn call(
+/// The members of the envelope of the first answer a verb read: the engine's clock (seconds since
+/// 1970) and the version of the schema `work`.
+#[derive(Default)]
+pub struct Seen {
+    pub now: Option<u64>,
+    pub schema: Option<u64>,
+}
+/// One call; a `store_busy` answer is called again, at most five more times. The answer, parsed, with
+/// whether the process succeeded.
+fn exchange(
     s: &mut impl System,
     store: Option<&str>,
     command: &[&str],
     body: &Value,
-) -> Result<Value, Failure> {
+) -> Result<(bool, Value), Failure> {
     let ctx = json!({ "store": store });
     let mut tries = 0;
     loop {
@@ -47,11 +55,33 @@ fn call(
         if refused {
             return Err(fail(REFUSED, command[0], v));
         }
-        if !reply.success || v["status"] != "ok" || !v["result"].is_object() {
-            return Err(error("store_answer_unreadable", command[0]));
-        }
-        return Ok(v);
+        return Ok((reply.success, v));
     }
+}
+fn call(
+    s: &mut impl System,
+    store: Option<&str>,
+    command: &[&str],
+    body: &Value,
+) -> Result<Value, Failure> {
+    call_seen(s, store, command, body, &mut Seen::default())
+}
+/// `call`, noting the envelope of the first answer in `seen`.
+fn call_seen(
+    s: &mut impl System,
+    store: Option<&str>,
+    command: &[&str],
+    body: &Value,
+    seen: &mut Seen,
+) -> Result<Value, Failure> {
+    let (success, v) = exchange(s, store, command, body)?;
+    if !success || v["status"] != "ok" || !v["result"].is_object() {
+        return Err(error("store_answer_unreadable", command[0]));
+    }
+    if seen.now.is_none() {
+        (seen.now, seen.schema) = (v["now"].as_u64(), v["schema"]["work"]["version"].as_u64());
+    }
+    Ok(v)
 }
 /// An applied action: its outcome (`applied` or `already_applied`) and its edits.
 pub struct Applied {
@@ -278,10 +308,20 @@ pub fn search(
     kind: &str,
     all: Vec<Value>,
 ) -> Result<Vec<Found>, Failure> {
+    search_seen(s, store, kind, all, &mut Seen::default())
+}
+/// `search`, noting the envelope of the first answer in `seen`.
+pub fn search_seen(
+    s: &mut impl System,
+    store: Option<&str>,
+    kind: &str,
+    all: Vec<Value>,
+    seen: &mut Seen,
+) -> Result<Vec<Found>, Failure> {
     let mut q = json!({"object_type": kind, "where": {"all": all}, "limit": PAGE});
     let mut found = vec![];
     loop {
-        let v = call(s, store, &["search"], &q)?;
+        let v = call_seen(s, store, &["search"], &q, seen)?;
         let r = &v["result"];
         if r["basis"]["qualified"] != true {
             return Err(fail("store_answer_unqualified", kind, r["basis"].clone()));
@@ -303,6 +343,113 @@ pub fn search(
             c => q["continuation"] = c.clone(),
         }
     }
+}
+/// The keys a view lists (its first column, unescaped), by one `ont render`. An answer cut at the
+/// engine's bound (`truncated`) is `store_answer_unqualified`.
+pub fn view_keys(
+    s: &mut impl System,
+    store: Option<&str>,
+    view: &str,
+    args: Value,
+) -> Result<Vec<String>, Failure> {
+    let unreadable = || error("store_answer_unreadable", view);
+    let body = json!({"view": view, "args": args});
+    let (success, v) = exchange(s, store, &["render"], &body)?;
+    let markdown = v["markdown"]
+        .as_str()
+        .filter(|_| success && v["status"] == "ok");
+    let markdown = markdown.ok_or_else(unreadable)?;
+    if v["truncated"] != false {
+        return Err(fail(
+            "store_answer_unqualified",
+            view,
+            json!({"truncated": true}),
+        ));
+    }
+    let rows = markdown.lines().skip(3).take_while(|l| l.starts_with("| "));
+    let keys: Vec<String> = rows.filter_map(first_cell).collect();
+    match v["rows"].as_u64() == Some(keys.len() as u64) && keys.iter().all(|k| !k.is_empty()) {
+        true => Ok(keys),
+        false => Err(unreadable()),
+    }
+}
+/// The first cell of a row of a rendered table: `| a | b |` gives `a`; `\|` and `\\` are unescaped.
+fn first_cell(row: &str) -> Option<String> {
+    let mut chars = row.strip_prefix("| ")?.chars().peekable();
+    let mut cell = String::new();
+    while let Some(c) = chars.next() {
+        match c {
+            '\\' => cell.push(chars.next().filter(|e| matches!(e, '|' | '\\'))?),
+            ' ' if chars.peek() == Some(&'|') => return Some(cell),
+            c => cell.push(c),
+        }
+    }
+    None
+}
+/// The installed schema as `ont describe` answers it: its `result`, read whole.
+pub fn describe(s: &mut impl System, store: Option<&str>) -> Result<Value, Failure> {
+    let mut v = call(s, store, &["describe"], &json!({}))?;
+    Ok(v["result"].take())
+}
+/// The members of the enumerated property `property` of `kind`, by one `ont aggregate` that scans no
+/// object (the empty `in`); none when the answer lists no group. A refusal (a type whose grant gives
+/// no derive) is the caller's to skip.
+pub fn members(
+    s: &mut impl System,
+    store: Option<&str>,
+    kind: &str,
+    property: &str,
+) -> Result<Vec<String>, Failure> {
+    let body = json!({"object_type": kind, "group_by": [property], "metrics": ["count"],
+        "where": {"in": [property, []]}});
+    let v = call(s, store, &["aggregate"], &body)?;
+    let groups = v["result"]["groups"].as_array().into_iter().flatten();
+    Ok(groups
+        .filter_map(|g| g["key"][property].as_str().map(str::to_owned))
+        .collect())
+}
+/// How `ap intent show` gives who confirmed an intent: `no` unless it is `confirmed` or `met`.
+pub fn confirmed(v: &Value) -> &'static str {
+    match (v["status"].as_str(), v["confirmed_delegated"] == true) {
+        (Some("confirmed" | "met"), true) => "by delegation",
+        (Some("confirmed" | "met"), false) => "by the user",
+        _ => "no",
+    }
+}
+/// The intent `key`, whose fields `v` were read, as `ap intent show` prints it: with `intent`, its
+/// `criteria` (by `added_at`), the `requests` routed to it (by `said_at`) and `confirmed`.
+pub fn intent_shown(
+    s: &mut impl System,
+    store: Option<&str>,
+    key: &str,
+    mut v: Value,
+) -> Result<Value, Failure> {
+    let by = |t: &'static str| {
+        move |o: &Found| (o.1[t].as_str().unwrap_or_default().to_owned(), o.0.clone())
+    };
+    let eq = |k: &str, v: Value| json!({"eq": [k, v]});
+    let mut criteria = at(
+        search(s, store, "criterion", vec![eq("intent", id("intent", key))]),
+        "criteria",
+    )?;
+    criteria.sort_by_key(by("added_at"));
+    let all = vec![eq("status", json!("current")), eq("route", json!("intent"))];
+    let mut requests = at(search(s, store, "request", all), "requests")?;
+    requests.retain(|(_, f)| f["intent"]["native_key"] == key);
+    requests.sort_by_key(by("said_at"));
+    let criterion = |(k, f): Found| {
+        json!({"criterion": k, "statement": f["statement"], "check": f["check"], "baseline": f["baseline"],
+            "state": f["state"], "evidence": f["evidence"], "checked_at": f["checked_at"]})
+    };
+    let request = |(k, f): Found| {
+        json!({"request": k, "topic": f["topic"], "kind": f["kind"], "said_at": f["said_at"],
+            "words_verified": f["words_verified"]})
+    };
+    v["intent"] = json!(key);
+    v["criteria"] = criteria.into_iter().map(criterion).collect();
+    v["requests"] = requests.into_iter().map(request).collect();
+    v["confirmed"] = json!(confirmed(&v));
+    Ok(v)
 }
 pub fn bad(f: &str) -> Failure {
     error("invalid_input", f)
