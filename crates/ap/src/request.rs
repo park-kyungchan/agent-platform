@@ -186,19 +186,28 @@ fn require_none(r: &Value, k: &str) -> Result<(), Failure> {
 enum Route {
     Intent(String),
     Aside(String),
+    Unit(String),
+    Finding(String),
 }
-/// Exactly one of `intent` (an intent's key) and `aside` (a reason of 1 to 600 bytes) of `v`.
+/// Exactly one of `intent` (an intent's key), `aside` (a reason of 1 to 600 bytes), `unit` (a unit's
+/// key) and `finding` (a finding's native key) of `v`.
 fn route_of(v: &Value, at: &str) -> Result<Route, Failure> {
     let whole = if at.is_empty() { "intent" } else { "route" };
-    match (v.get("intent"), v.get("aside")) {
-        (Some(_), None) => Ok(Route::Intent(
-            sized(&v["intent"], &format!("{at}intent"), 512)?.into(),
-        )),
-        (None, Some(_)) => Ok(Route::Aside(
-            sized(&v["aside"], &format!("{at}aside"), 600)?.into(),
-        )),
-        _ => Err(bad(whole)),
-    }
+    let given: Vec<_> = ["intent", "aside", "unit", "finding"]
+        .into_iter()
+        .filter(|k| v.get(*k).is_some())
+        .collect();
+    let [way] = given[..] else {
+        return Err(bad(whole));
+    };
+    let max = if way == "aside" { 600 } else { 512 };
+    let value = sized(&v[way], &format!("{at}{way}"), max)?.to_owned();
+    Ok(match way {
+        "intent" => Route::Intent(value),
+        "aside" => Route::Aside(value),
+        "unit" => Route::Unit(value),
+        _ => Route::Finding(value),
+    })
 }
 /// Before anything is applied: the intent a route names exists and is open.
 fn check(s: &mut impl System, store: Option<&str>, route: &Route, f: &str) -> Result<(), Failure> {
@@ -237,6 +246,20 @@ fn apply_route(
                 rid,
                 json!({"request": request, "reason": why}),
             ),
+            Route::Unit(k) => store::route_request_to_unit(
+                s,
+                store,
+                actor,
+                rid,
+                json!({"request": request, "unit": id("unit", k)}),
+            ),
+            Route::Finding(k) => store::route_request_to_finding(
+                s,
+                store,
+                actor,
+                rid,
+                json!({"request": request, "finding": id("finding", k)}),
+            ),
         },
         "route",
     )
@@ -260,10 +283,15 @@ fn inherited(
             .or(old[k]["native_key"].as_str())
             .map(str::to_owned)
     };
+    let held = |k: &str| text(k).ok_or_else(|| error("store_answer_unreadable", "supersedes"));
     Ok(match old["route"].as_str() {
-        Some("intent") => text("intent").map(Route::Intent),
-        Some("aside") => text("route_reason").map(Route::Aside),
-        _ => None,
+        Some("unrouted") => None,
+        Some("intent") => Some(Route::Intent(held("intent")?)),
+        Some("aside") => Some(Route::Aside(held("route_reason")?)),
+        Some("unit") => Some(Route::Unit(held("unit")?)),
+        Some("finding") => Some(Route::Finding(held("finding")?)),
+        // Never read as unrouted (R24).
+        _ => return Err(fail("route_unknown", "supersedes", old["route"].clone())),
     })
 }
 /// `record`, and `supersede` of the current request `request`.
@@ -296,7 +324,7 @@ fn record(
         .transpose()?;
     let route = r
         .get("route")
-        .map(|v| only(v, "intent aside", "route.").and_then(|_| route_of(v, "route.")))
+        .map(|v| only(v, "intent aside unit finding", "route.").and_then(|_| route_of(v, "route.")))
         .transpose()?;
     let w = words(s, r)?;
     if let Some(route) = &route {
@@ -349,7 +377,11 @@ fn record(
 }
 /// `route`: the request `request` to an intent or aside.
 fn route(s: &mut impl System, store: Option<&str>, r: &Value) -> Result<Value, Failure> {
-    only(r, "op request_id agent session request intent aside", "")?;
+    only(
+        r,
+        "op request_id agent session request intent aside unit finding",
+        "",
+    )?;
     let rid = shaped(r, "request_id", 50, "._-")?;
     let actor = actor(r)?;
     let key = sized(&r["request"], "request", 512)?;
@@ -385,7 +417,8 @@ fn list(s: &mut impl System, store: Option<&str>, r: &Value) -> Result<Value, Fa
         let aside = f["route"] == "aside";
         json!({"request": key, "topic": f["topic"], "kind": f["kind"], "said_at": f["said_at"],
             "words_verified": f["words_verified"], "truncated": f["truncated"] == true, "route": f["route"],
-            "intent": f["intent"]["native_key"], "route_reason": if aside { f["route_reason"].clone() } else { Value::Null },
+            "intent": f["intent"]["native_key"], "unit": f["unit"]["native_key"],
+            "finding": f["finding"]["native_key"], "route_reason": if aside { f["route_reason"].clone() } else { Value::Null },
             "reading": f["reading"], "words": f["words"]})
     };
     Ok(json!({"requests": found.into_iter().map(row).collect::<Vec<_>>()}))
@@ -403,7 +436,7 @@ pub fn text(v: &Value) -> String {
             out.push_str(" [truncated]");
         }
         out.push_str(&match g("route") {
-            "intent" => format!(" -> intent {}", g("intent")),
+            way @ ("intent" | "unit" | "finding") => format!(" -> {way} {}", g(way)),
             "aside" => format!(" -> aside ({})", g("route_reason")),
             other => format!(" -> {other}"),
         });
@@ -437,11 +470,15 @@ fn refusal(f: Failure, done: Option<String>) -> Refusal {
     } else {
         f.code
     };
+    let after = done.as_ref().map(|_| match code {
+        "route_unknown" => "supersede",
+        _ => "record",
+    });
     Refusal {
         code: code.into(),
         field: f.field,
         detail: f.detail,
-        after: done.as_ref().map(|_| "record"),
+        after,
         request: done,
     }
 }

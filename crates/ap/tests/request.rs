@@ -11,11 +11,13 @@ const RECORD: &[u8] = include_bytes!("fixtures/request/session.jsonl");
 const PATH: &str = "/rec/session.jsonl";
 /// The fake store's clock.
 const NOW: &str = "2026-11-17T12:00:00Z";
-const ACTIONS: [&str; 4] = [
+const ACTIONS: [&str; 6] = [
     "record_request",
     "supersede_request",
     "route_request",
     "set_request_aside",
+    "route_request_to_unit",
+    "route_request_to_finding",
 ];
 fn oid(kind: &str, key: &str) -> Value {
     json!({"object_type":kind,"namespace":{"instance":"vps://palantirkc","account":"root"},"native_key":key})
@@ -83,6 +85,15 @@ impl F {
                 json!({"object_type": "intent", "status": status}),
             );
         }
+        // Schema 11: a unit and a finding, keyed by their native key.
+        f.objects.insert(
+            "u1".into(),
+            json!({"object_type": "unit", "state": "ready"}),
+        );
+        f.objects.insert(
+            "f1".into(),
+            json!({"object_type": "finding", "state": "open"}),
+        );
         f
     }
     fn names(&self) -> Vec<String> {
@@ -131,13 +142,21 @@ impl F {
                 failed.push("intent_closed");
             }
         }
+        for (action_, kind, code) in [
+            ("route_request_to_unit", "unit", "unknown_unit"),
+            ("route_request_to_finding", "finding", "unknown_finding"),
+        ] {
+            if action == action_ && !self.is(&p[kind], kind, |_| true) {
+                failed.push(code);
+            }
+        }
         if action == "set_request_aside" && p["reason"] == "" {
             failed.push("reason_empty");
         }
         failed
     }
     fn create(&mut self, p: &Value) -> String {
-        let key = format!("rq{}", self.objects.len());
+        let key = format!("rq{}", self.requests().len() + 3);
         let mut o = p.clone();
         let o_ = o.as_object_mut().unwrap();
         o_.remove("request");
@@ -192,15 +211,22 @@ impl F {
                 self.objects.get_mut(&key).unwrap()["supersedes"] = p["request"].clone();
                 vec![change(&target, "modification"), change(&key, "initial")]
             }
-            "route_request" => {
-                let o = self.objects.get_mut(&target).unwrap();
-                (o["route"], o["intent"]) = (json!("intent"), p["intent"].clone());
-                vec![change(&target, "modification")]
-            }
+            // Each route sets its own reference and clears the others, as the rules of schema 11 do.
             _ => {
+                let (route, member) = match action {
+                    "route_request" => ("intent", "intent"),
+                    "route_request_to_unit" => ("unit", "unit"),
+                    "route_request_to_finding" => ("finding", "finding"),
+                    _ => ("aside", "route_reason"),
+                };
                 let o = self.objects.get_mut(&target).unwrap();
-                (o["route"], o["route_reason"]) = (json!("aside"), p["reason"].clone());
-                o.as_object_mut().unwrap().remove("intent");
+                let o = o.as_object_mut().unwrap();
+                for k in ["intent", "unit", "finding"] {
+                    o.remove(k);
+                }
+                o.insert("route".into(), json!(route));
+                let value = &p[if route == "aside" { "reason" } else { route }];
+                o.insert(member.into(), value.clone());
                 vec![change(&target, "modification")]
             }
         };
@@ -407,6 +433,12 @@ fn r2_a_malformed_request_is_invalid_input_with_its_field_before_any_call() {
         ),
         (with(rec(), "route", json!({"to": "open"})), "route.to"),
         (with(rec(), "route", json!({"intent": 5})), "route.intent"),
+        (
+            with(rec(), "route", json!({"unit": "u1", "finding": "f1"})),
+            "route",
+        ),
+        (with(rec(), "route", json!({"unit": ""})), "route.unit"),
+        (with(rec(), "route", json!({"finding": 1})), "route.finding"),
         (with(rec(), "words_file", json!("/w/x")), "words_file"),
         (without(rec(), "words"), "words"),
         (
@@ -1218,7 +1250,7 @@ fn r20_list_answers_the_requests_as_stored_in_their_order() {
         v["requests"][0],
         json!({"request": keys[0], "topic": "walk/one", "kind": "decision", "said_at": "2026-11-16T04:00:00Z",
             "words_verified": false, "truncated": false, "route": "aside", "intent": null,
-            "route_reason": "a remark", "reading": reading, "words": "words d\n"})
+            "unit": null, "finding": null, "route_reason": "a remark", "reading": reading, "words": "words d\n"})
     );
     assert_eq!(
         (
@@ -1239,21 +1271,29 @@ fn r20_list_answers_the_requests_as_stored_in_their_order() {
 // spec: specs/ap/request.md#R21
 #[test]
 fn r21_list_text_prints_one_block_per_request() {
-    let row = |route: &str, intent: Value, reason: Value, verified: bool, truncated: bool| {
-        json!({"request": "k", "topic": "walk/one", "kind": "order", "said_at": "2026-11-16T03:04:05Z",
-            "words_verified": verified, "truncated": truncated, "route": route, "intent": intent,
-            "route_reason": reason, "reading": "the reading", "words": "two\nlines "})
+    let row = |route: &str, key: Value, reason: Value, verified: bool, truncated: bool| {
+        let mut r = json!({"request": "k", "topic": "walk/one", "kind": "order", "said_at": "2026-11-16T03:04:05Z",
+            "words_verified": verified, "truncated": truncated, "route": route, "intent": null,
+            "unit": null, "finding": null, "route_reason": reason, "reading": "the reading", "words": "two\nlines "});
+        if ["intent", "unit", "finding"].contains(&route) {
+            r[route] = key;
+        }
+        r
     };
     let v = json!({"requests": [
         row("unrouted", Value::Null, Value::Null, true, false),
         row("intent", json!("open"), Value::Null, false, true),
         row("aside", Value::Null, json!("a remark"), true, false),
+        row("unit", json!("u1"), Value::Null, true, false),
+        row("finding", json!("f1"), Value::Null, true, false),
     ]});
     assert_eq!(
         text(&v),
         "2026-11-16T03:04:05Z order walk/one -> unrouted\nthe reading\ntwo\nlines \n\n\
          2026-11-16T03:04:05Z order walk/one [not verified] [truncated] -> intent open\nthe reading\ntwo\nlines \n\n\
-         2026-11-16T03:04:05Z order walk/one -> aside (a remark)\nthe reading\ntwo\nlines \n\n"
+         2026-11-16T03:04:05Z order walk/one -> aside (a remark)\nthe reading\ntwo\nlines \n\n\
+         2026-11-16T03:04:05Z order walk/one -> unit u1\nthe reading\ntwo\nlines \n\n\
+         2026-11-16T03:04:05Z order walk/one -> finding f1\nthe reading\ntwo\nlines \n\n"
     );
     assert_eq!(text(&json!({"requests": []})), "");
 }
@@ -1335,4 +1375,175 @@ fn an_unreadable_store_answer_is_a_refusal_in_the_one_form() {
         (e.code.as_str(), e.field.as_str(), e.after),
         ("store_answer_unreadable", "record", None)
     );
+}
+/// A request of `rec()` (`rq3`) routed to `route`/`member` = `value` as another writer may have left it.
+fn routed_by_hand(f: &mut F, route: &str, value: Value) -> Value {
+    let key = run(f, &rec())["request"].clone();
+    let o = f.objects.get_mut(key.as_str().unwrap()).unwrap();
+    o["route"] = json!(route);
+    if !value.is_null() {
+        o[route] = value;
+    }
+    key
+}
+// spec: specs/ap/request.md#R16
+#[test]
+fn r16_an_inherited_route_to_a_unit_or_a_finding_is_applied_again() {
+    for (route, action) in [
+        ("unit", "route_request_to_unit"),
+        ("finding", "route_request_to_finding"),
+    ] {
+        let mut f = F::new();
+        let target = oid(route, &format!("{}1", &route[..1]));
+        let old = routed_by_hand(&mut f, route, target.clone());
+        let v = run(&mut f, &supersede(&old, from("2026-11-16T03:04:05")));
+        let new = v["request"].as_str().unwrap();
+        assert_eq!(v["route"], "applied", "{route}");
+        assert_eq!(f.names().last().unwrap(), &format!("apply {action}"));
+        assert_eq!(
+            applied_params(&f, action),
+            json!({"request": oid("request", new), route: target})
+        );
+        assert_eq!(f.calls.last().unwrap().1["request_id"], "m2-route");
+        assert_eq!(
+            (&f.request(new)["route"], &f.request(new)[route]),
+            (&json!(route), &target)
+        );
+        // Repeated whole: nothing written.
+        let n = f.objects.clone();
+        let again = run(&mut f, &supersede(&old, from("2026-11-16T03:04:05")));
+        assert_eq!(again["route"], "already_applied");
+        assert!(f.objects == n);
+    }
+}
+// spec: specs/ap/request.md#R18
+#[test]
+fn r18_route_and_the_member_route_take_a_unit_or_a_finding() {
+    for (route, key, action) in [
+        ("unit", "u1", "route_request_to_unit"),
+        ("finding", "f1", "route_request_to_finding"),
+    ] {
+        let mut f = F::new();
+        let request = run(&mut f, &rec())["request"].clone();
+        let q = json!({"op": "route", "request_id": "m9", "agent": "lead", "session": "s1", "request": request, route: key});
+        let v = run(&mut f, &q);
+        assert_eq!(v, json!({"request": request, "route": "applied"}));
+        assert_eq!(
+            applied_params(&f, action),
+            json!({"request": oid("request", request.as_str().unwrap()), route: oid(route, key)})
+        );
+        assert_eq!(f.calls.last().unwrap().1["request_id"], "m9-route");
+        // An unknown key: the store's refusal, passed on, with nothing checked before.
+        let e = refusal(
+            &mut f,
+            &with(
+                with(q, "request_id", json!("m10")),
+                route,
+                json!("none-such"),
+            ),
+        );
+        let code = format!("unknown_{route}");
+        assert_eq!(
+            (e.code.as_str(), e.field.as_str(), e.after),
+            (code.as_str(), "route", None)
+        );
+        // The member `route` of `record`: no read before the record; a refusal after it says so.
+        let mut f = F::new();
+        let v = run(&mut f, &with(rec(), "route", json!({route: key})));
+        assert_eq!(v["route"], "applied");
+        assert_eq!(
+            f.names(),
+            [
+                "apply record_request",
+                "get request",
+                &format!("apply {action}")
+            ]
+        );
+        assert_eq!(f.request("rq3")[route], oid(route, key));
+        let mut f = F::new();
+        let e = refusal(&mut f, &with(rec(), "route", json!({route: "none-such"})));
+        assert_eq!(
+            (e.code.as_str(), e.after, e.request.as_deref()),
+            (code.as_str(), Some("record"), Some("rq3"))
+        );
+    }
+}
+// spec: specs/ap/request.md#R24
+#[test]
+fn r24_a_route_the_verb_does_not_know_is_refused_never_read_as_unrouted() {
+    let mut f = F::new();
+    let old = routed_by_hand(&mut f, "elsewhere", Value::Null);
+    let e = refusal(&mut f, &supersede(&old, from("2026-11-16T03:04:05")));
+    let new = f
+        .requests()
+        .iter()
+        .find(|r| r.1["status"] == "current")
+        .unwrap()
+        .0
+        .clone();
+    assert_eq!(
+        (
+            e.code.as_str(),
+            e.field.as_str(),
+            &e.detail,
+            e.after,
+            e.request.as_deref()
+        ),
+        (
+            "route_unknown",
+            "supersedes",
+            &json!("elsewhere"),
+            Some("supersede"),
+            Some(new.as_str())
+        )
+    );
+    assert_eq!(f.names().last().unwrap(), "get request");
+    // The same call with a route finishes it.
+    let q = with(
+        from("2026-11-16T03:04:05"),
+        "route",
+        json!({"aside": "routed by hand"}),
+    );
+    let v = run(&mut f, &supersede(&old, q));
+    assert_eq!(
+        (v["record"].as_str(), v["route"].as_str()),
+        (Some("already_applied"), Some("applied"))
+    );
+    assert_eq!(f.request(&new)["route"], "aside");
+}
+// spec: specs/ap/request.md#R20
+#[test]
+fn r20_list_names_the_unit_or_finding_a_request_is_routed_to() {
+    let mut f = F::new();
+    let q = |id: &str, at: &str, route: Value| {
+        let q = json!({"op": "record", "request_id": id, "agent": "lead", "session": "s1",
+            "topic": "walk/one", "kind": "order", "reading": "r", "words": id, "said_at": at});
+        with(q, "route", route)
+    };
+    run(
+        &mut f,
+        &q("a", "2026-11-16T03:00:00Z", json!({"unit": "u1"})),
+    );
+    run(
+        &mut f,
+        &q("b", "2026-11-16T02:00:00Z", json!({"finding": "f1"})),
+    );
+    let v = run(&mut f, &json!({"op": "list", "topic": "walk/one"}));
+    let pick = |r: &Value| {
+        (
+            r["route"].clone(),
+            r["intent"].clone(),
+            r["unit"].clone(),
+            r["finding"].clone(),
+        )
+    };
+    assert_eq!(
+        pick(&v["requests"][0]),
+        (json!("unit"), Value::Null, json!("u1"), Value::Null)
+    );
+    assert_eq!(
+        pick(&v["requests"][1]),
+        (json!("finding"), Value::Null, Value::Null, json!("f1"))
+    );
+    assert!(text(&v).contains(" -> unit u1\n") && text(&v).contains(" -> finding f1\n"));
 }

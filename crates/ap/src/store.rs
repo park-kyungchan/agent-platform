@@ -117,6 +117,26 @@ pub fn set_request_aside(
 ) -> Result<Applied, Failure> {
     apply(s, store, actor, "set_request_aside", rid, p)
 }
+/// Schema version 11 on: the request answered by a unit.
+pub fn route_request_to_unit(
+    s: &mut impl System,
+    store: Option<&str>,
+    actor: &Actor,
+    rid: String,
+    p: Value,
+) -> Result<Applied, Failure> {
+    apply(s, store, actor, "route_request_to_unit", rid, p)
+}
+/// Schema version 11 on: the request reports a finding.
+pub fn route_request_to_finding(
+    s: &mut impl System,
+    store: Option<&str>,
+    actor: &Actor,
+    rid: String,
+    p: Value,
+) -> Result<Applied, Failure> {
+    apply(s, store, actor, "route_request_to_finding", rid, p)
+}
 /// The fields of the head of one object (`kind`, `key`) by `ont get`, each the value or null; `None`
 /// when the store does not have the object (its answer `unavailable`).
 pub fn get(
