@@ -5896,7 +5896,8 @@ fn pc1_a_block_member_sets_the_stage_and_a_task_value_fills_the_rest() {
     let mut units = pc_units(&u);
     units["accounts"]["claude/opus"] = json!([u.p("a1")]);
     units["accounts"]["claude/verifier"] = json!([u.p("a3"), u.p("a1")]);
-    b["verifier"]["model"] = json!("haiku");
+    // An Opus verifier: both its role key and its model key apply, and the role's decides.
+    b["verifier"]["model"] = json!("opus");
     pc_write(&u, &units, &pc_text(&b));
     let r = ap::unit::compose(&page).unwrap()["request"].clone();
     assert_eq!(
@@ -5911,12 +5912,25 @@ fn pc1_a_block_member_sets_the_stage_and_a_task_value_fills_the_rest() {
     assert_eq!(
         r["verifier"]["account"],
         json!(u.p("a3")),
-        "a verifier by its role"
+        "the role before the model"
     );
     assert_eq!(r["verifier"]["next_accounts"], json!([u.p("a1")]));
+    // A model the block names with brackets has its own key; without a key of its own the
+    // runtime's decides.
+    units["accounts"]
+        .as_object_mut()
+        .unwrap()
+        .remove("claude/verifier");
+    units["accounts"]["claude/opus[1m]"] = json!([u.p("a3")]);
+    b["verifier"]["model"] = json!("opus[1m]");
     b["implementer"]["model"] = json!("sonnet");
     pc_write(&u, &units, &pc_text(&b));
     let r = ap::unit::compose(&page).unwrap()["request"].clone();
+    assert_eq!(
+        r["verifier"]["account"],
+        json!(u.p("a3")),
+        "a bracketed model's key"
+    );
     assert_eq!(
         r["implementer"]["account"],
         json!(u.p("a2")),
@@ -5990,6 +6004,16 @@ fn pc1_each_refusal_of_the_composition_is_before_any_effect() {
     with(
         "unknown runtime of a role key",
         &|v| v["accounts"]["other/verifier"] = json!([p]),
+        "units.accounts",
+    );
+    with(
+        "the fixer's key",
+        &|v| v["accounts"]["claude/fixer"] = json!([p]),
+        "units.accounts",
+    );
+    with(
+        "a name ap run does not take",
+        &|v| v["accounts"]["claude/opus 1"] = json!([p]),
         "units.accounts",
     );
     with(

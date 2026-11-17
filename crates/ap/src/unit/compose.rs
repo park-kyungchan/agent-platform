@@ -54,14 +54,17 @@ fn check(units: &Value) -> Result<(), Failure> {
             .is_some_and(|o| o.iter().all(|(k, v)| ok(k, v)))
     };
     let seconds = |v: &Value| v.as_u64().is_some_and(|n| (1..=86_400).contains(&n));
-    // A key is a runtime, or `<runtime>/<role or model>`: `claude/verifier`, `claude/opus`.
+    // A key is a runtime, or `<runtime>/<role or model>`: `claude/verifier`, `claude/opus`. The
+    // name takes the characters `ap run` takes in a model; `fixer` is refused, the fixer having the
+    // implementer's accounts.
     let accounts = |key: &str, v: &Value| {
         let (runtime, rest) = key.split_once('/').unwrap_or((key, ""));
         let name = |r: &str| {
             !r.is_empty()
-                && r.len() <= 64
+                && r.len() <= 40
+                && r != "fixer"
                 && r.bytes()
-                    .all(|c| c.is_ascii_alphanumeric() || b"-._".contains(&c))
+                    .all(|c| c.is_ascii_alphanumeric() || b"._-[]".contains(&c))
         };
         let list = v.as_array().filter(|l| !l.is_empty() && l.iter().all(path));
         let one = !matches!(runtime, "codex" | "muse") || list.is_some_and(|l| l.len() == 1);
