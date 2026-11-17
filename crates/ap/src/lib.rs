@@ -23,3 +23,5 @@ pub mod row;
 pub mod store;
 
 pub mod request;
+
+pub mod intent;
