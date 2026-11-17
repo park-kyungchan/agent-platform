@@ -1,0 +1,279 @@
+[
+ {
+  "id": "s01",
+  "situation": "As a Lead you must start one implementer session on Claude Code in a Git worktree, without a terminal UI, and get a record of the run that another command can read. Which command of this host do you use, and where is its contract?",
+  "must": [
+   {
+    "fact": [
+     "ap run"
+    ]
+   },
+   {
+    "fact": [
+     "crates/ap/README.md"
+    ]
+   }
+  ],
+  "wrong": []
+ },
+ {
+  "id": "s02",
+  "situation": "A Claude Code session without a terminal UI must decide tool approvals by itself, with no person present, without switching every check off. Which flag and value?",
+  "must": [
+   {
+    "fact": [
+     "--permission-mode auto"
+    ]
+   }
+  ],
+  "wrong": []
+ },
+ {
+  "id": "s03",
+  "situation": "A Claude Code worker without a terminal UI must compact its context at 400000 tokens, although the settings file of its account sets 600000. How do you start it so that this one run gets 400000?",
+  "must": [
+   {
+    "fact": [
+     "CLAUDE_CODE_AUTO_COMPACT_WINDOW"
+    ]
+   },
+   {
+    "fact": [
+     "--settings"
+    ]
+   }
+  ],
+  "wrong": []
+ },
+ {
+  "id": "s04",
+  "situation": "Run the prompt file /tmp/p.md through Muse Code without a terminal UI, in the workspace /tmp/w, with its events as JSON lines and with a session id you choose.",
+  "must": [
+   {
+    "fact": [
+     "muse exec"
+    ]
+   },
+   {
+    "fact": [
+     "--prompt-file"
+    ]
+   },
+   {
+    "fact": [
+     "--json"
+    ]
+   },
+   {
+    "fact": [
+     "--session-id"
+    ]
+   },
+   {
+    "fact": [
+     "--workspace"
+    ]
+   }
+  ],
+  "wrong": []
+ },
+ {
+  "id": "s05",
+  "situation": "The home settings of Muse Code register MCP servers. One run without a terminal UI must start none of them. How?",
+  "must": [
+   {
+    "fact": [
+     "withheld"
+    ]
+   },
+   {
+    "fact": [
+     "--trust-workspace"
+    ]
+   },
+   {
+    "fact": [
+     "--yolo"
+    ]
+   }
+  ],
+  "wrong": []
+ },
+ {
+  "id": "s06",
+  "situation": "For a Muse Code run without a terminal UI: which setting lets a model decide a tool approval without a person, and which flag removes approval and sandbox altogether?",
+  "must": [
+   {
+    "fact": [
+     "--approval-judge"
+    ]
+   },
+   {
+    "fact": [
+     "--yolo"
+    ]
+   }
+  ],
+  "wrong": []
+ },
+ {
+  "id": "s07",
+  "situation": "A Muse Code run without a terminal UI must compact its context at about 600000 tokens. Which flags do you set, and how do you compute their values?",
+  "must": [
+   {
+    "fact": [
+     "--context-compaction-soft-threshold"
+    ]
+   },
+   {
+    "fact": [
+     "--context-compaction-hard-threshold"
+    ]
+   }
+  ],
+  "wrong": []
+ },
+ {
+  "id": "s08",
+  "situation": "Yesterday's Muse Code session ran without a terminal UI. Give it a second prompt in the same session, again without a terminal UI.",
+  "must": [
+   {
+    "fact": [
+     "muse exec"
+    ]
+   },
+   {
+    "fact": [
+     "--session-id"
+    ]
+   },
+   {
+    "fact": [
+     "--workspace"
+    ]
+   }
+  ],
+  "wrong": []
+ },
+ {
+  "id": "s09",
+  "situation": "Run one prompt through the Antigravity CLI without a terminal UI, with its events as JSON lines and without permission prompts.",
+  "must": [
+   {
+    "fact": [
+     "--print"
+    ]
+   },
+   {
+    "fact": [
+     "--output-format stream-json"
+    ]
+   },
+   {
+    "fact": [
+     "--dangerously-skip-permissions"
+    ]
+   }
+  ],
+  "wrong": []
+ },
+ {
+  "id": "s10",
+  "situation": "The Antigravity CLI has MCP servers registered. One run without a terminal UI must not start them. What can you do for one run, and what must you not do?",
+  "must": [
+   {
+    "fact": [
+     "HOME="
+    ]
+   },
+   {
+    "fact": [
+     "mcp_config.json"
+    ]
+   }
+  ],
+  "wrong": []
+ },
+ {
+  "id": "s11",
+  "situation": "Continue an earlier Antigravity conversation with a second prompt, without a terminal UI.",
+  "must": [
+   {
+    "fact": [
+     "--conversation"
+    ]
+   }
+  ],
+  "wrong": []
+ },
+ {
+  "id": "s12",
+  "situation": "After a run without a terminal UI you must read what the session loaded and used. Where is the session record of Claude Code, of Muse Code and of the Antigravity CLI?",
+  "must": [
+   {
+    "fact": [
+     ".claude/projects"
+    ]
+   },
+   {
+    "fact": [
+     ".local/share/muse/sessions"
+    ]
+   },
+   {
+    "fact": [
+     ".gemini/antigravity-cli/conversations"
+    ]
+   }
+  ],
+  "wrong": []
+ },
+ {
+  "id": "s13",
+  "situation": "A Muse Code run without a terminal UI must run without the CLI's sandbox, but every tool call must still go through approval and the workspace must not become trusted. Which flag do you pass?",
+  "must": [
+   {
+    "fact": [
+     "--disable-sandbox"
+    ]
+   }
+  ],
+  "wrong": []
+ },
+ {
+  "id": "s14",
+  "situation": "You are about to start an Antigravity CLI run without a terminal UI and need the exact model names it accepts. Which command prints them?",
+  "must": [
+   {
+    "fact": [
+     "agy models"
+    ]
+   }
+  ],
+  "wrong": []
+ },
+ {
+  "id": "s15",
+  "situation": "An Antigravity CLI run without a terminal UI must end its output after at most 15 minutes. Which flag sets that bound?",
+  "must": [
+   {
+    "fact": [
+     "--print-timeout"
+    ]
+   }
+  ],
+  "wrong": []
+ },
+ {
+  "id": "s16",
+  "situation": "A Claude Code run without a terminal UI must load none of the account's skills and slash commands, but must still read CLAUDE.md. Which flag do you pass?",
+  "must": [
+   {
+    "fact": [
+     "--disable-slash-commands"
+    ]
+   }
+  ],
+  "wrong": []
+ }
+]
