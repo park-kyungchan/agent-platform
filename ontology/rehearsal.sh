@@ -771,7 +771,8 @@ print('v9_gate_rows_complete')
 PY
 
 # Version 10 on a second store: the user's rows of version 9 carried by ontology/migrate, then the walk of the
-# requests, intents and criteria.
+# requests, intents and criteria, on version 10 pinned in Git. Then version 11, the repository's file, over the
+# objects made under version 10, and the walk of the units, runs and findings.
 mkdir -- "$rehearsal_root/v10"
 python3 - "$ont_binary" "$repo" "$rehearsal_root/v10/store.sqlite" <<'PY'
 import datetime, hashlib, json, os, pathlib, subprocess, sys
@@ -794,16 +795,17 @@ def tick():
     global now
     now += 1
 def fingerprint(): return [(p.name, hashlib.sha256(p.read_bytes()).hexdigest() if p.exists() else None) for p in [pathlib.Path(store), pathlib.Path(store).with_name('edits.jsonl')]]
+phase = 'v10'
 def apply(action, rid, parameters, failure=None, role=None):
     before = fingerprint()
-    r = call(['action', 'apply'], dict(action_type=action, request_id='v10-' + action + '-' + rid, parameters=parameters), 2 if failure else 0, role=role)
+    r = call(['action', 'apply'], dict(action_type=action, request_id=phase + '-' + action + '-' + rid, parameters=parameters), 2 if failure else 0, role=role)
     if failure:
         expected = {failure} if isinstance(failure, str) else set(failure)
         actual = set(r['failed']) if r['code'] == 'submission_criteria' else {r['code']}
         assert actual == expected, (action, rid, expected, r)
         assert fingerprint() == before
     else: assert r['outcome'] == 'applied', r
-    print('gate_row=v10-' + action + '-' + rid + ' expected=' + (','.join(sorted(expected)) if failure else 'admitted'))
+    print('gate_row=' + phase + '-' + action + '-' + rid + ' expected=' + (','.join(sorted(expected)) if failure else 'admitted'))
     return r
 def install(commit, digest):
     pinned = subprocess.check_output(['git', '-C', repo, 'show', commit + ':ontology/work.schema.json'], timeout=10)
@@ -832,8 +834,8 @@ apply('triage_decision', 'v9-triaged', dict(decision=with_triage, triage='none',
 lead_row = row('v9-lead', 'v10-lead-order', who='lead')
 decisions = [no_words, with_words, with_triage, lead_row]
 v9_before = [obj(i) for i in [task, *decisions]]
-schema = json.loads(pathlib.Path(repo, 'ontology/work.schema.json').read_text())
-call(['schema', 'install', str(pathlib.Path(repo, 'ontology/work.schema.json'))])
+# Version 10 is pinned in Git by the commit of main that holds it; the repository's file comes after its walk.
+install('e8e0286d81a5020aed14d9232156cc8c1de0a5e4', 'd10e4f5dec9aadcf3dbc9d4be63655196743c09e17adf4e3b3041d3d847af388')
 assert [obj(i) for i in [task, *decisions]] == v9_before
 print('gate_row=v10-v9-rows-unchanged expected=admitted objects=' + str(len(v9_before)))
 # The migration, run as itself: delivery skips a file that is not executable.
@@ -861,11 +863,16 @@ call(['action', 'apply'], dict(action_type='record_request', request_id='migrate
 [third_request] = carried(third); assert fields(third_request)['route'] == 'unrouted'
 assert migrate(9, 10) == dict(carried=1, already=2)
 assert fields(third_request)['route'] == 'aside' and fields(third_request)['route_reason'] == 'carried from version 9'
+# A carried row triaged with the old verb between two runs: the second run's aside would carry another reason
+# under the same request id (request_id_reused); its record answered already_applied, so the row is already done.
+apply('triage_decision', 'v9-after-carry', dict(decision=third, triage='none', reason='a name, kept'))
 unchanged = fingerprint()
-for before, after in [(9, schema['version'] + 1), (10, 10), (10, 9)]:
+assert migrate(9, 10) == dict(carried=0, already=3)
+assert fingerprint() == unchanged and fields(third_request)['route_reason'] == 'carried from version 9'
+for before, after in [(9, 12), (10, 10), (10, 9)]:
     assert migrate(before, after, 2) == dict(status='unknown_pair')
 assert fingerprint() == unchanged
-assert migrate(schema['version'] - 1, schema['version']) == dict(carried=0, already=3)
+assert migrate(9, 10) == dict(carried=0, already=3)
 assert [obj(i) for i in decisions] == decided
 print('v10_migration_rows_complete')
 # The walk. Each refusal row is before the action it guards; a refusal writes nothing.
@@ -968,46 +975,43 @@ apply('set_request_aside', 'reason-empty', dict(request=r1, reason=''), 'reason_
 tick(); apply('set_request_aside', 'r1', dict(request=r1, reason='a question answered at once'))
 f = fields(r1); assert f['route'] == 'aside' and f['route_reason'] == 'a question answered at once' and f.get('intent') is None and f['routed_at'] == stamp() and f['words'] == 'Invented words of r1.', f
 print('v10_walk_rows_complete')
-# The role of the actor: an engine that knows it ships the verb log.
-if 'log' in [c['command'] for c in json.loads(subprocess.check_output([binary, '--help'], text=True, timeout=10))['commands']]:
-    tick(); assumed = oid('intent', 'widget-assume'); apply('draft_intent', 'assume', dict(dp, intent=assumed, origin=request('o-assume', 'order')))
-    apply('add_criterion', 'assume', dict(cp, intent=assumed))
-    apply('assume_intent', 'no-role', dict(intent=assumed, reason='the user is away'), 'not_the_lead')
-    apply('assume_intent', 'reason-empty', dict(intent=assumed, reason=''), 'reason_empty', role='lead')
-    apply('assume_intent', 'lead', dict(intent=assumed, reason='the user is away'), role='lead')
-    f = fields(assumed); assert f['status'] == 'assumed' and f['assumed_reason'] == 'the user is away', f
-    apply('assume_intent', 'again', dict(intent=assumed, reason='again'), 'intent_not_draft', role='lead')
-    tick(); order, delegation = request('not-a-delegation', 'order'), request('delegation', 'delegation')
-    apply('set_request_aside', 'delegation', dict(request=delegation, reason='it covers the widget intents'))
-    covered = oid('intent', 'widget-delegated'); apply('draft_intent', 'delegated', dict(dp, intent=covered, origin=request('o-delegated', 'order')))
-    dlp = dict(intent=assumed, delegation=delegation, reason='the delegation covers widget intents')
-    apply('confirm_intent_delegated', 'order', dict(dlp, delegation=order), 'not_a_delegation', role='lead')
-    apply('confirm_intent_delegated', 'no-role', dlp, 'not_the_lead')
-    apply('confirm_intent_delegated', 'reason-empty', dict(dlp, reason=''), 'reason_empty', role='lead')
-    apply('confirm_intent_delegated', 'no-criterion', dict(dlp, intent=covered), 'no_criterion', role='lead')
-    apply('confirm_intent_delegated', 'assumed', dlp, role='lead')
-    f = fields(assumed); assert f['status'] == 'confirmed' and f['confirmed_by'] == delegation and f['confirmed_delegated'] is True and f['confirmed_at'] == stamp(), f
-    apply('confirm_intent_delegated', 'confirmed', dlp, 'intent_not_open', role='lead')
-    apply('route_request', 'delegation-used', dict(request=delegation, intent=covered), 'request_confirms_an_intent')
-    apply('add_criterion', 'delegated', dict(cp, intent=covered))
-    early_stop = request('early-stop', 'stop', said=stamp(now - 10))
-    tick(); stop, later_preference = request('stop', 'stop'), request('later-preference', 'preference')
-    apply('end_delegation', 'not-a-delegation', dict(request=order, stopped_by=stop), 'not_a_delegation')
-    apply('end_delegation', 'preference', dict(request=delegation, stopped_by=later_preference), 'by_not_the_users_word')
-    apply('end_delegation', 'earlier', dict(request=delegation, stopped_by=early_stop), 'by_not_later')
-    ended = apply('end_delegation', 'ended', dict(request=delegation, stopped_by=stop))
-    # The action changed the delegation and nothing else: the user's later word stays current.
-    assert [(e['id'], e['change']) for e in ended['edits']] == [(delegation, 'update')], ended
-    assert fields(delegation)['status'] == 'superseded' and fields(stop)['status'] == 'current' and fields(assumed)['confirmed_by'] == delegation
-    apply('confirm_intent_delegated', 'ended', dict(dlp, intent=covered), 'not_a_delegation', role='lead')
-    apply('end_delegation', 'again', dict(request=delegation, stopped_by=stop), 'not_a_delegation')
-    refused = call(['log'], dict(outcome='refused', action_type='confirm_intent', parameters=True))['rows']
-    assert any(r['code'] == 'submission_criteria' and r.get('failed') == ['by_not_routed_here'] and r['parameters']['by'] == r2 for r in refused), refused
-    led = call(['log'], dict(action_type='assume_intent', actor=dict(role='lead')))['rows']
-    assert len(led) == 1 and led[0]['actor']['role'] == 'lead', led
-    print('v10_role_rows_complete')
-else:
-    print('rehearsal: skipped without the role of the actor: assume_intent, confirm_intent_delegated, end_delegation, ont log', file=sys.stderr)
+# The role of the actor: the engine of ontology/ENGINE-PIN knows it and ships the verb log.
+tick(); assumed = oid('intent', 'widget-assume'); apply('draft_intent', 'assume', dict(dp, intent=assumed, origin=request('o-assume', 'order')))
+apply('add_criterion', 'assume', dict(cp, intent=assumed))
+apply('assume_intent', 'no-role', dict(intent=assumed, reason='the user is away'), 'not_the_lead')
+apply('assume_intent', 'reason-empty', dict(intent=assumed, reason=''), 'reason_empty', role='lead')
+apply('assume_intent', 'lead', dict(intent=assumed, reason='the user is away'), role='lead')
+f = fields(assumed); assert f['status'] == 'assumed' and f['assumed_reason'] == 'the user is away', f
+apply('assume_intent', 'again', dict(intent=assumed, reason='again'), 'intent_not_draft', role='lead')
+tick(); order, delegation = request('not-a-delegation', 'order'), request('delegation', 'delegation')
+apply('set_request_aside', 'delegation', dict(request=delegation, reason='it covers the widget intents'))
+covered = oid('intent', 'widget-delegated'); apply('draft_intent', 'delegated', dict(dp, intent=covered, origin=request('o-delegated', 'order')))
+dlp = dict(intent=assumed, delegation=delegation, reason='the delegation covers widget intents')
+apply('confirm_intent_delegated', 'order', dict(dlp, delegation=order), 'not_a_delegation', role='lead')
+apply('confirm_intent_delegated', 'no-role', dlp, 'not_the_lead')
+apply('confirm_intent_delegated', 'reason-empty', dict(dlp, reason=''), 'reason_empty', role='lead')
+apply('confirm_intent_delegated', 'no-criterion', dict(dlp, intent=covered), 'no_criterion', role='lead')
+apply('confirm_intent_delegated', 'assumed', dlp, role='lead')
+f = fields(assumed); assert f['status'] == 'confirmed' and f['confirmed_by'] == delegation and f['confirmed_delegated'] is True and f['confirmed_at'] == stamp(), f
+apply('confirm_intent_delegated', 'confirmed', dlp, 'intent_not_open', role='lead')
+apply('route_request', 'delegation-used', dict(request=delegation, intent=covered), 'request_confirms_an_intent')
+apply('add_criterion', 'delegated', dict(cp, intent=covered))
+early_stop = request('early-stop', 'stop', said=stamp(now - 10))
+tick(); stop, later_preference = request('stop', 'stop'), request('later-preference', 'preference')
+apply('end_delegation', 'not-a-delegation', dict(request=order, stopped_by=stop), 'not_a_delegation')
+apply('end_delegation', 'preference', dict(request=delegation, stopped_by=later_preference), 'by_not_the_users_word')
+apply('end_delegation', 'earlier', dict(request=delegation, stopped_by=early_stop), 'by_not_later')
+ended = apply('end_delegation', 'ended', dict(request=delegation, stopped_by=stop))
+# The action changed the delegation and nothing else: the user's later word stays current.
+assert [(e['id'], e['change']) for e in ended['edits']] == [(delegation, 'update')], ended
+assert fields(delegation)['status'] == 'superseded' and fields(stop)['status'] == 'current' and fields(assumed)['confirmed_by'] == delegation
+apply('confirm_intent_delegated', 'ended', dict(dlp, intent=covered), 'not_a_delegation', role='lead')
+apply('end_delegation', 'again', dict(request=delegation, stopped_by=stop), 'not_a_delegation')
+refused = call(['log'], dict(outcome='refused', action_type='confirm_intent', parameters=True))['rows']
+assert any(r['code'] == 'submission_criteria' and r.get('failed') == ['by_not_routed_here'] and r['parameters']['by'] == r2 for r in refused), refused
+led = call(['log'], dict(action_type='assume_intent', actor=dict(role='lead')))['rows']
+assert len(led) == 1 and led[0]['actor']['role'] == 'lead', led
+print('v10_role_rows_complete')
 # The four views.
 open_keys = sorted(o['id']['native_key'] for o in call(['search'], dict(object_type='intent', where={'in': ['status', ['draft', 'assumed', 'confirmed']]}))['objects'])
 view = call(['render'], dict(view='intents_open', args={}))
@@ -1021,6 +1025,362 @@ view = call(['render'], dict(view='requests_unrouted', args={}))
 assert view['rows'] == len(unrouted) > 0 and 'v10 v10-widget-colour' not in view['markdown'] and 'The user corrects r2.' in view['markdown'], view
 print(view['markdown'])
 print('v10_gate_rows_complete')
+# Version 11: the repository's file over the objects made under version 10.
+v10_objects = [task, *decisions, third, *[o['id'] for t in ('request', 'intent', 'criterion') for o in call(['search'], dict(object_type=t, limit=1000))['objects']]]
+v10_before = [obj(i) for i in v10_objects]
+v10_views = [(view, args, call(['render'], dict(view=view, args=args))) for view, args in [('intents_open', {}), ('criteria_of_intent', dict(intent='widget-board')),
+             ('requests_by_topic', dict(topic='v10-widget-colour')), ('requests_unrouted', {})]]
+schema = json.loads(pathlib.Path(repo, 'ontology/work.schema.json').read_text())
+assert schema['version'] == 11
+call(['schema', 'install', str(pathlib.Path(repo, 'ontology/work.schema.json'))])
+assert [obj(i) for i in v10_objects] == v10_before
+for view, args, before in v10_views:
+    answer = call(['render'], dict(view=view, args=args))
+    assert answer['rows'] == before['rows'] and answer['markdown'] == before['markdown'].replace('schema=work@10', 'schema=work@11'), view
+print('gate_row=v11-v10-objects-and-views-unchanged expected=admitted objects=' + str(len(v10_objects)) + ' views=' + str(len(v10_views)))
+sizes = []
+for name in ('ont_describe', 'ont_action_list'):
+    wire = subprocess.run([binary, '--store', store, 'mcp'], input=json.dumps(dict(jsonrpc='2.0', id=1, method='tools/call', params=dict(name=name, arguments={}))) + '\n', text=True, capture_output=True, timeout=60)
+    answer = json.loads(wire.stdout.splitlines()[0])['result']; assert wire.returncode == 0 and not answer['isError'], answer
+    sizes.append(len(answer['content'][0]['text'].encode())); assert sizes[-1] <= 262144, (name, sizes[-1])
+print('v11_mcp_bytes=' + ','.join(map(str, sizes)), file=sys.stderr)
+unchanged = fingerprint()
+assert migrate(10, 11) == dict(carried=0, already=0)
+assert migrate(9, 11) == dict(carried=0, already=3)
+assert migrate(11, 12, 2) == dict(status='unknown_pair')
+assert fingerprint() == unchanged and [obj(i) for i in v10_objects] == v10_before
+print('v11_migration_rows_complete')
+phase = 'v11'
+# Version 10's actions on objects made under version 10.
+tick(); covered_word = request('covered-word', 'decision'); apply('route_request', 'covered', dict(request=covered_word, intent=covered))
+apply('confirm_intent', 'covered', dict(intent=covered, by=covered_word)); assert fields(covered)['status'] == 'confirmed'
+apply('route_request', 'v10-confirming', dict(request=r4, intent=covered), 'request_confirms_an_intent')
+[covered_criterion] = [o['id'] for o in call(['search'], dict(object_type='criterion', where={'eq': ['intent', covered]}))['objects']]
+apply('close_intent', 'covered-open', dict(intent=covered, reason='seen'), 'criterion_not_passed')
+apply('check_criterion', 'covered', dict(criterion=covered_criterion, state='pass', evidence='fixture-check: 3 widgets'))
+apply('close_intent', 'covered', dict(intent=covered, reason='fixture-check passed')); assert fields(covered)['status'] == 'met'
+print('v11_v10_actions_complete')
+
+# The walk of units. Each refusal row is before the action it guards; a refusal writes nothing.
+def digest(text): return hashlib.sha256(text.encode()).hexdigest()
+H1, H2, H3, MERGED = '1' * 40, '2' * 40, '3' * 40, 'e' * 40
+PROMPT = dict(prompt='/home/palantirkc/work/fixture/PROMPT.md', prompt_sha256='b' * 64)
+REPORT = dict(report='/home/palantirkc/work/fixture/REPORT.md', report_sha256='c' * 64)
+REPO = 'fixture-owner/widgets'
+page = dict(objective='The invented widget board lists every widget.', acceptance=[dict(check='fixture-check --count 3', kind='fails_on_base')], write_set=['src/**'],
+            implementer=dict(runtime='fixture-cli', model='fixture-model', effort='high'), verifier=dict(runtime='fixture-cli', model='fixture-model', effort='xhigh'), repository=REPO)
+def unit(key): return oid('unit', key)
+def review(rid, kind, head, verdict='accept', session='fixture-verifier', close=True, **subject):
+    tick()  # a review counts only when it started later than the unit's last amendment
+    started = created(apply('start_unit_review', rid, dict(dict(task=task, kind=kind, head=head, model='fixture-model', effort='xhigh', **PROMPT), **subject)), 'review')
+    if close:
+        given = dict(review=started, verdict=verdict, session=session, **REPORT)
+        if 'unit' in subject: given['unit'] = subject['unit']
+        apply('close_unit_review', rid, given)
+    return started
+def hold(rid, **on): return created(apply('set_hold_on', rid, dict(task=task, effect='fixture effect ' + rid, until='the fixture says so', scope='the fixture', **on)), 'hold')
+def lift(rid, h): apply('lift_hold', rid, dict(hold=h, reason='the fixture said so'))
+# The lane small.
+tick(); origin = request('small-origin', 'order', topic='v11-small'); sp = dict(page, unit=unit('fixture-small'), lane='small', origin=origin, **{'class': 'plain'})
+apply('add_unit', 'small-no-origin', {k: v for k, v in sp.items() if k != 'origin'}, 'origin_required')
+apply('add_unit', 'small-superseded', dict(sp, origin=r2), 'origin_not_current')
+apply('add_unit', 'small-contract', dict(sp, **{'class': 'contract'}), 'small_must_be_plain')
+apply('add_unit', 'small-no-repository', dict(sp, repository=''), 'small_needs_one_repository_and_a_write_set')
+apply('add_unit', 'small-no-write-set', dict(sp, write_set=[]), 'small_needs_one_repository_and_a_write_set')
+apply('add_unit', 'small-objective-empty', dict(sp, objective=''), 'objective_empty')
+apply('add_unit', 'small-itself', dict(sp, depends_on=[unit('fixture-small')]), 'depends_on_itself')
+small = unit('fixture-small'); apply('add_unit', 'small', sp)
+f = fields(small)
+assert f['state'] == 'draft' and f['rounds'] == 0 and f['writers'] == [] and f['added_at'] == f['amended_at'] == stamp() and f['origin'] == origin and f['lane'] == 'small', f
+apply('add_unit', 'small-same-key', dict(sp, origin=request('small-origin-2', 'order', topic='v11-small')), 'revision_conflict')
+apply('add_unit', 'small-second', dict(sp, unit=unit('fixture-small-2')), 'request_has_a_live_unit')
+apply('amend_unit', 'small-contract', dict(unit=small, **{'class': 'contract'}), 'small_must_be_plain')
+for member, value in [('origin', origin), ('intent', intent), ('lane', 'objective')]:
+    apply('amend_unit', 'small-' + member, dict(unit=small, **{member: value}), 'invalid_parameter')
+apply('ready_unit', 'small', dict(unit=small)); apply('start_unit', 'small', dict(unit=small))
+assert fields(small)['state'] == 'running' and fields(small)['started_at'] == stamp()
+# The lane objective: an intent that is still a draft holds no unit.
+tick(); gadget = oid('intent', 'gadget-board'); gadget_origin = request('gadget-origin', 'order', topic='v11-gadget')
+apply('draft_intent', 'gadget', dict(dp, intent=gadget, origin=gadget_origin)); gadget_criterion = created(apply('add_criterion', 'gadget', dict(cp, intent=gadget)), 'criterion')
+op = dict(page, lane='objective', intent=gadget, **{'class': 'plain'})
+apply('add_unit', 'no-intent', {k: v for k, v in op.items() if k != 'intent'} | dict(unit=unit('fixture-dep')), 'intent_required')
+apply('add_unit', 'draft-intent', dict(op, unit=unit('fixture-dep')), 'intent_not_open_for_units')
+def confirm(rid, i):
+    tick(); word = request(rid, 'decision', topic='v11-gadget'); apply('route_request', rid, dict(request=word, intent=i)); apply('confirm_intent', rid, dict(intent=i, by=word))
+confirm('gadget-yes', gadget)
+dep, contract = unit('fixture-dep'), unit('fixture-contract')
+apply('add_unit', 'dep', dict(op, unit=dep))
+apply('add_unit', 'contract', dict(op, unit=contract, depends_on=[dep], **{'class': 'contract'}))
+apply('ready_unit', 'dep-unreviewed-plan', dict(unit=dep, intent=gadget), 'plan_not_reviewed')
+apply('start_unit_review', 'plan-no-subject', dict(task=task, kind='plan', head=digest('the plan'), model='fixture-model', effort='xhigh', **PROMPT), 'subject_required')
+apply('start_unit_review', 'plan-unknown-intent', dict(task=task, kind='plan', head=digest('the plan'), model='fixture-model', effort='xhigh', intent=oid('intent', 'absent-v11-intent'), **PROMPT), 'unknown_intent')
+review('plan', 'plan', digest('the plan'), intent=gadget)
+apply('ready_unit', 'contract-unreviewed-page', dict(unit=contract, intent=gadget), 'page_not_reviewed')
+apply('start_unit_review', 'page-no-subject', dict(task=task, kind='page', head=digest('page 1'), model='fixture-model', effort='xhigh', **PROMPT), 'subject_required')
+apply('start_unit_review', 'page-unknown-unit', dict(task=task, kind='page', head=digest('page 1'), model='fixture-model', effort='xhigh', unit=unit('absent-v11-unit'), **PROMPT), 'unknown_unit')
+tick(); review('page-1', 'page', digest('page 1'), unit=contract)
+apply('ready_unit', 'contract-no-intent', dict(unit=contract), 'intent_parameter_required')
+apply('ready_unit', 'contract-other-intent', dict(unit=contract, intent=covered), ('intent_differs', 'intent_not_open_for_units', 'plan_not_reviewed'))
+apply('ready_unit', 'contract', dict(unit=contract, intent=gadget)); assert fields(contract)['state'] == 'ready' and fields(contract)['ready_at'] == stamp()
+apply('ready_unit', 'contract-again', dict(unit=contract, intent=gadget), 'unit_not_draft')
+# An amendment returns the unit to draft; a page review counts only when it started after the last amendment.
+tick(); apply('amend_unit', 'contract-objective-empty', dict(unit=contract, objective=''), 'objective_empty')
+apply('amend_unit', 'contract-itself', dict(unit=contract, depends_on=[contract]), 'depends_on_itself')
+apply('amend_unit', 'contract-1', dict(unit=contract, invariants='The board keeps its order.'))
+f = fields(contract); assert f['state'] == 'draft' and f['amended_at'] == stamp() and f['invariants'] == 'The board keeps its order.' and f['objective'] == page['objective'], f
+apply('ready_unit', 'contract-page-older', dict(unit=contract, intent=gadget), 'page_not_reviewed')
+tick(); early = review('page-2', 'page', digest('page 2'), unit=contract, close=False)
+apply('start_unit_review', 'page-2-twice', dict(task=task, kind='page', head=digest('page 2'), model='fixture-model', effort='xhigh', unit=contract, **PROMPT), 'duplicate_running_review')
+apply('start_unit_review', 'unknown-task', dict(task=oid('task', 'absent-v11-task'), kind='page', head=digest('page 2'), model='fixture-model', effort='xhigh', unit=contract, **PROMPT), 'unknown_task')
+tick(); apply('amend_unit', 'contract-2', dict(unit=contract, notes='Read the board first.'))
+tick(); apply('close_unit_review', 'page-2', dict(review=early, verdict='accept', session='fixture-verifier', unit=contract, **REPORT))
+apply('ready_unit', 'contract-page-started-before', dict(unit=contract, intent=gadget), 'page_not_reviewed')
+tick(); review('page-3', 'page', digest('page 3'), unit=contract)
+apply('ready_unit', 'contract-2', dict(unit=contract, intent=gadget))
+# start_unit: dependencies merged or done, no active hold.
+apply('start_unit', 'contract-dep', dict(unit=contract, intent=gadget), 'dependency_not_merged')
+apply('start_unit', 'dep-draft', dict(unit=dep, intent=gadget), 'unit_not_ready')
+apply('ready_unit', 'dep', dict(unit=dep, intent=gadget)); apply('start_unit', 'dep', dict(unit=dep, intent=gadget))
+apply('record_head', 'contract-not-running', dict(unit=contract, head=H1, writers=['fixture-implementer']), 'unit_not_running')
+apply('record_head', 'dep', dict(unit=dep, head=H1, writers=['fixture-implementer'], pull_request=6, rounds=0))
+apply('accept_unit', 'dep-unreviewed', dict(unit=dep, head=H1), 'head_not_reviewed')
+review('dep', 'packet', H1, unit=dep, repository=REPO); apply('accept_unit', 'dep', dict(unit=dep, head=H1))
+apply('merge_unit', 'dep-no-intent', dict(unit=dep, head=H1, merged_commit=MERGED), 'intent_parameter_required')
+apply('merge_unit', 'dep-other-head', dict(unit=dep, head=H2, merged_commit=MERGED, intent=gadget), ('head_differs', 'head_not_reviewed'))
+apply('merge_unit', 'dep', dict(unit=dep, head=H1, merged_commit=MERGED, intent=gadget))
+f = fields(dep); assert f['state'] == 'merged' and f['merged_commit'] == MERGED and f['ended_at'] == stamp(), f
+held_contract = hold('contract', unit=contract)
+apply('set_hold_on', 'unknown-unit', dict(task=task, effect='fixture other', until='x', unit=unit('absent-v11-unit')), 'unknown_unit')
+apply('set_hold_on', 'unknown-intent', dict(task=task, effect='fixture other', until='x', intent=oid('intent', 'absent-v11-intent')), 'unknown_intent')
+apply('set_hold_on', 'unknown-task', dict(task=oid('task', 'absent-v11-task'), effect='fixture other', until='x', unit=contract), 'unknown_task')
+apply('set_hold_on', 'duplicate', dict(task=task, effect='fixture effect contract', until='x', unit=contract), 'duplicate_active_hold')
+apply('start_unit', 'contract-held', dict(unit=contract, intent=gadget), 'held'); lift('contract', held_contract)
+held_gadget = hold('gadget', intent=gadget); apply('start_unit', 'contract-intent-held', dict(unit=contract, intent=gadget), 'held'); lift('gadget', held_gadget)
+assert fields(held_contract)['unit'] == contract and fields(held_gadget)['intent'] == gadget and fields(held_gadget)['scope'] == 'the fixture'
+apply('start_unit', 'contract', dict(unit=contract, intent=gadget)); assert fields(contract)['state'] == 'running'
+apply('record_head', 'contract', dict(unit=contract, head=H1, writers=['fixture-implementer'], pull_request=7, rounds=0))
+f = fields(contract); assert f['head'] == H1 and f['writers'] == ['fixture-implementer'] and f['pull_request'] == 7, f
+# A review of a unit is closed by close_unit_review, and never by a session that wrote to the unit.
+r1 = review('contract-h1', 'packet', H1, close=False, unit=contract, repository=REPO, pull_request=7, round=0)
+apply('accept_unit', 'contract-running-review', dict(unit=contract, head=H1), 'head_not_reviewed')
+apply('close_review', 'contract-h1-old-verb', dict(review=r1, verdict='accept', session='fixture-verifier', **REPORT), 'review_names_a_unit')
+apply('close_unit_review', 'contract-h1-no-report', dict(review=r1, verdict='accept', session='fixture-verifier', unit=contract), 'report_required')
+apply('close_unit_review', 'contract-h1-writer', dict(review=r1, verdict='accept', session='fixture-implementer', unit=contract, **REPORT), 'writer_cannot_review')
+apply('close_unit_review', 'contract-h1-no-session', dict(review=r1, verdict='accept', unit=contract, **REPORT), 'session_required')
+apply('close_unit_review', 'contract-h1-no-unit', dict(review=r1, verdict='accept', session='fixture-verifier', **REPORT), 'unit_differs')
+apply('close_unit_review', 'contract-h1-other-unit', dict(review=r1, verdict='accept', session='fixture-verifier', unit=dep, **REPORT), 'unit_differs')
+apply('close_unit_review', 'contract-h1', dict(review=r1, verdict='accept', session='fixture-verifier', unit=contract, **REPORT))
+f = fields(r1); assert f['status'] == 'closed' and f['verdict'] == 'accept' and f['unit'] == contract and f['round'] == 0 and f.get('running_in') is None and f['closed_at'] == stamp(), f
+apply('close_unit_review', 'contract-h1-again', dict(review=r1, verdict='accept', session='fixture-verifier', unit=contract, **REPORT), 'review_not_running')
+apply('accept_unit', 'contract-other-head', dict(unit=contract, head=H2), ('head_differs', 'head_not_reviewed'))
+apply('accept_unit', 'contract', dict(unit=contract, head=H1)); assert fields(contract)['state'] == 'accepted'
+apply('merge_unit', 'contract-unapproved', dict(unit=contract, head=H1, merged_commit=MERGED, intent=gadget), 'not_approved')
+# The come-back of an accepted unit: reopen, a new head, the carry of a review or a verifier's round, a second accept.
+apply('reopen_unit', 'contract-cause-empty', dict(unit=contract, cause='', intent=gadget), 'cause_empty')
+apply('reopen_unit', 'contract', dict(unit=contract, cause='main_moved', intent=gadget)); assert fields(contract)['state'] == 'running'
+apply('reopen_unit', 'contract-again', dict(unit=contract, cause='main_moved', intent=gadget), 'unit_not_accepted')
+apply('record_head', 'contract-h2', dict(unit=contract, head=H2, writers=['fixture-implementer', 'fixture-updater'], pull_request=7, rounds=1))
+no_repository = review('contract-h1-no-repository', 'packet', H1, unit=contract)
+apply('carry_review', 'no-repository', dict(review=no_repository, unit=contract, head=H2), 'review_incomplete')
+running = review('contract-h2-running', 'packet', H2, close=False, unit=contract, repository=REPO)
+apply('carry_review', 'running', dict(review=running, unit=contract, head=H3), ('review_not_accepting', 'review_incomplete'))
+apply('close_unit_review', 'contract-h2-running', dict(review=running, verdict='abandoned', session='fixture-verifier', unit=contract))
+apply('carry_review', 'other-unit', dict(review=r1, unit=dep, head=H2), 'unit_differs')
+apply('carry_review', 'same-head', dict(review=r1, unit=contract, head=H1), 'head_unchanged')
+apply('stop_unit', 'contract-cause-empty', dict(unit=contract, cause=''), 'cause_empty')
+apply('stop_unit', 'contract', dict(unit=contract, cause='page_changes', detail='The Lead amends the page.'))
+f = fields(contract); assert f['state'] == 'stopped' and f['stop_cause'] == 'page_changes' and f['ended_at'] == stamp(), f
+tick(); apply('amend_unit', 'contract-3', dict(unit=contract, invariants='The board keeps its order and its colour.'))
+tick(); review('page-4', 'page', digest('page 4'), unit=contract)
+apply('ready_unit', 'contract-3', dict(unit=contract, intent=gadget)); apply('start_unit', 'contract-3', dict(unit=contract, intent=gadget))
+apply('carry_review', 'older-than-amendment', dict(review=r1, unit=contract, head=H2), 'review_older_than_amendment')
+r3 = review('contract-h2', 'packet', H2, unit=contract, repository=REPO, round=1); tick()
+apply('record_head', 'contract-h3', dict(unit=contract, head=H3, writers=['fixture-implementer', 'fixture-updater'], pull_request=7, rounds=1))
+carried = created(apply('carry_review', 'contract-h3', dict(review=r3, unit=contract, head=H3)), 'review')
+f, g = fields(carried), fields(r3)
+assert f['kind'] == 'packet' and f['head'] == H3 and f['status'] == 'closed' and f['verdict'] == 'accept' and f['carried_from'] == r3 and f['started_at'] == f['closed_at'] == stamp(), f
+assert all(f[k] == g[k] for k in ('task', 'model', 'effort', 'prompt', 'prompt_sha256', 'repository', 'unit', 'report', 'report_sha256')) and 'session' not in f and 'round' not in f, f
+apply('accept_unit', 'contract-h3', dict(unit=contract, head=H3)); assert fields(contract)['state'] == 'accepted' and fields(contract)['head'] == H3
+# The search delivery makes (accepting in crates/ap/src/review.rs): by kind, head and status, then the fields it reads.
+for reviewed, head in [(r1, H1), (r3, H2), (carried, H3)]:
+    found = call(['search'], dict(object_type='review', where={'all': [{'eq': ['kind', 'packet']}, {'eq': ['head', head]}, {'eq': ['status', 'closed']}]}))
+    assert reviewed in [o['id'] for o in found['objects']] and found['basis']['qualified'] is True, found
+    f = fields(reviewed); assert f['verdict'] == 'accept' and f['repository'] == REPO and f['report'] == REPORT['report'] and f['report_sha256'] == REPORT['report_sha256'] and f['closed_at'], f
+print('gate_row=v11-delivery-search expected=admitted reviews=3')
+# The Lead's approval: the role lead, known to an engine with the verb log.
+skipped = []
+knows_role = 'log' in [c['command'] for c in json.loads(subprocess.check_output([binary, '--help'], text=True, timeout=10))['commands']]
+if knows_role:
+    apply('approve_unit', 'contract-no-role', dict(unit=contract, head=H3, reason='The Lead read the diff.'), 'not_the_lead')
+    apply('approve_unit', 'contract-old-head', dict(unit=contract, head=H1, reason='The Lead read the diff.'), 'head_differs', role='lead')
+    apply('approve_unit', 'contract-reason-empty', dict(unit=contract, head=H3, reason=''), 'reason_empty', role='lead')
+    apply('approve_unit', 'dep-merged', dict(unit=dep, head=H1, reason='The Lead read the diff.'), 'unit_not_accepted', role='lead')
+    apply('approve_unit', 'contract', dict(unit=contract, head=H3, reason='The Lead read the diff.'), role='lead'); assert fields(contract)['approved_head'] == H3
+    held_contract = hold('contract-merge', unit=contract)
+    apply('merge_unit', 'contract-held', dict(unit=contract, head=H3, merged_commit=MERGED, intent=gadget), 'held'); lift('contract-merge', held_contract)
+    apply('merge_unit', 'contract', dict(unit=contract, head=H3, merged_commit=MERGED, intent=gadget)); assert fields(contract)['state'] == 'merged'
+    apply('drop_unit', 'contract-merged', dict(unit=contract, reason='late'), 'unit_ended')
+else:
+    skipped.append('approve_unit and merge_unit of fixture-contract')
+    apply('drop_unit', 'contract', dict(unit=contract, reason='the engine has no role'))
+# A hold stops the merge of an accepted plain unit, and the way back into running.
+plain = unit('fixture-plain'); apply('add_unit', 'plain', dict(op, unit=plain)); apply('ready_unit', 'plain', dict(unit=plain, intent=gadget))
+apply('note_unit_wait', 'plain', dict(unit=plain, waits_on='a free slot')); assert fields(plain)['waits_on'] == 'a free slot'
+apply('start_unit', 'plain-no-intent', dict(unit=plain), 'intent_parameter_required')
+apply('start_unit', 'plain-other-intent', dict(unit=plain, intent=covered), ('intent_differs', 'intent_not_open_for_units'))
+apply('start_unit', 'plain', dict(unit=plain, intent=gadget)); apply('note_unit_wait', 'plain-running', dict(unit=plain, waits_on='x'), 'unit_not_ready')
+apply('record_head', 'plain', dict(unit=plain, head=H1, writers=['fixture-implementer'])); review('plain', 'packet', H1, unit=plain, repository=REPO)
+apply('accept_unit', 'plain', dict(unit=plain, head=H1))
+apply('accept_unit', 'plain-again', dict(unit=plain, head=H1), 'unit_not_running')
+apply('merge_unit', 'dep-again', dict(unit=dep, head=H1, merged_commit=MERGED, intent=gadget), 'unit_not_accepted')
+apply('merge_unit', 'plain-other-intent', dict(unit=plain, head=H1, merged_commit=MERGED, intent=covered), 'intent_differs')
+apply('reopen_unit', 'plain-no-intent', dict(unit=plain, cause='merge_failed'), 'intent_parameter_required')
+apply('reopen_unit', 'plain-other-intent', dict(unit=plain, cause='merge_failed', intent=covered), 'intent_differs')
+held_plain = hold('plain', unit=plain)
+apply('merge_unit', 'plain-held', dict(unit=plain, head=H1, merged_commit=MERGED, intent=gadget), 'held')
+apply('reopen_unit', 'plain-held', dict(unit=plain, cause='merge_failed', intent=gadget), 'held')
+lift('plain', held_plain); apply('merge_unit', 'plain', dict(unit=plain, head=H1, merged_commit=MERGED, intent=gadget)); assert fields(plain)['state'] == 'merged'
+stopped = unit('fixture-stopped'); apply('add_unit', 'stopped', dict(op, unit=stopped)); apply('ready_unit', 'stopped', dict(unit=stopped, intent=gadget))
+apply('resume_unit', 'stopped-ready', dict(unit=stopped, intent=gadget), 'unit_not_stopped')
+apply('start_unit', 'stopped', dict(unit=stopped, intent=gadget)); apply('stop_unit', 'stopped', dict(unit=stopped, cause='limit'))
+apply('stop_unit', 'stopped-again', dict(unit=stopped, cause='limit'), 'unit_not_running')
+apply('record_head', 'stopped', dict(unit=stopped, head=H2, writers=['fixture-implementer'])); assert fields(stopped)['head'] == H2
+held_stopped = hold('stopped', unit=stopped); apply('resume_unit', 'stopped-held', dict(unit=stopped, intent=gadget), 'held'); lift('stopped', held_stopped)
+apply('resume_unit', 'stopped-other-intent', dict(unit=stopped, intent=covered), 'intent_differs')
+apply('resume_unit', 'stopped-no-intent', dict(unit=stopped), 'intent_parameter_required')
+apply('resume_unit', 'stopped', dict(unit=stopped, intent=gadget)); assert fields(stopped)['state'] == 'running'
+# A unit of class contract or effect enters running only under a confirmed intent.
+effect = unit('fixture-effect'); apply('add_unit', 'effect', dict(op, unit=effect, **{'class': 'effect'})); tick(); review('page-effect', 'page', digest('page effect'), unit=effect)
+apply('ready_unit', 'effect', dict(unit=effect, intent=gadget))
+tick(); apply('amend_intent', 'gadget-why', dict(intent=gadget, why='The fixture needs gadgets.')); assert fields(gadget)['status'] == 'draft'
+apply('start_unit', 'effect-draft-intent', dict(unit=effect, intent=gadget), ('intent_not_open_for_units', 'intent_not_confirmed'))
+apply('ready_unit', 'second-draft-intent', dict(unit=unit('fixture-stopped'), intent=gadget), ('unit_not_draft', 'intent_not_open_for_units'))
+apply('add_unit', 'gadget-draft', dict(op, unit=unit('fixture-late')), 'intent_not_open_for_units')
+confirm('gadget-yes-again', gadget)
+apply('start_unit', 'effect', dict(unit=effect, intent=gadget)); apply('stop_unit', 'effect', dict(unit=effect, cause='limit'))
+tick(); apply('amend_intent', 'gadget-why-2', dict(intent=gadget, why='The fixture needs more gadgets.'))
+apply('resume_unit', 'effect-draft-intent', dict(unit=effect, intent=gadget), 'intent_not_confirmed')
+confirm('gadget-yes-third', gadget)
+apply('resume_unit', 'effect', dict(unit=effect, intent=gadget)); assert fields(effect)['state'] == 'running'
+# The page complete before ready.
+bare = unit('fixture-bare'); apply('add_unit', 'bare', dict(unit=bare, lane='objective', intent=gadget, objective='A bare page.', **{'class': 'plain'}))
+apply('ready_unit', 'bare', dict(unit=bare, intent=gadget), ('write_set_missing', 'acceptance_missing', 'tiers_missing'))
+apply('amend_unit', 'bare-write-set', dict(unit=bare, write_set=[], acceptance=[], implementer=page['implementer'], verifier=page['verifier']))
+apply('ready_unit', 'bare-empty', dict(unit=bare, intent=gadget), ('write_set_missing', 'acceptance_missing'))
+apply('amend_unit', 'bare-acceptance', dict(unit=bare, write_set=['docs/**']))
+apply('ready_unit', 'bare-acceptance', dict(unit=bare, intent=gadget), 'acceptance_missing')
+first, second = unit('fixture-first'), unit('fixture-second')
+apply('add_unit', 'first', dict(op, unit=first)); apply('add_unit', 'second', dict(op, unit=second, depends_on=[first]))
+apply('drop_unit', 'first-reason-empty', dict(unit=first, reason=''), 'reason_empty')
+apply('drop_unit', 'first', dict(unit=first, reason='replaced by fixture-second')); f = fields(first); assert f['state'] == 'dropped' and f['drop_reason'] == 'replaced by fixture-second', f
+apply('drop_unit', 'first-again', dict(unit=first, reason='again'), 'unit_ended')
+apply('ready_unit', 'second', dict(unit=second, intent=gadget), 'dependency_dropped')
+apply('amend_unit', 'first-dropped', dict(unit=first, notes='late'), 'unit_not_amendable')
+# A unit without a repository: its head is the digest of its evidence, reviewed like any head.
+nonrepo = {k: v for k, v in op.items() if k != 'repository'}
+evidence = 'The measurement shows 3 widgets.'
+def no_repository_unit(key, **extra):
+    u = unit(key); apply('add_unit', key, dict(nonrepo, unit=u, **extra)); apply('ready_unit', key, dict(unit=u, intent=gadget)); apply('start_unit', key, dict(unit=u, intent=gadget))
+    apply('record_head', key, dict(unit=u, head=digest(evidence), writers=['fixture-implementer']))
+    accepting = review(key, 'packet', digest(evidence), unit=u); apply('accept_unit', key, dict(unit=u, head=digest(evidence)))
+    return u, accepting
+done, _ = no_repository_unit('fixture-done')
+apply('merge_unit', 'done', dict(unit=done, head=digest(evidence), merged_commit=MERGED, intent=gadget), 'no_repository')
+apply('close_unit', 'repository', dict(unit=plain, evidence=evidence, intent=gadget), ('unit_has_a_repository', 'unit_not_accepted'))
+apply('close_unit', 'done-evidence-empty', dict(unit=done, evidence='', intent=gadget), 'evidence_empty')
+apply('close_unit', 'done-no-intent', dict(unit=done, evidence=evidence), 'intent_parameter_required')
+apply('close_unit', 'done-other-intent', dict(unit=done, evidence=evidence, intent=covered), 'intent_differs')
+held_done = hold('done', unit=done); apply('close_unit', 'done-held', dict(unit=done, evidence=evidence, intent=gadget), 'held'); lift('done', held_done)
+apply('close_unit', 'done', dict(unit=done, evidence=evidence, intent=gadget))
+f = fields(done); assert f['state'] == 'done' and f['evidence'] == evidence and f['head'] == digest(evidence) and f['ended_at'] == stamp(), f
+revoked, accepting = no_repository_unit('fixture-revoked')
+apply('revoke_review', 'revoked', dict(review=accepting, reason='the review missed a path'))
+apply('close_unit', 'revoked', dict(unit=revoked, evidence=evidence, intent=gadget), 'head_not_reviewed')
+tick(); effect_doc = unit('fixture-effect-doc'); apply('add_unit', 'fixture-effect-doc', dict(nonrepo, unit=effect_doc, **{'class': 'effect'}))
+tick(); review('page-effect-doc', 'page', digest('page effect doc'), unit=effect_doc)
+apply('ready_unit', 'fixture-effect-doc', dict(unit=effect_doc, intent=gadget)); apply('start_unit', 'fixture-effect-doc', dict(unit=effect_doc, intent=gadget))
+apply('record_head', 'fixture-effect-doc', dict(unit=effect_doc, head=digest(evidence), writers=['fixture-implementer']))
+review('fixture-effect-doc', 'packet', digest(evidence), unit=effect_doc); apply('accept_unit', 'fixture-effect-doc', dict(unit=effect_doc, head=digest(evidence)))
+apply('close_unit', 'effect-doc-unapproved', dict(unit=effect_doc, evidence=evidence, intent=gadget), 'not_approved')
+tick(); apply('amend_intent', 'gadget-why-3', dict(intent=gadget, why='The fixture needs gadgets again.'))
+apply('reopen_unit', 'effect-doc-draft-intent', dict(unit=effect_doc, cause='diff_rejected', intent=gadget), 'intent_not_confirmed')
+confirm('gadget-yes-fourth', gadget)
+if knows_role:
+    apply('approve_unit', 'effect-doc', dict(unit=effect_doc, head=digest(evidence), reason='The Lead read the evidence.'), role='lead')
+    apply('close_unit', 'effect-doc', dict(unit=effect_doc, evidence=evidence, intent=gadget)); assert fields(effect_doc)['state'] == 'done'
+else:
+    skipped.append('approve_unit and close_unit of fixture-effect-doc')
+apply('check_criterion', 'gadget', dict(criterion=gadget_criterion, state='pass', evidence='fixture-check: 3 gadgets'))
+apply('close_intent', 'gadget-live-units', dict(intent=gadget, reason='fixture-check passed'), 'unit_not_ended')
+if skipped: print('rehearsal: skipped without the role of the actor: ' + '; '.join(skipped), file=sys.stderr)
+print('v11_unit_rows_complete')
+# Runs.
+apply('start_run', 'unknown-unit', dict(role='implementer', runtime='fixture-cli', model='fixture-model', unit=unit('absent-v11-unit')), 'unknown_unit')
+apply('start_run', 'unknown-intent', dict(role='lead', runtime='fixture-cli', model='fixture-model', intent=oid('intent', 'absent-v11-intent')), 'unknown_intent')
+run = created(apply('start_run', 'implementer', dict(role='implementer', runtime='fixture-cli', model='fixture-model', effort='high', unit=stopped, session='fixture-implementer')), 'run')
+f = fields(run); assert f['status'] == 'running' and f['running_in'] == stopped and f['unit'] == stopped and f['started_at'] == stamp(), f
+view = call(['render'], dict(view='runs_running', args={})); assert view['rows'] == 1 and '| implementer | fixture-model |' in view['markdown'], view
+tick(); counts = dict(input_tokens=1200, cache_read_tokens=30000, cache_write_tokens=4000, output_tokens=900)
+apply('close_run', 'implementer', dict(run=run, state='pushed', served_by='fixture-model-2', limit='five-hour 12%', record='/home/palantirkc/work/fixture/run.json', **counts))
+f = fields(run); assert f['status'] == 'closed' and f.get('running_in') is None and f['ended_at'] == stamp() and f['state'] == 'pushed' and all(f[k] == v for k, v in counts.items()), f
+apply('close_run', 'implementer-again', dict(run=run, state='pushed'), 'run_not_running')
+view = call(['render'], dict(view='runs_of_unit', args=dict(unit='fixture-stopped'))); assert view['rows'] == 1 and '| closed | pushed |' in view['markdown'], view
+# Findings.
+finding = oid('finding', 'fixture-detector-widget-drift')
+fp = dict(finding=finding, kind='drift', detector='fixture-detector', summary='The invented board drifts from its page.', evidence='line 3 differs', severity='act')
+apply('open_finding', 'drift', fp); f = fields(finding); assert f['state'] == 'open' and f['first_seen_at'] == f['last_seen_at'] == stamp(), f
+apply('open_finding', 'drift-again', fp, 'revision_conflict')
+tick(); apply('see_finding_again', 'drift', dict(finding=finding, evidence='line 4 differs', severity='urgent'))
+f = fields(finding); assert f['last_seen_at'] == stamp() and f['first_seen_at'] != stamp() and f['severity'] == 'urgent' and f['evidence'] == 'line 4 differs', f
+apply('plan_finding_as_unit', 'unknown-unit', dict(finding=finding, unit=unit('absent-v11-unit')), 'unknown_unit')
+apply('plan_finding_as_unit', 'drift', dict(finding=finding, unit=stopped)); f = fields(finding); assert f['state'] == 'planned' and f['unit'] == stopped, f
+apply('plan_finding_as_unit', 'planned', dict(finding=finding, unit=stopped), 'finding_not_open')
+apply('plan_finding_as_intent', 'planned', dict(finding=finding, intent=gadget), 'finding_not_open')
+apply('reopen_finding', 'live', dict(finding=finding, evidence='x'), 'finding_live')
+apply('close_finding', 'reason-empty', dict(finding=finding, reason=''), 'reason_empty')
+apply('close_finding', 'drift', dict(finding=finding, reason='The page and the board agree.')); f = fields(finding); assert f['state'] == 'closed' and f['ended_at'] == stamp(), f
+apply('close_finding', 'closed', dict(finding=finding, reason='again'), 'finding_not_live')
+apply('see_finding_again', 'closed', dict(finding=finding), 'finding_not_live')
+apply('dismiss_finding', 'closed', dict(finding=finding, reason='x'), 'finding_not_live')
+tick(); apply('reopen_finding', 'drift', dict(finding=finding, evidence='line 5 differs')); f = fields(finding); assert f['state'] == 'open' and f['last_seen_at'] == stamp(), f
+apply('plan_finding_as_intent', 'unknown-intent', dict(finding=finding, intent=oid('intent', 'absent-v11-intent')), 'unknown_intent')
+apply('plan_finding_as_intent', 'drift', dict(finding=finding, intent=gadget)); f = fields(finding); assert f['state'] == 'planned' and f['intent'] == gadget and f.get('unit') is None, f
+view = call(['render'], dict(view='findings_open', args={})); assert view['rows'] == 1 and '| fixture-detector-widget-drift | urgent | drift |' in view['markdown'], view
+apply('dismiss_finding', 'reason-empty', dict(finding=finding, reason=''), 'reason_empty')
+apply('dismiss_finding', 'drift', dict(finding=finding, reason='The fixture accepts the drift.')); assert fields(finding)['state'] == 'dismissed'
+# Requests routed to a unit or a finding.
+tick(); answered = request('answered', 'order', topic='v11-small')
+apply('route_request_to_unit', 'superseded', dict(request=r2, unit=small), 'request_not_current')
+apply('route_request_to_unit', 'confirming', dict(request=r4, unit=small), 'request_confirms_an_intent')
+apply('route_request_to_unit', 'unknown-unit', dict(request=answered, unit=unit('absent-v11-unit')), 'unknown_unit')
+apply('route_request', 'answered', dict(request=answered, intent=gadget))
+r = apply('route_request_to_unit', 'answered', dict(request=answered, unit=small)); assert r['edits'] and all(e['id'] == answered for e in r['edits']), r
+f = fields(answered); assert f['route'] == 'unit' and f['unit'] == small and f.get('intent') is None and f['routed_at'] == stamp(), f
+apply('route_request_to_finding', 'superseded', dict(request=r2, finding=finding), 'request_not_current')
+apply('route_request_to_finding', 'confirming', dict(request=r4, finding=finding), 'request_confirms_an_intent')
+apply('route_request_to_finding', 'unknown-finding', dict(request=answered, finding=oid('finding', 'absent-v11-finding')), 'unknown_finding')
+apply('route_request_to_finding', 'answered', dict(request=answered, finding=finding)); f = fields(answered); assert f['route'] == 'finding' and f['finding'] == finding and f.get('unit') is None, f
+apply('route_request', 'answered-back', dict(request=answered, intent=gadget)); f = fields(answered); assert f['route'] == 'intent' and f.get('finding') is None and f.get('unit') is None, f
+apply('route_request_to_unit', 'answered-again', dict(request=answered, unit=small))
+apply('set_request_aside', 'answered', dict(request=answered, reason='answered at once')); f = fields(answered); assert f['route'] == 'aside' and f.get('unit') is None and f.get('intent') is None, f
+# The views of version 11.
+view = call(['render'], dict(view='units_of_intent', args=dict(intent='gadget-board')))
+assert view['rows'] == len(call(['search'], dict(object_type='unit', where={'eq': ['intent', gadget]}))['objects']) > 5 and '| fixture-dep | merged | plain | ' + REPO + ' | 6 |' in view['markdown'], view
+view = call(['render'], dict(view='units_live', args={}))
+live = sorted(o['id']['native_key'] for o in call(['search'], dict(object_type='unit', where={'in': ['state', ['ready', 'running', 'accepted', 'stopped']]}))['objects'])
+assert view['rows'] == len(live) > 0 and all('| ' + k + ' |' in view['markdown'] for k in live) and '| fixture-dep |' not in view['markdown'], view
+held_effect = hold('effect', unit=effect)
+view = call(['render'], dict(view='holds_on_work', args={})); assert view['rows'] == 1 and 'fixture effect effect' in view['markdown'], view
+lift('effect', held_effect)
+view = call(['render'], dict(view='reviews_of_unit', args=dict(unit='fixture-contract')))
+assert view['rows'] == len(call(['search'], dict(object_type='review', where={'eq': ['unit', contract]}))['objects']) >= 8 and '| revoked |' not in view['markdown'], view
+print(view['markdown'])
+# Refusals read back from the action log.
+refused = call(['log'], dict(outcome='refused', action_type='add_unit', parameters=True))['rows']
+assert any(r.get('failed') == ['intent_not_open_for_units'] and r['parameters']['unit'] == dep for r in refused), refused
+refused = call(['log'], dict(outcome='refused', action_type='ready_unit', parameters=True))['rows']
+assert any(r.get('failed') == ['page_not_reviewed'] and r['parameters']['unit'] == contract for r in refused), refused
+print('v11_gate_rows_complete')
 PY
 
 python3 -I -B "$repo/ontology/memory-index-walk.py" "$ont_binary" "$rehearsal_root/memory-walk" --records 2
