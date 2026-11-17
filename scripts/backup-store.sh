@@ -100,7 +100,7 @@ name=$(now +%Y%m%dT%H%M%SZ)-${sha:0:12}.sqlite
 base=$remote; case "$base" in *:|*/) ;; *) base=$base/ ;; esac
 rclone copyto "$backup" "$base$name" > /dev/null 2>&1 || { code=remote_copy_failed; finish 3; }
 listing=$(rclone lsf "$remote" 2> /dev/null) || { code=remote_list_failed; finish 3; }
-printf '%s\n' "$listing" | grep -qxF -- "$name" || { code=remote_list_failed; finish 3; }
+grep -xF -- "$name" <<< "$listing" > /dev/null || { code=remote_list_failed; finish 3; }   # a here-string: no pipe, so no SIGPIPE on a long listing
 remote_state=copied; remote_name=$name
 
 # Only names of the form this script writes are candidates; the newest `keep` stay; the new file never goes.

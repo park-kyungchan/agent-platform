@@ -24,7 +24,8 @@ dir() { printf '%s/remote/%s' "$FAKE_DIR" "${1/:/\/}"; }
 [ "${RCLONE_FAIL:-}" != "$verb" ] || exit 1
 case "$verb" in
   copyto) cp "$2" "$(dir "${3%/*}")/${3##*/}" ;;
-  lsf) [ -z "${KILL_PIDFILE:-}" ] || kill -9 "$(cat "$KILL_PIDFILE")"; ls -p "$(dir "$2")" | { [ -z "${LSF_HIDE:-}" ] && cat || grep -v "$LSF_HIDE"; } ;;
+  lsf) [ -z "${KILL_PIDFILE:-}" ] || kill -9 "$(cat "$KILL_PIDFILE")"; ls -p "$(dir "$2")" | { [ -z "${LSF_HIDE:-}" ] && cat || grep -v "$LSF_HIDE"; }
+       [ -z "${LSF_EXTRA:-}" ] || seq 1 "$LSF_EXTRA" | sed 's/^/zz-foreign-name-of-some-length-/' ;;
   deletefile) rm "$(dir "${2%/*}")/${2##*/}" ;;
   *) exit 9 ;;
 esac
@@ -72,6 +73,12 @@ form=$(ls "$t/remote/r/dir" | grep -cE '^[0-9]{8}T[0-9]{6}Z-[0-9a-f]{12}\.sqlite
 # a keep of 1 keeps only the new file of the form.
 sleep 1; conf ',"remote":"r:dir","keep":1'; echo four > "$store"; run
 { [ "$rc" -eq 0 ] && [ "$(ls "$t/remote/r/dir" | grep -cE '^[0-9]{8}T[0-9]{6}Z-[0-9a-f]{12}\.sqlite$')" -eq 1 ] && [ -e "$t/remote/r/dir/notes.txt" ]; } && ok "keep 1 leaves the newest file of the form" || bad "keep 1 rc=$rc"
+
+# a listing of more than 64 KiB after the new name: the name is still found (no SIGPIPE of the match), the run ends 0 and prunes.
+conf ',"remote":"r:dir","keep":2'; echo big > "$store"
+LSF_EXTRA=4000 run
+{ [ "$rc" -eq 0 ] && [ "$(rec 'r["remote"]')" = copied ] && [ "$(rec 'r["code"]')" = null ] && [ "$(ls "$t/remote/r/dir" | grep -cE '^[0-9]{8}T[0-9]{6}Z-[0-9a-f]{12}\.sqlite$')" -le 2 ]; } \
+  && ok "a remote listing over 64 KiB: the name is found, exit 0, pruned" || bad "big listing rc=$rc $(cat "$t/out")"
 
 # no remote: exit 0, remote none, no rclone call.
 conf ""; : > "$t/calls.log"; run
