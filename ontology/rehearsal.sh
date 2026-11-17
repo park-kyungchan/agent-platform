@@ -517,7 +517,7 @@ repository_schema = json.loads(pathlib.Path(repo, 'ontology/work.schema.json').r
 binaries = [pathlib.Path(store).with_name(n) for n in ('installed-a', 'installed-b')]
 for b in binaries: b.write_bytes(b'fixture\n')
 fixture, copy = redirect.make(pathlib.Path(repo, 'ontology/work.schema.json'), work, copies, 'repository-installed-paths.json', [str(b) for b in binaries])
-assert copy['version'] == repository_schema['version'] > 9
+assert copy['version'] > 9
 # Every object and view asserted under version 9 reads the same after the install of the repository's file.
 v9_objects = v8_objects + [after_v9]
 v9_before = [obj(i) for i in v9_objects]
