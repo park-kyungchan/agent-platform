@@ -1,72 +1,49 @@
-# VPS operations
+# Host configuration records
 
-Private Rust infrastructure module under agent-platform. The `vps-ops` binary
-owns domain validation, observations, update sequencing, durable request fences,
-SSH transport, host diagnostics, the fixed canary controller and update reports.
-It preserves separate observation, verification, authority and acceptance records.
+Recorded copies of host configuration files and the Herdr network's files.
+Nothing here is built or installed by this repository; agents follow
+[`AGENTS.md`](AGENTS.md).
+
+## Contents
+
+| Path | What it is |
+| --- | --- |
+| `deployments/host-artifacts.json` | The inventory: for each recorded copy, the host file (`source`), the copy (`destination`) and the SHA-256 of the copy's bytes (`sha256`) |
+| `deployments/ssh/` | The Tailscale-only sshd drop-in and the `ssh.socket` override |
+| `deployments/hindsight/compose.yaml` | The Hindsight compose file |
+| `deployments/tsidp/compose.yaml` | The tsidp compose file |
+| `deployments/host-cron/` | The Docker prune cron files |
+| `deployments/herdr-network/` | The Herdr network's sshd drop-in, its installer, the firewall helper, its unit and contract; its `README.md` maps each file to its host path |
+
+The copies the inventory names are byte copies of the host files as captured on
+2026-11-04. Each directory's `README.md` maps its files to their host paths.
+
+## Who uses it
+
+The Lead reads these records. The delivery of host files from this repository
+(unit D3) is not built yet; until it is, a merge here changes nothing on the host.
+
+## Check
 
 ```bash
-cargo fmt --all --check
-cargo clippy --locked --all-targets -- -D warnings
-cargo test --locked
-cargo run --locked -p vps-ops -- doctor
+./check
 ```
 
-Rust 1.95.0, edition 2024, `unsafe_code = forbid`. CI keeps the existing workflow
-and `source` job names. Tests use synthetic fixtures and injected command runners;
-they make no network, SSH or host service calls. Source verification is separate
-from live serving verification and user acceptance.
+A healthy run ends with `check: ok`. The check needs no network, no root and no
+host path. It parses every tracked JSON file, runs `bash -n` on every tracked shell
+script, verifies that every inventory row's copy exists and matches its recorded
+SHA-256, and fails on a file under `deployments/` that is not the inventory, a row's
+copy, a `README.md`, or under `deployments/herdr-network/`. The GitHub Actions job
+`rust` runs the same command and is the required check of `main`.
 
-`VPS_OPS_ROOT` selects the repository/configuration root for installed binaries;
-the source build defaults to its workspace root. Operational state and run receipts
-remain untracked under that root. Never publish environment files, native homes,
-conversations, credentials or databases.
+The check compares each copy with its recorded digest, never with the host. A copy
+is refreshed only from the host: its bytes unchanged, with its new digest written
+into the inventory in the same commit.
 
-Commands retain the previous CLI vocabulary:
+## Not changed here
 
-- `doctor`, `inventory`, `verify <observation.json>`.
-- `plan <start|stop|restart>` and `apply <request.json> --confirm-exact-target <id>`.
-- `update backend-only|coordinated [--plan|--apply] [--sha FULL_SHA|--release vX.Y.Z] [--resume DIRECTORY] [--desktop-cdp URL] [--authorization TEXT]`.
-- `update verify --sha FULL_SHA` and `update stage-overlay --sha FULL_SHA --patch FILE --apply --authorization TEXT`.
-
-Apply requires the current explicit instruction. The original run and pinned SHA
-own resumption. Recover unresolved native jobs and Desktop receipts before another
-invocation. Backend-only does not load Desktop configuration. Coordinated mode uses
-the completed native Desktop artifact SHA, or a freshly verified existing release.
-Installed and running alignment remain separate results.
-
-The binary also replaces these host-only command entrypoints through basename
-aliases or explicit subcommands:
-
-| Host alias | Explicit subcommand |
-| --- | --- |
-| `hermes-hostctl` | `hostctl inventory|resources|docker.status|ssh.status` |
-| `hermes-canary-control` | `canary capabilities|status|start HASH|stop HASH` |
-| `hermes-agent-auto-update`, `hermes-agent-update-latest` | `release-update` |
-| `hermes-main-report` | `main-report REPO OLD_SHA NEW_SHA OUTPUT` |
-
-Hostctl inventory observes SSH and Docker; retired k3s probes and ingress are
-removed. Missing executables retain Bash diagnostic bodies and exit 127 (126 for
-permission denial), without inventing a Bash source-location prefix. The legacy
-release helper preserves its
-first-image-line replacement and compose rollback behavior; main promotion remains
-exclusively through `scripts/hermes-main-update` and the installed helper's native
-one-shot path. Installing a binary or a symlink is a separate Lead-owned action.
-
-`deployments/` holds reviewed source configurations with README host-path mappings.
-The obsolete Herdr container/entrypoint deployment is removed; Herdr runs as the
-native `herdr server` process. `architecture/runtime-path-index.json` names retained
-runtime paths. Environment values remain in untracked host-owned files.
-
-The native promotion helper remains unchanged at deployed SHA256
-`3f36e01b72bbdbcc1bb9b7f78965f769497819a96e0ba51123194395f96bedd8`.
-Embedded `protocol/` Python and PowerShell sources bridge existing installed native
-APIs; they are compiled into the Rust binary, not separate installed scripts or a
-second agent runtime. They retain UID/HOME, process incarnation, inode and native
-serving checks. Rust CDP uses existing targets without creating or closing pages.
-
-`architecture/rust-port-provenance.json` identifies original source hashes and the
-archived domain revision. Golden fixtures were captured from the original pure
-functions and isolated host-script adapters before removing the Bun/TS toolchain.
-No model evaluation, host install, deployment, service restart or user acceptance
-is implied by source tests.
+The login path (the sshd drop-ins, the `ssh.socket` override,
+`00-herdr-runtime-key-only.conf` and `deployments/herdr-network/sshd-policy.sh`,
+installed as `/usr/local/sbin/herdr-network-sshd`, which writes that drop-in and
+reloads `ssh`) is changed only by the user's procedure described in `AGENTS.md`.
+Environment files, credentials and host keys are never tracked.
