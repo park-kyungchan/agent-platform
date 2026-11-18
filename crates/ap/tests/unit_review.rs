@@ -2203,11 +2203,11 @@ fn r21_a_page_amended_while_its_review_ran_is_not_made_ready() {
 #[test]
 fn r22_the_verb_writes_only_its_actions_and_removes_only_its_own() {
     let mut f = F::new();
-    first_look(&mut f, "repair");
+    let first = first_look(&mut f, "repair");
     let key = cut_after_start(&mut f);
     f.ok(&ending(&f, "abandon", &key));
     let mut r = f.req("unit", "u1");
-    r["earlier"] = json!([f.reviews_of("unit", "u1")[0].0]);
+    r["earlier"] = json!([first["review"]]);
     f.ok(&r);
     let actions: BTreeSet<String> = f.actions().into_iter().collect();
     let allowed = [
