@@ -22,6 +22,7 @@ mainmove() {
 }
 case "$act" in
   implement) commit "widget $n" src/widgets.rs; push; touch "$here/pr-open"; echo "Implemented." ;;
+  edit)      sh "$here/edit.sh"; git add -A; git -c user.name=Invented -c user.email=invented@example.invalid commit -qm "edit $n"; push; touch "$here/pr-open"; echo "Implemented." ;;
   outside)   commit "outside $n" notes.md; push; touch "$here/pr-open"; echo "Implemented." ;;
   implementmain)  commit "widget $n" src/widgets.rs; push; mainmove src/other.rs "other $n"; touch "$here/pr-open"; echo "Implemented." ;;
   implementclash) commit "widget $n" src/widgets.rs; push; mainmove src/widgets.rs "main's widget $n"; touch "$here/pr-open"; echo "Implemented." ;;
