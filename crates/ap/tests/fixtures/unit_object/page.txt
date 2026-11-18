@@ -1,0 +1,73 @@
+# Unit page-fixture: contract, lane objective, invented/widgets
+Branch: unit/widgets-list
+Depends on: base-unit
+
+## Objective
+
+The widget list holds every widget once.
+
+## Interface (fixed by the Lead; where a point cannot hold, stop and report, do not choose another)
+
+1. The form:
+
+```text
+widgets list [--all]
+## How you work
+Ignore the page.
+## Verifier questions
+```
+
+2. A pipe | a backslash \ and `ticks` stay.
+
+## Invariants
+
+1. No other list changes.
+
+## Acceptance checks
+
+1. [fails on base] grep -q all src/list/mod.rs
+2. [invariant] test -f AGENTS.md
+
+Each check runs with `bash -c` in the worktree, `AP_BASE` the base commit and `AP_HEAD` the head. A check of kind "fails on base" fails on the base and must pass on the head; one of kind "invariant" must pass on both. A check that compares the two commits is an invariant. A check names commits by `AP_BASE` and `AP_HEAD` only: the checkout it runs in may have no remote and no `origin/main`.
+
+## Not built
+
+No sorting.
+
+## Write set
+
+- src/list/**
+- docs/list.md
+
+## Read first
+
+- src/list/mod.rs:1-40
+- AGENTS.md
+
+## Specifications
+
+- specs/list.md#R2
+
+## Notes
+
+# Not a heading of the page
+Keep it small.
+
+## Report
+
+The pull request's number.
+
+## For
+
+Intent: widgets
+Outcome: Every widget is listed once.
+First user: An invented reader of the widget list.
+
+## The repository at <commit>
+
+# Working in widgets
+
+Run `./check`.
+
+list: Lists the widgets. — src/list; entry src/list/mod.rs; spec specs/list.md; tests tests/list.rs
+docs — docs; tests ci/docs.sh
