@@ -63,6 +63,27 @@ impl From<Failure> for Halt {
     }
 }
 type Step<T = ()> = Result<T, Halt>;
+/// A path a unit of class `plain` may not change (R36): `path` is repository-relative.
+fn protected(path: &str) -> bool {
+    const EXACT: [&str; 6] = [
+        "check",
+        "REVIEW.md",
+        "rust-toolchain",
+        "rust-toolchain.toml",
+        "ontology/rehearsal.sh",
+        "ontology/ENGINE-PIN",
+    ];
+    const NAMES: [&str; 4] = [
+        "clippy.toml",
+        ".clippy.toml",
+        "rustfmt.toml",
+        ".rustfmt.toml",
+    ];
+    const TREES: [&str; 5] = ["ci", ".github", "specs", "scripts", ".cargo"];
+    let last = path.rsplit('/').next().unwrap_or(path);
+    let first = path.split('/').next().unwrap_or(path);
+    EXACT.contains(&path) || NAMES.contains(&last) || TREES.contains(&first)
+}
 fn stop<T>(cause: &str, detail: impl ToString) -> Step<T> {
     Err(Halt::Stop(cause.to_owned(), detail.to_string()))
 }
@@ -1059,6 +1080,16 @@ impl Run {
                 "path_outside_write_set",
                 json!({"paths": shown, "count": outside.len()}),
             );
+        }
+        if self.u["class"] == "plain" {
+            let hit: Vec<&&str> = paths.iter().filter(|p| protected(p)).collect();
+            if !hit.is_empty() {
+                let shown: Vec<&&&str> = hit.iter().take(10).collect();
+                return stop(
+                    "protected_path_changed",
+                    json!({"paths": shown, "count": hit.len()}),
+                );
+            }
         }
         let merge_base = self.git(s, wt, &["merge-base", base, head])?;
         self.done.checks += 1;
