@@ -116,7 +116,7 @@ fn hex40(h: &str) -> bool {
             .all(|c| c.is_ascii_digit() || (b'a'..=b'f').contains(&c))
 }
 /// The key of a unit as `ap unit add` makes one (R2).
-fn key_form(key: &str) -> bool {
+pub(crate) fn key_form(key: &str) -> bool {
     let byte = |c: u8| c.is_ascii_lowercase() || c.is_ascii_digit() || c == b'-';
     let first = key.starts_with(|c: char| c.is_ascii_lowercase());
     (1..=59).contains(&key.len()) && first && key.bytes().all(byte)
@@ -345,7 +345,7 @@ struct Run {
     done: Done,
 }
 /// The member `units` (R3): the directory and the timeouts by role.
-fn units(policy: &Value) -> Result<(String, Map<String, Value>), Failure> {
+pub(crate) fn units(policy: &Value) -> Result<(String, Map<String, Value>), Failure> {
     let mut timeouts: Map<String, Value> = TIMEOUTS
         .iter()
         .map(|(k, t)| ((*k).to_owned(), json!(t)))
@@ -450,18 +450,27 @@ fn locked(directory: &str, key: &str) -> Result<(PathBuf, File), Failure> {
     held.map_err(|_| error("unit_run_active", "unit"))?;
     Ok((home, lock))
 }
-/// The checks before any effect (R1 to R4), then the directories and the lock (R3, R5).
-fn prepare(s: &mut impl System, store: Option<&str>, key: &str) -> Result<(Run, File), Failure> {
-    if object::lead_in_environment(s) {
-        return Err(error("role_in_environment", "ONT_ROLE"));
-    }
+/// What the checks of a unit read before any action give (R2 to R4): its places and its tiers.
+pub(crate) struct Checked {
+    repo: String,
+    branch: String,
+    clone: String,
+    reviews: Map<String, Value>,
+    task: String,
+    directory: String,
+    timeouts: Map<String, Value>,
+    implementer: Value,
+    verifier: Value,
+}
+/// The checks `ap unit run` makes on the unit `u` of the key `key` before any action (R2 to R4): the
+/// key, the repository, the branch, the policy's entries and the tiers. The dispatch pass
+/// (`specs/ap/work.md` R10) calls the same function, so a unit the run refuses is not started.
+pub(crate) fn checked(s: &mut impl System, key: &str, u: &Value) -> Result<Checked, Failure> {
     if !key_form(key) {
         return Err(error("invalid_input", "unit"));
     }
-    let u = at(store::get(s, store, "unit", key), "unit")?;
-    let u = u.ok_or_else(|| error("unknown_unit", "unit"))?;
-    let repo = text(&u, "repository").ok_or_else(|| error("no_repository", "unit"))?;
-    let branch = text(&u, "branch").map_or_else(|| format!("unit/{key}"), str::to_owned);
+    let repo = text(u, "repository").ok_or_else(|| error("no_repository", "unit"))?;
+    let branch = text(u, "branch").map_or_else(|| format!("unit/{key}"), str::to_owned);
     // `git check-ref-format` only for a name of R10's form, which never begins with `-`.
     let format = args(&["check-ref-format", "--branch", &branch]);
     let named = branch_ok(&branch)
@@ -478,26 +487,49 @@ fn prepare(s: &mut impl System, store: Option<&str>, key: &str) -> Result<(Run, 
         .ok_or_else(|| error("invalid_input", "task"))?
         .to_owned();
     let (directory, timeouts) = units(&policy)?;
-    let implementer = tier(&u, "implementer", "implementer", &policy)?;
-    let verifier = tier(&u, "verifier", "reviewer", &policy)?;
-    let (home, lock) = locked(&directory, key)?;
+    let implementer = tier(u, "implementer", "implementer", &policy)?;
+    let verifier = tier(u, "verifier", "reviewer", &policy)?;
+    Ok(Checked {
+        repo: repo.to_owned(),
+        branch,
+        clone,
+        reviews,
+        task,
+        directory,
+        timeouts,
+        implementer,
+        verifier,
+    })
+}
+/// The checks before any effect (R1 to R4), then the directories and the lock (R3, R5).
+fn prepare(s: &mut impl System, store: Option<&str>, key: &str) -> Result<(Run, File), Failure> {
+    if object::lead_in_environment(s) {
+        return Err(error("role_in_environment", "ONT_ROLE"));
+    }
+    if !key_form(key) {
+        return Err(error("invalid_input", "unit"));
+    }
+    let u = at(store::get(s, store, "unit", key), "unit")?;
+    let u = u.ok_or_else(|| error("unknown_unit", "unit"))?;
+    let c = checked(s, key, &u)?;
+    let (home, lock) = locked(&c.directory, key)?;
     let drawn = new_session_id(s)?.replace('-', "");
-    let dir = reviews.get("directory").and_then(Value::as_str);
+    let dir = c.reviews.get("directory").and_then(Value::as_str);
     let run = Run {
         store: store.map(str::to_owned),
         key: key.to_owned(),
         session: format!("u-{key}"),
         prefix: format!("ur-{}", &drawn[..16]),
-        repo: repo.to_owned(),
-        branch,
-        clone,
+        repo: c.repo,
+        branch: c.branch,
+        clone: c.clone,
         wt: home.join("wt").to_string_lossy().into_owned(),
         home,
         reviews: PathBuf::from(dir.unwrap_or(REVIEWS)),
-        task,
-        implementer,
-        verifier,
-        timeouts,
+        task: c.task,
+        implementer: c.implementer,
+        verifier: c.verifier,
+        timeouts: c.timeouts,
         u,
         base: String::new(),
         applied: false,

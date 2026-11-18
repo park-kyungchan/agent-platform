@@ -7,12 +7,12 @@ use std::{ffi::OsString, io::Write, process::ExitCode, time::Duration};
 const GAP: Duration = Duration::from_secs(10);
 
 /// The member `quota` of the policy file, validated (R2).
-struct Config {
-    slice: String,
-    busy_limit: i64,
-    margin: i64,
-    ceiling: i64,
-    floor: i64,
+pub(crate) struct Config {
+    pub(crate) slice: String,
+    pub(crate) busy_limit: i64,
+    pub(crate) margin: i64,
+    pub(crate) ceiling: i64,
+    pub(crate) floor: i64,
 }
 /// What one reading of a slice and the host says (R4 to R6), per cent.
 pub struct Load {
@@ -24,7 +24,7 @@ pub struct Load {
 fn invalid(member: &str, why: &str) -> Failure {
     fail("policy_invalid", "policy", json!(format!("{member} {why}")))
 }
-fn slice_ok(name: &str) -> bool {
+pub(crate) fn slice_ok(name: &str) -> bool {
     name.strip_suffix(".slice").is_some_and(|n| {
         (1..=32).contains(&n.len())
             && n.bytes()
@@ -50,7 +50,7 @@ fn number(
     })
 }
 /// The policy's `quota`: None without a file or a member.
-fn config(s: &impl System) -> Result<Option<Config>, Failure> {
+pub(crate) fn config(s: &impl System) -> Result<Option<Config>, Failure> {
     let Some(file) = s.policy_file() else {
         return Ok(None);
     };

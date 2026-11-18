@@ -18,10 +18,12 @@ Purpose: one file of the host states which models a stage may run on and which C
 
 ## Interface
 
-The file is one JSON object. `models` and `accounts` are required; every other top-level member is not read by `ap run`. The member `quota` (the runtime CPU quota of a slice) is read only by `ap quota`: `specs/ap/quota.md`.
+The file is one JSON object. `models` and `accounts` are required; every other top-level member is not read by `ap run`. The member `quota` (the runtime CPU quota of a slice) is read only by `ap quota` and by the dispatch pass `ap work`, which starts no unit over its limit: `specs/ap/quota.md`, `specs/ap/work.md`.
 
 - `models`: an object with exactly `allowed` (1 to 64 model names, each as `ap run` takes a model: at most 40 characters of letters, digits and `._-[]`) and `never` (0 to 16 patterns; a pattern is a model name in which `*` stands for any run of characters, at most two `*`).
 - `accounts`: an object from a key to an array of 1 to 5 absolute paths. A key is a runtime name (`claude`, `codex`, `muse`, `agy`), or a runtime, `/` and a role of `ap run` (`implementer`, `fixer`, `reviewer`), or a runtime, `/` and a model name. The runtime of a stage is the request's `runtime` (default `claude`).
+
+The member `work` (the dispatch pass's slots, slice and prefix) is read only by `ap work`: `specs/ap/work.md`.
 
 Refusals, all exit 2 before any effect, `{"error":{"code","field","detail"}}` on stderr:
 
@@ -33,7 +35,7 @@ The record's `policy` is `{"path", "sha256"}` of the file as `ap run` read it, s
 
 ## Not included
 
-- No member of the file beyond `models` and `accounts` is read by `ap run` (`quota` is read by `ap quota` alone): the scheduler's numbers and every later member come with their own units.
+- No member of the file beyond `models` and `accounts` is read by `ap run` (`quota` is read by `ap quota` and `ap work` alone, `work` by `ap work` alone): the scheduler's numbers and every later member come with their own units.
 - No check of the model that served: the record's `served_by` is as it was.
 - No change to `ap unit`, to `units.json` or to the composition: a unit's stages meet the policy through `ap run`.
 - No installation of the policy file and no default policy: without a file the host allows what `ap run` allowed before.

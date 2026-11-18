@@ -214,3 +214,47 @@ systemctl set-property --runtime <slice> CPUQuota=<ceiling>%
 rm -f /etc/systemd/system/ap-quota.service /etc/systemd/system/ap-quota.timer
 systemctl daemon-reload
 ```
+
+## The dispatch pass
+
+`ap work` (`specs/ap/work.md`) is one pass: under the lock `work.lock` of the units directory it reads the units of the store and the run units of the service manager once, starts each unit that may start now as `ap unit run <key>` in a transient unit `<prefix>-<key>.service` of the policy's slice, and notes on every `ready` unit that does not start what it waits on (`waits_on`). `ap-work.service` (`Type=oneshot`, run of `/usr/local/bin/ap work`, `TimeoutStartSec=300`, no `Slice=`: the pass runs outside the slice it fills) is one pass; `ap-work.timer` starts the first one two minutes after boot and each next one sixty seconds after the last ended. A run the pass starts is a transient unit of its own: the end of the pass's service does not end it, and the next pass sees it in flight. Each pass is a new process of the installed `ap`: a delivery of `ap` reaches the next pass with no restart.
+
+The policy file (`/etc/agent-platform/policy.json`) holds the member `work`; without it the pass answers `{"skipped":"no work"}` and starts nothing:
+
+```json
+{"work": {"slots": 3, "slice": "agents.slice", "prefix": "ap-unit"}}
+```
+
+Each member is optional: `slots` (1 to 16) is the number of units in flight, `slice` the slice of the runs, `prefix` the beginning of the name of each run's unit. The units directory is the member `units.directory` that `ap unit run` reads; when the policy has `quota` (section "The CPU quota"), a unit starts only while the busy share is at or under `quota.busy_limit` and the load outside the slice leaves it at least `quota.floor`. A `prefix` of `ap` would read the services `ap-work`, `ap-deliver` and `ap-quota` as runs of units named `work`, `deliver` and `quota`: keep the default, or another prefix that no other service of the host begins with.
+
+The service gives a run `HOME=/root` and `PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin` (and `LANG` and `USER` where the service manager sets them); the stages need the CLIs and every program a stage or an acceptance check calls (Node.js for a repository whose check needs it, `cargo`). Where any of them lies outside these directories, add at install the drop-in `/etc/systemd/system/ap-work.service.d/path.conf` with the lines `[Service]` and `Environment=PATH=<the directories of the CLIs and the other programs>:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin`, as for `cargo` above.
+
+Install, from a clean checkout of the merged commit, as root, after the member `work` is in the policy file:
+
+```sh
+install -m 0644 deploy/ap-work.service deploy/ap-work.timer /etc/systemd/system/
+systemctl daemon-reload
+systemd-analyze verify /etc/systemd/system/ap-work.service /etc/systemd/system/ap-work.timer
+systemctl enable --now ap-work.timer
+```
+
+Read the state:
+
+```sh
+systemctl list-timers ap-work.timer
+journalctl -u ap-work.service -n 5 -o cat             # one answer per pass: started, cut, not_restarted, waiting, in_flight
+systemctl list-units 'ap-unit-*'                      # the runs in flight
+```
+
+A unit listed under `cut` (a `running` unit no run holds) or `not_restarted` (its run ended with the unit as it was, or a pass was killed between its file `started` and the start) is started by no pass: read why with `ap status <key>` and call `ap unit run <key>`.
+
+The switch: remove the member `work` from the policy file. The next pass starts nothing; the runs in flight go on.
+
+Undo: disable the timer, wait until a pass that is going on has ended, remove the two files. The runs in flight go on.
+
+```sh
+systemctl disable --now ap-work.timer
+systemctl is-active ap-work.service                   # until it answers inactive or failed, not activating
+rm -f /etc/systemd/system/ap-work.service /etc/systemd/system/ap-work.timer
+systemctl daemon-reload
+```
