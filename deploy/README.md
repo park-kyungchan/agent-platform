@@ -172,3 +172,45 @@ systemctl daemon-reload
 ```
 
 `/etc/agent-platform/backup.json`, the state directory and the files already on the remote stay; remove them by hand when no run will happen again.
+
+## The CPU quota
+
+`ap quota` (`specs/ap/quota.md`) is one turn: it reads the host's busy share and the slice's own use for ten seconds, and sets the slice's runtime `CPUQuota` to what the busy limit leaves after the load outside the slice, held between a floor and a ceiling. `ap-quota.service` (`Type=oneshot`, run of `/usr/local/bin/ap quota`, no `Slice=`, so the quota does not throttle it) is one turn; `ap-quota.timer` starts the first one a minute after boot and each next one twenty seconds after the last ended, so a turn comes about every 30 seconds. Each turn is a new process of the installed `ap`: a delivery of `ap` reaches the next turn with no restart. The answer of each turn is one line in the journal.
+
+The policy file (`/etc/agent-platform/policy.json`, or the path in `AP_POLICY_FILE`) names the slice in its member `quota`; without the member the turn answers `{"skipped":"no quota"}` and does nothing:
+
+```json
+{"quota": {"slice": "agents.slice", "busy_limit": 85, "margin": 5, "ceiling": 170, "floor": 60}}
+```
+
+Only `slice` is required. The values are per cent: `busy_limit` of all CPUs, `margin` of all CPUs kept under it, `ceiling` and `floor` of one CPU (the `ceiling` is the value the slice's persistent setting holds). `ap run` does not read the member.
+
+Install, from a clean checkout of the merged commit, as root (the slice's own persistent `CPUQuota` stays as it is):
+
+```sh
+install -m 0644 deploy/ap-quota.service deploy/ap-quota.timer /etc/systemd/system/
+systemctl daemon-reload
+systemd-analyze verify /etc/systemd/system/ap-quota.service /etc/systemd/system/ap-quota.timer
+systemctl enable --now ap-quota.timer
+```
+
+Read the state:
+
+```sh
+systemctl list-timers ap-quota.timer
+systemctl is-failed ap-quota.service                  # failed: the last turn exited 2 or 3
+journalctl -u ap-quota.service -n 5 -o cat            # one answer per turn, or its error
+systemctl show -p CPUQuotaPerSecUSec agents.slice     # equals the newest answer's quota (600ms is 60 %, 1.700000s is 170 %)
+```
+
+A turn that fails leaves the last value in place and the timer starts the next one. `reading_failed` with the field `quota_now` is also what a value set by hand outside the forms `ap quota` reads (`1h` for 360,000 %) gives on every turn: clear it with `systemctl set-property --runtime <slice> CPUQuota=<ceiling>%`, and the next turn reads it. A reload of the service manager (`systemctl daemon-reload`) drops the runtime value until the next turn.
+
+Undo: disable the timer, wait until a turn that is going on has ended, return the slice to its ceiling, remove the two files.
+
+```sh
+systemctl disable --now ap-quota.timer
+systemctl is-active ap-quota.service                  # until it answers inactive or failed, not activating
+systemctl set-property --runtime <slice> CPUQuota=<ceiling>%
+rm -f /etc/systemd/system/ap-quota.service /etc/systemd/system/ap-quota.timer
+systemctl daemon-reload
+```
