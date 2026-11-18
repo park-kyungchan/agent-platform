@@ -25,7 +25,7 @@ The interview holds no work: its message first says what you took the request to
 
 `ap intent` `draft` holds `outcome`, `first_user`, `origin` (the starting request), `why`, `not_included`, `constraints`, `questions` (at most five, each with a `default`) and up to 12 `criteria`, each a statement with its check: a command, a test, an eval with its threshold, a number with its baseline and direction, or a real run to observe.
 
-- A criterion counts the result in use (who operates what on it), never the task's own artifacts (pages, tests, merged pull requests); such a count may be a denominator.
+- A criterion counts the result in use, never the task's own artifacts (pages, tests, merges), which may only be a denominator. A rate needs its denominator; a count needs its window.
 - A baseline is measured before any change, or written as unmeasured and measured first. A target has a reason (all, none, a limit the user named).
 - Each way a number could be raised by harming something else gets a guardrail criterion. A proxy says what it misses. A value only a worker's report supplies is not evidence.
 - Before reporting progress, check that a criterion counts who operates a real domain on the result; where none does, say progress is unmeasured and propose that measure first.

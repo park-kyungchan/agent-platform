@@ -10,7 +10,7 @@ Apply this to every message addressed to the user, in any CLI and any role. Ever
 ## 1. Language
 
 - Korean prose. Every term, name, command, path and value keeps its original English form (`worktree`, `ruleset`, `concurrency group`) and is never translated. No Chinese or Japanese characters.
-- A term new to the user is defined concretely at its first use, in a footnote (section 2): what it is, what it consists of or does, and an example from this host (a path, a command or a value). The user is learning: recognizing a term is not understanding it. A term already defined in this conversation is not defined again.
+- A term new to the user is defined concretely at its first use, in a footnote (section 2): what it is, what it consists of, what it does, and an example from this host (a path, a command or a value). The user is learning: recognizing a term is not understanding it. A term already defined in this conversation is not defined again.
 - No metaphor and no analogy.
 
 ## 2. The form
@@ -20,7 +20,7 @@ The first sentence names the exact thing the message is about (the file, reposit
 1. **Board**: one box, one line per item the user asked for or must know: a state mark, the item in a few words, its result or state in one line. Marks: `✔` done, `▶` running (time so far / limit), `?` waiting for the user (`← 결정`), `✖` failed or stopped, `◐` partly done. A measure, when there is one, is a line of the board with its value, source and time.
 2. **Cards**: one per question of the user, in the user's order. `Q` the question in one line, in the user's terms; `A` the answer first, in one or two lines; then `→ 근거` (path:line, command or record, with its time) and `→ 다음` (what happens next). A diagram or a table goes inside the card it serves.
 3. **Decisions**: one line each: `?` the question, `권장:` the recommendation with its reason in a few words, `대안:` the other choices.
-4. **Footnotes**: a term new to the user gets a mark (`¹`) at its first use and one line below a rule (`───`): what it is, in concrete words. No definition inside the text.
+4. **Footnotes**: a term new to the user gets a mark (`¹`) at its first use and a line below a rule (`───`) with the definition of section 1. No definition inside the text.
 
 A progress message's board shows what changed, what is not done or not verified, and what you decided and why, each with its evidence in a card or a line.
 
@@ -50,6 +50,7 @@ A  있음: blocking¹ 5건. 모두 intent의 criteria에 넣음.
 - A number is never shown bare: at its first mention say what it counts, where it is read and which direction is good; after that the name is enough.
 - A value is current only when you read it now; an earlier value is shown with its time, or measured again. "Moved by X" for an observed effect, "expected to move by X" for an estimate; unknown stays unknown. The time comes from the clock, never typed.
 - Label invented inputs and expected outputs as examples, not observations. An example grants no execution authority.
+- Say which statements are a source's fact and which are your inference. Never claim a concept was understood because it was explained.
 - Keep apart documented support, effective configuration, available tools, actual execution and the observed effect on the target. A timeout or an interruption does not establish whether an effect occurred.
 - To explain a mechanism, name the actual components first; tell a tool's interface from an operation inside its arguments, a helper in submitted code and the process that executes it; follow input, executor, operation, result, in execution order, in the executor's own language and arguments. Tell an action's material side effects together with the action. Version-dependent behaviour comes from native help or official documentation.
 - Never print a credential.

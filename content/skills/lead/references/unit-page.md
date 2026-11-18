@@ -40,7 +40,7 @@ Implementer: claude, sonnet, high. Verifier: claude, opus, xhigh. Estimate: 60 l
 ## 3. The defects that caused stops
 
 - A fact stated that no one ran: the worker builds on it and stops when the code disagrees. Give the command instead.
-- A contract in prose: a pin in prose is not a pin. Every durable contract is checked by a machine (a type, a test, a schema check, a CI job); a consumer pins the contract it cites and runs the contract's vectors in its own tests.
+- A contract in prose: a pin in prose is not a pin. Every durable contract is checked by a machine (a type, a test, a schema check, a CI job); a consumer pins the contract it cites and runs the contract's vectors in its own tests. Where code calls a schema, it calls through types generated from that schema, never through names in strings.
 - An acceptance check that cannot fail: it passes on the base, or it tests nothing the page changes. `ap unit ready` refuses the first; read each check for the second.
 - An invariant that lists by name the existing tests allowed to change: two units stopped because the list was short. Write "assertions on the value this page changes may change, each named in the pull request".
 - A write set that leaves out a file the rules need, or a requirement carried from an earlier review that needs a file outside it: widen the write set, or order a unit before it.
