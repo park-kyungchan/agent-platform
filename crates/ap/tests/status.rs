@@ -1755,6 +1755,9 @@ static NEXT: AtomicU32 = AtomicU32::new(0);
 const PREFIX: &str = "aptrial1";
 const SCRATCH: &str = "/invented/scratch/store.sqlite";
 
+/// What the next pause changes.
+type Step = Box<dyn FnOnce(&mut Wt)>;
+
 struct Wt {
     f: F,
     dir: PathBuf,
@@ -1765,7 +1768,7 @@ struct Wt {
     listed: Option<String>,
     /// The store fails every call.
     down: bool,
-    script: VecDeque<Box<dyn FnOnce(&mut Wt)>>,
+    script: VecDeque<Step>,
     pauses: usize,
     /// The number of calls to the store before each reading: the reading's `at` is `NOW` plus it.
     starts: Vec<usize>,
