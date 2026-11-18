@@ -12,7 +12,7 @@ use std::{
     fs::File,
     io::{Read, Seek, SeekFrom, Write},
     os::unix::fs::{FileExt, MetadataExt},
-    path::{Path, PathBuf},
+    path::{Component, Path, PathBuf},
     process::{Child, ExitCode},
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
@@ -36,7 +36,7 @@ const MODES: [&str; 6] = [
 const KEEP: [&str; 10] = [
     "PATH", "HOME", "USER", "LOGNAME", "SHELL", "LANG", "LC_ALL", "TERM", "TMPDIR", "TZ",
 ];
-const MEMBERS: [&str; 27] = [
+const MEMBERS: [&str; 28] = [
     "role",
     "runtime",
     "account",
@@ -64,11 +64,15 @@ const MEMBERS: [&str; 27] = [
     "store",
     "git_author",
     "ont_role",
+    "limits",
 ];
 /// The largest file of `answer_schema`, in bytes.
 const SCHEMA_MAX: u64 = 65_536;
 /// The longest prompt that is one argument of a program, in bytes: Linux takes 131072 with the NUL.
 const ARGUMENT_MAX: usize = 131_071;
+/// The program that holds a stage with `limits` to its home and its scratch directory
+/// (`specs/ap/run-limits.md`).
+const BWRAP: &str = "/usr/bin/bwrap";
 /// The levels an `agy` slug ends with: the `effort` of its stage.
 const LEVELS: [&str; 4] = ["low", "medium", "high", "xhigh"];
 /// The unit's own bound runs this long past the request's: `ap run` stops the unit first, and the
@@ -261,6 +265,8 @@ struct Request {
     store: Option<String>,
     /// The stage's role as the actor's claim: `verifier` for a reviewer that says so.
     actor_role: String,
+    /// The scratch directory of `limits`, as written (`specs/ap/run-limits.md`).
+    limits: Option<String>,
 }
 
 fn path(r: &Value, key: &str) -> Result<String, Failure> {
@@ -346,6 +352,48 @@ fn target(r: &Value) -> Result<Option<(&'static str, String)>, Failure> {
     match (key("unit")?, key("intent")?) {
         (Some(_), Some(_)) => Err(error("invalid_input", "intent")),
         (a, b) => Ok(a.or(b)),
+    }
+}
+/// The `scratch` of `limits`: a reviewer on the Claude CLI only, one member, an absolute path
+/// without `..`, apart from the accounts, the cwd, the out and the prompt by its components as
+/// written, and never with `expect.file` (`specs/ap/run-limits.md` R1).
+fn scratch(
+    v: &Value,
+    (role, runtime, expect_file): (&str, Runtime, bool),
+    accounts: &[String],
+    [cwd, out, prompt]: [&str; 3],
+) -> Result<String, Failure> {
+    let one = v.as_object().is_some_and(|o| o.len() == 1);
+    let p = path(v, "scratch").map_err(|_| error("invalid_input", "limits"))?;
+    let at = Path::new(&p);
+    let up = at.components().any(|c| c == Component::ParentDir);
+    let inside = (accounts.iter().map(String::as_str))
+        .chain([cwd])
+        .any(|a| at.starts_with(a));
+    let holds = [cwd, out, prompt]
+        .iter()
+        .any(|h| Path::new(h).starts_with(at));
+    let stage = role == "reviewer" && runtime == Runtime::Claude && !expect_file;
+    require!(one && stage && !up && !inside && !holds => "invalid_input", "limits");
+    Ok(p)
+}
+/// One `mkdir` of the scratch directory that fails when the path exists (mode 0700), then its
+/// `tmp` and `target`: whether this call made it, and whether all three were made (R4).
+fn make_scratch(scratch: &str) -> (bool, bool) {
+    use std::os::unix::fs::DirBuilderExt;
+    let mut dirs = std::fs::DirBuilder::new();
+    dirs.mode(0o700);
+    if dirs.create(scratch).is_err() {
+        return (false, false);
+    }
+    let made = ["tmp", "target"].map(|d| dirs.create(Path::new(scratch).join(d)).is_ok());
+    (true, made == [true, true])
+}
+/// Removes the scratch directory this call made: only a directory that is not a link, and
+/// nothing through a link inside it (`remove_dir_all` does not follow one) (R8).
+fn remove_scratch(scratch: &str) {
+    if std::fs::symlink_metadata(scratch).is_ok_and(|m| m.is_dir()) {
+        let _ = std::fs::remove_dir_all(scratch);
     }
 }
 /// What every stage's environment gets: its role and agent as the actor's claim (R3, R4) and, with
@@ -688,6 +736,15 @@ fn request_at(s: &mut impl System, r: &Value, at_cwd: bool) -> Result<Request, F
             expect_line = Some(line.to_owned());
         }
     }
+    let limits = match r.get("limits") {
+        None => None,
+        Some(v) => Some(scratch(
+            v,
+            (role, runtime, expect_file.is_some()),
+            &accounts,
+            [&cwd, &out, &prompt],
+        )?),
+    };
     // A typed answer is the Claude CLI's: its answer is the object, not a text with a first line.
     let schema = match r.get("answer_schema") {
         None => None,
@@ -748,6 +805,16 @@ fn request_at(s: &mut impl System, r: &Value, at_cwd: bool) -> Result<Request, F
         &format!("{out}.err"),
     ];
     require!(names.iter().all(|n| std::fs::symlink_metadata(n).is_err()) => "out_exists", "out");
+    if let Some(scratch) = &limits {
+        // The host's state for `limits`, before the policy step: nothing at the path, a parent
+        // that is a directory and not a link, and a `bwrap` that answers (R2, R3).
+        require!(std::fs::symlink_metadata(scratch).is_err() => "scratch_exists", "limits");
+        let parent = Path::new(scratch).parent().map(std::fs::symlink_metadata);
+        let parent = parent.is_some_and(|m| m.is_ok_and(|m| m.is_dir()));
+        require!(parent => "scratch_parent_missing", "limits");
+        let probe = s.call(BWRAP, &args(&["--version"]), &Value::Null, 10_000);
+        require!(probe.is_ok_and(|r| r.success) => "limits_unavailable", "limits");
+    }
     let mut home = None;
     let earlier = match &resume {
         None => None,
@@ -898,6 +965,7 @@ fn request_at(s: &mut impl System, r: &Value, at_cwd: bool) -> Result<Request, F
         target,
         store,
         actor_role: actor_role.to_owned(),
+        limits,
     })
 }
 /// The `home` of an `agy` record that a resume runs in: a directory under `<account>/homes` (links
@@ -1628,7 +1696,7 @@ fn attempt(
     q: &Request,
     account: &str,
     (output, errs): &(File, File),
-    (earlier, lead, resumes): (&[Value], Option<&str>, bool),
+    (earlier, lead, resumes, ready): (&[Value], Option<&str>, bool, bool),
     object: &Object,
 ) -> (Value, bool, bool) {
     let resume = q.resume.as_ref().filter(|_| resumes);
@@ -1656,6 +1724,10 @@ fn attempt(
     mirror(&mut record, false);
     if let Some((path, _, sha256)) = &q.schema {
         record["answer_schema"] = json!({"path": path, "sha256": sha256});
+    }
+    if let Some(scratch) = &q.limits {
+        record["limits"] =
+            json!({"scratch": scratch, "writable": [account, scratch], "bwrap": BWRAP});
     }
     let not_launched = |mut record: Value, unmet: &str| {
         record["state"] = json!("failed");
@@ -1715,6 +1787,9 @@ fn attempt(
     {
         return not_launched(record, "launch");
     }
+    if !ready {
+        return not_launched(record, "launch");
+    }
     let mut argv = args(&[
         "systemd-run",
         "--scope",
@@ -1737,6 +1812,7 @@ fn attempt(
         ]));
     }
     let mut env = q.base_env.clone();
+    let cli = argv.len();
     match q.runtime {
         Runtime::Claude => {
             claude_args(q, &mut argv, resume, &session);
@@ -1766,6 +1842,33 @@ fn attempt(
             ));
             env.push(("AGY_CLI_DISABLE_AUTO_UPDATE".into(), "1".into()));
         }
+    }
+    if let Some(scratch) = &q.limits {
+        // After `systemd-run … --`, in front of the CLI: its own pid namespace (no other stage
+        // in its `/proc`), everything read-only but the launch's account and the scratch
+        // directory, no capability (R5); temporary files and builds go to the scratch directory
+        // (R6).
+        let bwrap = [
+            BWRAP,
+            "--unshare-pid",
+            "--ro-bind",
+            "/",
+            "/",
+            "--dev",
+            "/dev",
+            "--proc",
+            "/proc",
+        ];
+        let mut bwrap = args(&bwrap);
+        bwrap.extend(args(&["--ro-bind", "/proc/sys", "/proc/sys"]));
+        bwrap.extend(args(&[
+            "--bind", account, account, "--bind", scratch, scratch,
+        ]));
+        bwrap.extend(args(&["--cap-drop", "ALL", "--chdir", &q.cwd, "--"]));
+        argv.splice(cli + 1..cli + 1, bwrap);
+        env.retain(|(k, _)| k != "TMPDIR" && k != "CARGO_TARGET_DIR");
+        env.push(("TMPDIR".into(), format!("{scratch}/tmp")));
+        env.push(("CARGO_TARGET_DIR".into(), format!("{scratch}/target")));
     }
     let started = s.now();
     let mut child = match s.launch(&argv, &env, &q.cwd, [prompt, stdout, stderr]) {
@@ -2042,6 +2145,8 @@ pub fn execute(s: &mut impl System, r: &Value) -> Result<(Value, u8), Failure> {
         if q.target.is_some() {
             object.begin(s, &q, &accounts[0]);
         }
+        // The scratch directory: made once, after the claim and before the first launch (R4).
+        let (made, ready) = q.limits.as_deref().map_or((false, true), make_scratch);
         for (i, account) in accounts.iter().enumerate() {
             // Once a launch of an implementer or a fixer has worked, every later one gets the text;
             // a launch of a resumed call after the first is a move and gets its own.
@@ -2053,7 +2158,7 @@ pub fn execute(s: &mut impl System, r: &Value) -> Result<(Value, u8), Failure> {
                 _ => None,
             };
             let earlier = last["attempts"].as_array().cloned().unwrap_or_default();
-            let launch = (&earlier[..], lead, i == 0);
+            let launch = (&earlier[..], lead, i == 0, ready);
             let (record, worked, saved) = attempt(s, &q, account, &files, launch, &object);
             clean &= saved;
             worked_before |= worked;
@@ -2067,6 +2172,10 @@ pub fn execute(s: &mut impl System, r: &Value) -> Result<(Value, u8), Failure> {
             if !next || !saved {
                 break;
             }
+        }
+        // Only the call whose `mkdir` made it removes it, after its last launch (R8).
+        if let Some(scratch) = q.limits.as_deref().filter(|_| made) {
+            remove_scratch(scratch);
         }
     } else {
         last = json!({"state": "failed", "unmet": "launch", "account": accounts[0]});
