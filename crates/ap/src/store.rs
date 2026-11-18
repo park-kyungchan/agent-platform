@@ -1,5 +1,5 @@
 //! Every call of `ap request`, `ap intent`, `ap status`, the stage runner and the unit object (`ap unit
-//! add|amend|ready|drop|page`) to the store engine `ont`: one function per action they apply and one
+//! add|amend|ready|drop|page|review`) to the store engine `ont`: one function per action they apply and one
 //! per read. An answer `store_busy` is asked again up to five times after a short wait; nothing else is. Also the request form both verbs share: the arguments, the members and their shapes.
 use crate::host::{Failure, LIMIT, System, error, fail, id, ont_within};
 use serde_json::{Map, Value, json};
@@ -291,7 +291,8 @@ actions!(
     waive_criterion,
     close_intent,
     retire_intent,
-    end_delegation
+    end_delegation,
+    close_unit_review
 );
 /// The Lead proceeds on a draft: the only actions that carry the role `lead`.
 pub fn assume_intent(
@@ -321,6 +322,20 @@ pub fn confirm_intent_delegated(
         p,
         Some(lead),
     )
+}
+/// Schema version 11 on: one `ont action validate` of a whole action request (`ap unit review`
+/// reads the key its start will make); its answer as the engine gives it.
+pub fn validate(s: &mut impl System, store: Option<&str>, body: &Value) -> Result<Value, Failure> {
+    call(s, store, &["action", "validate", "--client", "ap"], body)
+}
+/// Schema version 11 on: a review of a unit's page or an intent's plan started, the whole request
+/// (with `expected` for a page) as `validate` was given it.
+pub fn start_unit_review(
+    s: &mut impl System,
+    store: Option<&str>,
+    body: &Value,
+) -> Result<Applied, Failure> {
+    send(s, store, body)
 }
 /// `ready_unit` without a role, with the unit's id and the revision it was read at as `expected`: a
 /// unit changed since that read ends `revision_conflict`.
@@ -390,6 +405,15 @@ pub fn head(
     kind: &str,
     key: &str,
 ) -> Result<Option<(String, Value)>, Failure> {
+    Ok(head_now(s, store, kind, key)?.map(|(revision, fields, _)| (revision, fields)))
+}
+/// The head as `head` reads it, with the `now` of the answer (seconds since the epoch) when it has one.
+pub fn head_now(
+    s: &mut impl System,
+    store: Option<&str>,
+    kind: &str,
+    key: &str,
+) -> Result<Option<(String, Value, Option<u64>)>, Failure> {
     let object = id(kind, key);
     let v = match call(s, store, &["get"], &json!({ "id": object })) {
         Err(f) if f.code == REFUSED && f.detail["code"] == "unavailable" => return Ok(None),
@@ -411,7 +435,7 @@ pub fn head(
         .find(|ob| ob["revision"] == head)
         .ok_or_else(unreadable)?;
     let fields = observation["fields"].as_object().ok_or_else(unreadable)?;
-    Ok(Some((head.to_owned(), values(fields))))
+    Ok(Some((head.to_owned(), values(fields), v["now"].as_u64())))
 }
 /// The fields as one object, each the value or null.
 fn values(fields: &Map<String, Value>) -> Value {

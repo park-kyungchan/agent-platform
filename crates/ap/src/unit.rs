@@ -61,6 +61,7 @@ macro_rules! ensure {
 mod case;
 mod compose;
 pub mod object;
+pub mod page_review;
 pub mod render;
 use compose::Composed;
 
@@ -1146,8 +1147,12 @@ fn claimed(
 }
 /// No argument: a request on stdin. One absolute path: a unit from its page. `--compose-only` and a
 /// path: the composition printed. `add`, `amend`, `ready`, `drop` or `page` first: the unit object
-/// (`specs/ap/unit.md`). Any other form is `usage`.
+/// (`specs/ap/unit.md`); `review` first: a review of a page or a plan (`specs/ap/unit-review.md`).
+/// Any other form is `usage`.
 pub fn cli(argv: &[OsString]) -> ExitCode {
+    if argv.first().is_some_and(|w| w == "review") {
+        return page_review::cli(&argv[1..]);
+    }
     if argv
         .first()
         .is_some_and(|w| object::WORDS.iter().any(|o| w == o))
