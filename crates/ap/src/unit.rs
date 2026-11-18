@@ -60,6 +60,8 @@ macro_rules! ensure {
 }
 mod case;
 mod compose;
+pub mod object;
+pub mod render;
 use compose::Composed;
 
 fn absolute(p: &str) -> bool {
@@ -1143,8 +1145,15 @@ fn claimed(
     Ok((u.rec, status))
 }
 /// No argument: a request on stdin. One absolute path: a unit from its page. `--compose-only` and a
-/// path: the composition printed. Any other form is `usage`.
+/// path: the composition printed. `add`, `amend`, `ready`, `drop` or `page` first: the unit object
+/// (`specs/ap/unit.md`). Any other form is `usage`.
 pub fn cli(argv: &[OsString]) -> ExitCode {
+    if argv
+        .first()
+        .is_some_and(|w| object::WORDS.iter().any(|o| w == o))
+    {
+        return object::cli(argv);
+    }
     let page = |p: &OsString| p.to_str().filter(|p| absolute(p)).map(str::to_owned);
     let result = match argv {
         [] => return crate::run::cli_with(argv, execute),
