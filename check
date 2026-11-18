@@ -112,6 +112,16 @@ for path in "${tracked[@]}"; do
   [[ "$listed" == true ]] || fail "deployment_unlisted@$path"
 done
 
+# (e) The Git configuration's tests: the includeIf matching, the roster check and
+# the alias, all in scratch directories with a synthetic roster.
+if [[ -f scripts/test-git-config.sh ]]; then
+  if ! bash scripts/test-git-config.sh; then
+    fail "git_config_test_failed@scripts/test-git-config.sh"
+  fi
+else
+  fail "git_config_test_missing@scripts/test-git-config.sh"
+fi
+
 if [[ $failures -ne 0 ]]; then
   printf 'check: failed (%d)\n' "$failures" >&2
   exit 1
