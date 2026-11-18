@@ -8,7 +8,8 @@
 # runner lives is refused (by existence; its resume by the live unit); a stage bound to a unit stops when
 # that unit is stopped or its main process is killed; the policy file of the host is replaced through
 # AP_POLICY_FILE by one of this script's directory that allows its model and its account, and a
-# stage on another model is refused. Skipped, saying so, where `systemctl` is
+# stage on another model is refused; ONT_ROLE and ONT_AGENT (and with git_author the two author
+# variables) are in the stage's environment. Skipped, saying so, where `systemctl` is
 # absent or this caller cannot start a transient unit in the system manager.
 set -uo pipefail
 ap=$(realpath -- "${1:-${CARGO_TARGET_DIR:-$(cd "$(dirname "$0")/.." && pwd -P)/target}/debug/ap}")
@@ -71,6 +72,20 @@ sleeper=$(cat "$t/bin/sleeper.pid"); ! alive "$sleeper" && ok "the forked sleepe
 req p.md | sed 's/"haiku"/"opus"/' | apr > "$t/p.out" 2> "$t/p.err"; rc=$?
 { [ "$rc" -eq 2 ] && grep -q '"code":"model_not_allowed"' "$t/p.err" && [ ! -e "$t/p.md.run.json" ]; } \
   && ok "a model the policy does not allow is refused model_not_allowed, no file written" || bad "policy refusal: rc=$rc $(cat "$t/p.err")"
+
+# The role reaches the engine as the actor's claim: ONT_ROLE and ONT_AGENT are in every stage's
+# environment (never the caller's), and only with git_author do the two author variables follow.
+# No unit or intent is given here: this script runs on the host and touches no store.
+echo answer > "$t/bin/mode"
+req f.md ',"ont_role":"verifier","git_author":true' | ONT_ROLE=lead ONT_AGENT=caller GIT_AUTHOR_NAME=caller apr > "$t/f.out" 2> "$t/f.err"; rc=$?
+{ [ "$rc" -eq 0 ] && [ "$(grep -c '^ONT_' "$t/bin/env")" -eq 2 ] && grep -qx 'ONT_ROLE=verifier' "$t/bin/env" \
+  && grep -qx 'ONT_AGENT=claude:haiku' "$t/bin/env" && grep -qx 'GIT_AUTHOR_NAME=verifier haiku' "$t/bin/env" \
+  && grep -qx 'GIT_AUTHOR_EMAIL=verifier.haiku@agents.invalid' "$t/bin/env"; } \
+  && ok "ONT_ROLE=verifier, ONT_AGENT=claude:haiku and, with git_author, the two author variables reached the CLI" \
+  || bad "actor and author: rc=$rc $(grep -E '^(ONT|GIT)_' "$t/bin/env") $(cat "$t/f.err")"
+req g.md | apr > "$t/g.out" 2> "$t/g.err"; rc=$?
+{ [ "$rc" -eq 0 ] && grep -qx 'ONT_ROLE=reviewer' "$t/bin/env" && ! grep -q '^GIT_' "$t/bin/env"; } \
+  && ok "without git_author no variable of Git's reached the CLI; ONT_ROLE=reviewer" || bad "no author: rc=$rc $(grep -E '^(ONT|GIT)_' "$t/bin/env")"
 
 # 2. No answer: timeout_seconds 5 gives state timeout, and nothing remains.
 echo silent > "$t/bin/mode"; rm -f "$t/bin/sleeper.pid"; s0=$(date +%s)
