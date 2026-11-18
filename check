@@ -73,11 +73,13 @@ if [ "${CI:-}" = true ] && [ "$(id -u)" != 0 ]; then
 else
   bash ontology/rehearsal.sh "$ont_bin" > /dev/null
 fi
-# The tests of evals/lesson/replay build their stores with that engine (which also admits only uid 0).
+# The tests of evals/lesson/replay and of evals/intake/run build their stores with that engine (which also admits only uid 0).
 if [ "${CI:-}" = true ] && [ "$(id -u)" != 0 ]; then
   sudo env "ONT_BIN=$ont_bin" python3 -I -B -m unittest discover -s ci -p 'test_lesson_replay.py'
+  sudo env "ONT_BIN=$ont_bin" python3 -I -B -m unittest discover -s ci -p 'test_intake_suite.py'
 else
   ONT_BIN="$ont_bin" python3 -I -B -m unittest discover -s ci -p 'test_lesson_replay.py'
+  ONT_BIN="$ont_bin" python3 -I -B -m unittest discover -s ci -p 'test_intake_suite.py'
 fi
 # The walk of `ap deliver` on the real installer scripts, with the built ap and a scratch store of the same
 # engine; it kills real processes under one temporary directory. Skipped, saying so, under CI=true.
