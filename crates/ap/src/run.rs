@@ -1844,11 +1844,13 @@ fn attempt(
         }
     }
     if let Some(scratch) = &q.limits {
-        // After `systemd-run … --`, in front of the CLI: everything read-only but the launch's
-        // account and the scratch directory, no capability (R5); temporary files and builds go
-        // to the scratch directory (R6).
+        // After `systemd-run … --`, in front of the CLI: its own pid namespace (no other stage
+        // in its `/proc`), everything read-only but the launch's account and the scratch
+        // directory, no capability (R5); temporary files and builds go to the scratch directory
+        // (R6).
         let bwrap = [
             BWRAP,
+            "--unshare-pid",
             "--ro-bind",
             "/",
             "/",

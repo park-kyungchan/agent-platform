@@ -6872,6 +6872,7 @@ impl Fake {
         let (home, scratch, cwd) = (self.p(account), self.p("scratch"), self.p("cwd"));
         [
             BWRAP,
+            "--unshare-pid",
             "--ro-bind",
             "/",
             "/",
