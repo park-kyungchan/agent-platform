@@ -62,6 +62,12 @@ struct F {
     /// After the next `get` of an intent, the store names this session its Lead.
     rename: Option<&'static str>,
     unqualified: bool,
+    /// The keys the next criteria get, in the order they are added (else `cr<n>`).
+    keys: Vec<&'static str>,
+    /// The engine's log of the applied `add_criterion` actions, oldest first.
+    rows: Vec<Value>,
+    /// The rows of one `log` answer.
+    page: usize,
 }
 impl F {
     fn new() -> Self {
@@ -80,6 +86,9 @@ impl F {
             cut: None,
             rename: None,
             unqualified: false,
+            keys: vec![],
+            rows: vec![],
+            page: 200,
         };
         // Requests of the user, invented: q-* are current and unrouted unless routed below.
         for (key, kind, said) in [
@@ -129,6 +138,7 @@ impl F {
         let name = |(a, b): &(Vec<String>, Value)| match a[0].as_str() {
             "action" => format!("apply {}", b["action_type"].as_str().unwrap()),
             "get" => format!("get {}", b["id"]["object_type"].as_str().unwrap()),
+            "log" => format!("log {}", b["action_type"].as_str().unwrap()),
             other => format!("{other} {}", b["object_type"].as_str().unwrap()),
         };
         self.calls.iter().map(name).collect()
@@ -354,7 +364,10 @@ impl F {
             }
             "add_criterion" => {
                 self.made += 1;
-                let k = format!("cr{}", self.made);
+                let k = match self.keys.get(self.made - 1) {
+                    Some(k) => (*k).to_owned(),
+                    None => format!("cr{}", self.made),
+                };
                 let mut o = p.clone();
                 o["object_type"] = json!("criterion");
                 o["state"] = json!("open");
@@ -410,9 +423,30 @@ impl F {
                 vec![change("intent", &k, "modification")]
             }
         };
+        if action == "add_criterion" {
+            self.rows.push(
+                json!({"action_type": action, "outcome": "applied", "parameters": p,
+                "edits": edits}),
+            );
+        }
         self.applied
             .insert(derived, (content, json!(edits.clone())));
         ok(json!({"outcome": "applied", "edits": edits}))
+    }
+    /// `ont log`: the rows newest first, `limit` of them to a page.
+    fn log(&self, body: &Value) -> Answer {
+        assert_eq!(body["action_type"], "add_criterion");
+        assert_eq!(body["outcome"], "applied");
+        assert_eq!(body["parameters"], true, "the parameters name the intent");
+        let limit = body["limit"].as_u64().unwrap() as usize;
+        assert!((1..=1000).contains(&limit));
+        let newest: Vec<&Value> = self.rows.iter().rev().collect();
+        let from: usize = body["continuation"]
+            .as_str()
+            .map_or(0, |c| c.parse().unwrap());
+        let to = (from + limit.min(self.page)).min(newest.len());
+        let next = (to < newest.len()).then(|| to.to_string());
+        ok(json!({"rows": newest[from..to], "continuation": next, "scan_limited": false}))
     }
     fn fields(o: &Value) -> Value {
         let mine = o.as_object().unwrap().iter();
@@ -486,6 +520,7 @@ impl System for F {
             }
             "get" => self.get(input),
             "search" => self.search(input),
+            "log" => self.log(input),
             other => panic!("ont {other}"),
         }
     }
@@ -767,6 +802,8 @@ fn r4_the_key_of_a_new_intent_is_lower_case_letters_digits_and_dashes() {
             ("invalid_input", "intent"),
             "{key}"
         );
+        // The refused member is carried as null, not as the value that was refused.
+        assert_eq!(e.intent, None, "{key}");
         assert!(f.calls.is_empty(), "{key}");
     }
     let mut f = F::new();
@@ -1573,7 +1610,12 @@ fn r18_show_reads_the_intent_its_criteria_and_its_requests_and_writes_nothing() 
     let v = show(&mut f);
     assert_eq!(
         f.names(),
-        ["get intent", "search criterion", "search request"]
+        [
+            "get intent",
+            "search criterion",
+            "search request",
+            "log add_criterion"
+        ]
     );
     assert_eq!(
         f.calls[1].1["where"],
@@ -1646,6 +1688,51 @@ fn r18_show_reads_the_intent_its_criteria_and_its_requests_and_writes_nothing() 
         &json!({"op": "show", "intent": "widget-report"}),
     );
     assert_eq!(e.code, "unknown_intent");
+}
+
+// spec: specs/ap/intent.md#R18
+#[test]
+fn r18_show_prints_the_criteria_of_a_draft_in_the_order_it_listed_them() {
+    // Three criteria of one call: the same second, and keys (hashes) in another order than the draft's.
+    let mut f = F::new();
+    f.keys = vec!["k-zz", "k-aa", "k-mm"];
+    let q = with(
+        draft(),
+        json!({"criteria": [{"statement": "First.", "check": "c1"}, {"statement": "Second.", "check": "c2"},
+            {"statement": "Third.", "check": "c3"}]}),
+    );
+    run(&mut f, &q);
+    let keys = |v: &Value| {
+        let found = v["criteria"].as_array().unwrap().iter();
+        found.map(|c| c["criterion"].clone()).collect::<Vec<_>>()
+    };
+    // The log is read to its end, a page at a time.
+    for page in [200, 1] {
+        f.page = page;
+        f.calls.clear();
+        let v = show(&mut f);
+        assert_eq!(keys(&v), [json!("k-zz"), json!("k-aa"), json!("k-mm")]);
+        let logs = f.calls.iter().filter(|c| c.0[0] == "log").count();
+        assert_eq!(logs, if page == 1 { 3 } else { 1 });
+        assert!(f.applies().is_empty());
+    }
+    let text = text_of(&show(&mut f));
+    let at = |w: &str| text.find(w).unwrap();
+    assert!(
+        at("[open] First.") < at("[open] Second.") && at("[open] Second.") < at("[open] Third.")
+    );
+    // A criterion added later comes last.
+    run(
+        &mut f,
+        &with(
+            writer("criterion", "k9"),
+            json!({"do": "add", "intent": "widget-report", "statement": "Later.", "check": "c4"}),
+        ),
+    );
+    assert_eq!(
+        keys(&show(&mut f)),
+        [json!("k-zz"), json!("k-aa"), json!("k-mm"), json!("cr4")]
+    );
 }
 
 // spec: specs/ap/intent.md#R19
@@ -1801,7 +1888,7 @@ fn r22_only_the_schema_actions_of_the_verb_write() {
     assert!(
         f.calls
             .iter()
-            .all(|c| ["action", "get", "search"].contains(&c.0[0].as_str()))
+            .all(|c| ["action", "get", "search", "log"].contains(&c.0[0].as_str()))
     );
     assert_eq!(f.o("widget-report")["status"], "met");
 }

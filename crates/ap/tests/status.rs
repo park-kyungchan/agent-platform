@@ -1613,7 +1613,27 @@ fn r20_the_members_of_an_enumerated_property_are_read_by_aggregates_that_scan_no
         let p = b["group_by"][0].as_str().unwrap();
         assert_eq!(b["where"], json!({"in": [p, []]}));
     }
-    // One per property typed by a value type, a type whose grant gives no derive asked once.
+    // At most one answered per distinct value type; a second property of it only after a refusal of
+    // the first one's type (no derive).
+    let value_type = |b: &Value| {
+        let (t, p) = (
+            b["object_type"].as_str().unwrap(),
+            b["group_by"][0].as_str().unwrap(),
+        );
+        f.schema["object_types"][t]["properties"][p]["type"]["value_type"].clone()
+    };
+    let derives = |t: &Value| {
+        let grants = f.schema["grants"][0]["derive"].as_array().unwrap();
+        grants.iter().any(|d| d == t)
+    };
+    let mut answered = std::collections::BTreeSet::new();
+    for b in &aggregates {
+        let answers = derives(&b["object_type"]);
+        assert!(
+            !answers || answered.insert(value_type(b).to_string()),
+            "{b}"
+        );
+    }
     let mut seen = std::collections::BTreeSet::new();
     assert!(
         aggregates
@@ -1662,6 +1682,131 @@ fn r20_the_members_of_an_enumerated_property_are_read_by_aggregates_that_scan_no
     );
 }
 
+// spec: specs/ap/status.md#R20
+#[test]
+fn r20_a_term_makes_one_aggregate_per_value_type_and_answers_the_same_matches() {
+    let mut f = fixture();
+    // The matches the per-property reading gave: every member of every property typed by an
+    // enumeration, of a type whose grant gives a derive.
+    let schema = f.schema.clone();
+    let mut today = vec![];
+    for (t, o) in schema["object_types"].as_object().unwrap() {
+        if !schema["grants"][0]["derive"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|d| d == t)
+        {
+            continue;
+        }
+        for (p, v) in o["properties"].as_object().unwrap() {
+            let Some(vt) = v["type"]["value_type"].as_str() else {
+                continue;
+            };
+            for m in schema["value_types"][vt]["enum"]
+                .as_array()
+                .into_iter()
+                .flatten()
+            {
+                today.push((m.as_str().unwrap().to_owned(), format!("{t}.{p}")));
+            }
+        }
+    }
+    for word in ["urgent", "waived", "planned", "stopped"] {
+        let v = run(&mut f, &term(word));
+        assert_eq!(v["more"], 0, "{word}: every match is shown");
+        let found: std::collections::BTreeSet<(String, String)> = v["matches"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter(|m| m["kind"] == "value")
+            .map(|m| {
+                (
+                    m["name"].as_str().unwrap().to_owned(),
+                    m["of"].as_str().unwrap().to_owned(),
+                )
+            })
+            .collect();
+        let expected: std::collections::BTreeSet<_> = today
+            .iter()
+            .filter(|(n, _)| n.contains(word))
+            .cloned()
+            .collect();
+        assert!(!expected.is_empty(), "{word}");
+        assert_eq!(found, expected, "{word}");
+        // Calls: one `aggregate` per value type that has a property of a type with a derive, and one
+        // more for each type without it that was asked before.
+        let aggregates: Vec<&Value> = f
+            .calls
+            .iter()
+            .filter(|c| c.0[0] == "aggregate")
+            .map(|c| &c.1)
+            .collect();
+        let mut types = std::collections::BTreeSet::new();
+        let mut typed = 0;
+        for (t, o) in schema["object_types"].as_object().unwrap() {
+            for (_, v) in o["properties"].as_object().unwrap() {
+                if let Some(vt) = v["type"]["value_type"].as_str() {
+                    typed += 1;
+                    types.insert((vt.to_owned(), t.clone()));
+                }
+            }
+        }
+        let distinct: std::collections::BTreeSet<_> = types.iter().map(|(v, _)| v).collect();
+        let denied: std::collections::BTreeSet<_> = schema["object_types"]
+            .as_object()
+            .unwrap()
+            .keys()
+            .filter(|t| {
+                !schema["grants"][0]["derive"]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .any(|d| d == *t)
+            })
+            .collect();
+        assert!(
+            aggregates.len() <= distinct.len() + denied.len(),
+            "{} {}",
+            aggregates.len(),
+            distinct.len()
+        );
+        assert!(
+            aggregates.len() < typed,
+            "{} of {typed} properties",
+            aggregates.len()
+        );
+    }
+}
+// spec: specs/ap/status.md#R21
+#[test]
+fn r21_a_match_without_a_description_prints_no_description_and_its_json_text_stays_empty() {
+    let mut f = fixture();
+    f.schema["object_types"]["finding"]["properties"]["severity"]["description"] = json!("");
+    let call = term("severity");
+    let v = run(&mut f, &call);
+    let m = &v["matches"][0];
+    assert_eq!(
+        (m["kind"].as_str(), m["of"].as_str(), m["text"].as_str()),
+        (Some("property"), Some("finding"), Some(""))
+    );
+    let lines = text_of(&call, &v);
+    assert!(
+        lines.starts_with("property finding.severity: (no description)\n"),
+        "{lines}"
+    );
+    // Its values have the property's description.
+    let call = term("urgent");
+    let v = run(&mut f, &call);
+    assert_eq!(v["matches"][0]["text"], "");
+    assert!(text_of(&call, &v).starts_with("value finding.severity.urgent: (no description)\n"));
+    // A control character in a text is a space.
+    f.schema["object_types"]["finding"]["properties"]["severity"]["description"] =
+        json!("a\nb\u{1}c");
+    let call = term("urgent");
+    let v = run(&mut f, &call);
+    assert!(text_of(&call, &v).starts_with("value finding.severity.urgent: a b c\n"));
+}
 // spec: specs/ap/status.md#R21
 #[test]
 fn r21_the_text_of_a_word_is_one_line_per_match_and_never_the_whole_description() {

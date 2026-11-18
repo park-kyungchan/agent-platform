@@ -548,27 +548,33 @@ fn term(s: &mut impl System, store: Option<&str>, word: &str) -> Result<Value, F
             format!("{} ({args})", text(&v["object_type"])),
         );
     }
+    // The members belong to the value type: one `ont aggregate` per distinct value type, and a second
+    // property of the type only after a `derive_forbidden` (its object type's grant gives no derive).
     let mut denied: Vec<String> = vec![];
-    for (kind, p) in enumerated {
-        if denied.contains(&kind) {
+    let mut members: Vec<(String, Vec<String>)> = vec![];
+    let mut done: Vec<String> = vec![];
+    for (kind, p) in &enumerated {
+        let typed = value_type(&p["type"]).unwrap_or_default().to_owned();
+        if denied.contains(kind) || done.contains(&typed) {
             continue;
         }
-        let name = text(&p["name"]).to_owned();
-        match store::members(s, store, &kind, &name) {
-            Ok(found) => found.iter().for_each(|m| {
-                add(
-                    "value",
-                    &json!({"name": m}),
-                    Some(&format!("{kind}.{name}")),
-                    described(&p),
-                );
-            }),
-            Err(f) if f.code == store::REFUSED => {
-                if f.detail["code"] == "derive_forbidden" {
-                    denied.push(kind);
-                }
+        match store::members(s, store, kind, text(&p["name"])) {
+            Ok(found) => members.push((typed.clone(), found)),
+            Err(f) if f.code == store::REFUSED && f.detail["code"] == "derive_forbidden" => {
+                denied.push(kind.clone());
+                continue;
             }
+            Err(f) if f.code == store::REFUSED => {}
             Err(f) => return Err(f),
+        }
+        done.push(typed);
+    }
+    for (kind, p) in &enumerated {
+        let typed = value_type(&p["type"]).unwrap_or_default();
+        let found = members.iter().find(|(t, _)| t == typed).map(|(_, m)| m);
+        for m in found.into_iter().flatten() {
+            let of = format!("{kind}.{}", text(&p["name"]));
+            add("value", &json!({"name": m}), Some(&of), described(p));
         }
     }
     let w = word.to_ascii_lowercase();
@@ -1017,11 +1023,14 @@ pub fn text_of(call: &Call, v: &Value) -> String {
                     .as_str()
                     .map(|o| format!("{o}."))
                     .unwrap_or_default();
+                let said = match text(&m["text"]) {
+                    "" => "(no description)".to_owned(),
+                    t => one(t),
+                };
                 out.push_str(&format!(
-                    "{} {of}{}: {}\n",
+                    "{} {of}{}: {said}\n",
                     text(&m["kind"]),
                     text(&m["name"]),
-                    one(text(&m["text"]))
                 ));
             }
             match v["more"].as_u64() {

@@ -1409,7 +1409,13 @@ fn item08_the_worktree_check_fails_closed_in_a_clean_environment() {
 #[test]
 fn item09_env_refuses_anthropic_names_and_home() {
     let mut f = Fake::new();
-    for name in ["ANTHROPIC_API_KEY", "ANTHROPIC_BASE_URL", "HOME"] {
+    for name in [
+        "ANTHROPIC_API_KEY",
+        "ANTHROPIC_BASE_URL",
+        "HOME",
+        "BASH_ENV",
+        "ENV",
+    ] {
         let mut r = f.request("n.md");
         r["env"] = json!({name: "x"});
         assert_eq!(code(f.run(&r)), "env_forbidden@env", "{name}");
@@ -6334,6 +6340,9 @@ fn run_object_r3_every_stage_gets_its_role_and_never_lead() {
     f.env.push(("ONT_ROLE".into(), "lead".into()));
     f.env.push(("ONT_AGENT".into(), "someone".into()));
     f.env.push(("GIT_AUTHOR_NAME".into(), "caller".into()));
+    // A file a shell sources before a command: the caller's is not inherited either.
+    f.env.push(("BASH_ENV".into(), "/caller/rc".into()));
+    f.env.push(("ENV".into(), "/caller/rc".into()));
     for (role, ont_role, want) in [
         ("implementer", None, "implementer"),
         ("fixer", None, "fixer"),
@@ -6356,6 +6365,7 @@ fn run_object_r3_every_stage_gets_its_role_and_never_lead() {
             !env.contains_key("GIT_AUTHOR_NAME"),
             "the caller's author is not inherited"
         );
+        assert!(!env.contains_key("BASH_ENV") && !env.contains_key("ENV"));
         assert_eq!(env.keys().filter(|k| k.starts_with("ONT_")).count(), 2);
     }
 }

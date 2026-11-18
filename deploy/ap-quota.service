@@ -5,7 +5,9 @@ Documentation=https://github.com/park-kyungchan/agent-platform/blob/main/deploy/
 [Service]
 Type=oneshot
 ExecStart=/usr/local/bin/ap quota
-TimeoutStartSec=60
+# A turn can take 80 seconds: the wait of 10 between the readings and the bounds of its calls (four of 10
+# and one of 30). The limit is not less.
+TimeoutStartSec=90
 # No Slice=: the service runs outside the slice it sets, so the quota does not throttle it.
 # The command reads the policy file's path as `ap run` does (`/etc/agent-platform/policy.json`).
 Environment=HOME=/root

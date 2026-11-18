@@ -255,6 +255,8 @@ class World:
         (self.home / ".netrc").write_text("")
         self.acct = t / "acct"
         self.acct.mkdir()
+        self.tmpdir = t / "tmp"  # the runner's TMPDIR: its work directories are made, and swept, here only
+        self.tmpdir.mkdir()
         self.out = t / "out"
         self.plan({})
 
@@ -262,7 +264,8 @@ class World:
         (self.t / "plan.json").write_text(json.dumps(plan))
 
     def env(self, **extra):
-        env = {"PATH": str(self.bin), "HOME": str(self.home), "CLAUDE_CONFIG_DIR": str(self.acct)}
+        env = {"PATH": str(self.bin), "HOME": str(self.home), "CLAUDE_CONFIG_DIR": str(self.acct),
+               "TMPDIR": str(self.tmpdir)}
         env.update(extra)
         return {k: v for k, v in env.items() if v is not None}
 
@@ -375,6 +378,18 @@ class Session(unittest.TestCase):
         code, out, r = self.w.answers("--samples", "1", "--case", "one", **kw)
         self.assertEqual((code, r.stderr), (0, ""), out)
         return self.w.units()[0]
+
+    def test_a_session_has_the_routing_suites_work_directory_and_private_files(self):
+        import stat
+        self.run_one(env=self.w.env(**self.token_env))
+        [run] = self.w.lines("cli.jsonl")
+        work = Path(run["cwd"])
+        self.assertEqual(work.parent.parent, self.w.tmpdir)
+        self.assertRegex(work.parent.name, r"routing-[0-9]+-[0-9]+-[a-z0-9_]+")
+        self.assertEqual(sorted(x.name for x in self.w.tmpdir.iterdir()), [], "removed when the call ends")
+        for suffix in (".jsonl", ".err"):
+            mode = stat.S_IMODE(self.w.sample("one").with_suffix(suffix).stat().st_mode)
+            self.assertEqual(mode, 0o600, suffix)
 
     def test_the_unit_holds_every_property_of_the_isolation(self):
         call = self.run_one(env=self.w.env(**self.token_env))

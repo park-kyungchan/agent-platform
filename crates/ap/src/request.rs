@@ -1,6 +1,6 @@
 //! `ap request`: one message of the user recorded as a `request` of the store with its words, routed,
 //! and the current requests of a topic listed (README "One request", `specs/ap/request.md`).
-use crate::host::{Failure, Host, System, error, fail, id};
+use crate::host::{Failure, Host, LIMIT, System, error, fail, id};
 use crate::store::{self, Actor, Applied, Found, at, bad, only, shaped, sized};
 use serde_json::{Value, json};
 use std::{ffi::OsString, io::Write, process::ExitCode};
@@ -112,6 +112,9 @@ fn words(s: &impl System, r: &Value) -> Result<Words, Failure> {
         "words_file" => {
             let path = r[way].as_str().filter(|p| p.starts_with('/'));
             let bytes = path.and_then(|p| s.read(p).ok()).ok_or_else(|| bad(way))?;
+            if bytes.len() as u64 > LIMIT {
+                return Err(error("input_too_large", way));
+            }
             let text = String::from_utf8(bytes).map_err(|_| error("words_not_utf8", way))?;
             (text, None, typed_at()?)
         }
@@ -160,13 +163,12 @@ enum Route {
 /// Exactly one of `intent` (an intent's key), `aside` (a reason of 1 to 600 bytes), `unit` (a unit's
 /// key) and `finding` (a finding's native key) of `v`.
 fn route_of(v: &Value, at: &str) -> Result<Route, Failure> {
-    let whole = if at.is_empty() { "intent" } else { "route" };
     let given: Vec<_> = ["intent", "aside", "unit", "finding"]
         .into_iter()
         .filter(|k| v.get(*k).is_some())
         .collect();
     let [way] = given[..] else {
-        return Err(bad(whole));
+        return Err(bad("route"));
     };
     let max = if way == "aside" { 600 } else { 512 };
     let value = sized(&v[way], &format!("{at}{way}"), max)?.to_owned();
@@ -243,8 +245,12 @@ fn inherited(
     store: Option<&str>,
     key: &str,
 ) -> Result<Option<Route>, Failure> {
-    let old = at(store::get(s, store, "request", key), "supersedes")?;
-    let old = old.ok_or_else(|| error("store_answer_unreadable", "supersedes"))?;
+    // The head only: `ont get` answers every observation of the request, which passes 1 MiB for a
+    // request routed often.
+    let superseded = vec![json!({"eq": ["status", "superseded"]})];
+    let rows = at(store::search(s, store, "request", superseded), "supersedes")?;
+    let old = rows.into_iter().find(|(k, _)| k == key);
+    let (_, old) = old.ok_or_else(|| error("store_answer_unreadable", "supersedes"))?;
     let text = |k: &str| {
         old[k]
             .as_str()
@@ -261,6 +267,27 @@ fn inherited(
         // Never read as unrouted (R24).
         _ => return Err(fail("route_unknown", "supersedes", old["route"].clone())),
     })
+}
+/// The head of the request `key` this call created, from `ont search` of the requests of its
+/// `session`, `topic` and `said_at` (the head only: `ont get` answers every observation of an object,
+/// which passes 1 MiB for a request routed often); no such row is `store_answer_unreadable`.
+fn read_back(
+    s: &mut impl System,
+    store: Option<&str>,
+    (session, topic, said_at): (&str, &str, &str),
+    key: &str,
+) -> Result<Value, Failure> {
+    let eq = |k: &str, v: &str| json!({"eq": [k, v]});
+    let all = vec![
+        eq("session", session),
+        eq("topic", topic),
+        eq("said_at", said_at),
+    ];
+    let rows = at(store::search(s, store, "request", all), "request")?;
+    let row = rows.into_iter().find(|(k, _)| k == key);
+    Ok(row
+        .ok_or_else(|| error("store_answer_unreadable", "request"))?
+        .1)
 }
 /// `record`, and `supersede` of the current request `request`.
 fn record(
@@ -324,8 +351,8 @@ fn record(
         .ok_or_else(|| error("store_answer_unreadable", "record"))?
         .to_owned();
     *done = Some(key.clone());
-    let back = at(store::get(s, store, "request", &key), "request")?;
-    if back.as_ref().and_then(|b| b["words"].as_str()) != Some(w.text.as_str()) {
+    let back = read_back(s, store, (actor.session, topic, &w.said_at), &key)?;
+    if back["words"].as_str() != Some(w.text.as_str()) {
         return Err(error("readback_differs", "words"));
     }
     let route = match (route, old) {
