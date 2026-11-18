@@ -22,6 +22,8 @@ The first sentence names the exact thing the message is about (the file, reposit
 3. **Decisions**: one line each: `?` the question, `권장:` the recommendation with its reason in a few words, `대안:` the other choices.
 4. **Footnotes**: a term new to the user gets a mark (`¹`) at its first use and one line below a rule (`───`): what it is, in concrete words. No definition inside the text.
 
+A progress message's board shows what changed, what is not done or not verified, and what you decided and why, each with its evidence in a card or a line.
+
 Sample (invented values):
 
 ```text
