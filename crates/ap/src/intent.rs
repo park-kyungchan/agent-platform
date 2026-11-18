@@ -1,7 +1,7 @@
 //! `ap intent`: the intent of an objective drafted with its success criteria, amended, led, confirmed,
 //! checked and closed, and shown (README "One intent", `specs/ap/intent.md`).
 use crate::host::{Failure, Host, System, error, fail, id};
-use crate::store::{self, Actor, Applied, Found, Lead, at, bad, only, shaped, sized};
+use crate::store::{self, Actor, Applied, Lead, at, bad, only, shaped, sized};
 use serde_json::{Map, Value, json};
 use std::{ffi::OsString, io::Write, process::ExitCode};
 
@@ -417,38 +417,8 @@ fn show(s: &mut impl System, store: Option<&str>, r: &Value) -> Result<Value, Fa
     only(r, "op intent", "")?;
     let key = key(r, "intent")?;
     let intent = at(store::get(s, store, "intent", key), "intent")?;
-    let mut v = intent.ok_or_else(|| error("unknown_intent", "intent"))?;
-    let by = |t: &'static str| {
-        move |o: &Found| (o.1[t].as_str().unwrap_or_default().to_owned(), o.0.clone())
-    };
-    let eq = |k: &str, v: Value| json!({"eq": [k, v]});
-    let mut criteria = at(
-        store::search(s, store, "criterion", vec![eq("intent", id("intent", key))]),
-        "criteria",
-    )?;
-    criteria.sort_by_key(by("added_at"));
-    let all = vec![eq("status", json!("current")), eq("route", json!("intent"))];
-    let mut requests = at(store::search(s, store, "request", all), "requests")?;
-    requests.retain(|(_, f)| f["intent"]["native_key"] == key);
-    requests.sort_by_key(by("said_at"));
-    let criterion = |(k, f): Found| {
-        json!({"criterion": k, "statement": f["statement"], "check": f["check"], "baseline": f["baseline"],
-            "state": f["state"], "evidence": f["evidence"], "checked_at": f["checked_at"]})
-    };
-    let request = |(k, f): Found| {
-        json!({"request": k, "topic": f["topic"], "kind": f["kind"], "said_at": f["said_at"],
-            "words_verified": f["words_verified"]})
-    };
-    let confirmed = match (v["status"].as_str(), v["confirmed_delegated"] == true) {
-        (Some("confirmed" | "met"), true) => "by delegation",
-        (Some("confirmed" | "met"), false) => "by the user",
-        _ => "no",
-    };
-    v["intent"] = json!(key);
-    v["criteria"] = criteria.into_iter().map(criterion).collect();
-    v["requests"] = requests.into_iter().map(request).collect();
-    v["confirmed"] = json!(confirmed);
-    Ok(v)
+    let v = intent.ok_or_else(|| error("unknown_intent", "intent"))?;
+    store::intent_shown(s, store, key, v)
 }
 /// The lines of `show --text`.
 pub fn text_of(v: &Value) -> String {
