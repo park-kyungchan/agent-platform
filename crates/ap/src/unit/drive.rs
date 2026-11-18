@@ -1,13 +1,15 @@
 //! `ap unit run <key>`: one unit of the store driven from `ready`, `stopped` or a cut run to
-//! `accepted` or `stopped`, its repairs inside (`specs/ap/unit-run.md`). The stages are `ap run`'s
-//! code, the gate is `ap gate`'s, the acceptance checks run as `ap unit ready` runs them, and the
-//! review of a head is recorded as `ap unit review` records one.
+//! `accepted` or `stopped`, its repairs and the updates of its branch inside, then a `plain` or
+//! approved unit merged and its worktree removed (`specs/ap/unit-run.md`); `ap unit approve|reject`,
+//! the Lead's word on an accepted unit. The stages are `ap run`'s code, the gate is `ap gate`'s, the
+//! acceptance checks run as `ap unit ready` runs them, and the review of a head is recorded as
+//! `ap unit review` records one.
 use super::object::{self, branch_ok, clone_of};
 use super::page_review::{self, key_ok, stage_unit, unit_ended};
 use super::render::{self, Role};
 use crate::host::{Failure, Host, System, args, digest, error, fail, id, new_session_id};
 use crate::review::{self, DIFF_OPTIONS};
-use crate::store::{self, Actor, Applied, at};
+use crate::store::{self, Actor, Applied, Lead, at};
 use serde_json::{Map, Value, json};
 use std::{
     ffi::OsString,
@@ -32,6 +34,15 @@ const TIMEOUTS: [(&str, u64); 3] = [
 ];
 /// The most bytes of a stop's detail (R22).
 const DETAIL: usize = 1000;
+/// The most updates of a branch in one call (R26).
+const UPDATES: u32 = 5;
+/// The author and committer of the update's merge (R26).
+const MERGER: [&str; 4] = [
+    "GIT_AUTHOR_NAME=ap unit run",
+    "GIT_AUTHOR_EMAIL=ap-unit@agents.invalid",
+    "GIT_COMMITTER_NAME=ap unit run",
+    "GIT_COMMITTER_EMAIL=ap-unit@agents.invalid",
+];
 
 /// A refusal (R25): exit 2 before the run applied anything, else 3.
 #[derive(Debug)]
@@ -83,6 +94,12 @@ fn hex40(h: &str) -> bool {
         && h.bytes()
             .all(|c| c.is_ascii_digit() || (b'a'..=b'f').contains(&c))
 }
+/// The key of a unit as `ap unit add` makes one (R2).
+fn key_form(key: &str) -> bool {
+    let byte = |c: u8| c.is_ascii_lowercase() || c.is_ascii_digit() || c == b'-';
+    let first = key.starts_with(|c: char| c.is_ascii_lowercase());
+    (1..=59).contains(&key.len()) && first && key.bytes().all(byte)
+}
 /// A directory, and not a link.
 fn real_dir(p: &Path) -> bool {
     std::fs::symlink_metadata(p).is_ok_and(|m| m.is_dir())
@@ -99,6 +116,17 @@ fn w(words: &str) -> Vec<&str> {
     words.split(' ').collect()
 }
 
+/// The refusal an `ont action validate` answers, in the form of the store's refusal of an apply.
+fn not_valid(checked: &Value) -> Option<Value> {
+    let criteria = checked["result"]["criteria"].as_array().into_iter();
+    let no: Vec<&Value> = criteria
+        .flatten()
+        .filter(|c| c["passed"] == false)
+        .map(|c| &c["code"])
+        .collect();
+    let detail = json!({"status": "refused", "code": "submission_criteria", "failed": no});
+    (checked["result"]["valid"] != true).then_some(detail)
+}
 /// The arguments after `run`: `<key> [--store <absolute path>]` (R1).
 pub fn arguments(argv: &[OsString]) -> Result<(String, Option<String>), Failure> {
     let words: Option<Vec<&str>> = argv.iter().map(|a| a.to_str()).collect();
@@ -147,25 +175,56 @@ pub fn execute(
     key: &str,
 ) -> Result<(Value, u8), Box<Refusal>> {
     let (mut run, _lock) = prepare(s, store, key).map_err(|f| refusal(f, 2, false))?;
-    let begun = match run.u["state"].as_str().unwrap_or_default() {
-        "accepted" => return run.answer(s, None).map_err(|f| refusal(f, 3, true)),
+    let state = run.u["state"].as_str().unwrap_or_default().to_owned();
+    let ended = state == "merged" || state == "dropped";
+    let begun = match state.as_str() {
+        // The Lead's rejection is undone by an amendment or a drop, never by a run (R6).
+        "stopped" if run.u["stop_cause"] == "lead_rejected" => {
+            let detail = run.u["stop_detail"].as_str().unwrap_or_default().to_owned();
+            let answered = run.answer(s, Some(("lead_rejected", &detail)), &Outcome::default());
+            return answered.map_err(|f| refusal(f, 3, true));
+        }
         "ready" | "stopped" => run.begin(s),
         "running" => run.held(s),
+        "accepted" | "merged" | "dropped" => Ok(()),
         other => Err(fail("unit_not_runnable", "unit", json!(other))),
     };
     begun.map_err(|f| refusal(f, 2, false))?;
-    let answered = match run.leftovers(s).and_then(|()| run.drive(s)) {
-        Ok(()) => run.answer(s, None),
+    let driven = run.leftovers(s).and_then(|()| match ended {
+        true => Ok(Outcome {
+            cleanup: Some(run.cleanup(s)),
+            ..Outcome::default()
+        }),
+        false => run.drive(s),
+    });
+    let answered = match driven {
+        Ok(out) => run.answer(s, None, &out),
+        // A unit that is not running is not stopped: the answer names the refusal (R22, R30).
+        Err(Halt::Stop(cause, _)) if run.u["state"] != "running" => {
+            let out = Outcome {
+                refused: Some(cause),
+                ..Outcome::default()
+            };
+            run.answer(s, None, &out)
+        }
         Err(Halt::Stop(cause, detail)) => {
             let detail = cut(&detail, DETAIL);
             let p = json!({"unit": id("unit", key), "cause": cause, "detail": detail});
             let stopped = run.apply(s, "stop_unit", p);
-            stopped.and_then(|_| run.answer(s, Some((&cause, &detail))))
+            stopped.and_then(|_| run.answer(s, Some((&cause, &detail)), &Outcome::default()))
         }
         Err(Halt::Fail(f)) => Err(f),
     };
-    let status = if run.applied { 3 } else { 2 };
+    let status = if run.applied || ended { 3 } else { 2 };
     answered.map_err(|f| refusal(f, status, true))
+}
+/// How a call that did not stop ended: the merge, the cleanup, the refusal that left the unit as
+/// it is (R25).
+#[derive(Default)]
+struct Outcome {
+    merged_commit: Option<String>,
+    cleanup: Option<Value>,
+    refused: Option<String>,
 }
 
 /// An author record under `<directory>/<key>/`: `<n>.implementer.md.run.json` or `<n>.fixer.md.run.json`.
@@ -231,8 +290,17 @@ struct Done {
     settled: bool,
     turned: bool,
     moved: bool,
-    fixed: Option<String>,
+    own: Option<Own>,
     checks: u32,
+    updates: u32,
+}
+/// The heads this call's own fixer and updates moved, one after the other, from the head `from`
+/// (R19).
+struct Own {
+    from: String,
+    to: String,
+    repair: bool,
+    update: bool,
 }
 /// One call's unit and its places.
 struct Run {
@@ -328,14 +396,45 @@ fn tier(u: &Value, which: &str, role: &str, policy: &Value) -> Result<Value, Fai
     }
     Ok(req)
 }
+/// The policy file as one JSON object, or null.
+fn policy_of(s: &impl System) -> Value {
+    let file = s
+        .policy_file()
+        .and_then(|p| s.read(&p.to_string_lossy()).ok());
+    file.and_then(|b| serde_json::from_slice(&b).ok())
+        .unwrap_or_default()
+}
+/// The directories and the lock of the unit `key`, of a checked form (R3, R5, R35): the units
+/// directory is resolved once; `<key>/wt` is appended to it unresolved (R8).
+fn locked(directory: &str, key: &str) -> Result<(PathBuf, File), Failure> {
+    let io = |what: &str| fail("io_error", "directory", json!(what));
+    let mut dirs = std::fs::DirBuilder::new();
+    dirs.recursive(true).mode(0o700);
+    dirs.create(directory)
+        .map_err(|_| io("the units directory cannot be made"))?;
+    let root = std::fs::canonicalize(directory).map_err(|_| io("the units directory"))?;
+    let home = root.join(key);
+    match dirs.recursive(false).create(&home) {
+        Err(e) if e.kind() != std::io::ErrorKind::AlreadyExists => return Err(io("the unit's")),
+        _ if !real_dir(&home) => return Err(fail("worktree_failed", "directory", json!(home))),
+        _ => {}
+    }
+    let mut options = std::fs::OpenOptions::new();
+    options.read(true).write(true).create(true).mode(0o600);
+    options.custom_flags(rustix::fs::OFlags::NOFOLLOW.bits() as i32);
+    let lock = options
+        .open(home.join("lock"))
+        .map_err(|_| io("the lock"))?;
+    let held = rustix::fs::flock(&lock, rustix::fs::FlockOperation::NonBlockingLockExclusive);
+    held.map_err(|_| error("unit_run_active", "unit"))?;
+    Ok((home, lock))
+}
 /// The checks before any effect (R1 to R4), then the directories and the lock (R3, R5).
 fn prepare(s: &mut impl System, store: Option<&str>, key: &str) -> Result<(Run, File), Failure> {
     if object::lead_in_environment(s) {
         return Err(error("role_in_environment", "ONT_ROLE"));
     }
-    let byte = |c: u8| c.is_ascii_lowercase() || c.is_ascii_digit() || c == b'-';
-    let first = key.starts_with(|c: char| c.is_ascii_lowercase());
-    if !(1..=59).contains(&key.len()) || !first || !key.bytes().all(byte) {
+    if !key_form(key) {
         return Err(error("invalid_input", "unit"));
     }
     let u = at(store::get(s, store, "unit", key), "unit")?;
@@ -351,12 +450,7 @@ fn prepare(s: &mut impl System, store: Option<&str>, key: &str) -> Result<(Run, 
     }
     let clone = clone_of(s, repo)?;
     // `clone_of` read the file as one JSON object.
-    let file = s
-        .policy_file()
-        .and_then(|p| s.read(&p.to_string_lossy()).ok());
-    let policy: Value = file
-        .and_then(|b| serde_json::from_slice(&b).ok())
-        .unwrap_or_default();
+    let policy = policy_of(s);
     let reviews = page_review::policy(s)?;
     let task = reviews.get("task").and_then(Value::as_str);
     let task = task
@@ -365,27 +459,7 @@ fn prepare(s: &mut impl System, store: Option<&str>, key: &str) -> Result<(Run, 
     let (directory, timeouts) = units(&policy)?;
     let implementer = tier(&u, "implementer", "implementer", &policy)?;
     let verifier = tier(&u, "verifier", "reviewer", &policy)?;
-    // The directory is resolved once; `<key>/wt` is appended to it unresolved (R3, R8).
-    let io = |what: &str| fail("io_error", "directory", json!(what));
-    let mut dirs = std::fs::DirBuilder::new();
-    dirs.recursive(true).mode(0o700);
-    dirs.create(&directory)
-        .map_err(|_| io("the units directory cannot be made"))?;
-    let root = std::fs::canonicalize(&directory).map_err(|_| io("the units directory"))?;
-    let home = root.join(key);
-    match dirs.recursive(false).create(&home) {
-        Err(e) if e.kind() != std::io::ErrorKind::AlreadyExists => return Err(io("the unit's")),
-        _ if !real_dir(&home) => return Err(fail("worktree_failed", "directory", json!(home))),
-        _ => {}
-    }
-    let mut options = std::fs::OpenOptions::new();
-    options.read(true).write(true).create(true).mode(0o600);
-    options.custom_flags(rustix::fs::OFlags::NOFOLLOW.bits() as i32);
-    let lock = options
-        .open(home.join("lock"))
-        .map_err(|_| io("the lock"))?;
-    let held = rustix::fs::flock(&lock, rustix::fs::FlockOperation::NonBlockingLockExclusive);
-    held.map_err(|_| error("unit_run_active", "unit"))?;
+    let (home, lock) = locked(&directory, key)?;
     let drawn = new_session_id(s)?.replace('-', "");
     let dir = reviews.get("directory").and_then(Value::as_str);
     let run = Run {
@@ -418,6 +492,15 @@ impl Run {
     /// One apply as the client `ap`, the agent `ap-unit`, the session `u-<key>` and no role (R1).
     fn apply(&mut self, s: &mut impl System, action: &str, p: Value) -> Result<Applied, Failure> {
         let rid = self.rid();
+        self.apply_as(s, action, rid, p)
+    }
+    fn apply_as(
+        &mut self,
+        s: &mut impl System,
+        action: &str,
+        rid: String,
+        p: Value,
+    ) -> Result<Applied, Failure> {
         let actor = Actor {
             agent: "ap-unit",
             session: &self.session,
@@ -450,7 +533,9 @@ impl Run {
         if self.u["lane"] == "objective" {
             p["intent"] = self.u["intent"].clone();
         }
-        self.apply(s, action, p).map(|_| ())
+        self.apply(s, action, p)?;
+        self.u["state"] = json!("running");
+        Ok(())
     }
     /// The take-over of a cut run applies nothing: an active hold on the unit or its intent refuses it (R6).
     fn held(&mut self, s: &mut impl System) -> Result<(), Failure> {
@@ -676,15 +761,7 @@ impl Run {
             "pr list --repo {repo} --head {branch} --base main --state open --json {fields}"
         );
         let v = self.gh(s, &words)?;
-        let (owner, name) = repo.split_once('/').unwrap_or_default();
-        let same = |a: &Value, b: &str| a.as_str().is_some_and(|a| a.eq_ignore_ascii_case(b));
-        let own = |p: &&Value| {
-            p["headRefName"] == branch.as_str()
-                && p["baseRefName"] == "main"
-                && p["isCrossRepository"] == false
-                && same(&p["headRepositoryOwner"]["login"], owner)
-                && same(&p["headRepository"]["name"], name)
-        };
+        let own = |p: &&Value| p["baseRefName"] == "main" && self.of_branch(p);
         let list: Vec<&Value> = v.as_array().into_iter().flatten().filter(own).collect();
         let [p] = list.as_slice() else {
             return match list.len() {
@@ -700,17 +777,34 @@ impl Run {
         n.zip(head)
             .map_or_else(|| stop("github_unreadable", "pr list"), |p| Ok(Some(p)))
     }
-    /// The state and the head of pull request `n`.
-    fn view(&self, s: &mut impl System, n: u64) -> Step<(String, String)> {
+    /// A pull request whose head branch is the unit's branch of the repository itself (R9, R10).
+    fn of_branch(&self, p: &Value) -> bool {
+        let (owner, name) = self.repo.split_once('/').unwrap_or_default();
+        let same = |a: &Value, b: &str| a.as_str().is_some_and(|a| a.eq_ignore_ascii_case(b));
+        p["headRefName"] == self.branch.as_str()
+            && p["isCrossRepository"] == false
+            && same(&p["headRepositoryOwner"]["login"], owner)
+            && same(&p["headRepository"]["name"], name)
+    }
+    /// Pull request `n` as the hosting service shows it: its state and head (checked), its base, its
+    /// head branch and repository, its merge commit.
+    fn pull(&self, s: &mut impl System, n: u64) -> Step<Value> {
+        let fields = "state,baseRefName,headRefOid,headRefName,isCrossRepository,headRepositoryOwner,headRepository,mergeCommit";
         let v = self.gh(
             s,
-            &format!("pr view {n} --repo {} --json state,headRefOid", self.repo),
+            &format!("pr view {n} --repo {} --json {fields}", self.repo),
         )?;
-        let head = v["headRefOid"].as_str().filter(|h| hex40(h));
-        match (v["state"].as_str(), head) {
-            (Some(state), Some(head)) => Ok((state.to_owned(), head.to_owned())),
+        let head = v["headRefOid"].as_str().is_some_and(hex40);
+        match (v["state"].is_string(), head) {
+            (true, true) => Ok(v),
             _ => stop("github_unreadable", "pr view"),
         }
+    }
+    /// The state and the head of pull request `n`.
+    fn view(&self, s: &mut impl System, n: u64) -> Step<(String, String)> {
+        let v = self.pull(s, n)?;
+        let text = |k: &str| v[k].as_str().unwrap_or_default().to_owned();
+        Ok((text("state"), text("headRefOid")))
     }
     /// The read of the hosting service at the start of a pass (R9).
     fn read(&mut self, s: &mut impl System) -> Step<Option<(u64, String)>> {
@@ -766,7 +860,12 @@ impl Run {
         let added = if exists {
             let entry = self.entry(s)?;
             let own = entry.is_some_and(|e| e.lines().any(|l| l == format!("branch {reference}")));
-            if !own && self.u["pull_request"].is_null() {
+            // A pull request the unit holds makes the branch its own only as that one's head branch.
+            let held = match self.u["pull_request"].as_u64().filter(|_| !own) {
+                Some(n) => self.of_branch(&self.pull(s, n)?),
+                None => own,
+            };
+            if !held {
                 return stop("branch_in_use", json!({"branch": branch}));
             }
             self.git(s, clone, &["worktree", "add", "--quiet", wt, branch])
@@ -1006,33 +1105,53 @@ impl Run {
         Ok(())
     }
 
-    /// The record of the newest verdict's session and the head it judged, when the round resumes it
-    /// (R19): only after this call's own fixer moved that head, and no move of another since.
-    fn second_look(&self, v: &Verdicts) -> Option<(String, String)> {
+    /// This call's own fixer or update moved the head `from` to `to` (R19).
+    fn moved(&mut self, from: &str, to: &str, repair: bool) {
+        let own = match self.done.own.take() {
+            Some(o) if o.to == from => o,
+            _ => Own {
+                from: from.to_owned(),
+                to: String::new(),
+                repair: false,
+                update: false,
+            },
+        };
+        self.done.own = Some(Own {
+            to: to.to_owned(),
+            repair: own.repair || repair,
+            update: own.update || !repair,
+            ..own
+        });
+    }
+    /// The record of the newest verdict's session, the head it judged and what moved it, when the
+    /// round on `head` resumes it (R19): only when this call's own fixer and updates moved the judged
+    /// head to `head`, and no move of another since.
+    fn second_look(&self, v: &Verdicts, head: &str) -> Option<(String, String, &'static str)> {
         let since = v.list.iter().rfind(|(_, r)| v.later(r));
         let abandoned = since.is_some_and(|(_, r)| r["verdict"] == "abandoned");
         let (k, r) = v.newest()?;
         let (judged, session) = (r["head"].as_str()?, r["session"].as_str()?);
         let writers = self.u["writers"].as_array();
         let writer = writers.is_some_and(|w| w.iter().any(|w| w == session));
-        let own = self.done.fixed.as_deref() == Some(judged) && !self.done.moved;
+        let own = self
+            .done
+            .own
+            .as_ref()
+            .filter(|o| o.from == judged && o.to == head);
+        let what = match own.map(|o| (o.repair, o.update)) {
+            Some((true, true)) => "the author's repair and a merge of origin/main",
+            Some((true, false)) => "the author's repair",
+            _ => "a merge of origin/main",
+        };
         let record = format!("{}.run.json", self.report(k)?);
-        let fit = own && !abandoned && !writer && json_file(&record).is_some();
-        fit.then(|| (record, judged.to_owned()))
+        let fit = own.is_some() && !self.done.moved && !abandoned && !writer;
+        let fit = fit && json_file(&record).is_some();
+        fit.then(|| (record, judged.to_owned(), what))
     }
     /// One validate naming the review's key, the admission of the stage, the start (R19).
     fn start_review(&mut self, s: &mut impl System, body: &Value, req: &mut Value) -> Step<String> {
         let checked = at(store::validate(s, self.store(), body), "start")?;
-        if checked["result"]["valid"] != true {
-            let criteria = checked["result"]["criteria"]
-                .as_array()
-                .into_iter()
-                .flatten();
-            let no: Vec<&Value> = criteria
-                .filter(|c| c["passed"] == false)
-                .map(|c| &c["code"])
-                .collect();
-            let detail = json!({"status": "refused", "code": "submission_criteria", "failed": no});
+        if let Some(detail) = not_valid(&checked) {
             return failed(store::REFUSED, "start", detail);
         }
         let edits = checked["result"]["edits"].as_array().into_iter().flatten();
@@ -1075,11 +1194,10 @@ impl Run {
         head: &str,
         v: &Verdicts,
     ) -> Step<(String, String)> {
-        let resumed = self.second_look(v);
+        let resumed = self.second_look(v, head);
         let mut text = self.page(s, Role::Verifier)?;
-        if let Some((_, judged)) = &resumed {
-            let round =
-                format!("Head judged before: {judged}\nWhat moved it: the author's repair\n");
+        if let Some((_, judged, what)) = &resumed {
+            let round = format!("Head judged before: {judged}\nWhat moved it: {what}\n");
             text.push_str(&format!("\n{SECOND_LOOK}\n## The round\n\n{round}"));
         }
         let n = self.next();
@@ -1101,7 +1219,7 @@ impl Run {
         );
         let mut req = self.stage(&self.verifier, "reviewer", "verifier", (&prompt, ""));
         (req["ont_role"], req["expect"]) = (json!("verifier"), json!({"first_line": "Verdict: *"}));
-        if let Some((record, _)) = &resumed {
+        if let Some((record, ..)) = &resumed {
             req["resume"] = json!({"record": record});
         }
         let review = self.start_review(s, &body, &mut req)?;
@@ -1115,10 +1233,19 @@ impl Run {
         };
         let session = session(&rec).map(str::to_owned);
         let abandon = json!({"verdict": "abandoned", "session": session});
-        // A verifier that wrote or pushed becomes a writer before the unit stops (R20).
-        let t = self.tree(s)?;
-        let (_, now) = self.view(s, number)?;
-        if !t.clean || t.head != head || now != head || !t.on_branch {
+        // A verifier that wrote or pushed becomes a writer before the unit stops; a read that fails
+        // closes the review first (R20).
+        let read = self
+            .tree(s)
+            .and_then(|t| self.view(s, number).map(|v| (t, v)));
+        let (t, (state, now)) = match read {
+            Ok(read) => read,
+            Err(h) => {
+                self.close(s, &review, abandon)?;
+                return Err(h);
+            }
+        };
+        if !t.clean || t.head != head || now != head || !t.on_branch || state != "OPEN" {
             self.close(s, &review, abandon)?;
             self.record_head(s, number, &now, session.as_deref())?;
             let detail = json!({"review": review, "head": now, "worktree": t.shown()});
@@ -1154,6 +1281,8 @@ impl Run {
             let detail = json!({"review": review, "cause": "writer_cannot_review"});
             return stop("verifier_failed", detail);
         }
+        // The moves of this call are counted again from this verdict.
+        self.done.own = None;
         Ok((verdict.to_owned(), review))
     }
     /// The repair step (R21).
@@ -1170,22 +1299,38 @@ impl Run {
         let round = format!("Head judged: {judged}\nVerifier report: {report}\n");
         let text = format!("{page}\n{FIXER}\n## The round\n\n{round}");
         let (rec, out) = self.author(s, "fixer", Some(from), &text)?;
-        if self.git(s, &self.wt, &["rev-parse", "HEAD"])? == judged {
+        let now = self.git(s, &self.wt, &["rev-parse", "HEAD"])?;
+        if now == judged {
             return stop("repair_refused", Self::answered(&out, &rec));
         }
-        self.done.fixed = Some(judged.to_owned());
+        self.moved(judged, &now, true);
         self.wait(s)
     }
 
-    /// The loop: each pass reads, then takes the first step that applies (R8 to R21).
-    fn drive(&mut self, s: &mut impl System) -> Step {
+    /// One base commit: `refs/remotes/origin/main` after a fetch (R8, R30).
+    fn take_base(&mut self, s: &mut impl System) -> Step {
+        self.fetch(s, "main")?;
+        let main = ["rev-parse", "--verify", "refs/remotes/origin/main^{commit}"];
+        self.base = self.git(s, &self.clone, &main)?;
+        if !hex40(&self.base) {
+            return stop("fetch_failed", "refs/remotes/origin/main");
+        }
+        Ok(())
+    }
+    fn contains_base(&self, s: &mut impl System, head: &str) -> bool {
+        let words = ["merge-base", "--is-ancestor", &self.base, head];
+        self.git_ok(s, &self.clone, &words)
+    }
+    /// The loop: each pass reads, then takes the first step that applies (R8 to R21, R26 to R30).
+    fn drive(&mut self, s: &mut impl System) -> Step<Outcome> {
         loop {
-            self.fetch(s, "main")?;
-            let main = ["rev-parse", "--verify", "refs/remotes/origin/main^{commit}"];
-            self.base = self.git(s, &self.clone, &main)?;
-            if !hex40(&self.base) {
-                return stop("fetch_failed", "refs/remotes/origin/main");
+            if self.u["state"] == "accepted" {
+                match self.land(s)? {
+                    Some(out) => return Ok(out),
+                    None => continue,
+                }
             }
+            self.take_base(s)?;
             let pr = self.read(s)?;
             if Path::new(&self.wt).symlink_metadata().is_err() {
                 self.make_worktree(s)?;
@@ -1196,7 +1341,8 @@ impl Run {
                 self.implement(s, &t)?;
                 continue;
             };
-            if t.head != head || !t.clean || !t.on_branch {
+            let pending = self.own_merge(s, &t, &head);
+            if pending.is_none() && (t.head != head || !t.clean || !t.on_branch) {
                 let forward = t.clean && t.on_branch && {
                     self.fetch(s, &format!("refs/heads/{}", self.branch))?;
                     self.git_ok(
@@ -1213,7 +1359,7 @@ impl Run {
                 }
                 continue;
             }
-            if let Some(a) = self.amended_turn() {
+            if let Some(a) = self.amended_turn().filter(|_| pending.is_none()) {
                 self.done.turned = true;
                 self.turn(s, &a)?;
                 continue;
@@ -1221,12 +1367,18 @@ impl Run {
             if self.u["head"] != *head || self.u["pull_request"] != number {
                 self.record_head(s, number, &head, None)?;
             }
-            if !self.git_ok(
-                s,
-                &self.clone,
-                &["merge-base", "--is-ancestor", &self.base, &head],
-            ) {
-                return stop("behind_main", json!({"base": self.base, "head": head}));
+            // A head judged `repair` goes to its author before any update (R29).
+            let v = self.verdicts(s)?;
+            if let Some((k, r)) = v.of(&head).filter(|_| pending.is_none())
+                && r["verdict"] == "repair"
+            {
+                let k = k.clone();
+                self.repair(s, &k, &head, &v)?;
+                continue;
+            }
+            if !self.contains_base(s, &head) {
+                self.update(s, number, &head, pending)?;
+                continue;
             }
             self.checks(s, &head)?;
             self.gate(s, number, &head)?;
@@ -1239,22 +1391,306 @@ impl Run {
                 None => self.verify(s, number, &head, &v)?,
             };
             if verdict == "accept" {
-                self.apply(
-                    s,
-                    "accept_unit",
-                    json!({"unit": self.unit_id(), "head": head}),
-                )?;
-                return Ok(());
+                let p = json!({"unit": self.unit_id(), "head": head});
+                self.apply(s, "accept_unit", p)?;
+                self.reread(s)?;
+                // A `plain` unit goes on to its merge in this call (R18, R30).
+                if self.u["class"] != "plain" {
+                    return Ok(Outcome::default());
+                }
+                continue;
             }
             let v = self.verdicts(s)?;
             self.repair(s, &review, &head, &v)?;
         }
     }
+
+    /// The message of the update's own merges (R26, R27).
+    fn merge_message(&self) -> String {
+        format!("Merge origin/main into {} (ap unit run)", self.branch)
+    }
+    /// A clean worktree on the branch whose HEAD is the update's own merge of `head` with the base or
+    /// an ancestor of it, made by a call cut before its push (R27).
+    fn own_merge(&self, s: &mut impl System, t: &Tree, head: &str) -> Option<String> {
+        if !t.clean || !t.on_branch || t.head == head {
+            return None;
+        }
+        let parents = review::git(s, &self.wt, &["rev-list", "--parents", "-n", "1", &t.head]);
+        let parents = parents.ok()?;
+        let [_, first, second] = parents.split_whitespace().collect::<Vec<_>>()[..] else {
+            return None;
+        };
+        let message = review::git(s, &self.wt, &["log", "-1", "--format=%B", &t.head]).ok()?;
+        let ours = first == head && message.trim_end() == self.merge_message();
+        let ancestor = ["merge-base", "--is-ancestor", second, &self.base];
+        (ours && self.git_ok(s, &self.wt, &ancestor)).then(|| t.head.clone())
+    }
+    /// The update of a head behind the base: the base merged into the branch in the worktree (or the
+    /// run's own unpushed merge taken), the writers recorded, the push, the wait (R26 to R28).
+    fn update(
+        &mut self,
+        s: &mut impl System,
+        number: u64,
+        head: &str,
+        pending: Option<String>,
+    ) -> Step {
+        if self.done.updates >= UPDATES {
+            return stop("update_limit", json!({"updates": self.done.updates}));
+        }
+        let merged = match pending {
+            Some(m) => m,
+            None => self.merge_base(s)?,
+        };
+        let word = format!("{}:update", self.session);
+        let writers = self.u["writers"].as_array();
+        let known = writers.is_some_and(|w| w.iter().any(|w| *w == *word));
+        if self.u["head"] != *head || !known {
+            self.record_head(s, number, head, Some(&word))?;
+        }
+        let to = format!("HEAD:refs/heads/{}", self.branch);
+        let push = [
+            "--no-replace-objects",
+            "-C",
+            &self.wt,
+            "push",
+            "--quiet",
+            "origin",
+            &to,
+        ];
+        let pushed = s.call("git", &args(&push), &Value::Null, 120_000);
+        if !pushed.is_ok_and(|r| r.success) {
+            return stop("push_failed", json!({"head": merged}));
+        }
+        self.done.updates += 1;
+        self.moved(head, &merged, false);
+        self.wait(s)
+    }
+    /// The base merged into the worktree's HEAD by the run's own author; a conflict is aborted (R26).
+    fn merge_base(&self, s: &mut impl System) -> Step<String> {
+        let message = self.merge_message();
+        let mut words = MERGER.to_vec();
+        words.extend([
+            "git",
+            "--no-replace-objects",
+            "-C",
+            &self.wt,
+            "merge",
+            "--no-ff",
+        ]);
+        words.extend(["--no-edit", "--quiet", "-m", &message, &self.base]);
+        let merged = s.call("env", &args(&words), &Value::Null, 120_000);
+        if merged.is_ok_and(|r| r.success) {
+            return self.git(s, &self.wt, &["rev-parse", "HEAD"]);
+        }
+        let paths = ["diff", "--name-only", "--diff-filter=U"];
+        let paths = review::git(s, &self.wt, &paths).unwrap_or_default();
+        self.git(s, &self.wt, &["merge", "--abort"])?;
+        let paths: Vec<&str> = paths.lines().take(10).collect();
+        stop("merge_conflict", json!({"base": self.base, "paths": paths}))
+    }
+
+    /// An accepted unit: the pull request read against a new base, then the merge, the reopen or the
+    /// wait for the Lead's approval (R30). `None` when the unit runs again.
+    fn land(&mut self, s: &mut impl System) -> Step<Option<Outcome>> {
+        self.take_base(s)?;
+        let head = self.u["head"].as_str().unwrap_or_default().to_owned();
+        let Some(n) = self.u["pull_request"].as_u64() else {
+            return stop("pull_request_not_open", json!({"pull_request": null}));
+        };
+        let p = self.pull(s, n)?;
+        let (state, now) = (p["state"].as_str().unwrap_or_default(), &p["headRefOid"]);
+        // Only a pull request against `main` is merged or recorded merged; one moved off it is not.
+        if p["baseRefName"] != "main" {
+            let detail = json!({"pull_request": n, "state": state, "base": p["baseRefName"]});
+            return stop("pull_request_not_open", detail);
+        }
+        match state {
+            "MERGED" if *now == *head => {
+                let commit = p["mergeCommit"]["oid"].as_str().filter(|c| hex40(c));
+                let Some(commit) = commit else {
+                    return stop("github_unreadable", "mergeCommit");
+                };
+                let rid = self.rid();
+                let p = self.merge_parameters(&head, commit);
+                self.record_merge(s, rid, p).map(Some)
+            }
+            "OPEN" if *now != *head => self.reopen(s, "head_moved").map(|()| None),
+            "OPEN" if !self.contains_base(s, &head) => self.reopen(s, "main_moved").map(|()| None),
+            "OPEN" if self.u["class"] == "plain" || self.u["approved_head"] == *head => {
+                self.merge(s, n, &head).map(Some)
+            }
+            "OPEN" => Ok(Some(Outcome::default())),
+            _ => stop(
+                "pull_request_not_open",
+                json!({"pull_request": n, "state": state, "head": now}),
+            ),
+        }
+    }
+    /// `reopen_unit` with `cause`; the store's refusal ends the call with the unit `accepted` (R30).
+    fn reopen(&mut self, s: &mut impl System, cause: &str) -> Step {
+        let mut p = json!({"unit": self.unit_id(), "cause": cause});
+        if self.u["lane"] == "objective" {
+            p["intent"] = self.u["intent"].clone();
+        }
+        match self.apply(s, "reopen_unit", p) {
+            Err(f) if f.code == store::REFUSED => stop(&store::code(&f), f.detail),
+            other => {
+                other?;
+                Ok(self.reread(s)?)
+            }
+        }
+    }
+    fn merge_parameters(&self, head: &str, commit: &str) -> Value {
+        let mut p = json!({"unit": self.unit_id(), "head": head, "merged_commit": commit});
+        if self.u["lane"] == "objective" {
+            p["intent"] = self.u["intent"].clone();
+        }
+        p
+    }
+    /// The merge: `merge_unit` validated, the status `lead-review`, the merge with the head pinned,
+    /// read back, then `merge_unit` applied with the merge commit (R31).
+    fn merge(&mut self, s: &mut impl System, n: u64, head: &str) -> Step<Outcome> {
+        let rid = self.rid();
+        let p = self.merge_parameters(head, &"0".repeat(40));
+        let actor = Actor {
+            agent: "ap-unit",
+            session: &self.session,
+        };
+        let body = store::body(&actor, "merge_unit", rid.clone(), p);
+        let checked = at(store::validate(s, self.store(), &body), "merge_unit")?;
+        if let Some(detail) = not_valid(&checked) {
+            let code = detail["failed"][0]
+                .as_str()
+                .unwrap_or(store::REFUSED)
+                .to_owned();
+            return stop(&code, detail);
+        }
+        let v = self.verdicts(s)?;
+        let review = v.of(head).map(|(k, _)| k.clone()).unwrap_or_default();
+        let target = json!({"repository": self.repo, "head": head});
+        let posted = review::post(s, &target, "success", &format!("review {review} accept"));
+        posted.or_else(|_| stop("status_failed", json!({"head": head})))?;
+        let words = format!(
+            "pr merge {n} --repo {} --merge --match-head-commit {head}",
+            self.repo
+        );
+        let called = s.call("gh", &args(&w(&words)), &Value::Null, 120_000);
+        let called = called.is_ok_and(|r| r.success);
+        // The read decides, also after a call that failed: it may have merged.
+        let read = self.pull(s, n).ok();
+        let merged = read.filter(|p| {
+            p["state"] == "MERGED" && p["headRefOid"] == head && p["baseRefName"] == "main"
+        });
+        let commit = merged.and_then(|p| p["mergeCommit"]["oid"].as_str().map(str::to_owned));
+        let Some(commit) = commit.filter(|c| hex40(c)) else {
+            if called {
+                return stop("merge_unconfirmed", json!({"head": head}));
+            }
+            let _ = review::post(s, &target, "failure", "merge failed");
+            return stop("merge_failed", json!({"head": head}));
+        };
+        let p = self.merge_parameters(head, &commit);
+        self.record_merge(s, rid, p)
+    }
+    /// `merge_unit` applied, then the cleanup; the store's refusal leaves the unit as it reads (R30,
+    /// R31, R35).
+    fn record_merge(&mut self, s: &mut impl System, rid: String, p: Value) -> Step<Outcome> {
+        let mut out = Outcome {
+            merged_commit: p["merged_commit"].as_str().map(str::to_owned),
+            ..Outcome::default()
+        };
+        match self.apply_as(s, "merge_unit", rid, p) {
+            Err(f) if f.code == store::REFUSED => out.refused = Some(store::code(&f)),
+            Err(f) => return Err(f.into()),
+            Ok(_) => {
+                self.reread(s)?;
+                out.cleanup = Some(self.cleanup(s));
+            }
+        }
+        self.reread(s)?;
+        Ok(out)
+    }
+    /// The cleanup of a merged or dropped unit: the one worktree, the one branch, and for a dropped
+    /// unit its pull request named when it is open (R32).
+    fn cleanup(&mut self, s: &mut impl System) -> Value {
+        let dropped = self.u["state"] == "dropped";
+        let mut c = json!({});
+        let wt = Path::new(&self.wt);
+        let worktree = if wt.symlink_metadata().is_err() {
+            Ok("nothing")
+        } else if !real_dir(&self.home) || !real_dir(wt) {
+            Err("not a directory")
+        } else {
+            match self.entry(s) {
+                Ok(Some(_)) => {
+                    let mut words = vec!["worktree", "remove"];
+                    words.extend(dropped.then_some("--force"));
+                    words.push(&self.wt);
+                    match self.git_ok(s, &self.clone, &words) {
+                        true => Ok("removed"),
+                        false => Err("git worktree remove refused: the worktree is not clean"),
+                    }
+                }
+                Ok(None) => Err("no worktree of the clone at this path"),
+                Err(_) => Err("git worktree list failed"),
+            }
+        };
+        match worktree {
+            Ok(w) => c["worktree"] = json!(w),
+            Err(why) => {
+                (c["worktree"], c["worktree_reason"]) = (json!("worktree_kept"), json!(why))
+            }
+        }
+        let made = !self.u["pull_request"].is_null() || !self.authors().is_empty();
+        let branch = if made {
+            self.drop_branch(s)
+        } else {
+            Ok("nothing")
+        };
+        match branch {
+            Ok(b) => c["branch"] = json!(b),
+            Err(why) => (c["branch"], c["branch_reason"]) = (json!("kept"), json!(why)),
+        }
+        if let Some(n) = self.u["pull_request"].as_u64().filter(|_| dropped)
+            && self.view(s, n).is_ok_and(|(state, _)| state == "OPEN")
+        {
+            c["pull_request_open"] = json!(n);
+        }
+        c
+    }
+    /// The unit's branch deleted only when a fetch now shows its tip in `main` (R32).
+    fn drop_branch(&mut self, s: &mut impl System) -> Result<&'static str, &'static str> {
+        let (clone, branch) = (self.clone.clone(), self.branch.clone());
+        let reference = format!("refs/heads/{branch}");
+        let tip = review::git(s, &clone, &["rev-parse", "--verify", "--quiet", &reference]);
+        let Ok(tip) = tip.map(|t| t.trim().to_owned()) else {
+            return Ok("nothing");
+        };
+        if self.fetch(s, "main").is_err() {
+            return Err("fetch_failed");
+        }
+        let merged = [
+            "merge-base",
+            "--is-ancestor",
+            &tip,
+            "refs/remotes/origin/main",
+        ];
+        if !self.git_ok(s, &clone, &merged) {
+            return Err("not merged into main");
+        }
+        let deleted = self.git_ok(s, &clone, &["branch", "-d", &branch])
+            || self.git_ok(s, &clone, &["branch", "-D", &branch]);
+        deleted
+            .then_some("removed")
+            .ok_or("git branch -D refused: the branch is checked out")
+    }
+
     /// The answer (R25).
     fn answer(
         &mut self,
         s: &mut impl System,
         stopped: Option<(&str, &str)>,
+        out: &Outcome,
     ) -> Result<(Value, u8), Failure> {
         self.reread(s)?;
         let v = match self.verdicts(s) {
@@ -1264,15 +1700,164 @@ impl Run {
         };
         let one = |(k, r): &(String, Value)| json!({"key": k, "round": r["round"], "head": r["head"], "verdict": r["verdict"]});
         let u = &self.u;
+        let merged = out
+            .merged_commit
+            .as_ref()
+            .map_or(u["merged_commit"].clone(), |c| json!(c));
         let mut a = json!({"unit": self.key, "state": u["state"], "head": u["head"],
             "pull_request": u["pull_request"], "rounds": v.rounds(), "repairs": v.repairs(),
-            "reviews": v.list.iter().map(one).collect::<Vec<_>>()});
-        let Some((cause, detail)) = stopped else {
+            "reviews": v.list.iter().map(one).collect::<Vec<_>>(), "updates": self.done.updates,
+            "merged_commit": merged});
+        if let Some(c) = &out.cleanup {
+            a["cleanup"] = c.clone();
+        }
+        if let Some((cause, detail)) = stopped {
+            (a["stop_cause"], a["stop_detail"]) = (json!(cause), json!(detail));
+            return Ok((a, 3));
+        }
+        if let Some(code) = &out.refused {
+            a["refused"] = json!(code);
+            return Ok((a, 3));
+        }
+        if u["state"] == "accepted" {
             let approve = u["class"] == "contract" || u["class"] == "effect";
             a["waits_for"] = json!(if approve { "approve" } else { "merge" });
-            return Ok((a, 0));
-        };
-        (a["stop_cause"], a["stop_detail"]) = (json!(cause), json!(detail));
-        Ok((a, 3))
+        }
+        Ok((a, 0))
     }
+}
+
+/// The arguments after `approve` or `reject`: none, or `--store <absolute path>` (R33).
+fn store_argument(argv: &[OsString]) -> Result<Option<String>, Failure> {
+    let words: Option<Vec<&str>> = argv.iter().map(|a| a.to_str()).collect();
+    match words.as_deref() {
+        Some([]) => Ok(None),
+        Some(["--store", p]) if p.starts_with('/') => Ok(Some((*p).to_owned())),
+        _ => Err(error("usage", "args")),
+    }
+}
+/// `ap unit approve|reject [--store <path>] < request.json`: the answer, or the refusal on standard
+/// error with `after` and `unit`, exit 2 (R33, R34).
+pub fn decide_cli(op: &str, argv: &[OsString]) -> ExitCode {
+    let mut after = None;
+    let mut unit = None;
+    let result = store_argument(argv).and_then(|store| {
+        let r = object::request()?;
+        unit = r["unit"].as_str().map(str::to_owned);
+        decide(&mut Host, store.as_deref(), op, &r, &mut after)
+    });
+    let (written, status) = match result {
+        Ok(v) => (writeln!(std::io::stdout(), "{v}"), 0),
+        Err(f) => {
+            let code = store::code(&f);
+            let v = json!({"error": {"code": code, "field": f.field, "detail": f.detail,
+                "after": after, "unit": unit}});
+            (writeln!(std::io::stderr(), "{v}"), 2)
+        }
+    };
+    ExitCode::from(if written.is_ok() { status } else { 4 })
+}
+/// One `approve` or `reject` (R33 to R35): every check before the lock, the lock, the Lead read, the
+/// applies. `after` is the suffix of the last action applied.
+pub fn decide(
+    s: &mut impl System,
+    store: Option<&str>,
+    op: &str,
+    r: &Value,
+    after: &mut Option<String>,
+) -> Result<Value, Failure> {
+    let approve = op == "approve";
+    let members = match approve {
+        true => "request_id agent session unit head reason",
+        false => "request_id agent session unit reason",
+    };
+    if !r.is_object() {
+        return Err(store::bad("stdin"));
+    }
+    store::only(r, members, "")?;
+    let rid = store::shaped(r, "request_id", 44, "._-")?;
+    let actor = Actor {
+        agent: store::shaped(r, "agent", 64, "._:-")?,
+        session: store::shaped(r, "session", 64, "._:-")?,
+    };
+    let key = r["unit"].as_str().filter(|k| key_form(k));
+    let key = key.ok_or_else(|| store::bad("unit"))?;
+    let limit = if approve { 600 } else { DETAIL };
+    let reason = r["reason"].as_str().ok_or_else(|| store::bad("reason"))?;
+    if reason.len() > limit {
+        let detail = json!({"bytes": reason.len(), "limit": limit});
+        return Err(fail("invalid_input", "reason", detail));
+    }
+    let head = r["head"].as_str().filter(|h| hex40(h));
+    if approve && head.is_none() {
+        return Err(store::bad("head"));
+    }
+    // `reject` sends no role: the engine would give it the role of the environment.
+    if !approve && object::lead_in_environment(s) {
+        return Err(error("role_in_environment", "ONT_ROLE"));
+    }
+    let (directory, _) = units(&policy_of(s))?;
+    let (_, _lock) = locked(&directory, key)?;
+    let u = at(store::get(s, store, "unit", key), "unit")?;
+    let u = u.ok_or_else(|| error("unknown_unit", "unit"))?;
+    let intent = u["intent"]["native_key"].as_str();
+    let intent = intent.ok_or_else(|| error("no_intent", "unit"))?;
+    let read = at(store::head(s, store, "intent", intent), "intent")?;
+    let (revision, i) = read.ok_or_else(|| error("unknown_intent", "intent"))?;
+    if i["lead_session"].as_str() != Some(actor.session) {
+        return Err(fail("not_the_lead", "session", i["lead_session"].clone()));
+    }
+    let unit = id("unit", key);
+    if approve {
+        let lead = Lead {
+            intent: u["intent"].clone(),
+            revision,
+        };
+        let p = json!({"unit": unit, "head": head, "reason": reason});
+        let rid = format!("{rid}-approve");
+        let applied = at(
+            store::approve_unit(s, store, &actor, rid, p, &lead),
+            "approve",
+        )?;
+        *after = Some("approve".into());
+        let back = at(store::get(s, store, "unit", key), "unit")?.unwrap_or_default();
+        return Ok(
+            json!({"unit": key, "outcome": applied.outcome, "state": back["state"],
+            "approved_head": back["approved_head"]}),
+        );
+    }
+    // No action clears an approval: an approved head is not rejected (R34).
+    if u["approved_head"].is_string() && u["approved_head"] == u["head"] {
+        return Err(fail("approved", "unit", u["head"].clone()));
+    }
+    let mut p = json!({"unit": unit, "cause": "rejected by the Lead"});
+    if u["lane"] == "objective" {
+        p["intent"] = u["intent"].clone();
+    }
+    let reopened = store::unit_action(s, store, &actor, "reopen_unit", format!("{rid}-reopen"), p);
+    at(reopened, "reopen")?;
+    *after = Some("reopen".into());
+    let p = json!({"unit": unit, "cause": "lead_rejected", "detail": reason});
+    let stopped = store::unit_action(s, store, &actor, "stop_unit", format!("{rid}-stop"), p);
+    let applied = at(stopped, "stop")?;
+    *after = Some("stop".into());
+    let mut posted = Value::Null;
+    if let (Some(_), Some(head), Some(repo)) = (
+        u["pull_request"].as_u64(),
+        u["head"].as_str(),
+        u["repository"].as_str(),
+    ) {
+        let target = json!({"repository": repo, "head": head});
+        let sent = review::post(s, &target, "failure", "rejected by the Lead");
+        posted = json!(if sent.is_ok() {
+            "failure"
+        } else {
+            "not_posted"
+        });
+    }
+    let back = at(store::get(s, store, "unit", key), "unit")?.unwrap_or_default();
+    Ok(
+        json!({"unit": key, "outcome": applied.outcome, "state": back["state"],
+        "lead_review": posted}),
+    )
 }

@@ -1148,7 +1148,8 @@ fn claimed(
 }
 /// No argument: a request on stdin. One absolute path: a unit from its page. `--compose-only` and a
 /// path: the composition printed. `add`, `amend`, `ready`, `drop` or `page` first: the unit object
-/// (`specs/ap/unit.md`); `review` first: a review of a page or a plan (`specs/ap/unit-review.md`).
+/// (`specs/ap/unit.md`); `review` first: a review of a page or a plan (`specs/ap/unit-review.md`);
+/// `run`, `approve` or `reject` first: a unit driven, or the Lead's word (`specs/ap/unit-run.md`).
 /// Any other form is `usage`.
 pub fn cli(argv: &[OsString]) -> ExitCode {
     if argv.first().is_some_and(|w| w == "review") {
@@ -1156,6 +1157,11 @@ pub fn cli(argv: &[OsString]) -> ExitCode {
     }
     if argv.first().is_some_and(|w| w == "run") {
         return drive::cli(&argv[1..]);
+    }
+    if let Some(op) = argv.first().and_then(|w| w.to_str())
+        && (op == "approve" || op == "reject")
+    {
+        return drive::decide_cli(op, &argv[1..]);
     }
     if argv
         .first()
