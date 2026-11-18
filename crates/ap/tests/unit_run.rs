@@ -2182,6 +2182,118 @@ fn r16_the_write_set_and_the_checks_on_the_head() {
     }
 }
 
+impl F {
+    /// A commit on the origin's `main` that adds the file `rel`, before any call.
+    fn seed_main(&self, rel: &str) {
+        let seed = self.t.join("seed");
+        std::fs::create_dir_all(seed.join(rel).parent().unwrap()).unwrap();
+        std::fs::write(seed.join(rel), "invented\n").unwrap();
+        git(&seed, &["add", "-A"]);
+        git(&seed, &["commit", "--quiet", "-m", "invented seed"]);
+        let origin = self.t.join("origin.git");
+        git(
+            &seed,
+            &["push", "--quiet", origin.to_str().unwrap(), "main"],
+        );
+    }
+    /// One call of a unit whose author runs the shell lines `edit` in the worktree and commits.
+    fn edit(&mut self, class: &str, write_set: Value, seed: &[&str], edit: &str) -> (Value, u8) {
+        self.set_unit(json!({"class": class, "write_set": write_set, "acceptance": []}));
+        for rel in seed {
+            self.seed_main(rel);
+        }
+        std::fs::write(self.t.join("bin/edit.sh"), edit).unwrap();
+        self.steps(&["edit", "accept"]);
+        self.ok()
+    }
+}
+
+// spec: specs/ap/unit-run.md#R36
+#[test]
+fn r36_a_plain_unit_stops_on_a_protected_path_and_a_contract_unit_goes_on() {
+    let stops: [(&str, &str, &[&str], &str); 9] = [
+        ("ci/**", "ci/x", &[], "mkdir ci; echo x > ci/x"),
+        (
+            "specs/**",
+            "specs/ap/unit.md",
+            &[],
+            "mkdir -p specs/ap; echo x > specs/ap/unit.md",
+        ),
+        (
+            ".github/**",
+            ".github/workflows/rust.yml",
+            &[],
+            "mkdir -p .github/workflows; echo x > .github/workflows/rust.yml",
+        ),
+        ("check", "check", &[], "echo x > check"),
+        (
+            "crates/**",
+            "crates/x/clippy.toml",
+            &[],
+            "mkdir -p crates/x; echo x > crates/x/clippy.toml",
+        ),
+        (
+            "rust-toolchain",
+            "rust-toolchain",
+            &[],
+            "echo x > rust-toolchain",
+        ),
+        (".cargo", ".cargo", &[], "ln -s elsewhere .cargo"),
+        (
+            "ontology/**",
+            "ontology/ENGINE-PIN",
+            &[],
+            "mkdir ontology; echo x > ontology/ENGINE-PIN",
+        ),
+        // Without rename detection the old path of a file moved away is a changed path.
+        (
+            "tools/**",
+            "ci/checker.py",
+            &["ci/checker.py"],
+            "mkdir tools; git mv ci/checker.py tools/checker.py",
+        ),
+    ];
+    for (set, path, seed, edit) in stops {
+        let mut f = F::new();
+        let write_set = if path == "ci/checker.py" {
+            json!(["ci/**", "tools/**"])
+        } else {
+            json!([set])
+        };
+        let (a, status) = f.edit("plain", write_set, seed, edit);
+        assert_eq!(
+            (a["state"].as_str(), status),
+            (Some("stopped"), 3),
+            "{path}: {a}"
+        );
+        assert_eq!(a["stop_cause"], "protected_path_changed", "{path}: {a}");
+        assert!(
+            a["stop_detail"].as_str().unwrap().contains(path),
+            "{path}: {a}"
+        );
+        assert!(f.packets().is_empty(), "{path}");
+        assert_eq!(f.merges(), (0, 0), "{path}");
+    }
+    // Neighbours by name are not protected: the unit is judged, accepted and merged.
+    for (set, edit) in [
+        ("checks/**", "mkdir checks; echo x > checks/x"),
+        ("docs/**", "mkdir -p docs/specs; echo x > docs/specs/x"),
+    ] {
+        let mut f = F::new();
+        let (a, status) = f.edit("plain", json!([set]), &[], edit);
+        assert_eq!(
+            (a["state"].as_str(), status),
+            (Some("merged"), 0),
+            "{set}: {a}"
+        );
+    }
+    // The same change in a unit of class `contract` whose write set names the path goes on.
+    let mut f = F::new();
+    let (a, status) = f.edit("contract", json!(["ci/**"]), &[], "mkdir ci; echo x > ci/x");
+    assert_eq!((a["state"].as_str(), status), (Some("accepted"), 0), "{a}");
+    assert_eq!(a["waits_for"], "approve", "{a}");
+}
+
 // spec: specs/ap/unit-run.md#R17
 #[test]
 fn r17_the_required_check_and_the_review_threads() {
