@@ -158,7 +158,7 @@ pub fn cli(argv: &[OsString]) -> ExitCode {
     ExitCode::from(if written.is_ok() { status } else { 4 })
 }
 /// The request of standard input: one JSON value of at most 1 MiB.
-fn request() -> Result<Value, Failure> {
+pub(super) fn request() -> Result<Value, Failure> {
     let mut bytes = vec![];
     let read = std::io::stdin().take(LIMIT + 1).read_to_end(&mut bytes);
     if read.is_err() || bytes.len() as u64 > LIMIT {
@@ -375,7 +375,7 @@ fn page_parameters(r: &Value, op: &str, key: &str) -> Result<(Value, Vec<String>
     Ok((p.into(), depends))
 }
 /// The engine gives the role of `ONT_ROLE` to a request that carries none (R4).
-fn lead_in_environment(s: &impl System) -> bool {
+pub(super) fn lead_in_environment(s: &impl System) -> bool {
     s.environment()
         .iter()
         .any(|(k, v)| k == "ONT_ROLE" && v == "lead")
@@ -608,7 +608,7 @@ impl Drop for Scratch {
     }
 }
 /// Every directory below `dir` (not through a link) readable, writable and searchable by its owner.
-fn writable(dir: &Path) {
+pub(super) fn writable(dir: &Path) {
     let _ = std::fs::set_permissions(dir, std::fs::Permissions::from_mode(0o700));
     for e in std::fs::read_dir(dir).into_iter().flatten().flatten() {
         if e.file_type().is_ok_and(|t| t.is_dir()) {
@@ -623,6 +623,26 @@ fn git_step(s: &mut impl System, words: &[&str], step: &str) -> Result<String, F
     let reply = reply.ok_or_else(|| fail("git_failed", "clone", json!(step)))?;
     Ok(String::from_utf8_lossy(&reply.stdout).trim().to_owned())
 }
+/// `git fetch origin main` in the clone within its bound (R23): the commit `origin/main` then names.
+pub(super) fn fetch(s: &mut impl System, clone: &str) -> Result<String, Failure> {
+    let fetch = ["-C", clone, "fetch", "--quiet", "origin", "main"];
+    let fetch: Vec<String> = fetch.iter().map(|w| (*w).to_owned()).collect();
+    let fetched = s.call("git", &fetch, &Value::Null, FETCH_MS);
+    if !fetched.is_ok_and(|r| r.success) {
+        return Err(error("fetch_failed", "clone"));
+    }
+    let named = ["-C", clone, "rev-parse", "--verify", "origin/main^{commit}"];
+    git_step(s, &named, "rev-parse")
+}
+/// A throwaway copy of the clone at `dir` (R23): shared objects, no remote, a detached checkout of
+/// `base`. Nothing is added to the clone.
+pub(super) fn copy(s: &mut impl System, clone: &str, dir: &str, base: &str) -> Result<(), Failure> {
+    let copy = ["clone", "--quiet", "--shared", "--no-checkout", clone, dir];
+    git_step(s, &copy, "clone")?;
+    git_step(s, &["-C", dir, "remote", "remove", "origin"], "remote")?;
+    let checkout = ["-C", dir, "checkout", "--quiet", "--detach", base];
+    git_step(s, &checkout, "checkout").map(|_| ())
+}
 /// The acceptance checks of `u` on the base, in a throwaway copy (R23 to R27): the base and the checks.
 fn on_base(s: &mut impl System, u: &Value) -> Result<(Value, Vec<Value>), Failure> {
     let clone = match u["repository"].as_str().filter(|r| !r.is_empty()) {
@@ -633,19 +653,8 @@ fn on_base(s: &mut impl System, u: &Value) -> Result<(Value, Vec<Value>), Failur
     let dir = scratch.at("base");
     let base = match &clone {
         Some(clone) => {
-            let fetch = ["-C", clone, "fetch", "--quiet", "origin", "main"];
-            let fetch: Vec<String> = fetch.iter().map(|w| (*w).to_owned()).collect();
-            let fetched = s.call("git", &fetch, &Value::Null, FETCH_MS);
-            if !fetched.is_ok_and(|r| r.success) {
-                return Err(error("fetch_failed", "clone"));
-            }
-            let named = ["-C", clone, "rev-parse", "--verify", "origin/main^{commit}"];
-            let base = git_step(s, &named, "rev-parse")?;
-            let copy = ["clone", "--quiet", "--shared", "--no-checkout", clone, &dir];
-            git_step(s, &copy, "clone")?;
-            git_step(s, &["-C", &dir, "remote", "remove", "origin"], "remote")?;
-            let checkout = ["-C", &dir, "checkout", "--quiet", "--detach", &base];
-            git_step(s, &checkout, "checkout")?;
+            let base = fetch(s, clone)?;
+            copy(s, clone, &dir, &base)?;
             Some(base)
         }
         None => {

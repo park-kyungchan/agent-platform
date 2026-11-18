@@ -45,23 +45,36 @@ pub fn page(
     if digest_only {
         return Ok(format!("{}\n", page_digest(key, &u)));
     }
-    let repository = text(&u, "repository");
+    page_text(s, store, key, &u, role).map(|(out, _)| out)
+}
+/// The page of the unit `key` read as `u`, for `role`, and the commit its repository part names.
+pub fn page_text(
+    s: &mut impl System,
+    store: Option<&str>,
+    key: &str,
+    u: &Value,
+    role: Option<Role>,
+) -> Result<(String, Option<String>), Failure> {
+    let repository = text(u, "repository");
     if repository.is_none() && matches!(role, Some(Role::Implementer | Role::Verifier)) {
         return Err(error("no_frame", "for"));
     }
-    if role == Some(Role::Verifier) && text(&u, "head").is_none() {
+    if role == Some(Role::Verifier) && text(u, "head").is_none() {
         return Err(error("no_head", "unit"));
     }
     let questions = matches!(role, Some(Role::Verifier | Role::Reviewer));
-    let mut out = page_part(key, &u, questions);
+    let mut out = page_part(key, u, questions);
     out.push('\n');
-    out.push_str(&for_part(s, store, &u)?);
+    out.push_str(&for_part(s, store, u)?);
+    let mut commit = None;
     if let Some(repository) = repository {
         out.push('\n');
-        out.push_str(&repository_part(s, repository, &u)?);
+        let (part, at) = repository_part(s, repository, u)?;
+        out.push_str(&part);
+        commit = Some(at);
     }
     let frame = match role {
-        None => return Ok(out),
+        None => return Ok((out, commit)),
         Some(Role::Implementer) => IMPLEMENTER,
         Some(Role::Verifier) => VERIFIER,
         Some(Role::Reviewer) => REVIEWER,
@@ -70,9 +83,9 @@ pub fn page(
     out.push_str(frame);
     if role == Some(Role::Verifier) {
         out.push('\n');
-        out.push_str(&change(&u));
+        out.push_str(&change(u));
     }
-    Ok(out)
+    Ok((out, commit))
 }
 /// The SHA-256 of the page part as built for the reviewer: the unit's own page properties only.
 pub fn page_digest(key: &str, u: &Value) -> String {
@@ -197,7 +210,11 @@ fn blob(s: &mut impl System, clone: &str, commit: &str, name: &str) -> Option<Ve
     git(s, clone, &["cat-file", "blob", object])
 }
 /// `## The repository at <commit>`: its `AGENTS.md` and the entries of its map that meet the write set (R32).
-fn repository_part(s: &mut impl System, repository: &str, u: &Value) -> Result<String, Failure> {
+fn repository_part(
+    s: &mut impl System,
+    repository: &str,
+    u: &Value,
+) -> Result<(String, String), Failure> {
     let clone = clone_of(s, repository)?;
     let named = git(
         s,
@@ -227,12 +244,12 @@ fn repository_part(s: &mut impl System, repository: &str, u: &Value) -> Result<S
     out.push('\n');
     let Some(map) = blob(s, &clone, &commit, "map.json") else {
         out.push_str("No map of this repository yet.\n");
-        return Ok(out);
+        return Ok((out, commit));
     };
     let map: Option<Value> = serde_json::from_slice(&map).ok();
     let Some(components) = map.as_ref().and_then(|m| m["components"].as_array()) else {
         out.push_str("The map could not be read.\n");
-        return Ok(out);
+        return Ok((out, commit));
     };
     let patterns = u["write_set"].as_array().into_iter().flatten();
     let literals: Vec<&str> = patterns
@@ -268,7 +285,7 @@ fn repository_part(s: &mut impl System, repository: &str, u: &Value) -> Result<S
     if !found {
         out.push_str("No entry of the map meets the write set.\n");
     }
-    Ok(out)
+    Ok((out, commit))
 }
 /// A member of a map's entry: a string, or an array of strings.
 fn names(v: &Value) -> Vec<&str> {
