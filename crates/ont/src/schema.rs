@@ -436,9 +436,7 @@ pub(crate) fn schema_input_refusal(
             "1 to 64 ASCII characters: lowercase letter first; then lowercase letters, digits or underscore"
         }
         "reserved_domain" => "program is a reserved domain name",
-        "unknown_source_kind" => {
-            "source kind must be markdown_fields, markdown_table, file_digest, git_local, github_api, json_records or command"
-        }
+        "unknown_source_kind" => "source kind must be markdown_fields, file_digest or records",
         "invalid_source_option" => {
             "markdown_fields allows only glob, exclude, head_lines, complete_listing, fresh_for_s; file_digest allows only paths, exclude, complete_listing, fresh_for_s. glob: required string or 1 to 16 strings; paths: required 1 to 256 strings; exclude: optional 0 to 256 strings; head_lines: optional integer 1 to 10000; complete_listing: optional boolean; fresh_for_s: required integer 1 to 315360000"
         }

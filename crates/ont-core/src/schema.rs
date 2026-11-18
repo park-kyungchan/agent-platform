@@ -133,16 +133,7 @@ pub mod codes {
         RECORDS_SOURCE_OWNER,
     ];
 }
-const SOURCE_KINDS: &[&str] = &[
-    "markdown_fields",
-    "markdown_table",
-    "file_digest",
-    "git_local",
-    "github_api",
-    "json_records",
-    "records",
-    "command",
-];
+const SOURCE_KINDS: &[&str] = &["markdown_fields", "file_digest", "records"];
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct Violation {
@@ -737,7 +728,7 @@ impl SourceDef {
         }))
     }
 
-    /// `Ok(None)` for a kind that has no compiled file reader here.
+    /// `Ok(None)` for a kind this engine does not know.
     pub fn file_spec(&self) -> Result<Option<FileSourceSpec>, SourceOptionError> {
         let kind = match self.kind.as_str() {
             "markdown_fields" => FileSourceKind::MarkdownFields,
@@ -3255,7 +3246,7 @@ mod source_tests {
             (40, false, 5)
         );
         assert!(
-            def(json!({"kind":"json_records","x":1}))
+            def(json!({"kind":"unknown_kind","x":1}))
                 .file_spec()
                 .unwrap()
                 .is_none()

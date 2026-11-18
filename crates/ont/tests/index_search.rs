@@ -425,7 +425,7 @@ fn one_failed_source_beside_a_good_one() {
 #[test]
 fn source_failures_have_located_causes() {
     // key_unresolved, duplicate_key, schema_violation,
-    // source_kind_unsupported, fresh_until_overflow, too_many_records.
+    // fresh_until_overflow, too_many_records.
     let t = Temp::new();
     t.task("a", "# a\n");
     t.task("b", "# b\n");
@@ -456,31 +456,6 @@ fn source_failures_have_located_causes() {
     assert!(
         c.starts_with("schema_violation:wrong_value_type@/fields/state_sha256"),
         "{c}"
-    );
-    let t = Temp::new();
-    t.task("a", "# a\n");
-    let mut s = schema(&t);
-    s["sources"]["task_states"]["kind"] = json!("json_records");
-    s["sources"]["task_states"]["path"] = json!("x.json");
-    s["sources"]["task_states"]
-        .as_object_mut()
-        .unwrap()
-        .remove("glob");
-    s["sources"]["task_states"]
-        .as_object_mut()
-        .unwrap()
-        .remove("head_lines");
-    s["sources"]["task_states"]
-        .as_object_mut()
-        .unwrap()
-        .remove("complete_listing");
-    s["sources"]["task_states"]
-        .as_object_mut()
-        .unwrap()
-        .remove("fresh_for_s");
-    assert_eq!(
-        cause(&t, &s, 5),
-        "source_kind_unsupported@/sources/task_states/kind"
     );
     let t = Temp::new();
     t.task("a", "# a\n");

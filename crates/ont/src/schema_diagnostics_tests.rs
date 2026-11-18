@@ -14,15 +14,9 @@ use serde_json::{Value, json};
 use std::collections::{BTreeMap, BTreeSet};
 
 fn base(profile: &str) -> Value {
-    let mut schema = json!({"format":"ontology-schema/v1","domain":"demo","version":1,"namespace":{"instance":"test","account":"root"},"sources":{"input":{"kind":"json_records"}},"object_types":{"item":{"owner":"ontology","primary_key":{"from":"$action_id"},"properties":{"label":{"type":"string"},"flag":{"type":"boolean"},"ref":{"type":{"ref":"item"}}}}}});
+    let mut schema = json!({"format":"ontology-schema/v1","domain":"demo","version":1,"namespace":{"instance":"test","account":"root"},"sources":{"input":{"kind":"markdown_fields","glob":"/tmp/*.md","fresh_for_s":1}},"object_types":{"item":{"owner":"ontology","primary_key":{"from":"$action_id"},"properties":{"label":{"type":"string"},"flag":{"type":"boolean"},"ref":{"type":{"ref":"item"}}}}}});
     if matches!(profile, "source" | "file_source" | "digest_source") {
         schema["object_types"]["item"]["owner"] = json!({"source":"input"});
-        schema["object_types"]["item"]["primary_key"]["from"] = json!("/key");
-        schema["object_types"]["item"]["properties"]["label"]["from"] = json!("/label");
-    }
-    if profile == "file_source" {
-        schema["sources"]["input"] =
-            json!({"kind":"markdown_fields","glob":"/tmp/*.md","fresh_for_s":1});
         schema["object_types"]["item"]["primary_key"]["from"] = json!("/path");
         schema["object_types"]["item"]["properties"]["label"]["from"] = json!("/stem");
     }
@@ -177,7 +171,7 @@ cases! {
     invalid_name_domain => ("invalid_name","/domain","1565",false,"plain",json!({"/domain": "Bad"}),"1 to 64 ASCII characters: lowercase letter first; then lowercase letters, digits or underscore",&["reserved"]);
     invalid_name_scope_key => ("invalid_name","/scope_keys/0","1588",false,"plain",json!({"/scope_keys": ["Bad"]}),"1 to 64 ASCII characters: lowercase letter first; then lowercase letters, digits or underscore",&["reserved"]);
     invalid_name_value_type => ("invalid_name","/value_types/Bad","1601",false,"plain",json!({"/value_types": {"Bad": {"base": "string"}}}),"1 to 64 ASCII characters: lowercase letter first; then lowercase letters, digits or underscore",&["reserved"]);
-    invalid_name_source => ("invalid_name","/sources/Bad","1645",false,"plain",json!({"/sources": {"Bad": {"kind": "json_records"}}}),"1 to 64 ASCII characters: lowercase letter first; then lowercase letters, digits or underscore",&["reserved"]);
+    invalid_name_source => ("invalid_name","/sources/Bad","1645",false,"plain",json!({"/sources": {"Bad": {"kind": "markdown_fields", "glob": "/tmp/*.md", "fresh_for_s": 1}}}),"1 to 64 ASCII characters: lowercase letter first; then lowercase letters, digits or underscore",&["reserved"]);
     invalid_name_object_type => ("invalid_name","/object_types/Bad","1668",false,"plain",json!({"/object_types/Bad": {"owner": "ontology", "primary_key": {"from": "$action_id"}}}),"1 to 64 ASCII characters: lowercase letter first; then lowercase letters, digits or underscore",&["reserved"]);
     invalid_name_property => ("invalid_name","/object_types/item/properties/Bad","1792",false,"plain",json!({"/object_types/item/properties/Bad": {"type": "string"}}),"1 to 64 ASCII characters: lowercase letter first; then lowercase letters, digits or underscore",&["reserved"]);
     invalid_name_function => ("invalid_name","/functions/Bad","1875",false,"plain",json!({"/functions": {"Bad": {}}}),"1 to 64 ASCII characters: lowercase letter first; then lowercase letters, digits or underscore",&["reserved"]);

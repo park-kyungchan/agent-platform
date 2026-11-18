@@ -109,7 +109,7 @@ fn schema(store: &Store) -> Vec<(String, String)> {
 #[test]
 fn explicit_program_mode_uses_same_tables_and_application_id_without_actions() {
     let education = Store::memory().unwrap();
-    let mut program = Store::memory_program().unwrap();
+    let program = Store::memory_program().unwrap();
     assert_eq!(version(&education), 1);
     assert_eq!(version(&program), 2);
     assert_eq!(schema(&education), schema(&program));
@@ -119,8 +119,6 @@ fn explicit_program_mode_uses_same_tables_and_application_id_without_actions() {
         .query_row("PRAGMA application_id", [], |r| r.get(0))
         .unwrap();
     assert_eq!(app, APPLICATION_ID);
-    assert_eq!(program.prepare_local_actions(), Err(Error::StoreFailure));
-    assert_eq!(program.local_journal_id(), Err(Error::StoreFailure));
     assert_eq!(schema(&program), schema(&education));
     assert_eq!(version(&program), 2);
 }

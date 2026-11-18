@@ -454,7 +454,7 @@ fn schema_reserved_and_fixed_vocabulary_rules_state_the_constraint() {
             "kind",
             "unknown_source_kind",
             "/sources/input/kind",
-            "markdown_fields, markdown_table, file_digest, git_local, github_api, json_records or command",
+            "markdown_fields, file_digest or records",
         ),
         (
             "option",
@@ -519,6 +519,36 @@ fn schema_reserved_and_fixed_vocabulary_rules_state_the_constraint() {
             "{case}: {answer}"
         );
         assert!(!answer["rule"].as_str().unwrap().contains("unlisted"));
+    }
+}
+
+#[test]
+fn schema_check_refuses_each_source_kind_that_index_never_read() {
+    let t = Temp::new();
+    for kind in [
+        "markdown_table",
+        "git_local",
+        "github_api",
+        "json_records",
+        "command",
+    ] {
+        let mut schema: Value =
+            serde_json::from_slice(include_bytes!("fixtures/render-board.json")).unwrap();
+        schema["sources"] = json!({"input":{"kind":kind}});
+        let file = t.0.join("removed-kind.json");
+        std::fs::write(&file, schema.to_string()).unwrap();
+        let (exit, answer) = t.cli(&["schema", "check", file.to_str().unwrap()], json!({}));
+        assert_eq!(exit, 2, "{kind}: {answer}");
+        diagnostic(&answer, "schema_violation", "/sources/input/kind");
+        assert_eq!(
+            answer["violations"],
+            json!([{"code":"unknown_source_kind","pointer":"/sources/input/kind"}]),
+            "{kind}: {answer}"
+        );
+        assert_eq!(
+            answer["rule"], "source kind must be markdown_fields, file_digest or records",
+            "{kind}: {answer}"
+        );
     }
 }
 
@@ -823,10 +853,11 @@ fn transform_feedback_distinguishes_primary_keys_and_parameters() {
                 json!("first_word");
             "/action_types/create_item/parameters/title/transform"
         } else {
-            schema["sources"] = json!({"input":{"kind":"json_records"}});
+            schema["sources"] =
+                json!({"input":{"kind":"markdown_fields","glob":"/tmp/*.md","fresh_for_s":1}});
             schema["object_types"]["item"]["owner"] = json!({"source":"input"});
             schema["object_types"]["item"]["primary_key"] =
-                json!({"from":"/key","transform":"parse_integer"});
+                json!({"from":"/stem","transform":"parse_integer"});
             "/object_types/item/primary_key/transform"
         };
         let file = t.0.join("transform.json");
