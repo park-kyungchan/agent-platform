@@ -1737,3 +1737,939 @@ fn r22_a_refusal_of_the_store_keeps_its_code_and_names_the_step() {
     f.put("unit", "u-run", json!({"state": "running"}));
     assert!(execute(&mut f, None, &key("u-run")).is_ok());
 }
+
+// ---- `ap status --wait` (R23 to R33) ----
+// The wait has a fake of its own around `F`: the store's objects follow a script (one step at each
+// `pause`, which does not sleep), `systemctl list-units`, `units()`, the policy file and the units
+// directory (under a temporary directory) and the clock are the fake's. `F` itself still refuses every
+// program but `ont`.
+use std::{
+    cell::Cell,
+    collections::VecDeque,
+    path::{Path, PathBuf},
+    sync::atomic::{AtomicU32, Ordering},
+    time::{Duration, Instant},
+};
+
+static NEXT: AtomicU32 = AtomicU32::new(0);
+const PREFIX: &str = "aptrial1";
+const SCRATCH: &str = "/invented/scratch/store.sqlite";
+
+struct Wt {
+    f: F,
+    dir: PathBuf,
+    policy: Option<PathBuf>,
+    units: bool,
+    env: Vec<(String, String)>,
+    /// The lines `systemctl list-units` prints; None is a failed call.
+    listed: Option<String>,
+    /// The store fails every call.
+    down: bool,
+    script: VecDeque<Box<dyn FnOnce(&mut Wt)>>,
+    pauses: usize,
+    /// The number of calls to the store before each reading: the reading's `at` is `NOW` plus it.
+    starts: Vec<usize>,
+    systemctl: usize,
+    reads: std::cell::RefCell<Vec<String>>,
+    base: Instant,
+    clock: Cell<Duration>,
+}
+impl Wt {
+    /// The intent `walk` and a policy file whose units directory is under the temporary directory.
+    fn new() -> Self {
+        let dir = std::env::temp_dir().join(format!(
+            "ap-status-wait-{}-{}",
+            std::process::id(),
+            NEXT.fetch_add(1, Ordering::SeqCst)
+        ));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let dir = std::fs::canonicalize(&dir).unwrap();
+        let mut f = F::empty();
+        intent(&mut f, "walk", "confirmed", json!({}));
+        let mut w = Wt {
+            f,
+            policy: Some(dir.join("policy.json")),
+            dir,
+            units: true,
+            env: vec![],
+            listed: Some(String::new()),
+            down: false,
+            script: VecDeque::new(),
+            pauses: 0,
+            starts: vec![0],
+            systemctl: 0,
+            reads: Default::default(),
+            base: Instant::now(),
+            clock: Cell::default(),
+        };
+        w.policy_is(json!({"work": {"prefix": PREFIX, "slice": "aptrial1.slice"}}));
+        w
+    }
+    fn units_dir(&self) -> PathBuf {
+        self.dir.join("units")
+    }
+    /// The policy file, with the units directory added to what is given.
+    fn policy_is(&mut self, mut p: Value) {
+        if p.get("units").is_none() && p.is_object() {
+            p["units"] = json!({"directory": self.units_dir().to_str().unwrap()});
+        }
+        std::fs::write(self.dir.join("policy.json"), p.to_string()).unwrap();
+    }
+    /// The file `started` of a unit.
+    fn started(&self, key: &str, revision: &str) {
+        std::fs::create_dir_all(self.units_dir().join(key)).unwrap();
+        std::fs::write(self.units_dir().join(key).join("started"), revision).unwrap();
+    }
+    /// What the next pause changes.
+    fn then(&mut self, step: impl FnOnce(&mut Wt) + 'static) {
+        self.script.push_back(Box::new(step));
+    }
+    /// A run unit of the service manager that is live.
+    fn live(&mut self, key: &str) {
+        let line = format!("{PREFIX}-{key}.service loaded active running a run\n");
+        self.listed.get_or_insert_with(String::new).push_str(&line);
+    }
+    /// The scratch store with its policy of the environment.
+    fn scratch(&mut self) {
+        let path = self.dir.join("policy.json");
+        self.env = vec![("AP_POLICY_FILE".into(), path.to_str().unwrap().into())];
+    }
+    fn wait(&mut self, store: Option<&str>, timeout: u64) -> Result<Value, Failure> {
+        let call = Call::Wait("walk".into(), timeout);
+        execute(self, store, &call)
+    }
+    /// The answer of a wait that must end in one.
+    fn answer(&mut self, timeout: u64) -> Value {
+        match self.wait(None, timeout) {
+            Ok(v) => v,
+            Err(e) => panic!("{} {} {}", e.code, e.field, e.detail),
+        }
+    }
+    /// The `at` of reading `n` (counted from 0).
+    fn at(&self, n: usize) -> String {
+        let s = self.starts[n] as u64;
+        format!("2026-11-17T12:{:02}:{:02}Z", s / 60, s % 60)
+    }
+}
+impl Drop for Wt {
+    fn drop(&mut self) {
+        let _ = std::fs::remove_dir_all(&self.dir);
+    }
+}
+impl System for Wt {
+    fn call(&mut self, program: &str, args: &[String], input: &Value, ms: u64) -> Answer {
+        let broken = |p: &str| {
+            Err(Failure {
+                code: "process_failed",
+                field: p.into(),
+                detail: Value::Null,
+            })
+        };
+        match program {
+            "ont" if self.down => broken("ont"),
+            "ont" => self.f.call(program, args, input, ms),
+            "systemctl" => {
+                let pattern = format!("{PREFIX}-*");
+                assert_eq!(
+                    args,
+                    ["list-units", "--all", "--plain", "--no-legend", &pattern]
+                );
+                self.systemctl += 1;
+                let Some(t) = self.listed.clone() else {
+                    return broken("systemctl");
+                };
+                Ok(Reply {
+                    success: true,
+                    bytes: t.clone().into_bytes(),
+                    stdout: t.into_bytes(),
+                })
+            }
+            other => panic!("a call the wait does not make: {other}"),
+        }
+    }
+    fn read(&self, path: &str) -> std::io::Result<Vec<u8>> {
+        assert!(
+            path.starts_with(self.dir.to_str().unwrap()),
+            "a read of {path}"
+        );
+        self.reads.borrow_mut().push(path.to_owned());
+        std::fs::read(path)
+    }
+    fn units(&self) -> bool {
+        self.units
+    }
+    fn policy_file(&self) -> Option<PathBuf> {
+        self.policy.clone()
+    }
+    fn environment(&self) -> Vec<(String, String)> {
+        self.env.clone()
+    }
+    fn now(&self) -> Instant {
+        self.base + self.clock.get()
+    }
+    fn pause(&mut self, d: Duration) {
+        assert_eq!(d, Duration::from_secs(30), "the pause between readings");
+        self.clock.set(self.clock.get() + d);
+        self.pauses += 1;
+        self.starts.push(self.f.calls.len());
+        if let Some(step) = self.script.pop_front() {
+            step(self);
+        }
+    }
+}
+
+/// A unit of the intent `walk` with a repository, a head and the given members.
+fn wu(f: &mut F, key: &str, state: &str, more: Value) {
+    let mut o = json!({"intent": oid("intent", "walk"), "repository": "org/repo", "head": "h1"});
+    for (k, v) in more.as_object().unwrap() {
+        o[k] = v.clone();
+    }
+    unit(f, key, state, o);
+}
+/// Every file under `dir` with its bytes.
+fn tree(dir: &Path) -> BTreeMap<PathBuf, Vec<u8>> {
+    let mut all = BTreeMap::new();
+    for e in std::fs::read_dir(dir).unwrap().flatten() {
+        let p = e.path();
+        if p.is_dir() {
+            all.insert(p.clone(), vec![]);
+            all.extend(tree(&p));
+        } else {
+            all.insert(p.clone(), std::fs::read(&p).unwrap());
+        }
+    }
+    all
+}
+fn timeout_at(w: &Wt, n: usize) -> Value {
+    json!({"reason": "timeout", "unit": null, "finding": null, "at": w.at(n)})
+}
+
+// spec: specs/ap/status.md#R23
+#[test]
+fn r23_the_wait_form_is_one_intent_a_timeout_and_a_store_else_usage() {
+    let wait = |a: &[&str]| match args(a).map(|a| a.call) {
+        Ok(Call::Wait(i, t)) => Some((i, t)),
+        _ => None,
+    };
+    assert_eq!(wait(&["--wait", "walk"]), Some(("walk".into(), 14_400)));
+    assert_eq!(
+        wait(&["--store", "/s", "--wait", "walk", "--timeout", "30"]),
+        Some(("walk".into(), 30))
+    );
+    assert_eq!(
+        wait(&["--wait", "walk", "--timeout", "86400"]).unwrap().1,
+        86_400
+    );
+    let long = "k".repeat(513);
+    for bad in [
+        vec!["--wait"],
+        vec!["--wait", "-x"],
+        vec!["--wait", ""],
+        vec!["--wait", long.as_str()],
+        vec!["--wait", "a\u{1}b"],
+        vec!["--wait", "a", "--text"],
+        vec!["--text", "--wait", "a"],
+        vec!["--wait", "a", "--term", "unit"],
+        vec!["--wait", "a", "b"],
+        vec!["b", "--wait", "a"],
+        vec!["--wait", "a", "--wait", "b"],
+        vec!["--timeout", "30"],
+        vec!["--wait", "a", "--timeout"],
+        vec!["--wait", "a", "--timeout", "29"],
+        vec!["--wait", "a", "--timeout", "86401"],
+        vec!["--wait", "a", "--timeout", "+30"],
+        vec!["--wait", "a", "--timeout", "-30"],
+        vec!["--wait", "a", "--timeout", "30.0"],
+        vec!["--wait", "a", "--timeout", ""],
+        vec!["--wait", "a", "--timeout", "30", "--timeout", "40"],
+        vec!["--wait", "a", "--store", "relative"],
+    ] {
+        let e = args(&bad).err().unwrap_or_else(|| panic!("{bad:?} parses"));
+        assert_eq!((e.code, e.field.as_str()), ("usage", "args"), "{bad:?}");
+    }
+    // The binary refuses before any call: no program is on `PATH`.
+    let (code, out, e) = status(&["--wait", "walk", "--text"]);
+    assert_eq!(code, Some(2));
+    assert!(out.is_empty());
+    assert_eq!(e["error"]["code"], "usage");
+}
+
+// spec: specs/ap/status.md#R23
+#[test]
+fn r23_an_intent_the_store_does_not_have_is_unknown_exit_2_at_once() {
+    let mut w = Wt::new();
+    let call = Call::Wait("nobody".into(), 30);
+    let e = execute(&mut w, None, &call).expect_err("an unknown intent");
+    assert_eq!(
+        (e.code, e.field.as_str()),
+        ("unknown_intent", "intent"),
+        "{e:?}"
+    );
+    assert_eq!(
+        (w.pauses, w.f.calls.len(), w.systemctl),
+        (0, 1, 0),
+        "one get and no wait"
+    );
+    assert_eq!(ap::status::exit_code(true, &e), 2);
+    // The same in the binary, against a store program that answers `unavailable`.
+    let bin = w.dir.join("bin");
+    std::fs::create_dir_all(&bin).unwrap();
+    let ont = bin.join("ont");
+    let script = "#!/bin/sh\nwhile read -r line; do :; done\necho '{\"status\":\"refused\",\"code\":\"unavailable\"}'\nexit 1\n";
+    std::fs::write(&ont, script).unwrap();
+    std::fs::set_permissions(&ont, std::os::unix::fs::PermissionsExt::from_mode(0o755)).unwrap();
+    let out = std::process::Command::new(env!("CARGO_BIN_EXE_ap"))
+        .args(["status", "--wait", "nobody"])
+        .env("PATH", &bin)
+        .stdin(std::process::Stdio::null())
+        .output()
+        .unwrap();
+    assert_eq!(out.status.code(), Some(2));
+    assert!(out.stdout.is_empty());
+    let e: Value = serde_json::from_slice(&out.stderr).unwrap();
+    assert_eq!(e["error"]["code"], "unknown_intent");
+}
+
+// spec: specs/ap/status.md#R33
+#[test]
+fn r33_an_error_of_a_wait_is_exit_3_but_an_unknown_intent_and_other_verbs_are_exit_2() {
+    let failure = |code| Failure {
+        code,
+        field: "x".into(),
+        detail: Value::Null,
+    };
+    for code in [
+        "process_failed",
+        "policy_invalid",
+        "reading_failed",
+        "store_refused",
+    ] {
+        assert_eq!(ap::status::exit_code(true, &failure(code)), 3, "{code}");
+        assert_eq!(ap::status::exit_code(false, &failure(code)), 2, "{code}");
+    }
+    assert_eq!(ap::status::exit_code(true, &failure("unknown_intent")), 2);
+}
+
+// spec: specs/ap/status.md#R24
+#[test]
+fn r24_the_wait_reads_and_writes_nothing_and_applies_no_action() {
+    let mut w = Wt::new();
+    wu(&mut w.f, "cut", "running", json!({}));
+    wu(&mut w.f, "ran", "ready", json!({}));
+    w.started("ran", "r#1");
+    // A unit directory with a lock file the wait must not take over or remove, and no `work.lock`.
+    std::fs::create_dir_all(w.units_dir().join("cut")).unwrap();
+    std::fs::write(w.units_dir().join("cut").join("lock"), "").unwrap();
+    let before = tree(&w.dir);
+    let at = w.answer(300);
+    assert_eq!(at["reason"], "unit_idle", "{at}");
+    assert_eq!(
+        tree(&w.dir),
+        before,
+        "a file or directory was made, changed or removed"
+    );
+    assert!(!w.units_dir().join("work.lock").exists());
+    // Only the reads of the store, one `systemctl` per reading, and the policy file.
+    for name in w.f.names() {
+        assert!(["get", "search"].contains(&name), "ont {name}");
+    }
+    assert_eq!(w.systemctl, 2);
+    assert!(w.reads.borrow().iter().all(|p| p.ends_with("policy.json")));
+    // Where the units directory is absent it is not made.
+    let mut w = Wt::new();
+    wu(&mut w.f, "cut", "running", json!({}));
+    assert_eq!(w.answer(30)["reason"], "unit_idle");
+    assert!(!w.units_dir().exists());
+}
+
+// spec: specs/ap/status.md#R25
+#[test]
+fn r25_the_first_reading_and_then_one_every_30_seconds_end_in_one_answer() {
+    let mut w = Wt::new();
+    wu(&mut w.f, "u-1", "running", json!({"repository": null}));
+    wu(&mut w.f, "u-2", "ready", json!({"repository": null}));
+    w.then(|_| {});
+    w.then(|w| {
+        wu(
+            &mut w.f,
+            "u-1",
+            "stopped",
+            json!({"repository": null, "ended_at": "2026-11-17T12:00:00Z"}),
+        )
+    });
+    let v = w.answer(300);
+    assert_eq!(
+        v,
+        json!({"reason": "unit_stopped", "unit": "u-1", "finding": null, "at": w.at(2)})
+    );
+    assert_eq!(
+        (w.pauses, w.starts.len()),
+        (2, 3),
+        "readings at 0, 30 and 60 seconds"
+    );
+    assert_eq!(w.clock.get(), Duration::from_secs(60));
+    // The answer's `at` is the clock of the reading's first answer, not of a later one.
+    assert_eq!(
+        w.at(2),
+        "2026-11-17T12:00:".to_owned() + &format!("{:02}Z", w.starts[2])
+    );
+    assert_ne!(v["at"], w.at(1));
+    // The first reading is the intent's `get`, then the units and the open findings.
+    let first: Vec<(&str, &str)> = w.f.calls[..4]
+        .iter()
+        .map(|c| (c.0[0].as_str(), c.1["object_type"].as_str().unwrap_or("")))
+        .collect();
+    assert_eq!(first[0].0, "get");
+    assert_eq!(first[1..3], [("search", "unit"), ("search", "finding")]);
+}
+
+// spec: specs/ap/status.md#R26
+#[test]
+fn r26_a_contract_or_effect_unit_that_newly_waits_for_approve_ends_the_wait() {
+    let mut w = Wt::new();
+    w.policy = None; // the running unit is no cut run here
+    // At the first reading: a plain unit, a unit whose head is approved and one that waits already.
+    wu(&mut w.f, "p", "accepted", json!({"class": "plain"}));
+    wu(
+        &mut w.f,
+        "a",
+        "accepted",
+        json!({"class": "effect", "approved_head": "h1"}),
+    );
+    wu(&mut w.f, "k", "accepted", json!({"class": "contract"}));
+    wu(&mut w.f, "c", "running", json!({"class": "contract"}));
+    // Reading 1: heads move of the plain unit, and of the approved one together with its approval.
+    w.then(|w| {
+        wu(
+            &mut w.f,
+            "p",
+            "accepted",
+            json!({"class": "plain", "head": "h9"}),
+        );
+        wu(
+            &mut w.f,
+            "a",
+            "accepted",
+            json!({"class": "effect", "head": "h2", "approved_head": "h2"}),
+        );
+    });
+    // Reading 2: the running unit is accepted.
+    w.then(|w| {
+        wu(
+            &mut w.f,
+            "c",
+            "accepted",
+            json!({"class": "contract", "head": "h3"}),
+        )
+    });
+    let v = w.answer(600);
+    assert_eq!(
+        v,
+        json!({"reason": "unit_accepted", "unit": "c", "finding": null, "at": w.at(2)})
+    );
+    assert_eq!(w.pauses, 2);
+    // The unit that waited at the first reading with another head is a reason too.
+    let mut w = Wt::new();
+    wu(
+        &mut w.f,
+        "k",
+        "accepted",
+        json!({"class": "contract", "head": "h1"}),
+    );
+    w.then(|w| {
+        wu(
+            &mut w.f,
+            "k",
+            "accepted",
+            json!({"class": "contract", "head": "h2"}),
+        )
+    });
+    assert_eq!(w.answer(600)["unit"], "k");
+    assert_eq!(w.pauses, 1);
+}
+
+// spec: specs/ap/status.md#R27
+#[test]
+fn r27_a_unit_that_newly_stops_or_stops_again_ends_the_wait() {
+    let mut w = Wt::new();
+    wu(
+        &mut w.f,
+        "s",
+        "stopped",
+        json!({"ended_at": "2026-11-17T10:00:00Z"}),
+    );
+    w.then(|w| {
+        wu(
+            &mut w.f,
+            "s",
+            "stopped",
+            json!({"ended_at": "2026-11-17T10:00:00Z"}),
+        )
+    });
+    w.then(|w| {
+        wu(
+            &mut w.f,
+            "s",
+            "stopped",
+            json!({"ended_at": "2026-11-17T11:00:00Z"}),
+        )
+    });
+    let v = w.answer(600);
+    assert_eq!(
+        v,
+        json!({"reason": "unit_stopped", "unit": "s", "finding": null, "at": w.at(2)})
+    );
+    assert_eq!(
+        w.pauses, 2,
+        "a unit already stopped at the first reading is no reason"
+    );
+    let mut w = Wt::new();
+    wu(&mut w.f, "r", "running", json!({}));
+    w.then(|w| {
+        wu(
+            &mut w.f,
+            "r",
+            "stopped",
+            json!({"ended_at": "2026-11-17T11:00:00Z"}),
+        )
+    });
+    assert_eq!(w.answer(600)["unit"], "r");
+    assert_eq!(w.pauses, 1);
+}
+
+// spec: specs/ap/status.md#R28
+#[test]
+fn r28_an_open_finding_of_severity_act_or_urgent_that_is_new_ends_the_wait() {
+    let mut w = Wt::new();
+    wu(&mut w.f, "u", "running", json!({"repository": null}));
+    let seen = "2026-11-17T11:00:00Z";
+    finding(&mut w.f, "f-old", "act", "open", seen, json!({}));
+    w.then(|w| {
+        finding(
+            &mut w.f,
+            "f-info",
+            "info",
+            "open",
+            "2026-11-17T11:00:00Z",
+            json!({}),
+        );
+        finding(
+            &mut w.f,
+            "f-planned",
+            "urgent",
+            "planned",
+            "2026-11-17T11:00:00Z",
+            json!({}),
+        );
+        finding(
+            &mut w.f,
+            "f-closed",
+            "act",
+            "closed",
+            "2026-11-17T11:00:00Z",
+            json!({}),
+        );
+        finding(
+            &mut w.f,
+            "f-dismissed",
+            "act",
+            "dismissed",
+            "2026-11-17T11:00:00Z",
+            json!({}),
+        );
+    });
+    // A finding of another intent's unit or of none counts: the open findings are the store's.
+    w.then(|w| {
+        finding(
+            &mut w.f,
+            "f-new",
+            "urgent",
+            "open",
+            "2026-11-17T11:30:00Z",
+            json!({"unit": oid("unit", "other")}),
+        )
+    });
+    let v = w.answer(600);
+    assert_eq!(
+        v,
+        json!({"reason": "finding", "unit": null, "finding": "f-new", "at": w.at(2)})
+    );
+    assert_eq!(w.pauses, 2);
+}
+
+// spec: specs/ap/status.md#R29
+#[test]
+fn r29_an_intent_whose_units_all_ended_or_that_has_none_ends_the_wait_at_once() {
+    let mut w = Wt::new();
+    wu(&mut w.f, "m", "merged", json!({}));
+    wu(&mut w.f, "d", "done", json!({}));
+    wu(&mut w.f, "x", "dropped", json!({}));
+    wu(
+        &mut w.f,
+        "other",
+        "ready",
+        json!({"intent": oid("intent", "elsewhere")}),
+    );
+    let v = w.answer(600);
+    assert_eq!(
+        v,
+        json!({"reason": "all_ended", "unit": null, "finding": null, "at": w.at(0)})
+    );
+    assert_eq!(w.pauses, 0);
+    let mut w = Wt::new();
+    assert_eq!(w.answer(600)["reason"], "all_ended");
+    assert_eq!(w.pauses, 0);
+    // One unit not ended, until it is.
+    let mut w = Wt::new();
+    wu(&mut w.f, "m", "merged", json!({}));
+    wu(&mut w.f, "d", "draft", json!({}));
+    w.then(|w| wu(&mut w.f, "d", "merged", json!({})));
+    assert_eq!(w.answer(600)["reason"], "all_ended");
+    assert_eq!(w.pauses, 1);
+}
+
+/// A policy and a units directory where a cut run is read: the unit `cut` runs with no run alive.
+fn idle_fixture() -> Wt {
+    let mut w = Wt::new();
+    wu(&mut w.f, "cut", "running", json!({}));
+    w
+}
+
+// spec: specs/ap/status.md#R30
+#[test]
+fn r30_a_unit_no_run_drives_at_two_successive_readings_is_idle() {
+    let mut w = idle_fixture();
+    // A run that ended with its unit as it was: `ready` and `accepted` with `started` equal to the
+    // revision; and units that are not idle: no `started`, another revision, a live run.
+    wu(&mut w.f, "ran", "ready", json!({}));
+    wu(&mut w.f, "fin", "accepted", json!({}));
+    wu(&mut w.f, "fresh", "ready", json!({}));
+    wu(&mut w.f, "stale", "ready", json!({}));
+    wu(&mut w.f, "hot", "running", json!({}));
+    for k in ["ran", "fin"] {
+        w.started(k, "r#1");
+    }
+    w.started("stale", "r#0");
+    w.live("hot");
+    let v = w.answer(600);
+    assert_eq!(
+        v,
+        json!({"reason": "unit_idle", "unit": "cut", "finding": null, "at": w.at(1)})
+    );
+    assert_eq!(w.pauses, 1, "none at the first reading, one at the second");
+    // The reading breaks: idle at 0, a run alive at 1, idle at 2 and 3: the reason is at 3.
+    let mut w = idle_fixture();
+    w.then(|w| w.live("cut"));
+    w.then(|w| w.listed = Some(String::new()));
+    let v = w.answer(600);
+    assert_eq!(
+        (v["reason"].as_str(), v["unit"].as_str()),
+        (Some("unit_idle"), Some("cut"))
+    );
+    assert_eq!(w.pauses, 3);
+}
+
+// spec: specs/ap/status.md#R30
+#[test]
+fn r30_an_accepted_unit_whose_merge_run_lives_at_two_readings_gives_no_reason() {
+    let mut w = Wt::new();
+    wu(&mut w.f, "acc", "accepted", json!({}));
+    w.started("acc", "r#1");
+    w.live("acc");
+    let v = w.answer(90);
+    assert_eq!(v["reason"], "timeout", "{v}");
+    assert_eq!(w.pauses, 3);
+    // The same unit with its run gone is idle.
+    let mut w = Wt::new();
+    wu(&mut w.f, "acc", "accepted", json!({}));
+    w.started("acc", "r#1");
+    assert_eq!(w.answer(90)["reason"], "unit_idle");
+}
+
+// spec: specs/ap/status.md#R30
+#[test]
+fn r30_a_cut_run_of_a_unit_under_an_active_hold_gives_no_reason() {
+    let hold_on = |unit: Value, intent: Value, status: &str| {
+        let mut w = idle_fixture();
+        hold(
+            &mut w.f,
+            "h-1",
+            status,
+            "2026-11-17T10:00:00Z",
+            json!({"unit": unit, "intent": intent}),
+        );
+        w.answer(90)
+    };
+    let (unit, intent) = (oid("unit", "cut"), oid("intent", "walk"));
+    assert_eq!(
+        hold_on(unit.clone(), Value::Null, "active")["reason"],
+        "timeout"
+    );
+    assert_eq!(
+        hold_on(Value::Null, intent.clone(), "active")["reason"],
+        "timeout"
+    );
+    // A hold on another unit or intent, or one lifted, holds nothing.
+    let other = (oid("unit", "other"), oid("intent", "elsewhere"));
+    assert_eq!(hold_on(other.0, other.1, "active")["reason"], "unit_idle");
+    assert_eq!(hold_on(unit, intent, "lifted")["reason"], "unit_idle");
+}
+
+// spec: specs/ap/status.md#R31
+#[test]
+fn r31_unit_idle_is_given_only_where_the_policy_and_the_service_manager_say_where_to_look() {
+    let idle = |w: &mut Wt, store: Option<&str>| match w.wait(store, 90) {
+        Ok(v) => v["reason"].as_str().unwrap().to_owned(),
+        Err(e) => panic!("{} {} {}", e.code, e.field, e.detail),
+    };
+    // The control: it is given here.
+    assert_eq!(idle(&mut idle_fixture(), None), "unit_idle");
+    // No service manager.
+    let mut w = idle_fixture();
+    w.units = false;
+    assert_eq!(idle(&mut w, None), "timeout");
+    // No policy file, a policy without `work`.
+    let mut w = idle_fixture();
+    w.policy = None;
+    assert_eq!(idle(&mut w, None), "timeout");
+    let mut w = idle_fixture();
+    w.policy = Some(w.dir.join("absent.json"));
+    assert_eq!(idle(&mut w, None), "timeout");
+    let mut w = idle_fixture();
+    w.policy_is(json!({"units": {"directory": "/invented"}}));
+    assert_eq!(idle(&mut w, None), "timeout");
+    // `--store` without `AP_POLICY_FILE`, and `AP_POLICY_FILE` without `--store`: the file is not read.
+    let mut w = idle_fixture();
+    assert_eq!(idle(&mut w, Some(SCRATCH)), "timeout");
+    assert!(w.reads.borrow().is_empty(), "the policy file was read");
+    assert!(w.f.stores.iter().all(|s| s.as_deref() == Some(SCRATCH)));
+    let mut w = idle_fixture();
+    w.scratch();
+    assert_eq!(idle(&mut w, None), "timeout");
+    assert!(w.reads.borrow().is_empty(), "the policy file was read");
+    // `--store` with `AP_POLICY_FILE` and a policy `ap work` accepts with `--store`: given.
+    let mut w = idle_fixture();
+    w.scratch();
+    assert_eq!(idle(&mut w, Some(SCRATCH)), "unit_idle");
+    assert_eq!(w.systemctl, 2);
+    // ... and one it refuses with `--store`: without `units.directory`, `work.slice` or `work.prefix`.
+    let policies = [
+        json!({"work": {"prefix": PREFIX, "slice": "aptrial1.slice"}, "units": {"timeouts": {}}}),
+        json!({"work": {"prefix": PREFIX}, "units": {"directory": "/invented"}}),
+        json!({"work": {"slice": "aptrial1.slice"}, "units": {"directory": "/invented"}}),
+    ];
+    for p in policies {
+        let mut w = idle_fixture();
+        w.scratch();
+        w.policy_is(p.clone());
+        assert_eq!(idle(&mut w, Some(SCRATCH)), "timeout", "{p}");
+        assert_eq!(w.systemctl, 0, "no run unit is read");
+    }
+    // A unit without a repository, and keys that are not of `ap unit add`'s form, give none.
+    let mut w = Wt::new();
+    wu(&mut w.f, "cut", "running", json!({"repository": null}));
+    wu(&mut w.f, "empty", "running", json!({"repository": ""}));
+    for k in ["Cut_Run", "9lives", "-dash", "has space", &"k".repeat(60)] {
+        wu(&mut w.f, k, "running", json!({}));
+    }
+    assert_eq!(idle(&mut w, None), "timeout");
+}
+
+// spec: specs/ap/status.md#R32
+#[test]
+fn r32_the_timeout_ends_the_wait_after_the_reading_it_falls_in() {
+    let mut w = Wt::new();
+    wu(&mut w.f, "u", "running", json!({"repository": null}));
+    let v = w.answer(30);
+    assert_eq!(v, timeout_at(&w, 1));
+    assert_eq!(w.starts.len(), 2, "a reading at 0 and one at 30 seconds");
+    let mut w = Wt::new();
+    wu(&mut w.f, "u", "running", json!({"repository": null}));
+    assert_eq!(
+        w.answer(100),
+        timeout_at(&w, 4),
+        "the readings at 0, 30, 60, 90 and 120"
+    );
+    let mut w = Wt::new();
+    wu(&mut w.f, "u", "running", json!({"repository": null}));
+    assert_eq!(w.answer(14_400)["reason"], "timeout");
+    assert_eq!(w.pauses, 480, "the default is four hours");
+}
+
+// spec: specs/ap/status.md#R32
+#[test]
+fn r32_of_two_reasons_at_one_reading_the_first_in_the_order_is_given_and_the_smallest_key() {
+    // Accepted, stopped, a finding and a unit still running at one reading: `unit_accepted`, `a-one`.
+    let mut w = Wt::new();
+    wu(&mut w.f, "r", "running", json!({"repository": null}));
+    w.then(|w| {
+        wu(&mut w.f, "b-two", "accepted", json!({"class": "contract"}));
+        wu(&mut w.f, "a-one", "accepted", json!({"class": "effect"}));
+        wu(&mut w.f, "a-0", "stopped", json!({}));
+        finding(
+            &mut w.f,
+            "f-new",
+            "act",
+            "open",
+            "2026-11-17T11:30:00Z",
+            json!({}),
+        );
+    });
+    let v = w.answer(600);
+    assert_eq!(
+        (v["reason"].as_str(), v["unit"].as_str()),
+        (Some("unit_accepted"), Some("a-one"))
+    );
+    // Without the accepted ones: `unit_stopped`, the smallest key; then `finding`.
+    let mut w = Wt::new();
+    wu(&mut w.f, "r", "running", json!({"repository": null}));
+    w.then(|w| {
+        wu(&mut w.f, "s-two", "stopped", json!({}));
+        wu(&mut w.f, "s-one", "stopped", json!({}));
+        finding(
+            &mut w.f,
+            "f-new",
+            "act",
+            "open",
+            "2026-11-17T11:30:00Z",
+            json!({}),
+        );
+    });
+    let v = w.answer(600);
+    assert_eq!(
+        (v["reason"].as_str(), v["unit"].as_str()),
+        (Some("unit_stopped"), Some("s-one"))
+    );
+    // A finding before `all_ended`: every unit merged and a finding that is new.
+    let mut w = Wt::new();
+    wu(&mut w.f, "m", "running", json!({"repository": null}));
+    w.then(|w| {
+        wu(&mut w.f, "m", "merged", json!({}));
+        finding(
+            &mut w.f,
+            "f-new",
+            "urgent",
+            "open",
+            "2026-11-17T11:30:00Z",
+            json!({}),
+        );
+    });
+    assert_eq!(w.answer(600)["reason"], "finding");
+    // A finding before `unit_idle`, and `unit_idle` before `timeout`.
+    let mut w = idle_fixture();
+    w.then(|w| {
+        finding(
+            &mut w.f,
+            "f-new",
+            "act",
+            "open",
+            "2026-11-17T11:30:00Z",
+            json!({}),
+        )
+    });
+    assert_eq!(w.answer(30)["reason"], "finding");
+    let mut w = idle_fixture();
+    assert_eq!(
+        w.answer(30)["reason"],
+        "unit_idle",
+        "the timeout falls in the reading of the second idle"
+    );
+}
+
+// spec: specs/ap/status.md#R33
+#[test]
+fn r33_a_reading_that_fails_is_no_reason_and_the_wait_compares_with_the_first_that_succeeded() {
+    // The first reading fails; the comparisons are with the second.
+    let mut w = Wt::new();
+    wu(&mut w.f, "k", "accepted", json!({"class": "contract"}));
+    w.down = true;
+    w.then(|w| w.down = false);
+    assert_eq!(
+        w.answer(90),
+        timeout_at(&w, 3),
+        "the accepted unit of the first reading that succeeded is no reason"
+    );
+    // A failure between two readings: the head is the same, and no reason comes of it.
+    let mut w = Wt::new();
+    wu(&mut w.f, "k", "accepted", json!({"class": "contract"}));
+    w.then(|w| w.down = true);
+    w.then(|w| w.down = false);
+    assert_eq!(w.answer(90)["reason"], "timeout");
+    // Failures that are not in a row never end the wait.
+    let mut w = Wt::new();
+    w.down = true;
+    for n in 0..5 {
+        w.then(move |w| w.down = n % 2 == 1);
+    }
+    wu(&mut w.f, "u", "running", json!({"repository": null}));
+    let v = w.answer(150);
+    assert_eq!(v["reason"], "timeout");
+    // The idle readings are successive across a failed one.
+    let mut w = idle_fixture();
+    w.then(|w| w.down = true);
+    w.then(|w| w.down = false);
+    let v = w.answer(600);
+    assert_eq!(
+        (v["reason"].as_str(), v["unit"].as_str()),
+        (Some("unit_idle"), Some("cut"))
+    );
+    assert_eq!(w.pauses, 2);
+}
+
+// spec: specs/ap/status.md#R33
+#[test]
+fn r33_three_failed_readings_in_a_row_end_the_wait_with_the_last_error() {
+    let mut w = Wt::new();
+    w.down = true;
+    let e = w.wait(None, 600).expect_err("a store that is gone");
+    assert_eq!((e.code, e.field.as_str()), ("process_failed", "ont"));
+    assert_eq!(w.pauses, 2, "three readings");
+    // The service manager failing is a failed reading too.
+    let mut w = idle_fixture();
+    w.listed = None;
+    let e = w.wait(None, 600).expect_err("a service manager that fails");
+    assert_eq!((e.code, e.field.as_str()), ("reading_failed", "list_units"));
+    assert_eq!((w.pauses, w.systemctl), (2, 3));
+    // A policy that `ap work` refuses is a failed reading: its error ends the wait.
+    for policy in [
+        json!({"work": {"slots": 99}}),
+        json!({"work": "x"}),
+        json!({"work": {}, "units": {"directory": "relative"}}),
+    ] {
+        let mut w = idle_fixture();
+        w.policy_is(policy.clone());
+        let e = w.wait(None, 600).expect_err("a policy that is refused");
+        assert_eq!(
+            (e.code, e.field.as_str()),
+            ("policy_invalid", "policy"),
+            "{policy}"
+        );
+        assert_eq!(w.pauses, 2);
+        assert_eq!(ap::status::exit_code(true, &e), 3);
+    }
+    let mut w = idle_fixture();
+    std::fs::write(w.dir.join("policy.json"), "not json").unwrap();
+    assert_eq!(
+        w.wait(None, 600).expect_err("not json").code,
+        "policy_invalid"
+    );
+    // The policy's `quota` is not read: one that `ap quota` would refuse is no failure.
+    let mut w = idle_fixture();
+    w.policy_is(json!({"work": {"prefix": PREFIX}, "quota": "invalid"}));
+    assert_eq!(w.answer(600)["reason"], "unit_idle");
+}
+
+// spec: specs/ap/status.md#R33
+#[test]
+fn r33_a_timeout_ends_with_the_last_error_when_no_reading_succeeded() {
+    let mut w = Wt::new();
+    w.down = true;
+    let e = w.wait(None, 30).expect_err("no reading succeeded");
+    assert_eq!((e.code, w.pauses), ("process_failed", 1));
+    // A reading that succeeded before the timeout gives its `at`, though the last one failed.
+    let mut w = Wt::new();
+    wu(&mut w.f, "u", "running", json!({"repository": null}));
+    w.then(|w| w.down = true);
+    assert_eq!(w.answer(30), timeout_at(&w, 0));
+}

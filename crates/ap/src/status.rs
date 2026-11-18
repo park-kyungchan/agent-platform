@@ -3,8 +3,18 @@
 //! `specs/ap/status.md`). It writes nothing.
 use crate::host::{Failure, Host, System, error};
 use crate::store::{self, Found, Seen, at};
+use crate::unit::drive::{self, key_form};
+use crate::work;
 use serde_json::{Value, json};
-use std::{cmp::Reverse, ffi::OsString, io::Write, process::ExitCode};
+use std::{
+    cmp::Reverse,
+    collections::{BTreeMap, BTreeSet},
+    ffi::OsString,
+    io::Write,
+    path::PathBuf,
+    process::ExitCode,
+    time::Duration,
+};
 
 /// The request of delivery on this host (its member `state`), and the directory it defaults to.
 const DELIVER: &str = "/etc/agent-platform/deliver.json";
@@ -28,21 +38,32 @@ const MATCHES: usize = 12;
 /// Entries a section of the text form holds, and the oldest requests it names.
 const ENTRIES: usize = 9;
 const OLDEST: usize = 5;
+/// The wait: its default timeout, the pause between readings and the failed readings in a row that end it.
+const TIMEOUT: u64 = 14_400;
+const PAUSE: Duration = Duration::from_secs(30);
+const FAILED: usize = 3;
 
 pub enum Call {
     Overview,
     Key(String),
     Term(String),
+    /// `--wait <intent>` with its timeout in seconds.
+    Wait(String, u64),
 }
 pub struct Args {
     pub store: Option<String>,
     pub text: bool,
     pub call: Call,
 }
-/// `--store <absolute path>`, `--text`, `--term <word>` and one key, each at most once.
+/// `--store <absolute path>`, `--text`, `--term <word>` and one key, each at most once; or `--wait <intent>`
+/// with `--timeout <seconds>` and `--store`.
 pub fn parse(argv: &[OsString]) -> Result<Args, Failure> {
     let usage = || error("usage", "args");
     let (mut store, mut text, mut term, mut key) = (None, false, None, None);
+    let (mut wait, mut timeout) = (None, None);
+    let plain = |k: &str| {
+        !k.starts_with('-') && (1..=512).contains(&k.len()) && !k.chars().any(char::is_control)
+    };
     let mut it = argv.iter().map(|a| a.to_str());
     while let Some(arg) = it.next() {
         match arg.ok_or_else(usage)? {
@@ -64,20 +85,24 @@ pub fn parse(argv: &[OsString]) -> Result<Args, Failure> {
                         .to_owned(),
                 );
             }
-            k if key.is_none()
-                && !k.starts_with('-')
-                && (1..=512).contains(&k.len())
-                && !k.chars().any(char::is_control) =>
-            {
-                key = Some(k.to_owned())
+            "--wait" if wait.is_none() => {
+                wait = Some(it.next().flatten().filter(|k| plain(k)).ok_or_else(usage)?);
             }
+            "--timeout" if timeout.is_none() => {
+                let digits = |t: &&str| !t.is_empty() && t.bytes().all(|b| b.is_ascii_digit());
+                let n = it.next().flatten().filter(digits);
+                let n = n.and_then(|t| t.parse::<u64>().ok());
+                timeout = Some(n.filter(|n| (30..=86_400).contains(n)).ok_or_else(usage)?);
+            }
+            k if key.is_none() && plain(k) => key = Some(k.to_owned()),
             _ => return Err(usage()),
         }
     }
-    let call = match (term, key) {
-        (None, None) => Call::Overview,
-        (None, Some(k)) => Call::Key(k),
-        (Some(w), None) => Call::Term(w),
+    let call = match (term, key, wait, timeout) {
+        (None, None, None, None) => Call::Overview,
+        (None, Some(k), None, None) => Call::Key(k),
+        (Some(w), None, None, None) => Call::Term(w),
+        (None, None, Some(i), t) if !text => Call::Wait(i.to_owned(), t.unwrap_or(TIMEOUT)),
         _ => return Err(usage()),
     };
     Ok(Args { store, text, call })
@@ -588,6 +613,200 @@ pub fn execute(s: &mut impl System, store: Option<&str>, call: &Call) -> Result<
         Call::Overview => overview(s, store),
         Call::Key(key) => keyed(s, store, key),
         Call::Term(word) => term(s, store, word),
+        Call::Wait(intent, timeout) => wait(s, store, intent, *timeout),
+    }
+}
+
+/// What one reading of the wait holds: the store's clock, the units of the intent by key, the keys of
+/// the open findings of severity `act` or `urgent`, and the units that look idle.
+struct Reading {
+    at: u64,
+    units: Vec<Found>,
+    findings: BTreeSet<String>,
+    idle: BTreeSet<String>,
+}
+/// The first reading's accepted heads, stopped ends and findings: what a reason is compared with.
+struct Base {
+    accepted: BTreeMap<String, Value>,
+    stopped: BTreeMap<String, Value>,
+    findings: BTreeSet<String>,
+}
+/// The units directory and the prefix of the run units where `unit_idle` may be given, read from the
+/// policy as `ap work` reads it (a scratch store is never read against the host's units directory).
+fn watched(s: &impl System, store: Option<&str>) -> Result<Option<(PathBuf, String)>, Failure> {
+    if work::paired(s, store).is_err() {
+        return Ok(None);
+    }
+    let Some(policy) = work::policy(s)? else {
+        return Ok(None);
+    };
+    let Some(w) = work::work(&policy)? else {
+        return Ok(None);
+    };
+    if work::scratch(&policy, store).is_err() {
+        return Ok(None);
+    }
+    let (directory, _) = drive::units(&policy)?;
+    Ok(s.units().then(|| (PathBuf::from(directory), w.prefix)))
+}
+/// The units of the intent that no run drives and that nothing will start: a cut `running` unit, or a
+/// `ready` or `accepted` one whose file `started` equals its revision, with no active hold on it or its
+/// intent. Only a unit with a repository and a key of `ap unit add`'s form.
+fn idle(
+    s: &mut impl System,
+    store: Option<&str>,
+    intent: &str,
+    units: &[Found],
+) -> Result<BTreeSet<String>, Failure> {
+    let Some((root, prefix)) = watched(s, store)? else {
+        return Ok(BTreeSet::new());
+    };
+    let (mut given, mut cut) = (vec![], BTreeSet::new());
+    let mine = units
+        .iter()
+        .filter(|(k, u)| key_form(k) && !text(&u["repository"]).is_empty());
+    for (k, u) in mine {
+        match u["state"].as_str() {
+            Some("running") => {
+                cut.insert(k.clone());
+                given.push((k.clone(), String::new()));
+            }
+            Some("ready" | "accepted") => {
+                if let Some((revision, _)) = at(store::head(s, store, "unit", k), "unit")? {
+                    given.push((k.clone(), revision));
+                }
+            }
+            _ => {}
+        }
+    }
+    let seen = work::observe(s, &root, &prefix, &given)?;
+    let mut idle: BTreeSet<String> = (given.iter().map(|g| g.0.clone()))
+        .filter(|k| !seen.in_flight.contains(k) && (cut.contains(k) || seen.started.contains(k)))
+        .collect();
+    if !idle.is_empty() {
+        let held = active_holds(s, store)?;
+        idle.retain(|k| {
+            !(held.iter())
+                .any(|(_, h)| h["unit"]["native_key"] == *k || h["intent"]["native_key"] == intent)
+        });
+    }
+    Ok(idle)
+}
+fn reading(s: &mut impl System, store: Option<&str>, intent: &str) -> Result<Reading, Failure> {
+    let Some((_, _, now)) = at(store::head_now(s, store, "intent", intent), "intent")? else {
+        return Err(error("unknown_intent", "intent"));
+    };
+    let at = now.ok_or_else(|| error("store_answer_unreadable", "now"))?;
+    let mut units = all_units(s, store)?;
+    units.retain(|(_, u)| u["intent"]["native_key"] == intent);
+    units.sort_by_key(|(k, _)| k.clone());
+    let severe = |f: &Found| {
+        f.1["state"] == "open" && (f.1["severity"] == "act" || f.1["severity"] == "urgent")
+    };
+    let findings = open_findings(s, store)?.into_iter().filter(severe);
+    let findings = findings.map(|(k, _)| k).collect();
+    let idle = idle(s, store, intent, &units)?;
+    Ok(Reading {
+        at,
+        units,
+        findings,
+        idle,
+    })
+}
+/// The first reason that holds at `r` (the order of the specification), with its unit and finding.
+fn reason(
+    r: &Reading,
+    b: &Base,
+    before: &BTreeSet<String>,
+) -> Option<(&'static str, Option<String>, Option<String>)> {
+    let waits = |f: &Value| {
+        matches!(f["class"].as_str(), Some("contract" | "effect"))
+            && f["approved_head"] != f["head"]
+    };
+    let unit = |state: &str, new: &dyn Fn(&Found) -> bool| {
+        (r.units.iter().find(|u| u.1["state"] == state && new(u))).map(|u| u.0.clone())
+    };
+    let ended = |u: &Found| {
+        ["merged", "done", "dropped"]
+            .iter()
+            .any(|e| u.1["state"] == *e)
+    };
+    let accepted = |(k, f): &Found| waits(f) && b.accepted.get(k) != Some(&f["head"]);
+    let stopped = |(k, f): &Found| b.stopped.get(k) != Some(&f["ended_at"]);
+    let unit_of = |reason, k| (reason, Some(k), None);
+    unit("accepted", &accepted)
+        .map(|k| unit_of("unit_accepted", k))
+        .or_else(|| unit("stopped", &stopped).map(|k| unit_of("unit_stopped", k)))
+        .or_else(|| {
+            r.findings
+                .difference(&b.findings)
+                .next()
+                .map(|f| ("finding", None, Some(f.clone())))
+        })
+        .or_else(|| {
+            r.units
+                .iter()
+                .all(ended)
+                .then_some(("all_ended", None, None))
+        })
+        .or_else(|| {
+            r.idle
+                .intersection(before)
+                .next()
+                .map(|k| unit_of("unit_idle", k.clone()))
+        })
+}
+/// `ap status --wait`: reads every 30 seconds until a unit of the intent needs the Lead, a finding of
+/// severity `act` or `urgent` opens, every unit ended, or the timeout; one answer `{reason, unit,
+/// finding, at}`. A reading that fails is no reason; the third in a row ends the wait with its error.
+fn wait(
+    s: &mut impl System,
+    store: Option<&str>,
+    intent: &str,
+    timeout: u64,
+) -> Result<Value, Failure> {
+    let began = s.now();
+    let (mut base, mut before, mut failed, mut last) = (None, BTreeSet::new(), 0, None);
+    let mut last_at = None;
+    loop {
+        match reading(s, store, intent) {
+            Err(f) if f.code == "unknown_intent" => return Err(f),
+            Err(f) => {
+                failed += 1;
+                if failed == FAILED {
+                    return Err(f);
+                }
+                last = Some(f);
+            }
+            Ok(r) => {
+                failed = 0;
+                last_at = Some(r.at);
+                let of = |state: &str, member: &str| -> BTreeMap<String, Value> {
+                    let mine = r.units.iter().filter(|u| u.1["state"] == state);
+                    mine.map(|u| (u.0.clone(), u.1[member].clone())).collect()
+                };
+                let b = base.get_or_insert_with(|| Base {
+                    accepted: of("accepted", "head"),
+                    stopped: of("stopped", "ended_at"),
+                    findings: r.findings.clone(),
+                });
+                if let Some((why, unit, finding)) = reason(&r, b, &before) {
+                    return Ok(
+                        json!({"reason": why, "unit": unit, "finding": finding, "at": utc(r.at)}),
+                    );
+                }
+                before = r.idle;
+            }
+        }
+        if s.now().duration_since(began) >= Duration::from_secs(timeout) {
+            return match last_at {
+                Some(at) => {
+                    Ok(json!({"reason": "timeout", "unit": null, "finding": null, "at": utc(at)}))
+                }
+                None => Err(last.unwrap_or_else(|| error("store_answer_unreadable", "now"))),
+            };
+        }
+        s.pause(PAUSE);
     }
 }
 
@@ -822,6 +1041,7 @@ fn labelled(v: &Value, depth: usize, out: &mut String) {
 pub fn text_of(call: &Call, v: &Value) -> String {
     match call {
         Call::Overview => overview_text(v),
+        Call::Wait(..) => format!("{v}\n"),
         Call::Key(_) => {
             let mut out = String::new();
             labelled(v, 0, &mut out);
@@ -850,8 +1070,25 @@ pub fn text_of(call: &Call, v: &Value) -> String {
     }
 }
 
+/// The exit status of a refusal: 2, but 3 for a wait that ends in an error other than an unknown intent.
+pub fn exit_code(waiting: bool, f: &Failure) -> u8 {
+    if waiting && f.code != "unknown_intent" {
+        3
+    } else {
+        2
+    }
+}
+
 pub fn cli(argv: &[OsString]) -> ExitCode {
-    let result = parse(argv).and_then(|a| {
+    let parsed = parse(argv);
+    let waiting = matches!(
+        &parsed,
+        Ok(Args {
+            call: Call::Wait(..),
+            ..
+        })
+    );
+    let result = parsed.and_then(|a| {
         let v = execute(&mut Host, a.store.as_deref(), &a.call)?;
         Ok(if a.text {
             text_of(&a.call, &v)
@@ -864,7 +1101,7 @@ pub fn cli(argv: &[OsString]) -> ExitCode {
         Err(f) => {
             let v =
                 json!({"error": {"code": store::code(&f), "field": f.field, "detail": f.detail}});
-            (writeln!(std::io::stderr(), "{v}"), 2)
+            (writeln!(std::io::stderr(), "{v}"), exit_code(waiting, &f))
         }
     };
     ExitCode::from(if written.is_ok() { status } else { 4 })
