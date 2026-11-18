@@ -326,7 +326,8 @@ fn environment(r: &Value, runtime: Runtime) -> Result<Vec<(String, String)>, Fai
                 && !k.starts_with("ANTHROPIC_") && k != "HOME" => "env_forbidden", "env");
             require!(!runtime.reserved(k) => "env_forbidden", "env");
             // `BASH_ENV` and `ENV` name a file a shell sources before the stage's own command.
-            require!(!["ONT_ROLE", "ONT_AGENT", "GIT_AUTHOR_NAME", "GIT_AUTHOR_EMAIL", "BASH_ENV", "ENV"]
+            require!(!["ONT_ROLE", "ONT_AGENT", "GIT_AUTHOR_NAME", "GIT_AUTHOR_EMAIL",
+                "GIT_COMMITTER_NAME", "GIT_COMMITTER_EMAIL", "BASH_ENV", "ENV"]
                 .contains(&k.as_str()) => "env_forbidden", "env");
             let v = v
                 .as_str()
@@ -398,7 +399,7 @@ fn remove_scratch(scratch: &str) {
     }
 }
 /// What every stage's environment gets: its role and agent as the actor's claim (R3, R4) and, with
-/// `git_author`, the author of its commits (R5).
+/// `git_author`, the author and the committer of its commits, the same two values (R5).
 fn identity(
     runtime: Runtime,
     (role, model): (&str, &str),
@@ -419,9 +420,13 @@ fn identity(
         ("ONT_AGENT".into(), agent),
     ];
     if git_author {
-        env.push(("GIT_AUTHOR_NAME".into(), format!("{role} {model}")));
-        let email = clean(format!("{role}.{model}"), ".-");
-        env.push(("GIT_AUTHOR_EMAIL".into(), format!("{email}@agents.invalid")));
+        let name = format!("{role} {model}");
+        let email = format!("{}@agents.invalid", clean(format!("{role}.{model}"), ".-"));
+        // The committer is the author: a commit carries no host name (`user@host`) of Git's default.
+        for who in ["AUTHOR", "COMMITTER"] {
+            env.push((format!("GIT_{who}_NAME"), name.clone()));
+            env.push((format!("GIT_{who}_EMAIL"), email.clone()));
+        }
     }
     env
 }
@@ -2200,13 +2205,143 @@ pub fn execute(s: &mut impl System, r: &Value) -> Result<(Value, u8), Failure> {
     };
     Ok((last, status))
 }
+/// A refusal of the close form, or a failure of its store call, with its exit (2 or 3).
+#[derive(Debug)]
+pub struct Refused {
+    pub code: String,
+    pub field: String,
+    pub detail: Value,
+    pub status: u8,
+}
+impl From<Failure> for Refused {
+    fn from(f: Failure) -> Self {
+        Self {
+            code: f.code.to_owned(),
+            field: f.field,
+            detail: f.detail,
+            status: 2,
+        }
+    }
+}
+/// The members of the close form (`specs/ap/run-object.md` R14).
+const CLOSING: [&str; 2] = ["close", "store"];
+/// The youngest record of a stage that an orphan's close takes, and the pause between its two
+/// readings: a stage's record is younger, or changes, while its stage lives (R14).
+const SETTLED: Duration = Duration::from_secs(60);
+const SECOND_READING: Duration = Duration::from_secs(10);
+/// `ap run` with the member `close`: a `run` object left `running` by a stage whose process is gone
+/// closed with its record's state (R14). A store call that fails ends the call with exit 3.
+pub fn close(s: &mut impl System, r: &Value) -> Result<Value, Refused> {
+    let o = r
+        .as_object()
+        .ok_or_else(|| error("invalid_input", "stdin"))?;
+    if let Some(k) = o.keys().find(|k| !CLOSING.contains(&k.as_str())) {
+        return Err(error("invalid_input", k).into());
+    }
+    let key = r["close"]
+        .as_str()
+        .filter(|k| {
+            (1..=64).contains(&k.len())
+                && k.bytes()
+                    .all(|c| c.is_ascii_alphanumeric() || b"._-".contains(&c))
+        })
+        .ok_or_else(|| error("invalid_input", "close"))?;
+    let store = match r.get("store") {
+        Some(_) => Some(path(r, "store")?),
+        None => None,
+    };
+    let failed = |f: Failure| Refused {
+        code: store::code_of(&f),
+        field: "close".into(),
+        detail: f.detail,
+        status: 3,
+    };
+    let run = store::get(s, store.as_deref(), "run", key).map_err(failed)?;
+    let run = run.ok_or_else(|| error("unknown_run", "close"))?;
+    if run["status"] != "running" {
+        return Ok(json!({"run": key, "closed": false}));
+    }
+    let mismatch = |why: &str| fail("record_mismatch", "close", json!(why));
+    let record = run["record"]
+        .as_str()
+        .ok_or_else(|| mismatch("no record"))?;
+    let rec = std::fs::read(record)
+        .ok()
+        .and_then(|b| serde_json::from_slice::<Value>(&b).ok())
+        .filter(Value::is_object)
+        .ok_or_else(|| mismatch("the record is missing or unreadable"))?;
+    if rec["run_object"]["key"] != key {
+        return Err(mismatch("the record names another run object").into());
+    }
+    let scope = rec["unit"]
+        .as_str()
+        .filter(|n| scope_name(n))
+        .ok_or_else(|| mismatch("the record names no scope of ap run"))?;
+    let still = |why: &str| fail("run_still_active", "close", json!(why));
+    // The scope reads ended, and the record is old and does not change across a second reading.
+    let first = settled(s, record, scope)?;
+    let age = s.wall().duration_since(first.0).unwrap_or_default();
+    if age < SETTLED {
+        return Err(still("the record is younger than 60 seconds").into());
+    }
+    s.pause(SECOND_READING);
+    if settled(s, record, scope)? != first {
+        return Err(still("the record changed").into());
+    }
+    let state = match rec["state"].as_str() {
+        Some("running") => "killed",
+        other => other.unwrap_or("failed"),
+    };
+    let mut p = json!({"run": crate::host::id("run", key), "state": state});
+    if let Some(t) = rec["session"]
+        .as_str()
+        .filter(|t| (1..=200).contains(&t.len()))
+    {
+        p["session"] = json!(t);
+    }
+    let out = record.strip_suffix(".run.json").unwrap_or(record);
+    // The stage's own request id: the close its `ap run` would have applied (unit-run R7).
+    let rid = format!("run-{}-close", &digest(out.as_bytes())[..32]);
+    let role = run["role"].as_str().unwrap_or_default();
+    store::close_run(s, store.as_deref(), (&rid, role, &p)).map_err(failed)?;
+    Ok(json!({"run": key, "closed": true, "reason": "orphan"}))
+}
+/// One reading of an orphan: the record's modification time and size, when the scope reads ended.
+fn settled(s: &mut impl System, record: &str, scope: &str) -> Result<(SystemTime, u64), Failure> {
+    let still = |why: &str| fail("run_still_active", "close", json!(why));
+    let at = std::fs::metadata(record).map_err(|_| still("the record cannot be read again"))?;
+    let modified = at.modified().map_err(|_| still("the record has no time"))?;
+    if !ended(s, scope) {
+        return Err(still(scope));
+    }
+    Ok((modified, at.len()))
+}
+/// The name of a stage's transient scope: `ap-run-<36 of 0-9a-f->.scope`.
+fn scope_name(name: &str) -> bool {
+    let id = name
+        .strip_prefix("ap-run-")
+        .and_then(|r| r.strip_suffix(".scope"));
+    let digit = |c: u8| c.is_ascii_digit() || (b'a'..=b'f').contains(&c) || c == b'-';
+    id.is_some_and(|id| id.len() == 36 && id.bytes().all(digit))
+}
 pub fn cli(argv: &[OsString]) -> ExitCode {
-    cli_with(argv, execute)
+    // The close form has a path of its own: a failed store call exits 3 (R14).
+    answered(argv, |s, r| match r.get("close") {
+        Some(_) => close(s, r).map(|v| (v, 0)),
+        None => execute(s, r).map_err(Refused::from),
+    })
 }
 /// One JSON request on stdin, the answer on stdout, a refusal on stderr with exit 2.
 pub(crate) fn cli_with(
     argv: &[OsString],
     execute: impl FnOnce(&mut crate::host::Host, &Value) -> Result<(Value, u8), Failure>,
+) -> ExitCode {
+    answered(argv, |s, r| execute(s, r).map_err(Refused::from))
+}
+/// One JSON request on stdin, the answer on stdout, a refusal on stderr with its exit.
+fn answered(
+    argv: &[OsString],
+    execute: impl FnOnce(&mut crate::host::Host, &Value) -> Result<(Value, u8), Refused>,
 ) -> ExitCode {
     let result = (|| {
         require!(argv.is_empty() => "usage", "args");
@@ -2218,8 +2353,10 @@ pub(crate) fn cli_with(
         require!(bytes.len() as u64 <= LIMIT => "input_too_large", "stdin");
         let r: Value = serde_json::from_slice(&bytes)
             .map_err(|_| fail("invalid_input", "stdin", Value::Null))?;
-        execute(&mut crate::host::Host, &r)
-    })();
+        Ok(execute(&mut crate::host::Host, &r))
+    })()
+    .map_err(Refused::from)
+    .and_then(|answer| answer);
     match result {
         Ok((v, status)) => {
             if writeln!(std::io::stdout(), "{v}").is_err() {
@@ -2232,7 +2369,7 @@ pub(crate) fn cli_with(
             if writeln!(std::io::stderr(), "{v}").is_err() {
                 return ExitCode::from(4);
             }
-            ExitCode::from(2)
+            ExitCode::from(e.status)
         }
     }
 }

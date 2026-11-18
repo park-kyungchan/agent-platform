@@ -149,7 +149,11 @@ pub(crate) fn pr(s: &mut impl System, repository: &str, number: &Value) -> Resul
         &Value::Null,
         30_000,
     )?;
-    require!(reply.success => "review_head_differs", "pull_request");
+    // A call that failed says why in its reply, redacted as every `gh` reply that reaches a detail.
+    if !reply.success {
+        let said = crate::unit::redact(&reply.bytes);
+        return Err(fail("review_head_differs", "pull_request", json!(said)));
+    }
     parse(reply, "review_head_differs")
 }
 pub(crate) fn start(s: &mut impl System, r: &Value) -> Result<Value, Failure> {
@@ -303,8 +307,29 @@ pub(crate) fn post(
         &Value::Null,
         30_000,
     )?;
-    require!(reply.success => "process_failed", "gh");
-    Ok(())
+    // A call that failed says why in its reply: redacted here, so every caller gets it redacted.
+    match reply.success {
+        true => Ok(()),
+        false => Err(fail(
+            "process_failed",
+            "gh",
+            json!(crate::unit::redact(&reply.bytes)),
+        )),
+    }
+}
+/// The state of the status `lead-review` on `head` as GitHub reads it now (the newest of that
+/// context in the combined status), or `None` when the read fails or names none.
+pub(crate) fn lead_review(s: &mut impl System, repository: &str, head: &str) -> Option<String> {
+    let path = format!("repos/{repository}/commits/{head}/status");
+    let reply = s
+        .call("gh", &args(&["api", &path]), &Value::Null, 30_000)
+        .ok()?;
+    let v: Value = serde_json::from_slice(&reply.stdout)
+        .ok()
+        .filter(|_| reply.success)?;
+    let mut all = v["statuses"].as_array()?.iter();
+    let lead = all.find(|st| st["context"] == "lead-review")?;
+    lead["state"].as_str().map(str::to_owned)
 }
 /// The paths no pattern covers: a pattern matches its exact path; a trailing `/**` matches
 /// descendants, not the directory itself or another name with the same prefix.
