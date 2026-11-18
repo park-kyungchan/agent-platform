@@ -31,10 +31,10 @@ const LIVE: [&str; 4] = ["active", "activating", "deactivating", "reloading"];
 const READ: [&str; 3] = ["ready", "running", "accepted"];
 
 /// The member `work` of the policy file (R3).
-struct Work {
+pub(crate) struct Work {
     slots: usize,
     slice: String,
-    prefix: String,
+    pub(crate) prefix: String,
 }
 fn invalid(member: &str, why: &str) -> Failure {
     fail("policy_invalid", "policy", json!(format!("{member} {why}")))
@@ -47,7 +47,7 @@ fn prefix_ok(p: &str) -> bool {
             .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == b'-')
 }
 /// The member `work` as R3 reads it; None when the policy has none.
-fn work(policy: &Value) -> Result<Option<Work>, Failure> {
+pub(crate) fn work(policy: &Value) -> Result<Option<Work>, Failure> {
     let Some(w) = policy.get("work") else {
         return Ok(None);
     };
@@ -96,7 +96,7 @@ fn work(policy: &Value) -> Result<Option<Work>, Failure> {
     }))
 }
 /// The policy file as one JSON object; None when the host names none or it does not exist (R2).
-fn policy(s: &impl System) -> Result<Option<Value>, Failure> {
+pub(crate) fn policy(s: &impl System) -> Result<Option<Value>, Failure> {
     let Some(file) = s.policy_file() else {
         return Ok(None);
     };
@@ -115,7 +115,7 @@ fn policy(s: &impl System) -> Result<Option<Value>, Failure> {
     }
 }
 /// A variable of this process, when set and not empty.
-fn variable(s: &impl System, name: &str) -> Option<String> {
+pub(crate) fn variable(s: &impl System, name: &str) -> Option<String> {
     let env = s.environment().into_iter();
     env.filter(|(k, v)| k == name && !v.is_empty())
         .map(|(_, v)| v)
@@ -171,6 +171,16 @@ pub fn cli(argv: &[OsString]) -> ExitCode {
     ExitCode::from(if written.is_ok() { status } else { 4 })
 }
 
+/// With `--store` the policy names the scratch units directory, slice and prefix (R3).
+pub(crate) fn scratch(policy: &Value, store: Option<&str>) -> Result<(), Failure> {
+    let named = |k: &str| policy["work"].get(k).is_some();
+    let scratch = policy["units"].get("directory").is_some() && named("slice") && named("prefix");
+    if store.is_some() && !scratch {
+        return Err(error("invalid_input", "policy"));
+    }
+    Ok(())
+}
+
 /// One pass (R1 to R19): the answer, or the refusal.
 pub fn execute(s: &mut impl System, store: Option<&str>) -> Result<Value, Box<Refusal>> {
     if object::lead_in_environment(s) {
@@ -187,11 +197,7 @@ pub fn execute(s: &mut impl System, store: Option<&str>) -> Result<Value, Box<Re
     let Some(w) = work(&policy).map_err(before)? else {
         return Ok(json!({"skipped": "no work"}));
     };
-    let named = |k: &str| policy["work"].get(k).is_some();
-    let scratch = policy["units"].get("directory").is_some() && named("slice") && named("prefix");
-    if store.is_some() && !scratch {
-        return Err(before(error("invalid_input", "policy")));
-    }
+    scratch(&policy, store).map_err(before)?;
     let (directory, _) = drive::units(&policy).map_err(before)?;
     let cpu = quota::config(s).map_err(before)?;
     if !s.units() {

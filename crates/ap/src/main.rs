@@ -45,7 +45,7 @@ const VERBS: [(&str, &str, &str); 15] = [
     ),
     (
         "status",
-        "status [<key> | --term <word>] [--text] [--store <path>]",
+        "status [<key> | --term <word>] [--text] [--store <path>], or ap status --wait <intent> [--timeout <seconds>] [--store <path>]",
         "The status",
     ),
     ("quota", "quota", "The CPU quota"),
@@ -62,7 +62,7 @@ const BACKLOG_HELP: &str = "Usage: ap backlog <task key> [--text] [--store <path
 const STATE_HELP: &str = "Usage: ap state <task directory> [--text]\nPrints the unit calls, stages, limits and streams of a task directory from its records and Git; reads only.\n";
 const REQUEST_HELP: &str = "Usage: ap request [--store <path>] [--text] < request.json\nRecords a message of the user as a request of the store with its words, routes it, or lists the current requests of a topic; one JSON answer.\n";
 const INTENT_HELP: &str = "Usage: ap intent [--store <path>] [--text] < request.json\nDrafts, amends, leads, confirms and closes the intent of an objective with its success criteria, or shows it; one JSON answer.\n";
-const STATUS_HELP: &str = "Usage: ap status [<key> | --term <word>] [--text] [--store <path>]\nPrints what is asked, planned, running, waiting and broken from the store alone, one intent or unit in full, or what a word of the life cycle means; reads only.\n";
+const STATUS_HELP: &str = "Usage: ap status [<key> | --term <word>] [--text] [--store <path>]\n       ap status --wait <intent> [--timeout <seconds>] [--store <path>]\nPrints what is asked, planned, running, waiting and broken from the store alone, one intent or unit in full, or what a word of the life cycle means; reads only. With --wait it returns, in one JSON answer, when a unit of the intent needs the Lead (unit_accepted, unit_stopped, unit_idle), a finding of severity act or urgent opens, every unit has ended, or the timeout (30 to 86400 seconds, default 14400) passes.\n";
 const QUOTA_HELP: &str = "Usage: ap quota\nOne turn: sets the runtime CPU quota of the slice the policy file names to what the host's busy limit leaves after the load outside it; one JSON answer.\n";
 const WORK_HELP: &str = "Usage: ap work [--store <path>]\nOne dispatch pass: starts each unit of the store that may start now as a run of ap unit run in a transient unit of the service manager, and notes on every ready unit that does not start what it waits on; one JSON answer.\n";
 const BUILD_REVISION: &str = match option_env!("AP_BUILD_REVISION") {
