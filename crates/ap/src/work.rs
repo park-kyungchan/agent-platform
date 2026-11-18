@@ -220,9 +220,18 @@ pub fn execute(s: &mut impl System, store: Option<&str>) -> Result<Value, Box<Re
         })
     })
 }
+/// The lock of the pass, let go by an explicit `LOCK_UN` before its descriptor closes: a child another
+/// thread of the process forked holds a copy of the descriptor until its `exec`, and a close alone would
+/// leave the lock held through that copy, so the next pass would wait for it.
+struct Held(File);
+impl Drop for Held {
+    fn drop(&mut self) {
+        let _ = rustix::fs::flock(&self.0, rustix::fs::FlockOperation::Unlock);
+    }
+}
 /// The units directory made (mode 0700), then the lock `work.lock` taken within 120 seconds (R4):
 /// the resolved directory and the open lock, or None when another pass held it all that time.
-fn pass_lock(s: &mut impl System, directory: &str) -> Result<Option<(PathBuf, File)>, Failure> {
+fn pass_lock(s: &mut impl System, directory: &str) -> Result<Option<(PathBuf, Held)>, Failure> {
     let io = |what: &str| fail("io_error", "directory", json!(what));
     let mut dirs = std::fs::DirBuilder::new();
     dirs.recursive(true).mode(0o700);
@@ -238,7 +247,7 @@ fn pass_lock(s: &mut impl System, directory: &str) -> Result<Option<(PathBuf, Fi
     let began = s.now();
     loop {
         match rustix::fs::flock(&lock, rustix::fs::FlockOperation::NonBlockingLockExclusive) {
-            Ok(()) => return Ok(Some((root, lock))),
+            Ok(()) => return Ok(Some((root, Held(lock)))),
             Err(e) if e == rustix::io::Errno::WOULDBLOCK => {}
             Err(_) => return Err(io("the lock")),
         }

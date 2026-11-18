@@ -3,6 +3,8 @@
 //! list-units`, `systemd-run`, `git check-ref-format`, `/proc/stat` and the control group's file itself.
 //! The policy file and the units directory are under a temporary directory: no test starts a unit of
 //! the service manager or reaches the host's store, policy file or units directory.
+#[path = "fixtures/work/forks.rs"]
+mod forks;
 use ap::host::{Answer, Failure, Reply, System};
 use ap::work::{Observed, arguments, execute, observe, overlap};
 use serde_json::{Value, json};
@@ -90,10 +92,11 @@ struct W {
     base: Instant,
     clock: Cell<Duration>,
     /// A lock the test holds, let go at the first pause.
-    held: Option<File>,
+    held: Option<Held>,
 }
 impl W {
     fn new() -> Self {
+        forks::gap();
         let dir = std::env::temp_dir().join(format!(
             "ap-work-test-{}-{}",
             std::process::id(),
@@ -449,12 +452,21 @@ impl System for W {
         panic!("the pass launched {argv:?}")
     }
 }
+/// A lock the test holds, let go by an explicit `LOCK_UN` before its descriptor closes: a child another
+/// test's thread forked holds a copy of the descriptor until its `exec` (`fixtures/work/forks.rs`), and
+/// a close alone would leave the lock held through that copy.
+struct Held(File);
+impl Drop for Held {
+    fn drop(&mut self) {
+        rustix::fs::flock(&self.0, rustix::fs::FlockOperation::Unlock).unwrap();
+    }
+}
 /// An exclusive lock on `path` (made), held by the test.
-fn hold(path: &Path) -> File {
+fn hold(path: &Path) -> Held {
     std::fs::create_dir_all(path.parent().unwrap()).unwrap();
     let f = File::create(path).unwrap();
     rustix::fs::flock(&f, rustix::fs::FlockOperation::NonBlockingLockExclusive).unwrap();
-    f
+    Held(f)
 }
 fn keys(v: &Value) -> Vec<String> {
     v.as_array()
