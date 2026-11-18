@@ -1,0 +1,121 @@
+#!/usr/bin/env bash
+# The repository's one check. It reads only the repository's tracked files:
+# no network, no root, no host path. It ends with `check: ok`.
+set -euo pipefail
+
+cd "$(dirname "${BASH_SOURCE[0]}")"
+
+inventory=deployments/host-artifacts.json
+failures=0
+
+fail() {
+  printf 'check: %s\n' "$*" >&2
+  failures=$((failures + 1))
+}
+
+tracked=()
+while IFS= read -r -d '' path; do
+  tracked+=("$path")
+done < <(git ls-files -z)
+if [[ ${#tracked[@]} -eq 0 ]]; then
+  fail "no tracked files: run in a Git checkout of the repository"
+fi
+
+# (a) Every tracked JSON file parses.
+json_count=0
+for path in "${tracked[@]}"; do
+  [[ "$path" == *.json ]] || continue
+  json_count=$((json_count + 1))
+  if ! python3 -I -c 'import json, sys; json.load(open(sys.argv[1], "rb"))' "$path" 2>/dev/null; then
+    fail "json_invalid@$path"
+  fi
+done
+
+# (b) Every tracked shell script passes `bash -n`: a name ending in `.sh`, or a
+# first line `#!` naming bash or sh, directly or through env.
+shell_count=0
+for path in "${tracked[@]}"; do
+  is_shell=false
+  if [[ "$path" == *.sh ]]; then
+    is_shell=true
+  elif [[ -f "$path" ]]; then
+    first=""
+    IFS= read -r first < "$path" || true
+    if [[ "$first" =~ ^#![[:space:]]*([^[:space:]]*/)?(env[[:space:]]+(-[^[:space:]]*[[:space:]]+)*)?(bash|sh)([[:space:]]|$) ]]; then
+      is_shell=true
+    fi
+  fi
+  [[ "$is_shell" == true ]] || continue
+  shell_count=$((shell_count + 1))
+  if ! bash -n "$path"; then
+    fail "shell_syntax@$path"
+  fi
+done
+
+# (c) Every inventory row names source, destination and sha256; the destination
+# exists, and the SHA-256 of its bytes equals the recorded digest. The copy is
+# compared with its recorded digest, never with the host.
+destinations=()
+if [[ -f "$inventory" ]]; then
+  rows="$(python3 -I - "$inventory" <<'PY'
+import json, sys
+rows = json.load(open(sys.argv[1], "rb"))
+if not isinstance(rows, list):
+    print("ERR\tinventory_not_list")
+    sys.exit(0)
+for index, row in enumerate(rows):
+    if not isinstance(row, dict):
+        print(f"ERR\trow_not_object[{index}]")
+        continue
+    missing = [k for k in ("source", "destination", "sha256")
+               if not isinstance(row.get(k), str) or not row.get(k)]
+    if missing:
+        print(f"ERR\trow_missing_{'_'.join(missing)}[{index}]")
+        continue
+    print(f"ROW\t{row['destination']}\t{row['sha256']}")
+PY
+)" || fail "inventory_unreadable@$inventory"
+  while IFS=$'\t' read -r kind first second; do
+    [[ -n "$kind" ]] || continue
+    if [[ "$kind" == ERR ]]; then
+      fail "$first@$inventory"
+      continue
+    fi
+    destinations+=("$first")
+    if [[ ! -f "$first" ]]; then
+      fail "destination_missing@$first"
+      continue
+    fi
+    actual="$(sha256sum -- "$first" | cut -d' ' -f1)"
+    if [[ "$actual" != "$second" ]]; then
+      fail "digest_mismatch@$first"
+    fi
+  done <<< "$rows"
+else
+  fail "inventory_missing@$inventory"
+fi
+
+# (d) A tracked file under deployments/ is the inventory, a row's destination,
+# a README.md, or under deployments/herdr-network/.
+for path in "${tracked[@]}"; do
+  [[ "$path" == deployments/* ]] || continue
+  [[ "$path" == "$inventory" ]] && continue
+  [[ "$path" == */README.md ]] && continue
+  [[ "$path" == deployments/herdr-network/* ]] && continue
+  listed=false
+  for destination in "${destinations[@]}"; do
+    if [[ "$path" == "$destination" ]]; then
+      listed=true
+      break
+    fi
+  done
+  [[ "$listed" == true ]] || fail "deployment_unlisted@$path"
+done
+
+if [[ $failures -ne 0 ]]; then
+  printf 'check: failed (%d)\n' "$failures" >&2
+  exit 1
+fi
+printf 'check: %d json, %d shell scripts, %d inventory rows\n' \
+  "$json_count" "$shell_count" "${#destinations[@]}"
+echo 'check: ok'

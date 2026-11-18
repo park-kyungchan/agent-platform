@@ -16,7 +16,6 @@ state/
 **/runs/
 **/state/
 **/.codex/
-**/.hermes/
 **/.ssh/
 **/native-home/
 **/runtime-home/
@@ -48,13 +47,7 @@ ssh_host_*
 .DS_Store
 Thumbs.db
 patches/
-architecture/authorization*.json
-# Historical effect/run helpers are not maintained source. Keep the native updater.
-scripts/*
-!scripts/hermes-main-update
 
-# Rust outputs and host environment files
-/target/
-**/target/
+# Host environment files
 *.env
 **/*.env

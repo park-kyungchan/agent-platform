@@ -1,17 +1,48 @@
-# VPS operations
+# Host configuration records
 
-Use the workspace and shared-project instructions. Read `project.json` for scope and commands. This is a private Rust infrastructure module under agent-platform. Use the pinned Rust 1.95.0 workspace and Cargo.lock.
+## What this repository holds
 
-Native Codex owns the agent loop. Model stable infrastructure entities, observations, verification results, acceptance decisions, and bounded operation requests. Parsers and utilities are ordinary Rust. Native Hermes Python and Desktop PowerShell API bridges are embedded protocol sources. Observation does not imply verification; a passing verification does not imply user acceptance or permission.
+- `deployments/host-artifacts.json`: the inventory. Each row names a host file (`source`), its recorded copy in this repository (`destination`) and the SHA-256 of the copy's bytes (`sha256`).
+- The recorded copies the inventory names: `deployments/ssh/` (the Tailscale-only sshd drop-in and the `ssh.socket` override), `deployments/hindsight/compose.yaml`, `deployments/tsidp/compose.yaml` and `deployments/host-cron/` (the Docker prune cron files). They are byte copies of the host files as captured on 2026-11-04; the host may have changed since.
+- `deployments/herdr-network/`: the Herdr network's files: the sshd drop-in `00-herdr-runtime-key-only.conf`, its installer `sshd-policy.sh`, the firewall helper `firewall-policy.sh`, its unit `herdr-network-firewall.service` and `contract.json`. Its `README.md` maps each file to its installed host path.
+- `./check` and the workflow `.github/workflows/rust.yml`, whose job `rust` runs `./check`.
 
-Read `state/latest-operation.json` when present before continuing infrastructure maintenance. It points to actual deployment/cleanup effects, the user's rationale, and remaining work. Preserve its completed-effect fences; do not replay an old apply merely because a new session starts.
+Nothing here is installed by this repository and no program is built here.
 
-Inspect current host, container IDs, shared mounts, PID namespaces, process-start identities, lock device/inode, and port ownership before relying on a historical record. For Hermes use the installed native lifecycle and run native serving probes as the recorded owner UID with the verified `HOME` and `HERMES_HOME`. A Docker healthy state, s6 up status, HTTP login redirect, or stored served-profile list alone cannot establish gateway serving. A sibling container can share data and a callable UNIX socket while its PID-identity guard rejects the owner.
+## Who uses it
 
-Preserve active conversations, session history, databases, tunnels, and unrelated services. Do not automatically perform broad restarts, deletion, credential exposure/rotation, forced singleton bypass, or native lock replacement. Revalidate exact process incarnation immediately before a narrowly authorized lifecycle action. External operation requests are records; schema validation does not grant execution authority. Ask for explicit current instruction before an interruption outside the user's authorized bounded action.
+The Lead reads these records. The delivery of host files from this repository (unit D3) is not built yet: until it is, a merge here changes nothing on the host.
 
-Ministry and academy business effects are excluded. Do not read session transcripts or dump environment variables, credential values, or unrelated process arguments. Keep errors sanitized and report adapter failures separately from gateway control-plane verification. Preserve the original evidence and record subsequent corrections separately.
+## The check
 
-Run `cargo fmt --all --check`, `cargo clippy --locked --all-targets -- -D warnings` and `cargo test --locked` for domain or adapter changes. Deterministic domain checks are not native model evals. Native model evals require an explicit suite budget. Do not commit, publish, deploy, or introduce a second agent runtime as a side effect.
+Run `./check` at the root. It needs no network, no root and no host path, and it reads only the repository's tracked files. It checks that:
 
-For an explicitly requested Hermes version update, read `architecture/update-workflow.json` and use `vps-ops update backend-only` or `coordinated`. Default CLI planning is read-only; under the current explicit update instruction use `--apply --authorization '<current instruction>'` without asking for the same permission again. Backend-only never inspects or changes Desktop. Coordinated uses the official native Desktop updater's completed artifact SHA as the backend target; installation and running alignment are separate. Resume the saved run and pinned SHA; a changed overlay uses a new native backend attempt within that run. Recover existing Desktop receipts before another invocation. Native helper receipts and current serving checks establish completion; an app version label, zero process exit, or collected systemd unit alone cannot.
+1. every tracked `*.json` file parses;
+2. `bash -n` passes for every tracked file ending in `.sh` or whose first line is a `#!` line naming `bash` or `sh`, directly or through `env`;
+3. every row of `deployments/host-artifacts.json` has `source`, `destination` and `sha256`, its `destination` exists, and the SHA-256 of the destination's bytes equals `sha256`;
+4. every tracked file under `deployments/` is the inventory, a row's `destination`, a `README.md`, or under `deployments/herdr-network/`.
+
+A healthy run ends with the line `check: ok`. A failure prints one `check: <code>@<path>` line per finding and exits non-zero. The job `rust` is the required status check of `main`: keep its job id and name `rust`.
+
+The check compares each copy with its recorded digest, never with the host. A difference between a copy and the host is not a check failure; it is found only by reading the host.
+
+## Changing a record
+
+- Never edit a recorded copy by hand. A copy is refreshed only from the host: copy the host file's bytes unchanged, and write the new SHA-256 of those bytes into its inventory row in the same commit.
+- A new recorded copy gets a row in the inventory; a file under `deployments/` without a row fails the check.
+- Environment files and their values stay untracked (`.gitignore`). Existing `${VAR}` references in a copy stay as they are.
+
+## Never changed or run here without the user's procedure
+
+The login path: the sshd drop-ins (`deployments/ssh/90-tailscale-only.conf` and `deployments/herdr-network/00-herdr-runtime-key-only.conf`), the `ssh.socket` override (`deployments/ssh/ssh.socket.d/override.conf`), and `deployments/herdr-network/sshd-policy.sh`, installed as `/usr/local/sbin/herdr-network-sshd`, which writes the drop-in `00-herdr-runtime-key-only.conf` and reloads `ssh`.
+
+Do not run `sshd-policy.sh` or `firewall-policy.sh`, and do not install or reload anything from this repository. A change of the login path is made only when the user orders it, by the user's procedure and by no timer:
+
+1. the user confirms that the provider's console is the way back in;
+2. the new file is written;
+3. `sshd -t` passes and `sshd -T` prints the expected setting, both before any reload; on a mismatch the previous bytes return and nothing is reloaded;
+4. a timed restore of the previous bytes with a reload is armed;
+5. the reload;
+6. the timed restore is cancelled only after the user reports a new login from a device. An agent's session on the host proves nothing about a new login.
+
+Never commit a credential, a host key, an environment file or private data.
