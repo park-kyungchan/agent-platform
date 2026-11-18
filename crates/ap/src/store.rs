@@ -1,5 +1,5 @@
-//! Every call of `ap request` and `ap intent` to the store engine `ont`: one function per action they
-//! apply and one per read. An answer `store_busy` is asked again up to five times after a short wait;
+//! Every call of `ap request`, `ap intent` and the unit object (`ap unit add|amend|ready|drop|page`) to
+//! the store engine `ont`: one function per action they apply and one per read. An answer `store_busy` is asked again up to five times after a short wait;
 //! nothing else is. Also the request form both verbs share: the arguments, the members and their shapes.
 use crate::host::{Failure, LIMIT, System, error, fail, id, ont};
 use serde_json::{Map, Value, json};
@@ -32,6 +32,19 @@ fn call(
     command: &[&str],
     body: &Value,
 ) -> Result<Value, Failure> {
+    let v = answer(s, store, command, body)?;
+    if !v["result"].is_object() {
+        return Err(error("store_answer_unreadable", command[0]));
+    }
+    Ok(v)
+}
+/// One call whose answer is `ok`, with or without a `result` object (`render` has none).
+fn answer(
+    s: &mut impl System,
+    store: Option<&str>,
+    command: &[&str],
+    body: &Value,
+) -> Result<Value, Failure> {
     let ctx = json!({ "store": store });
     let mut tries = 0;
     loop {
@@ -47,7 +60,7 @@ fn call(
         if refused {
             return Err(fail(REFUSED, command[0], v));
         }
-        if !reply.success || v["status"] != "ok" || !v["result"].is_object() {
+        if !reply.success || v["status"] != "ok" {
             return Err(error("store_answer_unreadable", command[0]));
         }
         return Ok(v);
@@ -91,13 +104,21 @@ fn apply_as(
     parameters: Value,
     lead: Option<&Lead>,
 ) -> Result<Applied, Failure> {
-    let mut body = json!({"action_type": action, "request_id": request_id, "agent": actor.agent,
-        "session": actor.session, "parameters": parameters});
+    let mut body = body(actor, action, request_id, parameters);
     if let Some(lead) = lead {
         body["role"] = json!("lead");
         body["expected"] = json!([{"id": lead.intent, "revision": lead.revision}]);
     }
-    let v = call(s, store, &["action", "apply", "--client", "ap"], &body)?;
+    send(s, store, &body)
+}
+/// The action request as it is sent, without a role and without `expected`.
+pub fn body(actor: &Actor, action: &str, request_id: String, parameters: Value) -> Value {
+    json!({"action_type": action, "request_id": request_id, "agent": actor.agent,
+        "session": actor.session, "parameters": parameters})
+}
+/// One apply of a whole action request.
+fn send(s: &mut impl System, store: Option<&str>, body: &Value) -> Result<Applied, Failure> {
+    let v = call(s, store, &["action", "apply", "--client", "ap"], body)?;
     let outcome = v["result"]["outcome"].as_str().unwrap_or_default();
     let edits = v["result"]["edits"].as_array();
     match (outcome, edits) {
@@ -179,6 +200,9 @@ macro_rules! actions {
     )*};
 }
 actions!(
+    add_unit,
+    amend_unit,
+    drop_unit,
     draft_intent,
     amend_intent,
     note_intent,
@@ -219,6 +243,55 @@ pub fn confirm_intent_delegated(
         p,
         Some(lead),
     )
+}
+/// `ready_unit` without a role, with the unit's id and the revision it was read at as `expected`: a
+/// unit changed since that read ends `revision_conflict`.
+pub fn ready_unit(
+    s: &mut impl System,
+    store: Option<&str>,
+    actor: &Actor,
+    rid: String,
+    p: Value,
+    revision: &str,
+) -> Result<Applied, Failure> {
+    let mut body = body(actor, "ready_unit", rid, p);
+    body["expected"] = json!([{"id": body["parameters"]["unit"], "revision": revision}]);
+    send(s, store, &body)
+}
+/// The native keys of the rows of a view (`ont render`), read from the first column (`Key`) of the
+/// table it renders; a truncated rendering, or one whose rows differ from its count, is not read.
+pub fn view_keys(
+    s: &mut impl System,
+    store: Option<&str>,
+    view: &str,
+    args: Value,
+) -> Result<Vec<String>, Failure> {
+    let v = answer(s, store, &["render"], &json!({"view": view, "args": args}))?;
+    let unreadable = || error("store_answer_unreadable", view);
+    if v["truncated"] != false {
+        return Err(fail(
+            "store_answer_unqualified",
+            view,
+            v["truncated"].clone(),
+        ));
+    }
+    let table = v["markdown"].as_str().ok_or_else(unreadable)?;
+    let mut lines = table.lines().skip_while(|l| !l.starts_with("| Key |"));
+    if lines.next().is_none() || lines.next().is_none_or(|l| !l.starts_with("| --- |")) {
+        return Err(unreadable());
+    }
+    let mut keys = vec![];
+    for line in lines.take_while(|l| l.starts_with("| ")) {
+        let key = line[2..].split(" |").next().unwrap_or_default();
+        if key.is_empty() || key.contains(char::is_whitespace) {
+            return Err(unreadable());
+        }
+        keys.push(key.to_owned());
+    }
+    match v["rows"].as_u64() {
+        Some(n) if n as usize == keys.len() => Ok(keys),
+        _ => Err(unreadable()),
+    }
 }
 /// The fields of the head of one object (`kind`, `key`) by `ont get`, each the value or null; `None`
 /// when the store does not have the object (its answer `unavailable`).
