@@ -72,7 +72,7 @@ It does not rest on the model: `add_unit` in the lane `objective` without an int
 | 수업 세션 | A CLI session the user runs while teaching | Never send input to it or close it |
 | 워커, 서브에이전트, 에이전트들 | Workers; sometimes every agent, Leads too | — |
 | 새 Lead, 새 세션 | The Lead session that takes the task over next | — |
-| 라우팅 | Which file an agent opens, or which model does which work | `AGENTS.md` section 3, or a unit's tiers |
+| 라우팅 | Which file an agent opens, or which model does which work | `AGENTS.md` section 8, or a unit's tiers |
 | 컨텍스트 거버넌스, Context Governance | Which context each agent loads, from which home, in what order | `CONTEXT-GOVERNANCE.md` |
 | reference-docs, 레퍼런스 문서 | The design sources under `/home/palantirkc/external/reference-docs/` | Only the lines `OFFICIAL-DOCS.md` section 4 names |
 | 지표, 메트릭, KPI | A number the user wants watched | Write it as a criterion |

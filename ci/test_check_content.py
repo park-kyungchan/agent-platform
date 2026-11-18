@@ -1,4 +1,5 @@
-"""Tests of ci/check-content.py: the verbs of `ap` and the sections of crates/ap/README.md that content/ names.
+"""Tests of ci/check-content.py: the verbs of `ap` and the sections of crates/ap/README.md that content/ names,
+the model names and byte limits, the paths and design routes, and the form of AGENTS.md.
 
 Each test copies what the check reads into a scratch directory, changes one file of content/ there
 (and its line of SHA256SUMS, so that only the case under test fails) and runs the copied check.
@@ -23,8 +24,8 @@ READ_BY_THE_CHECK = (
 TARGET = "runtime-references/NAMING.md"
 
 
-def run_check(root, corpus=None):
-    env = dict(os.environ, CONTENT_CHECK_CORPUS=str(corpus or (root / "no-corpus")))
+def run_check(root, corpus=None, host=None):
+    env = dict(os.environ, CONTENT_CHECK_CORPUS=str(corpus or (root / "no-corpus")), CONTENT_CHECK_HOST=str(host or (root / "no-host")))
     done = subprocess.run([sys.executable, "-I", "-B", str(root / "ci/check-content.py")], capture_output=True, text=True, timeout=120, env=env)
     return done.returncode, done.stdout
 
@@ -228,6 +229,87 @@ class PathsAndDesignRoutes(Scratch, unittest.TestCase):
         code, out = run_check(root, self.corpus(root))
         self.assertEqual(code, 1, out)
         self.assertIn("design_routes_section_missing@content/runtime-references/OFFICIAL-DOCS.md", out)
+
+class AgentsFile(Scratch, unittest.TestCase):
+    """The always-loaded AGENTS.md (specs/content/agents-file.md): its size, its eight sections, prose, existing paths."""
+
+    def write(self, root, text):
+        path = root / "content/AGENTS.md"
+        path.write_text(text, encoding="utf-8")
+        sums = root / "content/SHA256SUMS"
+        digest = hashlib.sha256(path.read_bytes()).hexdigest()
+        sums.write_text("".join(f"{digest}  AGENTS.md\n" if l.endswith("  AGENTS.md") else l + "\n" for l in sums.read_text().splitlines()))
+
+    def append_lines(self, root, *lines):
+        """Append lines to AGENTS.md and return the line number of each."""
+        text = (root / "content/AGENTS.md").read_text(encoding="utf-8")
+        first = text.count("\n") + 1
+        self.write(root, text + "".join(line + "\n" for line in lines))
+        return [first + n for n in range(len(lines))]
+
+    def test_over_the_byte_limit_fails(self):
+        root = self.fixture()
+        size = len((root / "content/AGENTS.md").read_bytes())
+        self.append_lines(root, *(["y" * 99] * ((6500 - size) // 100)), "z" * ((6500 - size) % 100))
+        code, out = run_check(root)
+        self.assertEqual(code, 1, out)
+        self.assertIn("file_over_limit@content/AGENTS.md: 6501 bytes, limit 6500", out)
+
+    def test_a_missing_section_fails(self):
+        root = self.fixture()
+        text = (root / "content/AGENTS.md").read_text(encoding="utf-8")
+        self.write(root, text.replace("## 4. Evidence\n", "## 4. Proof\n"))
+        code, out = run_check(root)
+        self.assertEqual(code, 1, out)
+        self.assertIn("agents_section_missing@content/AGENTS.md: '## 4. Evidence'", out)
+        self.assertIn("agents_section_unexpected@content/AGENTS.md: '## 4. Proof'", out)
+
+    def test_sections_out_of_order_fail(self):
+        root = self.fixture()
+        text = (root / "content/AGENTS.md").read_text(encoding="utf-8")
+        head, rest = text.split("## 4. Evidence\n", 1)
+        evidence, tail = rest.split("## 5. Effects\n", 1)
+        self.write(root, head + "## 5. Effects\n" + tail + "\n## 4. Evidence\n" + evidence)
+        code, out = run_check(root)
+        self.assertEqual(code, 1, out)
+        self.assertIn("agents_sections_out_of_order@content/AGENTS.md", out)
+        self.assertNotIn("agents_section_missing@", out)
+
+    def test_a_long_line_and_a_table_row_fail_with_their_line(self):
+        root = self.fixture()
+        long_line, row, fine = self.append_lines(root, "w " * 201, "| Situation | Read |", "w " * 199)
+        code, out = run_check(root)
+        self.assertEqual(code, 1, out)
+        self.assertIn(f"agents_line_too_long@content/AGENTS.md:{long_line}: 402 characters, limit 400", out)
+        self.assertIn(f"agents_table@content/AGENTS.md:{row}", out)
+        self.assertNotIn(f"AGENTS.md:{fine}", out)
+        self.assertEqual(out.count("agents_line_too_long@"), 1, out)
+
+    def test_a_missing_absolute_path_fails_on_the_host(self):
+        root = self.fixture()
+        host = root / "host-agents.md"
+        host.write_text("installed\n")
+        missing, present, pattern = self.append_lines(
+            root,
+            f"- Read `{root}/no-such-dir/file.md`.",
+            f"- Read `{root}/content/` and {host}.",
+            "- Read `/no-such-root/<repo>/` and `/no-such-root/*.md`.",
+        )
+        code, out = run_check(root, host=host)
+        self.assertEqual(code, 1, out)
+        self.assertIn(f"agents_path_missing@content/AGENTS.md:{missing}: {root}/no-such-dir/file.md", out)
+        self.assertNotIn(f"AGENTS.md:{present}:", out)
+        self.assertNotIn(f"AGENTS.md:{pattern}:", out)
+        self.assertNotIn("agents paths: skipped", out)
+
+    def test_without_the_host_the_paths_are_skipped_with_one_line(self):
+        root = self.fixture()
+        self.append_lines(root, f"- Read `{root}/no-such-dir/file.md`.")
+        code, out = run_check(root)
+        self.assertEqual(code, 0, out)
+        self.assertNotIn("agents_path_missing@", out)
+        self.assertEqual(out.count("agents paths: skipped"), 1, out)
+
 
 if __name__ == "__main__":
     unittest.main()

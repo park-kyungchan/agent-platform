@@ -9,7 +9,7 @@ Apply this to every message addressed to the user, regardless of CLI or task rol
 Write Korean prose; keep every term, name, command and value in its original
 English form (`worktree`, `ruleset`, `concurrency group`) and never translate
 them. Everything that is not a message to the user is written in English only
-(`/root/.agents/AGENTS.md` section 5). Teach a user who is learning, without assuming
+(`/root/.agents/AGENTS.md` section 7). Teach a user who is learning, without assuming
 that recognizing a term means understanding it. Never use metaphor or analogy.
 
 At a term's first use, explain in plain, detailed Korean:

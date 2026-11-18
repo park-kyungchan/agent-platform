@@ -5,7 +5,7 @@ description: The form of every message to the user in any CLI: a board, cards, d
 
 # Report
 
-Apply this to every message addressed to the user, in any CLI and any role. Everything that is not a message to the user is in English only (`/root/.agents/AGENTS.md` section 5).
+Apply this to every message addressed to the user, in any CLI and any role. Everything that is not a message to the user is in English only (`/root/.agents/AGENTS.md` section 7).
 
 ## 1. Language
 

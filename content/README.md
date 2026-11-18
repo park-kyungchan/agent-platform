@@ -25,7 +25,7 @@ The task owner separately authorizes and verifies any host installation.
 
 The owned files are `AGENTS.md`, the
 runtime references (including `ONTOLOGY-USE.md` for operational store reads
-and Lead writes) and the seven generic skill bundles (the Lead's one skill is `lead`). `AGENTS.md` section 3 is the
-only routing table: each reference is self-contained and is read when its listed situation applies. Changing values
+and Lead writes) and the seven generic skill bundles (the Lead's one skill is `lead`). Each reference is
+self-contained and says in its first lines when it is read. Changing values
 (model names, efforts, versions, token windows, counts, dates of approvals) stay
 out of `AGENTS.md` and skill frontmatter; they belong in task STATE.
