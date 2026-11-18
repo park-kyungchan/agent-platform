@@ -606,6 +606,32 @@ pub fn criteria_logged(
     newest_first.reverse();
     Ok(newest_first)
 }
+/// The applied rows of the action log of one `action_type` (`ap status --indicators`), newest first as
+/// the engine gives them, and how many rows the engine withheld in all.
+#[derive(Default)]
+pub struct Logged {
+    pub rows: Vec<Value>,
+    pub withheld: u64,
+}
+/// Every applied row of `action` with its parameters, over every page of 100; a continuation the engine
+/// repeats, or an answer without `rows` or without a `withheld` count, is `store_answer_unreadable`.
+pub fn logged(s: &mut impl System, store: Option<&str>, action: &str) -> Result<Logged, Failure> {
+    let mut q =
+        json!({"action_type": action, "outcome": "applied", "parameters": true, "limit": 100});
+    let (mut rows, mut withheld) = (vec![], 0);
+    loop {
+        let v = call(s, store, &["log"], &q)?;
+        let r = &v["result"];
+        let unreadable = || error("store_answer_unreadable", "log");
+        rows.extend(r["rows"].as_array().ok_or_else(unreadable)?.iter().cloned());
+        withheld += r["withheld"].as_u64().ok_or_else(unreadable)?;
+        match &r["continuation"] {
+            Value::Null => return Ok(Logged { rows, withheld }),
+            c if c == &q["continuation"] => return Err(unreadable()),
+            c => q["continuation"] = c.clone(),
+        }
+    }
+}
 /// The first cell of a row of a rendered table: `| a | b |` gives `a`; `\|` and `\\` are unescaped.
 fn first_cell(row: &str) -> Option<String> {
     let mut chars = row.strip_prefix("| ")?.chars().peekable();
