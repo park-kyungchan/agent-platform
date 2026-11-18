@@ -418,7 +418,16 @@ fn show(s: &mut impl System, store: Option<&str>, r: &Value) -> Result<Value, Fa
     let key = key(r, "intent")?;
     let intent = at(store::get(s, store, "intent", key), "intent")?;
     let v = intent.ok_or_else(|| error("unknown_intent", "intent"))?;
-    store::intent_shown(s, store, key, v)
+    let mut v = store::intent_shown(s, store, key, v)?;
+    // `added_at` is equal to the second for the criteria of one `draft` and their keys are hashes:
+    // the order of the draft is the order the log gives their creation.
+    let logged = at(store::criteria_logged(s, store, key), "criteria")?;
+    let place = |c: &Value| logged.iter().position(|k| c["criterion"] == *k);
+    if let Some(list) = v["criteria"].as_array_mut() {
+        // Stable: a criterion the log does not hold keeps its place, ahead of the logged ones.
+        list.sort_by_key(place);
+    }
+    Ok(v)
 }
 /// The lines of `show --text`.
 pub fn text_of(v: &Value) -> String {
@@ -473,7 +482,11 @@ fn run<S: System>(
         None => Err(bad("op")),
     }
 }
-fn refusal(f: Failure, done: Done) -> Box<Refusal> {
+fn refusal(f: Failure, mut done: Done) -> Box<Refusal> {
+    // A refusal of the member `intent` itself carries no intent: the value is the refused one.
+    if f.code == "invalid_input" && f.field == "intent" {
+        done.intent = None;
+    }
     Box::new(Refusal {
         code: store::code(&f),
         field: f.field,

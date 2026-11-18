@@ -325,8 +325,9 @@ fn environment(r: &Value, runtime: Runtime) -> Result<Vec<(String, String)>, Fai
             require!(!k.starts_with("HERDR_") && !k.starts_with("CLAUDE_")
                 && !k.starts_with("ANTHROPIC_") && k != "HOME" => "env_forbidden", "env");
             require!(!runtime.reserved(k) => "env_forbidden", "env");
-            require!(!["ONT_ROLE", "ONT_AGENT", "GIT_AUTHOR_NAME", "GIT_AUTHOR_EMAIL"].contains(&k.as_str())
-                => "env_forbidden", "env");
+            // `BASH_ENV` and `ENV` name a file a shell sources before the stage's own command.
+            require!(!["ONT_ROLE", "ONT_AGENT", "GIT_AUTHOR_NAME", "GIT_AUTHOR_EMAIL", "BASH_ENV", "ENV"]
+                .contains(&k.as_str()) => "env_forbidden", "env");
             let v = v
                 .as_str()
                 .filter(|v| !v.contains('\0') && v.len() <= 4096)

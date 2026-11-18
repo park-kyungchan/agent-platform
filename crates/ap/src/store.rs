@@ -570,6 +570,42 @@ pub fn search_seen(
         }
     }
 }
+/// The keys of the criteria added to the intent `key`, oldest first, as the engine's log of the action
+/// `add_criterion` gives them (newest first; `added_at` is only to the second, so it cannot order the
+/// criteria of one call). Every page is read; a criterion the log does not hold (a scan the engine
+/// limited) is not listed.
+pub fn criteria_logged(
+    s: &mut impl System,
+    store: Option<&str>,
+    key: &str,
+) -> Result<Vec<String>, Failure> {
+    let mut q = json!({"action_type": "add_criterion", "outcome": "applied", "parameters": true,
+        "limit": 200});
+    let mut newest_first = vec![];
+    loop {
+        let v = call(s, store, &["log"], &q)?;
+        let r = &v["result"];
+        let unreadable = || error("store_answer_unreadable", "log");
+        for row in r["rows"].as_array().ok_or_else(unreadable)? {
+            if row["parameters"]["intent"]["native_key"] != key {
+                continue;
+            }
+            for e in row["edits"].as_array().into_iter().flatten() {
+                let made = e["change"] == "initial" && e["id"]["object_type"] == "criterion";
+                if let Some(k) = e["id"]["native_key"].as_str().filter(|_| made) {
+                    newest_first.push(k.to_owned());
+                }
+            }
+        }
+        match &r["continuation"] {
+            Value::Null => break,
+            c if c == &q["continuation"] => return Err(unreadable()),
+            c => q["continuation"] = c.clone(),
+        }
+    }
+    newest_first.reverse();
+    Ok(newest_first)
+}
 /// The first cell of a row of a rendered table: `| a | b |` gives `a`; `\|` and `\\` are unescaped.
 fn first_cell(row: &str) -> Option<String> {
     let mut chars = row.strip_prefix("| ")?.chars().peekable();

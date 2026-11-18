@@ -6610,7 +6610,9 @@ fn pc1_a_page_call_does_not_read_standard_input() {
             .unwrap();
         use std::io::{Read, Write};
         let mut hold = child.stdin.take().unwrap();
-        hold.write_all(br#"{"bogus":1}"#).unwrap();
+        // A call that does not read standard input may end before this write: that is `EPIPE`, the
+        // behaviour under test, not a failure of it.
+        let _ = hold.write_all(br#"{"bogus":1}"#);
         let deadline = Instant::now() + Duration::from_secs(20);
         let status = loop {
             if let Some(s) = child.try_wait().unwrap() {

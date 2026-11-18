@@ -16,6 +16,7 @@ import hashlib
 import json
 import math
 import os
+import re
 import shutil
 import signal
 import statistics
@@ -71,6 +72,53 @@ def refuse(code):
 class Parser(argparse.ArgumentParser):
     def error(self, message):
         refuse("usage")
+
+
+def start_time(pid):
+    """The time a process started, in clock ticks since boot (field 22 of its /proc stat), or None when it is gone."""
+    try:
+        with open("/proc/%d/stat" % pid) as f:
+            return int(f.read().rsplit(")", 1)[1].split()[19])
+    except (OSError, IndexError, ValueError):
+        return None
+
+
+# A work directory of a call: `routing-<pid>-<start time>-<random>` in the temporary directory. The pid with its
+# start time is the owner's identity: a pid that is reused by another process has another start time.
+WORK = re.compile(r"routing-([0-9]+)-([0-9]+)-[a-z0-9_]+")
+
+
+def work_prefix():
+    return "routing-%d-%s-" % (os.getpid(), start_time(os.getpid()))
+
+
+def sweep_dead_work():
+    """Removes the work directories of calls that no longer live: the `routing-*` directories of the form above, owned
+    by this user, whose owner (that pid with that start time) is not alive. A directory of a live call, one of another
+    form, and anything that is not a directory is left as it is."""
+    root = tempfile.gettempdir()
+    try:
+        names = os.listdir(root)
+    except OSError:
+        return
+    for name in names:
+        m = WORK.fullmatch(name)
+        if not m or start_time(int(m.group(1))) == int(m.group(2)):
+            continue
+        path = os.path.join(root, name)
+        try:
+            st = os.lstat(path)
+        except OSError:
+            continue
+        if os.path.isdir(path) and not os.path.islink(path) and st.st_uid == os.getuid():
+            shutil.rmtree(path, ignore_errors=True)
+
+
+def private_file(path):
+    """A file created for writing with mode 0600 (kept at 0600 when it exists): it holds what a reader printed."""
+    fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    os.fchmod(fd, 0o600)
+    return os.fdopen(fd, "wb")
 
 
 def sha_file(path):
@@ -345,7 +393,7 @@ class Sandbox:
 
     def probe(self, out):
         """A unit of the same properties whose command only leaves the mark: no reader starts unless it does."""
-        tmp = tempfile.mkdtemp(prefix="routing-")
+        tmp = tempfile.mkdtemp(prefix=work_prefix())
         try:
             mark = os.path.join(tmp, "started")
             unit = unit_of(os.path.join(out, ".probe-" + uuid.uuid4().hex))
@@ -429,7 +477,8 @@ def run_sample(a, sandbox, case, n, base):
             os.unlink(base + suffix)
         except FileNotFoundError:
             pass
-    tmp = tempfile.mkdtemp(prefix="routing-")
+    sweep_dead_work()
+    tmp = tempfile.mkdtemp(prefix=work_prefix())
     work, mark = os.path.join(tmp, "work"), os.path.join(tmp, "started")
     os.mkdir(work)
     sid = str(uuid.uuid4())
@@ -452,7 +501,7 @@ def run_sample(a, sandbox, case, n, base):
                          sandbox.writable, deny_paths(a.deny), env)
         argv += ["--"] + started_argv(mark, cli)
         start = time.time()
-        with open(base + ".jsonl", "wb") as so, open(base + ".err", "wb") as se:
+        with private_file(base + ".jsonl") as so, private_file(base + ".err") as se:
             try:
                 p = subprocess.Popen(argv, stdin=subprocess.DEVNULL, stdout=so, stderr=se, start_new_session=True)
             except OSError:
@@ -542,6 +591,7 @@ def cmd_answers(a):
     todo = [(c, n) for c, n in todo if "%s__s%d" % (c["id"], n) not in states]
     if sandbox.active([unit_of(os.path.join(out, "%s__s%d" % (c["id"], n))) for c, n in todo]):
         refuse("run_still_active")
+    sweep_dead_work()  # after the last refusal: the work directories of killed calls
     os.makedirs(out, exist_ok=True)
     if todo:
         sandbox.probe(out)

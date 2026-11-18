@@ -5,8 +5,10 @@ import importlib.machinery
 import importlib.util
 import json
 import os
+import re
 import shutil
 import signal
+import stat
 import subprocess
 import sys
 import tempfile
@@ -71,7 +73,9 @@ if argv[0] == "is-active":
         print("active" if u in active else "inactive")
     sys.exit(0 if all(u in active for u in argv[1:]) else 3)
 if argv[0] == "show":
-    print("")
+    import json
+    plan = json.load(open(os.path.join(state, "plan.json")))
+    print(plan.get("control_group", ""))
     sys.exit(0)
 sys.exit(1)
 '''
@@ -87,9 +91,20 @@ cid = re.search(r"CASEID (\S+)", prompt).group(1)
 cnt = os.path.join(state, "count", name + "-" + cid)
 n = int(open(cnt).read()) if os.path.exists(cnt) else 0
 open(cnt, "w").write(str(n + 1))
+def chain():
+    """(pid, start time) of this process and of each process above it."""
+    found, pid = [], os.getpid()
+    while pid > 1:
+        try:
+            rest = open("/proc/%d/stat" % pid).read().rsplit(")", 1)[1].split()
+        except OSError:
+            break
+        found.append([pid, int(rest[19])])
+        pid = int(rest[1])
+    return found
 with open(os.path.join(state, "cli.jsonl"), "a") as f:
     f.write(json.dumps({"cli": name, "case": cid, "try": n, "argv": args, "cwd": os.getcwd(),
-                        "env": dict(os.environ)}) + "\n")
+                        "env": dict(os.environ), "chain": chain()}) + "\n")
 beh = plan.get("cli", {}).get(cid, [{}])
 beh = beh[min(n, len(beh) - 1)]
 mode = beh.get("mode", "ok")
@@ -100,6 +115,10 @@ if mode == "sleep":
     time.sleep(beh["seconds"])
 if mode == "mcp":
     subprocess.run([sys.executable, "-c", "import time; time.sleep(0.8)", "mcp-server.js"])
+if mode == "mcp_orphan":
+    # A server that left the process tree (its parent ended): only the unit's control group still holds it.
+    subprocess.run(["/bin/sh", "-c", "(%s -c 'import time; time.sleep(4)' mcp-server.js &)" % sys.executable])
+    time.sleep(1.5)
 if name == "claude":
     sid = args[args.index("--session-id") + 1]
     events = [{"type": "system", "subtype": "init", "session_id": sid},
@@ -167,6 +186,8 @@ class World:
         self.root = t / "root"
         self.root.mkdir()
         (self.root / "AGENTS.md").write_text("agents\n")
+        self.tmpdir = t / "tmp"  # the runner's TMPDIR: its work directories are made, and swept, here only
+        self.tmpdir.mkdir()
         self.home = t / "home"
         self.acct = t / "acct"
         self.acct.mkdir()
@@ -189,13 +210,14 @@ class World:
         (self.t / "plan.json").write_text(json.dumps(plan))
 
     def env(self, **extra):
-        env = {"PATH": str(self.bin), "HOME": str(self.home), "CLAUDE_CONFIG_DIR": str(self.acct)}
+        env = {"PATH": str(self.bin), "HOME": str(self.home), "CLAUDE_CONFIG_DIR": str(self.acct),
+               "TMPDIR": str(self.tmpdir)}
         env.update(extra)
         return {k: v for k, v in env.items() if v is not None}
 
-    def call(self, verb, *args, env=None):
+    def call(self, verb, *args, env=None, umask=-1):
         r = subprocess.run([PY, "-I", "-B", str(self.run_path), verb, *map(str, args)], env=env or self.env(),
-                           capture_output=True, text=True, timeout=120)
+                           capture_output=True, text=True, timeout=120, umask=umask)
         out = json.loads(r.stdout) if r.stdout.strip() else None
         return r.returncode, out, r
 
@@ -459,6 +481,189 @@ class Samples(unittest.TestCase):
         code, out, _ = w.answers("--samples", "2", out=other)
         self.assertEqual(code, 0, "the active unit is of a done sample")
         self.assertEqual(out["samples"]["c1__s1"], "done")
+
+
+class Watch(unittest.TestCase):
+    """The MCP watch reads the process tree of the call, or the unit's control group once systemd names it."""
+
+    def setUp(self):
+        self.w = World(self)
+
+    def own_group(self):
+        """The control group this test runs in (the fake `systemctl show` gives it as the unit's)."""
+        try:
+            line = [x for x in Path("/proc/self/cgroup").read_text().splitlines() if x.startswith("0::")][0]
+            cg = line[3:]
+            Path("/sys/fs/cgroup" + cg, "cgroup.procs").read_text()
+        except (OSError, IndexError):
+            self.skipTest("no readable cgroup v2 of this process")
+        return cg
+
+    def test_control_group_branch_sees_a_server_the_process_tree_does_not(self):
+        w = self.w
+        cg = self.own_group()
+        # The server's parent ended, so it is no descendant of the call: only the control group holds it.
+        w.plan({"control_group": cg, "cli": {"c1": [{"mode": "mcp_orphan", "answer": GOOD}], "c2": [{"answer": GOOD}]}})
+        code, out, r = w.answers("--jobs", "1", "--samples", "1")
+        self.assertEqual(code, 2, r.stdout + r.stderr)
+        self.assertEqual(out["mcp_rule_broken"], ["c1__s1"])
+        self.assertEqual(out["samples"]["c2__s1"], "not_run")
+        unit = "routing-" + hashlib.sha256(str(w.sample("c1", 1)).encode()).hexdigest()[:16] + ".service"
+        self.assertIn("show -p ControlGroup --value %s" % unit, (w.t / "systemctl.log").read_text())
+        usage = json.loads(w.sample("c1", 1).with_suffix(".json").read_text())
+        self.assertTrue(usage["mcp_processes"])
+        # Without a group the tree is read, and finds nothing of the orphan: the same plan, no break.
+        w2 = World(self)
+        w2.plan({"cli": {"c1": [{"mode": "mcp_orphan", "answer": GOOD}], "c2": [{"answer": GOOD}]}})
+        code, out, r = w2.answers("--jobs", "1", "--samples", "1")
+        self.assertEqual((code, out["mcp_rule_broken"]), (0, []), r.stdout + r.stderr)
+
+
+class Deny(unittest.TestCase):
+    def test_the_fixed_deny_patterns(self):
+        edu = "/home/palantirkc/platforms/education-platform"
+        wt = "/home/palantirkc/work/*/wt/education-platform*"
+        want = (["/home/palantirkc/work/edu-*"]
+                + ["%s/%s" % (base, d) for base in (edu, wt) for d in ("context", "apps", "modules", "migration")]
+                + ["~/.claude*/projects/*edu-*", "~/.claude*/projects/*education-platform*"])
+        self.assertEqual(want, load_module().DENY)
+        self.assertEqual(len(want), 11)
+
+
+class WorkDirs(unittest.TestCase):
+    """A call's work directories are `routing-<pid>-<start time>-<random>` in the TMPDIR, swept only when dead."""
+
+    FORM = re.compile(r"routing-([0-9]+)-([0-9]+)-[a-z0-9_]+")
+
+    def setUp(self):
+        self.w = World(self)
+        self.w.plan({"cli": {"c1": [{"answer": GOOD}], "c2": [{"answer": GOOD}]}})
+        self.procs = []
+        self.addCleanup(self.stop)
+
+    def stop(self):
+        for p in self.procs:
+            p.kill()
+            p.wait()
+
+    def process(self):
+        p = subprocess.Popen(["sleep", "300"])
+        self.procs.append(p)
+        mod = load_module()
+        started = mod.start_time(p.pid)
+        self.assertIsNotNone(started)
+        return p, started
+
+    def dead(self):
+        """The identity of a process that has ended."""
+        p, started = self.process()
+        p.kill()
+        p.wait()
+        self.assertIsNone(load_module().start_time(p.pid))
+        return p.pid, started
+
+    def left(self):
+        return sorted(x.name for x in self.w.tmpdir.iterdir())
+
+    def test_a_directory_is_named_by_its_owner_the_call(self):
+        w = self.w
+        code, _, r = w.answers("--case", "c1", "--samples", "1")
+        self.assertEqual(code, 0, r.stderr)
+        [run] = w.cli_runs()
+        work = Path(run["cwd"])
+        self.assertEqual(work.parent.parent, w.tmpdir)
+        m = self.FORM.fullmatch(work.parent.name)
+        self.assertTrue(m, work.parent.name)
+        self.assertIn([int(m.group(1)), int(m.group(2))], run["chain"], "the call that made it owns it")
+        self.assertEqual(self.left(), [], "removed when the call ends")
+
+    def test_only_directories_of_dead_owners_are_removed(self):
+        w = self.w
+        alive, started = self.process()
+        gone_pid, gone_start = self.dead()
+        made = {
+            "dead": "routing-%d-%d-abcd1234" % (gone_pid, gone_start),
+            "reused": "routing-%d-%d-abcd1235" % (alive.pid, started + 1),  # the pid lives, another process owns it
+            "live": "routing-%d-%d-abcd1236" % (alive.pid, started),
+            "no_owner": "routing-abcd1237",
+            "no_start": "routing-%d-abcd1238" % gone_pid,
+            "letters": "routing-%d-%d-ABCD" % (gone_pid, gone_start),
+            "other": "other-%d-%d-abcd1239" % (gone_pid, gone_start),
+            "after": "routing-%d-%d-abcd1240-more" % (gone_pid, gone_start),
+        }
+        for name in made.values():
+            d = w.tmpdir / name
+            d.mkdir()
+            (d / "home").mkdir()
+            (d / "home" / "token").symlink_to(w.secret)
+        file_like = w.tmpdir / ("routing-%d-%d-abcd1241" % (gone_pid, gone_start))
+        file_like.write_text("a file is not a directory")
+        link = w.tmpdir / ("routing-%d-%d-abcd1242" % (gone_pid, gone_start))
+        link.symlink_to(w.secret)
+        code, _, r = w.answers("--case", "c1", "--samples", "1")
+        self.assertEqual(code, 0, r.stderr)
+        self.assertEqual(
+            self.left(),
+            sorted([made["live"], made["no_owner"], made["no_start"], made["letters"], made["other"], made["after"],
+                    file_like.name, link.name]))
+        self.assertTrue(w.secret.is_dir(), "a link is removed, never followed")
+        self.assertEqual(os.kill(alive.pid, 0), None, "a live process is not touched")
+
+    def test_a_refused_call_removes_nothing(self):
+        w = self.w
+        gone_pid, gone_start = self.dead()
+        d = w.tmpdir / ("routing-%d-%d-abcd1234" % (gone_pid, gone_start))
+        d.mkdir()
+        code, out, _ = w.call("answers", "--root", w.root, "--reader", "claude-haiku", "--out", w.out, "--case", "nope")
+        self.assertEqual((code, out), (2, {"status": "case_unknown"}))
+        self.assertTrue(d.is_dir())
+
+    def test_a_killed_call_of_the_agy_reader_leaves_its_home_until_the_next_call_sweeps_it(self):
+        w = self.w
+        token = w.home / ".gemini" / "antigravity-cli"
+        token.mkdir(parents=True)
+        (token / "antigravity-oauth-token").write_text("not a token")
+        w.plan({"cli": {"c1": [{"mode": "sleep", "seconds": 60, "answer": GOOD}], "c2": [{"answer": GOOD}]}})
+        p = subprocess.Popen([PY, "-I", "-B", str(w.run_path), "answers", "--root", str(w.root), "--reader",
+                              "agy-hydrogen", "--out", str(w.out), "--samples", "1", "--jobs", "1", "--case", "c1"],
+                             env=w.env(), stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        deadline = time.time() + 60
+        while not w.cli_runs() and time.time() < deadline:
+            time.sleep(0.1)
+        self.assertTrue(w.cli_runs(), "the session started")
+        p.kill()
+        p.wait()
+        for f in (w.t / "pids").iterdir():
+            try:
+                os.kill(int(f.name), signal.SIGKILL)
+            except ProcessLookupError:
+                pass
+        [left] = self.left()
+        self.assertTrue(self.FORM.fullmatch(left), left)
+        self.assertTrue((w.tmpdir / left / "home" / ".gemini" / "antigravity-cli" / "antigravity-oauth-token").is_symlink())
+        w.plan({"cli": {"c1": [{"answer": GOOD}]}})
+        code, _, r = w.answers("--samples", "1", "--case", "c1", "--jobs", "1", reader="agy-hydrogen")
+        self.assertEqual(code, 0, r.stdout + r.stderr)
+        self.assertEqual(self.left(), [], "no routing directory, and no link to the token, is left")
+        self.assertEqual((token / "antigravity-oauth-token").read_text(), "not a token")
+
+    def test_the_event_stream_and_the_error_file_are_private(self):
+        w = self.w
+        code, _, r = w.call("answers", "--root", w.root, "--reader", "claude-haiku", "--out", w.out, "--samples", "1",
+                            umask=0)
+        self.assertEqual(code, 0, r.stderr)
+        for cid in ("c1", "c2"):
+            for suffix in (".jsonl", ".err", ".md", ".json"):
+                mode = stat.S_IMODE(w.sample(cid, 1).with_suffix(suffix).stat().st_mode)
+                self.assertEqual(mode, 0o600, "%s%s" % (cid, suffix))
+        # A file of an earlier try, with a wider mode, is private again.
+        w.sample("c2", 1).with_suffix(".md").unlink()
+        w.sample("c2", 1).with_suffix(".json").unlink()
+        w.sample("c2", 1).with_suffix(".jsonl").chmod(0o644)
+        code, _, r = w.call("answers", "--root", w.root, "--reader", "claude-haiku", "--out", w.out, "--samples", "1",
+                            umask=0)
+        self.assertEqual(code, 0, r.stderr)
+        self.assertEqual(stat.S_IMODE(w.sample("c2", 1).with_suffix(".jsonl").stat().st_mode), 0o600)
 
 
 class Refusals(unittest.TestCase):

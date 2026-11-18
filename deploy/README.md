@@ -205,12 +205,12 @@ systemctl show -p CPUQuotaPerSecUSec agents.slice     # equals the newest answer
 
 A turn that fails leaves the last value in place and the timer starts the next one. `reading_failed` with the field `quota_now` is also what a value set by hand outside the forms `ap quota` reads (`1h` for 360,000 %) gives on every turn: clear it with `systemctl set-property --runtime <slice> CPUQuota=<ceiling>%`, and the next turn reads it. A reload of the service manager (`systemctl daemon-reload`) drops the runtime value until the next turn.
 
-Undo: disable the timer, wait until a turn that is going on has ended, return the slice to its ceiling, remove the two files.
+Undo: disable the timer, wait until a turn that is going on has ended, return every slice a policy has named since the install to its ceiling (not only the slice the policy names now: a slice that a later policy renamed away from keeps the last runtime value a turn set on it), remove the two files.
 
 ```sh
 systemctl disable --now ap-quota.timer
 systemctl is-active ap-quota.service                  # until it answers inactive or failed, not activating
-systemctl set-property --runtime <slice> CPUQuota=<ceiling>%
+systemctl set-property --runtime <slice> CPUQuota=<ceiling>%     # once for each slice the policy has named since the install
 rm -f /etc/systemd/system/ap-quota.service /etc/systemd/system/ap-quota.timer
 systemctl daemon-reload
 ```

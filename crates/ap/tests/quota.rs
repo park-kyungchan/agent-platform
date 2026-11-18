@@ -36,6 +36,9 @@ struct Fake {
     /// How long one `pause` lasts on the clock.
     gap: Duration,
     calls: Vec<Vec<String>>,
+    /// The bound in milliseconds of each call, and the time waited by `pause`.
+    bounds: Vec<u64>,
+    waited: Duration,
     reads: RefCell<Vec<String>>,
     base: Instant,
     clock: Cell<Duration>,
@@ -61,6 +64,8 @@ impl Fake {
             set_call_ok: true,
             gap: Duration::from_secs(10),
             calls: vec![],
+            bounds: vec![],
+            waited: Duration::ZERO,
             reads: RefCell::default(),
             base: Instant::now(),
             clock: Cell::default(),
@@ -161,9 +166,10 @@ fn reply(text: &str) -> Answer {
     })
 }
 impl System for Fake {
-    fn call(&mut self, program: &str, args: &[String], _: &Value, _: u64) -> Answer {
+    fn call(&mut self, program: &str, args: &[String], _: &Value, ms: u64) -> Answer {
         assert_eq!(program, "systemctl", "a call to {program}");
         self.calls.push(args.to_vec());
+        self.bounds.push(ms);
         let words: Vec<&str> = args.iter().map(String::as_str).collect();
         match words[..] {
             ["show", "-p", "ControlGroup", "--value", SLICE] => {
@@ -238,6 +244,7 @@ impl System for Fake {
     }
     fn pause(&mut self, duration: Duration) {
         assert_eq!(duration, Duration::from_secs(10));
+        self.waited += duration;
         self.clock.set(self.clock.get() + self.gap);
     }
     fn wall(&self) -> SystemTime {
@@ -816,10 +823,20 @@ fn r13_the_service_and_the_timer_are_the_ones_the_spec_names() {
         "Type=oneshot",
         "ExecStart=/usr/local/bin/ap quota",
         "Environment=HOME=/root",
-        "TimeoutStartSec=60",
+        "TimeoutStartSec=90",
     ] {
         assert!(service.iter().any(|l| l == want), "{want}");
     }
+    // Not less than the longest a turn can take: every call at its bound (a turn that sets reads the
+    // value twice) and the wait between the readings.
+    let mut f = Fake::new();
+    f.scenario(2, 20, 30);
+    f.ok();
+    assert_eq!(f.calls.len(), 5);
+    let longest = f.bounds.iter().sum::<u64>() + f.waited.as_millis() as u64;
+    assert_eq!(longest, 80_000);
+    let timeout = service.iter().find_map(|l| l.strip_prefix("TimeoutStartSec="));
+    assert!(timeout.unwrap().parse::<u64>().unwrap() * 1000 >= longest);
     // The service runs outside the slice it sets.
     assert!(!service.iter().any(|l| l.starts_with("Slice=")));
     for want in [
