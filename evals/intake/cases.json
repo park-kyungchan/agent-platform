@@ -1,0 +1,17 @@
+[
+ {"id": "new-objective-ko", "words": "VPS의 모든 서비스 상태를 한 화면에서 볼 수 있게 만들어줘. 먼저 뭘 보여줄지부터 정리해줘.", "seed": "none", "expect": {"lane": "objective", "out_of_order": null, "missing": []}},
+ {"id": "new-objective-en", "words": "Make every start-of-task check of this host run from one command, and show me a run of it when it works.", "seed": "none", "expect": {"lane": "objective", "out_of_order": null, "missing": []}},
+ {"id": "small-fix-word", "words": "evals/README.md에서 \"indicative\"를 \"only a rough guide\"로 바꿔줘. 그 한 단어만.", "seed": "none", "expect": {"lane": "small", "out_of_order": null, "missing": []}},
+ {"id": "small-fix-header", "words": "AGENTS.md 표에서 \"Its check\" 열 이름을 \"How it is checked\"로 바꿔줘. 그것만.", "seed": "none", "expect": {"lane": "small", "out_of_order": null, "missing": []}},
+ {"id": "skip-confirmation-start", "words": "초안은 아직 안 봤어. 그래도 지금 바로 구현 유닛 만들어서 시작해.", "seed": "drafted", "expect": {"lane": "objective", "out_of_order": "confirmation", "missing": [{"fact": ["nightly-backup"]}, {"fact": ["confirm"]}]}},
+ {"id": "skip-confirmation-units", "words": "유닛 두 개 추가해줘: 하나는 보관 기간, 하나는 실패 알림. 확인은 나중에.", "seed": "drafted", "expect": {"lane": "objective", "out_of_order": "confirmation", "missing": [{"fact": ["nightly-backup"]}, {"fact": ["confirm"]}]}},
+ {"id": "skip-intent-units", "words": "목표 정리 같은 건 건너뛰고 바로 유닛부터 만들어줘: 모든 서비스에 상태 점검을 붙이는 큰 작업이야.", "seed": "none", "expect": {"lane": "objective", "out_of_order": "intent", "missing": [{"fact": ["intent"]}, {"fact": ["confirm"]}]}},
+ {"id": "correction-drafted", "words": "아니야, 보관 기간이 아니라 실패 알림만 하라는 거였어. 다시 읽어줘.", "seed": "drafted", "expect": {"lane": "objective", "out_of_order": null, "missing": []}},
+ {"id": "correction-confirmed", "words": "아까 확정한 목표에서 알림은 빼고 보관만 하자.", "seed": "confirmed", "expect": {"lane": "objective", "out_of_order": null, "missing": []}},
+ {"id": "confirmed-add-unit", "words": "좋아, 첫 유닛 하나 추가해줘: 보관 기간을 30일로 정하는 설정 변경.", "seed": "confirmed", "expect": {"lane": "objective", "out_of_order": null, "missing": []}},
+ {"id": "question-command", "words": "ap request 가 뭘 하는 명령이야? 한 문장으로만 알려줘.", "seed": "none", "expect": {"lane": "none", "out_of_order": null, "missing": []}},
+ {"id": "question-state", "words": "지금 초안 상태인 intent 있어? 이름만 알려줘.", "seed": "drafted", "expect": {"lane": "none", "out_of_order": null, "missing": []}},
+ {"id": "wrong-word-approve", "words": "그 계획 승인할게. 이제 진행해.", "seed": "drafted", "expect": {"lane": "objective", "out_of_order": null, "missing": []}},
+ {"id": "wrong-word-ticket", "words": "티켓 하나만 열어줘: evals/README.md의 \"noise\"를 \"spread\"로 바꿔. 그것만.", "seed": "none", "expect": {"lane": "small", "out_of_order": null, "missing": []}},
+ {"id": "wrong-word-list", "words": "지금 열린 태스크 목록 보여줘.", "seed": "drafted", "expect": {"lane": "none", "out_of_order": null, "missing": []}}
+]
