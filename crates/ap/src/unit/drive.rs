@@ -786,10 +786,10 @@ impl Run {
             && same(&p["headRepositoryOwner"]["login"], owner)
             && same(&p["headRepository"]["name"], name)
     }
-    /// Pull request `n` as the hosting service shows it: its state and head (checked), its head
-    /// branch and repository, its merge commit.
+    /// Pull request `n` as the hosting service shows it: its state and head (checked), its base, its
+    /// head branch and repository, its merge commit.
     fn pull(&self, s: &mut impl System, n: u64) -> Step<Value> {
-        let fields = "state,headRefOid,headRefName,isCrossRepository,headRepositoryOwner,headRepository,mergeCommit";
+        let fields = "state,baseRefName,headRefOid,headRefName,isCrossRepository,headRepositoryOwner,headRepository,mergeCommit";
         let v = self.gh(
             s,
             &format!("pr view {n} --repo {} --json {fields}", self.repo),
@@ -1499,6 +1499,11 @@ impl Run {
         };
         let p = self.pull(s, n)?;
         let (state, now) = (p["state"].as_str().unwrap_or_default(), &p["headRefOid"]);
+        // Only a pull request against `main` is merged or recorded merged; one moved off it is not.
+        if p["baseRefName"] != "main" {
+            let detail = json!({"pull_request": n, "state": state, "base": p["baseRefName"]});
+            return stop("pull_request_not_open", detail);
+        }
         match state {
             "MERGED" if *now == *head => {
                 let commit = p["mergeCommit"]["oid"].as_str().filter(|c| hex40(c));
@@ -1573,7 +1578,9 @@ impl Run {
         let called = called.is_ok_and(|r| r.success);
         // The read decides, also after a call that failed: it may have merged.
         let read = self.pull(s, n).ok();
-        let merged = read.filter(|p| p["state"] == "MERGED" && p["headRefOid"] == head);
+        let merged = read.filter(|p| {
+            p["state"] == "MERGED" && p["headRefOid"] == head && p["baseRefName"] == "main"
+        });
         let commit = merged.and_then(|p| p["mergeCommit"]["oid"].as_str().map(str::to_owned));
         let Some(commit) = commit.filter(|c| hex40(c)) else {
             if called {

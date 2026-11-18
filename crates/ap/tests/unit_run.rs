@@ -125,6 +125,8 @@ struct F {
     statuses: Vec<(String, String, String)>,
     /// The head branch the pull request names.
     head_ref: String,
+    /// The base branch the pull request names.
+    base_ref: String,
     /// At the run's push, the store dies and the push fails.
     die_at_push: bool,
     /// After the validate of `merge_unit`, the unit is dropped by another call.
@@ -194,6 +196,7 @@ impl F {
             merge_mode: "ok",
             statuses: vec![],
             head_ref: format!("unit/{KEY}"),
+            base_ref: "main".into(),
             die_at_push: false,
             drop_after_validate: false,
         };
@@ -981,7 +984,7 @@ impl F {
                     None => (self.pr_state, json!(head), Value::Null),
                 };
                 ok(
-                    json!({"state": state, "headRefOid": head, "headRefName": self.head_ref,
+                    json!({"state": state, "baseRefName": self.base_ref, "headRefOid": head, "headRefName": self.head_ref,
                     "isCrossRepository": false, "headRepositoryOwner": {"login": "invented"},
                     "headRepository": {"name": "widgets"}, "mergeCommit": commit}),
                 )
@@ -2598,6 +2601,45 @@ fn r30_a_call_cut_between_the_merge_and_merge_unit_merges_once() {
     );
     assert_eq!(f.actions()[calls..], ["merge_unit"]);
     assert!(f.statuses.is_empty() && f.wt().exists());
+}
+
+// spec: specs/ap/unit-run.md#R30
+// spec: specs/ap/unit-run.md#R31
+#[test]
+fn r30_a_pull_request_moved_off_main_is_neither_merged_nor_recorded_merged() {
+    // An approved unit whose pull request's base is then set to another branch.
+    let mut f = F::new();
+    f.set_unit(json!({"class": "contract"}));
+    f.steps(&["implement", "accept"]);
+    let (a, _) = f.ok();
+    let r = json!({"request_id": "ap-1", "head": a["head"], "reason": "Read."});
+    f.decide("approve", "lead-1", r).unwrap();
+    f.base_ref = "release".into();
+    let calls = f.actions().len();
+    let (b, status) = f.ok();
+    assert_eq!(
+        (b["state"].as_str(), b["refused"].as_str(), status),
+        (Some("accepted"), Some("pull_request_not_open"), 3),
+        "{b}"
+    );
+    assert!(f.statuses.is_empty() && f.merges() == (0, 0));
+    assert_eq!(f.actions().len(), calls);
+    // A call cut after a merge the read shows made into another branch: nothing is recorded.
+    let mut f = F::new();
+    f.merge_mode = "cut";
+    f.steps(&["implement", "accept"]);
+    assert_eq!(f.refusal().status, 3);
+    (f.dead, f.merge_mode) = (false, "ok");
+    f.base_ref = "release".into();
+    let calls = f.actions().len();
+    let (b, status) = f.ok();
+    assert_eq!(
+        (b["state"].as_str(), b["refused"].as_str(), status),
+        (Some("accepted"), Some("pull_request_not_open"), 3),
+        "{b}"
+    );
+    assert_eq!(f.actions().len(), calls);
+    assert!(b.get("cleanup").is_none() && f.wt().exists());
 }
 
 // spec: specs/ap/unit-run.md#R30
