@@ -18,6 +18,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from unittest import mock
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent
@@ -457,15 +458,29 @@ class Session(unittest.TestCase):
         self.assertEqual(self.w.answers("--samples", "2", "--case", "two")[0], 0)
         self.assertFalse(marker.exists())
 
+    def test_the_callers_identity_reaches_neither_the_seed_nor_a_session(self):
+        who = {"ONT_ROLE": "lead", "ONT_AGENT": "someone-else"}
+        code, out, r = self.w.answers("--samples", "1", "--case", "two", env=self.w.env(**who))
+        self.assertEqual((code, r.stderr), (0, ""), out)
+        self.assertEqual([c for c in self.w.lines("cli.jsonl") if any(k in c["env"] for k in who)], [])
+        store = str(self.w.sample("two")) + ".store/ontology.sqlite"
+        rows = json.loads(subprocess.run([ONT, "--store", store, "log"], input="{}", capture_output=True, text=True).stdout)["result"]["rows"]
+        self.assertEqual(len(rows), 6)
+        self.assertEqual({(x["actor"]["agent"], x["actor"].get("role")) for x in rows}, {("seed", None)})
+        self.assertEqual(self.w.answers("--samples", "1", "--case", "two", env=self.w.env())[0], 0)
+
     def test_the_seeds_are_none_drafted_and_confirmed(self):
         mod = load(self.w.run_path, "intake_for_test")
+        # The engine is found on PATH, as `run` finds it; a caller whose PATH lacks it (CI under sudo) puts it there.
+        env = {"PATH": str(self.w.bin) + os.pathsep + os.environ.get("PATH", "")}
         for seed, status, requests in (("none", None, 0), ("drafted", "draft", 1), ("confirmed", "confirmed", 2)):
             d = tempfile.mkdtemp(dir=self.w.t)
-            self.assertTrue(mod.build_store(d, seed))
-            intents = mod.objects(d, "intent")
+            with mock.patch.dict(os.environ, env):
+                self.assertTrue(mod.build_store(d, seed))
+                intents, reqs, rows = mod.objects(d, "intent"), mod.objects(d, "request"), mod.log_rows(d)
+            self.assertEqual(len(reqs), requests)
             self.assertEqual([f["status"] for _, f in intents], [status] if status else [])
-            self.assertEqual(len(mod.objects(d, "request")), requests)
-            self.assertTrue(all(r["submitted_at"] <= mod.SEED_END for r in mod.log_rows(d)))
+            self.assertTrue(all(r["submitted_at"] <= mod.SEED_END for r in rows))
 
 
     def test_parity_is_the_share_of_sonnets_majority_the_reader_also_holds_and_the_gate_judges_each_reader(self):
