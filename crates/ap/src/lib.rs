@@ -26,4 +26,6 @@ pub mod request;
 
 pub mod intent;
 
+pub mod status;
+
 pub mod quota;
