@@ -2,8 +2,8 @@
 """Source check for content/: the shared instructions every coding CLI loads.
 
 Fails the build when (1) SHA256SUMS and the files disagree, (2) always-loaded text
-(AGENTS.md, skill frontmatter) carries a value that changes over time, (3) any owned
-file names a model, (4) a file that content/ routes a reader to does not exist, (5) a path
+(AGENTS.md, skill frontmatter) carries a value that changes over time, (3) an owned file
+names a model (the Lead's table of the allowed models alone excepted), (4) a file that content/ routes a reader to does not exist, (5) a path
 is elided or points into a main checkout's files, or (6) on a host that has the corpus of
 design sources, a line range of OFFICIAL-DOCS.md section 4 falls outside its file.
 Reads the repository, and the corpus when it is present. Run: python3 -I -B ci/check-content.py
@@ -49,9 +49,12 @@ for name in listed:
 texts = {name: (ROOT / name).read_text(encoding="utf-8") for name in owned if name.endswith((".md", ".json"))}
 # A file name of the corpus of design sources is a citation, not a model assignment.
 CORPUS_PATH = re.compile(r"`docs/[^`\s]+`")
+# The one file that names models: the Lead's table of the allowed models and the rule that chooses them by a page's size.
+MODEL_TABLE = "skills/lead/references/unit-page.md"
 for name, text in texts.items():
-    for m in MODEL.finditer(CORPUS_PATH.sub("``", text)):
-        fail("model_name_in_content", name, f"'{m.group(0)}' belongs in a task STATE, not in shared instructions")
+    if name != MODEL_TABLE:
+        for m in MODEL.finditer(CORPUS_PATH.sub("``", text)):
+            fail("model_name_in_content", name, f"'{m.group(0)}' belongs in a task STATE, not in shared instructions")
     always = text if name == "AGENTS.md" else ""
     if name.endswith("/SKILL.md"):
         fm = re.match(r"---\n(.*?)\n---", text, re.S)
@@ -123,7 +126,7 @@ for name, text in texts.items():
             fail("word_the_glossary_replaces", name, f"'{word}': write '{term}' ({GLOSSARY})")
 
 # The vocabulary is a closed set with a budget, not a list that grows: a term must be used, and the files have limits.
-CORE_TERM_LIMIT, GLOSSARY_BYTE_LIMIT, USER_ROW_LIMIT, AGENTS_BYTE_LIMIT, MEASUREMENT_BYTE_LIMIT = 16, 12000, 30, 13500, 6000
+CORE_TERM_LIMIT, GLOSSARY_BYTE_LIMIT, USER_ROW_LIMIT, AGENTS_BYTE_LIMIT, SKILL_BYTE_LIMIT, LEAD_REFERENCE_BYTE_LIMIT = 16, 12000, 30, 13500, 6500, 8000
 if not terms or not banned:
     fail("glossary_no_terms", GLOSSARY, "no term table with a last column 'Do not write' was found")
 others = " ".join(text.lower() for name, text in texts.items() if name != GLOSSARY)
@@ -137,7 +140,9 @@ if core > CORE_TERM_LIMIT:
 size = len(texts.get(GLOSSARY, "").encode())
 if size > GLOSSARY_BYTE_LIMIT:
     fail("glossary_over_limit", GLOSSARY, f"{size} bytes, limit {GLOSSARY_BYTE_LIMIT}: remove or move rows before adding")
-for path, limit in (("AGENTS.md", AGENTS_BYTE_LIMIT), ("skills/lead/references/measurement.md", MEASUREMENT_BYTE_LIMIT)):
+LIMITS = [("AGENTS.md", AGENTS_BYTE_LIMIT), ("skills/lead/SKILL.md", SKILL_BYTE_LIMIT), ("skills/report/SKILL.md", SKILL_BYTE_LIMIT)]
+LIMITS += [(f"skills/lead/references/{n}.md", LEAD_REFERENCE_BYTE_LIMIT) for n in ("interview", "unit-page", "judging")]
+for path, limit in LIMITS:
     used = len(texts.get(path, "").encode())
     if used > limit:
         fail("file_over_limit", path, f"{used} bytes, limit {limit}: cut or move text before adding")

@@ -26,20 +26,9 @@ Git object 저장소는 공유합니다. branch별 파일 변경을 분리할 �
 
 ## Answer order and depth
 
-In a progress or closure message the KPI table comes first; an answer to a question starts with the answer. Both are defined by [lead](../lead/SKILL.md), section 3.
-
-Compact report example (invented values; define new terms in the table at first
-use, without adding a definition paragraph before it):
-
-| KPI(목표 달성 정도를 수치로 확인하는 지표) | 현재 | 지난 보고 대비 변화 | 목표 |
-| --- | --- | --- | --- |
-| CI(변경한 코드를 자동으로 검사하는 작업) 검사 통과 수 | GitHub Actions의 `rust`: 1/1 | 0/1 → 1/1 | 1/1 |
-| recall(질문에 필요한 현재 근거를 기억 검색으로 찾는 동작) 정답 수 | 질문 33개 중 15개 | 이전 값 미측정 | 33/33 |
-
-`rust` 통과는 해당 코드 검사가 성공했다는 뜻입니다. 기억 검색 정답 수의
-개선은 아직 측정하지 않았습니다. 예시 근거는 `gh pr checks <PR번호>`의 검사
-결과와 recall 평가 파일 `recall-results.json`이며, 실제 보고에는 관측한 파일과
-측정 시각을 적습니다. 이미 설명한 용어는 다시 풀어 쓰지 않습니다.
+The form of a message to the user (what comes first, the board, the cards, the
+decisions and the footnotes) is the skill [report](../report/SKILL.md); where this
+skill and `report` differ, `report` holds.
 
 For other explanations, default to this order, using connected prose and only useful structure:
 1. One-line conclusion.
@@ -53,7 +42,7 @@ Short questions get short answers; do not force all six parts, headings, a
 question after each action, quizzes or a tutorial into a routine update. Answer
 the local question and continue the objective. Teaching creates no approval step.
 What the Lead decides itself and the few things it asks the user: skill
-`lead` section 3.
+`lead`.
 
 The user's wording is often loose or names the wrong thing. In the first sentence
 name the exact thing you took it to mean (file, repository, command, value), so
@@ -61,7 +50,7 @@ that one word from the user can correct it. Do not ask the user to restate.
 
 A number is never shown bare. At the first mention of a KPI or metric say what it
 counts, where it is read from and which direction is good; after that the name is
-enough. Terms: `/root/.agents/skills/lead/references/measurement.md`.
+enough. How a measure is written: `/root/.agents/skills/lead/references/interview.md`.
 
 ## Mechanisms and evidence
 

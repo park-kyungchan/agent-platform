@@ -89,6 +89,54 @@ class CheckContent(Scratch, unittest.TestCase):
         self.assertIn(f'unknown_readme_section@content/{TARGET}:{line}: "Gone"', out)
 
 
+class ModelNamesAndLimits(Scratch, unittest.TestCase):
+    """Only the Lead's table of the allowed models may name a model; the Lead's and report's files have byte limits."""
+
+    MODEL_TABLE = "skills/lead/references/unit-page.md"
+
+    def append_to(self, root, name, line):
+        path = root / "content" / name
+        text = path.read_text(encoding="utf-8")
+        path.write_text(text + ("" if text.endswith("\n") else "\n") + line + "\n", encoding="utf-8")
+        sums = root / "content/SHA256SUMS"
+        digest = hashlib.sha256(path.read_bytes()).hexdigest()
+        sums.write_text("".join(f"{digest}  {name}\n" if l.endswith("  " + name) else l + "\n" for l in sums.read_text().splitlines()))
+
+    def test_a_model_name_in_the_model_table_passes(self):
+        root = self.fixture()
+        self.append_to(root, self.MODEL_TABLE, "| Claude Code | Opus | another line of the table, with claude-sonnet-5-5 |")
+        code, out = run_check(root)
+        self.assertEqual(code, 0, out)
+
+    def test_the_model_table_still_has_its_routes_and_links_checked(self):
+        root = self.fixture()
+        self.append_to(root, self.MODEL_TABLE, "See [x](gone.md) and `/root/.agents/skills/lead/references/gone.md`.")
+        code, out = run_check(root)
+        self.assertEqual(code, 1, out)
+        self.assertIn(f"route_to_missing_file@content/{self.MODEL_TABLE}", out)
+        self.assertIn(f"broken_relative_link@content/{self.MODEL_TABLE}", out)
+
+    def test_a_model_name_in_any_other_owned_file_fails(self):
+        for name in ("skills/lead/SKILL.md", "skills/lead/references/judging.md", "skills/report/SKILL.md", TARGET, "AGENTS.md"):
+            with self.subTest(name=name):
+                root = self.fixture()
+                self.append_to(root, name, "Run the verifier on Opus.")
+                code, out = run_check(root)
+                self.assertEqual(code, 1, out)
+                self.assertIn(f"model_name_in_content@content/{name}: 'Opus'", out)
+                self.assertEqual(out.count("model_name_in_content@"), 1, out)
+
+    def test_the_lead_skill_and_its_references_have_byte_limits(self):
+        for name, limit in (("skills/lead/SKILL.md", 6500), ("skills/report/SKILL.md", 6500), ("skills/lead/references/interview.md", 8000)):
+            with self.subTest(name=name):
+                root = self.fixture()
+                size = len((root / "content" / name).read_bytes())
+                self.append_to(root, name, "x" * (limit - size))
+                code, out = run_check(root)
+                self.assertEqual(code, 1, out)
+                self.assertIn(f"file_over_limit@content/{name}: {limit + 1} bytes, limit {limit}", out)
+
+
 class PathsAndDesignRoutes(Scratch, unittest.TestCase):
     """An elided path, a path into a main checkout's files, and the line ranges of OFFICIAL-DOCS.md section 4."""
 
