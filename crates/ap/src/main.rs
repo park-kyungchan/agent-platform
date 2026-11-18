@@ -15,7 +15,11 @@ const VERBS: [(&str, &str, &str); 13] = [
         "review <start|close|revoke> < request.json",
         "One review",
     ),
-    ("unit", "unit [<page>] < request.json", "One unit"),
+    (
+        "unit",
+        "unit [<page>] < request.json | unit add|amend|ready|drop [--store <path>] < request.json | unit page <key> [--for implementer|verifier|reviewer] [--digest] [--store <path>]",
+        "One unit",
+    ),
     ("accept", "accept <page>", "The page's block"),
     ("deliver", "deliver < request.json", "Delivery"),
     (
@@ -50,7 +54,7 @@ fn verb_line(verb: &str, form: &str, heading: &str) -> String {
 }
 const RUN_HELP: &str = "Usage: ap run < request.json\nOne headless Claude Code stage in a transient scope of agents.slice; one record <out>.run.json.\n";
 const GATE_HELP: &str = "Usage: ap gate < request.json\nWaits on a pull request's head for its required checks, and for an automatic review when the request names its reviewer; one JSON answer.\n";
-const UNIT_HELP: &str = "Usage: ap unit < request.json | ap unit [--compose-only] <page>\nOne unit of work once from its page to the merge; one record <out>.unit.json. With a page, the request and prompts are composed from it and units.json; --compose-only prints them only.\n";
+const UNIT_HELP: &str = "Usage: ap unit < request.json | ap unit [--compose-only] <page>\n       ap unit add|amend|ready|drop [--store <path>] < request.json\n       ap unit page <key> [--for implementer|verifier|reviewer] [--digest] [--store <path>]\nOne unit of work once from its page to the merge; one record <out>.unit.json. With a page, the request and prompts are composed from it and units.json; --compose-only prints them only.\nadd, amend, ready and drop write the unit's page as an object of the store (ready after its acceptance checks ran on the base); page prints the rendered page, or with --digest its SHA-256 (README \"The unit object\").\n";
 const DELIVER_HELP: &str = "Usage: ap deliver < request.json\nInstalls the accepted tip of main (ap and content) and records the attempt in the store; one JSON record.\n";
 const BACKLOG_HELP: &str = "Usage: ap backlog <task key> [--text] [--store <path>]\nPrints the board of a task: its order, each item's refusal, the unplaced items and the untriaged rows; reads only.\n";
 const STATE_HELP: &str = "Usage: ap state <task directory> [--text]\nPrints the unit calls, stages, limits and streams of a task directory from its records and Git; reads only.\n";
