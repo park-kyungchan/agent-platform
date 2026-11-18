@@ -16,11 +16,13 @@ This repository holds the command `ap`, the shared instructions every coding CLI
 
 | Contract | Where it is stated | What relies on it |
 | --- | --- | --- |
-| The schema of the Lead's records, `ontology/work.schema.json` | `ontology/work.schema.json`; `ontology/rehearsal.sh` installs it into a disposable store and asserts every action answer that `ap` parses | `ap` and every reader of the store |
+| The schema of the Lead's records, `ontology/work.schema.json` | `ontology/README.md`, the schema's text by version: its value types, among them `nonempty_text`, which refuses `""` with `invalid_parameter` for the string parameters of the version 9 actions but `line` of `record_check`, while the actions of versions 10 and 11 refuse an empty string by a `<parameter>_empty` criterion with a rehearsal row (not every string parameter), and what the store does not check; the check `ont schema check ontology/work.schema.json`; `ontology/rehearsal.sh`, which installs the schema into a disposable store and asserts every action answer that `ap` parses | `ap` and every reader of the store |
 | The engine revision, `ontology/ENGINE-PIN` | `ontology/ENGINE-PIN`; changed only with a passing rehearsal (`ontology/rehearsal.sh`) and the answer shapes named in the pull request | `ap` parsing an engine answer; `ontology/rehearsal.sh` |
 | The shared instructions, `content/` with `content/SHA256SUMS` | `content/SHA256SUMS`, the one list of the content | Every coding CLI that loads the installed instructions; `ci/check-content.py` |
 | The rulesets and settings under `github/` | `github/repositories.json`, `github/ruleset-main.json`, `github/ruleset-tags.json`; compared and applied by `github/apply` | The repositories the files name; `./check` |
 | The map, `map.json` | `map.json`; `ci/check-map.py` checks it | `ap unit page`, which prints one line per entry that meets a unit's write set, and `./check` |
+
+A new action or value type of the work schema follows the latest version section of `ontology/README.md` (`## Version 11`) and adds a rehearsal row for each new refusal.
 
 A pull request that adds, removes or renames a file under the coverage roots (`crates/`, `ci/`, `content/`, `deploy/`, `evals/`, `github/`, `memory/`, `ontology/`, `scripts/`, `specs/`, `.github/`, `check`, `rust-toolchain.toml`, `Cargo.toml`, `Cargo.lock`), or shortens a file below an entry's range, changes `map.json` in the same pull request; a removed root also changes the root list in `check`. A file added to or removed from `content/` is added to or removed from `content/SHA256SUMS`; every changed file gets its new checksum. Never edit the installed copy of the content.
 
@@ -33,7 +35,7 @@ A pull request that adds, removes or renames a file under the coverage roots (`c
 ## Pull request
 
 - One pull request per unit of work, able to merge alone. Its description is your plan and your proof. Never force-push. A repair is a new commit.
-- The required check is `rust`. Review policy: `REVIEW.md`.
+- The required check is `rust`; the required status is `lead-review`. Review policy: `REVIEW.md`.
 - `ap` and `content/` are installed by `ap deliver` (its timer) after the merge; the `scripts/install-ap.sh` and `scripts/install-content.sh` files are delivery's own steps. A merged change is not an installed one.
 
 ## Why Rust
