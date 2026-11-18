@@ -75,3 +75,12 @@ fn r2_help_lists_every_verb() {
         );
     }
 }
+
+// spec: specs/ap/status.md#R23
+#[test]
+fn r23_the_help_of_status_names_the_wait_form() {
+    let help = String::from_utf8(ap(&["--help"]).stdout).unwrap();
+    assert!(help.contains("ap status --wait <intent> [--timeout <seconds>] [--store <path>]"));
+    let status = String::from_utf8(ap(&["status", "--help"]).stdout).unwrap();
+    assert!(status.contains("ap status --wait <intent> [--timeout <seconds>] [--store <path>]"));
+}
