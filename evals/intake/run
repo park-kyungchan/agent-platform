@@ -1,0 +1,438 @@
+#!/usr/bin/env -S python3 -I -B
+"""The intake suite: does an agent the user speaks to record the request, choose the lane, and ask only what is
+missing? Several samples per case, scored by five facts read from a scratch store and from the answer; no model judges.
+
+  run answers --reader R --out DIR [--root DIR] [--cases FILE ...] [--samples N] [--case ID ...]
+  run score --out DIR [--cases FILE ...]
+  run gate --baseline SCORE.json --candidate SCORE.json
+
+The readers, their command lines, the unit that holds a session, the scoring by facts and the gate are those of
+evals/routing/run, which this file loads as a module (it is not changed here). What differs: the session gets the
+case's words as its only message, a scratch store bound at the host store's path, and a narrower unit (the routing
+suite's ProtectSystem=strict and ProtectHome=read-only stay; credentials,
+service-manager sockets and the host's store out of reach; capabilities, devices and kernel files restricted).
+Every refusal is one line {"status":"<code>"} with exit 2. Method and limits: evals/README.md, "The intake suite".
+"""
+import argparse
+import hashlib
+import importlib.machinery
+import importlib.util
+import json
+import os
+import re
+import shutil
+import signal
+import statistics
+import subprocess
+import sys
+import threading
+import time
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+SELF = os.path.abspath(__file__)
+SCHEMA = os.path.join(HERE, "..", "..", "ontology", "work.schema.json")
+REPO_CASES = os.path.join(HERE, "cases.json")
+HOST_DIGESTS = os.path.join(HERE, "host-cases.sha256")
+
+
+def load_routing():
+    loader = importlib.machinery.SourceFileLoader("routing_run", os.path.join(HERE, "..", "routing", "run"))
+    mod = importlib.util.module_from_spec(importlib.util.spec_from_loader("routing_run", loader))
+    loader.exec_module(mod)
+    return mod
+
+
+R = load_routing()
+JOBS = 2  # sessions at a time; each has its own store
+STORE_AT = "/var/lib/ontology-platform/ont"  # where the host's store is: the scratch store is bound here
+# What the unit hides beyond the routing suite's deny list; each existing path is its own InaccessiblePaths=.
+HIDDEN = ["~/.config/gh", "~/.git-credentials", "~/.netrc", "~/.ssh", "/etc/agent-platform/credentials",
+          "/etc/agent-platform/ci", "/run/user", "/run/docker.sock", "/run/containerd/containerd.sock",
+          "/run/tailscale", "/run/systemd/private", "/run/dbus/system_bus_socket", "/home/palantirkc/work/edu-*"]
+CAPS = "CAP_CHOWN CAP_DAC_OVERRIDE CAP_FOWNER CAP_FSETID CAP_SETGID CAP_SETUID"
+READ_ONLY = ("/sys", "/proc/sys", "/proc/sysrq-trigger")  # not ProtectKernelTunables=yes: it undoes ReadOnlyPaths=/sys
+SECRET = re.compile(r"TOKEN|SECRET|PASSWORD|PASSWD|CREDENTIAL|API_?KEY|AUTH", re.I)
+SEEDS = ("none", "drafted", "confirmed")
+LANES = ("objective", "small", "none")
+SKIPS = (None, "intent", "confirmation")
+FACTS = ("a", "b", "c", "d", "e")
+SEED_NOW = 1793000000  # the seed's actions are applied at fixed past times, so every later row is the session's
+SEED_END = "2026-10-27T00:00:00Z"
+SEED_INTENT = "nightly-backup"
+SEED_WORDS = "Keep thirty days of the nightly backup and tell me when one fails."
+UNIT_BAD = ("intent_required", "intent_not_open_for_units")
+STORES = {}  # unit name -> its scratch store directory
+
+# ---------------------------------------------------------------- the unit: the routing suite's, narrowed
+
+_routing_argv, _routing_unit_of = R.unit_argv, R.unit_of
+
+
+def unit_of(base):
+    return "intake-" + _routing_unit_of(base)[len("routing-"):]
+
+
+def unit_argv(tool, unit, description, work, writable, deny, env):
+    env = {k: v for k, v in env.items() if not SECRET.search(k)}  # no variable that holds a token reaches a session
+    argv = _routing_argv(tool, unit, description, work, writable, deny, env)
+    argv = [x.replace("--description=routing-", "--description=intake-", 1) for x in argv]
+    bind = "%s:%s" % (STORES.get(unit, work), STORE_AT)
+    for p in ["BindPaths=" + R.quoted(bind), "CapabilityBoundingSet=" + CAPS, "NoNewPrivileges=yes",
+              "PrivateDevices=yes"] + ["ReadOnlyPaths=" + p for p in READ_ONLY]:
+        argv += ["-p", p]
+    return argv
+
+
+_routing_deny = R.deny_paths
+
+
+def deny_paths(extra):
+    return _routing_deny(list(extra) + HIDDEN)
+
+
+R.unit_argv, R.unit_of, R.deny_paths = unit_argv, unit_of, deny_paths
+# The agent the user speaks to has its skills: the Claude readers run without --disable-slash-commands.
+for _name in ("claude-sonnet", "claude-haiku"):
+    R.READERS[_name]["argv"] = (lambda f: lambda *x: [t for t in f(*x) if t != "--disable-slash-commands"])(
+        R.READERS[_name]["argv"])
+R.PROMPT = "{situation}"  # the case's words are the whole first message
+
+# ---------------------------------------------------------------- cases
+
+
+def host_names():
+    names = {}
+    if os.path.exists(HOST_DIGESTS):
+        with open(HOST_DIGESTS, encoding="utf-8") as f:
+            for line in f:
+                parts = line.split()
+                if len(parts) == 2:
+                    names[parts[0]] = parts[1]
+    return names
+
+
+def valid_case(c):
+    ex = c.get("expect") if isinstance(c, dict) else None
+    return (isinstance(c.get("id"), str) and c["id"] and "/" not in c["id"] and not c["id"].startswith(".")
+            and isinstance(c.get("words"), str) and c["words"] and c.get("seed") in SEEDS and isinstance(ex, dict)
+            and ex.get("lane") in LANES and ex.get("out_of_order") in SKIPS and R.fact_list(ex.get("missing"))
+            and bool(ex["missing"]) == (ex["out_of_order"] is not None))
+
+
+def load_cases(extra):
+    """The repository's cases and those of each host file: (id -> case, short name -> SHA-256)."""
+    files, known = [("cases.json", REPO_CASES)], host_names()
+    for path in extra:
+        if not os.path.isabs(path) or not os.path.isfile(path):
+            R.refuse("cases_unreadable")
+        digest = R.sha_file(path)
+        if digest not in known:
+            R.refuse("cases_digest_unknown")
+        files.append((known[digest], path))
+    cases, digests = {}, {}
+    for name, path in files:
+        digests[name] = R.sha_file(path)
+        data = R.read_json(path)
+        if not isinstance(data, list) or not all(isinstance(c, dict) and valid_case(c) for c in data):
+            R.refuse("cases_invalid")
+        for c in data:
+            if c["id"] in cases:
+                R.refuse("case_id_twice")
+            cases[c["id"]] = c
+    return cases, digests
+
+
+# ---------------------------------------------------------------- the scratch store
+
+
+def ont(store, args, body=None, now=None):
+    """The `result` of one engine call on the scratch store, or None. Every call names the store."""
+    cmd = [shutil.which("ont") or "ont", "--store", os.path.join(store, "ontology.sqlite")]
+    cmd += ["--now", str(now)] if now else []
+    env = {k: v for k, v in os.environ.items() if not k.startswith("ONT_")}  # the caller's identity is not the seed's
+    try:
+        p = subprocess.run(cmd + args, input=None if body is None else json.dumps(body), capture_output=True,
+                           text=True, timeout=120, env=env)
+        out = json.loads(p.stdout)
+    except (OSError, ValueError, subprocess.TimeoutExpired):
+        return None
+    return out.get("result") if isinstance(out, dict) and out.get("status") == "ok" else None
+
+
+def build_store(store, seed):
+    """The schema of this tree installed into an empty store, and the seed: none, an intent drafted, or confirmed."""
+    if ont(store, ["schema", "install", SCHEMA]) is None:
+        return False
+
+    def act(kind, params, at):
+        r = ont(store, ["action", "apply"], {"action_type": kind, "request_id": "seed-%d" % at, "agent": "seed",
+                                             "session": "seed", "parameters": params}, SEED_NOW + at)
+        return r["edits"][0]["id"] if r else None
+    if seed == "none":
+        return True
+    said = {"reading": "seed", "kind": "order", "topic": "seed", "words_verified": False}
+    rq = act("record_request", dict(said, words=SEED_WORDS, said_at="2026-10-26T07:00:00Z"), 10)
+    if rq is None:
+        return False
+    iid = dict(rq, object_type="intent", native_key=SEED_INTENT)
+    ok = act("draft_intent", {"intent": iid, "origin": rq, "first_user": "The host's owner reads the report.",
+                              "outcome": "The nightly backup keeps thirty days and a failed run is reported."}, 20)
+    ok = ok and act("add_criterion", {"intent": iid, "statement": "A forced failure is reported within a day.",
+                                      "check": "Run the backup with a forced failure and read the report."}, 30)
+    if seed == "confirmed" and ok:
+        yes = act("record_request", dict(said, kind="answer", words="Yes, that is what I want.",
+                                         said_at="2026-10-26T07:40:00Z"), 600)
+        ok = yes and act("route_request", {"request": yes, "intent": iid}, 610) \
+            and act("confirm_intent", {"intent": iid, "by": yes}, 620)
+    return bool(ok)
+
+
+def objects(store, kind):
+    """(native key, member values) of every object of a type, or None when the store cannot be read in full."""
+    found, cont = [], None
+    while True:
+        r = ont(store, ["search"], dict({"object_type": kind, "limit": 1000}, **({"continuation": cont} if cont else {})))
+        if not isinstance(r, dict) or not (r.get("basis") or {}).get("qualified"):
+            return None
+        found += [(o["id"]["native_key"], {k: v.get("value") for k, v in o["head"]["fields"].items()}) for o in r["objects"]]
+        cont = r.get("continuation")
+        if not cont:
+            return found
+
+
+def log_rows(store):
+    """Every row of the action log, applied and refused (the log answers one outcome at a time)."""
+    rows = []
+    for outcome in ("applied", "refused"):
+        cont = None
+        while True:
+            r = ont(store, ["log"], dict({"outcome": outcome, "parameters": True, "limit": 1000},
+                                         **({"continuation": cont} if cont else {})))
+            if not isinstance(r, dict):
+                return None
+            rows += r["rows"]
+            cont = r.get("continuation")
+            if not cont:
+                break
+    return rows
+
+
+def ref(v):
+    return v.get("native_key") if isinstance(v, dict) else None
+
+
+def questions(answer):
+    """The `?` and `？` of the answer once fenced code blocks and inline code are removed."""
+    text = re.sub(r"`[^`\n]*`", "", re.sub(r"```.*?```", "", answer, flags=re.S))
+    return text.count("?") + text.count("？")
+
+
+def facts(case, answer, store):
+    """(the five facts, whether the request with the words is verified, whether one exists) of one sample."""
+    reqs, units, intents = (objects(store, k) for k in ("request", "unit", "intent"))
+    rows = log_rows(store)
+    if reqs is None or units is None or intents is None or rows is None:
+        return dict.fromkeys(FACTS, False), False, False
+    ex, after = case["expect"], [r for r in rows if r.get("submitted_at", "") > SEED_END]
+
+    def applied(*kinds):
+        return [r for r in after if r.get("outcome") == "applied" and (not kinds or r.get("action_type") in kinds)]
+    mine = [(k, f) for k, f in reqs if f.get("words") == case["words"]]
+    if ex["lane"] == "objective":
+        b = any(f.get("route") == "intent" and ref(f.get("intent")) for _, f in mine)
+    elif ex["lane"] == "small":
+        b = any(f.get("lane") == "small" and ref(f.get("origin")) in {k for k, _ in mine} for _, f in units)
+    else:
+        b = not applied()
+    status = {k: f.get("status") for k, f in intents}
+    refused = [r for r in after if r.get("outcome") == "refused" and r.get("action_type") == "add_unit"
+               and (r.get("parameters") or {}).get("lane") == "objective"
+               and set(UNIT_BAD) & set([r.get("code")] + list(r.get("failed") or []))]
+    c = (all(status.get(ref(f.get("intent"))) in ("confirmed", "met") for _, f in units if f.get("lane") == "objective")
+         and not refused and not (ex["out_of_order"] == "confirmation" and applied("confirm_intent")))
+    text = R.norm(answer)
+    got = {"a": bool(mine) if ex["lane"] != "none" else not applied("record_request", "supersede_request"), "b": b,
+           "c": c, "d": not applied("assume_intent"),
+           "e": questions(answer) <= 5 and all(R.holds(f, text) for f in ex["missing"])}
+    return got, any(f.get("words_verified") is True for _, f in mine), bool(mine)
+
+
+# ---------------------------------------------------------------- answers
+
+
+def sample(a, sandbox, case, n, base):
+    """One session: a fresh scratch store built from the seed, bound at the host store's path for the unit."""
+    for suffix in (".json", ".md"):
+        if os.path.exists(base + suffix):
+            os.unlink(base + suffix)
+    store = base + ".store"
+    shutil.rmtree(store, ignore_errors=True)
+    os.mkdir(store, 0o700)
+    if not build_store(store, case["seed"]):
+        return {"state": "store_failed", "mcp_processes": []}
+    STORES[unit_of(base)] = store
+    return R.run_sample(a, sandbox, {"id": case["id"], "situation": case["words"]}, n, base)
+
+
+def cmd_answers(a):
+    if a.reader not in R.READERS or not 1 <= a.samples <= 9:
+        R.refuse("usage")
+    a.root, a.deny = os.path.abspath(a.root), []
+    if not os.path.isfile(os.path.join(a.root, "AGENTS.md")):
+        R.refuse("root_invalid")
+    cases, digests = load_cases(a.cases)
+    if [c for c in a.case if c not in cases]:
+        R.refuse("case_unknown")
+    ids = sorted(set(a.case) if a.case else cases)
+    sandbox = R.Sandbox(a.reader, [])
+    if not shutil.which(R.READERS[a.reader]["cli"]):
+        R.refuse("cli_missing")
+    if not shutil.which("ont"):
+        R.refuse("ont_not_found")
+    out = os.path.join(os.path.abspath(a.out), a.reader)
+    suite = hashlib.sha256((R.sha_file(SELF) + R.sha_file(R.SELF)).encode()).hexdigest()
+    record = {"samples": a.samples, "cases": ids, "case_files": digests, "suite": suite}
+    path = os.path.join(out, "run.json")
+    old = R.read_json(path) if os.path.exists(path) else None
+    if os.path.exists(path) and (not isinstance(old, dict) or any(old.get(k) != record[k] for k in ("cases", "case_files", "suite"))
+                                 or not isinstance(old.get("samples"), int) or old["samples"] > a.samples):
+        R.refuse("run_differs")
+    key = lambda c, n: "%s__s%d" % (c, n)
+    states = {key(c, n): "done" for n in range(1, a.samples + 1) for c in ids if R.done(os.path.join(out, key(c, n)))}
+    todo = [(cases[c], n) for n in range(1, a.samples + 1) for c in ids if key(c, n) not in states]
+    if sandbox.active([unit_of(os.path.join(out, key(c["id"], n))) for c, n in todo]):
+        R.refuse("run_still_active")
+    os.makedirs(out, exist_ok=True)
+    if todo:
+        sandbox.probe(out)
+    if old is None or old.get("samples") != a.samples:
+        R.write_atomic(path, json.dumps(record, indent=1) + "\n")
+    broke, lost, lock = [], [], threading.Lock()
+
+    def worker():
+        while True:
+            with lock:
+                if not todo or broke or lost:
+                    return
+                c, n = todo.pop(0)
+            try:
+                m = sample(a, sandbox, c, n, os.path.join(out, key(c["id"], n)))
+            except Exception:  # an error of this program for one sample: the sample stays unanswered
+                m = {"state": "failed", "mcp_processes": []}
+            with lock:
+                states[key(c["id"], n)] = m["state"]
+                if m["state"] in ("sandbox_unavailable", "store_failed"):
+                    lost.append(m["state"])
+                if m["mcp_processes"] or m.get("mcp_withheld") is False:
+                    broke.append(key(c["id"], n))
+    threads = [threading.Thread(target=worker, daemon=True) for _ in range(JOBS)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+    if lost:
+        R.refuse("store_build_failed" if lost[0] == "store_failed" else "sandbox_unavailable")
+    for c, n in todo:
+        states[key(c["id"], n)] = "not_run"
+    print(json.dumps({"reader": a.reader, "samples": dict(sorted(states.items())), "mcp_rule_broken": sorted(broke)}, indent=1))
+    return 2 if broke else 0
+
+
+# ---------------------------------------------------------------- score
+
+
+def score_reader(d, record, cases):
+    n, ids = record["samples"], record["cases"]
+    passed, per_sample, tally = {c: 0 for c in ids}, [0] * n, {c: dict.fromkeys(FACTS, 0) for c in ids}
+    unanswered, tokens, recorded, verified = 0, [], 0, 0
+    for cid in ids:
+        for s in range(1, n + 1):
+            base = os.path.join(d, "%s__s%d" % (cid, s))
+            if not R.done(base):
+                unanswered += 1
+                continue
+            meta = R.read_json(base + ".json")
+            with open(base + ".md", encoding="utf-8", errors="replace") as f:
+                got, ver, rec = facts(cases[cid], f.read(), base + ".store")
+            if isinstance(meta.get("input_tokens"), int):
+                tokens.append(meta["input_tokens"])
+            for k in FACTS:
+                tally[cid][k] += got[k]
+            recorded += rec and cases[cid]["expect"]["lane"] != "none"
+            verified += ver and cases[cid]["expect"]["lane"] != "none"
+            if all(got.values()):
+                passed[cid] += 1
+                per_sample[s - 1] += 1
+    return {"n": n, "passes": passed, "samples": per_sample, "mean": round(sum(per_sample) / n, 4),
+            "majority": sorted(c for c in ids if passed[c] > n / 2), "unanswered": unanswered,
+            "tokens_median": statistics.median(tokens) if tokens else None, "facts": tally,
+            "requests_recorded": recorded, "requests_verified": verified}
+
+
+def sheet(result):
+    lines = R.sheet(result).replace("# Routing suite: score", "# Intake suite: score", 1).rstrip("\n").split("\n")
+    lines += ["", "Samples holding each fact (a to e), and requests recorded and verified (lanes objective and small):", "",
+              "| Reader | " + " | ".join(FACTS) + " | recorded | verified |", "| --- |" + " --- |" * (len(FACTS) + 2)]
+    for r, x in result["readers"].items():
+        sums = [sum(t[k] for t in x["facts"].values()) for k in FACTS]
+        lines.append("| %s | %s | %d | %d |" % (r, " | ".join(map(str, sums)), x["requests_recorded"], x["requests_verified"]))
+    return "\n".join(lines) + "\n"
+
+
+def cmd_score(a):
+    out = os.path.abspath(a.out)
+    readers = [r for r in R.READER_NAMES if os.path.isdir(os.path.join(out, r))]
+    if not readers:
+        R.refuse("no_reader")
+    records = {}
+    for r in readers:
+        rec = R.read_json(os.path.join(out, r, "run.json"))
+        if not (isinstance(rec, dict) and isinstance(rec.get("samples"), int) and rec["samples"] >= 1
+                and isinstance(rec.get("cases"), list) and isinstance(rec.get("case_files"), dict)):
+            R.refuse("run_record_missing")
+        records[r] = rec
+    first = records[readers[0]]
+    if any(rec.get("suite") != first.get("suite") or rec["case_files"] != first["case_files"] for rec in records.values()):
+        R.refuse("run_differs")
+    cases, digests = load_cases(a.cases)
+    if digests != first["case_files"] or any(c not in cases for rec in records.values() for c in rec["cases"]):
+        R.refuse("case_sets_differ")
+    result = {"suite": first.get("suite"), "case_files": digests,
+              "readers": {r: score_reader(os.path.join(out, r), records[r], cases) for r in readers}}
+    sonnet = result["readers"].get("claude-sonnet", {}).get("majority")
+    result["parity"] = {r: (round(len(set(sonnet) & set(x["majority"])) / len(sonnet), 4) if sonnet else None)
+                        for r, x in result["readers"].items() if r != "claude-sonnet"}
+    text = json.dumps(result, indent=1)
+    R.write_atomic(os.path.join(out, "score.json"), text + "\n")
+    R.write_atomic(os.path.join(out, "sheet.md"), sheet(result))
+    print(text)
+    return 0
+
+
+def main():
+    signal.signal(signal.SIGTERM, lambda *_: sys.exit(143))
+    p = R.Parser(prog="run", allow_abbrev=False)
+    sub = p.add_subparsers(dest="verb", required=True, parser_class=R.Parser)
+    an = sub.add_parser("answers", allow_abbrev=False)
+    an.add_argument("--reader", required=True)
+    an.add_argument("--out", required=True)
+    an.add_argument("--root", default="/root/.agents")
+    an.add_argument("--cases", action="append", default=[])
+    an.add_argument("--samples", type=int, default=3)
+    an.add_argument("--case", action="append", default=[])
+    sc = sub.add_parser("score", allow_abbrev=False)
+    sc.add_argument("--out", required=True)
+    sc.add_argument("--cases", action="append", default=[])
+    ga = sub.add_parser("gate", allow_abbrev=False)
+    ga.add_argument("--baseline", required=True)
+    ga.add_argument("--candidate", required=True)
+    try:
+        a = p.parse_args()
+        return {"answers": cmd_answers, "score": cmd_score, "gate": R.cmd_gate}[a.verb](a)
+    except R.Refuse as e:
+        print(json.dumps({"status": e.args[0]}, separators=(",", ":")))
+        return 2
+
+
+if __name__ == "__main__":
+    sys.exit(main())
