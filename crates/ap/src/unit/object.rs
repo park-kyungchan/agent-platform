@@ -669,7 +669,8 @@ fn on_base(s: &mut impl System, u: &Value) -> Result<(Value, Vec<Value>), Failur
         let check = c["check"].as_str().unwrap_or_default();
         let output = scratch.at(&format!("check-{index}.out"));
         let started = s.now();
-        let status = run_check(s, &dir, base.as_deref().unwrap_or_default(), &output, check)?;
+        let base = base.as_deref().unwrap_or_default();
+        let status = run_check(s, &dir, (base, base), &output, check)?;
         let seconds = s.now().saturating_duration_since(started).as_secs();
         let code = match (status, kind) {
             (None, _) => Some("acceptance_not_runnable"),
@@ -704,7 +705,7 @@ fn tail(s: &impl System, output: &str) -> String {
 pub fn check_command(
     s: &impl System,
     dir: &str,
-    base: &str,
+    (base, head): (&str, &str),
     output: &str,
     check: &str,
 ) -> Vec<String> {
@@ -726,7 +727,7 @@ pub fn check_command(
         &format!("PATH={}", var("PATH")),
         &format!("HOME={}", var("HOME")),
         &format!("AP_BASE={base}"),
-        &format!("AP_HEAD={base}"),
+        &format!("AP_HEAD={head}"),
         "timeout",
         "-k",
         "10",
@@ -738,15 +739,15 @@ pub fn check_command(
     words.iter().map(|w| (*w).to_owned()).collect()
 }
 /// One check through the port, inside a transient unit where units are used (R24, R25); its status,
-/// when the wrapper printed one.
-fn run_check(
+/// when the wrapper printed one. `ap unit run` gives the merge base and the head (`AP_BASE`, `AP_HEAD`).
+pub(super) fn run_check(
     s: &mut impl System,
     dir: &str,
-    base: &str,
+    commits: (&str, &str),
     output: &str,
     check: &str,
 ) -> Result<Option<i64>, Failure> {
-    let command = check_command(s, dir, base, output, check);
+    let command = check_command(s, dir, commits, output, check);
     let (reply, unit) = if s.units() {
         let id = new_session_id(s).map_err(|_| error("io_error", "unit"))?;
         let unit = format!("ap-check-{id}");

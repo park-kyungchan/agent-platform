@@ -294,6 +294,18 @@ actions!(
     end_delegation,
     close_unit_review
 );
+/// Schema version 11 on: an action of `ap unit run` on a unit (`start_unit`, `resume_unit`,
+/// `record_head`, `stop_unit`, `accept_unit`), without a role.
+pub fn unit_action(
+    s: &mut impl System,
+    store: Option<&str>,
+    actor: &Actor,
+    action: &str,
+    rid: String,
+    p: Value,
+) -> Result<Applied, Failure> {
+    apply(s, store, actor, action, rid, p)
+}
 /// The Lead proceeds on a draft: the only actions that carry the role `lead`.
 pub fn assume_intent(
     s: &mut impl System,
@@ -387,6 +399,60 @@ pub fn view_keys(
         Some(n) if n as usize == keys.len() => Ok(keys),
         _ => Err(unreadable()),
     }
+}
+/// The rows of a view (`ont render`), each a map from a column's header to its cell, unescaped (`\x`
+/// gives `x`); a truncated rendering, or one whose rows differ from its count, is not read.
+pub fn view_rows(
+    s: &mut impl System,
+    store: Option<&str>,
+    view: &str,
+    args: Value,
+) -> Result<Vec<Map<String, Value>>, Failure> {
+    let body = json!({"view": view, "args": args});
+    let v = answer_in(s, store, &["render"], &body, (RETRIES, 30_000))?;
+    let unreadable = || error("store_answer_unreadable", view);
+    if v["truncated"] != false {
+        return Err(fail(
+            "store_answer_unqualified",
+            view,
+            v["truncated"].clone(),
+        ));
+    }
+    let table = v["markdown"].as_str().ok_or_else(unreadable)?;
+    let mut lines = table.lines().skip_while(|l| !l.starts_with("| "));
+    let header = lines.next().and_then(cells).ok_or_else(unreadable)?;
+    if lines.next().is_none_or(|l| !l.starts_with("| --- |")) {
+        return Err(unreadable());
+    }
+    let mut rows = vec![];
+    for line in lines.take_while(|l| l.starts_with("| ")) {
+        let row = cells(line).filter(|r| r.len() == header.len());
+        let row = row.ok_or_else(unreadable)?.into_iter().map(Value::from);
+        rows.push(header.iter().cloned().zip(row).collect());
+    }
+    match v["rows"].as_u64() {
+        Some(n) if n as usize == rows.len() => Ok(rows),
+        _ => Err(unreadable()),
+    }
+}
+/// The cells of a rendered row `| a | b |`, each without the one space on either side.
+fn cells(row: &str) -> Option<Vec<String>> {
+    let mut chars = row.strip_prefix('|')?.strip_suffix('|')?.chars();
+    let (mut all, mut cell) = (vec![], String::new());
+    while let Some(c) = chars.next() {
+        match c {
+            '\\' => cell.push(chars.next()?),
+            '|' => all.push(std::mem::take(&mut cell)),
+            c => cell.push(c),
+        }
+    }
+    all.push(cell);
+    let trim = |c: String| {
+        c.strip_prefix(' ')
+            .and_then(|c| c.strip_suffix(' '))
+            .map(str::to_owned)
+    };
+    all.into_iter().map(trim).collect()
 }
 /// The fields of the head of one object (`kind`, `key`) by `ont get`, each the value or null; `None`
 /// when the store does not have the object (its answer `unavailable`).
