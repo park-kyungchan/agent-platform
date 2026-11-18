@@ -1,13 +1,14 @@
 //! `ap deliver`: one call brings the pair `ap` and content of this repository to the accepted tip
 //! of `main` and leaves its record in the store (README "Delivery"). Every program it starts goes
-//! through `System`; the lock is the only file it holds, `<state>` the only directory it writes.
+//! through `System`; the lock is the only file it holds, `<state>` the only directory it writes,
+//! except that a request with `checkouts` may fast-forward those checkouts (`specs/ap/deliver.md`).
 use crate::host::{Host, LIMIT, System, args, complete_id, digest, id, ont, refused};
 use crate::review::{accepting, field, objects};
 use crate::run::{stamp, write};
 use serde_json::{Value, json};
 use std::{
     cell::RefCell,
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     ffi::OsString,
     fs::{File, OpenOptions},
     io::{Read, Seek, Write},
@@ -18,7 +19,7 @@ use std::{
 };
 
 const MEMBERS: &str =
-    "repository url state build_lock build_wait_seconds by reason past rollback engine";
+    "repository url state build_lock build_wait_seconds by reason past rollback engine checkouts";
 const TARGET: &str = "/usr/local/bin/ap";
 const ENGINE: &str = "/usr/local/bin/ont";
 const MARKER: &str = "migrate.pending";
@@ -69,6 +70,23 @@ fn hex40(s: &str) -> bool {
 fn absolute(p: &str) -> bool {
     let path = Path::new(p);
     path.is_absolute() && !p.contains('\0') && !path.components().any(|c| c == Component::ParentDir)
+}
+/// The member `checkouts`: 1 to 20 distinct absolute paths with no `.` or `..` component, no control
+/// character and no trailing `/`.
+fn checkouts(v: &Value) -> bool {
+    let path = |p: &Value| {
+        p.as_str().is_some_and(|p| {
+            p.len() <= 4096
+                && p.starts_with('/')
+                && !p.ends_with('/')
+                && !p.chars().any(char::is_control)
+                && !p.split('/').any(|part| part == "." || part == "..")
+        })
+    };
+    v.as_array().is_some_and(|a| {
+        let distinct: HashSet<&str> = a.iter().filter_map(Value::as_str).collect();
+        (1..=20).contains(&a.len()) && a.iter().all(path) && distinct.len() == a.len()
+    })
 }
 /// The member that makes the request unusable, if one does.
 fn check(r: &Value) -> Result<(), String> {
@@ -128,6 +146,7 @@ fn check(r: &Value) -> Result<(), String> {
         ),
         ("repository", r.get("engine").is_none() || own != MARKER),
         ("engine", engine),
+        ("checkouts", r.get("checkouts").is_none_or(checkouts)),
     ];
     match checks.iter().find(|(_, ok)| !ok) {
         Some((k, _)) => Err((*k).to_owned()),
@@ -1373,6 +1392,100 @@ fn schema_step(s: &mut impl System, c: &mut Call, tip: &str, from: u64, to: u64)
     }
     Ok(())
 }
+/// One command of the fast-forward on a checkout (`specs/ap/deliver.md` R3): `git` with no optional
+/// lock, no hook and no automatic maintenance; the stdout of a command that exited 0 within `ms`.
+fn at(s: &mut impl System, path: &str, words: &[&str], ms: u64) -> Option<String> {
+    let mut argv = args(&[
+        "--no-optional-locks",
+        "-C",
+        path,
+        "-c",
+        "core.hooksPath=/dev/null",
+        "-c",
+        "gc.auto=0",
+        "-c",
+        "maintenance.auto=false",
+    ]);
+    argv.extend(args(words));
+    run(s, "git", argv, ms)
+}
+/// The commit `spec` names in the checkout: 40 hex digits.
+fn commit_at(s: &mut impl System, path: &str, spec: &str) -> Option<String> {
+    let out = at(s, path, &["rev-parse", "--verify", spec], 30_000)?;
+    Some(out.trim_end().to_owned()).filter(|c| hex40(c))
+}
+/// The steps of one checkout (R3); `from` and `to` are the record's, set where the steps read them.
+fn steps(
+    s: &mut impl System,
+    path: &str,
+    from: &mut Option<String>,
+    to: &mut Option<String>,
+) -> &'static str {
+    let line = |o: Option<String>| o.map(|o| o.strip_suffix('\n').unwrap_or(&o).to_owned());
+    let top = line(at(s, path, &["rev-parse", "--show-toplevel"], 30_000));
+    if top.as_deref() != Some(path) {
+        return "not_a_checkout";
+    }
+    let branch = line(at(
+        s,
+        path,
+        &["symbolic-ref", "--short", "-q", "HEAD"],
+        30_000,
+    ));
+    if branch.as_deref() != Some("main") {
+        return "not_on_main";
+    }
+    match at(
+        s,
+        path,
+        &["status", "--porcelain", "--untracked-files=no"],
+        30_000,
+    ) {
+        None => return "git_failed",
+        Some(changes) if !changes.is_empty() => return "dirty",
+        Some(_) => {}
+    }
+    let refspec = "+refs/heads/main:refs/remotes/origin/main";
+    let fetch = ["fetch", "--quiet", "--no-tags", "origin", refspec];
+    if at(s, path, &fetch, 60_000).is_none() {
+        return "fetch_failed";
+    }
+    *from = commit_at(s, path, "HEAD^{commit}");
+    let Some(head) = from.clone() else {
+        return "git_failed";
+    };
+    let Some(tip) = commit_at(s, path, "refs/remotes/origin/main^{commit}") else {
+        return "git_failed";
+    };
+    if head == tip {
+        *to = Some(head);
+        return "current";
+    }
+    if at(
+        s,
+        path,
+        &["merge-base", "--is-ancestor", &head, &tip],
+        30_000,
+    )
+    .is_none()
+    {
+        return "diverged";
+    }
+    // The read after the merge decides, whatever the merge's exit.
+    let _ = at(s, path, &["merge", "--ff-only", "--quiet", &tip], 600_000);
+    *to = commit_at(s, path, "HEAD^{commit}");
+    if to.as_deref() == Some(tip.as_str()) {
+        "forwarded"
+    } else {
+        "git_failed"
+    }
+}
+/// The record's row of one checkout.
+fn forward(s: &mut impl System, path: &str) -> Value {
+    let (mut from, mut to) = (None, None);
+    let result = steps(s, path, &mut from, &mut to);
+    json!({"path": path, "from": from, "to": to, "result": result})
+}
 fn record() -> Value {
     json!({"at": stamp(SystemTime::now()), "by": null, "repository": null, "target": TARGET, "tip": null,
         "from": null, "end": "refused", "outcome": null, "code": null, "detail": null, "install": null,
@@ -1435,6 +1548,9 @@ pub fn execute(s: &mut impl System, r: &Value) -> (Value, u8) {
         ));
         c.rec["schema"] = Value::Null;
     }
+    if r.get("checkouts").is_some() {
+        c.rec["checkouts"] = Value::Null;
+    }
     (c.rec["by"], c.rec["repository"]) = (c.by.clone(), r["repository"].clone());
     let made = std::fs::create_dir_all(&c.state).is_ok();
     c.lock = take(&var(&c.env, "AP_DELIVER_LOCK", "/run/lock/ap-deliver.lock"));
@@ -1462,6 +1578,17 @@ pub fn execute(s: &mut impl System, r: &Value) -> (Value, u8) {
         (Some("not_started" | "failed_restored"), _) => 3,
         _ => 5,
     };
+    // The fast-forward of the listed checkouts: only after an end `current` or `installed` of a call
+    // that is no rollback, and it changes neither `end`, `code` nor the exit.
+    let ended = matches!(c.rec["end"].as_str(), Some("installed" | "current"));
+    if let (true, None, Some(list)) = (ended, r.get("rollback"), r["checkouts"].as_array()) {
+        let rows: Vec<Value> = list
+            .iter()
+            .filter_map(Value::as_str)
+            .map(|p| forward(s, p))
+            .collect();
+        c.rec["checkouts"] = json!(rows);
+    }
     if made {
         let _ = write(
             &format!("{}/last.json", c.state),
