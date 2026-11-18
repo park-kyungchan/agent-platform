@@ -61,6 +61,10 @@ pub trait System {
     fn now(&self) -> Instant {
         Instant::now()
     }
+    /// The wall-clock time, for a stamp (`now` is monotonic and has no date).
+    fn wall(&self) -> std::time::SystemTime {
+        std::time::SystemTime::now()
+    }
     fn pause(&mut self, duration: Duration) {
         std::thread::sleep(duration);
     }

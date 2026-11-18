@@ -339,6 +339,10 @@ The answer is one JSON object on stdout:
 
 What it does not print: the installed revisions (`deploy/README.md`, "Read the state"), the store's holds, items and rows ("The board"), the host's disk and CPU.
 
+## The CPU quota
+
+`ap quota` takes no argument and no standard input. It reads the host's busy share of all CPUs (`/proc/stat`, ten seconds apart) and the use of the slice that the policy file's member `quota` names (its `cpu.stat`), and sets that slice's runtime `CPUQuota` to what the busy limit leaves after the load outside the slice, held between a floor and a ceiling; it answers one JSON line (`at`, `slice`, `cpus`, `busy`, `slice_use`, `outside`, `before`, `quota`, `set`) and calls only `systemctl show` and one `systemctl set-property --runtime` of that slice. A file without `quota` answers `{"skipped":"no quota"}`. The rules, each pinned by a test of `tests/quota.rs`, are in `specs/ap/quota.md`; the timer and its install are in `deploy/README.md`, "The CPU quota".
+
 ## Delivery
 
 `ap deliver < request.json`, called by a Lead or by the timer `ap-deliver.timer` (`deploy/README.md`), brings the pair `ap` and content of this repository to the fetched tip of `origin/main` when every merge on the way is accepted, records the attempt as an `install` object of the store, rolls the pair back by itself when the installers leave it at no single commit, and prints one JSON record on stdout. A Lead's rollback request undoes the newest install by the same command. It replaces the install by hand of `BUILD-AND-DELIVERY.md` section 5. Its only network call is the fetch; it calls no API of the hosting provider and needs no token.

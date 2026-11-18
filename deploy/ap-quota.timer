@@ -1,0 +1,12 @@
+[Unit]
+Description=ap quota about every 30 seconds
+Documentation=https://github.com/park-kyungchan/agent-platform/blob/main/deploy/README.md
+
+[Timer]
+OnBootSec=1min
+# A turn reads for ten seconds; twenty seconds of rest make a turn about every 30 seconds.
+OnUnitInactiveSec=20s
+AccuracySec=1s
+
+[Install]
+WantedBy=timers.target

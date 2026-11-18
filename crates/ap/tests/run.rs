@@ -5972,6 +5972,26 @@ fn policy_the_record_names_the_file_as_it_was_read() {
     assert_eq!(v["policy"]["sha256"], json!(f.sha("policy.json")));
 }
 
+// spec: specs/ap/quota.md#R14
+#[test]
+fn policy_the_member_quota_is_not_read_by_a_stage() {
+    let mut f = Fake::new();
+    let mut p = f.open_policy();
+    p["quota"] = json!({"slice": "agents.slice", "busy_limit": 85});
+    f.policy_is(&p);
+    let (v, status) = f.run(&f.request("x.md")).unwrap();
+    assert_eq!(status, 0, "{v}");
+    // Not even a `quota` that `ap quota` refuses changes an admission, and a refusal stays what it was.
+    p["quota"] = json!({"slice": "a-b.slice", "other": 1});
+    p["models"]["allowed"] = json!(["haiku"]);
+    f.policy_is(&p);
+    assert_eq!(code(f.run(&f.request("y.md"))), "model_not_allowed@model");
+    p["quota"] = json!("not an object");
+    p["models"]["allowed"] = json!(["sonnet"]);
+    f.policy_is(&p);
+    assert_eq!(f.run(&f.request("z.md")).unwrap().1, 0);
+}
+
 // spec: specs/ap/policy.md#R1
 /// The built binary with the default path replaced only through `AP_POLICY_FILE`: a host file at
 /// `/etc/agent-platform/policy.json` cannot change these answers. The policy is the last check of

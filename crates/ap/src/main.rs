@@ -6,7 +6,7 @@ use serde::Serialize;
 const HELP: &str = "Usage: ap <verb> [< request.json]\n";
 /// Every verb the dispatch below knows: the verb, its request form, the heading of the section of
 /// `crates/ap/README.md` that documents it. `ap --help` prints one line of this table per verb.
-const VERBS: [(&str, &str, &str); 13] = [
+const VERBS: [(&str, &str, &str); 14] = [
     ("version", "version | --version", "The older verbs"),
     ("run", "run < request.json", "One stage"),
     ("gate", "gate < request.json", "The gate"),
@@ -48,6 +48,7 @@ const VERBS: [(&str, &str, &str); 13] = [
         "status [<key> | --term <word>] [--text] [--store <path>]",
         "The status",
     ),
+    ("quota", "quota", "The CPU quota"),
 ];
 fn verb_line(verb: &str, form: &str, heading: &str) -> String {
     format!("  {verb}: ap {form} (README \"{heading}\")\n")
@@ -61,6 +62,7 @@ const STATE_HELP: &str = "Usage: ap state <task directory> [--text]\nPrints the 
 const REQUEST_HELP: &str = "Usage: ap request [--store <path>] [--text] < request.json\nRecords a message of the user as a request of the store with its words, routes it, or lists the current requests of a topic; one JSON answer.\n";
 const INTENT_HELP: &str = "Usage: ap intent [--store <path>] [--text] < request.json\nDrafts, amends, leads, confirms and closes the intent of an objective with its success criteria, or shows it; one JSON answer.\n";
 const STATUS_HELP: &str = "Usage: ap status [<key> | --term <word>] [--text] [--store <path>]\nPrints what is asked, planned, running, waiting and broken from the store alone, one intent or unit in full, or what a word of the life cycle means; reads only.\n";
+const QUOTA_HELP: &str = "Usage: ap quota\nOne turn: sets the runtime CPU quota of the slice the policy file names to what the host's busy limit leaves after the load outside it; one JSON answer.\n";
 const BUILD_REVISION: &str = match option_env!("AP_BUILD_REVISION") {
     Some(value) => value,
     None => "unknown",
@@ -186,6 +188,15 @@ fn main() -> ExitCode {
             };
         }
         return ap::status::cli(&args[1..]);
+    }
+    if args.first().is_some_and(|arg| arg == "quota") {
+        if args.len() == 2 && args[1] == "--help" {
+            return match io::stdout().lock().write_all(QUOTA_HELP.as_bytes()) {
+                Ok(()) => ExitCode::SUCCESS,
+                Err(_) => fail("io_error", "stdout", 4),
+            };
+        }
+        return ap::quota::cli(&args[1..]);
     }
     if args.first().is_some_and(|arg| arg == "deliver") {
         if args.len() == 2 && args[1] == "--help" {
