@@ -1,0 +1,16 @@
+[Unit]
+Description=ap work: start the units of the store that may start now (one dispatch pass)
+Documentation=https://github.com/park-kyungchan/agent-platform/blob/main/deploy/README.md
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/ap work
+# A pass waits up to 120 seconds for the lock of the pass before it, reads the load for ten seconds
+# when the policy has `quota`, and does not wait for the runs it starts.
+TimeoutStartSec=300
+# No Slice=: the pass runs outside the slice it fills. Each run it starts is a transient unit of its
+# own in the slice of the policy's member `work`, not a child of this service.
+# The runs it starts keep HOME and PATH of this service: the stages need the CLIs and every program a
+# stage or an acceptance check calls (see deploy/README.md, "The dispatch pass", for a drop-in).
+Environment=HOME=/root
+Environment=PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin
