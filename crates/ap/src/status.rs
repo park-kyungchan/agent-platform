@@ -89,7 +89,8 @@ fn eq(k: &str, v: &str) -> Value {
 fn any(k: &str, v: &[&str]) -> Value {
     json!({"in": [k, v]})
 }
-/// Every object of `kind` the filter matches, the failure naming the list.
+/// Every object of `kind` the filter matches, over every page; a page that is not qualified is
+/// `store_answer_unqualified` (from `store.rs`), and the failure names the list.
 fn list(
     s: &mut impl System,
     store: Option<&str>,

@@ -411,7 +411,7 @@ fn fixture() -> F {
         "aside",
         "current",
     );
-    let long = "Wide outcome \u{3042}\u{3044}\u{3046} ".repeat(30);
+    let long = "\u{3042}".repeat(100);
     intent(
         &mut f,
         "beta-index",
@@ -843,13 +843,9 @@ fn r6_each_open_intent_is_listed_with_its_criteria_and_units() {
         alpha["units"],
         json!({"draft": 1, "merged": 1, "ready": 1, "running": 1})
     );
-    // 200 bytes at a character boundary: the outcome is a run of three-byte characters.
+    // 200 bytes cut back to a character boundary: 66 characters of three bytes.
     let outcome = alpha["outcome"].as_str().unwrap();
-    assert!(
-        outcome.len() <= 200 && outcome.len() > 196,
-        "{}",
-        outcome.len()
-    );
+    assert_eq!(outcome.len(), 198);
     assert_eq!(alpha["outcome_cut"], true);
     assert!(
         f.objects[&("intent".to_owned(), "alpha-report".to_owned())]["outcome"]
