@@ -9,8 +9,10 @@
 # that unit is stopped or its main process is killed; the policy file of the host is replaced through
 # AP_POLICY_FILE by one of this script's directory that allows its model and its account, and a
 # stage on another model is refused; ONT_ROLE and ONT_AGENT (and with git_author the two author
-# variables) are in the stage's environment. Skipped, saying so, where `systemctl` is
-# absent or this caller cannot start a transient unit in the system manager.
+# variables) are in the stage's environment; a reviewer stage with `limits` under the real `bwrap`
+# cannot write its cwd or another process's root but writes its scratch directory, which is gone
+# after the return. Skipped, saying so, where `systemctl` is absent or this caller cannot start a
+# transient unit in the system manager.
 set -uo pipefail
 ap=$(realpath -- "${1:-${CARGO_TARGET_DIR:-$(cd "$(dirname "$0")/.." && pwd -P)/target}/debug/ap}")
 if ! command -v systemctl > /dev/null || [ ! -d /run/systemd/system ]; then
@@ -19,7 +21,8 @@ fi
 if ! systemd-run --scope --quiet --collect --unit="ap-run-probe-$$" --slice=agents.slice true 2> /dev/null; then
   echo "host-run-scope: skipped (this caller cannot start a transient unit in the system manager)"; exit 0
 fi
-t=$(mktemp -d /tmp/ap-run-XXXXXX); chmod 0755 "$t"
+t=$(mktemp -d "${TMPDIR:-/tmp}/ap-run-XXXXXX") || { echo "host-run-scope: cannot make a directory under ${TMPDIR:-/tmp}" >&2; exit 1; }
+chmod 0755 "$t"
 cleanup() { for p in "$t"/bin/*.pid; do [ -e "$p" ] && kill -KILL "$(cat "$p")" 2> /dev/null; done; rm -rf -- "$t"
   systemctl stop "ap-gate-bind-$$-stop.service" "ap-gate-bind-$$-kill.service" 2> /dev/null; }
 trap cleanup EXIT
@@ -32,6 +35,12 @@ sid=; prev=; for a in "$@"; do case "$prev" in --session-id|--resume) sid=$a ;; 
 printf '{"type":"system","subtype":"init","session_id":"%s","mcp_servers":[]}\n' "$sid"
 # A shell forked into the background that outlives the answer, as a real session's can.
 /bin/bash -c 'echo $$ > "'"$here"'/sleeper.pid"; sleep 600; :' &
+# Under limits $here is read-only: the fake reports its three writes in its answer.
+if [ "$(cat "$here/mode")" = limits ]; then
+  w() { if e=$( (: > "$1") 2>&1 ); then echo "$2 written"; else echo "$2 refused (${e##*: })"; fi; }
+  said="$(w "$PWD/x" cwd); $(w "$TMPDIR/x" scratch); $(w "/proc/1/root$here/x" root)"
+  printf '{"type":"result","subtype":"success","is_error":false,"num_turns":1,"result":"%s","session_id":"%s","usage":{"input_tokens":1,"output_tokens":1},"permission_denials":[]}\n' "$said" "$sid"
+fi
 if [ "$(cat "$here/mode")" = answer ]; then
   printf '{"type":"result","subtype":"success","is_error":false,"num_turns":1,"result":"ready","session_id":"%s","usage":{"input_tokens":1,"output_tokens":1},"permission_denials":[]}\n' "$sid"
 fi
@@ -140,5 +149,22 @@ for how in stop kill; do
     || bad "bind $how: rc=$rc took=${took}s $(cat "$t/d.err") $(field "$t/d$how.md.run.json" state)"
   systemctl stop "$b" 2> /dev/null
 done
+
+# 5. limits (specs/ap/run-limits.md): the real bwrap between the scope and the CLI. Under bwrap the
+#    CLI is a grandchild of ap run, so the check that it is a child of ap run is not made here.
+if ! /usr/bin/bwrap --ro-bind / / true 2> /dev/null; then
+  echo "host-run-scope: limits skipped (/usr/bin/bwrap --ro-bind / / true fails here)"
+else
+  echo limits > "$t/bin/mode"
+  req l.md ",\"limits\":{\"scratch\":\"$t/scratch\"}" | apr > "$t/l.out" 2> "$t/l.err"; rc=$?
+  { [ "$rc" -eq 0 ] && [ "$(field "$t/l.md.run.json" state)" = ok ] && [ ! -e "$t/cwd/x" ] && [ ! -e "$t/bin/x" ] \
+    && [ "$(cat "$t/l.md")" = "cwd refused (Read-only file system); scratch written; root refused (Permission denied)" ]; } \
+    && ok "limits: the cwd and /proc/1/root refused, the scratch directory written: $(cat "$t/l.md")" \
+    || bad "limits: rc=$rc $(cat "$t/l.md" 2> /dev/null) $(tail -c 400 "$t/l.err")"
+  python3 -I -c 'import json,sys; t=sys.argv[1]; l=json.load(open(t+"/l.md.run.json"))["limits"]
+sys.exit(l != {"scratch": t+"/scratch", "writable": [t+"/acct", t+"/scratch"], "bwrap": "/usr/bin/bwrap"})' "$t" \
+    && ok "limits: the record names the scratch directory and the two writable paths" || bad "limits member: $(field "$t/l.md.run.json" limits)"
+  [ ! -e "$t/scratch" ] && ok "limits: the scratch directory is gone after the return" || bad "limits: $t/scratch remains"
+fi
 
 [ "$fails" -eq 0 ] && echo "host-run-scope: PASS" || { echo "host-run-scope: $fails FAILED"; exit 1; }
