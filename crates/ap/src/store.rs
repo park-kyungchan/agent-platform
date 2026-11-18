@@ -294,8 +294,9 @@ actions!(
     end_delegation,
     close_unit_review
 );
-/// Schema version 11 on: an action of `ap unit run` on a unit (`start_unit`, `resume_unit`,
-/// `record_head`, `stop_unit`, `accept_unit`), without a role.
+/// Schema version 11 on: an action of `ap unit run`, `ap unit reject` on a unit (`start_unit`,
+/// `resume_unit`, `record_head`, `stop_unit`, `accept_unit`, `reopen_unit`, `merge_unit`), without a
+/// role.
 pub fn unit_action(
     s: &mut impl System,
     store: Option<&str>,
@@ -306,7 +307,18 @@ pub fn unit_action(
 ) -> Result<Applied, Failure> {
     apply(s, store, actor, action, rid, p)
 }
-/// The Lead proceeds on a draft: the only actions that carry the role `lead`.
+/// `ap unit approve`: the Lead's approval of a unit's accepted head, with the role `lead`.
+pub fn approve_unit(
+    s: &mut impl System,
+    store: Option<&str>,
+    actor: &Actor,
+    rid: String,
+    p: Value,
+    lead: &Lead,
+) -> Result<Applied, Failure> {
+    apply_as(s, store, actor, "approve_unit", rid, p, Some(lead))
+}
+/// The Lead proceeds on a draft: with `approve_unit`, the only actions that carry the role `lead`.
 pub fn assume_intent(
     s: &mut impl System,
     store: Option<&str>,

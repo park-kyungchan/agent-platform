@@ -9,7 +9,7 @@
 //! a temporary directory: no test starts a unit of the service manager or reaches the host's store,
 //! policy file, units, reviews, a clone of the host or the hosting service.
 use ap::host::{Answer, Failure, Host, Reply, System};
-use ap::unit::drive::{Refusal, arguments, execute};
+use ap::unit::drive::{Refusal, arguments, decide, execute};
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 use std::{
@@ -116,6 +116,19 @@ struct F {
     sleepers: Vec<Child>,
     /// The walk: the real engine on a scratch store, instead of the fake store.
     engine: Option<String>,
+    /// The merge of the pull request on the hosting service: its head and its merge commit.
+    merged: Option<(String, String)>,
+    /// What `gh pr merge` does: `ok`, `fail` (nothing merged, the call fails), `unconfirmed` (the call
+    /// succeeds, nothing merged), `cut` (merged, then the store dies).
+    merge_mode: &'static str,
+    /// Every status posted: the head, the state, the description.
+    statuses: Vec<(String, String, String)>,
+    /// The head branch the pull request names.
+    head_ref: String,
+    /// At the run's push, the store dies and the push fails.
+    die_at_push: bool,
+    /// After the validate of `merge_unit`, the unit is dropped by another call.
+    drop_after_validate: bool,
 }
 impl F {
     fn new() -> Self {
@@ -177,10 +190,16 @@ impl F {
             threads: vec![],
             sleepers: vec![],
             engine: None,
+            merged: None,
+            merge_mode: "ok",
+            statuses: vec![],
+            head_ref: format!("unit/{KEY}"),
+            die_at_push: false,
+            drop_after_validate: false,
         };
         f.policy(json!({}));
         f.put("task", "invented-task", json!({"status": "open"}));
-        f.put("intent", "widgets", json!({"status": "confirmed",
+        f.put("intent", "widgets", json!({"status": "confirmed", "lead_session": "lead-1",
             "outcome": "Every invented widget is listed once.", "first_user": "An invented reader."}));
         let earlier = stamp(SystemTime::now() - Duration::from_secs(100));
         f.put("unit", KEY, json!({"lane": "objective", "class": "plain",
@@ -412,6 +431,51 @@ impl F {
         self.alive.insert(unit);
         (self.dead, self.die_at_launch, self.die_after) = (false, None, None);
     }
+    /// `ap unit approve` or `reject` by the session `session`: the answer, or the refusal and `after`.
+    fn decide(
+        &mut self,
+        op: &str,
+        session: &str,
+        mut r: Value,
+    ) -> Result<Value, (Failure, Option<String>)> {
+        for (k, v) in [
+            ("agent", json!("lead")),
+            ("session", json!(session)),
+            ("unit", json!(KEY)),
+        ] {
+            if r.get(k).is_none() {
+                r[k] = v;
+            }
+        }
+        let mut after = None;
+        decide(self, Some(STORE), op, &r, &mut after).map_err(|f| (f, after))
+    }
+    /// The index of the first call that `found` matches.
+    fn first(&self, found: impl Fn(&(String, Vec<String>, Value)) -> bool) -> Option<usize> {
+        self.calls.iter().position(found)
+    }
+    /// The merges: `gh pr merge` calls, and the update's own merges.
+    fn merges(&self) -> (usize, usize) {
+        let gh = self
+            .calls
+            .iter()
+            .filter(|c| c.0 == "gh" && c.1[..2] == ["pr", "merge"]);
+        let own = self
+            .calls
+            .iter()
+            .filter(|c| c.0 == "env" && c.1.iter().any(|a| a == "merge"));
+        (gh.count(), own.count())
+    }
+    fn origin(&self, words: &[&str]) -> String {
+        git(&self.t.join("origin.git"), words)
+    }
+    /// The run made a stage's check after call `from`.
+    fn checks_since(&self, from: usize) -> usize {
+        self.calls[from..]
+            .iter()
+            .filter(|c| c.0 == "systemd-run")
+            .count()
+    }
     fn record(&self, rel: &str) -> Value {
         serde_json::from_slice(&std::fs::read(self.home().join(rel)).unwrap()).unwrap()
     }
@@ -479,6 +543,14 @@ impl F {
         let v = self.engine_call(&["action", "apply", "--client", "walk"], &body);
         assert_eq!(v["outcome"], "applied", "{action}: {v}");
         v
+    }
+    /// `ready_unit` on the walk's unit, with its intent when it has one.
+    fn engine_ready(&mut self) {
+        let mut p = json!({"unit": oid("unit", KEY)});
+        if let Some(i) = self.unit().get("intent").filter(|i| !i.is_null()) {
+            p["intent"] = i.clone();
+        }
+        self.engine_apply("ready_unit", p);
     }
     fn wrap(fields: &Value) -> Value {
         let o = fields.as_object().unwrap().iter();
@@ -581,6 +653,27 @@ impl F {
         )
     }
     fn validate(&mut self, body: &Value) -> Answer {
+        if body["action_type"] == "merge_unit" {
+            let failed = self.merge_failed(&body["parameters"]);
+            let criteria: Vec<Value> = [
+                "unit_not_accepted",
+                "head_differs",
+                "head_not_reviewed",
+                "intent_parameter_required",
+                "held",
+                "not_approved",
+            ]
+            .iter()
+            .map(|c| json!({"code": c, "passed": !failed.contains(c)}))
+            .collect();
+            if self.drop_after_validate {
+                self.set_unit(json!({"state": "dropped", "drop_reason": "an invented drop"}));
+            }
+            return reply(
+                true,
+                &json!({"status": "ok", "result": {"valid": failed.is_empty(), "criteria": criteria, "edits": []}}),
+            );
+        }
         assert_eq!(body["action_type"], "start_unit_review");
         let known = self.objects.contains_key(&k(
             "task",
@@ -600,6 +693,38 @@ impl F {
             &json!({"status": "ok", "result": {"valid": known,
             "criteria": [{"code": "unknown_task", "passed": known}], "edits": edits}}),
         )
+    }
+    /// The criteria of `merge_unit` that fail.
+    fn merge_failed(&self, p: &Value) -> Vec<&'static str> {
+        let u = self.unit();
+        let mut failed = vec![];
+        if u["state"] != "accepted" {
+            failed.push("unit_not_accepted");
+        }
+        if p["head"] != u["head"] {
+            failed.push("head_differs");
+        }
+        if !self.reviewed(&p["head"], &u) {
+            failed.push("head_not_reviewed");
+        }
+        if u["lane"] == "objective" && p["intent"].is_null() {
+            failed.push("intent_parameter_required");
+        }
+        if self.held(&u) {
+            failed.push("held");
+        }
+        if (u["class"] == "contract" || u["class"] == "effect") && u["approved_head"] != p["head"] {
+            failed.push("not_approved");
+        }
+        failed
+    }
+    fn reviewed(&self, head: &Value, u: &Value) -> bool {
+        self.packets().iter().any(|(_, r)| {
+            r["head"] == *head
+                && r["status"] == "closed"
+                && r["verdict"] == "accept"
+                && r["started_at"].as_str() > u["amended_at"].as_str()
+        })
     }
     fn held(&self, u: &Value) -> bool {
         self.objects.iter().any(|((t, _), h)| {
@@ -679,13 +804,7 @@ impl F {
                     if p["head"] != u["head"] {
                         failed.push("head_differs");
                     }
-                    let reviewed = self.packets().iter().any(|(_, r)| {
-                        r["head"] == p["head"]
-                            && r["status"] == "closed"
-                            && r["verdict"] == "accept"
-                            && r["started_at"].as_str() > u["amended_at"].as_str()
-                    });
-                    if !reviewed {
+                    if !self.reviewed(&p["head"], &u) {
                         failed.push("head_not_reviewed");
                     }
                 }
@@ -700,6 +819,58 @@ impl F {
                     self.set_unit(set);
                 }
                 json!([{"change": "update", "id": oid("unit", &unit_key)}])
+            }
+            "reopen_unit" => {
+                if state != "accepted" {
+                    failed.push("unit_not_accepted");
+                }
+                if p["intent"] != u["intent"] {
+                    failed.push("intent_differs");
+                }
+                if self.held(&u) {
+                    failed.push("held");
+                }
+                if failed.is_empty() {
+                    self.set_unit(json!({"state": "running"}));
+                }
+                json!([{"change": "update", "id": oid("unit", KEY)}])
+            }
+            "merge_unit" => {
+                failed = self.merge_failed(p);
+                if failed.is_empty() {
+                    self.set_unit(
+                        json!({"state": "merged", "merged_commit": p["merged_commit"],
+                        "ended_at": now}),
+                    );
+                }
+                json!([{"change": "update", "id": oid("unit", KEY)}])
+            }
+            "approve_unit" => {
+                if state != "accepted" {
+                    failed.push("unit_not_accepted");
+                }
+                if body["role"] != "lead" {
+                    failed.push("not_the_lead");
+                }
+                if p["head"] != u["head"] {
+                    failed.push("head_differs");
+                }
+                let expected = &body["expected"][0];
+                let intent = k(
+                    "intent",
+                    expected["id"]["native_key"].as_str().unwrap_or_default(),
+                );
+                let revision = self.revisions.get(&intent).map(|r| format!("r#{r}"));
+                if revision.as_deref() != expected["revision"].as_str() {
+                    return reply(
+                        false,
+                        &json!({"status": "refused", "code": "revision_conflict"}),
+                    );
+                }
+                if failed.is_empty() {
+                    self.set_unit(json!({"approved_head": p["head"]}));
+                }
+                json!([{"change": "update", "id": oid("unit", KEY)}])
             }
             "start_unit_review" => {
                 let key = Self::made_key(
@@ -799,7 +970,75 @@ impl F {
             }
             ("pr", "view") => {
                 assert_eq!(a[2], "7");
-                ok(json!({"state": self.pr_state, "headRefOid": head}))
+                if self.t.join("bin/gh-down").exists() {
+                    return reply(false, &json!({}));
+                }
+                let (state, head, commit) = match &self.merged {
+                    Some((h, c)) => ("MERGED", json!(h), json!({"oid": c})),
+                    None if self.t.join("bin/pr-closed").exists() => {
+                        ("CLOSED", json!(head), Value::Null)
+                    }
+                    None => (self.pr_state, json!(head), Value::Null),
+                };
+                ok(
+                    json!({"state": state, "headRefOid": head, "headRefName": self.head_ref,
+                    "isCrossRepository": false, "headRepositoryOwner": {"login": "invented"},
+                    "headRepository": {"name": "widgets"}, "mergeCommit": commit}),
+                )
+            }
+            ("pr", "merge") => {
+                let pinned = a
+                    .windows(2)
+                    .find(|w| w[0] == "--match-head-commit")
+                    .unwrap()[1]
+                    .clone();
+                match self.merge_mode {
+                    "fail" => return reply(false, &json!({})),
+                    "unconfirmed" => return ok(json!({})),
+                    _ => {}
+                }
+                let origin = self.t.join("origin.git");
+                let main = git(&origin, &["rev-parse", "refs/heads/main"]);
+                let behind = !Command::new("git")
+                    .arg("-C")
+                    .arg(&origin)
+                    .args(["merge-base", "--is-ancestor", &main, &pinned])
+                    .status()
+                    .unwrap()
+                    .success();
+                if head.as_deref() != Some(pinned.as_str()) || behind || self.merged.is_some() {
+                    return reply(false, &json!({}));
+                }
+                let tree = format!("{pinned}^{{tree}}");
+                let commit = git(
+                    &origin,
+                    &[
+                        "commit-tree",
+                        &tree,
+                        "-p",
+                        &main,
+                        "-p",
+                        &pinned,
+                        "-m",
+                        "Merge pull request #7",
+                    ],
+                );
+                git(&origin, &["update-ref", "refs/heads/main", &commit]);
+                self.merged = Some((pinned, commit));
+                if self.merge_mode == "cut" {
+                    self.dead = true;
+                }
+                ok(json!({}))
+            }
+            ("api", "--method") => {
+                let head = a[3].rsplit('/').next().unwrap().to_owned();
+                let field = |k: &str| {
+                    let f = a.iter().find_map(|w| w.strip_prefix(&format!("{k}=")));
+                    f.unwrap().to_owned()
+                };
+                self.statuses
+                    .push((head, field("state"), field("description")));
+                ok(json!({}))
             }
             ("api", "graphql") => {
                 let query = a.last().unwrap();
@@ -840,6 +1079,14 @@ impl System for F {
         match program {
             "ont" => self.ont(args, input),
             "gh" => self.gh(args),
+            "git" if self.die_at_push && args.iter().any(|a| a == "push") => {
+                self.dead = true;
+                Ok(Reply {
+                    success: false,
+                    bytes: vec![],
+                    stdout: vec![],
+                })
+            }
             "systemctl" => {
                 let unit = args.last().unwrap();
                 let (success, stdout) = match args[0].as_str() {
@@ -926,6 +1173,17 @@ impl System for F {
         self.env.clone()
     }
 }
+/// The code of a refusal of `decide`: the store's first failed criterion, else the code itself.
+fn store_code(f: &Failure) -> String {
+    match f.code {
+        "store_refused" => f.detail["failed"][0]
+            .as_str()
+            .or(f.detail["code"].as_str())
+            .unwrap()
+            .to_owned(),
+        code => code.to_owned(),
+    }
+}
 fn code(e: &Refusal) -> (&str, &str, u8) {
     (e.code.as_str(), e.field.as_str(), e.status)
 }
@@ -977,7 +1235,7 @@ fn r1_the_form_the_role_and_the_actor_of_every_apply() {
     assert!(f.calls.is_empty(), "{:?}", f.calls);
     f.env.pop();
     f.steps(&["implement", "accept"]);
-    assert_eq!(f.ok().0["state"], "accepted");
+    assert_eq!(f.ok().0["state"], "merged");
     let ours: Vec<Value> = f
         .calls
         .iter()
@@ -1134,7 +1392,7 @@ fn r3_the_units_member_and_where_a_run_keeps_its_files() {
     std::fs::create_dir(f.t.join("real-units")).unwrap();
     f.policy(json!({"units": {"directory": f.p("units-link"), "timeouts": {"verifier": 600}}}));
     f.steps(&["implement", "repair", "fix", "accept"]);
-    assert_eq!(f.ok().0["state"], "accepted");
+    assert_eq!(f.ok().0["state"], "merged");
     let home = f.t.join("real-units").join(KEY);
     let mode = |p: &Path| std::fs::metadata(p).unwrap().permissions().mode() & 0o777;
     assert_eq!(mode(&home), 0o700);
@@ -1144,7 +1402,6 @@ fn r3_the_units_member_and_where_a_run_keeps_its_files() {
         .collect();
     for name in [
         "lock",
-        "wt",
         "1.implementer.md",
         "1.implementer.prompt.md",
         "1.implementer.md.run.json",
@@ -1155,11 +1412,10 @@ fn r3_the_units_member_and_where_a_run_keeps_its_files() {
     ] {
         assert!(entries.contains(name), "{name}: {entries:?}");
     }
+    // The worktree was there, and is removed after the merge (R32).
+    assert!(!entries.contains("wt"), "{entries:?}");
     let worktrees = git(&f.t.join("clone"), &["worktree", "list", "--porcelain"]);
-    assert!(
-        worktrees.contains(&format!("worktree {}", home.join("wt").display())),
-        "{worktrees}"
-    );
+    assert!(!worktrees.contains(home.to_str().unwrap()), "{worktrees}");
     // The reports are where `ap unit review` puts them; the verifier's bound is the policy's.
     for (key, r) in f.packets() {
         assert_eq!(r["report"], f.p(&format!("reviews/{key}.md")));
@@ -1192,7 +1448,7 @@ fn r3_the_units_member_and_where_a_run_keeps_its_files() {
 fn r4_the_accounts_of_each_stage_by_the_policy_order() {
     let mut f = F::new();
     f.steps(&["implement", "repair", "fix", "accept"]);
-    assert_eq!(f.ok().0["state"], "accepted");
+    assert_eq!(f.ok().0["state"], "merged");
     let dir = |n: usize| f.launch(n).0.split('|').next().unwrap().to_owned();
     // `claude/implementer` before `claude`; the fixer has the implementer's accounts and resumes on
     // the record's; `claude/reviewer` for the verifier.
@@ -1205,7 +1461,7 @@ fn r4_the_accounts_of_each_stage_by_the_policy_order() {
     let mut f = F::new();
     f.policy(json!({"accounts": {"claude/opus": [f.p("a3")], "claude/fixer": [f.p("a3")]}}));
     f.steps(&["implement", "accept"]);
-    assert_eq!(f.ok().0["state"], "accepted");
+    assert_eq!(f.ok().0["state"], "merged");
     assert_eq!(f.launch(1).0.split('|').next().unwrap(), f.p("a3"));
 }
 
@@ -1230,7 +1486,7 @@ fn r5_one_run_per_unit_by_an_advisory_lock() {
     std::os::unix::fs::symlink(g.t.join("seed"), g.home()).unwrap();
     assert_eq!(code(&g.refusal()), ("worktree_failed", "directory", 2));
     f.steps(&["implement", "accept"]);
-    assert_eq!(f.ok().0["state"], "accepted");
+    assert_eq!(f.ok().0["state"], "merged");
 }
 
 // spec: specs/ap/unit-run.md#R6
@@ -1259,14 +1515,36 @@ fn r6_what_the_state_read_decides() {
     assert_eq!(code(&e), ("held", "unit", 2));
     assert_eq!(e.detail["Until"], "an invented | condition");
     f.objects.remove(&k("hold", "h2"));
-    for (state, want) in [
-        ("draft", "unit_not_runnable"),
-        ("merged", "unit_not_runnable"),
-    ] {
+    for state in ["draft", "done"] {
         f.set_unit(json!({"state": state}));
-        assert_eq!(code(&f.refusal()), (want, "unit", 2));
+        assert_eq!(code(&f.refusal()), ("unit_not_runnable", "unit", 2));
     }
-    f.set_unit(json!({"state": "accepted", "head": "a".repeat(40), "class": "contract"}));
+    // Stopped by the Lead's rejection: answered as it is, nothing applied (exit 3).
+    f.set_unit(json!({"state": "stopped", "stop_cause": "lead_rejected", "stop_detail": "an invented reason"}));
+    let calls = f.actions().len();
+    let a = f.stopped("lead_rejected");
+    assert_eq!(a["stop_detail"], "an invented reason");
+    assert_eq!((f.actions().len(), f.launches), (calls, 0));
+    // A merged or dropped unit: its cleanup only, nothing applied.
+    for state in ["merged", "dropped"] {
+        f.set_unit(json!({"state": state}));
+        let (a, status) = f.ok();
+        assert_eq!((a["state"].as_str(), status), (Some(state), 0), "{a}");
+        assert_eq!(
+            a["cleanup"],
+            json!({"worktree": "nothing", "branch": "nothing"})
+        );
+        assert_eq!(f.actions().len(), calls);
+    }
+    // An accepted unit of class `contract` waits for the Lead's approval: nothing applied.
+    f.set_unit(json!({"state": "ready", "class": "contract", "stop_cause": null}));
+    f.steps(&["implement", "accept"]);
+    let (a, status) = f.ok();
+    assert_eq!(
+        (a["state"].as_str(), a["waits_for"].as_str(), status),
+        (Some("accepted"), Some("approve"), 0),
+        "{a}"
+    );
     let calls = f.actions().len();
     let (a, status) = f.ok();
     assert_eq!(
@@ -1274,9 +1552,10 @@ fn r6_what_the_state_read_decides() {
         (Some("accepted"), Some("approve"), 0)
     );
     assert_eq!(f.actions().len(), calls);
+    let mut f = F::new();
     f.set_unit(json!({"state": "stopped", "head": null}));
     f.steps(&["implement", "accept"]);
-    assert_eq!(f.ok().0["state"], "accepted");
+    assert_eq!(f.ok().0["state"], "merged");
     assert_eq!(f.bodies("resume_unit").len(), 1);
 }
 
@@ -1293,7 +1572,7 @@ fn r7_a_call_killed_during_the_implementer_before_its_pull_request() {
     let rec: Value = serde_json::from_slice(&std::fs::read(&record).unwrap()).unwrap();
     let scope = rec["unit"].as_str().unwrap().to_owned();
     let (a, status) = f.ok();
-    assert_eq!((a["state"].as_str(), status), (Some("accepted"), 0), "{a}");
+    assert_eq!((a["state"].as_str(), status), (Some("merged"), 0), "{a}");
     assert!(
         f.calls
             .iter()
@@ -1345,7 +1624,7 @@ fn r7_a_call_killed_after_the_implementer_opened_its_pull_request() {
     assert_eq!(f.refusal().status, 3);
     f.cut(&f.home().join("1.implementer.md.run.json"));
     let (a, _) = f.ok();
-    assert_eq!(a["state"], "accepted", "{a}");
+    assert_eq!(a["state"], "merged", "{a}");
     let (line, prompt) = f.launch(2);
     assert!(
         line.contains("--resume") && prompt.ends_with(CONTINUE),
@@ -1372,7 +1651,7 @@ fn r7_a_call_killed_during_the_fixer_resumes_the_repair() {
             a["repairs"].as_u64(),
             a["rounds"].as_u64()
         ),
-        (Some("accepted"), Some(1), Some(2)),
+        (Some("merged"), Some(1), Some(2)),
         "{a}"
     );
     let (line, prompt) = f.launch(4);
@@ -1401,7 +1680,7 @@ fn r7_a_call_killed_during_the_verifier_abandons_its_review() {
     f.cut(&record);
     let session = f.session_of(2);
     let (a, _) = f.ok();
-    assert_eq!(a["state"], "accepted", "{a}");
+    assert_eq!(a["state"], "merged", "{a}");
     let first = &f.objects[&k("review", &key)];
     assert_eq!(
         (&first["verdict"], &first["session"]),
@@ -1424,7 +1703,7 @@ fn r7_a_review_started_and_never_run_closes_with_the_recovery_session() {
     let (key, _) = f.packets()[0].clone();
     std::fs::remove_file(f.t.join(format!("reviews/{key}.md.run.json"))).unwrap();
     let (a, _) = f.ok();
-    assert_eq!(a["state"], "accepted", "{a}");
+    assert_eq!(a["state"], "merged", "{a}");
     assert_eq!(
         f.objects[&k("review", &key)]["session"],
         format!("u-{KEY}:recovery")
@@ -1443,7 +1722,7 @@ fn r7_a_call_killed_between_two_applies_goes_on() {
     let (a, _) = f.ok();
     assert_eq!(
         (a["state"].as_str(), f.launches),
-        (Some("accepted"), 2),
+        (Some("merged"), 2),
         "{a}"
     );
     assert_eq!(f.bodies("record_head").len(), 1);
@@ -1454,10 +1733,13 @@ fn r7_a_call_killed_between_two_applies_goes_on() {
 fn r8_the_base_is_one_commit_and_the_worktree_is_guarded() {
     let mut f = F::new();
     f.steps(&["implement", "accept"]);
-    assert_eq!(f.ok().0["state"], "accepted");
+    let (a, _) = f.ok();
+    assert_eq!(a["state"], "merged");
+    // The base of the round is the commit `main` was when the run merged into it.
+    let merged = a["merged_commit"].as_str().unwrap();
     let base = git(
-        &f.t.join("clone"),
-        &["rev-parse", "refs/remotes/origin/main"],
+        &f.t.join("origin.git"),
+        &["rev-parse", &format!("{merged}^1")],
     );
     assert_eq!(f.bodies("start_unit_review")[0]["parameters"]["base"], base);
     // No git command of the run names `origin/main`.
@@ -1580,10 +1862,17 @@ fn r12_a_head_pushed_from_another_clone_is_fast_forwarded_and_judged_anew() {
     let (a, _) = f.ok();
     assert_eq!(
         (a["state"].as_str(), a["head"].as_str()),
-        (Some("accepted"), Some(pushed.as_str())),
+        (Some("merged"), Some(pushed.as_str())),
         "{a}"
     );
-    assert_eq!(git(&f.wt(), &["rev-parse", "HEAD"]), pushed);
+    let merged = a["merged_commit"].as_str().unwrap();
+    assert_eq!(
+        git(
+            &f.t.join("origin.git"),
+            &["rev-parse", &format!("{merged}^2")]
+        ),
+        pushed
+    );
     assert!(f.calls.iter().any(|c| c.0 == "git"
         && c.1.ends_with(&[
             "merge".into(),
@@ -1620,7 +1909,7 @@ fn r13_a_stop_amended_and_run_again_gives_the_author_one_turn() {
     let (a, _) = f.ok();
     assert_eq!(
         (a["state"].as_str(), a["rounds"].as_u64()),
-        (Some("accepted"), Some(1)),
+        (Some("merged"), Some(1)),
         "{a}"
     );
     let (line, prompt) = f.launch(2);
@@ -1640,7 +1929,7 @@ fn r14_the_writers_hold_every_session_of_every_author_attempt() {
     std::fs::write(f.t.join("bin/mode-a1"), "limit45").unwrap();
     f.steps(&["", "implement", "repair", "fix", "accept"]);
     let (a, _) = f.ok();
-    assert_eq!(a["state"], "accepted", "{a}");
+    assert_eq!(a["state"], "merged", "{a}");
     let rec = f.record("1.implementer.md.run.json");
     let sessions: Vec<Value> = rec["attempts"]
         .as_array()
@@ -1663,14 +1952,203 @@ fn r14_the_writers_hold_every_session_of_every_author_attempt() {
 }
 
 // spec: specs/ap/unit-run.md#R15
+// spec: specs/ap/unit-run.md#R26
+// spec: specs/ap/unit-run.md#R28
+// spec: specs/ap/unit-run.md#R23
 #[test]
-fn r15_a_head_behind_main_stops() {
+fn r15_a_head_behind_main_is_updated_by_the_runs_own_merge() {
     let mut f = F::new();
-    f.steps(&["implement", "repair", "nothing"]);
+    f.steps(&["implementmain", "accept"]);
+    let (a, status) = f.ok();
+    assert_eq!(
+        (a["state"].as_str(), a["updates"].as_u64(), status),
+        (Some("merged"), Some(1), 0),
+        "{a}"
+    );
+    let head = a["head"].as_str().unwrap();
+    // The update's merge: the implementer's head first, the base second, by the run's own name.
+    let implemented = f.bodies("record_head")[0]["parameters"]["head"].clone();
+    assert_eq!(
+        json!(f.origin(&["rev-parse", &format!("{head}^1")])),
+        implemented
+    );
+    let shown = f.origin(&["log", "-1", "--format=%s|%an <%ae>|%cn <%ce>", head]);
+    assert_eq!(
+        shown,
+        format!(
+            "Merge origin/main into unit/{KEY} (ap unit run)|ap unit run <ap-unit@agents.invalid>|ap unit run <ap-unit@agents.invalid>"
+        )
+    );
+    // R28: the writers gain the update's word before the push, recorded with the head it merged.
+    let word = json!(format!("u-{KEY}:update"));
+    let worded = |b: &Value| {
+        b["action_type"] == "record_head"
+            && b["parameters"]["writers"]
+                .as_array()
+                .unwrap()
+                .contains(&word)
+    };
+    let heads = f.bodies("record_head");
+    let with = heads.iter().find(|b| worded(b)).expect("the update's word");
+    assert_eq!(with["parameters"]["head"], implemented);
+    let recorded = f.first(|c| c.0 == "ont" && worded(&c.2)).unwrap();
+    let push = f
+        .first(|c| c.0 == "git" && c.1.iter().any(|w| w == "push"))
+        .unwrap();
+    assert!(recorded < push);
+    let to = format!("HEAD:refs/heads/unit/{KEY}");
+    assert_eq!(
+        f.calls[push].1[3..],
+        ["push", "--quiet", "origin", to.as_str()]
+    );
+    // The new head has no verdict: a round in a new session.
+    assert!(f.launch(2).0.contains("--session-id"));
+    assert_eq!(f.merges(), (1, 1));
+}
+
+// spec: specs/ap/unit-run.md#R26
+// spec: specs/ap/unit-run.md#R30
+#[test]
+fn r26_a_conflict_with_main_stops_and_the_updates_are_bounded() {
+    let mut f = F::new();
+    f.steps(&["implementclash", "accept"]);
+    let a = f.stopped("merge_conflict");
+    assert!(
+        a["stop_detail"]
+            .as_str()
+            .unwrap()
+            .contains("src/widgets.rs"),
+        "{a}"
+    );
+    assert_eq!(git(&f.wt(), &["status", "--porcelain"]), "");
+    assert!(f.packets().is_empty());
+    // The same stop on the next call, until the Lead amends the unit or drops it.
+    f.set_unit(json!({"state": "stopped"}));
+    f.stopped("merge_conflict");
+    assert_eq!(f.launches, 1);
+    // `main` moved under each look: five updates in one call, then `update_limit`.
+    let mut f = F::new();
+    let mut steps = vec!["implement"];
+    steps.extend(["acceptmain"; 6]);
+    f.steps(&steps);
+    let a = f.stopped("update_limit");
+    assert_eq!((a["updates"].as_u64(), f.launches), (Some(5), 7), "{a}");
+    let causes: Vec<Value> = f
+        .bodies("reopen_unit")
+        .iter()
+        .map(|b| b["parameters"]["cause"].clone())
+        .collect();
+    assert_eq!(causes, vec![json!("main_moved"); 6]);
+    // Each look after an update is the same verifier's, the round naming the merge.
+    for n in 3..=7 {
+        let (line, prompt) = f.launch(n);
+        assert!(
+            line.contains(&format!("--resume {}", f.session_of(2))),
+            "{n}: {line}"
+        );
+        assert!(
+            prompt.contains("What moved it: a merge of origin/main\n"),
+            "{prompt}"
+        );
+    }
+    assert_eq!(f.merges(), (0, 5));
+}
+
+// spec: specs/ap/unit-run.md#R12
+// spec: specs/ap/unit-run.md#R27
+#[test]
+fn r27_a_call_cut_between_its_merge_and_its_push_is_continued() {
+    let mut f = F::new();
+    f.steps(&["implementmain", "accept"]);
+    f.die_at_push = true;
+    assert_eq!(f.refusal().status, 3);
+    (f.dead, f.die_at_push) = (false, false);
+    assert_eq!(f.unit()["state"], "running");
+    let left = git(&f.wt(), &["rev-parse", "HEAD"]);
+    assert_ne!(json!(left), json!(f.origin_head()));
+    let (a, _) = f.ok();
+    assert_eq!(
+        (a["state"].as_str(), a["updates"].as_u64()),
+        (Some("merged"), Some(1)),
+        "{a}"
+    );
+    // The merge the cut call left is pushed, not made again.
+    assert_eq!(a["head"], left);
+    assert_eq!(f.merges(), (1, 1));
+    // A merge commit of another message (one made by hand) is its author's to settle.
+    let mut f = F::new();
+    f.steps(&["implement", "repair", "nothing", "settle", "accept"]);
+    f.stopped("repair_refused");
+    f.push_from_elsewhere("main", "src/main-moved.rs");
+    git(&f.t.join("clone"), &["fetch", "--quiet", "origin"]);
+    git(
+        &f.wt(),
+        &[
+            "merge",
+            "--no-ff",
+            "--quiet",
+            "-m",
+            "A merge by hand",
+            "refs/remotes/origin/main",
+        ],
+    );
+    f.set_unit(json!({"state": "stopped"}));
+    let (a, _) = f.ok();
+    assert_eq!(
+        (a["state"].as_str(), a["updates"].as_u64()),
+        (Some("merged"), Some(0)),
+        "{a}"
+    );
+    let (line, prompt) = f.launch(4);
+    assert!(
+        line.contains("--resume") && prompt.ends_with(CONTINUE),
+        "{line}"
+    );
+    assert_eq!(f.merges(), (1, 0));
+}
+
+// spec: specs/ap/unit-run.md#R29
+// spec: specs/ap/unit-run.md#R19
+#[test]
+fn r29_a_head_judged_repair_goes_to_its_author_before_the_update() {
+    let mut f = F::new();
+    f.steps(&["implement", "repair", "nothing", "fix", "accept"]);
     f.stopped("repair_refused");
     f.push_from_elsewhere("main", "src/main-moved.rs");
     f.set_unit(json!({"state": "stopped"}));
-    f.stopped("behind_main");
+    let from = f.calls.len();
+    let (a, _) = f.ok();
+    assert_eq!(
+        (
+            a["state"].as_str(),
+            a["updates"].as_u64(),
+            a["rounds"].as_u64()
+        ),
+        (Some("merged"), Some(1), Some(2)),
+        "{a}"
+    );
+    // The fixer first; the update merges the fixer's head; the check ran only on the new head.
+    let (line, prompt) = f.launch(4);
+    assert!(
+        line.contains("--resume") && prompt.contains(FIXER),
+        "{line}"
+    );
+    let head = a["head"].as_str().unwrap();
+    assert_eq!(
+        f.origin(&["log", "-1", "--format=%s", &format!("{head}^1")]),
+        "fix 4"
+    );
+    assert_eq!(f.checks_since(from), 1);
+    // The verifier who asked for the repair looks again, the round naming both moves.
+    let (line, prompt) = f.launch(5);
+    assert!(
+        line.contains(&format!("--resume {}", f.session_of(2))),
+        "{line}"
+    );
+    assert!(
+        prompt.contains("What moved it: the author's repair and a merge of origin/main\n"),
+        "{prompt}"
+    );
 }
 
 // spec: specs/ap/unit-run.md#R16
@@ -1736,7 +2214,7 @@ fn r18_two_repairs_inside_one_call_and_the_third_is_the_limit() {
             a["rounds"].as_u64(),
             a["repairs"].as_u64()
         ),
-        (Some("accepted"), 0, Some(3), Some(2)),
+        (Some("merged"), 0, Some(3), Some(2)),
         "{a}"
     );
     let rounds: Vec<u64> = a["reviews"]
@@ -1771,7 +2249,7 @@ fn r19_a_report_without_the_form_abandons_the_review() {
     assert_eq!(f.packets()[0].1["verdict"], "abandoned");
     f.set_unit(json!({"state": "stopped"}));
     let (a, _) = f.ok();
-    assert_eq!(a["state"], "accepted");
+    assert_eq!(a["state"], "merged");
     // The abandoned review's session is not asked again.
     assert!(f.launch(3).0.contains("--session-id"));
     let start = f.bodies("start_unit_review");
@@ -1874,19 +2352,48 @@ fn r25_the_answer() {
             "rounds",
             "repairs",
             "reviews",
-            "waits_for"
+            "updates",
+            "merged_commit",
+            "cleanup"
         ])
     );
     assert_eq!(
-        (a["waits_for"].as_str(), a["head"].clone()),
-        (Some("merge"), json!(f.origin_head()))
+        (
+            a["state"].as_str(),
+            a["head"].clone(),
+            a["updates"].as_u64()
+        ),
+        (Some("merged"), json!(f.origin_head()), Some(0))
+    );
+    assert_eq!(
+        a["merged_commit"],
+        f.origin(&["rev-parse", "refs/heads/main"])
     );
     let r = &a["reviews"][0];
     assert_eq!(
         (&r["round"], &r["head"], &r["verdict"]),
         (&json!(1), &a["head"], &json!("accept"))
     );
-    assert_eq!(f.unit()["state"], "accepted");
+    assert_eq!(f.unit()["state"], "merged");
+    // A unit of class `effect` waits for the approval: `waits_for`, exit 0.
+    let mut f = F::new();
+    f.set_unit(json!({"class": "effect"}));
+    f.steps(&["implement", "accept"]);
+    let (a, status) = f.ok();
+    assert_eq!(
+        (a["state"].as_str(), a["waits_for"].as_str(), status),
+        (Some("accepted"), Some("approve"), 0)
+    );
+    assert!(a.get("cleanup").is_none() && a.get("refused").is_none());
+    assert!(a["merged_commit"].is_null());
+    // A refusal that leaves the unit accepted: `refused`, exit 3, no `waits_for`.
+    f.pr_state = "CLOSED";
+    let (a, status) = f.ok();
+    assert_eq!(
+        (a["state"].as_str(), a["refused"].as_str(), status),
+        (Some("accepted"), Some("pull_request_not_open"), 3)
+    );
+    assert!(a.get("waits_for").is_none());
     // The binary prints a refusal with the key.
     let out = Command::new(env!("CARGO_BIN_EXE_ap"))
         .args(["unit", "run", "Bad"])
@@ -1913,7 +2420,7 @@ fn r23_the_run_stops_only_units_of_a_stage_its_records_name() {
     let names = f.alive.clone();
     let before = f.calls.len();
     f.steps(&["implement", "accept", "accept"]);
-    assert_eq!(f.ok().0["state"], "accepted");
+    assert_eq!(f.ok().0["state"], "merged");
     let stopped: Vec<&String> = f.calls[before..]
         .iter()
         .filter(|c| c.0 == "systemctl" && c.1[0] == "stop")
@@ -1933,10 +2440,550 @@ fn r23_the_run_stops_only_units_of_a_stage_its_records_name() {
     );
 }
 
+// spec: specs/ap/unit-run.md#R18
+// spec: specs/ap/unit-run.md#R30
+// spec: specs/ap/unit-run.md#R31
+// spec: specs/ap/unit-run.md#R32
+#[test]
+fn r30_a_plain_unit_is_merged_in_the_call_that_accepts_it() {
+    let mut f = F::new();
+    f.steps(&["implement", "accept"]);
+    let (a, status) = f.ok();
+    assert_eq!((a["state"].as_str(), status), (Some("merged"), 0), "{a}");
+    let (head, merged) = (
+        a["head"].as_str().unwrap(),
+        a["merged_commit"].as_str().unwrap(),
+    );
+    assert_eq!(f.unit()["merged_commit"], merged);
+    // What delivery needs: two parents, the tree of the second, a closed accepting review of it
+    // with the repository and a report whose digest it holds.
+    let parents = f.origin(&["rev-list", "--parents", "-n", "1", merged]);
+    assert_eq!(parents.split(' ').count(), 3);
+    assert_eq!(f.origin(&["rev-parse", &format!("{merged}^2")]), head);
+    assert_eq!(
+        f.origin(&["rev-parse", &format!("{merged}^{{tree}}")]),
+        f.origin(&["rev-parse", &format!("{head}^{{tree}}")])
+    );
+    let (key, r) = f.packets().pop().unwrap();
+    assert_eq!(
+        (&r["status"], &r["verdict"], &r["head"], &r["repository"]),
+        (
+            &json!("closed"),
+            &json!("accept"),
+            &json!(head),
+            &json!("invented/widgets")
+        )
+    );
+    let report = std::fs::read(r["report"].as_str().unwrap()).unwrap();
+    assert_eq!(r["report_sha256"], format!("{:x}", Sha256::digest(&report)));
+    // R31: validated, then the status on the head, then the merge pinned to the head, then applied.
+    let validate = f
+        .first(|c| c.0 == "ont" && c.1[1] == "validate" && c.2["action_type"] == "merge_unit")
+        .unwrap();
+    let posted = f.first(|c| c.0 == "gh" && c.1[1] == "--method").unwrap();
+    let merge = f.first(|c| c.0 == "gh" && c.1[1] == "merge").unwrap();
+    let applied = f
+        .first(|c| c.0 == "ont" && c.1[1] == "apply" && c.2["action_type"] == "merge_unit")
+        .unwrap();
+    assert!(validate < posted && posted < merge && merge < applied);
+    assert_eq!(
+        f.calls[validate].2["parameters"]["merged_commit"],
+        "0".repeat(40)
+    );
+    assert_eq!(
+        f.calls[validate].2["request_id"],
+        f.calls[applied].2["request_id"]
+    );
+    assert_eq!(
+        f.calls[applied].2["parameters"]["intent"],
+        oid("intent", "widgets")
+    );
+    assert!(
+        f.calls[merge]
+            .1
+            .ends_with(&["--match-head-commit".into(), head.to_owned()])
+    );
+    let want = (
+        head.to_owned(),
+        "success".into(),
+        format!("review {key} accept"),
+    );
+    assert_eq!(f.statuses, [want]);
+    // R32: the one worktree and the one branch.
+    assert_eq!(
+        a["cleanup"],
+        json!({"worktree": "removed", "branch": "removed"})
+    );
+    assert!(!f.wt().exists() && f.home().join("1.implementer.md").exists());
+    let branches = git(&f.t.join("clone"), &["branch", "--list"]);
+    assert!(!branches.contains(KEY), "{branches}");
+    assert!(!f.actions().contains(&"approve_unit".to_owned()));
+    // A second call on the merged unit finds nothing more to remove.
+    let (a, status) = f.ok();
+    assert_eq!(
+        (a["cleanup"].clone(), status),
+        (json!({"worktree": "nothing", "branch": "nothing"}), 0)
+    );
+}
+
+// spec: specs/ap/unit-run.md#R30
+// spec: specs/ap/unit-run.md#R33
+#[test]
+fn r30_a_contract_unit_waits_for_the_approval_of_the_lead() {
+    let mut f = F::new();
+    f.set_unit(json!({"class": "contract"}));
+    f.steps(&["implement", "accept"]);
+    let (a, _) = f.ok();
+    assert_eq!(a["waits_for"], "approve", "{a}");
+    let head = a["head"].clone();
+    // Another session than the intent's Lead: refused before any apply.
+    let calls = f.actions().len();
+    let r = json!({"request_id": "ap-1", "head": head, "reason": "Read the diff."});
+    let (e, after) = f.decide("approve", "someone-else", r.clone()).unwrap_err();
+    assert_eq!(
+        (e.code, e.field.as_str(), &e.detail, after),
+        ("not_the_lead", "session", &json!("lead-1"), None)
+    );
+    assert_eq!(f.actions().len(), calls);
+    let answer = f.decide("approve", "lead-1", r).unwrap();
+    assert_eq!(
+        (&answer["outcome"], &answer["approved_head"]),
+        (&json!("applied"), &head)
+    );
+    let body = f.bodies("approve_unit")[0].clone();
+    assert_eq!(
+        (&body["role"], &body["request_id"], &body["session"]),
+        (&json!("lead"), &json!("ap-1-approve"), &json!("lead-1"))
+    );
+    assert_eq!(body["expected"][0]["id"]["native_key"], "widgets");
+    // The merge by the next call.
+    let (a, status) = f.ok();
+    assert_eq!((a["state"].as_str(), status), (Some("merged"), 0), "{a}");
+    assert_eq!(f.merges(), (1, 0));
+}
+
+// spec: specs/ap/unit-run.md#R30
+#[test]
+fn r30_a_call_cut_between_the_merge_and_merge_unit_merges_once() {
+    let mut f = F::new();
+    f.merge_mode = "cut";
+    f.steps(&["implement", "accept"]);
+    assert_eq!(f.refusal().status, 3);
+    (f.dead, f.merge_mode) = (false, "ok");
+    assert_eq!(f.unit()["state"], "accepted");
+    let (a, status) = f.ok();
+    assert_eq!((a["state"].as_str(), status), (Some("merged"), 0), "{a}");
+    assert_eq!(a["merged_commit"], json!(f.merged.as_ref().unwrap().1));
+    assert_eq!(a["cleanup"]["worktree"], "removed");
+    assert_eq!(f.merges(), (1, 0));
+    // Merged by hand on another head, or closed: nothing applied, the unit stays accepted.
+    let mut f = F::new();
+    f.set_unit(json!({"class": "contract"}));
+    f.steps(&["implement", "accept"]);
+    let (a, _) = f.ok();
+    let calls = f.actions().len();
+    f.merged = Some(("c".repeat(40), "d".repeat(40)));
+    let (b, status) = f.ok();
+    assert_eq!(
+        (b["state"].as_str(), b["refused"].as_str(), status),
+        (Some("accepted"), Some("pull_request_not_open"), 3)
+    );
+    // Merged by hand with the head, without the approval: `merge_unit` is refused.
+    f.merged = Some((a["head"].as_str().unwrap().into(), "d".repeat(40)));
+    let (b, status) = f.ok();
+    assert_eq!(
+        (b["state"].as_str(), b["refused"].as_str(), status),
+        (Some("accepted"), Some("not_approved"), 3),
+        "{b}"
+    );
+    assert_eq!(f.actions()[calls..], ["merge_unit"]);
+    assert!(f.statuses.is_empty() && f.wt().exists());
+}
+
+// spec: specs/ap/unit-run.md#R30
+// spec: specs/ap/unit-run.md#R19
+#[test]
+fn r30_a_head_or_main_moved_under_an_accepted_unit() {
+    // A head pushed from outside: reopened `head_moved`, judged anew by a new session.
+    let mut f = F::new();
+    f.set_unit(json!({"class": "contract"}));
+    f.steps(&["implement", "accept", "accept"]);
+    assert_eq!(f.ok().0["waits_for"], "approve");
+    let pushed = f.push_from_elsewhere(&format!("unit/{KEY}"), "src/widgets.rs");
+    let (a, _) = f.ok();
+    assert_eq!(
+        (
+            a["state"].as_str(),
+            a["head"].as_str(),
+            a["rounds"].as_u64()
+        ),
+        (Some("accepted"), Some(pushed.as_str()), Some(2)),
+        "{a}"
+    );
+    assert_eq!(
+        f.bodies("reopen_unit")[0]["parameters"]["cause"],
+        "head_moved"
+    );
+    assert!(f.launch(3).0.contains("--session-id"));
+    // `main` moved: reopened `main_moved`, updated, and the same verifier looks again.
+    let mut f = F::new();
+    f.set_unit(json!({"class": "contract"}));
+    f.steps(&["implement", "accept", "accept"]);
+    let (a, _) = f.ok();
+    f.push_from_elsewhere("main", "src/main-moved.rs");
+    let (b, _) = f.ok();
+    assert_eq!(
+        (b["state"].as_str(), b["updates"].as_u64()),
+        (Some("accepted"), Some(1)),
+        "{b}"
+    );
+    assert_eq!(
+        f.bodies("reopen_unit")[0]["parameters"]["cause"],
+        "main_moved"
+    );
+    let (line, prompt) = f.launch(3);
+    assert!(
+        line.contains(&format!("--resume {}", f.session_of(2))),
+        "{line}"
+    );
+    let round = format!(
+        "Head judged before: {}\nWhat moved it: a merge of origin/main\n",
+        a["head"].as_str().unwrap()
+    );
+    assert!(prompt.contains(&round), "{prompt}");
+    // `main` moved again and a hold on the unit: the reopen is refused, the unit stays accepted.
+    f.push_from_elsewhere("main", "src/main-moved-again.rs");
+    f.put(
+        "hold",
+        "h1",
+        json!({"status": "active", "effect": "no work", "unit": oid("unit", KEY)}),
+    );
+    let (c, status) = f.ok();
+    assert_eq!(
+        (c["state"].as_str(), c["refused"].as_str(), status),
+        (Some("accepted"), Some("held"), 3)
+    );
+}
+
+// spec: specs/ap/unit-run.md#R31
+// spec: specs/ap/unit-run.md#R22
+#[test]
+fn r31_a_merge_refused_at_the_validate_or_not_made() {
+    // A hold set after the approval: refused at the validate, nothing posted or merged.
+    let mut f = F::new();
+    f.set_unit(json!({"class": "contract"}));
+    f.steps(&["implement", "accept"]);
+    let (a, _) = f.ok();
+    let r = json!({"request_id": "ap-2", "head": a["head"], "reason": "Read."});
+    f.decide("approve", "lead-1", r).unwrap();
+    f.put(
+        "hold",
+        "h1",
+        json!({"status": "active", "effect": "no merge", "intent": oid("intent", "widgets")}),
+    );
+    let (b, status) = f.ok();
+    assert_eq!(
+        (b["state"].as_str(), b["refused"].as_str(), status),
+        (Some("accepted"), Some("held"), 3)
+    );
+    assert!(f.statuses.is_empty() && f.merges() == (0, 0));
+    assert!(!f.actions().contains(&"merge_unit".to_owned()));
+    // A merge that failed: `lead-review` posted again as `failure`; the next call merges.
+    let mut f = F::new();
+    f.merge_mode = "fail";
+    f.steps(&["implement", "accept"]);
+    let (a, status) = f.ok();
+    assert_eq!(
+        (a["state"].as_str(), a["refused"].as_str(), status),
+        (Some("accepted"), Some("merge_failed"), 3)
+    );
+    let states: Vec<&str> = f.statuses.iter().map(|s| s.1.as_str()).collect();
+    assert_eq!(states, ["success", "failure"]);
+    assert!(f.statuses.iter().all(|s| json!(s.0) == a["head"]));
+    f.merge_mode = "ok";
+    assert_eq!(f.ok().0["state"], "merged");
+    // A merge not confirmed: the unit stays accepted, no failure posted.
+    let mut f = F::new();
+    f.merge_mode = "unconfirmed";
+    f.steps(&["implement", "accept"]);
+    let (a, status) = f.ok();
+    assert_eq!(
+        (a["refused"].as_str(), status),
+        (Some("merge_unconfirmed"), 3)
+    );
+    assert_eq!(f.statuses.len(), 1);
+}
+
+// spec: specs/ap/unit-run.md#R35
+// spec: specs/ap/unit-run.md#R32
+#[test]
+fn r35_a_drop_between_the_validate_and_merge_unit() {
+    let mut f = F::new();
+    f.drop_after_validate = true;
+    f.steps(&["implement", "accept"]);
+    let (a, status) = f.ok();
+    assert_eq!(
+        (a["state"].as_str(), a["refused"].as_str(), status),
+        (Some("dropped"), Some("unit_not_accepted"), 3),
+        "{a}"
+    );
+    assert_eq!(a["merged_commit"], json!(f.merged.as_ref().unwrap().1));
+    assert!(a.get("cleanup").is_none() && f.wt().exists());
+    // The next call does the cleanup of the dropped unit: its branch is in `main`.
+    f.drop_after_validate = false;
+    let (a, status) = f.ok();
+    assert_eq!(
+        (a["cleanup"].clone(), status),
+        (json!({"worktree": "removed", "branch": "removed"}), 0)
+    );
+}
+
+// spec: specs/ap/unit-run.md#R32
+#[test]
+fn r32_the_cleanup_of_a_dropped_unit_and_of_a_worktree_that_is_not_clean() {
+    // Dropped with uncommitted work: the worktree goes with the drop; the branch is not in `main`.
+    let mut f = F::new();
+    f.steps(&["implement", "repair", "nothing"]);
+    f.stopped("repair_refused");
+    std::fs::write(f.wt().join("stray.txt"), "x").unwrap();
+    f.set_unit(json!({"state": "dropped"}));
+    let calls = f.actions().len();
+    let (a, status) = f.ok();
+    assert_eq!(status, 0);
+    assert_eq!(
+        a["cleanup"],
+        json!({"worktree": "removed", "branch": "kept", "branch_reason": "not merged into main",
+            "pull_request_open": 7})
+    );
+    assert_eq!(f.actions().len(), calls);
+    let branches = git(&f.t.join("clone"), &["branch", "--list"]);
+    assert!(branches.contains(KEY), "{branches}");
+    assert!(
+        f.calls
+            .iter()
+            .any(|c| c.0 == "git" && c.1.contains(&"--force".to_owned()))
+    );
+    // Merged, with a worktree that is not clean: it stays, and so does its branch.
+    let mut f = F::new();
+    f.steps(&["implement", "repair", "nothing"]);
+    f.stopped("repair_refused");
+    std::fs::write(f.wt().join("stray.txt"), "x").unwrap();
+    f.set_unit(json!({"state": "merged"}));
+    let (a, status) = f.ok();
+    assert_eq!(
+        (a["cleanup"]["worktree"].as_str(), status),
+        (Some("worktree_kept"), 0)
+    );
+    assert_eq!(a["cleanup"]["branch"], "kept");
+    assert!(a["cleanup"].get("pull_request_open").is_none());
+    assert!(f.wt().join("stray.txt").exists());
+    // A link at the worktree's path is not followed: nothing behind it is removed.
+    let mut f = F::new();
+    f.steps(&["implement", "repair", "nothing"]);
+    f.stopped("repair_refused");
+    std::fs::rename(f.wt(), f.t.join("moved")).unwrap();
+    std::os::unix::fs::symlink(f.t.join("moved"), f.wt()).unwrap();
+    f.set_unit(json!({"state": "dropped"}));
+    let (a, _) = f.ok();
+    assert_eq!(
+        (&a["cleanup"]["worktree"], &a["cleanup"]["worktree_reason"]),
+        (&json!("worktree_kept"), &json!("not a directory"))
+    );
+    assert!(f.t.join("moved/src/widgets.rs").exists());
+}
+
+// spec: specs/ap/unit-run.md#R33
+// spec: specs/ap/unit-run.md#R35
+#[test]
+fn r33_approve_checks_its_request_the_lead_and_the_lock() {
+    let mut f = F::new();
+    let head = "a".repeat(40);
+    for (r, field) in [
+        (
+            json!({"request_id": "x", "head": head, "reason": "r", "extra": 1}),
+            "extra",
+        ),
+        (
+            json!({"request_id": "x", "head": "HEAD", "reason": "r"}),
+            "head",
+        ),
+        (
+            json!({"request_id": "x", "head": head, "reason": "r", "unit": "../b"}),
+            "unit",
+        ),
+        (
+            json!({"request_id": "x y", "head": head, "reason": "r"}),
+            "request_id",
+        ),
+        (
+            json!({"request_id": "x", "head": head, "reason": "r".repeat(601)}),
+            "reason",
+        ),
+    ] {
+        let (e, _) = f.decide("approve", "lead-1", r).unwrap_err();
+        assert_eq!((e.code, e.field.as_str()), ("invalid_input", field));
+    }
+    assert!(f.calls.is_empty() && !f.t.join("units").exists());
+    // The lock of a run refuses it; a unit of the lane `small` has no intent.
+    std::fs::create_dir_all(f.home()).unwrap();
+    let held = std::fs::OpenOptions::new()
+        .create(true)
+        .truncate(false)
+        .write(true)
+        .open(f.home().join("lock"))
+        .unwrap();
+    held.try_lock().unwrap();
+    let r = json!({"request_id": "x", "head": head, "reason": "r"});
+    let (e, _) = f.decide("approve", "lead-1", r.clone()).unwrap_err();
+    assert_eq!(e.code, "unit_run_active");
+    drop(held);
+    f.set_unit(json!({"lane": "small", "intent": null}));
+    let (e, _) = f.decide("approve", "lead-1", r.clone()).unwrap_err();
+    assert_eq!(e.code, "no_intent");
+    let (e, _) = f
+        .decide(
+            "reject",
+            "lead-1",
+            json!({"request_id": "x", "reason": "r"}),
+        )
+        .unwrap_err();
+    assert_eq!(e.code, "no_intent");
+    assert!(f.actions().is_empty());
+    // The store's refusal passes on: a unit that is not accepted.
+    f.set_unit(json!({"lane": "objective", "intent": oid("intent", "widgets")}));
+    let (e, after) = f.decide("approve", "lead-1", r).unwrap_err();
+    assert_eq!((store_code(&e), after), ("unit_not_accepted".into(), None));
+    // The binary: `usage` for another argument, the refusal with `after` and `unit`.
+    let out = Command::new(env!("CARGO_BIN_EXE_ap"))
+        .args(["unit", "approve", "x"])
+        .env_remove("ONT_ROLE")
+        .stdin(std::process::Stdio::null())
+        .output()
+        .unwrap();
+    let e: Value = serde_json::from_slice(&out.stderr).unwrap();
+    assert_eq!(
+        (out.status.code(), &e["error"]["code"]),
+        (Some(2), &json!("usage"))
+    );
+}
+
+// spec: specs/ap/unit-run.md#R34
+// spec: specs/ap/unit-run.md#R6
+#[test]
+fn r34_reject_reopens_and_stops_the_unit_and_revokes_the_status() {
+    let mut f = F::new();
+    f.set_unit(json!({"class": "contract"}));
+    f.steps(&["implement", "accept"]);
+    let (a, _) = f.ok();
+    let reason = "The list shows a widget twice.";
+    // Checked before anything: a reason over 1,000 bytes; the role in the environment.
+    let long = json!({"request_id": "rj", "reason": "x".repeat(1001)});
+    let (e, _) = f.decide("reject", "lead-1", long).unwrap_err();
+    assert_eq!((e.code, e.field.as_str()), ("invalid_input", "reason"));
+    f.env.push(("ONT_ROLE".into(), "lead".into()));
+    let r = json!({"request_id": "rj", "reason": reason});
+    let (e, _) = f.decide("reject", "lead-1", r.clone()).unwrap_err();
+    assert_eq!(e.code, "role_in_environment");
+    f.env.pop();
+    let (e, _) = f.decide("reject", "lead-2", r.clone()).unwrap_err();
+    assert_eq!(e.code, "not_the_lead");
+    // A call cut between its two applies is completed by its repeat.
+    f.refuse = Some(("stop_unit", "unit_not_running"));
+    let (e, after) = f.decide("reject", "lead-1", r.clone()).unwrap_err();
+    assert_eq!(
+        (store_code(&e), after.as_deref()),
+        ("unit_not_running".into(), Some("reopen"))
+    );
+    assert_eq!(f.unit()["state"], "running");
+    f.refuse = None;
+    let answer = f.decide("reject", "lead-1", r).unwrap();
+    assert_eq!(
+        (&answer["state"], &answer["lead_review"]),
+        (&json!("stopped"), &json!("failure"))
+    );
+    let reopen = f.bodies("reopen_unit");
+    assert_eq!(reopen.len(), 2);
+    assert_eq!(
+        (&reopen[0]["request_id"], &reopen[0]["parameters"]["cause"]),
+        (&json!("rj-reopen"), &json!("rejected by the Lead"))
+    );
+    let stop = f.bodies("stop_unit").pop().unwrap();
+    assert_eq!(
+        (
+            &stop["request_id"],
+            &stop["parameters"]["cause"],
+            &stop["parameters"]["detail"]
+        ),
+        (&json!("rj-stop"), &json!("lead_rejected"), &json!(reason))
+    );
+    assert!(stop.get("role").is_none());
+    let last = f.statuses.last().unwrap();
+    assert_eq!(
+        (json!(last.0), last.1.as_str()),
+        (a["head"].clone(), "failure")
+    );
+    // R6: the run takes no rejected unit up again.
+    let (calls, launches) = (f.actions().len(), f.launches);
+    let b = f.stopped("lead_rejected");
+    assert_eq!(b["stop_detail"], reason);
+    assert_eq!((f.actions().len(), f.launches), (calls, launches));
+    // An approved head is not rejected.
+    let mut f = F::new();
+    f.set_unit(json!({"class": "contract"}));
+    f.steps(&["implement", "accept"]);
+    let (a, _) = f.ok();
+    let r = json!({"request_id": "ok", "head": a["head"], "reason": "Read."});
+    f.decide("approve", "lead-1", r).unwrap();
+    let (e, _) = f
+        .decide(
+            "reject",
+            "lead-1",
+            json!({"request_id": "rj", "reason": "No."}),
+        )
+        .unwrap_err();
+    assert_eq!(e.code, "approved");
+    assert!(f.bodies("reopen_unit").is_empty());
+}
+
+// spec: specs/ap/unit-run.md#R10
+#[test]
+fn r10_a_branch_taken_by_its_pull_request_must_be_that_ones_head_branch() {
+    let mut f = F::new();
+    f.steps(&["implement", "repair", "nothing", "fix", "accept"]);
+    f.stopped("repair_refused");
+    let wt = f.p(&format!("units/{KEY}/wt"));
+    git(&f.t.join("clone"), &["worktree", "remove", "--force", &wt]);
+    f.head_ref = "someone/else".into();
+    f.set_unit(json!({"state": "stopped"}));
+    f.stopped("branch_in_use");
+    assert!(!f.wt().exists());
+    f.head_ref = format!("unit/{KEY}");
+    f.set_unit(json!({"state": "stopped"}));
+    assert_eq!(f.ok().0["state"], "merged");
+}
+
+// spec: specs/ap/unit-run.md#R20
+#[test]
+fn r20_the_read_after_a_verifier_includes_the_state_and_its_failure_closes_the_review() {
+    let mut f = F::new();
+    f.steps(&["implement", "close"]);
+    f.stopped("verifier_wrote");
+    assert_eq!(f.packets()[0].1["verdict"], "abandoned");
+    let mut f = F::new();
+    f.steps(&["implement", "ghdown"]);
+    f.stopped("github_unreadable");
+    let r = &f.packets()[0].1;
+    assert_eq!(
+        (&r["verdict"], &r["session"]),
+        (&json!("abandoned"), &json!(f.session_of(2)))
+    );
+}
+
 /// One walk by the real engine of `ontology/ENGINE-PIN` on a scratch store, the fake CLI and the fakes of
 /// the hosting service above: `AP_UNIT_RUN_TEMPLATE` names a directory whose `store.sqlite` holds the
 /// schema of this repository, installed from a copy redirected as `ontology/rehearsal.sh` redirects it,
-/// and the `ready` unit `widgets-list` of the lane `small`. Each walk prints one line.
+/// and the `ready` unit `widgets-list` (of the lane `objective`, class `plain`, under a confirmed intent
+/// whose plan is reviewed and whose Lead session is `lead-1`). Each walk prints one line.
 #[test]
 #[ignore = "the walk: needs the pinned engine and a scratch store named by AP_UNIT_RUN_TEMPLATE"]
 fn walk_with_the_real_engine() {
@@ -1969,7 +3016,7 @@ fn walk_with_the_real_engine() {
     let (_, a) = walk("one-repair", &["implement", "repair", "fix", "accept"]);
     assert_eq!(
         (a["state"].as_str(), a["repairs"].as_u64()),
-        (Some("accepted"), Some(1)),
+        (Some("merged"), Some(1)),
         "{a}"
     );
     let (_, a) = walk(
@@ -1978,7 +3025,7 @@ fn walk_with_the_real_engine() {
     );
     assert_eq!(
         (a["state"].as_str(), a["repairs"].as_u64()),
-        (Some("accepted"), Some(2)),
+        (Some("merged"), Some(2)),
         "{a}"
     );
     let (_, a) = walk(
@@ -1997,7 +3044,7 @@ fn walk_with_the_real_engine() {
     f.push_from_elsewhere(&format!("unit/{KEY}"), "src/widgets.rs");
     let (a, _) = f.ok();
     line("pushed-elsewhere", &f, &a);
-    assert_eq!(a["state"], "accepted", "{a}");
+    assert_eq!(a["state"], "merged", "{a}");
     assert!(f.launch(4).0.contains("--session-id"));
     // Stopped `acceptance_failed`, amended, made ready and run again.
     let mut f = F::engine();
@@ -2006,7 +3053,7 @@ fn walk_with_the_real_engine() {
         "amend_unit",
         json!({"unit": oid("unit", KEY), "acceptance": failing}),
     );
-    f.engine_apply("ready_unit", json!({"unit": oid("unit", KEY)}));
+    f.engine_ready();
     f.steps(&["implement", "fix", "accept"]);
     let (a, _) = f.ok();
     line("acceptance-failed", &f, &a);
@@ -2017,10 +3064,10 @@ fn walk_with_the_real_engine() {
         "amend_unit",
         json!({"unit": oid("unit", KEY), "acceptance": passing}),
     );
-    f.engine_apply("ready_unit", json!({"unit": oid("unit", KEY)}));
+    f.engine_ready();
     let (a, _) = f.ok();
     line("amended-and-run-again", &f, &a);
-    assert_eq!(a["state"], "accepted", "{a}");
+    assert_eq!(a["state"], "merged", "{a}");
     assert!(f.launch(2).1.ends_with(CONTINUE));
     // Calls killed during a stage, each followed by a call that goes on.
     for (name, steps, at, record) in [
@@ -2073,7 +3120,7 @@ fn walk_with_the_real_engine() {
                 .map(|(_, r)| (r["verdict"].clone(), r["session"].clone()))
                 .collect::<Vec<_>>()
         );
-        assert_eq!(a["state"], "accepted", "{name} {a}");
+        assert_eq!(a["state"], "merged", "{name} {a}");
     }
     // A take-over refused by a hold; a branch named `main`; a pull request closed under a running unit.
     let mut f = F::engine();
@@ -2097,7 +3144,7 @@ fn walk_with_the_real_engine() {
         "amend_unit",
         json!({"unit": oid("unit", KEY), "branch": "main"}),
     );
-    f.engine_apply("ready_unit", json!({"unit": oid("unit", KEY)}));
+    f.engine_ready();
     let e = f.refusal();
     println!(
         "walk branch-main: refusal {} {} store state {}",
@@ -2114,5 +3161,170 @@ fn walk_with_the_real_engine() {
     assert_eq!(
         (a["stop_cause"].as_str(), f.launches),
         (Some("pull_request_not_open"), launches)
+    );
+}
+
+/// The walk of the update, the merge, `approve`, `reject` and the cleanup by the real engine on the
+/// scratch store of `walk_with_the_real_engine` (its unit of the lane `objective`, class `plain`, under
+/// an intent whose Lead session is `lead-1`). Each walk prints one line.
+#[test]
+#[ignore = "the walk: needs the pinned engine and a scratch store named by AP_UNIT_RUN_TEMPLATE"]
+fn walk_the_merge_with_the_real_engine() {
+    let line = |name: &str, f: &F, a: &Value, status: u8| {
+        println!(
+            "walk {name}: state={} exit={status} updates={} merged_commit={} refused={} waits_for={} cause={} cleanup={} launches={} merges={:?}",
+            a["state"],
+            a["updates"],
+            a["merged_commit"].as_str().map_or("null", |c| &c[..7]),
+            a["refused"],
+            a["waits_for"],
+            a["stop_cause"],
+            a["cleanup"],
+            f.launches,
+            f.merges()
+        );
+    };
+    let run = |name: &str, f: &mut F| {
+        let (a, status) = f.ok();
+        line(name, f, &a, status);
+        a
+    };
+    // A unit of class `contract` made ready again: amended, its page reviewed, ready.
+    let contract = |f: &mut F| {
+        f.engine_apply(
+            "amend_unit",
+            json!({"unit": oid("unit", KEY), "class": "contract"}),
+        );
+        std::thread::sleep(Duration::from_millis(1100));
+        let p = json!({"task": oid("task", "ontology-operational-base"), "kind": "page", "head": "e".repeat(64),
+            "model": "walk", "effort": "high", "prompt": f.p("PROMPT.md"), "prompt_sha256": "b".repeat(64),
+            "unit": oid("unit", KEY)});
+        let started = f.engine_apply("start_unit_review", p);
+        let review = started["edits"][0]["id"].clone();
+        f.engine_apply("close_unit_review", json!({"review": review, "verdict": "accept",
+            "session": "walk-page-reviewer", "report": f.p("REPORT.md"), "unit": oid("unit", KEY), "report_sha256": "c".repeat(64)}));
+        let intent = f.unit()["intent"].clone();
+        f.engine_apply(
+            "ready_unit",
+            json!({"unit": oid("unit", KEY), "intent": intent}),
+        );
+    };
+    // A plain unit merged in one call, its worktree gone.
+    let mut f = F::engine();
+    f.steps(&["implement", "accept"]);
+    let a = run("plain-merged", &mut f);
+    assert_eq!(
+        (a["state"].as_str(), f.wt().exists()),
+        (Some("merged"), false)
+    );
+    let m = a["merged_commit"].as_str().unwrap();
+    let head = a["head"].as_str().unwrap();
+    assert_eq!(f.origin(&["rev-parse", &format!("{m}^2")]), head);
+    assert_eq!(
+        f.origin(&["rev-parse", &format!("{m}^{{tree}}")]),
+        f.origin(&["rev-parse", &format!("{head}^{{tree}}")])
+    );
+    // A contract unit that waits, an approval by another session refused, the Lead's, the merge.
+    let mut f = F::engine();
+    contract(&mut f);
+    f.steps(&["implement", "accept"]);
+    let a = run("contract-waits", &mut f);
+    assert_eq!(a["waits_for"], "approve");
+    let r = json!({"request_id": "walk-approve", "head": a["head"], "reason": "Read the diff."});
+    let (e, _) = f.decide("approve", "someone-else", r.clone()).unwrap_err();
+    println!("walk approve-by-another: {} {}", e.code, e.detail);
+    assert_eq!(e.code, "not_the_lead");
+    let answer = f.decide("approve", "lead-1", r).unwrap();
+    println!("walk approve-by-the-lead: {answer}");
+    let a = run("contract-merged", &mut f);
+    assert_eq!(a["state"], "merged");
+    // `main` moved under a running unit.
+    let mut f = F::engine();
+    f.steps(&["implementmain", "accept"]);
+    let a = run("main-moved-running", &mut f);
+    assert_eq!(
+        (a["state"].as_str(), a["updates"].as_u64()),
+        (Some("merged"), Some(1))
+    );
+    // `main` moved, then a head pushed from outside, under an accepted unit.
+    let mut f = F::engine();
+    contract(&mut f);
+    f.steps(&["implement", "accept", "accept", "accept"]);
+    run("before-main-moves", &mut f);
+    f.push_from_elsewhere("main", "src/main-moved.rs");
+    let a = run("main-moved-accepted", &mut f);
+    assert_eq!(
+        (a["state"].as_str(), a["updates"].as_u64()),
+        (Some("accepted"), Some(1))
+    );
+    assert!(f.launch(3).0.contains("--resume"));
+    f.push_from_elsewhere(&format!("unit/{KEY}"), "src/widgets.rs");
+    let a = run("head-pushed-accepted", &mut f);
+    assert_eq!(a["state"], "accepted");
+    assert!(f.launch(4).0.contains("--session-id"));
+    // A call cut between the merge on the hosting service and `merge_unit`.
+    let mut f = F::engine();
+    f.merge_mode = "cut";
+    f.steps(&["implement", "accept"]);
+    let e = f.refusal();
+    println!("walk cut-after-merge: first call {} {}", e.code, e.status);
+    (f.dead, f.merge_mode) = (false, "ok");
+    let a = run("cut-after-merge", &mut f);
+    assert_eq!((a["state"].as_str(), f.merges()), (Some("merged"), (1, 0)));
+    // A call cut between the run's merge and its push.
+    let mut f = F::engine();
+    f.die_at_push = true;
+    f.steps(&["implementmain", "accept"]);
+    let e = f.refusal();
+    println!("walk cut-before-push: first call {} {}", e.code, e.status);
+    (f.dead, f.die_at_push) = (false, false);
+    let a = run("cut-before-push", &mut f);
+    assert_eq!((a["state"].as_str(), f.merges()), (Some("merged"), (1, 1)));
+    // A merge refused by a hold at the validate.
+    let mut f = F::engine();
+    contract(&mut f);
+    f.steps(&["implement", "accept"]);
+    let a = run("hold-before", &mut f);
+    let r = json!({"request_id": "walk-approve-2", "head": a["head"], "reason": "Read."});
+    f.decide("approve", "lead-1", r).unwrap();
+    f.engine_apply(
+        "set_hold_on",
+        json!({"task": oid("task", "ontology-operational-base"),
+        "effect": "no merge", "until": "the walk ends", "unit": oid("unit", KEY)}),
+    );
+    let a = run("hold-at-validate", &mut f);
+    assert_eq!(a["refused"], "held");
+    assert!(f.statuses.is_empty() && f.merges() == (0, 0));
+    // `reject`, then a run that takes nothing up.
+    let mut f = F::engine();
+    contract(&mut f);
+    f.steps(&["implement", "accept"]);
+    run("reject-before", &mut f);
+    let r = json!({"request_id": "walk-reject", "reason": "The list shows a widget twice."});
+    let answer = f.decide("reject", "lead-1", r).unwrap();
+    println!("walk reject: {answer}");
+    let a = run("rejected-run", &mut f);
+    assert_eq!(a["stop_cause"], "lead_rejected");
+    // The cleanup of a dropped unit with uncommitted work, and of a worktree that is not clean.
+    let mut f = F::engine();
+    f.steps(&["implement", "repair", "nothing"]);
+    run("drop-before", &mut f);
+    std::fs::write(f.wt().join("stray.txt"), "x").unwrap();
+    f.engine_apply(
+        "drop_unit",
+        json!({"unit": oid("unit", KEY), "reason": "The walk drops it."}),
+    );
+    let a = run("dropped-cleanup", &mut f);
+    assert_eq!(a["cleanup"]["worktree"], "removed");
+    let mut f = F::engine();
+    f.merge_mode = "cut";
+    f.steps(&["implement", "accept"]);
+    let _ = f.refusal();
+    (f.dead, f.merge_mode) = (false, "ok");
+    std::fs::write(f.wt().join("stray.txt"), "x").unwrap();
+    let a = run("not-clean-cleanup", &mut f);
+    assert_eq!(
+        (a["state"].as_str(), a["cleanup"]["worktree"].as_str()),
+        (Some("merged"), Some("worktree_kept"))
     );
 }
