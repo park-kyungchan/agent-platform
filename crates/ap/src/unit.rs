@@ -60,6 +60,7 @@ macro_rules! ensure {
 }
 mod case;
 mod compose;
+pub mod drive;
 pub mod object;
 pub mod page_review;
 pub mod render;
@@ -1152,6 +1153,9 @@ fn claimed(
 pub fn cli(argv: &[OsString]) -> ExitCode {
     if argv.first().is_some_and(|w| w == "review") {
         return page_review::cli(&argv[1..]);
+    }
+    if argv.first().is_some_and(|w| w == "run") {
+        return drive::cli(&argv[1..]);
     }
     if argv
         .first()

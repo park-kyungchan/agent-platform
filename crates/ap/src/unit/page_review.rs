@@ -104,7 +104,7 @@ struct Ending {
 }
 
 /// A key the verb takes (R2): 1 to 80 ASCII letters, digits and `-`.
-fn key_ok(k: &str) -> bool {
+pub(super) fn key_ok(k: &str) -> bool {
     (1..=80).contains(&k.len()) && k.bytes().all(|c| c.is_ascii_alphanumeric() || c == b'-')
 }
 fn key<'a>(v: &'a Value, field: &str) -> Result<&'a str, Failure> {
@@ -289,7 +289,7 @@ fn invalid(member: &str, why: &str) -> Failure {
 }
 /// The member `reviews` of the host's policy file, each member checked (R4, R5); empty without a
 /// file or without the member.
-fn policy(s: &impl System) -> Result<Map<String, Value>, Failure> {
+pub(super) fn policy(s: &impl System) -> Result<Map<String, Value>, Failure> {
     let Some(file) = s.policy_file() else {
         return Ok(Map::new());
     };
@@ -849,7 +849,7 @@ fn answer(
     Ok((a, if e.verdict == "abandoned" { 3 } else { 0 }))
 }
 /// The name `ap run` gives a stage's unit: `ap-run-<36 of 0-9a-f->.scope` (R16).
-fn stage_unit(name: &str) -> bool {
+pub(super) fn stage_unit(name: &str) -> bool {
     let id = name
         .strip_prefix("ap-run-")
         .and_then(|r| r.strip_suffix(".scope"));
@@ -858,7 +858,7 @@ fn stage_unit(name: &str) -> bool {
 }
 /// Whether `systemctl is-active` answers a state in which nothing of the unit lives, after a stop
 /// when `stop`.
-fn unit_ended(s: &mut impl System, unit: &str, stop: bool) -> bool {
+pub(super) fn unit_ended(s: &mut impl System, unit: &str, stop: bool) -> bool {
     let words = |w: &[&str]| w.iter().map(|w| (*w).to_owned()).collect::<Vec<String>>();
     if stop {
         let _ = s.call("systemctl", &words(&["stop", unit]), &Value::Null, 60_000);
