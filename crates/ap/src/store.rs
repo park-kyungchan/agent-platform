@@ -1,7 +1,7 @@
-//! Every call of `ap request`, `ap intent` and the unit object (`ap unit add|amend|ready|drop|page`) to
-//! the store engine `ont`: one function per action they apply and one per read. An answer `store_busy` is asked again up to five times after a short wait;
-//! nothing else is. Also the request form both verbs share: the arguments, the members and their shapes.
-use crate::host::{Failure, LIMIT, System, error, fail, id, ont};
+//! Every call of `ap request`, `ap intent`, the stage runner and the unit object (`ap unit
+//! add|amend|ready|drop|page`) to the store engine `ont`: one function per action they apply and one
+//! per read. An answer `store_busy` is asked again up to five times after a short wait; nothing else is. Also the request form both verbs share: the arguments, the members and their shapes.
+use crate::host::{Failure, LIMIT, System, error, fail, id, ont_within};
 use serde_json::{Map, Value, json};
 use std::{ffi::OsString, io::Read, time::Duration};
 
@@ -25,33 +25,44 @@ pub struct Lead {
     pub intent: Value,
     pub revision: String,
 }
-/// One call; a `store_busy` answer is called again, at most five more times.
+/// One call bound to 30 seconds; a `store_busy` answer is called again, at most five more times.
 fn call(
     s: &mut impl System,
     store: Option<&str>,
     command: &[&str],
     body: &Value,
 ) -> Result<Value, Failure> {
-    let v = answer(s, store, command, body)?;
+    call_in(s, store, command, body, (RETRIES, 30_000))
+}
+/// One call with its own `(retries, milliseconds)`: the stage runner makes one attempt of 15 seconds.
+fn call_in(
+    s: &mut impl System,
+    store: Option<&str>,
+    command: &[&str],
+    body: &Value,
+    within: (usize, u64),
+) -> Result<Value, Failure> {
+    let v = answer_in(s, store, command, body, within)?;
     if !v["result"].is_object() {
         return Err(error("store_answer_unreadable", command[0]));
     }
     Ok(v)
 }
 /// One call whose answer is `ok`, with or without a `result` object (`render` has none).
-fn answer(
+fn answer_in(
     s: &mut impl System,
     store: Option<&str>,
     command: &[&str],
     body: &Value,
+    (retries, ms): (usize, u64),
 ) -> Result<Value, Failure> {
     let ctx = json!({ "store": store });
     let mut tries = 0;
     loop {
-        let reply = ont(s, &ctx, command, body)?;
+        let reply = ont_within(s, &ctx, command, body, ms)?;
         let v: Value = serde_json::from_slice(&reply.bytes)
             .map_err(|_| error("store_answer_unreadable", command[0]))?;
-        if v["code"] == "store_busy" && tries < RETRIES {
+        if v["code"] == "store_busy" && tries < retries {
             tries += 1;
             s.pause(WAIT);
             continue;
@@ -119,6 +130,9 @@ pub fn body(actor: &Actor, action: &str, request_id: String, parameters: Value) 
 /// One apply of a whole action request.
 fn send(s: &mut impl System, store: Option<&str>, body: &Value) -> Result<Applied, Failure> {
     let v = call(s, store, &["action", "apply", "--client", "ap"], body)?;
+    applied(&v)
+}
+fn applied(v: &Value) -> Result<Applied, Failure> {
     let outcome = v["result"]["outcome"].as_str().unwrap_or_default();
     let edits = v["result"]["edits"].as_array();
     match (outcome, edits) {
@@ -127,6 +141,55 @@ fn send(s: &mut impl System, store: Option<&str>, body: &Value) -> Result<Applie
             edits: edits.clone(),
         }),
         _ => Err(error("store_answer_unreadable", "action")),
+    }
+}
+/// The stage runner's own action (`specs/ap/run-object.md`): one attempt bound to 15 seconds, as the
+/// agent `ap-run` with the stage's `role`.
+fn once(
+    s: &mut impl System,
+    store: Option<&str>,
+    action: &str,
+    (rid, role, parameters): (&str, &str, &Value),
+) -> Result<Applied, Failure> {
+    let body = json!({"action_type": action, "request_id": rid, "agent": "ap-run", "role": role,
+        "parameters": parameters});
+    let v = call_in(
+        s,
+        store,
+        &["action", "apply", "--client", "ap"],
+        &body,
+        (0, 15_000),
+    )?;
+    applied(&v)
+}
+/// Schema version 11 on: a `running` run of a stage.
+pub fn start_run(
+    s: &mut impl System,
+    store: Option<&str>,
+    call: (&str, &str, &Value),
+) -> Result<Applied, Failure> {
+    once(s, store, "start_run", call)
+}
+/// Schema version 11 on: the run closed with the stage's end.
+pub fn close_run(
+    s: &mut impl System,
+    store: Option<&str>,
+    call: (&str, &str, &Value),
+) -> Result<Applied, Failure> {
+    once(s, store, "close_run", call)
+}
+/// True only when one `ont get` of the object answers `unavailable`; any other answer or failure of
+/// that read (one attempt of 15 seconds) is not an absence.
+pub fn absent(s: &mut impl System, store: Option<&str>, kind: &str, key: &str) -> bool {
+    let body = json!({ "id": id(kind, key) });
+    let reply = call_in(s, store, &["get"], &body, (0, 15_000));
+    matches!(reply, Err(f) if f.code == REFUSED && f.detail["code"] == "unavailable")
+}
+/// The code of a failed call: the engine's for a refusal, else the failure's own.
+pub fn code_of(f: &Failure) -> String {
+    match f.code == REFUSED {
+        true => f.detail["code"].as_str().unwrap_or(REFUSED).to_owned(),
+        false => f.code.to_owned(),
     }
 }
 pub fn record_request(
@@ -266,7 +329,8 @@ pub fn view_keys(
     view: &str,
     args: Value,
 ) -> Result<Vec<String>, Failure> {
-    let v = answer(s, store, &["render"], &json!({"view": view, "args": args}))?;
+    let body = json!({"view": view, "args": args});
+    let v = answer_in(s, store, &["render"], &body, (RETRIES, 30_000))?;
     let unreadable = || error("store_answer_unreadable", view);
     if v["truncated"] != false {
         return Err(fail(
