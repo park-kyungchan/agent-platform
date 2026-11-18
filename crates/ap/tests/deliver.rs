@@ -169,6 +169,10 @@ struct W {
     marker_at_install: Vec<Option<String>>,
     /// `git ls-tree` of the tip fails.
     ls_tree_fails: bool,
+    /// The checkouts a request's `checkouts` names, as the fake models them; with `real_git` the
+    /// commands of a checkout run the real `git` instead.
+    cos: Vec<Co>,
+    real_git: bool,
 }
 
 impl W {
@@ -250,6 +254,8 @@ impl W {
             schema_noop: false,
             marker_at_install: vec![],
             ls_tree_fails: false,
+            cos: vec![],
+            real_git: false,
         };
         w.lock = w.p("deliver.lock");
         for n in 1..=k {
@@ -460,7 +466,10 @@ impl W {
             sha(&content(commit, "skills/a/SKILL.md"))
         )
     }
-    fn git(&mut self, a: &[String]) -> Answer {
+    fn git(&mut self, a: &[String], ms: u64) -> Answer {
+        if a[0] == "--no-optional-locks" {
+            return self.checkout(a, ms);
+        }
         let clone = self.p("state/r");
         let eclone = self.p("state/engine");
         if a[0] == "init" && a[2] == eclone {
@@ -712,7 +721,7 @@ impl System for W {
             };
         }
         match program {
-            "git" => self.git(a),
+            "git" => self.git(a, ms),
             "ont" => self.store(a, body),
             "df" => {
                 assert_eq!(a, args(&["-BM", "--output=avail", &self.p("state")]));
@@ -3879,4 +3888,670 @@ fn e_schema_with_an_unreadable_migrate_entry_installs_nothing() {
     assert_eq!((w.schema, v["schema"]["migrate"].clone()), (9, json!("ok")));
     assert_eq!(w.migrates.len(), 1);
     assert_eq!(w.marker(), None);
+}
+
+// ---- D2 `checkouts`: the fast-forward of the host's main checkouts ----------------------------------
+
+/// One checkout as the fake models it. `fails` names the commands that exit non-zero (`toplevel`,
+/// `branch`, `status`, `fetch`, `head`, `tip`, `merge-base`, `merge`, `after`: the read after the
+/// merge); `after` is what that read prints once a merge was called.
+#[derive(Clone)]
+struct Co {
+    path: String,
+    top: String,
+    branch: String,
+    dirty: bool,
+    head: String,
+    tip: String,
+    after: String,
+    fails: Vec<&'static str>,
+    merged: bool,
+}
+impl Co {
+    /// A checkout that fast-forwards from c(10) to c(11).
+    fn new(path: String) -> Self {
+        Self {
+            top: path.clone(),
+            path,
+            branch: "main".into(),
+            dirty: false,
+            head: c(10),
+            tip: c(11),
+            after: c(11),
+            fails: vec![],
+            merged: false,
+        }
+    }
+    fn failing(mut self, what: &'static str) -> Self {
+        self.fails.push(what);
+        self
+    }
+}
+const TOP: &str = "rev-parse --show-toplevel";
+const BRANCH: &str = "symbolic-ref --short -q HEAD";
+const STATUS: &str = "status --porcelain --untracked-files=no";
+const HEAD: &str = "rev-parse --verify HEAD^{commit}";
+const TIP: &str = "rev-parse --verify refs/remotes/origin/main^{commit}";
+fn fetch_words() -> String {
+    format!("fetch --quiet --no-tags origin {MAIN}")
+}
+fn ancestor_words(co: &Co) -> String {
+    format!("merge-base --is-ancestor {} {}", co.head, co.tip)
+}
+fn merge_words(co: &Co) -> String {
+    format!("merge --ff-only --quiet {}", co.tip)
+}
+fn real_checkout(a: &[String]) -> Answer {
+    let out = Command::new("git")
+        .args(a)
+        .env("GIT_CONFIG_GLOBAL", "/dev/null")
+        .env("GIT_CONFIG_NOSYSTEM", "1")
+        .env("GIT_TERMINAL_PROMPT", "0")
+        .output()
+        .unwrap();
+    Ok(Reply {
+        success: out.status.success(),
+        bytes: out.stdout.clone(),
+        stdout: out.stdout,
+    })
+}
+impl W {
+    /// A checkout command: the fixed prefix, the bound of its step, and the model's answer.
+    fn checkout(&mut self, a: &[String], ms: u64) -> Answer {
+        assert_eq!(a[..2], args(&["--no-optional-locks", "-C"]));
+        let prefix = [
+            "-c",
+            "core.hooksPath=/dev/null",
+            "-c",
+            "gc.auto=0",
+            "-c",
+            "maintenance.auto=false",
+        ];
+        assert_eq!(a[3..9], args(&prefix));
+        let words: Vec<&str> = a[9..].iter().map(String::as_str).collect();
+        let bound = match words[0] {
+            "fetch" => 60_000,
+            "merge" => 600_000,
+            _ => 30_000,
+        };
+        assert_eq!(ms, bound, "{words:?}");
+        if self.real_git {
+            return real_checkout(a);
+        }
+        let i = self.cos.iter().position(|co| co.path == a[2]);
+        let co = &mut self.cos[i.expect("a checkout the test does not model")];
+        let joined = words.join(" ");
+        let (name, out) = match joined.as_str() {
+            TOP => ("toplevel", format!("{}\n", co.top)),
+            BRANCH => ("branch", format!("{}\n", co.branch)),
+            STATUS => ("status", if co.dirty { " M f\n" } else { "" }.to_owned()),
+            HEAD if co.merged => ("after", format!("{}\n", co.after)),
+            HEAD => ("head", format!("{}\n", co.head)),
+            TIP => ("tip", format!("{}\n", co.tip)),
+            _ if joined == fetch_words() => ("fetch", String::new()),
+            _ if joined == ancestor_words(co) => ("merge-base", String::new()),
+            _ if joined == merge_words(co) => {
+                co.merged = true;
+                ("merge", String::new())
+            }
+            _ => panic!("unexpected checkout command {joined}"),
+        };
+        Self::text(!co.fails.contains(&name), &out)
+    }
+    /// The commands run on checkouts, in order: (path, words).
+    fn at_checkouts(&self) -> Vec<(String, String)> {
+        let git = self
+            .calls
+            .iter()
+            .filter(|(p, a, _)| p == "git" && a[0] == "--no-optional-locks");
+        git.map(|(_, a, _)| (a[2].clone(), a[9..].join(" ")))
+            .collect()
+    }
+    fn co_path(&self, name: &str) -> String {
+        self.p(&format!("co/{name}"))
+    }
+    /// A request with `checkouts` naming the paths of `cos`, which the fake then models.
+    fn with_checkouts(&mut self, cos: Vec<Co>) -> Value {
+        let mut r = self.request();
+        r["checkouts"] = json!(cos.iter().map(|co| co.path.clone()).collect::<Vec<_>>());
+        self.cos = cos;
+        r
+    }
+}
+/// The commands of one checkout up to and including the step `upto` of the plain run.
+fn steps_of(co: &Co, upto: usize) -> Vec<(String, String)> {
+    let all = [
+        TOP.to_owned(),
+        BRANCH.to_owned(),
+        STATUS.to_owned(),
+        fetch_words(),
+        HEAD.to_owned(),
+        TIP.to_owned(),
+        ancestor_words(co),
+        merge_words(co),
+        HEAD.to_owned(),
+    ];
+    all[..upto]
+        .iter()
+        .map(|w| (co.path.clone(), w.clone()))
+        .collect()
+}
+/// Runs one checkout of `co` in a call that installs and returns the world and the one row.
+fn one(co: impl FnOnce(String) -> Co) -> (W, Co, Value) {
+    let mut w = W::new();
+    let co = co(w.co_path("a"));
+    let r = w.with_checkouts(vec![co.clone()]);
+    let (v, exit) = w.run_with(&r);
+    assert_eq!((end(&v), exit), (("installed", ""), 0), "{v}");
+    assert_eq!(w.last().as_ref(), Some(&v));
+    let row = v["checkouts"][0].clone();
+    (w, co, row)
+}
+fn row_is(row: &Value, co: &Co, from: Option<&str>, to: Option<&str>, result: &str) {
+    assert_eq!(
+        *row,
+        json!({"path": co.path, "from": from, "to": to, "result": result})
+    );
+}
+
+#[test]
+fn co_absent_member_runs_no_checkout_command() {
+    // spec: specs/ap/deliver.md#R7
+    let mut w = W::new();
+    w.cos = vec![Co::new(w.co_path("a"))];
+    let (v, exit) = w.run();
+    assert_eq!((end(&v), exit), (("installed", ""), 0), "{v}");
+    assert_eq!(members(&v), sorted());
+    assert!(w.at_checkouts().is_empty());
+    let path = w.co_path("a");
+    assert!(w.calls.iter().all(|(_, a, _)| !a.contains(&path)));
+    // The same for a call that ends `current`.
+    let mut w = W::new();
+    (w.file, w.tree, w.bytes) = (Some(c(2)), Some(c(2)), binary(&c(2)));
+    let (v, _) = w.run();
+    assert_eq!(end(&v), ("current", ""));
+    assert_eq!(members(&v), sorted());
+    assert!(w.at_checkouts().is_empty());
+}
+
+#[test]
+fn co_the_record_has_the_member_only_with_the_request_member() {
+    // spec: specs/ap/deliver.md#R6
+    let mut w = W::new();
+    let r = w.with_checkouts(vec![Co::new(w.co_path("a"))]);
+    let (v, _) = w.run_with(&r);
+    let mut want = sorted();
+    want.push("checkouts".into());
+    want.sort();
+    assert_eq!(members(&v), want);
+    assert_eq!(w.last(), Some(v));
+}
+
+#[test]
+fn co_a_current_call_runs_the_steps() {
+    // spec: specs/ap/deliver.md#R2
+    let mut w = W::new();
+    (w.file, w.tree, w.bytes) = (Some(c(2)), Some(c(2)), binary(&c(2)));
+    let co = Co::new(w.co_path("a"));
+    let r = w.with_checkouts(vec![co.clone()]);
+    let (v, exit) = w.run_with(&r);
+    assert_eq!((end(&v), exit), (("current", ""), 0), "{v}");
+    assert_eq!(v["checkouts"][0]["result"], "forwarded");
+    assert_eq!(w.at_checkouts(), steps_of(&co, 9));
+}
+
+#[test]
+fn co_a_refused_call_moves_no_checkout() {
+    // spec: specs/ap/deliver.md#R2
+    type Setup = fn(&mut W);
+    let setups: [(&str, Setup); 4] = [
+        ("fetch_failed", |w| w.fetch_fails = true),
+        ("build_busy", |w| w.build_busy = true),
+        ("engine_differs", |w| w.pin = "f".repeat(40)),
+        ("not_accepted", |w| w.reviews.clear()),
+    ];
+    for (code, setup) in setups {
+        let mut w = W::new();
+        setup(&mut w);
+        let r = w.with_checkouts(vec![Co::new(w.co_path("a"))]);
+        let (v, exit) = w.run_with(&r);
+        assert_eq!((end(&v), exit), (("refused", code), 2), "{v}");
+        assert_eq!(v["checkouts"], Value::Null, "{code}");
+        assert!(w.at_checkouts().is_empty(), "{code}");
+        assert_eq!(w.last().as_ref(), Some(&v));
+    }
+}
+
+#[test]
+fn co_a_failed_call_moves_no_checkout() {
+    // spec: specs/ap/deliver.md#R2
+    let mut w = W::new();
+    let tarball = w.tarball();
+    let content = w.inst.get_mut("content").unwrap();
+    (content.tree, content.exit, content.out) = (None, 1, String::new());
+    content.err = format!("install_failed_restored@/x: back; kept copy {tarball}\n");
+    let r = w.with_checkouts(vec![Co::new(w.co_path("a"))]);
+    let (v, exit) = w.run_with(&r);
+    assert_eq!(
+        (end(&v), exit),
+        (("failed_restored", "content_failed_restored"), 3)
+    );
+    assert_eq!(v["checkouts"], Value::Null);
+    assert!(w.at_checkouts().is_empty());
+}
+
+#[test]
+fn co_a_rollback_call_carrying_checkouts_moves_none() {
+    // spec: specs/ap/deliver.md#R2
+    let mut w = W::new();
+    installed_by_a(&mut w);
+    let mut r = w.rollback();
+    r["checkouts"] = json!([w.co_path("a")]);
+    w.cos = vec![Co::new(w.co_path("a"))];
+    let (v, exit) = w.run_with(&r);
+    assert_eq!((end(&v), exit), (("installed", ""), 0), "{v}");
+    assert_eq!(v["checkouts"], Value::Null);
+    assert!(w.at_checkouts().is_empty());
+    assert_eq!(w.last().as_ref(), Some(&v));
+}
+
+#[test]
+fn co_forwarded() {
+    // spec: specs/ap/deliver.md#R3
+    let (w, co, row) = one(Co::new);
+    row_is(&row, &co, Some(&c(10)), Some(&c(11)), "forwarded");
+    assert_eq!(w.at_checkouts(), steps_of(&co, 9));
+}
+
+#[test]
+fn co_the_merge_is_given_the_tip_digits() {
+    // spec: specs/ap/deliver.md#R3
+    let (w, co, _) = one(Co::new);
+    let merge = &w.at_checkouts()[7].1;
+    assert_eq!(*merge, format!("merge --ff-only --quiet {}", co.tip));
+    assert!(merge.rsplit(' ').next().unwrap().len() == 40);
+}
+
+#[test]
+fn co_the_read_after_the_merge_decides() {
+    // spec: specs/ap/deliver.md#R4
+    // A merge that exits non-zero but leaves HEAD at the tip is forwarded.
+    let (_, co, row) = one(|p| Co::new(p).failing("merge"));
+    row_is(&row, &co, Some(&c(10)), Some(&c(11)), "forwarded");
+    // A refused merge: git_failed with HEAD where it was.
+    let (_, co, row) = one(|p| {
+        let mut co = Co::new(p).failing("merge");
+        co.after = c(10);
+        co
+    });
+    row_is(&row, &co, Some(&c(10)), Some(&c(10)), "git_failed");
+    // A merge that exits 0 and leaves another head.
+    let (_, co, row) = one(|p| {
+        let mut co = Co::new(p);
+        co.after = c(12);
+        co
+    });
+    row_is(&row, &co, Some(&c(10)), Some(&c(12)), "git_failed");
+    // A failed read after the merge.
+    let (w, co, row) = one(|p| Co::new(p).failing("after"));
+    row_is(&row, &co, Some(&c(10)), None, "git_failed");
+    assert_eq!(w.at_checkouts(), steps_of(&co, 9));
+}
+
+#[test]
+fn co_current() {
+    // spec: specs/ap/deliver.md#R4
+    let (w, co, row) = one(|p| {
+        let mut co = Co::new(p);
+        co.tip = co.head.clone();
+        co
+    });
+    row_is(&row, &co, Some(&c(10)), Some(&c(10)), "current");
+    assert_eq!(w.at_checkouts(), steps_of(&co, 6));
+}
+
+#[test]
+fn co_not_a_checkout() {
+    // spec: specs/ap/deliver.md#R4
+    // Another top level, and a failed command: nothing after step 1.
+    let (w, co, row) = one(|p| {
+        let mut co = Co::new(p);
+        co.top = "/elsewhere".into();
+        co
+    });
+    row_is(&row, &co, None, None, "not_a_checkout");
+    assert_eq!(w.at_checkouts(), steps_of(&co, 1));
+    let (w, co, row) = one(|p| Co::new(p).failing("toplevel"));
+    row_is(&row, &co, None, None, "not_a_checkout");
+    assert_eq!(w.at_checkouts(), steps_of(&co, 1));
+}
+
+#[test]
+fn co_not_on_main() {
+    // spec: specs/ap/deliver.md#R4
+    let (w, co, row) = one(|p| {
+        let mut co = Co::new(p);
+        co.branch = "topic".into();
+        co
+    });
+    row_is(&row, &co, None, None, "not_on_main");
+    assert_eq!(w.at_checkouts(), steps_of(&co, 2));
+    // A detached HEAD: `symbolic-ref -q` exits 1.
+    let (w, co, row) = one(|p| Co::new(p).failing("branch"));
+    row_is(&row, &co, None, None, "not_on_main");
+    assert_eq!(w.at_checkouts(), steps_of(&co, 2));
+}
+
+#[test]
+fn co_dirty() {
+    // spec: specs/ap/deliver.md#R4
+    let (w, co, row) = one(|p| {
+        let mut co = Co::new(p);
+        co.dirty = true;
+        co
+    });
+    row_is(&row, &co, None, None, "dirty");
+    assert_eq!(w.at_checkouts(), steps_of(&co, 3));
+}
+
+#[test]
+fn co_a_failed_status_is_git_failed_with_no_fetch_and_no_merge() {
+    // spec: specs/ap/deliver.md#R4
+    let (w, co, row) = one(|p| Co::new(p).failing("status"));
+    row_is(&row, &co, None, None, "git_failed");
+    assert_eq!(w.at_checkouts(), steps_of(&co, 3));
+}
+
+#[test]
+fn co_fetch_failed() {
+    // spec: specs/ap/deliver.md#R4
+    let (w, co, row) = one(|p| Co::new(p).failing("fetch"));
+    row_is(&row, &co, None, None, "fetch_failed");
+    assert_eq!(w.at_checkouts(), steps_of(&co, 4));
+}
+
+#[test]
+fn co_diverged() {
+    // spec: specs/ap/deliver.md#R4
+    let (w, co, row) = one(|p| Co::new(p).failing("merge-base"));
+    row_is(&row, &co, Some(&c(10)), None, "diverged");
+    assert_eq!(w.at_checkouts(), steps_of(&co, 7));
+}
+
+#[test]
+fn co_a_failed_read_of_step_five_is_git_failed() {
+    // spec: specs/ap/deliver.md#R4
+    let (w, co, row) = one(|p| Co::new(p).failing("head"));
+    row_is(&row, &co, None, None, "git_failed");
+    assert_eq!(w.at_checkouts(), steps_of(&co, 5));
+    let (w, co, row) = one(|p| Co::new(p).failing("tip"));
+    row_is(&row, &co, Some(&c(10)), None, "git_failed");
+    assert_eq!(w.at_checkouts(), steps_of(&co, 6));
+    // A read that prints no commit.
+    let (_, co, row) = one(|p| {
+        let mut co = Co::new(p);
+        co.tip = "main".into();
+        co
+    });
+    row_is(&row, &co, Some(&c(10)), None, "git_failed");
+}
+
+#[test]
+fn co_the_next_checkout_is_taken_after_a_result_that_stops_one() {
+    // spec: specs/ap/deliver.md#R4
+    let mut w = W::new();
+    let mut first = Co::new(w.co_path("a"));
+    first.dirty = true;
+    let second = Co::new(w.co_path("b"));
+    let r = w.with_checkouts(vec![first.clone(), second.clone()]);
+    let (v, exit) = w.run_with(&r);
+    assert_eq!((end(&v), exit), (("installed", ""), 0), "{v}");
+    let rows = v["checkouts"].as_array().unwrap();
+    row_is(&rows[0], &first, None, None, "dirty");
+    row_is(&rows[1], &second, Some(&c(10)), Some(&c(11)), "forwarded");
+    let want: Vec<_> = [steps_of(&first, 3), steps_of(&second, 9)].concat();
+    assert_eq!(w.at_checkouts(), want);
+}
+
+#[test]
+fn co_checkouts_are_valid_or_refused() {
+    // spec: specs/ap/deliver.md#R1
+    let long = format!("/{}", "a".repeat(4096));
+    let many: Vec<String> = (0..21).map(|n| format!("/co/{n}")).collect();
+    let bad = [
+        json!([]),
+        json!("/a"),
+        json!(null),
+        json!({"a": 1}),
+        json!([1]),
+        json!([null]),
+        json!(many),
+        json!(["a/b"]),
+        json!([""]),
+        json!(["/a/../b"]),
+        json!(["/a/.."]),
+        json!(["/a/./b"]),
+        json!(["/."]),
+        json!(["/a/"]),
+        json!(["/"]),
+        json!(["/a\nb"]),
+        json!(["/a\u{0}b"]),
+        json!(["/a\u{7f}b"]),
+        json!(["/a", "/b", "/a"]),
+        json!([long]),
+    ];
+    for b in bad {
+        let mut w = W::new();
+        let mut r = w.request();
+        r["checkouts"] = b.clone();
+        let (v, exit) = w.run_with(&r);
+        assert_eq!((end(&v), exit), (("refused", "invalid_input"), 2), "{b}");
+        assert_eq!(v["detail"], json!({"field": "checkouts"}), "{b}");
+        assert!(v.get("checkouts").is_none(), "{b}");
+        assert!(w.last().is_none() && w.calls.is_empty(), "{b}");
+    }
+    // 20 distinct paths, one of exactly 4,096 bytes, are admitted, in the request's order.
+    let mut w = W::new();
+    let mut cos: Vec<Co> = (0..19)
+        .map(|n| Co::new(w.co_path(&n.to_string())))
+        .collect();
+    cos.push(Co::new(format!("/{}", "a".repeat(4095))));
+    let paths: Vec<String> = cos.iter().map(|co| co.path.clone()).collect();
+    let r = w.with_checkouts(cos);
+    let (v, exit) = w.run_with(&r);
+    assert_eq!((end(&v), exit), (("installed", ""), 0), "{v}");
+    let got: Vec<&str> = v["checkouts"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|r| r["path"].as_str().unwrap())
+        .collect();
+    assert_eq!(got, paths);
+    // Every other request member is still checked, and the timer's form admits the member.
+    let mut w = W::new();
+    let mut r = w.timer();
+    r["checkouts"] = json!([w.co_path("a")]);
+    w.cos = vec![Co::new(w.co_path("a"))];
+    let (v, exit) = w.run_with(&r);
+    assert_eq!((end(&v), exit), (("installed", ""), 0), "{v}");
+    assert_eq!(v["checkouts"][0]["result"], "forwarded");
+}
+
+// ---- the real `git` on a scratch bare origin ------------------------------------------------------
+
+/// `git <words>` in `dir` with an identity of its own and no configuration of the host; its output.
+fn plain(dir: &str, words: &[&str]) -> String {
+    let out = Command::new("git")
+        .args([
+            "-C",
+            dir,
+            "-c",
+            "user.name=t",
+            "-c",
+            "user.email=t@example.invalid",
+        ])
+        .args([
+            "-c",
+            "init.defaultBranch=main",
+            "-c",
+            "commit.gpgsign=false",
+        ])
+        .args(words)
+        .env("GIT_CONFIG_GLOBAL", "/dev/null")
+        .env("GIT_CONFIG_NOSYSTEM", "1")
+        .output()
+        .unwrap();
+    assert!(out.status.success(), "git {words:?}: {out:?}");
+    String::from_utf8(out.stdout).unwrap().trim().to_owned()
+}
+/// A bare origin, a seed that pushes to it and a clone of it, all under `W.t`; the origin then
+/// holds one commit more than the clone.
+struct Scratch {
+    origin: String,
+    seed: String,
+    clone: String,
+}
+fn scratch(w: &W) -> Scratch {
+    let root = std::fs::canonicalize(&w.t).unwrap();
+    let at = |n: &str| root.join(n).to_str().unwrap().to_owned();
+    let s = Scratch {
+        origin: at("origin.git"),
+        seed: at("seed"),
+        clone: at("co/clone"),
+    };
+    std::fs::create_dir_all(&s.seed).unwrap();
+    std::fs::create_dir_all(&s.origin).unwrap();
+    plain(&s.origin, &["init", "--quiet", "--bare", "-b", "main"]);
+    plain(&s.seed, &["init", "--quiet", "-b", "main"]);
+    std::fs::write(format!("{}/f.txt", s.seed), "one\n").unwrap();
+    plain(&s.seed, &["add", "f.txt"]);
+    plain(&s.seed, &["commit", "--quiet", "-m", "one"]);
+    plain(&s.seed, &["remote", "add", "origin", &s.origin]);
+    plain(&s.seed, &["push", "--quiet", "origin", "main"]);
+    plain(&at("."), &["clone", "--quiet", &s.origin, &s.clone]);
+    advance(&s);
+    s
+}
+/// One more commit on the origin's `main`, in the seed.
+fn advance(s: &Scratch) {
+    std::fs::write(format!("{}/g.txt", s.seed), "two\n").unwrap();
+    plain(&s.seed, &["add", "g.txt"]);
+    plain(&s.seed, &["commit", "--quiet", "-m", "two"]);
+    plain(&s.seed, &["push", "--quiet", "origin", "main"]);
+}
+fn real_call(w: &mut W, s: &Scratch) -> Value {
+    w.real_git = true;
+    let mut r = w.request();
+    r["checkouts"] = json!([s.clone]);
+    let (v, exit) = w.run_with(&r);
+    assert_eq!((end(&v), exit), (("installed", ""), 0), "{v}");
+    v["checkouts"][0].clone()
+}
+fn rev(dir: &str, name: &str) -> String {
+    plain(dir, &["rev-parse", "--verify", name])
+}
+
+#[test]
+fn co_real_git_forwards_to_the_origin() {
+    // spec: specs/ap/deliver.md#R3
+    let mut w = W::new();
+    let s = scratch(&w);
+    let before = rev(&s.clone, "HEAD");
+    let row = real_call(&mut w, &s);
+    let tip = rev(&s.origin, "refs/heads/main");
+    assert_eq!(
+        row,
+        json!({"path": s.clone, "from": before, "to": tip, "result": "forwarded"})
+    );
+    assert_eq!(rev(&s.clone, "HEAD"), tip);
+    assert_eq!(
+        std::fs::read(format!("{}/g.txt", s.clone)).unwrap(),
+        b"two\n"
+    );
+    assert_eq!(
+        plain(&s.clone, &["symbolic-ref", "--short", "HEAD"]),
+        "main"
+    );
+    // The next run reads it current.
+    let row = real_call(&mut W::new(), &s);
+    assert_eq!(row["result"], "current");
+}
+
+#[test]
+fn co_real_git_leaves_a_dirty_checkout_byte_equal() {
+    // spec: specs/ap/deliver.md#R5
+    let mut w = W::new();
+    let s = scratch(&w);
+    let file = format!("{}/f.txt", s.clone);
+    std::fs::write(&file, "edited\n").unwrap();
+    let (head, remote) = (
+        rev(&s.clone, "HEAD"),
+        rev(&s.clone, "refs/remotes/origin/main"),
+    );
+    let row = real_call(&mut w, &s);
+    assert_eq!(row["result"], "dirty");
+    assert_eq!((&row["from"], &row["to"]), (&Value::Null, &Value::Null));
+    assert_eq!(std::fs::read(&file).unwrap(), b"edited\n");
+    assert_eq!(rev(&s.clone, "HEAD"), head);
+    // No fetch ran: step 4 comes after step 3.
+    assert_eq!(rev(&s.clone, "refs/remotes/origin/main"), remote);
+    assert_eq!(plain(&s.clone, &["status", "--porcelain"]), "M f.txt");
+}
+
+#[test]
+fn co_real_git_keeps_a_local_commit_when_diverged() {
+    // spec: specs/ap/deliver.md#R5
+    let mut w = W::new();
+    let s = scratch(&w);
+    std::fs::write(format!("{}/h.txt", s.clone), "local\n").unwrap();
+    plain(&s.clone, &["add", "h.txt"]);
+    plain(&s.clone, &["commit", "--quiet", "-m", "local"]);
+    let local = rev(&s.clone, "HEAD");
+    let row = real_call(&mut w, &s);
+    assert_eq!(
+        row,
+        json!({"path": s.clone, "from": local, "to": null, "result": "diverged"})
+    );
+    assert_eq!(rev(&s.clone, "HEAD"), local);
+    assert_eq!(rev(&s.clone, "refs/heads/main"), local);
+    assert!(std::fs::metadata(format!("{}/g.txt", s.clone)).is_err());
+    // The fetch of step 4 ran: the remote-tracking ref is the origin's.
+    assert_eq!(
+        rev(&s.clone, "refs/remotes/origin/main"),
+        rev(&s.origin, "refs/heads/main")
+    );
+}
+
+#[test]
+fn co_real_git_leaves_a_detached_head_and_a_blocked_merge_alone() {
+    // spec: specs/ap/deliver.md#R5
+    let mut w = W::new();
+    let s = scratch(&w);
+    let head = rev(&s.clone, "HEAD");
+    plain(&s.clone, &["checkout", "--quiet", "--detach"]);
+    let row = real_call(&mut w, &s);
+    assert_eq!(row["result"], "not_on_main");
+    assert_eq!(rev(&s.clone, "HEAD"), head);
+    assert_eq!(
+        plain(&s.clone, &["rev-parse", "--abbrev-ref", "HEAD"]),
+        "HEAD"
+    );
+    plain(&s.clone, &["checkout", "--quiet", "main"]);
+    // An untracked file the fast-forward would overwrite: the merge refuses, nothing is written.
+    let blocking = format!("{}/g.txt", s.clone);
+    std::fs::write(&blocking, "mine\n").unwrap();
+    let row = real_call(&mut W::new(), &s);
+    assert_eq!(row["result"], "git_failed");
+    assert_eq!((&row["from"], &row["to"]), (&json!(head), &json!(head)));
+    assert_eq!(std::fs::read(&blocking).unwrap(), b"mine\n");
+    assert_eq!(rev(&s.clone, "HEAD"), head);
+    // A lock file of the index: the merge cannot start, and the lock is not removed.
+    std::fs::remove_file(&blocking).unwrap();
+    let lock = format!("{}/.git/index.lock", s.clone);
+    std::fs::write(&lock, "").unwrap();
+    let row = real_call(&mut W::new(), &s);
+    assert_eq!(row["result"], "git_failed");
+    assert_eq!(rev(&s.clone, "HEAD"), head);
+    assert!(std::fs::metadata(&lock).is_ok());
+    assert!(std::fs::metadata(format!("{}/g.txt", s.clone)).is_err());
 }
