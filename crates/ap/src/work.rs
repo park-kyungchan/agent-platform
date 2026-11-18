@@ -389,6 +389,9 @@ struct Pass {
 enum End {
     Started,
     Waits(String),
+    /// A wait after this pass cleared the stored `waits_on` (a start that failed): the store now
+    /// holds the empty string.
+    WaitsCleared(String),
     /// Nothing to note: a unit that moved meanwhile.
     Skipped,
 }
@@ -528,16 +531,21 @@ impl Pass {
                 Some(why) => End::Waits(why),
                 None => self.start(s, &u.key, &f, revision)?,
             };
+            let end_cleared = matches!(end, End::WaitsCleared(_));
             match end {
                 End::Started | End::Skipped => {}
-                End::Waits(why) if is_ready => {
+                End::Waits(why) | End::WaitsCleared(why) if is_ready => {
                     let why = cut_to(&why, WAITS_ON);
-                    if f["waits_on"].as_str().unwrap_or_default() != why {
+                    let stored = match end_cleared {
+                        true => "",
+                        false => f["waits_on"].as_str().unwrap_or_default(),
+                    };
+                    if stored != why {
                         self.note(s, &u.key, &why)?;
                     }
                     waiting.push(json!({"unit": u.key, "waits_on": why}));
                 }
-                End::Waits(why) => {
+                End::Waits(why) | End::WaitsCleared(why) => {
                     waiting.push(json!({"unit": u.key, "waits_on": cut_to(&why, WAITS_ON)}))
                 }
             }
@@ -643,11 +651,11 @@ impl Pass {
         f: &Value,
         revision: String,
     ) -> Result<End, Failure> {
-        let mut revision = revision;
+        let (mut revision, mut cleared) = (revision, false);
         let stored = f["waits_on"].as_str().unwrap_or_default();
         if f["state"] == "ready" && !stored.is_empty() {
             match self.note(s, key, "")? {
-                Some(r) => revision = r,
+                Some(r) => (revision, cleared) = (r, true),
                 None => return Ok(End::Skipped),
             }
         }
@@ -679,7 +687,12 @@ impl Pass {
         }
         // No start: the file this pass wrote goes, and the next pass tries again.
         let _ = std::fs::remove_file(&path);
-        Ok(End::Waits("start failed".into()))
+        let why = "start failed".to_owned();
+        Ok(if cleared {
+            End::WaitsCleared(why)
+        } else {
+            End::Waits(why)
+        })
     }
     /// The arguments of `systemd-run` for the unit `key` (R14).
     fn command(&self, s: &impl System, key: &str) -> Vec<String> {

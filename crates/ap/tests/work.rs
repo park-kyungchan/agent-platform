@@ -1153,6 +1153,16 @@ fn r15_a_failed_systemd_run_is_no_start() {
     assert_eq!(waiting(&v), pairs(&[("a", "start failed")]));
     assert!(!w.root().join("a").join("started").exists());
     assert_eq!(w.f("a")["waits_on"], "start failed");
+    // A start that keeps failing: each pass clears the note before it tries, and notes the failure
+    // again after it, so the store reads `start failed` after every such pass.
+    for _ in 0..3 {
+        w.reset();
+        let v = w.ok();
+        assert_eq!(waiting(&v), pairs(&[("a", "start failed")]));
+        assert_eq!(w.notes(), pairs(&[("a", ""), ("a", "start failed")]));
+        assert_eq!(w.f("a")["waits_on"], "start failed");
+        assert!(!w.root().join("a").join("started").exists());
+    }
     // The next pass tries it again.
     w.run_fails.clear();
     w.reset();
