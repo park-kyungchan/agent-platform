@@ -10,7 +10,7 @@ The Ontology engine of this host: one generic engine, no domain knowledge. A dom
 | `ont-store` | The store: one SQLite file per store, atomic appends, snapshot reads |
 | `ont` | The command `ont` and its library: `schema check`, `schema install`, `describe`, `get`, `search`, `around`, `aggregate`, `render`, `index`, `action list`, `action validate`, `action apply`, `backup`, `compact`, and `mcp` (the same reads and actions as an MCP server over standard input and output) |
 
-The reads and the action commands (`describe`, `get`, `search`, `around`, `aggregate`, `render`, `action ...`) read one JSON request on standard input and print one JSON answer; `schema check`, `schema install`, `index`, `backup` and `compact` take arguments only; `mcp` speaks the MCP protocol. `ont --help` lists every form and the request fields. The contract of each command is in [crates/ont/README.md](crates/ont/README.md).
+The reads and the action commands (`describe`, `get`, `search`, `around`, `aggregate`, `render`, `action ...`) read one JSON request on standard input and print one JSON answer; `schema check`, `schema install`, `index`, `backup` and `compact` take arguments only; `mcp` speaks the MCP protocol. `ont --help` lists every form and the request fields. The contract of each command is in [specs/ont/](specs/ont/).
 
 ## Who uses it
 

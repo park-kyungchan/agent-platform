@@ -8,7 +8,7 @@
 //! are `update`; equal values with changed bytes, coverage or schema pin are `refresh`;
 //! unchanged stale heads are renewed in place; equal values
 //! with a fresh head append nothing. A `records` source carries its own time
-//! per record (`T`): see `README.md`, "records", for the rule that replaces
+//! per record (`T`): see `specs/ont/index.md`, "Source kind `records`", for the rule that replaces
 //! `now` as the observation time. With `complete_listing` a non-retracted
 //! head whose key is absent from the listing gets a `retraction`.
 //!

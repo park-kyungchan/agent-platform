@@ -2,7 +2,7 @@
 //!
 //! Applied rows come from the store's `action_log` table; refused rows from
 //! `refusals.jsonl` beside the store, which `crate::action::apply_action`
-//! appends to (README "Refusal records" and "Reading the action log").
+//! appends to (`specs/ont/action.md` "Refusal records" and `specs/ont/log.md` "Reading the action log").
 use crate::principal::GrantView;
 use crate::refusal::{io, open_store, st};
 use crate::{Answer, Context, Failure, Refusal};
@@ -198,7 +198,7 @@ fn defines(set: &SchemaSet, domain: &str, action_type: &str) -> bool {
         .is_some_and(|s| s.action_types.contains_key(action_type))
 }
 
-/// The admission of one row (README "Reading the action log").
+/// The admission of one row (`specs/ont/log.md` "Reading the action log").
 fn admits(
     set: &SchemaSet,
     view: &GrantView,
@@ -564,7 +564,7 @@ mod tests {
         );
     }
 
-    // The table scan stops at its bound (README "Reading the action log").
+    // The table scan stops at its bound (`specs/ont/log.md` "Reading the action log").
     #[test]
     fn the_table_scan_stops_at_its_bound() {
         let nonce = std::time::SystemTime::now()

@@ -1,0 +1,138 @@
+{
+ "components": [
+  {
+   "name": "ont-core",
+   "purpose": "The schema language and the data model: identity, observations, scopes and grants.",
+   "paths": [
+    "crates/ont-core/"
+   ],
+   "entry": [
+    "crates/ont-core/src/lib.rs:1-12",
+    "crates/ont-core/src/schema.rs:1-40"
+   ],
+   "spec": [
+    "specs/ont/schema-language.md"
+   ],
+   "tests": [
+    "crates/ont-core/tests/schema.rs",
+    "crates/ont-core/tests/scope.rs"
+   ]
+  },
+  {
+   "name": "ont-store",
+   "purpose": "The store: one SQLite file per store, atomic appends and snapshot reads.",
+   "paths": [
+    "crates/ont-store/"
+   ],
+   "entry": [
+    "crates/ont-store/src/lib.rs:1-15",
+    "crates/ont-store/src/schema_mode.rs:1-40"
+   ],
+   "spec": [
+    "specs/ont/store.md",
+    "specs/ont/schema-language.md"
+   ],
+   "tests": [
+    "crates/ont-store/src/tests.rs",
+    "crates/ont-store/src/tests_v3.rs"
+   ]
+  },
+  {
+   "name": "ont-command",
+   "purpose": "The ont command and its library: schema, reads, actions, log, render, index and the MCP server.",
+   "paths": [
+    "crates/ont/"
+   ],
+   "entry": [
+    "crates/ont/src/lib.rs:1-20",
+    "crates/ont/src/cli.rs:1-40",
+    "crates/ont/src/main.rs:1-35"
+   ],
+   "spec": [
+    "specs/ont/action.md",
+    "specs/ont/schema-language.md",
+    "specs/ont/log.md",
+    "specs/ont/store.md",
+    "specs/ont/read.md",
+    "specs/ont/index.md",
+    "specs/ont/mcp.md",
+    "specs/ont/render.md",
+    "specs/ont/cli.md"
+   ],
+   "tests": [
+    "crates/ont/tests/action.rs",
+    "crates/ont/tests/render.rs",
+    "crates/ont/tests/mcp.rs",
+    "crates/ont/tests/refusal_log.rs"
+   ]
+  },
+  {
+   "name": "specs",
+   "purpose": "The specifications of the engine contracts, moved from the crate READMEs.",
+   "paths": [
+    "specs/"
+   ],
+   "entry": [
+    "specs/ont/action.md:1-6",
+    "specs/ont/store.md:1-6"
+   ],
+   "spec": [],
+   "tests": []
+  },
+  {
+   "name": "scripts",
+   "purpose": "Install scripts and repository check helpers.",
+   "paths": [
+    "scripts/"
+   ],
+   "entry": [
+    "scripts/install-ont.sh:1-30",
+    "scripts/check-map.py:1-30"
+   ],
+   "spec": [
+    "specs/ont/cli.md"
+   ],
+   "tests": [
+    "scripts/test_check_map.py",
+    "scripts/test-install-ont.sh"
+   ]
+  },
+  {
+   "name": "conformance",
+   "purpose": "Synthetic fixtures that tests of ont-core and ont-store read.",
+   "paths": [
+    "conformance/"
+   ],
+   "entry": [
+    "conformance/fixtures/synthetic.json:1-20"
+   ],
+   "spec": [],
+   "tests": []
+  },
+  {
+   "name": "github",
+   "purpose": "GitHub Actions workflow and Dependabot configuration of this repository.",
+   "paths": [
+    ".github/"
+   ],
+   "entry": [
+    ".github/workflows/rust.yml:1-30"
+   ],
+   "spec": [],
+   "tests": []
+  },
+  {
+   "name": "repo-check",
+   "purpose": "The one check of this repository and its pinned Rust toolchain.",
+   "paths": [
+    "check",
+    "rust-toolchain.toml"
+   ],
+   "entry": [
+    "check:1-26"
+   ],
+   "spec": [],
+   "tests": []
+  }
+ ]
+}

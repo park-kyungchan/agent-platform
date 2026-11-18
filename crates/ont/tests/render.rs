@@ -961,11 +961,50 @@ fn fenced_markers_and_readme_examples_are_ignored() {
         assert_eq!(t.write(&file, "items").1["code"], "render_block_missing");
         assert_eq!(std::fs::read_to_string(&file).unwrap(), text);
     }
-    let readme = t.file("README.md", include_bytes!("../README.md"));
-    assert_eq!(
-        t.run(&["render", "--check", &readme], json!({})),
-        (0, json!({"status":"ok","blocks":0,"drift":[]}))
-    );
+    for (name, bytes) in [
+        (
+            "action.md",
+            include_bytes!("../../../specs/ont/action.md").as_slice(),
+        ),
+        (
+            "schema-language.md",
+            include_bytes!("../../../specs/ont/schema-language.md").as_slice(),
+        ),
+        (
+            "log.md",
+            include_bytes!("../../../specs/ont/log.md").as_slice(),
+        ),
+        (
+            "store.md",
+            include_bytes!("../../../specs/ont/store.md").as_slice(),
+        ),
+        (
+            "read.md",
+            include_bytes!("../../../specs/ont/read.md").as_slice(),
+        ),
+        (
+            "index.md",
+            include_bytes!("../../../specs/ont/index.md").as_slice(),
+        ),
+        (
+            "mcp.md",
+            include_bytes!("../../../specs/ont/mcp.md").as_slice(),
+        ),
+        (
+            "render.md",
+            include_bytes!("../../../specs/ont/render.md").as_slice(),
+        ),
+        (
+            "cli.md",
+            include_bytes!("../../../specs/ont/cli.md").as_slice(),
+        ),
+    ] {
+        let file = t.file(name, bytes);
+        assert_eq!(
+            t.run(&["render", "--check", &file], json!({})),
+            (0, json!({"status":"ok","blocks":0,"drift":[]}))
+        );
+    }
 }
 
 #[test]
