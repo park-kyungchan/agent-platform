@@ -114,6 +114,8 @@ struct F {
     threads: Vec<Value>,
     /// The processes that stand for a cut stage's unit, reaped at the end.
     sleepers: Vec<Child>,
+    /// The walk: the real engine on a scratch store, instead of the fake store.
+    engine: Option<String>,
 }
 impl F {
     fn new() -> Self {
@@ -174,6 +176,7 @@ impl F {
             check: "SUCCESS",
             threads: vec![],
             sleepers: vec![],
+            engine: None,
         };
         f.policy(json!({}));
         f.put("task", "invented-task", json!({"status": "open"}));
@@ -232,6 +235,9 @@ impl F {
         *self.revisions.get_mut(&k(kind, key)).unwrap() += 1;
     }
     fn unit(&self) -> Value {
+        if self.engine.is_some() {
+            return self.fields("unit", KEY);
+        }
         self.objects[&k("unit", KEY)].clone()
     }
     fn set_unit(&mut self, set: Value) {
@@ -277,6 +283,32 @@ impl F {
             .collect()
     }
     fn packets(&self) -> Vec<(String, Value)> {
+        if self.engine.is_some() {
+            let view = self.engine_call(
+                &["render"],
+                &json!({"view": "reviews_of_unit", "args": {"unit": KEY}}),
+            );
+            let keys = view["markdown"]
+                .as_str()
+                .unwrap()
+                .lines()
+                .skip_while(|l| !l.starts_with("| --- |"))
+                .skip(1)
+                .take_while(|l| l.starts_with("| "));
+            let keys: Vec<String> = keys
+                .map(|l| l[2..].split(' ').next().unwrap().to_owned())
+                .collect();
+            let mut list: Vec<(String, Value)> = keys
+                .into_iter()
+                .map(|k| {
+                    let v = self.fields("review", &k);
+                    (k, v)
+                })
+                .collect();
+            list.retain(|(_, v)| v["kind"] == "packet");
+            list.sort_by_key(|(k, v)| (v["started_at"].as_str().unwrap().to_owned(), k.clone()));
+            return list;
+        }
         let mut list: Vec<(String, Value)> = self
             .objects
             .iter()
@@ -384,6 +416,70 @@ impl F {
         serde_json::from_slice(&std::fs::read(self.home().join(rel)).unwrap()).unwrap()
     }
 
+    /// The walk's fixture: the store of `AP_UNIT_RUN_TEMPLATE` copied, its task in the policy.
+    fn engine() -> Self {
+        let mut f = Self::new();
+        let template =
+            PathBuf::from(std::env::var("AP_UNIT_RUN_TEMPLATE").expect("AP_UNIT_RUN_TEMPLATE"));
+        std::fs::create_dir(f.t.join("store")).unwrap();
+        for name in ["store.sqlite", "edits.jsonl"] {
+            std::fs::copy(template.join(name), f.t.join("store").join(name)).unwrap();
+        }
+        f.engine = Some(f.p("store/store.sqlite"));
+        f.policy(
+            json!({"reviews": {"task": "ontology-operational-base", "directory": f.p("reviews")}}),
+        );
+        f
+    }
+    fn engine_call(&self, args: &[&str], body: &Value) -> Value {
+        let store = self.engine.as_deref().unwrap();
+        let out = Command::new("ont")
+            .arg("--store")
+            .arg(store)
+            .args(args)
+            .stdin(std::process::Stdio::piped())
+            .stdout(std::process::Stdio::piped())
+            .spawn()
+            .unwrap();
+        let mut out = out;
+        std::io::Write::write_all(out.stdin.as_mut().unwrap(), body.to_string().as_bytes())
+            .unwrap();
+        let out = out.wait_with_output().unwrap();
+        let v: Value = serde_json::from_slice(&out.stdout).unwrap();
+        v.get("result").cloned().unwrap_or(v)
+    }
+    /// An id of the walk's store: its namespace is the engine's.
+    fn eid(&self, kind: &str, key: &str) -> Value {
+        let units = json!({"object_type": "unit", "where": {"all": [{"in": ["lane", ["small", "objective"]]}]}, "limit": 1});
+        let found = self.engine_call(&["search"], &units);
+        json!({"object_type": kind, "namespace": found["objects"][0]["id"]["namespace"], "native_key": key})
+    }
+    fn fields(&self, kind: &str, key: &str) -> Value {
+        let v = self.engine_call(&["get"], &json!({"id": self.eid(kind, key)}));
+        let o = &v["objects"][0]["observations"]
+            .as_array()
+            .unwrap()
+            .last()
+            .unwrap()["fields"];
+        o.as_object()
+            .unwrap()
+            .iter()
+            .map(|(k, v)| (k.clone(), v["value"].clone()))
+            .collect()
+    }
+    /// An action of the Lead's side of the walk (another agent and session than the run's), applied.
+    fn engine_apply(&mut self, action: &str, mut p: Value) -> Value {
+        for k in ["unit", "task"] {
+            if let Some(key) = p[k]["native_key"].as_str().map(str::to_owned) {
+                p[k] = self.eid(k, &key);
+            }
+        }
+        let rid = format!("walk-{}", NEXT.fetch_add(1, Ordering::SeqCst));
+        let body = json!({"action_type": action, "request_id": rid, "agent": "walk", "session": "walk-1", "parameters": p});
+        let v = self.engine_call(&["action", "apply", "--client", "walk"], &body);
+        assert_eq!(v["outcome"], "applied", "{action}: {v}");
+        v
+    }
     fn wrap(fields: &Value) -> Value {
         let o = fields.as_object().unwrap().iter();
         o.map(|(k, v)| (k.clone(), json!({"kind": "value", "value": v})))
@@ -409,6 +505,11 @@ impl F {
                 field: "ont".into(),
                 detail: Value::Null,
             });
+        }
+        if let Some(store) = &self.engine {
+            let mut a = args.to_vec();
+            *a.last_mut().unwrap() = store.clone();
+            return Host.call("ont", &a, input, 60_000);
         }
         let epoch = SystemTime::now()
             .duration_since(UNIX_EPOCH)
@@ -1330,6 +1431,24 @@ fn r7_a_review_started_and_never_run_closes_with_the_recovery_session() {
     );
 }
 
+// spec: specs/ap/unit-run.md#R7
+#[test]
+fn r7_a_call_killed_between_two_applies_goes_on() {
+    let mut f = F::new();
+    f.steps(&["implement", "accept"]);
+    f.die_after = Some("record_head");
+    assert_eq!(f.refusal().status, 3);
+    (f.dead, f.die_after) = (false, None);
+    assert_eq!(f.unit()["state"], "running");
+    let (a, _) = f.ok();
+    assert_eq!(
+        (a["state"].as_str(), f.launches),
+        (Some("accepted"), 2),
+        "{a}"
+    );
+    assert_eq!(f.bodies("record_head").len(), 1);
+}
+
 // spec: specs/ap/unit-run.md#R8
 #[test]
 fn r8_the_base_is_one_commit_and_the_worktree_is_guarded() {
@@ -1811,5 +1930,189 @@ fn r23_the_run_stops_only_units_of_a_stage_its_records_name() {
     assert!(
         f.home().join("1.implementer.md").exists()
             && f.home().join("2.verifier.prompt.md").exists()
+    );
+}
+
+/// One walk by the real engine of `ontology/ENGINE-PIN` on a scratch store, the fake CLI and the fakes of
+/// the hosting service above: `AP_UNIT_RUN_TEMPLATE` names a directory whose `store.sqlite` holds the
+/// schema of this repository, installed from a copy redirected as `ontology/rehearsal.sh` redirects it,
+/// and the `ready` unit `widgets-list` of the lane `small`. Each walk prints one line.
+#[test]
+#[ignore = "the walk: needs the pinned engine and a scratch store named by AP_UNIT_RUN_TEMPLATE"]
+fn walk_with_the_real_engine() {
+    let line = |name: &str, f: &F, a: &Value| {
+        let stopped: Vec<String> = f
+            .calls
+            .iter()
+            .filter(|c| c.0 == "systemctl" && c.1[0] == "stop")
+            .map(|c| c.1[1].clone())
+            .collect();
+        println!(
+            "walk {name}: state={} cause={} rounds={} repairs={} launches={} pull_request={} reviews={} stops={}",
+            a["state"],
+            a["stop_cause"],
+            a["rounds"],
+            a["repairs"],
+            f.launches,
+            a["pull_request"],
+            a["reviews"].as_array().map_or(0, Vec::len),
+            stopped.len()
+        );
+    };
+    let walk = |name: &str, steps: &[&str]| {
+        let mut f = F::engine();
+        f.steps(steps);
+        let (a, _) = f.ok();
+        line(name, &f, &a);
+        (f, a)
+    };
+    let (_, a) = walk("one-repair", &["implement", "repair", "fix", "accept"]);
+    assert_eq!(
+        (a["state"].as_str(), a["repairs"].as_u64()),
+        (Some("accepted"), Some(1)),
+        "{a}"
+    );
+    let (_, a) = walk(
+        "two-repairs",
+        &["implement", "repair", "fix", "repair", "fix", "accept"],
+    );
+    assert_eq!(
+        (a["state"].as_str(), a["repairs"].as_u64()),
+        (Some("accepted"), Some(2)),
+        "{a}"
+    );
+    let (_, a) = walk(
+        "third-repair",
+        &["implement", "repair", "fix", "repair", "fix", "repair"],
+    );
+    assert_eq!(a["stop_cause"], "repair_limit", "{a}");
+    let (_, a) = walk("no-pull-request", &["nopr"]);
+    assert_eq!(a["stop_cause"], "no_pull_request", "{a}");
+    // A fixer that changes nothing, then a head pushed from another clone.
+    let (mut f, a) = walk(
+        "fixer-changes-nothing",
+        &["implement", "repair", "nothing", "accept"],
+    );
+    assert_eq!(a["stop_cause"], "repair_refused", "{a}");
+    f.push_from_elsewhere(&format!("unit/{KEY}"), "src/widgets.rs");
+    let (a, _) = f.ok();
+    line("pushed-elsewhere", &f, &a);
+    assert_eq!(a["state"], "accepted", "{a}");
+    assert!(f.launch(4).0.contains("--session-id"));
+    // Stopped `acceptance_failed`, amended, made ready and run again.
+    let mut f = F::engine();
+    let failing = json!([{"check": "grep -q amended src/widgets.rs", "kind": "fails_on_base"}]);
+    f.engine_apply(
+        "amend_unit",
+        json!({"unit": oid("unit", KEY), "acceptance": failing}),
+    );
+    f.engine_apply("ready_unit", json!({"unit": oid("unit", KEY)}));
+    f.steps(&["implement", "fix", "accept"]);
+    let (a, _) = f.ok();
+    line("acceptance-failed", &f, &a);
+    assert_eq!(a["stop_cause"], "acceptance_failed", "{a}");
+    std::thread::sleep(Duration::from_millis(1100));
+    let passing = json!([{"check": "test -f src/widgets.rs", "kind": "fails_on_base"}]);
+    f.engine_apply(
+        "amend_unit",
+        json!({"unit": oid("unit", KEY), "acceptance": passing}),
+    );
+    f.engine_apply("ready_unit", json!({"unit": oid("unit", KEY)}));
+    let (a, _) = f.ok();
+    line("amended-and-run-again", &f, &a);
+    assert_eq!(a["state"], "accepted", "{a}");
+    assert!(f.launch(2).1.ends_with(CONTINUE));
+    // Calls killed during a stage, each followed by a call that goes on.
+    for (name, steps, at, record) in [
+        (
+            "killed-in-implementer",
+            vec!["local", "settle", "accept"],
+            1,
+            "1.implementer.md.run.json",
+        ),
+        (
+            "killed-after-pull-request",
+            vec!["dirty", "settle", "accept"],
+            1,
+            "1.implementer.md.run.json",
+        ),
+        (
+            "killed-in-fixer",
+            vec!["implement", "repair", "local", "settle", "accept"],
+            3,
+            "3.fixer.md.run.json",
+        ),
+        (
+            "killed-in-verifier",
+            vec!["implement", "accept", "accept"],
+            2,
+            "",
+        ),
+    ] {
+        let mut f = F::engine();
+        f.steps(&steps);
+        f.die_at_launch = Some(at);
+        let first = f.refusal();
+        let path = match record {
+            "" => {
+                f.t.join(format!("reviews/{}.md.run.json", f.packets()[0].0))
+            }
+            r => f.home().join(r),
+        };
+        f.cut(&path);
+        let (a, _) = f.ok();
+        line(name, &f, &a);
+        let runs = f.engine_call(&["search"], &json!({"object_type": "run", "where": {"all": [{"eq": ["state", "killed"]}]}, "limit": 15}));
+        println!(
+            "walk {name}: first call {} {}; killed runs {}; reviews {:?}",
+            first.code,
+            first.status,
+            runs["objects"].as_array().map_or(0, Vec::len),
+            f.packets()
+                .iter()
+                .map(|(_, r)| (r["verdict"].clone(), r["session"].clone()))
+                .collect::<Vec<_>>()
+        );
+        assert_eq!(a["state"], "accepted", "{name} {a}");
+    }
+    // A take-over refused by a hold; a branch named `main`; a pull request closed under a running unit.
+    let mut f = F::engine();
+    f.steps(&["local"]);
+    f.die_at_launch = Some(1);
+    let _ = f.refusal();
+    f.cut(&f.home().join("1.implementer.md.run.json"));
+    let hold = f.engine_apply(
+        "set_hold_on",
+        json!({"task": oid("task", "ontology-operational-base"),
+        "effect": "no walk", "until": "the walk ends", "unit": oid("unit", KEY)}),
+    );
+    let e = f.refusal();
+    println!(
+        "walk held: hold {} refusal {} {}",
+        hold["outcome"], e.code, e.status
+    );
+    assert_eq!(e.code, "held");
+    let mut f = F::engine();
+    f.engine_apply(
+        "amend_unit",
+        json!({"unit": oid("unit", KEY), "branch": "main"}),
+    );
+    f.engine_apply("ready_unit", json!({"unit": oid("unit", KEY)}));
+    let e = f.refusal();
+    println!(
+        "walk branch-main: refusal {} {} store state {}",
+        e.code,
+        e.status,
+        f.unit()["state"]
+    );
+    assert_eq!(e.code, "invalid_branch");
+    let (mut f, _) = walk("before-close", &["implement", "repair", "nothing"]);
+    f.pr_state = "CLOSED";
+    let launches = f.launches;
+    let (a, _) = f.ok();
+    line("pull-request-closed", &f, &a);
+    assert_eq!(
+        (a["stop_cause"].as_str(), f.launches),
+        (Some("pull_request_not_open"), launches)
     );
 }
