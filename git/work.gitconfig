@@ -1,0 +1,8 @@
+# Included by /etc/gitconfig for the task directories ws-*, ap-*, ont-* and mem-*
+# under the work directory. Installed as /usr/local/lib/agents-git/work.gitconfig.
+[core]
+	hooksPath = /usr/local/lib/agents-git/hooks
+[push]
+	default = upstream
+[agents]
+	roster = /root/.local/share/academy-capture-20261113/inputs/students-*.json
