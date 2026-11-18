@@ -4103,7 +4103,8 @@ fn co_a_current_call_runs_the_steps() {
 #[test]
 fn co_a_refused_call_moves_no_checkout() {
     // spec: specs/ap/deliver.md#R2
-    let setups: [(&str, fn(&mut W)); 4] = [
+    type Setup = fn(&mut W);
+    let setups: [(&str, Setup); 4] = [
         ("fetch_failed", |w| w.fetch_fails = true),
         ("build_busy", |w| w.build_busy = true),
         ("engine_differs", |w| w.pin = "f".repeat(40)),
