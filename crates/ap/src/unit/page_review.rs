@@ -1024,7 +1024,8 @@ fn plan(
     let all = vec![eq("intent", id("intent", key))];
     let mut criteria = at(store::search(s, store, "criterion", all), "criteria")?;
     criteria.sort_by_key(by);
-    let all = vec![eq("lane", json!("objective"))];
+    // Both lanes: a unit of the lane `small` may name the intent too.
+    let all = vec![json!({"in": ["lane", ["small", "objective"]]})];
     let mut units = at(store::search(s, store, "unit", all), "units")?;
     units.retain(|(_, u)| u["intent"]["native_key"] == key && u["state"] != "dropped");
     let deps = |u: &Value| -> Vec<String> {

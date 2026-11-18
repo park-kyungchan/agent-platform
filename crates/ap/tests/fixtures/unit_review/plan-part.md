@@ -31,6 +31,14 @@ Estimate: 40 lines
 Implementer: claude opus high
 Verifier: claude opus xhigh
 
+### g: plain, lane small, invented/widgets
+
+The invented widget list shows each widget once.
+Write set: src/widgets.rs
+Estimate: 12 lines
+Implementer: claude opus high
+Verifier: claude opus xhigh
+
 These units depend on each other in a cycle:
 
 ### c: plain, lane objective, no repository

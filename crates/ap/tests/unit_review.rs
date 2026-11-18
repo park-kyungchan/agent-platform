@@ -431,9 +431,14 @@ impl F {
                     .unwrap_or_default();
                 let found = self.objects.iter().filter(|((t, _), o)| {
                     t == kind
-                        && all
-                            .iter()
-                            .all(|c| o[c["eq"][0].as_str().unwrap()] == c["eq"][1])
+                        && all.iter().all(|c| match (c.get("eq"), c.get("in")) {
+                            (Some(eq), _) => o[eq[0].as_str().unwrap()] == eq[1],
+                            (_, Some(any)) => any[1]
+                                .as_array()
+                                .unwrap()
+                                .contains(&o[any[0].as_str().unwrap()]),
+                            _ => panic!("filter {c}"),
+                        })
                 });
                 let objects: Vec<Value> = found
                     .map(|((t, key), o)| json!({"id": oid(t, key), "head": {"fields": Self::wrap(o)}}))
@@ -1115,8 +1120,8 @@ fn r6_a_page_is_the_reviewer_s_page_and_its_digest_from_one_read() {
     assert_eq!(code(&e), ("unknown_unit".into(), "unit".into()));
 }
 
-/// The intent `widgets` with two criteria and six units: `a`, `b` after `a`, `c` and `d` on a cycle,
-/// `e` dropped, and `f` of another intent.
+/// The intent `widgets` with two criteria and seven units: `a`, `b` after `a`, `c` and `d` on a cycle,
+/// `e` dropped, `f` of another intent, and `g` of the lane `small` that names the intent.
 fn plan_fixture(f: &mut F) {
     f.put(
         "intent",
@@ -1160,6 +1165,12 @@ fn plan_fixture(f: &mut F) {
     );
     f.modify("unit", "e", json!({"state": "dropped"}));
     f.modify("unit", "f", json!({"intent": oid("intent", "other")}));
+    f.unit("g", "plain", true);
+    f.modify(
+        "unit",
+        "g",
+        json!({"lane": "small", "origin": oid("request", "q-small"), "estimate_lines": 12}),
+    );
     f.objects.remove(&k("unit", "u1"));
 }
 
@@ -1189,7 +1200,7 @@ fn r7_the_plan_part_is_a_golden_text_and_its_digest_ignores_every_state() {
         f.p("clone")
     );
     assert!(rest.starts_with(&repositories), "{rest}");
-    let states = "## States now\n\n- unit a: draft\n- unit b: draft\n- unit c: draft\n- unit d: draft\n- criterion c1: open\n- criterion c2: open\n";
+    let states = "## States now\n\n- unit a: draft\n- unit b: draft\n- unit g: draft\n- unit c: draft\n- unit d: draft\n- criterion c1: open\n- criterion c2: open\n";
     assert!(rest.contains(states), "{rest}");
     assert!(rest.ends_with(&format!(
         "{PLAN_REVIEWER}\nDigest: {}\n",
