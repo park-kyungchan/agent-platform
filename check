@@ -19,6 +19,9 @@ if [ "${CI:-}" != true ] && [ -z "${CHECK_LOCKED:-}" ]; then
     exec flock "$lock" "$self" "$@"
   fi
 fi
+unset ONT_AGENT ONT_ROLE
+python3 -I -B scripts/check-map.py crates/ scripts/ conformance/ specs/ .github/ check rust-toolchain.toml
+python3 -I -B -m unittest discover -s scripts -p 'test_check_map.py'
 cargo fmt --all -- --check
 cargo clippy --workspace --all-targets --locked -- -D warnings
 cargo test --workspace --locked

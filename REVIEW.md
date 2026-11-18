@@ -4,7 +4,7 @@ For the one reviewer session of a pull request (and for the automatic reviewer).
 
 ## A finding blocks only when it is one of these, shown by a command or a test you supply
 
-1. Wrong behaviour: a sequence of commands of this repository's binaries, on a store they produced, after which a read omits or wrongly returns a head or a count, an action is applied or refused against its criteria, or a command's answer contradicts `crates/ont/README.md`.
+1. Wrong behaviour: a sequence of commands of this repository's binaries, on a store they produced, after which a read omits or wrongly returns a head or a count, an action is applied or refused against its criteria, or a command's answer contradicts `specs/ont/`.
 2. Loss or exposure of data: a write, a migration, `compact`, `backup` or an interrupted run that loses or damages rows; a reader that learns of objects outside its grants.
 3. A broken contract: the schema language, an answer's shape, the store format or a public library item changes without the pull request saying so, or an installed schema no longer installs.
 4. Unbounded work: the work of one read or one action grows without a stated bound.

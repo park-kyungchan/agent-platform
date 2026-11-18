@@ -2728,7 +2728,7 @@ fn records_refusal(code: &str) -> bool {
 }
 
 /// Apply one action. A refusal raised after the action type was found also
-/// appends one line to `refusals.jsonl` (README "Refusal records"); the
+/// appends one line to `refusals.jsonl` (`specs/ont/action.md` "Refusal records"); the
 /// answer is the same whether or not the append succeeds.
 pub fn apply_action(ctx: &Context, req: &ApplyActionRequest) -> Result<Answer, Failure> {
     let mut found: Option<(String, u64)> = None;
