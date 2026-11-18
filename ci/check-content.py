@@ -52,10 +52,9 @@ CORPUS_PATH = re.compile(r"`docs/[^`\s]+`")
 # The one file that names models: the Lead's table of the allowed models and the rule that chooses them by a page's size.
 MODEL_TABLE = "skills/lead/references/unit-page.md"
 for name, text in texts.items():
-    if name == MODEL_TABLE:
-        continue
-    for m in MODEL.finditer(CORPUS_PATH.sub("``", text)):
-        fail("model_name_in_content", name, f"'{m.group(0)}' belongs in a task STATE, not in shared instructions")
+    if name != MODEL_TABLE:
+        for m in MODEL.finditer(CORPUS_PATH.sub("``", text)):
+            fail("model_name_in_content", name, f"'{m.group(0)}' belongs in a task STATE, not in shared instructions")
     always = text if name == "AGENTS.md" else ""
     if name.endswith("/SKILL.md"):
         fm = re.match(r"---\n(.*?)\n---", text, re.S)

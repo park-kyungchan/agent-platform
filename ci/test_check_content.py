@@ -108,6 +108,14 @@ class ModelNamesAndLimits(Scratch, unittest.TestCase):
         code, out = run_check(root)
         self.assertEqual(code, 0, out)
 
+    def test_the_model_table_still_has_its_routes_and_links_checked(self):
+        root = self.fixture()
+        self.append_to(root, self.MODEL_TABLE, "See [x](gone.md) and `/root/.agents/skills/lead/references/gone.md`.")
+        code, out = run_check(root)
+        self.assertEqual(code, 1, out)
+        self.assertIn(f"route_to_missing_file@content/{self.MODEL_TABLE}", out)
+        self.assertIn(f"broken_relative_link@content/{self.MODEL_TABLE}", out)
+
     def test_a_model_name_in_any_other_owned_file_fails(self):
         for name in ("skills/lead/SKILL.md", "skills/lead/references/judging.md", "skills/report/SKILL.md", TARGET, "AGENTS.md"):
             with self.subTest(name=name):
