@@ -1,0 +1,12 @@
+[Unit]
+Description=ap work about every minute
+Documentation=https://github.com/park-kyungchan/agent-platform/blob/main/deploy/README.md
+
+[Timer]
+OnBootSec=2min
+# A pass starts sixty seconds after the last one ended.
+OnUnitInactiveSec=60s
+AccuracySec=1s
+
+[Install]
+WantedBy=timers.target

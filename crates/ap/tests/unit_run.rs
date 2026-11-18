@@ -8,6 +8,8 @@
 //! answered by running its command here. The policy file, the units and the reviews directory are under
 //! a temporary directory: no test starts a unit of the service manager or reaches the host's store,
 //! policy file, units, reviews, a clone of the host or the hosting service.
+#[path = "fixtures/work/forks.rs"]
+mod forks;
 use ap::host::{Answer, Failure, Host, Reply, System};
 use ap::unit::drive::{Refusal, arguments, decide, execute};
 use serde_json::{Value, json};
@@ -61,26 +63,30 @@ fn now() -> String {
     stamp(SystemTime::now())
 }
 fn git(dir: &Path, words: &[&str]) -> String {
-    let out = Command::new("git")
-        .arg("-C")
-        .arg(dir)
-        .args(words)
-        .env("GIT_AUTHOR_NAME", "Invented")
-        .env("GIT_AUTHOR_EMAIL", "invented@example.invalid")
-        .env("GIT_COMMITTER_NAME", "Invented")
-        .env("GIT_COMMITTER_EMAIL", "invented@example.invalid")
-        .env("GIT_CONFIG_NOSYSTEM", "1")
-        .env("GIT_CONFIG_GLOBAL", "/dev/null")
-        .output()
-        .unwrap();
+    let out = forks::forking(|| {
+        Command::new("git")
+            .arg("-C")
+            .arg(dir)
+            .args(words)
+            .env("GIT_AUTHOR_NAME", "Invented")
+            .env("GIT_AUTHOR_EMAIL", "invented@example.invalid")
+            .env("GIT_COMMITTER_NAME", "Invented")
+            .env("GIT_COMMITTER_EMAIL", "invented@example.invalid")
+            .env("GIT_CONFIG_NOSYSTEM", "1")
+            .env("GIT_CONFIG_GLOBAL", "/dev/null")
+            .output()
+    })
+    .unwrap();
     assert!(out.status.success(), "git {words:?}: {out:?}");
     String::from_utf8(out.stdout).unwrap().trim().to_owned()
 }
 fn kill_group(pgid: u32) {
-    let _ = Command::new("kill")
-        .args(["-KILL", "--", &format!("-{pgid}")])
-        .stderr(std::process::Stdio::null())
-        .status();
+    let _ = forks::forking(|| {
+        Command::new("kill")
+            .args(["-KILL", "--", &format!("-{pgid}")])
+            .stderr(std::process::Stdio::null())
+            .status()
+    });
 }
 type Key = (String, String);
 fn k(kind: &str, key: &str) -> Key {
@@ -134,6 +140,7 @@ struct F {
 }
 impl F {
     fn new() -> Self {
+        forks::gap();
         let t = std::env::temp_dir().join(format!(
             "ap-unit-run-{}-{}",
             std::process::id(),
@@ -266,6 +273,7 @@ impl F {
         self.modify("unit", KEY, set);
     }
     fn run(&mut self) -> Result<(Value, u8), Box<Refusal>> {
+        forks::settled();
         execute(self, Some(STORE), KEY)
     }
     fn ok(&mut self) -> (Value, u8) {
@@ -359,17 +367,19 @@ impl F {
         words[at + 1].to_owned()
     }
     fn origin_head(&self) -> Option<String> {
-        let out = Command::new("git")
-            .arg("-C")
-            .arg(self.t.join("origin.git"))
-            .args([
-                "rev-parse",
-                "--verify",
-                "--quiet",
-                &format!("refs/heads/unit/{KEY}"),
-            ])
-            .output()
-            .unwrap();
+        let out = forks::forking(|| {
+            Command::new("git")
+                .arg("-C")
+                .arg(self.t.join("origin.git"))
+                .args([
+                    "rev-parse",
+                    "--verify",
+                    "--quiet",
+                    &format!("refs/heads/unit/{KEY}"),
+                ])
+                .output()
+        })
+        .unwrap();
         out.status
             .success()
             .then(|| String::from_utf8(out.stdout).unwrap().trim().to_owned())
@@ -390,12 +400,14 @@ impl F {
         }
         git(&other, &["fetch", "--quiet", "origin"]);
         let theirs = format!("refs/remotes/origin/{branch}");
-        let known = Command::new("git")
-            .arg("-C")
-            .arg(&other)
-            .args(["rev-parse", "--verify", "--quiet", &theirs])
-            .output()
-            .unwrap();
+        let known = forks::forking(|| {
+            Command::new("git")
+                .arg("-C")
+                .arg(&other)
+                .args(["rev-parse", "--verify", "--quiet", &theirs])
+                .output()
+        })
+        .unwrap();
         let from = match known.status.success() {
             true => theirs,
             false => "refs/remotes/origin/main".to_owned(),
@@ -424,11 +436,8 @@ impl F {
         rec["end"] = Value::Null;
         std::fs::write(record, rec.to_string()).unwrap();
         let unit = rec["unit"].as_str().unwrap().to_owned();
-        let child = Command::new("sleep")
-            .arg("600")
-            .process_group(0)
-            .spawn()
-            .unwrap();
+        let child =
+            forks::forking(|| Command::new("sleep").arg("600").process_group(0).spawn()).unwrap();
         self.groups.insert(unit.clone(), child.id());
         self.sleepers.push(child);
         self.alive.insert(unit);
@@ -451,6 +460,7 @@ impl F {
             }
         }
         let mut after = None;
+        forks::settled();
         decide(self, Some(STORE), op, &r, &mut after).map_err(|f| (f, after))
     }
     /// The index of the first call that `found` matches.
@@ -500,14 +510,16 @@ impl F {
     }
     fn engine_call(&self, args: &[&str], body: &Value) -> Value {
         let store = self.engine.as_deref().unwrap();
-        let out = Command::new("ont")
-            .arg("--store")
-            .arg(store)
-            .args(args)
-            .stdin(std::process::Stdio::piped())
-            .stdout(std::process::Stdio::piped())
-            .spawn()
-            .unwrap();
+        let out = forks::forking(|| {
+            Command::new("ont")
+                .arg("--store")
+                .arg(store)
+                .args(args)
+                .stdin(std::process::Stdio::piped())
+                .stdout(std::process::Stdio::piped())
+                .spawn()
+        })
+        .unwrap();
         let mut out = out;
         std::io::Write::write_all(out.stdin.as_mut().unwrap(), body.to_string().as_bytes())
             .unwrap();
@@ -584,7 +596,7 @@ impl F {
         if let Some(store) = &self.engine {
             let mut a = args.to_vec();
             *a.last_mut().unwrap() = store.clone();
-            return Host.call("ont", &a, input, 60_000);
+            return forks::forking(|| Host.call("ont", &a, input, 60_000));
         }
         let epoch = SystemTime::now()
             .duration_since(UNIX_EPOCH)
@@ -1002,13 +1014,15 @@ impl F {
                 }
                 let origin = self.t.join("origin.git");
                 let main = git(&origin, &["rev-parse", "refs/heads/main"]);
-                let behind = !Command::new("git")
-                    .arg("-C")
-                    .arg(&origin)
-                    .args(["merge-base", "--is-ancestor", &main, &pinned])
-                    .status()
-                    .unwrap()
-                    .success();
+                let behind = !forks::forking(|| {
+                    Command::new("git")
+                        .arg("-C")
+                        .arg(&origin)
+                        .args(["merge-base", "--is-ancestor", &main, &pinned])
+                        .status()
+                })
+                .unwrap()
+                .success();
                 if head.as_deref() != Some(pinned.as_str()) || behind || self.merged.is_some() {
                     return reply(false, &json!({}));
                 }
@@ -1113,9 +1127,9 @@ impl System for F {
             // A check's unit: the command after `--`, run here (no unit is started).
             "systemd-run" => {
                 let at = args.iter().position(|a| a == "--").unwrap();
-                Host.call(&args[at + 1], &args[at + 2..], input, ms)
+                forks::forking(|| Host.call(&args[at + 1], &args[at + 2..], input, ms))
             }
-            _ => Host.call(program, args, input, ms),
+            _ => forks::forking(|| Host.call(program, args, input, ms)),
         }
     }
     fn launch(
@@ -1138,16 +1152,23 @@ impl System for F {
             .find_map(|a| a.strip_prefix("--unit="))
             .unwrap()
             .to_owned();
-        let child = Command::new(self.t.join("bin").join(&argv[at + 1]))
-            .args(&argv[at + 2..])
-            .env_clear()
-            .envs(env.iter().map(|(k, v)| (k, v)))
-            .current_dir(cwd)
-            .stdin(files[0].try_clone()?)
-            .stdout(files[1].try_clone()?)
-            .stderr(files[2].try_clone()?)
-            .process_group(0)
-            .spawn()?;
+        let (stdin, stdout, stderr) = (
+            files[0].try_clone()?,
+            files[1].try_clone()?,
+            files[2].try_clone()?,
+        );
+        let child = forks::forking(|| {
+            Command::new(self.t.join("bin").join(&argv[at + 1]))
+                .args(&argv[at + 2..])
+                .env_clear()
+                .envs(env.iter().map(|(k, v)| (k, v)))
+                .current_dir(cwd)
+                .stdin(stdin)
+                .stdout(stdout)
+                .stderr(stderr)
+                .process_group(0)
+                .spawn()
+        })?;
         self.groups.insert(unit.clone(), child.id());
         self.alive.insert(unit);
         Ok(child)
@@ -1209,12 +1230,14 @@ fn r1_the_form_the_role_and_the_actor_of_every_apply() {
     }
     // The binary: `usage` on standard error with exit 2; the present forms answer as before.
     let ap = |args: &[&str]| {
-        Command::new(env!("CARGO_BIN_EXE_ap"))
-            .args(args)
-            .env_remove("ONT_ROLE")
-            .stdin(std::process::Stdio::null())
-            .output()
-            .unwrap()
+        forks::forking(|| {
+            Command::new(env!("CARGO_BIN_EXE_ap"))
+                .args(args)
+                .env_remove("ONT_ROLE")
+                .stdin(std::process::Stdio::null())
+                .output()
+        })
+        .unwrap()
     };
     let out = ap(&["unit", "run"]);
     assert_eq!(out.status.code(), Some(2));
@@ -1356,6 +1379,7 @@ fn r2_every_check_before_anything_is_made_or_applied() {
         let mut f = F::new();
         f.set_unit(unit.clone());
         f.policy(policy.clone());
+        forks::settled();
         let e = match execute(&mut f, Some(STORE), key) {
             Err(e) => *e,
             Ok(v) => panic!("{v:?}"),
@@ -2510,12 +2534,14 @@ fn r25_the_answer() {
     );
     assert!(a.get("waits_for").is_none());
     // The binary prints a refusal with the key.
-    let out = Command::new(env!("CARGO_BIN_EXE_ap"))
-        .args(["unit", "run", "Bad"])
-        .env_remove("ONT_ROLE")
-        .stdin(std::process::Stdio::null())
-        .output()
-        .unwrap();
+    let out = forks::forking(|| {
+        Command::new(env!("CARGO_BIN_EXE_ap"))
+            .args(["unit", "run", "Bad"])
+            .env_remove("ONT_ROLE")
+            .stdin(std::process::Stdio::null())
+            .output()
+    })
+    .unwrap();
     let e: Value = serde_json::from_slice(&out.stderr).unwrap();
     assert_eq!(
         (out.status.code(), &e["error"]["code"], &e["error"]["unit"]),
@@ -3008,12 +3034,14 @@ fn r33_approve_checks_its_request_the_lead_and_the_lock() {
     let (e, after) = f.decide("approve", "lead-1", r).unwrap_err();
     assert_eq!((store_code(&e), after), ("unit_not_accepted".into(), None));
     // The binary: `usage` for another argument, the refusal with `after` and `unit`.
-    let out = Command::new(env!("CARGO_BIN_EXE_ap"))
-        .args(["unit", "approve", "x"])
-        .env_remove("ONT_ROLE")
-        .stdin(std::process::Stdio::null())
-        .output()
-        .unwrap();
+    let out = forks::forking(|| {
+        Command::new(env!("CARGO_BIN_EXE_ap"))
+            .args(["unit", "approve", "x"])
+            .env_remove("ONT_ROLE")
+            .stdin(std::process::Stdio::null())
+            .output()
+    })
+    .unwrap();
     let e: Value = serde_json::from_slice(&out.stderr).unwrap();
     assert_eq!(
         (out.status.code(), &e["error"]["code"]),

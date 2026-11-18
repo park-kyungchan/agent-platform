@@ -375,7 +375,7 @@ fn page_parameters(r: &Value, op: &str, key: &str) -> Result<(Value, Vec<String>
     Ok((p.into(), depends))
 }
 /// The engine gives the role of `ONT_ROLE` to a request that carries none (R4).
-pub(super) fn lead_in_environment(s: &impl System) -> bool {
+pub(crate) fn lead_in_environment(s: &impl System) -> bool {
     s.environment()
         .iter()
         .any(|(k, v)| k == "ONT_ROLE" && v == "lead")

@@ -33,7 +33,7 @@ const MODES: [&str; 6] = [
     "plan",
 ];
 /// The fixed short list of variables taken from this process; nothing else is inherited.
-const KEEP: [&str; 10] = [
+pub(crate) const KEEP: [&str; 10] = [
     "PATH", "HOME", "USER", "LOGNAME", "SHELL", "LANG", "LC_ALL", "TERM", "TMPDIR", "TZ",
 ];
 const MEMBERS: [&str; 28] = [
