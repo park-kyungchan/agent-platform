@@ -289,8 +289,15 @@ impl F {
         assert!((1..=1000).contains(&page), "the engine's bound of limit");
         let to = (from + page).min(found.len());
         let next = (to < found.len()).then(|| to.to_string());
+        // As the engine answers: a filter on a property that a scanned object of the type lacks is unqualified.
+        let lacks = self.objects.values().any(|o| {
+            o["object_type"] == body["object_type"]
+                && all
+                    .iter()
+                    .any(|c| o.get(c["eq"][0].as_str().unwrap()).is_none())
+        });
         ok(
-            json!({"basis": {"qualified": !self.unqualified}, "objects": found[from..to],
+            json!({"basis": {"qualified": !(self.unqualified || lacks)}, "objects": found[from..to],
             "continuation": next}),
         )
     }
@@ -852,11 +859,11 @@ fn r13_a_request_routed_often_reads_back_and_can_be_superseded() {
         (again["record"].as_str(), again["request"].as_str()),
         (Some("already_applied"), Some(key.as_str()))
     );
-    // A search of the session, topic and time, to the end, and no `get` of the request.
+    // A search of the topic and time, to the end, and no `get` of the request.
     let last = f.calls.last().unwrap();
     assert_eq!(
         last.1["where"],
-        json!({"all": [{"eq": ["session", "s1"]}, {"eq": ["topic", "walk/one"]}, {"eq": ["said_at", "2026-11-16T03:04:05Z"]}]})
+        json!({"all": [{"eq": ["topic", "walk/one"]}, {"eq": ["said_at", "2026-11-16T03:04:05Z"]}]})
     );
     assert!(f.names().iter().all(|n| n != "get request"));
     // Superseded: the route it had (aside, with its reason) is read from the superseded rows.
@@ -982,6 +989,26 @@ fn r12_a_route_is_checked_before_anything_is_applied() {
 }
 // spec: specs/ap/request.md#R13
 #[test]
+fn r13_read_back_is_qualified_when_a_stored_request_has_no_session() {
+    let mut f = F::new();
+    // A request recorded without the optional `session`: a filter on `session` would answer unqualified.
+    f.objects.insert(
+        "nosession".into(),
+        json!({"object_type": "request", "status": "current", "route": "unrouted",
+            "topic": "walk/other", "said_at": "2026-11-15T01:02:03Z", "words": "older"}),
+    );
+    let v = run(&mut f, &from("2026-11-16T03:04:05"));
+    assert_eq!(v["record"], "applied");
+    assert_eq!(v["words_verified"], true);
+    let last = f.calls.last().unwrap();
+    assert_eq!(last.1["object_type"], "request");
+    assert_eq!(
+        last.1["where"],
+        json!({"all": [{"eq": ["topic", "walk/one"]}, {"eq": ["said_at", "2026-11-16T03:04:05Z"]}]})
+    );
+}
+// spec: specs/ap/request.md#R13
+#[test]
 fn r13_record_applies_reads_back_then_routes() {
     let mut f = F::new();
     run(&mut f, &with(rec(), "route", json!({"intent": "open"})));
@@ -994,11 +1021,11 @@ fn r13_record_applies_reads_back_then_routes() {
             "apply route_request"
         ]
     );
-    // The read-back is a search of the call's session, topic and time; the row of the key is the one read.
+    // The read-back is a search of the call's topic and time; the row of the key is the one read.
     assert_eq!(f.calls[2].1["object_type"], "request");
     assert_eq!(
         f.calls[2].1["where"],
-        json!({"all": [{"eq": ["session", "s1"]}, {"eq": ["topic", "walk/one"]}, {"eq": ["said_at", "2026-11-16T03:04:05Z"]}]})
+        json!({"all": [{"eq": ["topic", "walk/one"]}, {"eq": ["said_at", "2026-11-16T03:04:05Z"]}]})
     );
     assert_eq!(
         applied_params(&f, "route_request"),
