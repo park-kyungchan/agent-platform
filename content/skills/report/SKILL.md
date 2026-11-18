@@ -15,7 +15,7 @@ Apply this to every message addressed to the user, in any CLI and any role. Ever
 
 ## 2. The form
 
-The first sentence names the exact thing the message is about (the file, repository, command or value you took the user's words to mean), so that one word of the user can correct it; an answer to a question starts with the answer. Then the parts, in this order; a part with nothing in it is left out:
+The first sentence names the exact thing the message is about (the file, repository, command or value you took the user's words to mean), so that one word of the user can correct it; an answer to a question starts with the answer. The next sentence names the read or measurement you start now, with its source: reversible work never waits for an answer, and a question decides only what follows it. Then the parts, in this order; a part with nothing in it is left out:
 
 1. **Board**: one box, one line per item the user asked for or must know: a state mark, the item in a few words, its result or state in one line. Marks: `✔` done, `▶` running (time so far / limit), `?` waiting for the user (`← 결정`), `✖` failed or stopped, `◐` partly done. A measure, when there is one, is a line of the board with its value, source and time.
 2. **Cards**: one per question of the user, in the user's order. `Q` the question in one line, in the user's terms; `A` the answer first, in one or two lines; then `→ 근거` (path:line, command or record, with its time) and `→ 다음` (what happens next). A diagram or a table goes inside the card it serves.

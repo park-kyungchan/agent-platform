@@ -11,7 +11,7 @@ Read when a message starts or changes an objective, a word of the user is unclea
 
 ## 2. The interview
 
-Due at every new objective: one message, before the intent is drafted, of at most five questions, each asked only where the request and the current requests (`ap request`, `op` `list`) do not answer it, each with its recommended default:
+Due at every new objective: one message, before the intent is drafted, of at most five questions, each asked only where neither the request, the current requests (`ap request`, `op` `list`) nor a read or measurement you can take now answers it, each with its recommended default:
 
 1. Outcome: what is true when this is done, and how it will be seen (the criteria).
 2. First use: who or what uses the result first, on which real case.
@@ -28,7 +28,6 @@ The interview holds no work: its message first says what you took the request to
 - A criterion counts the result in use, never the task's own artifacts (pages, tests, merges), which may only be a denominator. A rate needs its denominator; a count needs its window.
 - A baseline is measured before any change, or written as unmeasured and measured first. A target has a reason (all, none, a limit the user named).
 - Each way a number could be raised by harming something else gets a guardrail criterion. A proxy says what it misses. A value only a worker's report supplies is not evidence.
-- Before reporting progress, check that a criterion counts who operates a real domain on the result; where none does, say progress is unmeasured and propose that measure first.
 
 The card, in the form of skill `report`: the outcome, the criteria, what is not included, the defaults taken. The user's answer is recorded as a request routed to the intent; `confirm` names it in `by`.
 

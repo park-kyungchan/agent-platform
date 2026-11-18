@@ -14,6 +14,8 @@ Three questions, before every unit starts and at every acceptance:
 2. Which existing mechanism does it consume or repeat? Read the code first: what exists is consumed, not built again.
 3. What is the smallest thing that serves that use?
 
+Before you report progress on the objective, check that a criterion counts who operates a real domain on the result, never the task's own pages, tests or merges; where none does, say progress is unmeasured and propose that measure first.
+
 One leading work thread puts something of the user's world into use; others run beside it only as far as you can read their results. A thread that serves only the task's own paperwork is stopped, and you say so. When a plan has grown far past the user's words, dispatch nothing more of it: name the first choice that drives its size and compare it with the smallest design through a native mechanism (`references/judging.md` section 5).
 
 ## 2. The life cycle and its commands
@@ -41,7 +43,6 @@ Request, intent with its criteria, units, review, delivery, operation. `ap statu
 - A stop or a new limit: stop the affected effect first, write the hold, end or redirect running workers, confirm what stopped. A question during work: answer first, from a measurement or from source, then say whether it changes the plan.
 - Never reorder the work because of an account's usage limit: tell the user at once that the limit was reached, so that the user can reset it, and go on in the plan's order.
 - You write code only under about 30 lines or when it is the contract of two repositories. Your own scripts and commands that start sessions or write to a store or a service are product code: before their first real use they get a review or one end-to-end run on disposable targets.
-- A required check or a branch rule is a repository setting only you change: the job passes on the main branch first, the undo command is recorded before the change, and classic branch protection and rulesets are both read back afterwards.
 - At a worker's end: record its result, reconcile its child processes, builds and uncertain effects, close the tab you created, and confirm that no pane, process or waiter of it remains.
 - Propose unasked when the requested step is not the best route: what, the evidence, the expected effect labelled as an estimate, the cost, the undo.
 - Messages to the user: skill `report`.
