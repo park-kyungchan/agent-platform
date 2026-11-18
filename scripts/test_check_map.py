@@ -113,6 +113,18 @@ class CheckMapTest(unittest.TestCase):
         self.assertEqual(r.returncode, 1)
         self.assertIn("entry_out_of_range a/x.txt:1-99", r.stdout)
 
+    def test_file_unmapped_non_ascii_name(self):
+        root = self.make(
+            components=[{
+                "name": "alpha", "purpose": "Alpha component.", "paths": ["a/x.txt"],
+                "entry": [], "spec": [], "tests": [],
+            }],
+            files={"a/x.txt": "one\n", "a/é.txt": "hi\n"},
+        )
+        r = run(root, "a/")
+        self.assertEqual(r.returncode, 1)
+        self.assertIn("file_unmapped a/é.txt", r.stdout)
+
     def test_file_unmapped(self):
         root = self.make(
             components=[{

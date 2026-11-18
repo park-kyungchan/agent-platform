@@ -12,15 +12,14 @@ ENTRY_RE = re.compile(r"^(.+):([0-9]+)-([0-9]+)$")
 def tracked_files(root):
     try:
         out = subprocess.run(
-            ["git", "ls-files"],
+            ["git", "-c", "core.quotePath=false", "ls-files", "-z"],
             cwd=str(root),
             capture_output=True,
-            text=True,
             check=True,
         ).stdout
     except Exception:
         return None
-    return [line for line in out.splitlines() if line]
+    return [p.decode("utf-8", "surrogateescape") for p in out.split(b"\0") if p]
 
 
 def bad_path(p):
