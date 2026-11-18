@@ -1,0 +1,546 @@
+#!/usr/bin/env python3
+"""Compare the GitHub settings of the listed repositories with the files beside this script, or apply them.
+
+    github/apply --check [--repo OWNER/NAME]... [--file PATH]
+    github/apply --undo-dir DIR [--repo OWNER/NAME]... [--file PATH]
+
+What the files hold, the output, the undo and who applies: github/README.md.
+Every GitHub call is one `gh api` process with the caller's own login, bounded to 60 seconds.
+`--check` makes only GET calls. Exit: 0 when every repository is `same` (check) or `same`/`applied`
+(apply), 1 otherwise, 2 when nothing was called (invalid_usage, invalid_file, repository_not_listed,
+undo_dir_exists).
+"""
+import json
+import os
+import re
+import shlex
+import subprocess
+import sys
+
+SETTINGS = ("allow_merge_commit", "allow_squash_merge", "allow_rebase_merge", "delete_branch_on_merge")
+ACTIONS = ("enabled", "allowed_actions", "sha_pinning_required")
+ALLOWED_ACTIONS = ("all", "local_only", "selected")
+SELECTED = ("github_owned_allowed", "verified_allowed", "patterns_allowed")
+FEATURES = ("vulnerability_alerts", "automated_security_fixes")
+STATUSES = ("secret_scanning", "secret_scanning_push_protection")
+STATUS_VALUES = ("enabled", "disabled")
+RULESET = ("name", "target", "enforcement", "conditions", "rules", "bypass_actors")
+ENTRY = ("repository", "settings", "actions") + FEATURES + STATUSES
+REPOSITORY_NAME = re.compile(r"^[A-Za-z0-9][A-Za-z0-9-]*/[A-Za-z0-9._-]+$")
+TIMEOUT_SECONDS = 60
+
+
+class Refusal(Exception):
+    """An exit 2 before any call: the code and one short cause."""
+
+    def __init__(self, code, cause):
+        super().__init__(cause)
+        self.code = code
+        self.cause = cause
+
+
+class ReadFailed(Exception):
+    pass
+
+
+def canon(value):
+    """JSON equality: member order ignored, array order kept, true never equal to 1."""
+    return json.dumps(value, sort_keys=True, separators=(",", ":"))
+
+
+def same(a, b):
+    return canon(a) == canon(b)
+
+
+# ---------------------------------------------------------------- arguments and files
+
+
+def parse_args(argv):
+    check, undo_dir, path, repos = False, None, None, []
+    i = 0
+    while i < len(argv):
+        arg = argv[i]
+        if arg == "--check":
+            if check:
+                raise Refusal("invalid_usage", "--check given twice")
+            check = True
+            i += 1
+            continue
+        if arg in ("--undo-dir", "--file", "--repo"):
+            if i + 1 >= len(argv) or not argv[i + 1] or argv[i + 1].startswith("--"):
+                raise Refusal("invalid_usage", f"{arg} needs a value")
+            value = argv[i + 1]
+            if arg == "--undo-dir":
+                if undo_dir is not None:
+                    raise Refusal("invalid_usage", "--undo-dir given twice")
+                undo_dir = value
+            elif arg == "--file":
+                if path is not None:
+                    raise Refusal("invalid_usage", "--file given twice")
+                path = value
+            else:
+                repos.append(value)
+            i += 2
+            continue
+        raise Refusal("invalid_usage", f"unknown argument {arg!r}")
+    if check == (undo_dir is not None):
+        raise Refusal("invalid_usage", "give exactly one of --check and --undo-dir")
+    if path is None:
+        path = os.path.join(os.path.dirname(os.path.realpath(__file__)), "repositories.json")
+    return check, undo_dir, path, repos
+
+
+def is_bool(value):
+    return type(value) is bool
+
+
+def invalid(cause):
+    return Refusal("invalid_file", cause)
+
+
+def read_json(path):
+    try:
+        with open(path, encoding="utf-8") as handle:
+            return json.load(handle)
+    except (OSError, ValueError) as error:
+        raise invalid(f"{path}: {error}") from None
+
+
+def check_ruleset(name, body):
+    if not isinstance(body, dict) or set(body) != set(RULESET):
+        raise invalid(f"{name}: a ruleset holds exactly the members {', '.join(RULESET)}")
+    for key in ("name", "target", "enforcement"):
+        if not isinstance(body[key], str) or not body[key]:
+            raise invalid(f"{name}: {key} is a non-empty string")
+    if not isinstance(body["conditions"], dict):
+        raise invalid(f"{name}: conditions is an object")
+    for key in ("rules", "bypass_actors"):
+        if not isinstance(body[key], list):
+            raise invalid(f"{name}: {key} is an array")
+
+
+def check_entry(entry):
+    if not isinstance(entry, dict) or "repository" not in entry or not set(entry) <= set(ENTRY):
+        raise invalid(f"an entry holds repository and only the members {', '.join(ENTRY[1:])}")
+    name = entry["repository"]
+    if not isinstance(name, str) or not REPOSITORY_NAME.match(name):
+        raise invalid(f"repository {name!r} is not OWNER/NAME")
+    settings = entry.get("settings", {})
+    if not isinstance(settings, dict) or not set(settings) <= set(SETTINGS) or not all(map(is_bool, settings.values())):
+        raise invalid(f"{name}: settings holds only {', '.join(SETTINGS)}, each true or false")
+    if "actions" in entry:
+        actions = entry["actions"]
+        if not isinstance(actions, dict):
+            raise invalid(f"{name}: actions is an object")
+        wanted = set(ACTIONS) | ({"selected_actions"} if actions.get("allowed_actions") == "selected" else set())
+        if set(actions) != wanted:
+            raise invalid(f"{name}: actions holds {', '.join(ACTIONS)}, and selected_actions exactly when allowed_actions is selected")
+        if not is_bool(actions["enabled"]) or not is_bool(actions["sha_pinning_required"]) or actions["allowed_actions"] not in ALLOWED_ACTIONS:
+            raise invalid(f"{name}: actions has a value of a wrong type")
+        if "selected_actions" in actions:
+            selected = actions["selected_actions"]
+            if (not isinstance(selected, dict) or set(selected) != set(SELECTED)
+                    or not is_bool(selected["github_owned_allowed"]) or not is_bool(selected["verified_allowed"])
+                    or not isinstance(selected["patterns_allowed"], list)
+                    or not all(isinstance(p, str) and p for p in selected["patterns_allowed"])):
+                raise invalid(f"{name}: selected_actions holds {', '.join(SELECTED)} of their types")
+    for key in FEATURES:
+        if key in entry and not is_bool(entry[key]):
+            raise invalid(f"{name}: {key} is true or false")
+    for key in STATUSES:
+        if key in entry and entry[key] not in STATUS_VALUES:
+            raise invalid(f"{name}: {key} is enabled or disabled")
+
+
+def load(path):
+    top = read_json(path)
+    if not isinstance(top, dict) or set(top) != {"rulesets", "repositories"}:
+        raise invalid(f"{path}: the file holds exactly rulesets and repositories")
+    names = top["rulesets"]
+    if not isinstance(names, list) or not all(isinstance(n, str) and n and "/" not in n and not n.startswith(".") for n in names):
+        raise invalid(f"{path}: rulesets is a list of file names beside the file")
+    if len(set(names)) != len(names):
+        raise invalid(f"{path}: a ruleset file is named twice")
+    rulesets = []
+    for name in names:
+        body = read_json(os.path.join(os.path.dirname(os.path.abspath(path)), name))
+        check_ruleset(name, body)
+        rulesets.append(body)
+    keys = [(r["name"], r["target"]) for r in rulesets]
+    if len(set(keys)) != len(keys):
+        raise invalid(f"{path}: two ruleset files have the same name and target")
+    entries = top["repositories"]
+    if not isinstance(entries, list) or not entries:
+        raise invalid(f"{path}: repositories is a non-empty list")
+    for entry in entries:
+        check_entry(entry)
+    listed = [e["repository"] for e in entries]
+    if len(set(listed)) != len(listed):
+        raise invalid(f"{path}: a repository is listed twice")
+    return rulesets, entries
+
+
+# ---------------------------------------------------------------- gh api
+
+
+class Answer:
+    def __init__(self, ok, status, stdout, cause):
+        self.ok, self.status, self.stdout, self.cause = ok, status, stdout, cause
+
+    def json(self):
+        try:
+            return json.loads(self.stdout)
+        except ValueError:
+            raise ReadFailed("the answer is not JSON") from None
+
+
+class Gh:
+    """One `gh api` process per call. In --check, a call that is not a GET is a defect and stops the run."""
+
+    def __init__(self, writes_allowed):
+        self.writes_allowed = writes_allowed
+
+    def call(self, method, endpoint, body=None):
+        if method != "GET" and not self.writes_allowed:
+            raise AssertionError(f"--check attempted {method} {endpoint}")
+        argv = ["gh", "api", "--method", method, endpoint]
+        if body is not None:
+            argv += ["--input", "-"]
+        try:
+            proc = subprocess.run(argv, input=canon(body) if body is not None else None,
+                                  stdin=None if body is not None else subprocess.DEVNULL,
+                                  capture_output=True, text=True, timeout=TIMEOUT_SECONDS)
+        except subprocess.TimeoutExpired:
+            return Answer(False, None, "", f"{method} {endpoint}: no answer in {TIMEOUT_SECONDS} s")
+        except OSError as error:
+            return Answer(False, None, "", f"{method} {endpoint}: gh could not run: {error.strerror}")
+        found = re.search(r"\(HTTP (\d{3})\)", proc.stderr)
+        status = int(found.group(1)) if found else None
+        if proc.returncode == 0:
+            return Answer(True, status, proc.stdout, None)
+        first = (proc.stderr.strip().splitlines() or ["no message"])[-1][:200]
+        return Answer(False, status, proc.stdout, f"{method} {endpoint}: {first}")
+
+
+def get_json(gh, endpoint):
+    answer = gh.call("GET", endpoint)
+    if not answer.ok:
+        raise ReadFailed(answer.cause)
+    return answer.json()
+
+
+def get_flag(gh, endpoint, on_answer):
+    """A GET whose 404 means off; any other failure is a failed read."""
+    answer = gh.call("GET", endpoint)
+    if answer.ok:
+        return on_answer(answer)
+    if answer.status == 404:
+        return False
+    raise ReadFailed(answer.cause)
+
+
+def members(source, keys, what):
+    if not isinstance(source, dict) or not all(k in source for k in keys):
+        raise ReadFailed(f"{what}: the answer lacks one of {', '.join(keys)}")
+    return {k: source[k] for k in keys}
+
+
+def ruleset_members(ruleset):
+    return {k: ruleset.get(k) for k in RULESET}
+
+
+def read_state(gh, repo):
+    """The values the comparison uses, and nothing else of GitHub's answers."""
+    base = f"repos/{repo}"
+    answer = get_json(gh, base)
+    settings = members(answer, SETTINGS, base)
+    analysis = answer.get("security_and_analysis") if isinstance(answer, dict) else None
+    statuses = {}
+    for key in STATUSES:
+        item = analysis.get(key) if isinstance(analysis, dict) else None
+        statuses[key] = item.get("status") if isinstance(item, dict) else None
+    actions = members(get_json(gh, f"{base}/actions/permissions"), ACTIONS, f"{base}/actions/permissions")
+    actions["selected_actions"] = None
+    if actions["allowed_actions"] == "selected":
+        endpoint = f"{base}/actions/permissions/selected-actions"
+        actions["selected_actions"] = members(get_json(gh, endpoint), SELECTED, endpoint)
+    vulnerability_alerts = get_flag(gh, f"{base}/vulnerability-alerts", lambda a: True)
+
+    def fixes_enabled(answer):
+        enabled = answer.json().get("enabled") if isinstance(answer.json(), dict) else None
+        if not is_bool(enabled):
+            raise ReadFailed(f"{base}/automated-security-fixes: the answer lacks enabled")
+        return enabled
+
+    automated_security_fixes = get_flag(gh, f"{base}/automated-security-fixes", fixes_enabled)
+    classic_protection = get_flag(gh, f"{base}/branches/main/protection", lambda a: True)
+    listed = get_json(gh, f"{base}/rulesets?per_page=100")
+    if not isinstance(listed, list) or not all(isinstance(r, dict) and isinstance(r.get("id"), int) for r in listed):
+        raise ReadFailed(f"{base}/rulesets: the answer is not a list of rulesets")
+    rulesets = []
+    for item in listed:
+        full = get_json(gh, f"{base}/rulesets/{item['id']}")
+        if not isinstance(full, dict):
+            raise ReadFailed(f"{base}/rulesets/{item['id']}: the answer is not an object")
+        rulesets.append(dict(id=item["id"], **ruleset_members(full)))
+    state = {"repository": repo, "settings": settings, "actions": actions,
+             "vulnerability_alerts": vulnerability_alerts, "automated_security_fixes": automated_security_fixes,
+             "classic_protection": classic_protection, "rulesets": rulesets}
+    state.update(statuses)
+    return state
+
+
+# ---------------------------------------------------------------- comparison and writes
+
+
+def differences(entry, rulesets, state):
+    """Each difference: setting, present, wanted, and for the writes the kind and the live ruleset id."""
+    found = []
+
+    def add(setting, present, wanted, **extra):
+        found.append(dict(setting=setting, present=present, wanted=wanted, **extra))
+
+    for key in SETTINGS:
+        if key in entry.get("settings", {}) and not same(state["settings"][key], entry["settings"][key]):
+            add(f"settings.{key}", state["settings"][key], entry["settings"][key])
+    if "actions" in entry:
+        for key in ACTIONS + ("selected_actions",):
+            if key in entry["actions"] and not same(state["actions"][key], entry["actions"][key]):
+                add(f"actions.{key}", state["actions"][key], entry["actions"][key])
+    for key in FEATURES + STATUSES:
+        if key in entry and not same(state[key], entry[key]):
+            add(key, state[key], entry[key])
+    live = list(state["rulesets"])
+    for wanted in rulesets:
+        match = next((r for r in live if r["name"] == wanted["name"] and r["target"] == wanted["target"]), None)
+        if match is None:
+            add(f"ruleset:{wanted['name']}", None, wanted, ruleset_id=None)
+            continue
+        live.remove(match)
+        if not same(ruleset_members(match), wanted):
+            add(f"ruleset:{wanted['name']}", ruleset_members(match), wanted, ruleset_id=match["id"])
+    for other in live:
+        add(f"ruleset:{other['name']}", ruleset_members(other), None, unnamed=True)
+    return found
+
+
+def shown(found):
+    return [{k: d[k] for k in ("setting", "present", "wanted")} for d in found]
+
+
+def plan_writes(entry, state, found):
+    """The writes in the fixed order, each with its inverse (None for a create: its delete follows the create)."""
+    repo = state["repository"]
+    base = f"repos/{repo}"
+    by = {d["setting"]: d for d in found if not d.get("unnamed")}
+    writes = []
+    changed = [k for k in SETTINGS if f"settings.{k}" in by]
+    if changed:
+        writes.append((("PATCH", base, {k: entry["settings"][k] for k in changed}),
+                       ("PATCH", base, {k: state["settings"][k] for k in changed})))
+    if any(f"actions.{k}" in by for k in ACTIONS):
+        writes.append((("PUT", f"{base}/actions/permissions", {k: entry["actions"][k] for k in ACTIONS}),
+                       ("PUT", f"{base}/actions/permissions", {k: state["actions"][k] for k in ACTIONS})))
+    if "actions.selected_actions" in by:
+        endpoint = f"{base}/actions/permissions/selected-actions"
+        present = state["actions"]["selected_actions"]
+        writes.append((("PUT", endpoint, entry["actions"]["selected_actions"]),
+                       ("PUT", endpoint, present) if present is not None else None))
+    for key in FEATURES:
+        if key in by:
+            endpoint = f"{base}/{key.replace('_', '-')}"
+            writes.append((("PUT" if entry[key] else "DELETE", endpoint, None),
+                           ("PUT" if state[key] else "DELETE", endpoint, None)))
+    changed = [k for k in STATUSES if k in by]
+    if changed:
+        present = {k: {"status": state[k]} for k in changed if state[k] is not None}
+        writes.append((("PATCH", base, {"security_and_analysis": {k: {"status": entry[k]} for k in changed}}),
+                       ("PATCH", base, {"security_and_analysis": present}) if present else None))
+    for difference in found:
+        if not difference["setting"].startswith("ruleset:") or difference.get("unnamed"):
+            continue
+        if difference["ruleset_id"] is None:
+            writes.append((("POST", f"{base}/rulesets", difference["wanted"]), None))
+        else:
+            endpoint = f"{base}/rulesets/{difference['ruleset_id']}"
+            writes.append((("PUT", endpoint, difference["wanted"]), ("PUT", endpoint, difference["present"])))
+    return writes
+
+
+def write_file(path, text, mode):
+    temporary = f"{path}.partial"
+    descriptor = os.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, mode)
+    with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
+        handle.write(text)
+        handle.flush()
+        os.fsync(handle.fileno())
+    os.chmod(temporary, mode)
+    os.replace(temporary, path)
+
+
+UNDO_HEAD = """#!/usr/bin/env bash
+# Undo of `github/apply` for {repo}: puts back each setting the run was about to change, in the reverse
+# order of its writes. Every call runs whatever the earlier ones answered; exit 1 when one failed.
+set -u
+failed=0
+call() {{
+  local out
+  if out=$(timeout {timeout} gh api --method "$@" 2>&1); then
+    printf 'ok: %s\\n' "$*"
+  else
+    printf 'failed: %s: %s\\n' "$*" "${{out//$'\\n'/ }}"
+    failed=1
+  fi
+}}
+"""
+
+
+class Undo:
+    """present.json and undo.sh of one repository, written before its first write and after each create."""
+
+    def __init__(self, directory, state):
+        self.repo = state["repository"]
+        self.prefix = os.path.join(directory, self.repo.replace("/", "__"))
+        self.script = f"{self.prefix}.undo.sh"
+        self.inverses = []
+        write_file(f"{self.prefix}.present.json", json.dumps(state, indent=2, sort_keys=True) + "\n", 0o600)
+
+    def add(self, inverse):
+        method, endpoint, body = inverse
+        path = None
+        if body is not None:
+            path = f"{self.prefix}.undo-{len(self.inverses) + 1}.json"
+            write_file(path, json.dumps(body, indent=2, sort_keys=True) + "\n", 0o600)
+        self.inverses.append((method, endpoint, path))
+
+    def write(self):
+        lines = [UNDO_HEAD.format(repo=self.repo, timeout=TIMEOUT_SECONDS)]
+        for method, endpoint, path in reversed(self.inverses):
+            line = f"call {method} {shlex.quote(endpoint)}"
+            if path is not None:
+                line += f" --input {shlex.quote(path)}"
+            lines.append(line + "\n")
+        lines.append('exit "$failed"\n')
+        write_file(self.script, "".join(lines), 0o700)
+
+
+# ---------------------------------------------------------------- the two modes
+
+
+def result(repo, outcome, code=None, found=(), undo=None):
+    return {"repository": repo, "result": outcome, "code": code, "differences": shown(found), "undo": undo}
+
+
+def say(code, repo, cause):
+    print(f"{code}@github/apply: {repo}: {cause}", file=sys.stderr)
+
+
+def check_one(gh, entry, rulesets):
+    repo = entry["repository"]
+    try:
+        state = read_state(gh, repo)
+    except ReadFailed as error:
+        say("read_failed", repo, error)
+        return result(repo, "failed", "read_failed")
+    found = differences(entry, rulesets, state)
+    if state["classic_protection"]:
+        return result(repo, "refused", "classic_protection_present", found)
+    return result(repo, "differs" if found else "same", None, found)
+
+
+def apply_one(gh, entry, rulesets, directory):
+    """The result of one repository and whether every later write stops."""
+    repo = entry["repository"]
+    try:
+        state = read_state(gh, repo)
+    except ReadFailed as error:
+        say("read_failed", repo, error)
+        return result(repo, "failed", "read_failed"), True
+    found = differences(entry, rulesets, state)
+    if state["classic_protection"]:
+        say("classic_protection_present", repo, "classic protection of main is present; nothing written")
+        return result(repo, "refused", "classic_protection_present", found), False
+    writes = plan_writes(entry, state, found)
+    if not writes:
+        return result(repo, "same", None, found), False
+    try:
+        undo = Undo(directory, state)
+        for _, inverse in writes:
+            if inverse is not None:
+                undo.add(inverse)
+        undo.write()
+    except OSError as error:
+        say("write_failed", repo, f"the undo could not be written ({error}); nothing written to GitHub")
+        return result(repo, "failed", "write_failed", found), True
+    for (method, endpoint, body), _ in writes:
+        answer = gh.call(method, endpoint, body)
+        if not answer.ok:
+            say("write_failed", repo, answer.cause)
+            return result(repo, "failed", "write_failed", found, undo.script), True
+        if method == "POST":
+            try:
+                created = answer.json()
+                identifier = created["id"] if isinstance(created, dict) else None
+                if not isinstance(identifier, int):
+                    raise ReadFailed("the answer lacks the new id")
+                undo.add(("DELETE", f"{endpoint}/{identifier}", None))
+                undo.write()
+            except (ReadFailed, OSError) as error:
+                say("write_failed", repo, f"{method} {endpoint}: created, but its delete is not in the undo ({error})")
+                return result(repo, "failed", "write_failed", found, undo.script), True
+    try:
+        after = read_state(gh, repo)
+    except ReadFailed as error:
+        say("read_failed", repo, f"read-back: {error}")
+        return result(repo, "failed", "read_failed", found, undo.script), True
+    left = [d["setting"] for d in differences(entry, rulesets, after) if not d.get("unnamed")]
+    if left:
+        say("read_back_differs", repo, f"still different after the writes: {', '.join(left)}")
+        return result(repo, "failed", "read_back_differs", found, undo.script), True
+    return result(repo, "applied", None, found, undo.script), False
+
+
+def main(argv):
+    try:
+        check, directory, path, repos = parse_args(argv)
+        rulesets, entries = load(path)
+        listed = [e["repository"] for e in entries]
+        unknown = [r for r in repos if r not in listed]
+        if unknown:
+            raise Refusal("repository_not_listed", f"{', '.join(unknown)} is not in {path}")
+        if repos:
+            entries = [e for e in entries if e["repository"] in repos]
+        if not check:
+            directory = os.path.abspath(directory)
+            if os.path.lexists(directory):
+                raise Refusal("undo_dir_exists", f"{directory} exists")
+            os.makedirs(os.path.dirname(directory), exist_ok=True)
+            try:
+                os.mkdir(directory, 0o700)
+            except FileExistsError:
+                raise Refusal("undo_dir_exists", f"{directory} exists") from None
+            os.chmod(directory, 0o700)
+    except Refusal as refusal:
+        print(f"{refusal.code}@github/apply: {refusal.cause}", file=sys.stderr)
+        return 2
+    gh = Gh(writes_allowed=not check)
+    results = []
+    if check:
+        for entry in entries:
+            results.append(check_one(gh, entry, rulesets))
+        good = all(r["result"] == "same" for r in results)
+    else:
+        stopped = False
+        for entry in entries:
+            if stopped:
+                results.append(result(entry["repository"], "not_run"))
+                continue
+            outcome, stopped = apply_one(gh, entry, rulesets, directory)
+            results.append(outcome)
+        good = all(r["result"] in ("same", "applied") for r in results)
+    print(json.dumps({"mode": "check" if check else "apply", "repositories": results}, indent=2))
+    return 0 if good else 1
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))
