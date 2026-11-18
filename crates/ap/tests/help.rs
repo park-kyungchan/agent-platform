@@ -84,3 +84,13 @@ fn r23_the_help_of_status_names_the_wait_form() {
     let status = String::from_utf8(ap(&["status", "--help"]).stdout).unwrap();
     assert!(status.contains("ap status --wait <intent> [--timeout <seconds>] [--store <path>]"));
 }
+
+// spec: specs/ap/status.md#R34
+#[test]
+fn r34_the_help_of_status_names_the_indicators_form() {
+    let form = "ap status --indicators [<intent>] [--text] [--store <path>]";
+    let help = String::from_utf8(ap(&["--help"]).stdout).unwrap();
+    assert!(help.contains(form));
+    let status = String::from_utf8(ap(&["status", "--help"]).stdout).unwrap();
+    assert!(status.contains(form));
+}

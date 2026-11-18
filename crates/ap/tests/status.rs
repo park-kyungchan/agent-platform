@@ -45,6 +45,14 @@ struct F {
     ghost: Option<String>,
     /// The view states one row too many.
     skew: bool,
+    /// The applied rows of the action log, oldest first (the fake answers newest first): `action_type`,
+    /// `parameters` and `submitted_at`.
+    log: Vec<Value>,
+    /// Rows to a page of the log, the rows the engine withheld by action type, and a log that repeats its
+    /// continuation.
+    log_page: usize,
+    withheld: BTreeMap<&'static str, u64>,
+    log_loops: bool,
 }
 impl F {
     fn empty() -> Self {
@@ -60,6 +68,10 @@ impl F {
             refuse: None,
             ghost: None,
             skew: false,
+            log: vec![],
+            log_page: 100,
+            withheld: BTreeMap::new(),
+            log_loops: false,
         }
     }
     fn put(&mut self, kind: &str, key: &str, fields: Value) {
@@ -189,6 +201,28 @@ impl F {
                 "truncated": self.truncated, "view": view}),
         )
     }
+    /// `ont log`: the rows of one action type newest first, `limit` of them to a page.
+    fn log(&self, b: &Value) -> Answer {
+        assert_eq!(b["outcome"], "applied");
+        assert_eq!(b["parameters"], true, "the parameters name the unit");
+        assert_eq!(b["limit"], 100);
+        let action = b["action_type"].as_str().unwrap();
+        let newest: Vec<&Value> = (self.log.iter().rev())
+            .filter(|r| r["action_type"] == action)
+            .collect();
+        let at = b["continuation"].as_str().filter(|_| !self.log_loops);
+        let from: usize = at.map_or(0, |c| c.parse().unwrap());
+        let to = (from + self.log_page).min(newest.len());
+        let mut next = (to < newest.len()).then(|| to.to_string());
+        if self.log_loops {
+            next = Some("again".to_owned());
+        }
+        let withheld = self.withheld.get(action).copied().unwrap_or(0);
+        self.ok(
+            json!({"rows": newest[from..to], "continuation": next, "scan_limited": false,
+            "skipped": 0, "withheld": withheld}),
+        )
+    }
     fn describe(&self) -> Answer {
         let map = |kind: &str| -> Vec<Value> {
             let all = self.schema[kind].as_object().unwrap().iter();
@@ -280,6 +314,7 @@ impl System for F {
             "render" => self.render(input),
             "describe" => self.describe(),
             "aggregate" => self.aggregate(input),
+            "log" => self.log(input),
             other => panic!("ont {other}: the verb reads only"),
         }
     }
@@ -680,6 +715,32 @@ fn r2_the_verb_only_reads() {
             "{:?}",
             f.reads
         );
+    }
+}
+
+// spec: specs/ap/status.md#R2
+#[test]
+fn r2_the_log_is_read_by_the_indicators_only() {
+    let mut f = indicator_store();
+    indicators_of(&mut f, None);
+    let reads = ["get", "search", "render", "describe", "aggregate", "log"];
+    assert!(
+        f.names().iter().all(|n| reads.contains(n)),
+        "{:?}",
+        f.names()
+    );
+    assert!(f.names().contains(&"log"));
+    assert!(f.reads.borrow().is_empty(), "no file is read");
+    for call in [Call::Overview, key("u-a"), key("vps"), term("unit")] {
+        let mut f = indicator_store();
+        f.put(
+            "request",
+            "q-start",
+            json!({"topic": "t", "kind": "order", "said_at": "2026-11-17T08:00:00Z",
+            "status": "current", "route": "intent", "words_verified": true}),
+        );
+        let _ = execute(&mut f, None, &call);
+        assert!(!f.names().contains(&"log"), "{:?}", f.names());
     }
 }
 
@@ -2820,4 +2881,582 @@ fn r33_a_timeout_ends_with_the_last_error_when_no_reading_succeeded() {
     wu(&mut w.f, "u", "running", json!({"repository": null}));
     w.then(|w| w.down = true);
     assert_eq!(w.answer(30), timeout_at(&w, 0));
+}
+
+// The indicators (R34 to R41): a store of merged units with the log rows the engine would hold.
+fn log_row(f: &mut F, action: &str, unit: &str, at: &str, more: Value) {
+    let mut parameters = json!({"unit": oid("unit", unit)});
+    for (k, v) in more.as_object().unwrap() {
+        parameters[k] = v.clone();
+    }
+    f.log.push(
+        json!({"action_type": action, "outcome": "applied", "parameters": parameters,
+        "submitted_at": at, "actor": {"agent": "ap"}}),
+    );
+}
+fn review(
+    f: &mut F,
+    key: &str,
+    unit: &str,
+    kind: &str,
+    (status, verdict): (&str, Value),
+    closed: &str,
+) {
+    f.put(
+        "review",
+        key,
+        json!({"kind": kind, "unit": oid("unit", unit), "head": "h", "status": status,
+        "verdict": verdict, "started_at": "2026-11-17T08:00:00Z", "closed_at": closed}),
+    );
+}
+fn token_run(f: &mut F, key: &str, unit: &str, role: &str, tokens: [Option<u64>; 4]) {
+    let [i, r, w, o] = tokens;
+    run_object(
+        f,
+        key,
+        "closed",
+        "2026-11-17T09:00:00Z",
+        json!({"unit": oid("unit", unit), "role": role,
+        "input_tokens": i, "cache_read_tokens": r, "cache_write_tokens": w, "output_tokens": o}),
+    );
+}
+fn indicator_store() -> F {
+    let mut f = F::empty();
+    intent(&mut f, "vps", "confirmed", json!({}));
+    intent(&mut f, "other", "confirmed", json!({}));
+    let tier = json!({"runtime": "claude", "model": "m1", "effort": "high"});
+    let merged = |f: &mut F, k: &str, i: &str, more: Value| {
+        let mut o = json!({"state": "merged", "intent": oid("intent", i)});
+        for (m, v) in more.as_object().unwrap() {
+            o[m] = v.clone();
+        }
+        unit(f, k, "merged", o);
+    };
+    merged(
+        &mut f,
+        "u-a",
+        "vps",
+        json!({"class": "contract", "implementer": tier}),
+    );
+    merged(&mut f, "u-b", "vps", json!({}));
+    merged(&mut f, "u-e", "vps", json!({}));
+    merged(&mut f, "u-c", "other", json!({}));
+    unit(
+        &mut f,
+        "u-d",
+        "running",
+        json!({"intent": oid("intent", "vps")}),
+    );
+    // u-a: a stop and a resume, a repair, one rejected round and one accepted; the rows are put in time order.
+    log_row(
+        &mut f,
+        "start_unit",
+        "u-a",
+        "2026-11-17T09:00:00Z",
+        json!({}),
+    );
+    log_row(
+        &mut f,
+        "start_unit",
+        "u-a",
+        "2026-11-17T09:05:00Z",
+        json!({}),
+    );
+    log_row(
+        &mut f,
+        "stop_unit",
+        "u-a",
+        "2026-11-17T09:20:00Z",
+        json!({"cause": "limit"}),
+    );
+    log_row(
+        &mut f,
+        "stop_unit",
+        "u-a",
+        "2026-11-17T09:50:00Z",
+        json!({"cause": "failed_check"}),
+    );
+    log_row(
+        &mut f,
+        "merge_unit",
+        "u-a",
+        "2026-11-17T10:30:30Z",
+        json!({"head": "h"}),
+    );
+    log_row(
+        &mut f,
+        "start_unit",
+        "u-b",
+        "2026-11-17T11:00:00Z",
+        json!({}),
+    );
+    log_row(
+        &mut f,
+        "merge_unit",
+        "u-b",
+        "2026-11-17T11:20:59Z",
+        json!({}),
+    );
+    log_row(
+        &mut f,
+        "start_unit",
+        "u-c",
+        "2026-11-17T12:00:00Z",
+        json!({}),
+    );
+    log_row(
+        &mut f,
+        "merge_unit",
+        "u-c",
+        "2026-11-17T12:05:00Z",
+        json!({}),
+    );
+    log_row(
+        &mut f,
+        "start_unit",
+        "u-d",
+        "2026-11-17T12:00:00Z",
+        json!({}),
+    );
+    // The rounds of u-a: its keys are not in time order, and only a closed packet review that said accept or repair counts.
+    review(
+        &mut f,
+        "rv-2",
+        "u-a",
+        "packet",
+        ("closed", json!("accept")),
+        "2026-11-17T10:00:00Z",
+    );
+    review(
+        &mut f,
+        "rv-9",
+        "u-a",
+        "packet",
+        ("closed", json!("repair")),
+        "2026-11-17T09:40:00Z",
+    );
+    review(
+        &mut f,
+        "rv-3",
+        "u-a",
+        "page",
+        ("closed", json!("accept")),
+        "2026-11-17T08:30:00Z",
+    );
+    review(
+        &mut f,
+        "rv-4",
+        "u-a",
+        "packet",
+        ("closed", json!("abandoned")),
+        "2026-11-17T08:40:00Z",
+    );
+    review(
+        &mut f,
+        "rv-5",
+        "u-a",
+        "packet",
+        ("running", Value::Null),
+        "",
+    );
+    review(
+        &mut f,
+        "rv-6",
+        "u-a",
+        "packet",
+        ("revoked", json!("accept")),
+        "2026-11-17T08:50:00Z",
+    );
+    review(
+        &mut f,
+        "rv-7",
+        "u-b",
+        "packet",
+        ("closed", json!("accept")),
+        "2026-11-17T11:10:00Z",
+    );
+    token_run(
+        &mut f,
+        "run-1",
+        "u-a",
+        "implementer",
+        [Some(10), Some(20), None, Some(40)],
+    );
+    token_run(
+        &mut f,
+        "run-2",
+        "u-a",
+        "implementer",
+        [Some(1), None, None, Some(4)],
+    );
+    token_run(
+        &mut f,
+        "run-3",
+        "u-a",
+        "fixer",
+        [Some(5), Some(6), Some(7), Some(8)],
+    );
+    token_run(&mut f, "run-4", "u-a", "verifier", [None; 4]);
+    f
+}
+fn indicators_of(f: &mut F, intent: Option<&str>) -> Value {
+    run(f, &Call::Indicators(intent.map(str::to_owned)))
+}
+
+// spec: specs/ap/status.md#R34
+#[test]
+fn r34_the_indicators_form_takes_an_optional_intent_a_store_and_text_else_usage() {
+    for bad in [
+        vec!["--indicators", "--term", "unit"],
+        vec!["--indicators", "--wait", "vps"],
+        vec!["--indicators", "--timeout", "30"],
+        vec!["--indicators", "a", "b"],
+        vec!["--indicators", "--indicators"],
+        vec!["--indicators", "-x"],
+        vec!["--indicators", ""],
+        vec!["--indicators", "--store", "relative"],
+        vec!["--indicators", "--text", "--text"],
+        vec!["--wait", "vps", "--indicators"],
+    ] {
+        assert_eq!(args(&bad).err().map(|e| e.code), Some("usage"), "{bad:?}");
+    }
+    for ok in [
+        vec!["--indicators"],
+        vec!["--indicators", "vps"],
+        vec!["vps", "--text", "--store", "/s", "--indicators"],
+    ] {
+        assert!(args(&ok).is_ok(), "{ok:?}");
+    }
+    // A refusal of the form is made before any call: no program is found.
+    let (status, out, e) = status(&["--indicators", "--timeout", "30"]);
+    assert_eq!((status, out.is_empty()), (Some(2), true));
+    assert_eq!(e["error"]["code"], "usage");
+    // An intent the store does not have: `unknown_intent`, exit 2, after one read of the intent.
+    let mut f = indicator_store();
+    let e = refusal(&mut f, &Call::Indicators(Some("nonesuch".into())));
+    assert_eq!((e.code, e.field.as_str()), ("unknown_intent", "intent"));
+    assert_eq!(ap::status::exit_code(false, &e), 2);
+    assert_eq!(f.names(), ["get"]);
+}
+
+// spec: specs/ap/status.md#R35
+#[test]
+fn r35_one_row_for_each_merged_unit_of_the_intent_or_of_the_store() {
+    let mut f = indicator_store();
+    let v = indicators_of(&mut f, Some("vps"));
+    assert_eq!(
+        v["at"], "2026-11-17T12:00:00Z",
+        "the now of the first answer"
+    );
+    assert_eq!(strs(&column(&v["units"], "unit")), ["u-a", "u-b", "u-e"]);
+    let a = &v["units"][0];
+    assert_eq!(a["intent"], "vps");
+    assert_eq!(a["class"], "contract");
+    assert_eq!(
+        a["implementer"],
+        json!({"runtime": "claude", "model": "m1", "effort": "high"})
+    );
+    assert_eq!(v["units"][1]["implementer"], Value::Null);
+    let all = indicators_of(&mut f, None);
+    assert_eq!(all["at"], "2026-11-17T12:00:00Z");
+    assert_eq!(
+        strs(&column(&all["units"], "unit")),
+        ["u-a", "u-b", "u-c", "u-e"]
+    );
+    assert_eq!(all["units"][2]["intent"], "other");
+    assert_eq!(
+        f.names()[..2],
+        ["search", "log"],
+        "no read of an intent without one named"
+    );
+    // No merged unit: no row, and the log is not read.
+    let mut none = F::empty();
+    let v = indicators_of(&mut none, None);
+    assert_eq!(v["units"], json!([]));
+    assert_eq!(none.names(), ["search"]);
+}
+
+// spec: specs/ap/status.md#R36
+#[test]
+fn r36_the_minutes_run_from_the_first_start_to_the_merge_rounded_down() {
+    let mut f = indicator_store();
+    let v = indicators_of(&mut f, Some("vps"));
+    let (a, b) = (&v["units"][0], &v["units"][1]);
+    // The first of two `start_unit` rows (the log answers newest first), the merge's second counted away.
+    assert_eq!(a["started_at"], "2026-11-17T09:00:00Z");
+    assert_eq!(a["merged_at"], "2026-11-17T10:30:30Z");
+    assert_eq!(a["minutes"], 90);
+    assert_eq!(
+        (b["minutes"].clone(), b["started_at"].clone()),
+        (json!(20), json!("2026-11-17T11:00:00Z"))
+    );
+    // The stops, in the order they were applied.
+    assert_eq!(a["stops"], json!(["limit", "failed_check"]));
+    assert_eq!(b["stops"], json!([]));
+    // A merge before the start gives no minutes.
+    let mut g = indicator_store();
+    log_row(
+        &mut g,
+        "merge_unit",
+        "u-b",
+        "2026-11-17T10:00:00Z",
+        json!({}),
+    );
+    g.log.rotate_right(1);
+    let v = indicators_of(&mut g, Some("vps"));
+    assert_eq!(v["units"][1]["minutes"], Value::Null);
+}
+
+// spec: specs/ap/status.md#R37
+#[test]
+fn r37_rounds_repairs_the_first_verdict_and_the_tokens_by_role() {
+    let mut f = indicator_store();
+    let v = indicators_of(&mut f, Some("vps"));
+    let a = &v["units"][0];
+    // Closed packet reviews that said accept or repair: not a page, an abandoned, a running or a revoked one.
+    assert_eq!(a["rounds"], 2);
+    assert_eq!(a["first_verdict"], "repair", "by closed_at, not by key");
+    assert_eq!(a["repairs"], 1);
+    assert_eq!(
+        a["tokens"],
+        json!({
+        "implementer": {"input": 11, "cache_read": 20, "cache_write": null, "output": 44},
+        "fixer": {"input": 5, "cache_read": 6, "cache_write": 7, "output": 8},
+        "verifier": {"input": null, "cache_read": null, "cache_write": null, "output": null}})
+    );
+    let b = &v["units"][1];
+    assert_eq!(
+        (
+            b["rounds"].clone(),
+            b["repairs"].clone(),
+            b["first_verdict"].clone()
+        ),
+        (json!(1), json!(0), json!("accept"))
+    );
+    assert_eq!(b["tokens"], json!({}));
+    let e = &v["units"][2];
+    assert_eq!(
+        (e["rounds"].clone(), e["first_verdict"].clone()),
+        (json!(0), Value::Null)
+    );
+    // Two reviews closed at one second go by key.
+    let mut g = indicator_store();
+    review(
+        &mut g,
+        "rv-0",
+        "u-b",
+        "packet",
+        ("closed", json!("repair")),
+        "2026-11-17T11:10:00Z",
+    );
+    let v = indicators_of(&mut g, Some("vps"));
+    assert_eq!(v["units"][1]["first_verdict"], "repair");
+    assert_eq!(v["units"][1]["rounds"], 2);
+}
+
+// spec: specs/ap/status.md#R38
+#[test]
+fn r38_the_log_is_read_by_action_type_to_the_end_and_the_rest_through_the_unit_views() {
+    let mut f = indicator_store();
+    f.log_page = 1;
+    let paged = indicators_of(&mut f, Some("vps"));
+    let names = f.names();
+    let logs: Vec<&Value> = f
+        .calls
+        .iter()
+        .filter(|c| c.0[0] == "log")
+        .map(|c| &c.1)
+        .collect();
+    // One read of each action type, paged by continuation to the end (a page of one row).
+    let first = |a: &str| {
+        logs.iter()
+            .find(|b| b["action_type"] == a)
+            .map(|b| (*b).clone())
+            .unwrap()
+    };
+    assert_eq!(
+        first("start_unit"),
+        json!({"action_type": "start_unit", "outcome": "applied", "parameters": true, "limit": 100})
+    );
+    assert_eq!(
+        logs.iter()
+            .filter(|b| b["action_type"] == "start_unit")
+            .count(),
+        5
+    );
+    assert_eq!(
+        logs.iter()
+            .filter(|b| b["action_type"] == "stop_unit")
+            .count(),
+        2
+    );
+    assert_eq!(
+        logs.iter()
+            .filter(|b| b["action_type"] == "merge_unit")
+            .count(),
+        3
+    );
+    assert_eq!(&names[..2], ["get", "search"]);
+    // Each unit's reviews and runs as `ap status <unit>` reads them: a view, then a get of each object.
+    let rendered = f.calls.iter().filter(|c| c.0[0] == "render").count();
+    assert_eq!(rendered, 6, "two views of each of three units");
+    f.log_page = 100;
+    assert_eq!(
+        indicators_of(&mut f, Some("vps")),
+        paged,
+        "the page size changes nothing"
+    );
+    // The unit of a row is read from its parameters: a row of another unit is not this unit's.
+    let mut g = indicator_store();
+    log_row(
+        &mut g,
+        "merge_unit",
+        "u-zzz",
+        "2026-11-17T08:00:00Z",
+        json!({}),
+    );
+    assert_eq!(indicators_of(&mut g, Some("vps")), paged);
+    // A continuation the engine repeats is unreadable, and names the log.
+    let mut h = indicator_store();
+    h.log_loops = true;
+    let e = refusal(&mut h, &Call::Indicators(None));
+    assert_eq!(
+        (e.code, e.field.as_str()),
+        ("store_answer_unreadable", "log")
+    );
+    // Nothing is written and no file is read.
+    assert!(f.reads.borrow().is_empty());
+}
+
+// spec: specs/ap/status.md#R39
+#[test]
+fn r39_a_missing_row_or_a_withheld_log_is_null_and_marks_the_rows_cut() {
+    let mut f = indicator_store();
+    let v = indicators_of(&mut f, Some("vps"));
+    assert!(v["units"][0].get("log_cut").is_none() && v["units"][1].get("log_cut").is_none());
+    let e = &v["units"][2];
+    assert_eq!(
+        (
+            e["started_at"].clone(),
+            e["merged_at"].clone(),
+            e["minutes"].clone()
+        ),
+        (Value::Null, Value::Null, Value::Null)
+    );
+    assert_eq!(e["log_cut"], true, "no start and no merge row");
+    assert_eq!(e["stops"], json!([]), "no stop row is no stop");
+    // A unit with a start and no merge row: the merge is null, the start stays.
+    let mut g = indicator_store();
+    g.log.retain(|r| {
+        !(r["action_type"] == "merge_unit" && r["parameters"]["unit"]["native_key"] == "u-b")
+    });
+    let v = indicators_of(&mut g, Some("vps"));
+    let b = &v["units"][1];
+    assert_eq!(
+        (
+            b["started_at"].clone(),
+            b["merged_at"].clone(),
+            b["minutes"].clone(),
+            b["log_cut"].clone()
+        ),
+        (
+            json!("2026-11-17T11:00:00Z"),
+            Value::Null,
+            Value::Null,
+            json!(true)
+        )
+    );
+    // Rows the engine withheld: that action's members are null on every row, and every row is cut.
+    for (action, nulls) in [
+        ("start_unit", ["started_at", "minutes"]),
+        ("merge_unit", ["merged_at", "minutes"]),
+        ("stop_unit", ["stops", "stops"]),
+    ] {
+        let mut h = indicator_store();
+        h.withheld.insert(action, 1);
+        let v = indicators_of(&mut h, Some("vps"));
+        for row in v["units"].as_array().unwrap() {
+            assert_eq!(row["log_cut"], true, "{action}");
+            assert!(nulls.iter().all(|m| row[*m].is_null()), "{action} {row}");
+            assert!(row["rounds"].is_u64());
+        }
+        let others = &v["units"][0];
+        let kept = ["started_at", "merged_at", "stops"]
+            .iter()
+            .filter(|m| !others[**m].is_null())
+            .count();
+        assert_eq!(kept, 2, "{action}: the other two actions are still read");
+    }
+}
+
+// spec: specs/ap/status.md#R40
+#[test]
+fn r40_the_summary_holds_the_count_the_medians_and_the_share_of_first_accepts() {
+    let mut f = indicator_store();
+    let v = indicators_of(&mut f, Some("vps"));
+    // Minutes of 90 and 20 (u-e has none): 55; rounds 2, 1, 0: 1; repairs 1, 0, 0: 0; first verdicts repair, accept.
+    assert_eq!(
+        v["summary"],
+        json!({"count": 3, "median_minutes": 55, "median_rounds": 1, "median_repairs": 0,
+        "first_accept_share": 0.5})
+    );
+    // An even count: the mean of the two middle values, a half where they add to an odd number.
+    let mut g = indicator_store();
+    g.objects.remove(&("unit".to_owned(), "u-e".to_owned()));
+    log_row(
+        &mut g,
+        "start_unit",
+        "u-b",
+        "2026-11-17T08:00:00Z",
+        json!({}),
+    );
+    g.log.rotate_right(1);
+    // u-b now starts at 08:00 and ends at 11:20: 200 minutes; with u-a's 90: 145.
+    let v = indicators_of(&mut g, Some("vps"));
+    assert_eq!(v["summary"]["median_minutes"], 145);
+    assert_eq!(v["summary"]["median_rounds"], 1.5);
+    assert_eq!(v["summary"]["count"], 2);
+    // No row: a count of 0 and null elsewhere.
+    let mut none = F::empty();
+    let v = indicators_of(&mut none, None);
+    assert_eq!(
+        v["summary"],
+        json!({"count": 0, "median_minutes": null, "median_rounds": null,
+        "median_repairs": null, "first_accept_share": null})
+    );
+    // A third that is not a half rounds to three places.
+    let mut h = indicator_store();
+    h.objects.remove(&("unit".to_owned(), "u-e".to_owned()));
+    review(
+        &mut h,
+        "rv-8",
+        "u-c",
+        "packet",
+        ("closed", json!("accept")),
+        "2026-11-17T12:03:00Z",
+    );
+    let v = indicators_of(&mut h, None);
+    // u-a repair, u-b accept, u-c accept
+    assert_eq!(v["summary"]["first_accept_share"], 0.667);
+}
+
+// spec: specs/ap/status.md#R41
+#[test]
+fn r41_the_text_is_one_line_for_each_row_and_the_summary() {
+    let mut f = indicator_store();
+    let v = indicators_of(&mut f, Some("vps"));
+    let text = text_of(&Call::Indicators(Some("vps".into())), &v);
+    let lines = [
+        "u-a vps contract claude/m1/high 2026-11-17T09:00:00Z 2026-11-17T10:30:30Z 90 2 1 repair limit,failed_check fixer:5/6/7/8,implementer:11/20/-/44,verifier:-/-/-/-",
+        "u-b vps plain - 2026-11-17T11:00:00Z 2026-11-17T11:20:59Z 20 1 0 accept none -",
+        "u-e vps plain - - - - 0 0 - none - log_cut",
+        "summary 3 units median minutes 55 rounds 1 repairs 0 first accepted 0.5",
+    ];
+    assert_eq!(text, lines.join("\n") + "\n");
+    let mut none = F::empty();
+    let v = indicators_of(&mut none, None);
+    assert_eq!(
+        text_of(&Call::Indicators(None), &v),
+        "summary 0 units median minutes - rounds - repairs - first accepted -\n"
+    );
 }
