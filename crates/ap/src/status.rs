@@ -6,15 +6,8 @@ use crate::store::{self, Found, Seen, at};
 use crate::unit::drive::{self, key_form};
 use crate::work;
 use serde_json::{Value, json};
-use std::{
-    cmp::Reverse,
-    collections::{BTreeMap, BTreeSet},
-    ffi::OsString,
-    io::Write,
-    path::PathBuf,
-    process::ExitCode,
-    time::Duration,
-};
+use std::{cmp::Reverse, ffi::OsString, io::Write, process::ExitCode};
+use std::{collections::BTreeSet, path::PathBuf, time::Duration};
 
 /// The request of delivery on this host (its member `state`), and the directory it defaults to.
 const DELIVER: &str = "/etc/agent-platform/deliver.json";
@@ -38,10 +31,6 @@ const MATCHES: usize = 12;
 /// Entries a section of the text form holds, and the oldest requests it names.
 const ENTRIES: usize = 9;
 const OLDEST: usize = 5;
-/// The wait: its default timeout, the pause between readings and the failed readings in a row that end it.
-const TIMEOUT: u64 = 14_400;
-const PAUSE: Duration = Duration::from_secs(30);
-const FAILED: usize = 3;
 
 pub enum Call {
     Overview,
@@ -102,7 +91,7 @@ pub fn parse(argv: &[OsString]) -> Result<Args, Failure> {
         (None, None, None, None) => Call::Overview,
         (None, Some(k), None, None) => Call::Key(k),
         (Some(w), None, None, None) => Call::Term(w),
-        (None, None, Some(i), t) if !text => Call::Wait(i.to_owned(), t.unwrap_or(TIMEOUT)),
+        (None, None, Some(i), t) if !text => Call::Wait(i.to_owned(), t.unwrap_or(14_400)),
         _ => return Err(usage()),
     };
     Ok(Args { store, text, call })
@@ -617,30 +606,25 @@ pub fn execute(s: &mut impl System, store: Option<&str>, call: &Call) -> Result<
     }
 }
 
-/// What one reading of the wait holds: the store's clock, the units of the intent by key, the keys of
-/// the open findings of severity `act` or `urgent`, and the units that look idle.
+/// One reading of the wait: the store's clock, the intent's units by key, the keys of the open `act` or
+/// `urgent` findings and the units that look idle.
+#[derive(Clone)]
 struct Reading {
     at: u64,
     units: Vec<Found>,
     findings: BTreeSet<String>,
     idle: BTreeSet<String>,
 }
-/// The first reading's accepted heads, stopped ends and findings: what a reason is compared with.
-struct Base {
-    accepted: BTreeMap<String, Value>,
-    stopped: BTreeMap<String, Value>,
-    findings: BTreeSet<String>,
-}
-/// The units directory and the prefix of the run units where `unit_idle` may be given, read from the
-/// policy as `ap work` reads it (a scratch store is never read against the host's units directory).
+/// The units directory and run-unit prefix where `unit_idle` may be given, from the policy as `ap work`
+/// reads it (a scratch store is never read against the host's units directory).
 fn watched(s: &impl System, store: Option<&str>) -> Result<Option<(PathBuf, String)>, Failure> {
-    if work::paired(s, store).is_err() {
-        return Ok(None);
-    }
-    let Some(policy) = work::policy(s)? else {
-        return Ok(None);
+    let policy = if store.is_some() == work::variable(s, "AP_POLICY_FILE").is_some() {
+        work::policy(s)?
+    } else {
+        None
     };
-    let Some(w) = work::work(&policy)? else {
+    let w = policy.as_ref().map(work::work).transpose()?.flatten();
+    let (Some(policy), Some(w)) = (policy, w) else {
         return Ok(None);
     };
     if work::scratch(&policy, store).is_err() {
@@ -649,9 +633,9 @@ fn watched(s: &impl System, store: Option<&str>) -> Result<Option<(PathBuf, Stri
     let (directory, _) = drive::units(&policy)?;
     Ok(s.units().then(|| (PathBuf::from(directory), w.prefix)))
 }
-/// The units of the intent that no run drives and that nothing will start: a cut `running` unit, or a
-/// `ready` or `accepted` one whose file `started` equals its revision, with no active hold on it or its
-/// intent. Only a unit with a repository and a key of `ap unit add`'s form.
+/// The units of the intent that no run drives and nothing will start: a cut `running` unit, or a `ready`
+/// or `accepted` one whose file `started` equals its revision, under no active hold; only a unit with a
+/// repository and a key of `ap unit add`'s form.
 fn idle(
     s: &mut impl System,
     store: Option<&str>,
@@ -662,33 +646,32 @@ fn idle(
         return Ok(BTreeSet::new());
     };
     let (mut given, mut cut) = (vec![], BTreeSet::new());
-    let mine = units
+    for (k, u) in units
         .iter()
-        .filter(|(k, u)| key_form(k) && !text(&u["repository"]).is_empty());
-    for (k, u) in mine {
+        .filter(|(k, u)| key_form(k) && !text(&u["repository"]).is_empty())
+    {
         match u["state"].as_str() {
             Some("running") => {
                 cut.insert(k.clone());
                 given.push((k.clone(), String::new()));
             }
             Some("ready" | "accepted") => {
-                if let Some((revision, _)) = at(store::head(s, store, "unit", k), "unit")? {
-                    given.push((k.clone(), revision));
-                }
+                let head = at(store::head(s, store, "unit", k), "unit")?;
+                given.extend(head.map(|(revision, _)| (k.clone(), revision)));
             }
             _ => {}
         }
     }
     let seen = work::observe(s, &root, &prefix, &given)?;
-    let mut idle: BTreeSet<String> = (given.iter().map(|g| g.0.clone()))
+    let mut idle: BTreeSet<String> = (given.into_iter().map(|g| g.0))
         .filter(|k| !seen.in_flight.contains(k) && (cut.contains(k) || seen.started.contains(k)))
         .collect();
     if !idle.is_empty() {
         let held = active_holds(s, store)?;
-        idle.retain(|k| {
-            !(held.iter())
-                .any(|(_, h)| h["unit"]["native_key"] == *k || h["intent"]["native_key"] == intent)
-        });
+        let named = |k: &String, h: &Found| {
+            h.1["unit"]["native_key"] == *k || h.1["intent"]["native_key"] == intent
+        };
+        idle.retain(|k| !held.iter().any(|h| named(k, h)));
     }
     Ok(idle)
 }
@@ -700,11 +683,12 @@ fn reading(s: &mut impl System, store: Option<&str>, intent: &str) -> Result<Rea
     let mut units = all_units(s, store)?;
     units.retain(|(_, u)| u["intent"]["native_key"] == intent);
     units.sort_by_key(|(k, _)| k.clone());
-    let severe = |f: &Found| {
-        f.1["state"] == "open" && (f.1["severity"] == "act" || f.1["severity"] == "urgent")
-    };
-    let findings = open_findings(s, store)?.into_iter().filter(severe);
-    let findings = findings.map(|(k, _)| k).collect();
+    let severe = |f: &Found| f.1["state"] == "open" && f.1["severity"] != "info";
+    let findings = open_findings(s, store)?
+        .into_iter()
+        .filter(severe)
+        .map(|f| f.0)
+        .collect();
     let idle = idle(s, store, intent, &units)?;
     Ok(Reading {
         at,
@@ -713,52 +697,49 @@ fn reading(s: &mut impl System, store: Option<&str>, intent: &str) -> Result<Rea
         idle,
     })
 }
-/// The first reason that holds at `r` (the order of the specification), with its unit and finding.
-fn reason(
-    r: &Reading,
-    b: &Base,
-    before: &BTreeSet<String>,
-) -> Option<(&'static str, Option<String>, Option<String>)> {
+fn answer(reason: &str, unit: Option<&String>, finding: Option<&String>, at: u64) -> Value {
+    json!({"reason": reason, "unit": unit, "finding": finding, "at": utc(at)})
+}
+/// The first reason that holds at `r` (the order of the specification) against the first reading `b`.
+fn reason(r: &Reading, b: &Reading, before: &BTreeSet<String>) -> Option<Value> {
+    let was = |k: &String, state: &str, m: &str| {
+        (b.units.iter().find(|u| u.0 == *k && u.1["state"] == state)).map(|u| u.1[m].clone())
+    };
     let waits = |f: &Value| {
-        matches!(f["class"].as_str(), Some("contract" | "effect"))
-            && f["approved_head"] != f["head"]
+        ["contract", "effect"].iter().any(|c| f["class"] == *c) && f["approved_head"] != f["head"]
     };
     let unit = |state: &str, new: &dyn Fn(&Found) -> bool| {
-        (r.units.iter().find(|u| u.1["state"] == state && new(u))).map(|u| u.0.clone())
+        (r.units.iter().find(|u| u.1["state"] == state && new(u))).map(|u| &u.0)
     };
+    let say =
+        |why, unit: Option<&String>, finding: Option<&String>| answer(why, unit, finding, r.at);
     let ended = |u: &Found| {
         ["merged", "done", "dropped"]
             .iter()
             .any(|e| u.1["state"] == *e)
     };
-    let accepted = |(k, f): &Found| waits(f) && b.accepted.get(k) != Some(&f["head"]);
-    let stopped = |(k, f): &Found| b.stopped.get(k) != Some(&f["ended_at"]);
-    let unit_of = |reason, k| (reason, Some(k), None);
-    unit("accepted", &accepted)
-        .map(|k| unit_of("unit_accepted", k))
-        .or_else(|| unit("stopped", &stopped).map(|k| unit_of("unit_stopped", k)))
-        .or_else(|| {
-            r.findings
-                .difference(&b.findings)
-                .next()
-                .map(|f| ("finding", None, Some(f.clone())))
+    [
+        unit("accepted", &|(k, f)| {
+            waits(f) && was(k, "accepted", "head").as_ref() != Some(&f["head"])
         })
-        .or_else(|| {
-            r.units
-                .iter()
-                .all(ended)
-                .then_some(("all_ended", None, None))
+        .map(|k| say("unit_accepted", Some(k), None)),
+        unit("stopped", &|(k, f)| {
+            was(k, "stopped", "ended_at").as_ref() != Some(&f["ended_at"])
         })
-        .or_else(|| {
-            r.idle
-                .intersection(before)
-                .next()
-                .map(|k| unit_of("unit_idle", k.clone()))
-        })
+        .map(|k| say("unit_stopped", Some(k), None)),
+        (r.findings.difference(&b.findings).next()).map(|f| say("finding", None, Some(f))),
+        r.units
+            .iter()
+            .all(ended)
+            .then(|| say("all_ended", None, None)),
+        (r.idle.intersection(before).next()).map(|k| say("unit_idle", Some(k), None)),
+    ]
+    .into_iter()
+    .flatten()
+    .next()
 }
-/// `ap status --wait`: reads every 30 seconds until a unit of the intent needs the Lead, a finding of
-/// severity `act` or `urgent` opens, every unit ended, or the timeout; one answer `{reason, unit,
-/// finding, at}`. A reading that fails is no reason; the third in a row ends the wait with its error.
+/// `ap status --wait`: reads every 30 seconds until a reason holds or the timeout passes; one answer. A
+/// reading that fails is no reason; the third in a row ends the wait with its error.
 fn wait(
     s: &mut impl System,
     store: Option<&str>,
@@ -766,47 +747,29 @@ fn wait(
     timeout: u64,
 ) -> Result<Value, Failure> {
     let began = s.now();
-    let (mut base, mut before, mut failed, mut last) = (None, BTreeSet::new(), 0, None);
-    let mut last_at = None;
+    let (mut first, mut before, mut failed, mut last_at, mut last) =
+        (None, BTreeSet::new(), 0, None, None);
     loop {
         match reading(s, store, intent) {
-            Err(f) if f.code == "unknown_intent" => return Err(f),
-            Err(f) => {
-                failed += 1;
-                if failed == FAILED {
-                    return Err(f);
-                }
-                last = Some(f);
-            }
+            Err(f) if f.code == "unknown_intent" || failed == 2 => return Err(f),
+            Err(f) => (failed, last) = (failed + 1, Some(f)),
             Ok(r) => {
                 failed = 0;
                 last_at = Some(r.at);
-                let of = |state: &str, member: &str| -> BTreeMap<String, Value> {
-                    let mine = r.units.iter().filter(|u| u.1["state"] == state);
-                    mine.map(|u| (u.0.clone(), u.1[member].clone())).collect()
-                };
-                let b = base.get_or_insert_with(|| Base {
-                    accepted: of("accepted", "head"),
-                    stopped: of("stopped", "ended_at"),
-                    findings: r.findings.clone(),
-                });
-                if let Some((why, unit, finding)) = reason(&r, b, &before) {
-                    return Ok(
-                        json!({"reason": why, "unit": unit, "finding": finding, "at": utc(r.at)}),
-                    );
+                let b = first.get_or_insert_with(|| r.clone());
+                if let Some(v) = reason(&r, b, &before) {
+                    return Ok(v);
                 }
                 before = r.idle;
             }
         }
         if s.now().duration_since(began) >= Duration::from_secs(timeout) {
-            return match last_at {
-                Some(at) => {
-                    Ok(json!({"reason": "timeout", "unit": null, "finding": null, "at": utc(at)}))
-                }
-                None => Err(last.unwrap_or_else(|| error("store_answer_unreadable", "now"))),
-            };
+            let last = || last.unwrap_or_else(|| error("store_answer_unreadable", "now"));
+            return last_at
+                .map(|at| answer("timeout", None, None, at))
+                .ok_or_else(last);
         }
-        s.pause(PAUSE);
+        s.pause(Duration::from_secs(30));
     }
 }
 
@@ -1070,24 +1033,16 @@ pub fn text_of(call: &Call, v: &Value) -> String {
     }
 }
 
-/// The exit status of a refusal: 2, but 3 for a wait that ends in an error other than an unknown intent.
+/// The exit status of a refusal: 3 for a wait's error but `unknown_intent`, else 2.
 pub fn exit_code(waiting: bool, f: &Failure) -> u8 {
-    if waiting && f.code != "unknown_intent" {
-        3
-    } else {
-        2
-    }
+    2 + u8::from(waiting && f.code != "unknown_intent")
 }
 
 pub fn cli(argv: &[OsString]) -> ExitCode {
     let parsed = parse(argv);
-    let waiting = matches!(
-        &parsed,
-        Ok(Args {
-            call: Call::Wait(..),
-            ..
-        })
-    );
+    let waiting = parsed
+        .as_ref()
+        .is_ok_and(|a| matches!(a.call, Call::Wait(..)));
     let result = parsed.and_then(|a| {
         let v = execute(&mut Host, a.store.as_deref(), &a.call)?;
         Ok(if a.text {

@@ -171,15 +171,6 @@ pub fn cli(argv: &[OsString]) -> ExitCode {
     ExitCode::from(if written.is_ok() { status } else { 4 })
 }
 
-/// `--store` and `AP_POLICY_FILE` come together or not at all (R1).
-pub(crate) fn paired(s: &impl System, store: Option<&str>) -> Result<(), Failure> {
-    match (store.is_some(), variable(s, "AP_POLICY_FILE").is_some()) {
-        (false, true) => return Err(error("invalid_input", "store")),
-        (true, false) => return Err(error("invalid_input", "policy")),
-        _ => {}
-    }
-    Ok(())
-}
 /// With `--store` the policy names the scratch units directory, slice and prefix (R3).
 pub(crate) fn scratch(policy: &Value, store: Option<&str>) -> Result<(), Failure> {
     let named = |k: &str| policy["work"].get(k).is_some();
@@ -195,7 +186,11 @@ pub fn execute(s: &mut impl System, store: Option<&str>) -> Result<Value, Box<Re
     if object::lead_in_environment(s) {
         return Err(before(error("role_in_environment", "ONT_ROLE")));
     }
-    paired(s, store).map_err(before)?;
+    match (store.is_some(), variable(s, "AP_POLICY_FILE").is_some()) {
+        (false, true) => return Err(before(error("invalid_input", "store"))),
+        (true, false) => return Err(before(error("invalid_input", "policy"))),
+        _ => {}
+    }
     let Some(policy) = policy(s).map_err(before)? else {
         return Ok(json!({"skipped": "no policy file"}));
     };
