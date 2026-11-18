@@ -1,6 +1,5 @@
 //! Synthetic literal compatibility and exact-domain authorization challenges.
 #![allow(clippy::unwrap_used)]
-use ont_core::action::{ActionInput, Basis, Review, TargetSnapshot};
 use ont_core::{Authority, Error, Grant, Id, Namespace, Object, Policy, Query, Scope, Snapshot};
 use serde::Deserialize;
 use std::collections::{BTreeMap, BTreeSet};
@@ -8,7 +7,6 @@ use std::collections::{BTreeMap, BTreeSet};
 const EDUCATION: &str = r#"{"namespace":{"instance":"synthetic://same-host","account":"A"},"class_key":"C1","student_key":"001"}"#;
 const PROGRAM: &str = r#"{"namespace":{"instance":"synthetic://same-host","account":"A"},"domain":"program","program_key":"001"}"#;
 const OBSERVATION: &str = r#"{"revision":"r1","source_revision":"s1","observed_at":10,"fresh_until":20,"change":"initial","supersedes":null,"coverage":"complete","fields":{"physical_record":{"kind":"value","value":"R1"},"recommendation":{"kind":"value","value":"next"}},"lineage":{"artifact_sha256":"0000000000000000000000000000000000000000000000000000000000000000","pointer":"/0"}}"#;
-const ID: &str = r#"{"object_type":"progress","namespace":{"instance":"synthetic://same-host","account":"A"},"native_key":"001"}"#;
 
 fn namespace() -> Namespace {
     Namespace {
@@ -189,24 +187,6 @@ fn constructors_validate_without_normalizing_identity() {
         program_key: String::new(),
     };
     assert!(serde_json::to_string(&invalid).is_err());
-}
-
-#[test]
-fn serialized_s07_basis_target_and_review_are_byte_stable() {
-    // Hand-authored legacy bytes; no candidate output is used to set expectations.
-    let basis = format!(r#"{{"id":{ID},"scope":{EDUCATION},"observation":{OBSERVATION}}}"#);
-    let target = format!(
-        r#"{{"identity":"fake-1","canonical_path":"/synthetic/target.sqlite","physical":{{"namespace":{{"instance":"synthetic://same-host","account":"A"}},"record":"R1","field":"note"}},"scope":{EDUCATION},"value":"old","version":0}}"#
-    );
-    let review = format!(
-        r#"{{"input":{{"request_id":"r1","lesson_date":"2026-11-05","object":{ID}}},"basis":{basis},"target":{target},"desired":"next","owner":"synthetic-owner","authorization_generation":1}}"#
-    );
-    let decoded: Basis = serde_json::from_str(&basis).unwrap();
-    assert_eq!(serde_json::to_string(&decoded).unwrap(), basis);
-    let decoded: TargetSnapshot = serde_json::from_str(&target).unwrap();
-    assert_eq!(serde_json::to_string(&decoded).unwrap(), target);
-    let decoded: Review = serde_json::from_str(&review).unwrap();
-    assert_eq!(serde_json::to_string(&decoded).unwrap(), review);
 }
 
 struct Graph(Vec<Object>);
@@ -454,15 +434,6 @@ fn grants_isolate_account_instance_domain_program_and_derive() {
                 .unwrap()
         )
         .unwrap()
-    );
-    let input = ActionInput {
-        request_id: "r1".into(),
-        lesson_date: "2026-11-05".into(),
-        object: root.id.clone(),
-    };
-    assert_eq!(
-        admission.action_basis(&graph, &input, 15),
-        Err(Error::ActionForbidden)
     );
     let read_only = self::authority(root.scope.clone(), false);
     let session = read_only.bind_trusted("owner").unwrap();

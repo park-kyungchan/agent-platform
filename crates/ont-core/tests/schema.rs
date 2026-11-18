@@ -158,12 +158,22 @@ fn base_value() -> Value {
         "namespace":{"instance":"vps://palantirkc","account":"root"},
         "scope_keys":["class_key"],
         "value_types":{},
-        "sources":{"src":{"kind":"json_records","path":"x.json"}},
-        "object_types":{"thing":{"owner":{"source":"src"},"primary_key":{"from":"/id"},"title":"name",
-            "properties":{"name":{"type":"string","required":true,"from":"/name"}}}},
+        "sources":{"src":{"kind":"markdown_fields","glob":"/tmp/*.md","fresh_for_s":1}},
+        "object_types":{"thing":{"owner":"ontology","primary_key":{"from":"$action_id"},"title":"name",
+            "properties":{"name":{"type":"string","required":true}}}},
         "link_types":{},"action_types":{},"functions":{},
         "grants":[{"principal":"agent","scope":{"class_key":"C1"},"read":["thing"],"derive":[],"actions":[]}]
     })
+}
+/// A source-owned `thing`: a source-owned type is refused when the schema has
+/// scope keys, so the scope key and the grant's scope key are dropped.
+fn source_owned(m: &mut Value) {
+    m["scope_keys"] = json!([]);
+    m["grants"][0]["scope"] = json!({});
+    m["object_types"]["thing"]["owner"] = json!({"source":"src"});
+    m["object_types"]["thing"]["primary_key"] = json!({"from":"/path"});
+    m["object_types"]["thing"]["properties"]["name"] =
+        json!({"type":"string","required":true,"from":"/stem"});
 }
 fn check_of(v: Value) -> Vec<ont_core::schema::Violation> {
     let schema: Schema = serde_json::from_value(v).unwrap();
@@ -210,6 +220,7 @@ fn one_test_per_check_code() {
         m["grants"][0]["principal"] = json!("");
         v.push((m, vec![("invalid_principal", "/grants/0/principal")]));
         let mut m = base_value();
+        source_owned(&mut m);
         m["object_types"]["thing"]["properties"]["name"]["from"] = json!("name");
         v.push((
             m,
@@ -219,14 +230,16 @@ fn one_test_per_check_code() {
             )],
         ));
         let mut m = base_value();
+        source_owned(&mut m);
         m["object_types"]["thing"]["properties"]["other"] =
-            json!({"type":"string","required":false,"from":"/other"});
+            json!({"type":"string","required":false,"from":"/stem"});
         m["link_types"] = json!({"l":{"from":"thing","via":"other","to":"thing",
             "cardinality":"many_to_one","names":{"forward":"to_thing","reverse":"from_thing"}}});
         v.push((m, vec![("invalid_link_backing", "/link_types/l/via")]));
         let mut m = base_value();
+        source_owned(&mut m);
         m["object_types"]["thing"]["properties"]["other"] =
-            json!({"type":{"ref":"thing"},"required":false,"from":"/other"});
+            json!({"type":{"ref":"thing"},"required":false,"from":"/stem"});
         m["link_types"] = json!({"l":{"from":"thing","via":"other","to":"thing",
             "cardinality":"many_to_one","names":{"forward":"same","reverse":"same"}}});
         v.push((
@@ -747,17 +760,17 @@ fn duplicate_json_keys_are_refused_with_pointer() {
         ),
         // A key containing `/` is escaped as `~1` in the pointer.
         (
-            br#"{"format":"ontology-schema/v1","domain":"work","version":1,"namespace":{"instance":"vps://palantirkc","account":"root"},"sources":{"src":{"kind":"json_records","a/b":1,"a/b":2}}}"#,
+            br#"{"format":"ontology-schema/v1","domain":"work","version":1,"namespace":{"instance":"vps://palantirkc","account":"root"},"sources":{"src":{"kind":"markdown_fields","a/b":1,"a/b":2}}}"#,
             "/sources/src/a~1b",
         ),
         // A key containing `~` is escaped as `~0` in the pointer.
         (
-            br#"{"format":"ontology-schema/v1","domain":"work","version":1,"namespace":{"instance":"vps://palantirkc","account":"root"},"sources":{"src":{"kind":"json_records","a~b":1,"a~b":2}}}"#,
+            br#"{"format":"ontology-schema/v1","domain":"work","version":1,"namespace":{"instance":"vps://palantirkc","account":"root"},"sources":{"src":{"kind":"markdown_fields","a~b":1,"a~b":2}}}"#,
             "/sources/src/a~0b",
         ),
         // An escaped duplicate: `"ab"` written with a unicode escape.
         (
-            br#"{"format":"ontology-schema/v1","domain":"work","version":1,"namespace":{"instance":"vps://palantirkc","account":"root"},"sources":{"src":{"kind":"json_records","ab":1,"a\u0062":2}}}"#,
+            br#"{"format":"ontology-schema/v1","domain":"work","version":1,"namespace":{"instance":"vps://palantirkc","account":"root"},"sources":{"src":{"kind":"markdown_fields","ab":1,"a\u0062":2}}}"#,
             "/sources/src/ab",
         ),
     ];
@@ -797,5 +810,10 @@ fn valid_document_nested_100_deep_in_source_options_checks() {
     let mut doc = base_value();
     doc["sources"]["src"]["nested"] = nested;
     let bytes = serde_json::to_vec(&doc).unwrap();
-    assert!(Schema::check_bytes(&bytes, &BTreeSet::new()).is_ok());
+    // No kind that stays takes a free option.
+    let err = Schema::check_bytes(&bytes, &BTreeSet::new()).unwrap_err();
+    assert_eq!(
+        pairs(&err),
+        vec![("invalid_source_option", "/sources/src/nested")]
+    );
 }

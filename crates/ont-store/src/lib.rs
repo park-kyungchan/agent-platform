@@ -6,8 +6,6 @@ use rusqlite::{
 use std::path::Path;
 use std::time::Duration;
 
-pub mod actions;
-pub mod fake;
 pub mod schema_mode;
 
 /// Largest supported candidate clock; action-created heads never become stale.
@@ -92,16 +90,6 @@ impl StoreMode {
         }
         Ok(scope)
     }
-}
-/// Every persisted v1 scope must remain readable by the Education-only reader.
-fn v1_scope(scope: &Scope, namespace: &Namespace) -> Result<(), Error> {
-    if !StoreMode::Education.accepts(scope, namespace) {
-        return Err(Error::StoreFailure);
-    }
-    Ok(())
-}
-fn decode_v1_scope(s: &str, namespace: &Namespace) -> Result<Scope, Error> {
-    StoreMode::Education.decode_scope(s, namespace)
 }
 pub struct Store {
     connection: Connection,

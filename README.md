@@ -27,6 +27,5 @@ A change of an answer's shape or of the schema language is a change of a contrac
 
 ## What else is in the tree
 
-- `docs/effects/`: the contract for effects on external systems (vocabulary and vectors).
-- `conformance/`, `docs/S06-*.md`, `docs/s07/`: the record of the first two verticals. Tests of `ont-core` and `ont-store` still read fixtures from `conformance/`. The crate those verticals composed, `ont-daemon`, was removed when nothing consumed it; its source is in the Git history.
+- `conformance/fixtures/`: synthetic fixtures that tests of `ont-core` and `ont-store` read.
 - `AGENTS.md`: how an agent works in this repository. `REVIEW.md`: what blocks a pull request.

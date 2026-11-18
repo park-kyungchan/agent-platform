@@ -10,8 +10,9 @@
   "value_types": {},
   "sources": {
     "src": {
-      "kind": "json_records",
-      "path": "x.json"
+      "kind": "markdown_fields",
+      "glob": "/tmp/*.md",
+      "fresh_for_s": 1
     }
   },
   "object_types": {
@@ -20,14 +21,14 @@
         "source": "src"
       },
       "primary_key": {
-        "from": "/id"
+        "from": "/path"
       },
       "title": "name",
       "properties": {
         "name": {
           "type": "string",
           "required": true,
-          "from": "/name"
+          "from": "/stem"
         }
       }
     }
