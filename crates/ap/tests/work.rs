@@ -1,0 +1,1459 @@
+//! `ap work` (`specs/ap/work.md`) against a fake host: the fake answers the store (`ont search`, `get`,
+//! `action validate` and `action apply` of `note_unit_wait` as the engine answers them), `systemctl
+//! list-units`, `systemd-run`, `git check-ref-format`, `/proc/stat` and the control group's file itself.
+//! The policy file and the units directory are under a temporary directory: no test starts a unit of
+//! the service manager or reaches the host's store, policy file or units directory.
+use ap::host::{Answer, Failure, Reply, System};
+use ap::work::{Observed, arguments, execute, observe, overlap};
+use serde_json::{Value, json};
+use std::{
+    cell::{Cell, RefCell},
+    collections::{BTreeMap, BTreeSet, VecDeque},
+    ffi::OsString,
+    fs::File,
+    io::ErrorKind,
+    os::unix::fs::PermissionsExt,
+    path::{Path, PathBuf},
+    process::{Command, Stdio},
+    sync::atomic::{AtomicU32, Ordering},
+    time::{Duration, Instant},
+};
+
+static NEXT: AtomicU32 = AtomicU32::new(0);
+const STORE: &str = "/invented/scratch/store.sqlite";
+const PREFIX: &str = "aptest";
+const SLICE: &str = "aptest.slice";
+const CPU_STAT: &str = "/sys/fs/cgroup/aptest.slice/cpu.stat";
+const UUID: &str = "0123abcd-4567-89ef-0123-456789abcdef";
+
+fn reply(success: bool, v: &Value) -> Answer {
+    let bytes = serde_json::to_vec(v).unwrap();
+    Ok(Reply {
+        success,
+        stdout: bytes.clone(),
+        bytes,
+    })
+}
+fn text(success: bool, t: &str) -> Answer {
+    Ok(Reply {
+        success,
+        stdout: t.as_bytes().to_vec(),
+        bytes: t.as_bytes().to_vec(),
+    })
+}
+fn broken(program: &str) -> Answer {
+    Err(Failure {
+        code: "process_failed",
+        field: program.into(),
+        detail: Value::Null,
+    })
+}
+fn wrap(fields: &Value) -> Value {
+    let o = fields.as_object().unwrap().iter();
+    o.map(|(k, v)| (k.clone(), json!({"kind": "value", "value": v})))
+        .collect()
+}
+fn uid(key: &str) -> Value {
+    json!({"object_type": "unit", "namespace": {"instance": "vps://palantirkc", "account": "root"}, "native_key": key})
+}
+fn stat(cpus: u64, user: u64, idle: u64) -> String {
+    let mut t = format!("cpu  {user} 0 0 {idle} 0 0 0 0 0 0\n");
+    for n in 0..cpus {
+        t += &format!("cpu{n} 1 2 3 4 5 6 7 8 9 10\n");
+    }
+    t
+}
+
+/// The fake host.
+struct W {
+    dir: PathBuf,
+    policy: Option<PathBuf>,
+    units: bool,
+    env: Vec<(String, String)>,
+    /// The units of the store: the revision counter and the fields.
+    objects: BTreeMap<String, (u64, Value)>,
+    /// The lines `systemctl list-units` prints; None is a failed call.
+    listed: Option<String>,
+    /// The keys whose `systemd-run` fails.
+    run_fails: BTreeSet<String>,
+    /// The codes `start_unit` and `merge_unit` fail beside the fake's own rules, per unit.
+    refuse: BTreeMap<String, Vec<String>>,
+    /// The units whose `note_unit_wait` the store refuses `unit_not_ready`.
+    moved: BTreeSet<String>,
+    /// The store fails every call after this many applies.
+    store_dies_after: Option<usize>,
+    applies: usize,
+    calls: RefCell<Vec<(String, Vec<String>, Value)>>,
+    reads: RefCell<Vec<String>>,
+    proc: RefCell<VecDeque<String>>,
+    cgroup: RefCell<VecDeque<String>>,
+    base: Instant,
+    clock: Cell<Duration>,
+    /// A lock the test holds, let go at the first pause.
+    held: Option<File>,
+}
+impl W {
+    fn new() -> Self {
+        let dir = std::env::temp_dir().join(format!(
+            "ap-work-test-{}-{}",
+            std::process::id(),
+            NEXT.fetch_add(1, Ordering::SeqCst)
+        ));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(dir.join("a1")).unwrap();
+        let dir = std::fs::canonicalize(&dir).unwrap();
+        let mut w = W {
+            policy: Some(dir.join("policy.json")),
+            units: true,
+            env: vec![
+                ("PATH".into(), "/invented/bin:/usr/bin".into()),
+                ("HOME".into(), "/invented/home".into()),
+                ("LANG".into(), "C.UTF-8".into()),
+                ("FOO".into(), "not kept".into()),
+                (
+                    "AP_POLICY_FILE".into(),
+                    dir.join("policy.json").to_string_lossy().into_owned(),
+                ),
+            ],
+            dir,
+            objects: BTreeMap::new(),
+            listed: Some(String::new()),
+            run_fails: BTreeSet::new(),
+            refuse: BTreeMap::new(),
+            moved: BTreeSet::new(),
+            store_dies_after: None,
+            applies: 0,
+            calls: RefCell::default(),
+            reads: RefCell::default(),
+            proc: RefCell::default(),
+            cgroup: RefCell::default(),
+            base: Instant::now(),
+            clock: Cell::default(),
+            held: None,
+        };
+        w.policy_with(json!({}));
+        w
+    }
+    fn p(&self, rel: &str) -> String {
+        self.dir.join(rel).to_string_lossy().into_owned()
+    }
+    fn root(&self) -> PathBuf {
+        self.dir.join("units")
+    }
+    /// The trial's policy with `extra`'s members over it (a null member left out).
+    fn policy_with(&mut self, extra: Value) {
+        let mut policy = json!({"models": {"allowed": ["opus"], "never": []},
+            "accounts": {"claude": [self.p("a1")]},
+            "repositories": {"o/r": {"clone": self.p("clone-r")}, "o/s": {"clone": self.p("clone-s")}},
+            "reviews": {"task": "invented-task"},
+            "units": {"directory": self.p("units")},
+            "work": {"prefix": PREFIX, "slice": SLICE}});
+        for (k, v) in extra.as_object().unwrap() {
+            match v {
+                Value::Null => {
+                    policy.as_object_mut().unwrap().remove(k);
+                }
+                v => policy[k] = v.clone(),
+            }
+        }
+        std::fs::write(self.dir.join("policy.json"), policy.to_string()).unwrap();
+    }
+    /// A ready unit of `o/r` with the write set `ws`, ready at second `at`.
+    fn ready(&mut self, key: &str, ws: &[&str], at: u32) {
+        self.put(
+            key,
+            json!({"lane": "small", "class": "plain", "objective": "invented", "repository": "o/r",
+            "write_set": ws, "state": "ready", "ready_at": format!("2026-11-18T10:00:{at:02}Z"),
+            "implementer": {"runtime": "claude", "model": "opus", "effort": "high"},
+            "verifier": {"runtime": "claude", "model": "opus", "effort": "high"}}),
+        );
+    }
+    fn put(&mut self, key: &str, f: Value) {
+        let n = self.objects.get(key).map_or(1, |o| o.0 + 1);
+        self.objects.insert(key.into(), (n, f));
+    }
+    fn set(&mut self, key: &str, set: Value) {
+        let o = self.objects.get_mut(key).unwrap();
+        for (k, v) in set.as_object().unwrap() {
+            o.1[k] = v.clone();
+        }
+        o.0 += 1;
+    }
+    fn f(&self, key: &str) -> &Value {
+        &self.objects[key].1
+    }
+    fn revision(&self, key: &str) -> String {
+        format!("r#{}", self.objects[key].0)
+    }
+    fn live(&mut self, lines: &[&str]) {
+        self.listed = Some(lines.iter().map(|l| format!("{l}\n")).collect());
+    }
+    fn pass(&mut self) -> Result<Value, Box<ap::work::Refusal>> {
+        execute(self, Some(STORE))
+    }
+    fn ok(&mut self) -> Value {
+        self.pass().unwrap_or_else(|e| panic!("refused: {e:?}"))
+    }
+    fn refused(&mut self) -> (String, u8) {
+        match self.pass() {
+            Err(e) => (format!("{}@{}", e.failure.code, e.failure.field), e.status),
+            Ok(v) => panic!("expected a refusal, got {v}"),
+        }
+    }
+    fn calls_of(&self, program: &str) -> Vec<Vec<String>> {
+        let calls = self.calls.borrow();
+        calls
+            .iter()
+            .filter(|c| c.0 == program)
+            .map(|c| c.1.clone())
+            .collect()
+    }
+    fn bodies(&self, what: &str) -> Vec<Value> {
+        let calls = self.calls.borrow();
+        calls
+            .iter()
+            .filter(|c| c.0 == "ont" && c.1[0] == "action" && c.1[1] == what)
+            .map(|c| c.2.clone())
+            .collect()
+    }
+    fn notes(&self) -> Vec<(String, String)> {
+        let notes = self.bodies("apply");
+        notes
+            .iter()
+            .map(|b| {
+                assert_eq!(b["action_type"], "note_unit_wait");
+                let p = &b["parameters"];
+                (
+                    p["unit"]["native_key"].as_str().unwrap().to_owned(),
+                    p["waits_on"].as_str().unwrap().to_owned(),
+                )
+            })
+            .collect()
+    }
+    fn gets(&self) -> Vec<String> {
+        let calls = self.calls.borrow();
+        calls
+            .iter()
+            .filter(|c| c.0 == "ont" && c.1[0] == "get")
+            .map(|c| c.2["id"]["native_key"].as_str().unwrap().to_owned())
+            .collect()
+    }
+    fn reset(&mut self) {
+        self.calls.borrow_mut().clear();
+        self.reads.borrow_mut().clear();
+    }
+    /// Two readings of the load: `cpus` CPUs at `busy` per cent of all, the slice at `inside` per cent
+    /// of one CPU, over ten seconds.
+    fn load(&mut self, cpus: u64, busy: u64, inside: u64) {
+        let (user, idle) = (busy * 10 * cpus, (100 - busy) * 10 * cpus);
+        self.proc = RefCell::new(VecDeque::from([
+            stat(cpus, 1_000, 9_000),
+            stat(cpus, 1_000 + user, 9_000 + idle),
+        ]));
+        self.cgroup = RefCell::new(VecDeque::from([
+            "usage_usec 5000000\n".to_owned(),
+            format!("usage_usec {}\n", 5_000_000 + inside * 100_000),
+        ]));
+    }
+    /// The criteria of `start_unit` or `merge_unit` that fail for `p`.
+    fn failed(&self, action: &str, p: &Value) -> Vec<String> {
+        let key = p["unit"]["native_key"].as_str().unwrap();
+        let mut failed = vec![];
+        let Some((_, u)) = self.objects.get(key) else {
+            return vec!["unit_not_ready".into()];
+        };
+        if action == "start_unit" {
+            if u["state"] != "ready" {
+                failed.push("unit_not_ready".to_owned());
+            }
+            let deps = u["depends_on"].as_array().cloned().unwrap_or_default();
+            let merged = |d: &Value| {
+                let k = d["native_key"].as_str().unwrap();
+                self.objects
+                    .get(k)
+                    .is_some_and(|o| o.1["state"] == "merged")
+            };
+            if !deps.iter().all(merged) {
+                failed.push("dependency_not_merged".to_owned());
+            }
+        } else {
+            if u["state"] != "accepted" {
+                failed.push("unit_not_accepted".to_owned());
+            }
+            if p["head"] != u["head"] {
+                failed.push("head_differs".to_owned());
+            }
+            assert_eq!(p["merged_commit"], "0".repeat(40));
+        }
+        if u["lane"] == "objective" && p["intent"] != u["intent"] {
+            failed.push("intent_differs".to_owned());
+        }
+        failed.extend(self.refuse.get(key).cloned().unwrap_or_default());
+        failed
+    }
+    fn ont(&mut self, args: &[String], input: &Value) -> Answer {
+        assert_eq!(args[args.len() - 2..], ["--store", STORE], "{args:?}");
+        if self
+            .store_dies_after
+            .is_some_and(|n| self.applies >= n && n > 0)
+        {
+            return broken("ont");
+        }
+        match args[0].as_str() {
+            "search" => {
+                assert_eq!(input["object_type"], "unit");
+                let states = &input["where"]["all"][0]["in"];
+                assert_eq!(states[0], "state");
+                let states = states[1].as_array().unwrap();
+                let objects: Vec<Value> = self
+                    .objects
+                    .iter()
+                    .filter(|(_, (_, f))| states.contains(&f["state"]))
+                    .map(|(k, (_, f))| json!({"id": uid(k), "head": {"fields": wrap(f)}}))
+                    .collect();
+                reply(
+                    true,
+                    &json!({"status": "ok", "result": {"basis": {"qualified": true},
+                    "objects": objects, "continuation": null}}),
+                )
+            }
+            "get" => {
+                let id = &input["id"];
+                assert_eq!(id["object_type"], "unit");
+                let key = id["native_key"].as_str().unwrap();
+                let Some((n, f)) = self.objects.get(key) else {
+                    return reply(false, &json!({"status": "refused", "code": "unavailable"}));
+                };
+                let r = format!("r#{n}");
+                reply(
+                    true,
+                    &json!({"status": "ok", "result": {"objects": [{"id": id, "head": r,
+                    "observations": [{"revision": r, "fields": wrap(f)}]}]}}),
+                )
+            }
+            "action" if args[1] == "validate" => {
+                let action = input["action_type"].as_str().unwrap();
+                let failed = self.failed(action, &input["parameters"]);
+                let criteria: Vec<Value> = failed
+                    .iter()
+                    .map(|c| json!({"code": c, "passed": false}))
+                    .chain([json!({"code": "held", "passed": true})])
+                    .collect();
+                reply(
+                    true,
+                    &json!({"status": "ok", "result": {"valid": failed.is_empty(), "criteria": criteria}}),
+                )
+            }
+            "action" => {
+                assert_eq!(args[1], "apply");
+                assert_eq!(input["action_type"], "note_unit_wait", "{input}");
+                self.applies += 1;
+                let key = input["parameters"]["unit"]["native_key"]
+                    .as_str()
+                    .unwrap()
+                    .to_owned();
+                if self.moved.contains(&key) || self.f(&key)["state"] != "ready" {
+                    let refusal = json!({"status": "refused", "code": "submission_criteria",
+                        "failed": ["unit_not_ready"]});
+                    return reply(false, &refusal);
+                }
+                self.set(&key, json!({"waits_on": input["parameters"]["waits_on"]}));
+                let r = self.revision(&key);
+                reply(
+                    true,
+                    &json!({"status": "ok", "result": {"outcome": "applied",
+                    "edits": [{"change": "update", "id": uid(&key), "revision": r}]}}),
+                )
+            }
+            other => panic!("ont {other}"),
+        }
+    }
+}
+impl Drop for W {
+    fn drop(&mut self) {
+        let _ = std::fs::remove_dir_all(&self.dir);
+    }
+}
+impl System for W {
+    fn call(&mut self, program: &str, args: &[String], input: &Value, _: u64) -> Answer {
+        self.calls
+            .borrow_mut()
+            .push((program.to_owned(), args.to_vec(), input.clone()));
+        let words: Vec<&str> = args.iter().map(String::as_str).collect();
+        match (program, &words[..]) {
+            ("ont", _) => self.ont(args, input),
+            ("git", ["check-ref-format", "--branch", _]) => text(true, ""),
+            ("systemctl", ["list-units", "--all", "--plain", "--no-legend", pattern]) => {
+                assert_eq!(*pattern, format!("{PREFIX}-*"));
+                match &self.listed {
+                    Some(t) => text(true, t),
+                    None => broken("systemctl"),
+                }
+            }
+            ("systemctl", ["show", "-p", "ControlGroup", "--value", SLICE]) => {
+                text(true, &format!("/{SLICE}\n"))
+            }
+            ("systemd-run", ["--unit", unit, ..]) => {
+                let key = unit.strip_prefix(&format!("{PREFIX}-")).unwrap();
+                assert!(!words.contains(&"--wait"), "the pass waited: {words:?}");
+                text(!self.run_fails.contains(key), "")
+            }
+            _ => panic!("a call the pass does not make: {program} {words:?}"),
+        }
+    }
+    fn read(&self, path: &str) -> std::io::Result<Vec<u8>> {
+        self.reads.borrow_mut().push(path.to_owned());
+        match path {
+            "/proc/sys/kernel/random/uuid" => Ok(format!("{UUID}\n").into_bytes()),
+            "/proc/stat" => {
+                let next = self.proc.borrow_mut().pop_front();
+                Ok(next.expect("one reading too many").into_bytes())
+            }
+            CPU_STAT => {
+                let next = self.cgroup.borrow_mut().pop_front();
+                next.map(String::into_bytes)
+                    .ok_or_else(|| ErrorKind::NotFound.into())
+            }
+            _ => {
+                assert!(
+                    path.starts_with(self.dir.to_str().unwrap()),
+                    "a read of {path}"
+                );
+                std::fs::read(path)
+            }
+        }
+    }
+    fn units(&self) -> bool {
+        self.units
+    }
+    fn policy_file(&self) -> Option<PathBuf> {
+        self.policy.clone()
+    }
+    fn environment(&self) -> Vec<(String, String)> {
+        self.env.clone()
+    }
+    fn now(&self) -> Instant {
+        self.base + self.clock.get()
+    }
+    fn pause(&mut self, d: Duration) {
+        self.held = None;
+        self.clock.set(self.clock.get() + d);
+    }
+    fn launch(
+        &mut self,
+        argv: &[String],
+        _: &[(String, String)],
+        _: &str,
+        _: [std::fs::File; 3],
+    ) -> std::io::Result<std::process::Child> {
+        panic!("the pass launched {argv:?}")
+    }
+}
+/// An exclusive lock on `path` (made), held by the test.
+fn hold(path: &Path) -> File {
+    std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+    let f = File::create(path).unwrap();
+    rustix::fs::flock(&f, rustix::fs::FlockOperation::NonBlockingLockExclusive).unwrap();
+    f
+}
+fn keys(v: &Value) -> Vec<String> {
+    v.as_array()
+        .unwrap()
+        .iter()
+        .map(|k| k.as_str().unwrap().to_owned())
+        .collect()
+}
+fn waiting(v: &Value) -> Vec<(String, String)> {
+    v["waiting"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|w| {
+            (
+                w["unit"].as_str().unwrap().to_owned(),
+                w["waits_on"].as_str().unwrap().to_owned(),
+            )
+        })
+        .collect()
+}
+fn pairs(list: &[(&str, &str)]) -> Vec<(String, String)> {
+    list.iter()
+        .map(|(a, b)| ((*a).to_owned(), (*b).to_owned()))
+        .collect()
+}
+/// The files under `dir`, relative, with a `/` after a directory.
+fn tree(dir: &Path) -> BTreeSet<String> {
+    let mut all = BTreeSet::new();
+    let mut todo = vec![dir.to_path_buf()];
+    while let Some(d) = todo.pop() {
+        for e in std::fs::read_dir(&d).into_iter().flatten().flatten() {
+            let rel = e
+                .path()
+                .strip_prefix(dir)
+                .unwrap()
+                .to_string_lossy()
+                .into_owned();
+            if e.file_type().unwrap().is_dir() {
+                all.insert(format!("{rel}/"));
+                todo.push(e.path());
+            } else {
+                all.insert(rel);
+            }
+        }
+    }
+    all
+}
+
+/// The command `ap` with exactly `env`, `PATH` being the directory of stand-ins that log each call.
+fn ap_cli(args: &[&str], env: &[(&str, &str)]) -> std::process::Output {
+    let mut c = Command::new(env!("CARGO_BIN_EXE_ap"));
+    c.args(args).env_clear().stdin(Stdio::null());
+    for (k, v) in env {
+        c.env(k, v);
+    }
+    c.output().unwrap()
+}
+
+// spec: specs/ap/work.md#R1
+#[test]
+fn r1_the_form_and_the_refusals_before_any_effect() {
+    let a = |words: &[&str]| -> Vec<OsString> { words.iter().map(OsString::from).collect() };
+    assert_eq!(arguments(&a(&[])).unwrap(), None);
+    assert_eq!(
+        arguments(&a(&["--store", "/s"])).unwrap().as_deref(),
+        Some("/s")
+    );
+    for bad in [
+        &["now"][..],
+        &["--store"],
+        &["--store", "s"],
+        &["--store", "/s", "--store", "/t"],
+        &["--now"],
+    ] {
+        assert_eq!(arguments(&a(bad)).unwrap_err().code, "usage", "{bad:?}");
+    }
+    let mut w = W::new();
+    w.ready("a", &["a/**"], 1);
+    w.env.push(("ONT_ROLE".into(), "lead".into()));
+    assert_eq!(w.refused(), ("role_in_environment@ONT_ROLE".into(), 2));
+    w.env.pop();
+    // A trial's pass never reads the host's store; a scratch store never runs under the host's policy.
+    match execute(&mut w, None) {
+        Err(e) => assert_eq!(
+            (e.failure.code, e.failure.field.as_str(), e.status),
+            ("invalid_input", "store", 2)
+        ),
+        Ok(v) => panic!("{v}"),
+    }
+    w.env.retain(|(k, _)| k != "AP_POLICY_FILE");
+    assert_eq!(w.refused(), ("invalid_input@policy".into(), 2));
+    w.env.push(("AP_POLICY_FILE".into(), String::new()));
+    assert_eq!(w.refused(), ("invalid_input@policy".into(), 2));
+    assert!(w.calls.borrow().is_empty() && !w.root().exists());
+}
+
+// spec: specs/ap/work.md#R2
+#[test]
+fn r2_each_skip_makes_no_call_and_no_file() {
+    let mut w = W::new();
+    w.ready("a", &["a/**"], 1);
+    let skipped = |w: &mut W, why: &str| {
+        assert_eq!(w.ok(), json!({ "skipped": why }));
+        assert!(w.calls.borrow().is_empty(), "{:?}", w.calls.borrow());
+        assert!(!w.root().exists());
+    };
+    w.policy = None;
+    skipped(&mut w, "no policy file");
+    w.policy = Some(w.dir.join("absent.json"));
+    skipped(&mut w, "no policy file");
+    w.policy = Some(w.dir.join("policy.json"));
+    w.policy_with(json!({"work": null}));
+    skipped(&mut w, "no work");
+    w.policy_with(json!({}));
+    w.units = false;
+    skipped(&mut w, "no service manager");
+    std::fs::write(w.dir.join("policy.json"), "[1]").unwrap();
+    let e = w.pass().unwrap_err();
+    assert_eq!((e.failure.code, e.status), ("policy_invalid", 2));
+    assert!(e.failure.detail.as_str().unwrap().starts_with("file"));
+}
+
+// spec: specs/ap/work.md#R3
+#[test]
+fn r3_the_member_work_its_defaults_and_its_forms() {
+    let mut w = W::new();
+    let bad = [
+        json!(1),
+        json!({"slots": 0}),
+        json!({"slots": 17}),
+        json!({"slots": "3"}),
+        json!({"slice": "a-b.slice"}),
+        json!({"slice": "ab"}),
+        json!({"prefix": "-ap"}),
+        json!({"prefix": "ap-"}),
+        json!({"prefix": "1ap"}),
+        json!({"prefix": "Ap"}),
+        json!({"prefix": "abcdefghijklmnopq"}),
+        json!({"other": 1}),
+    ];
+    for work in bad {
+        w.policy_with(json!({ "work": work }));
+        let e = w.pass().unwrap_err();
+        assert_eq!((e.failure.code, e.status), ("policy_invalid", 2), "{work}");
+        assert!(
+            e.failure.detail.as_str().unwrap().starts_with("work"),
+            "{work}"
+        );
+    }
+    // With `--store`, the trial names its directory, prefix and slice.
+    for extra in [
+        json!({"work": {"slice": SLICE}}),
+        json!({"work": {"prefix": PREFIX}}),
+        json!({"units": null}),
+        json!({"units": {}}),
+    ] {
+        w.policy_with(extra.clone());
+        assert_eq!(w.refused(), ("invalid_input@policy".into(), 2), "{extra}");
+    }
+    w.policy_with(json!({"units": {"directory": "relative"}}));
+    assert_eq!(w.refused(), ("policy_invalid@policy".into(), 2));
+    w.policy_with(json!({"quota": {"slice": "a-b.slice"}}));
+    assert_eq!(w.refused(), ("policy_invalid@policy".into(), 2));
+    assert!(w.calls.borrow().is_empty() && !w.root().exists());
+    // The defaults: three slots, `ap-unit` and `agents.slice`, read by the host's own pass.
+    w.policy_with(json!({"work": {}}));
+    w.env.retain(|(k, _)| k != "AP_POLICY_FILE");
+    for k in ["a", "b", "c", "d"] {
+        w.ready(k, &[&format!("{k}/**")], 1);
+    }
+    w.listed = Some(String::new());
+    let mut host = HostDefaults(w);
+    let v = execute(&mut host, None).unwrap();
+    assert_eq!(keys(&v["started"]), ["a", "b", "c"]);
+    assert_eq!(waiting(&v), pairs(&[("d", "slots 3/3")]));
+    let runs = host.0.calls_of("systemd-run");
+    assert_eq!(
+        runs[0][..4],
+        ["--unit", "ap-unit-a", "--slice", "agents.slice"]
+    );
+    assert!(!runs[0].iter().any(|a| a == "--store"));
+}
+/// The fake under the default prefix and slice.
+struct HostDefaults(W);
+impl System for HostDefaults {
+    fn call(&mut self, program: &str, args: &[String], input: &Value, ms: u64) -> Answer {
+        let mut args = args.to_vec();
+        match program {
+            "ont" => args.extend(["--store".into(), STORE.into()]),
+            "systemctl" => {
+                assert_eq!(args.last().unwrap(), "ap-unit-*");
+                *args.last_mut().unwrap() = format!("{PREFIX}-*");
+            }
+            "systemd-run" => {
+                assert!(args[1].starts_with("ap-unit-"));
+                self.0
+                    .calls
+                    .borrow_mut()
+                    .push((program.into(), args.clone(), input.clone()));
+                return text(true, "");
+            }
+            _ => {}
+        }
+        self.0.call(program, &args, input, ms)
+    }
+    fn read(&self, path: &str) -> std::io::Result<Vec<u8>> {
+        self.0.read(path)
+    }
+    fn units(&self) -> bool {
+        true
+    }
+    fn policy_file(&self) -> Option<PathBuf> {
+        self.0.policy_file()
+    }
+    fn environment(&self) -> Vec<(String, String)> {
+        self.0.environment()
+    }
+    fn now(&self) -> Instant {
+        self.0.now()
+    }
+    fn pause(&mut self, d: Duration) {
+        self.0.pause(d)
+    }
+}
+
+// spec: specs/ap/work.md#R4
+#[test]
+fn r4_the_pass_waits_for_its_lock_and_reads_the_store_only_with_it() {
+    let mut w = W::new();
+    w.ready("a", &["a/**"], 1);
+    // Held all the time: 120 seconds, then the skip, and no call to the store.
+    std::fs::create_dir_all(w.root()).unwrap();
+    let held = hold(&w.root().join("work.lock"));
+    struct Keep<'a>(&'a mut W);
+    impl System for Keep<'_> {
+        fn call(&mut self, p: &str, a: &[String], i: &Value, ms: u64) -> Answer {
+            self.0.call(p, a, i, ms)
+        }
+        fn read(&self, path: &str) -> std::io::Result<Vec<u8>> {
+            self.0.read(path)
+        }
+        fn policy_file(&self) -> Option<PathBuf> {
+            self.0.policy_file()
+        }
+        fn environment(&self) -> Vec<(String, String)> {
+            self.0.environment()
+        }
+        fn now(&self) -> Instant {
+            self.0.now()
+        }
+        fn pause(&mut self, d: Duration) {
+            self.0.clock.set(self.0.clock.get() + d);
+        }
+        fn units(&self) -> bool {
+            true
+        }
+    }
+    let v = execute(&mut Keep(&mut w), Some(STORE)).unwrap();
+    assert_eq!(v, json!({"skipped": "pass_running"}));
+    assert!(w.calls.borrow().is_empty());
+    assert_eq!(w.clock.get(), Duration::from_secs(120));
+    // Let go at the first pause: the pass then reads the store and starts.
+    w.held = Some(held);
+    w.clock.set(Duration::ZERO);
+    let v = w.ok();
+    assert_eq!(keys(&v["started"]), ["a"]);
+    assert_eq!(w.clock.get(), Duration::from_secs(1));
+    // The directory is made with mode 0700 when absent.
+    let mut w = W::new();
+    w.ok();
+    let mode = std::fs::metadata(w.root()).unwrap().permissions().mode();
+    assert_eq!(mode & 0o777, 0o700);
+    let lock = std::fs::metadata(w.root().join("work.lock")).unwrap();
+    assert_eq!(lock.permissions().mode() & 0o777, 0o600);
+}
+
+// spec: specs/ap/work.md#R5
+#[test]
+fn r5_the_reading_of_the_store_and_of_the_service_manager() {
+    let mut w = W::new();
+    w.ready("a", &["a/**"], 1);
+    w.put("d", json!({"state": "draft"}));
+    w.live(&[
+        "aptest-x.scope loaded active running x",
+        "aptestx-y.service loaded active running y",
+        "aptest-z.service loaded failed failed z",
+        "aptest-q.service loaded activating start q",
+    ]);
+    let v = w.ok();
+    let search = w.calls.borrow()[0].clone();
+    assert_eq!(search.0, "ont");
+    assert_eq!(
+        search.2["where"]["all"],
+        json!([{"in": ["state", ["ready", "running", "accepted"]]}])
+    );
+    // Only `aptest-q.service` is a live run unit; `d` is not read.
+    assert_eq!(keys(&v["in_flight"]), ["aptest-q.service"]);
+    assert_eq!(keys(&v["started"]), ["a"]);
+    assert!(!w.gets().contains(&"d".to_owned()));
+    for listed in [None, Some("aptest-a.service loaded\n".to_owned())] {
+        let mut w = W::new();
+        w.ready("a", &["a/**"], 1);
+        w.listed = listed;
+        assert_eq!(w.refused(), ("reading_failed@list_units".into(), 3));
+        assert!(w.calls_of("systemd-run").is_empty());
+    }
+}
+
+// spec: specs/ap/work.md#R6
+#[test]
+fn r6_in_flight_by_a_live_run_unit_or_a_held_lock_and_keys_of_another_form() {
+    let mut w = W::new();
+    w.policy_with(json!({"work": {"prefix": PREFIX, "slice": SLICE, "slots": 4}}));
+    w.ready("Bad_Key", &["z/**"], 0);
+    w.ready("a", &["a/**"], 1);
+    w.ready("b", &["b/**"], 2);
+    w.ready("c", &["c/**"], 3);
+    w.live(&[
+        "aptest-a.service loaded active running a",
+        "aptest-gone.service loaded deactivating stop-sigterm gone",
+    ]);
+    let lock = hold(&w.root().join("b").join("lock"));
+    let v = w.ok();
+    assert_eq!(keys(&v["in_flight"]), ["a", "b", "aptest-gone.service"]);
+    // Three in flight of four slots: one start.
+    assert_eq!(keys(&v["started"]), ["c"]);
+    assert!(!w.gets().contains(&"Bad_Key".to_owned()));
+    assert!(!w.root().join("Bad_Key").exists());
+    // The test of a lock makes no file: `c` has none and none was made.
+    assert!(!w.root().join("c").join("lock").exists());
+    drop(lock);
+    // A lock that no process holds is not in flight.
+    let mut w = W::new();
+    w.ready("b", &["b/**"], 2);
+    std::fs::create_dir_all(w.root().join("b")).unwrap();
+    std::fs::write(w.root().join("b").join("lock"), "").unwrap();
+    assert_eq!(keys(&w.ok()["started"]), ["b"]);
+}
+
+// spec: specs/ap/work.md#R7
+#[test]
+fn r7_a_running_unit_no_run_holds_is_cut_and_never_started() {
+    let mut w = W::new();
+    w.put(
+        "r",
+        json!({"state": "running", "repository": "o/r", "write_set": ["r/**"]}),
+    );
+    w.put(
+        "s",
+        json!({"state": "running", "repository": "o/r", "write_set": ["s/**"]}),
+    );
+    w.live(&["aptest-s.service loaded active running s"]);
+    let v = w.ok();
+    assert_eq!(keys(&v["cut"]), ["r"]);
+    assert_eq!(keys(&v["in_flight"]), ["s"]);
+    assert!(w.calls_of("systemd-run").is_empty() && w.gets().is_empty());
+}
+
+// spec: specs/ap/work.md#R8
+#[test]
+fn r8_the_candidates_their_order_and_their_one_read() {
+    let mut w = W::new();
+    w.policy_with(json!({"work": {"prefix": PREFIX, "slice": SLICE, "slots": 16}}));
+    let head = "a".repeat(40);
+    let accepted = |class: &str, approved: Option<&str>| {
+        let mut f = json!({"state": "accepted", "class": class, "lane": "small", "repository": "o/r",
+            "head": head, "write_set": ["x/**"],
+            "implementer": {"runtime": "claude", "model": "opus", "effort": "high"},
+            "verifier": {"runtime": "claude", "model": "opus", "effort": "high"}});
+        if let Some(a) = approved {
+            f["approved_head"] = json!(a);
+        }
+        f
+    };
+    w.ready("r-late", &["l/**"], 9);
+    w.ready("r-b", &["b/**"], 1);
+    w.ready("r-a", &["a/**"], 1);
+    w.put("m-plain", accepted("plain", None));
+    w.put("m-approved", accepted("contract", Some(&head)));
+    w.put("m-waits", accepted("contract", None));
+    w.put("m-old", accepted("effect", Some(&"b".repeat(40))));
+    let v = w.ok();
+    assert_eq!(
+        keys(&v["started"]),
+        ["m-approved", "m-plain", "r-a", "r-b", "r-late"]
+    );
+    assert_eq!(w.gets(), ["m-approved", "m-plain", "r-a", "r-b", "r-late"]);
+    let merges = w.bodies("validate");
+    assert_eq!(merges[0]["action_type"], "merge_unit");
+    assert_eq!(merges[0]["parameters"]["head"], head);
+    // The read decides: a unit that moved out of `ready` since the search is skipped.
+    struct Moving(W);
+    impl System for Moving {
+        fn call(&mut self, p: &str, a: &[String], i: &Value, ms: u64) -> Answer {
+            if p == "ont" && a[0] == "get" {
+                self.0.set("x", json!({"state": "running"}));
+            }
+            self.0.call(p, a, i, ms)
+        }
+        fn read(&self, path: &str) -> std::io::Result<Vec<u8>> {
+            self.0.read(path)
+        }
+        fn policy_file(&self) -> Option<PathBuf> {
+            self.0.policy_file()
+        }
+        fn environment(&self) -> Vec<(String, String)> {
+            self.0.environment()
+        }
+        fn units(&self) -> bool {
+            true
+        }
+    }
+    let mut m = Moving(W::new());
+    m.0.ready("x", &["x/**"], 1);
+    let v = execute(&mut m, Some(STORE)).unwrap();
+    assert_eq!(v["started"], json!([]));
+    assert_eq!(v["waiting"], json!([]));
+    // A `waits_on` is cut to 300 bytes.
+    let mut w = W::new();
+    w.ready("long", &["l/**"], 1);
+    let codes: Vec<String> = (0..40).map(|n| format!("invented_code_{n:02}")).collect();
+    w.refuse.insert("long".into(), codes);
+    let v = w.ok();
+    let why = &waiting(&v)[0].1;
+    assert_eq!(why.len(), 300);
+    assert!(why.starts_with("invented_code_00, invented_code_01"));
+    assert_eq!(w.notes(), [("long".to_owned(), why.clone())]);
+}
+
+// spec: specs/ap/work.md#R9
+#[test]
+fn r9_a_unit_is_started_once_for_one_revision() {
+    let mut w = W::new();
+    w.ready("a", &["a/**"], 1);
+    w.ok();
+    let started = std::fs::read_to_string(w.root().join("a").join("started")).unwrap();
+    assert_eq!(started, w.revision("a"));
+    // The run ended with the unit as it was: no second start.
+    w.reset();
+    let v = w.ok();
+    assert_eq!(keys(&v["not_restarted"]), ["a"]);
+    assert!(w.calls_of("systemd-run").is_empty());
+    // A new revision (the Lead made it ready again, approved it) is started again.
+    w.set("a", json!({"ready_at": "2026-11-18T11:00:00Z"}));
+    w.reset();
+    assert_eq!(keys(&w.ok()["started"]), ["a"]);
+    let started = std::fs::read_to_string(w.root().join("a").join("started")).unwrap();
+    assert_eq!(started, w.revision("a"));
+}
+
+// spec: specs/ap/work.md#R10
+#[test]
+fn r10_a_repository_the_runs_own_checks_and_the_stores_validate() {
+    let mut w = W::new();
+    w.policy_with(json!({"work": {"prefix": PREFIX, "slice": SLICE, "slots": 16}}));
+    w.ready("no-repo", &["n/**"], 1);
+    w.set("no-repo", json!({"repository": null}));
+    w.ready("branch", &["b/**"], 2);
+    w.set("branch", json!({"branch": "main"}));
+    w.ready("tier", &["t/**"], 3);
+    w.set(
+        "tier",
+        json!({"implementer": {"runtime": "codex", "model": "m", "effort": "e"}}),
+    );
+    w.ready("unmapped", &["u/**"], 4);
+    w.set("unmapped", json!({"repository": "o/unmapped"}));
+    w.ready("held", &["h/**"], 5);
+    w.refuse.insert(
+        "held".into(),
+        vec!["held".into(), "intent_not_confirmed".into()],
+    );
+    w.ready("dep", &["d/**"], 6);
+    w.set("dep", json!({"depends_on": [uid("gone"), uid("open")]}));
+    w.put("gone", json!({"state": "dropped"}));
+    w.put("open", json!({"state": "draft"}));
+    w.ready("dep2", &["e/**"], 7);
+    w.set("dep2", json!({"depends_on": [uid("open")]}));
+    w.put(
+        "m-bad",
+        json!({"state": "accepted", "class": "plain", "repository": "o/r",
+        "head": "c".repeat(40), "write_set": ["m/**"],
+        "implementer": {"runtime": "claude", "model": "opus", "effort": "high"},
+        "verifier": {"runtime": "claude", "model": "opus", "effort": "high"}}),
+    );
+    w.refuse.insert("m-bad".into(), vec!["held".into()]);
+    let v = w.ok();
+    assert_eq!(v["started"], json!([]));
+    let expected = [
+        ("m-bad", "held"),
+        ("no-repo", "no repository"),
+        ("branch", "run refused: invalid_branch"),
+        ("tier", "run refused: tier_not_supported"),
+        ("unmapped", "run refused: repository_not_mapped"),
+        ("held", "held, intent_not_confirmed"),
+        ("dep", "dependency dropped: gone"),
+        ("dep2", "dependency_not_merged"),
+    ];
+    assert_eq!(waiting(&v), pairs(&expected));
+    // The accepted unit gets no note; the dependencies are read only for the failed validate.
+    assert_eq!(w.notes(), pairs(&expected[1..]));
+    let gets = w.gets();
+    assert_eq!(gets.iter().filter(|g| *g == "gone").count(), 1);
+    assert_eq!(gets.iter().filter(|g| *g == "open").count(), 1);
+}
+
+// spec: specs/ap/work.md#R11
+#[test]
+fn r11_the_overlap_rule() {
+    assert!(overlap("crates/ap/src/**", "crates/ap/src/run.rs"));
+    assert!(!overlap("crates/ap/**", "crates/ont/**"));
+    assert!(overlap("check", "check"));
+    assert!(overlap("a/b*", "a/bc/d"));
+    // Both ways round, whole components without `*`, and the matcher's `<dir>/**`.
+    assert!(overlap("crates/ap/src/run.rs", "crates/ap/src/**"));
+    assert!(!overlap("check", "checks"));
+    assert!(!overlap("a/b", "a/bc"));
+    assert!(overlap("a/b", "a/b/c"));
+    assert!(!overlap("crates/ap/**", "crates/apx/y"));
+    assert!(overlap("**", "anything"));
+    let mut w = W::new();
+    w.policy_with(json!({"work": {"prefix": PREFIX, "slice": SLICE, "slots": 16}}));
+    w.ready("first", &["crates/ap/src/**"], 1);
+    w.ready("second", &["crates/ont/**"], 2);
+    w.ready("third", &["crates/ap/src/run.rs"], 3);
+    w.ready("fourth", &["docs/x"], 4);
+    w.set("fourth", json!({"repository": "o/s"}));
+    w.put("busy", json!({"state": "accepted", "class": "contract", "repository": "o/s", "write_set": ["docs/**"]}));
+    let v = w.ok();
+    assert_eq!(keys(&v["started"]), ["first", "second"]);
+    assert_eq!(
+        waiting(&v),
+        pairs(&[
+            ("third", "write set overlaps first"),
+            ("fourth", "write set overlaps busy")
+        ])
+    );
+    // The first merged: the third starts by itself in the next pass.
+    w.set("first", json!({"state": "merged"}));
+    w.put("busy", json!({"state": "merged"}));
+    w.live(&["aptest-second.service loaded active running s"]);
+    w.reset();
+    let v = w.ok();
+    assert_eq!(keys(&v["started"]), ["third", "fourth"]);
+}
+
+// spec: specs/ap/work.md#R12
+#[test]
+fn r12_the_slots() {
+    let mut w = W::new();
+    w.policy_with(json!({"work": {"prefix": PREFIX, "slice": SLICE, "slots": 2}}));
+    for (n, k) in ["a", "b", "c"].iter().enumerate() {
+        w.ready(k, &[&format!("{k}/**")], n as u32);
+    }
+    let v = w.ok();
+    assert_eq!(keys(&v["started"]), ["a", "b"]);
+    assert_eq!(waiting(&v), pairs(&[("c", "slots 2/2")]));
+    // A live run unit of a unit not read counts.
+    let mut w = W::new();
+    w.policy_with(json!({"work": {"prefix": PREFIX, "slice": SLICE, "slots": 2}}));
+    w.ready("a", &["a/**"], 1);
+    w.ready("b", &["b/**"], 2);
+    w.live(&["aptest-dropped.service loaded active running d"]);
+    let v = w.ok();
+    assert_eq!(keys(&v["started"]), ["a"]);
+    assert_eq!(waiting(&v), pairs(&[("b", "slots 2/2")]));
+}
+
+// spec: specs/ap/work.md#R13
+#[test]
+fn r13_the_cpu_limit_and_the_load_outside_the_slice() {
+    let quota = json!({"slice": SLICE});
+    // Two CPUs, 150 % of one CPU outside the slice and 10 % inside, Q1's defaults: nothing starts.
+    let mut w = W::new();
+    w.policy_with(json!({ "quota": quota }));
+    w.ready("a", &["a/**"], 1);
+    w.ready("b", &["b/**"], 2);
+    w.load(2, 80, 10);
+    let v = w.ok();
+    assert_eq!(v["started"], json!([]));
+    assert_eq!(
+        (v["busy"].clone(), v["outside"].clone()),
+        (json!(80), json!(150))
+    );
+    assert_eq!(
+        waiting(&v),
+        pairs(&[("a", "cpu outside"), ("b", "cpu outside")])
+    );
+    // One reading per pass: two moments of /proc/stat.
+    let stats = w
+        .reads
+        .borrow()
+        .iter()
+        .filter(|r| *r == "/proc/stat")
+        .count();
+    assert_eq!(stats, 2);
+    // The next pass reads again and notes nothing new.
+    w.load(2, 80, 10);
+    w.reset();
+    w.ok();
+    assert!(w.notes().is_empty());
+    // Over the busy limit.
+    let mut w = W::new();
+    w.policy_with(json!({"quota": {"slice": SLICE, "busy_limit": 50}}));
+    w.ready("a", &["a/**"], 1);
+    w.load(4, 60, 200);
+    let v = w.ok();
+    assert_eq!(waiting(&v), pairs(&[("a", "cpu over 50%")]));
+    // Under both: the start, with the readings in the answer.
+    let mut w = W::new();
+    w.policy_with(json!({ "quota": quota }));
+    w.ready("a", &["a/**"], 1);
+    w.load(4, 30, 100);
+    let v = w.ok();
+    assert_eq!(keys(&v["started"]), ["a"]);
+    assert_eq!(
+        (v["busy"].clone(), v["outside"].clone()),
+        (json!(30), json!(20))
+    );
+    // No candidate that passed every other constraint: no reading at all.
+    let mut w = W::new();
+    w.policy_with(json!({ "quota": quota }));
+    w.ready("a", &["a/**"], 1);
+    w.set("a", json!({"repository": null}));
+    let v = w.ok();
+    assert_eq!(
+        (v["busy"].clone(), v["outside"].clone()),
+        (Value::Null, Value::Null)
+    );
+    assert!(!w.reads.borrow().iter().any(|r| r == "/proc/stat"));
+    // Without `quota`, nothing is read.
+    let mut w = W::new();
+    w.ready("a", &["a/**"], 1);
+    assert_eq!(w.ok()["busy"], Value::Null);
+    assert!(!w.reads.borrow().iter().any(|r| r == "/proc/stat"));
+}
+
+// spec: specs/ap/work.md#R14
+#[test]
+fn r14_the_start_clears_waits_on_writes_started_and_runs_the_unit() {
+    let mut w = W::new();
+    w.ready("a", &["a/**"], 1);
+    w.set("a", json!({"waits_on": "slots 3/3"}));
+    let v = w.ok();
+    assert_eq!(keys(&v["started"]), ["a"]);
+    assert_eq!(w.notes(), pairs(&[("a", "")]));
+    // The revision after the clear is the one written.
+    let started = std::fs::read_to_string(w.root().join("a").join("started")).unwrap();
+    assert_eq!(started, w.revision("a"));
+    let mode = std::fs::metadata(w.root().join("a"))
+        .unwrap()
+        .permissions()
+        .mode();
+    assert_eq!(mode & 0o777, 0o700);
+    let run = &w.calls_of("systemd-run")[0];
+    let head = [
+        "--unit",
+        "aptest-a",
+        "--slice",
+        SLICE,
+        "--collect",
+        "--quiet",
+        "--expand-environment=no",
+    ];
+    assert_eq!(run[..7], head);
+    let policy = w.p("policy.json");
+    let env = [
+        "--setenv",
+        "PATH=/invented/bin:/usr/bin",
+        "--setenv",
+        "HOME=/invented/home",
+        "--setenv",
+        "LANG=C.UTF-8",
+        "--setenv",
+        &format!("AP_POLICY_FILE={policy}"),
+        "--",
+    ];
+    assert_eq!(run[7..16], env);
+    assert!(Path::new(&run[16]).is_absolute() && !run[16].ends_with(" (deleted)"));
+    assert_eq!(run[17..], ["unit", "run", "a", "--store", STORE]);
+    assert!(
+        !run.iter()
+            .any(|a| a.contains("FOO") || a.contains("RuntimeMax"))
+    );
+}
+
+// spec: specs/ap/work.md#R15
+#[test]
+fn r15_a_failed_systemd_run_is_no_start() {
+    let mut w = W::new();
+    w.ready("a", &["a/**"], 1);
+    w.ready("b", &["b/**"], 2);
+    w.run_fails.insert("a".into());
+    let v = w.ok();
+    assert_eq!(keys(&v["started"]), ["b"]);
+    assert_eq!(waiting(&v), pairs(&[("a", "start failed")]));
+    assert!(!w.root().join("a").join("started").exists());
+    assert_eq!(w.f("a")["waits_on"], "start failed");
+    // The next pass tries it again.
+    w.run_fails.clear();
+    w.reset();
+    assert_eq!(keys(&w.ok()["started"]), ["a"]);
+}
+
+// spec: specs/ap/work.md#R16
+#[test]
+fn r16_notes_only_when_they_change_and_a_store_failure_ends_the_pass() {
+    let mut w = W::new();
+    w.policy_with(json!({"work": {"prefix": PREFIX, "slice": SLICE, "slots": 1}}));
+    w.ready("a", &["a/**"], 1);
+    w.ready("b", &["b/**"], 2);
+    w.ok();
+    assert_eq!(w.notes(), pairs(&[("b", "slots 1/1")]));
+    w.live(&["aptest-a.service loaded active running a"]);
+    w.reset();
+    w.ok();
+    assert!(w.notes().is_empty());
+    // A unit that moved meanwhile: its note refused `unit_not_ready` is no failure.
+    let mut w = W::new();
+    w.ready("a", &["a/**"], 1);
+    w.set("a", json!({"repository": null}));
+    w.moved.insert("a".into());
+    assert_eq!(waiting(&w.ok()), pairs(&[("a", "no repository")]));
+    // Nor is a clear refused so; that unit does not start.
+    let mut w = W::new();
+    w.ready("a", &["a/**"], 1);
+    w.set("a", json!({"waits_on": "slots 3/3"}));
+    w.moved.insert("a".into());
+    let v = w.ok();
+    assert_eq!(v["started"], json!([]));
+    assert!(w.calls_of("systemd-run").is_empty() && !w.root().join("a").exists());
+    // A store that fails after a start ends the pass, exit 3, with that start.
+    let mut w = W::new();
+    w.ready("a", &["a/**"], 1);
+    w.ready("b", &["b/**"], 2);
+    w.set("b", json!({"repository": null}));
+    w.store_dies_after = Some(1);
+    w.set("a", json!({"waits_on": "x"}));
+    let e = w.pass().unwrap_err();
+    assert_eq!((e.failure.code, e.status), ("process_failed", 3));
+    assert_eq!(e.started, Some(vec!["a".to_owned()]));
+}
+
+// spec: specs/ap/work.md#R17
+#[test]
+fn r17_the_actor_and_the_request_ids() {
+    let mut w = W::new();
+    w.ready("a", &["a/**"], 1);
+    w.set("a", json!({"waits_on": "old"}));
+    w.ready("b", &["b/**"], 2);
+    w.set("b", json!({"repository": null}));
+    w.ok();
+    let mut bodies = w.bodies("validate");
+    bodies.extend(w.bodies("apply"));
+    assert_eq!(bodies.len(), 3);
+    let mut ids = BTreeSet::new();
+    for b in &bodies {
+        assert_eq!(
+            (b["agent"].as_str(), b["session"].as_str()),
+            (Some("ap-work"), Some("w-0123abcd456789ef"))
+        );
+        assert!(b.get("role").is_none(), "{b}");
+        ids.insert(b["request_id"].as_str().unwrap().to_owned());
+    }
+    let want: BTreeSet<String> = (1..=3)
+        .map(|n| format!("wk-0123abcd456789ef-{n}"))
+        .collect();
+    assert_eq!(ids, want);
+    let applies = w
+        .calls
+        .borrow()
+        .iter()
+        .filter(|c| c.1[..2] == ["action", "apply"])
+        .count();
+    let clients = w
+        .calls
+        .borrow()
+        .iter()
+        .filter(|c| c.0 == "ont" && c.1[0] == "action")
+        .all(|c| c.1[2..4] == ["--client", "ap"]);
+    assert!(applies == 2 && clients);
+}
+
+// spec: specs/ap/work.md#R18
+#[test]
+fn r18_the_answer() {
+    let mut w = W::new();
+    w.ready("a", &["a/**"], 1);
+    let v = w.ok();
+    let mut members: Vec<&str> = v.as_object().unwrap().keys().map(String::as_str).collect();
+    members.sort();
+    assert_eq!(
+        members,
+        [
+            "busy",
+            "cut",
+            "in_flight",
+            "not_restarted",
+            "outside",
+            "started",
+            "waiting"
+        ]
+    );
+    let out = ap_cli(&["work", "--help"], &[]);
+    assert!(
+        out.status.success()
+            && String::from_utf8(out.stdout)
+                .unwrap()
+                .starts_with("Usage: ap work")
+    );
+    let help = String::from_utf8(ap_cli(&["--help"], &[]).stdout).unwrap();
+    assert!(
+        help.contains("  work: ap work [--store <path>] (README \"The dispatch pass\")\n"),
+        "{help}"
+    );
+}
+
+// spec: specs/ap/work.md#R19
+#[test]
+fn r19_the_only_effects_and_no_call_of_a_test_reaches_the_real_service_manager() {
+    let mut w = W::new();
+    w.ready("a", &["a/**"], 1);
+    w.ready("b", &["b/**"], 2);
+    w.ready("c", &["c/**"], 3);
+    w.run_fails.insert("c".into());
+    std::fs::create_dir_all(w.root().join("old")).unwrap();
+    std::fs::write(w.root().join("old").join("started"), "r#9").unwrap();
+    w.ok();
+    let programs: BTreeSet<String> = w.calls.borrow().iter().map(|c| c.0.clone()).collect();
+    assert_eq!(
+        programs,
+        ["git", "ont", "systemctl", "systemd-run"]
+            .map(String::from)
+            .into()
+    );
+    for c in w.calls_of("systemctl") {
+        assert_eq!(c[0], "list-units");
+    }
+    let made = tree(&w.root());
+    let want = [
+        "a/",
+        "a/started",
+        "b/",
+        "b/started",
+        "c/",
+        "old/",
+        "old/started",
+        "work.lock",
+    ];
+    assert_eq!(made, want.map(String::from).into());
+    // The command itself, with stand-ins first on PATH: nothing reaches the host's service manager or
+    // store. Each stand-in logs its call; the pass's own calls are answered by them.
+    let t = W::new();
+    let bin = t.dir.join("bin");
+    std::fs::create_dir_all(&bin).unwrap();
+    let log = t.dir.join("calls.log");
+    let stand_in = |name: &str, answer: &str| {
+        let path = bin.join(name);
+        let script = format!(
+            "#!/bin/sh\nwhile read -r _; do :; done\necho \"{name} $*\" >> '{}'\n{answer}\n",
+            log.display()
+        );
+        // Written by a child: no thread of this process holds a descriptor open for writing on an
+        // executable that another thread's child may run (`ETXTBSY`).
+        let mut writer = Command::new("sh")
+            .args(["-c", "cat > \"$1\" && chmod 0755 \"$1\"", "sh"])
+            .arg(&path)
+            .stdin(Stdio::piped())
+            .spawn()
+            .unwrap();
+        std::io::Write::write_all(writer.stdin.as_mut().unwrap(), script.as_bytes()).unwrap();
+        drop(writer.stdin.take());
+        assert!(writer.wait().unwrap().success());
+    };
+    stand_in("systemctl", "exit 0");
+    stand_in("systemd-run", "exit 1");
+    stand_in("git", "exit 0");
+    stand_in(
+        "ont",
+        "echo '{\"status\":\"ok\",\"result\":{\"basis\":{\"qualified\":true},\"objects\":[],\"continuation\":null}}'",
+    );
+    let path = bin.to_string_lossy().into_owned();
+    let policy = t.p("policy.json");
+    let store = t.p("store.sqlite");
+    let out = ap_cli(
+        &["work", "--store", &store],
+        &[("PATH", &path), ("AP_POLICY_FILE", &policy)],
+    );
+    assert_eq!(out.status.code(), Some(0), "{out:?}");
+    let v: Value = serde_json::from_slice(&out.stdout).unwrap();
+    // A runner without systemd as its init skips; the host and CI's runner have it.
+    if Path::new("/run/systemd/system").is_dir() {
+        assert_eq!(v["started"], json!([]));
+        let calls = std::fs::read_to_string(&log).unwrap();
+        let lines: Vec<&str> = calls.lines().collect();
+        assert_eq!(lines.len(), 2, "{calls}");
+        assert!(lines[0].starts_with("ont search --store "));
+        assert_eq!(
+            lines[1],
+            "systemctl list-units --all --plain --no-legend aptest-*"
+        );
+        // The refusals and skips of the command make no call at all.
+        std::fs::remove_file(&log).unwrap();
+    } else {
+        assert_eq!(v, json!({"skipped": "no service manager"}));
+    }
+    for (args, env, code) in [
+        (vec!["work", "now"], vec![("PATH", path.as_str())], 2),
+        (
+            vec!["work"],
+            vec![("PATH", path.as_str()), ("AP_POLICY_FILE", policy.as_str())],
+            2,
+        ),
+        (
+            vec!["work", "--store", &store],
+            vec![("PATH", path.as_str())],
+            2,
+        ),
+        (
+            vec!["work", "--store", &store],
+            vec![
+                ("PATH", path.as_str()),
+                ("AP_POLICY_FILE", policy.as_str()),
+                ("ONT_ROLE", "lead"),
+            ],
+            2,
+        ),
+    ] {
+        let out = ap_cli(&args, &env);
+        assert_eq!(out.status.code(), Some(code), "{args:?} {out:?}");
+        let e: Value = serde_json::from_slice(&out.stderr).unwrap();
+        assert!(e["error"]["code"].is_string());
+    }
+    std::fs::write(&policy, "{}").unwrap();
+    let out = ap_cli(
+        &["work", "--store", &store],
+        &[("PATH", &path), ("AP_POLICY_FILE", &policy)],
+    );
+    assert_eq!(
+        String::from_utf8(out.stdout).unwrap(),
+        "{\"skipped\":\"no work\"}\n"
+    );
+    assert!(!log.exists(), "a call was made");
+}
+
+// spec: specs/ap/work.md#R20
+#[test]
+fn r20_observe_reads_without_writing_or_taking_the_pass_lock() {
+    let mut w = W::new();
+    let root = w.root();
+    std::fs::create_dir_all(root.join("a")).unwrap();
+    std::fs::write(root.join("a").join("started"), "r#2").unwrap();
+    std::fs::create_dir_all(root.join("c")).unwrap();
+    std::fs::write(root.join("c").join("started"), "r#1").unwrap();
+    let _pass = hold(&root.join("work.lock"));
+    let _b = hold(&root.join("b").join("lock"));
+    w.live(&[
+        "aptest-c.service loaded active running c",
+        "aptest-other.service loaded active running o",
+    ]);
+    let before = tree(&root);
+    let units = [("a", "r#2"), ("b", "r#1"), ("c", "r#5"), ("Bad", "r#1")]
+        .map(|(k, r)| (k.to_owned(), r.to_owned()));
+    let seen = observe(&mut w, &root, PREFIX, &units).unwrap();
+    assert_eq!(
+        seen,
+        Observed {
+            in_flight: vec!["b".into(), "c".into()],
+            started: vec!["a".into()],
+            others: vec!["aptest-other.service".into()],
+        }
+    );
+    assert_eq!(tree(&root), before);
+    assert!(w.calls.borrow().iter().all(|c| c.0 == "systemctl"));
+}
+
+// spec: specs/ap/work.md#R21
+#[test]
+fn r21_the_timer_and_its_service() {
+    let service = include_str!("../../../deploy/ap-work.service");
+    let lines: Vec<&str> = service.lines().collect();
+    for line in [
+        "Type=oneshot",
+        "ExecStart=/usr/local/bin/ap work",
+        "Environment=HOME=/root",
+        "Environment=PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin",
+        "TimeoutStartSec=300",
+    ] {
+        assert!(lines.contains(&line), "{line}");
+    }
+    assert!(!lines.iter().any(|l| l.starts_with("Slice=")));
+    let timer = include_str!("../../../deploy/ap-work.timer");
+    let lines: Vec<&str> = timer.lines().collect();
+    for line in [
+        "OnBootSec=2min",
+        "OnUnitInactiveSec=60s",
+        "AccuracySec=1s",
+        "WantedBy=timers.target",
+    ] {
+        assert!(lines.contains(&line), "{line}");
+    }
+}
