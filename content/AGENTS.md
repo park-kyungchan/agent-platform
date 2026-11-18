@@ -42,6 +42,7 @@ When a request asks for the output of a later stage while the record of an earli
 
 - Never print a credential.
 - Never touch a session, pane, process, worktree or service identity that is not yours.
+- Do not change global configuration merely to orient yourself.
 - A CLI's private memory holds nothing another agent or a later session needs: that goes to the store, the owning repository or the task's directory.
 - Before deleting, verify the recovery copy and every consumer of the path; a task's completion is not enough. A pinned artifact is immutable: fix forward in a new version.
 - When an effect on a real target has an uncertain outcome, read the target before a retry; only a disposable target is simply rerun.
