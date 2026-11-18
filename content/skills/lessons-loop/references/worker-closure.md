@@ -7,15 +7,16 @@ a read-only task writes only its already permitted local result. If a metric,
 process or session observation is unavailable, say unknown rather than launching
 a client, reading transcripts or expanding authority to obtain it.
 
-[Lead](../../lead/SKILL.md) owns KPI-first reporting;
-[explain precisely](../../explain-precisely/SKILL.md) owns user-facing language.
+[report](../../report/SKILL.md) owns the form and the language of a message to
+the user.
 [Context Governance](../../../runtime-references/CONTEXT-GOVERNANCE.md) owns
 source authority, isolation/continuity and memory boundaries. Parent-facing
 outputs retain their domain format. Link these contracts; do not copy them.
 
 ## Task-local report template
 
-The first block is the KPI table of skill `lead` section 3.
+The first block is the result: for the user, the board of skill `report`; for the
+Lead, the head and each acceptance check with its result.
 
 Then include only applicable evidence:
 
