@@ -20,6 +20,7 @@ const FAKE: &str = include_str!("fixtures/fake-claude.sh");
 const FAKE_CODEX: &str = include_str!("fixtures/fake-codex.sh");
 const FAKE_MUSE: &str = include_str!("fixtures/fake-muse.sh");
 const FAKE_AGY: &str = include_str!("fixtures/fake-agy.sh");
+const BWRAP: &str = "/usr/bin/bwrap";
 
 struct Fake {
     t: PathBuf,
@@ -43,6 +44,15 @@ struct Fake {
     dirs: BTreeMap<String, String>,
     /// `environment()` creates this file: the call's own file then exists when it is opened.
     precreate: Option<String>,
+    /// `environment()` creates this directory: it appears after the request's checks.
+    precreate_dir: Option<String>,
+    /// The answer of `/usr/bin/bwrap --version` (the probe of `limits`), and every such call with
+    /// its arguments and bound.
+    bwrap: bool,
+    probes: Vec<(Vec<String>, u64)>,
+    /// The environment list each launch was given, before a later value of a name replaces an
+    /// earlier one.
+    launch_envs: Vec<Vec<(String, String)>>,
     /// The policy file the host names (`policy_file()`); none unless a test sets one.
     policy: Option<PathBuf>,
     /// The store engine the stage runner calls: a call to `ont` without one is a failed test.
@@ -206,6 +216,10 @@ impl Fake {
             launches: vec![],
             dirs: BTreeMap::new(),
             precreate: None,
+            precreate_dir: None,
+            bwrap: true,
+            probes: vec![],
+            launch_envs: vec![],
             policy: None,
             ont: None,
             events: vec![],
@@ -314,6 +328,15 @@ impl System for Fake {
                 }),
             };
         }
+        if program == BWRAP {
+            self.probes.push((args.to_vec(), ms));
+            self.events.push("probe".into());
+            return Ok(Reply {
+                success: self.bwrap,
+                bytes: b"bubblewrap 0.9.0\n".to_vec(),
+                stdout: b"bubblewrap 0.9.0\n".to_vec(),
+            });
+        }
         if program != "systemctl" {
             return Host.call(program, args, input, ms);
         }
@@ -359,15 +382,21 @@ impl System for Fake {
         files: [std::fs::File; 3],
     ) -> std::io::Result<Child> {
         self.launches.push(argv.to_vec());
+        self.launch_envs.push(env.to_vec());
         self.events.push("launch".into());
-        let at = argv.iter().position(|a| a == "--").unwrap();
+        let unit_at = argv.iter().position(|a| a == "--").unwrap();
         assert_eq!(
             &argv[..4],
             ["systemd-run", "--scope", "--quiet", "--collect"]
         );
-        assert!(argv[..at].contains(&"--slice=agents.slice".to_owned()));
+        assert!(argv[..unit_at].contains(&"--slice=agents.slice".to_owned()));
+        // `bwrap … --` in front of the CLI (limits) is checked by the tests and dropped here.
+        let at = match argv[unit_at + 1] == BWRAP {
+            true => unit_at + 1 + argv[unit_at + 1..].iter().position(|a| a == "--").unwrap(),
+            false => unit_at,
+        };
         assert!(["claude", "codex", "muse", "agy"].contains(&argv[at + 1].as_str()));
-        let unit = argv[..at]
+        let unit = argv[..unit_at]
             .iter()
             .find_map(|a| a.strip_prefix("--unit="))
             .unwrap()
@@ -395,6 +424,9 @@ impl System for Fake {
     fn environment(&self) -> Vec<(String, String)> {
         if let Some(p) = &self.precreate {
             std::fs::write(p, b"").unwrap();
+        }
+        if let Some(p) = &self.precreate_dir {
+            let _ = std::fs::create_dir(p);
         }
         self.env.clone()
     }
@@ -6819,4 +6851,381 @@ fn run_object_r13_a_request_without_the_members_never_reaches_the_store() {
     );
     assert_eq!(f.record("h.md"), v);
     assert!(f.store().bodies("start_run").is_empty() && f.store().bodies("close_run").is_empty());
+}
+
+// ---- A reviewer stage with limits (specs/ap/run-limits.md) ------------------------------------
+
+const FAKE_LIMITS: &str = include_str!("fixtures/run_limits/fake-claude.sh");
+impl Fake {
+    /// A reviewer request on `out` whose `limits` name the scratch directory `<t>/scratch`.
+    fn limited(&self, out: &str) -> Value {
+        let mut r = self.request(out);
+        r["limits"] = json!({"scratch": self.p("scratch")});
+        r
+    }
+    /// The fake of `fixtures/run_limits` in place of the CLI.
+    fn limits_fake(&self) {
+        std::fs::write(self.t.join("bin/claude"), FAKE_LIMITS).unwrap();
+    }
+    /// What a launch on `account` runs between `systemd-run … --` and the CLI.
+    fn bwrap(&self, account: &str) -> Vec<String> {
+        let (home, scratch, cwd) = (self.p(account), self.p("scratch"), self.p("cwd"));
+        [
+            BWRAP,
+            "--unshare-pid",
+            "--ro-bind",
+            "/",
+            "/",
+            "--dev",
+            "/dev",
+            "--proc",
+            "/proc",
+            "--ro-bind",
+            "/proc/sys",
+            "/proc/sys",
+            "--bind",
+            &home,
+            &home,
+            "--bind",
+            &scratch,
+            &scratch,
+            "--cap-drop",
+            "ALL",
+            "--chdir",
+            &cwd,
+            "--",
+        ]
+        .map(str::to_owned)
+        .to_vec()
+    }
+    /// The words of launch `n` after `systemd-run … --`.
+    fn after_unit(&self, n: usize) -> Vec<String> {
+        let launch = &self.launches[n];
+        let at = launch.iter().position(|a| a == "--").unwrap();
+        launch[at + 1..].to_vec()
+    }
+    fn text(&self, rel: &str) -> String {
+        std::fs::read_to_string(self.t.join(rel)).unwrap()
+    }
+}
+
+// spec: specs/ap/run-limits.md#R1
+#[test]
+fn limits_r1_only_a_claude_reviewer_with_one_scratch_apart_from_its_paths() {
+    let mut f = Fake::new();
+    let (v, status) = f.run(&f.limited("x.md")).unwrap();
+    assert_eq!((status, &v["state"]), (0, &json!("ok")), "{v}");
+    for d in ["o", "pr"] {
+        std::fs::create_dir(f.t.join(d)).unwrap();
+    }
+    std::fs::copy(f.p("prompt.md"), f.p("pr/prompt.md")).unwrap();
+    let scratch = |r: &mut Value, p: Value| r["limits"] = json!({ "scratch": p });
+    type Change<'a> = Box<dyn Fn(&mut Value) + 'a>;
+    let cases: Vec<(&str, Change)> = vec![
+        (
+            "implementer",
+            Box::new(|r| r["role"] = json!("implementer")),
+        ),
+        ("fixer", Box::new(|r| r["role"] = json!("fixer"))),
+        (
+            "muse",
+            Box::new(|r| {
+                r["runtime"] = json!("muse");
+                r["permission_mode"] = json!("bypassPermissions");
+            }),
+        ),
+        ("no object", Box::new(|r| r["limits"] = json!("/tmp/x"))),
+        ("empty", Box::new(|r| r["limits"] = json!({}))),
+        (
+            "other member",
+            Box::new(|r| r["limits"]["writable"] = json!(["/tmp"])),
+        ),
+        ("relative", Box::new(|r| scratch(r, json!("scratch")))),
+        ("not text", Box::new(|r| scratch(r, json!(7)))),
+        (
+            "..",
+            Box::new(|r| scratch(r, json!(format!("{}/../s", r["cwd"].as_str().unwrap())))),
+        ),
+        (
+            "in account",
+            Box::new(|r| scratch(r, json!(format!("{}/s", r["account"].as_str().unwrap())))),
+        ),
+        (
+            "in next_accounts",
+            Box::new(|r| {
+                let a2 = r["account"].as_str().unwrap().replace("/a1", "/a2");
+                r["next_accounts"] = json!([a2.clone() + "/"]);
+                scratch(r, json!(format!("{a2}/x/s")));
+            }),
+        ),
+        (
+            "in cwd",
+            Box::new(|r| scratch(r, json!(format!("{}//s", r["cwd"].as_str().unwrap())))),
+        ),
+        ("is cwd", Box::new(|r| scratch(r, r["cwd"].clone()))),
+        (
+            "holds out",
+            Box::new(|r| {
+                let o = r["out"].as_str().unwrap().replace("/y.md", "/o");
+                r["out"] = json!(format!("{o}/y.md"));
+                scratch(r, json!(o));
+            }),
+        ),
+        (
+            "holds prompt",
+            Box::new(|r| {
+                let p = r["prompt"].as_str().unwrap().replace("/prompt.md", "/pr");
+                r["prompt"] = json!(format!("{p}/prompt.md"));
+                scratch(r, json!(p));
+            }),
+        ),
+        ("holds all", Box::new(|r| scratch(r, json!("/")))),
+        (
+            "expect.file",
+            Box::new(|r| {
+                r["expect"] = json!({"file": r["cwd"].as_str().unwrap().to_owned() + "/a"})
+            }),
+        ),
+    ];
+    for (name, change) in cases {
+        let mut r = f.limited("y.md");
+        change(&mut r);
+        assert_eq!(code(f.run(&r)), "invalid_input@limits", "{name}");
+    }
+    // Every refusal came before the probe and made nothing.
+    assert_eq!((f.probes.len(), f.launches.len()), (1, 1));
+    assert!(!Path::new(&f.p("y.md.run.json")).exists() && !Path::new(&f.p("scratch")).exists());
+}
+
+// spec: specs/ap/run-limits.md#R2
+#[test]
+fn limits_r2_an_existing_scratch_or_a_parent_that_is_no_directory_refuses_before_the_policy() {
+    use std::os::unix::fs::symlink;
+    let mut f = Fake::new();
+    // A policy that refuses the request's model: these refusals come first.
+    let barred = json!({"models": {"allowed": ["haiku"], "never": []},
+                        "accounts": {"claude": [f.p("a1")]}});
+    f.policy_is(&barred);
+    let s = f.p("scratch");
+    std::fs::create_dir(&s).unwrap();
+    std::fs::write(f.t.join("scratch/keep"), "k").unwrap();
+    assert_eq!(code(f.run(&f.limited("x.md"))), "scratch_exists@limits");
+    assert_eq!(f.text("scratch/keep"), "k");
+    std::fs::remove_dir_all(&s).unwrap();
+    symlink(f.p("nowhere"), &s).unwrap();
+    assert_eq!(code(f.run(&f.limited("x.md"))), "scratch_exists@limits");
+    std::fs::remove_file(&s).unwrap();
+    std::fs::write(&s, "").unwrap();
+    assert_eq!(code(f.run(&f.limited("x.md"))), "scratch_exists@limits");
+    std::fs::remove_file(&s).unwrap();
+    symlink(f.p("cwd"), f.p("link")).unwrap();
+    for parent in ["none", "prompt.md", "link"] {
+        let mut r = f.limited("x.md");
+        r["limits"]["scratch"] = json!(f.p(&format!("{parent}/s")));
+        assert_eq!(code(f.run(&r)), "scratch_parent_missing@limits", "{parent}");
+    }
+    f.untouched("x.md");
+    assert!(f.probes.is_empty() && !Path::new(&f.p("cwd/s")).exists());
+    // Nothing in the way: the policy's refusal, after the probe.
+    assert_eq!(code(f.run(&f.limited("x.md"))), "model_not_allowed@model");
+    assert_eq!(f.events, ["probe"]);
+    assert!(!Path::new(&s).exists());
+    f.untouched("x.md");
+}
+
+// spec: specs/ap/run-limits.md#R3
+#[test]
+fn limits_r3_a_bwrap_that_does_not_answer_refuses_before_any_effect() {
+    let mut f = Fake::new();
+    f.bwrap = false;
+    let barred = json!({"models": {"allowed": ["haiku"], "never": []},
+                        "accounts": {"claude": [f.p("a1")]}});
+    f.policy_is(&barred);
+    assert_eq!(code(f.run(&f.limited("x.md"))), "limits_unavailable@limits");
+    assert_eq!(f.probes, [(vec!["--version".to_owned()], 10_000)]);
+    f.untouched("x.md");
+    assert!(!Path::new(&f.p("scratch")).exists());
+    // An answering `bwrap` admits the stage, probed once before its launch.
+    (f.bwrap, f.policy) = (true, None);
+    f.events.clear();
+    let (v, status) = f.run(&f.limited("x.md")).unwrap();
+    assert_eq!(status, 0, "{v}");
+    assert_eq!(f.events, ["probe", "launch"]);
+}
+
+// spec: specs/ap/run-limits.md#R4
+#[test]
+fn limits_r4_the_scratch_directory_is_made_once_with_mode_0700_tmp_and_target() {
+    let mut f = Fake::new();
+    f.limits_fake();
+    std::fs::write(f.t.join("bin/cut-a1"), "").unwrap();
+    let mut r = f.limited("x.md");
+    r["next_accounts"] = json!([f.p("a2")]);
+    let (v, status) = f.run(&r).unwrap();
+    assert_eq!((status, &v["account"]), (0, &json!(f.p("a2"))), "{v}");
+    assert_eq!(v["attempts"].as_array().unwrap().len(), 2);
+    // The second launch finds what the first left: one directory for the call.
+    assert_eq!(f.text("bin/scratch.1"), "700\ntarget\ntmp\n");
+    assert_eq!(f.text("bin/scratch.2"), "700\nmark.1\ntarget\ntmp\n");
+    assert!(!Path::new(&f.p("scratch")).exists());
+}
+
+// spec: specs/ap/run-limits.md#R4
+// spec: specs/ap/run-limits.md#R8
+#[test]
+fn limits_r8_a_directory_another_call_made_is_never_removed() {
+    let mut f = Fake::new();
+    // It appears after the request's checks and before this call's `mkdir`.
+    f.precreate_dir = Some(f.p("scratch"));
+    let (v, status) = f.run(&f.limited("x.md")).unwrap();
+    assert_eq!(
+        (status, &v["state"], &v["unmet"]),
+        (3, &json!("failed"), &json!("launch")),
+        "{v}"
+    );
+    assert!(f.launches.is_empty() && f.calls().is_empty());
+    assert_eq!(v["limits"]["scratch"], f.p("scratch"));
+    assert!(Path::new(&f.p("scratch")).is_dir());
+    assert!(!Path::new(&f.p("scratch/tmp")).exists());
+}
+
+// spec: specs/ap/run-limits.md#R5
+#[test]
+fn limits_r5_bwrap_comes_after_the_unit_and_binds_the_account_of_each_launch() {
+    let mut f = Fake::new();
+    f.limits_fake();
+    std::fs::write(f.t.join("bin/cut-a1"), "").unwrap();
+    let mut r = f.limited("x.md");
+    r["next_accounts"] = json!([f.p("a2")]);
+    let (v, _) = f.run(&r).unwrap();
+    assert_eq!(v["state"], "ok", "{v}");
+    for (n, account) in [(0, "a1"), (1, "a2")] {
+        let after = f.after_unit(n);
+        let want = f.bwrap(account);
+        assert_eq!(after[..want.len()], want[..], "{after:?}");
+        assert_eq!(after[want.len()], "claude");
+        assert_eq!(after.iter().filter(|a| *a == BWRAP).count(), 1);
+    }
+    assert_eq!(f.accounts(), ["a1", "a2"]);
+    // A resumed call binds the account its record names, where it starts.
+    std::fs::remove_file(f.t.join("bin/cut-a1")).unwrap();
+    let mut r = f.resume(f.limited("y.md"), "y.md", "x.md");
+    r["next_accounts"] = json!([f.p("a2")]);
+    let (v, _) = f.run(&r).unwrap();
+    assert_eq!(
+        (&v["state"], &v["account"]),
+        (&json!("ok"), &json!(f.p("a2")))
+    );
+    assert_eq!(f.after_unit(2)[..f.bwrap("a2").len()], f.bwrap("a2")[..]);
+}
+
+// spec: specs/ap/run-limits.md#R6
+#[test]
+fn limits_r6_tmpdir_and_cargo_target_dir_name_the_scratch_directory() {
+    let mut f = Fake::new();
+    f.env.push(("TMPDIR".into(), "/caller/tmp".into()));
+    let mut r = f.limited("x.md");
+    r["env"] = json!({"TMPDIR": "/request/tmp", "CARGO_TARGET_DIR": "/request/target", "X_Y": "1"});
+    let (v, _) = f.run(&r).unwrap();
+    assert_eq!(v["state"], "ok", "{v}");
+    let env = f.text("bin/env.1");
+    let lines = |name: &str| -> Vec<String> {
+        env.lines()
+            .filter(|l| l.starts_with(&format!("{name}=")))
+            .map(str::to_owned)
+            .collect()
+    };
+    assert_eq!(lines("TMPDIR"), [format!("TMPDIR={}/tmp", f.p("scratch"))]);
+    assert_eq!(
+        lines("CARGO_TARGET_DIR"),
+        [format!("CARGO_TARGET_DIR={}/target", f.p("scratch"))]
+    );
+    assert_eq!(lines("X_Y"), ["X_Y=1"]);
+    // Replaced in the list the launch is given, not only by a later value of the name.
+    let given = &f.launch_envs[0];
+    for name in ["TMPDIR", "CARGO_TARGET_DIR"] {
+        assert_eq!(given.iter().filter(|(k, _)| k == name).count(), 1, "{name}");
+    }
+    assert_eq!(
+        lines("CLAUDE_CONFIG_DIR"),
+        [format!("CLAUDE_CONFIG_DIR={}", f.p("a1"))]
+    );
+}
+
+// spec: specs/ap/run-limits.md#R7
+#[test]
+fn limits_r7_the_record_names_the_limits_before_the_launch_and_at_the_end() {
+    let mut f = Fake::new();
+    std::fs::write(f.t.join("bin/watch"), f.p("w.md.run.json")).unwrap();
+    f.mode("a1", "watch");
+    let (v, _) = f.run(&f.limited("w.md")).unwrap();
+    let s = f.p("scratch");
+    let want = json!({"scratch": s, "writable": [f.p("a1"), s], "bwrap": BWRAP});
+    assert_eq!((&v["state"], &v["limits"]), (&json!("ok"), &want), "{v}");
+    assert_eq!(f.record("w.md"), v);
+    // What a call killed during its stage leaves: the record names the scratch directory.
+    let seen: Value =
+        serde_json::from_slice(&std::fs::read(f.t.join("bin/seen.json")).unwrap()).unwrap();
+    assert_eq!(
+        (&seen["state"], &seen["limits"]),
+        (&json!("running"), &want)
+    );
+    // The member is the only key a request without `limits` does not have.
+    f.clear("a1");
+    let (plain, _) = f.run(&f.request("p.md")).unwrap();
+    let keys = |v: &Value| v.as_object().unwrap().keys().cloned().collect::<Vec<_>>();
+    let mut with = keys(&plain);
+    with.push("limits".into());
+    with.sort();
+    assert_eq!(keys(&v), with);
+}
+
+// spec: specs/ap/run-limits.md#R8
+#[test]
+fn limits_r8_the_call_that_made_the_directory_removes_it_and_follows_no_link() {
+    let mut f = Fake::new();
+    f.limits_fake();
+    std::fs::create_dir(f.t.join("outside")).unwrap();
+    std::fs::write(f.t.join("outside/keep"), "k").unwrap();
+    // At any end: a stage that is cut on its only account.
+    std::fs::write(f.t.join("bin/cut-a1"), "").unwrap();
+    let (v, _) = f.run(&f.limited("c.md")).unwrap();
+    assert_eq!(v["state"], "cut", "{v}");
+    assert!(!Path::new(&f.p("scratch")).exists());
+    std::fs::remove_file(f.t.join("bin/cut-a1")).unwrap();
+    // A link inside it that points outside: the link goes, what it points to stays.
+    let then = format!("ln -s {} \"$S/link\"\nmkdir \"$S/tmp/d\"\n", f.p("outside"));
+    std::fs::write(f.t.join("bin/then"), then).unwrap();
+    let (v, _) = f.run(&f.limited("x.md")).unwrap();
+    assert_eq!(v["state"], "ok", "{v}");
+    assert!(std::fs::symlink_metadata(f.p("scratch")).is_err());
+    assert_eq!(f.text("outside/keep"), "k");
+    // The path made a link to another directory: not a directory, so nothing is removed.
+    let then = format!(
+        "mv \"$S\" {}\nln -s {} \"$S\"\n",
+        f.p("moved"),
+        f.p("outside")
+    );
+    std::fs::write(f.t.join("bin/then"), then).unwrap();
+    let (v, _) = f.run(&f.limited("y.md")).unwrap();
+    assert_eq!(v["state"], "ok", "{v}");
+    assert!(std::fs::symlink_metadata(f.p("scratch")).is_ok_and(|m| m.is_symlink()));
+    assert_eq!(f.text("outside/keep"), "k");
+    assert!(Path::new(&f.p("moved/mark.3")).exists());
+}
+
+// spec: specs/ap/run-limits.md#R9
+#[test]
+fn limits_r9_a_request_without_limits_runs_as_before() {
+    let mut f = Fake::new();
+    f.env.push(("TMPDIR".into(), "/caller/tmp".into()));
+    let (v, _) = f.run(&f.request("x.md")).unwrap();
+    assert_eq!(v["state"], "ok", "{v}");
+    assert!(f.probes.is_empty());
+    assert_eq!(f.after_unit(0)[0], "claude");
+    assert!(!f.launches[0].iter().any(|a| a.contains("bwrap")));
+    assert!(v.get("limits").is_none() && f.record("x.md").get("limits").is_none());
+    let env = f.text("bin/env.1");
+    assert!(env.lines().any(|l| l == "TMPDIR=/caller/tmp"), "{env}");
+    assert!(!env.contains("CARGO_TARGET_DIR="));
 }

@@ -9,8 +9,11 @@
 # that unit is stopped or its main process is killed; the policy file of the host is replaced through
 # AP_POLICY_FILE by one of this script's directory that allows its model and its account, and a
 # stage on another model is refused; ONT_ROLE and ONT_AGENT (and with git_author the two author
-# variables) are in the stage's environment. Skipped, saying so, where `systemctl` is
-# absent or this caller cannot start a transient unit in the system manager.
+# variables) are in the stage's environment; a reviewer stage with `limits` under the real `bwrap`
+# cannot write its cwd, nor the scratch directory or the account of another stage with `limits`
+# running at the same time (directly or through that stage's /proc/<pid>/root), but writes its
+# own scratch directory, which is gone after the return. Skipped, saying so, where `systemctl` is absent or this caller cannot start a
+# transient unit in the system manager.
 set -uo pipefail
 ap=$(realpath -- "${1:-${CARGO_TARGET_DIR:-$(cd "$(dirname "$0")/.." && pwd -P)/target}/debug/ap}")
 if ! command -v systemctl > /dev/null || [ ! -d /run/systemd/system ]; then
@@ -19,11 +22,12 @@ fi
 if ! systemd-run --scope --quiet --collect --unit="ap-run-probe-$$" --slice=agents.slice true 2> /dev/null; then
   echo "host-run-scope: skipped (this caller cannot start a transient unit in the system manager)"; exit 0
 fi
-t=$(mktemp -d /tmp/ap-run-XXXXXX); chmod 0755 "$t"
+t=$(mktemp -d "${TMPDIR:-/tmp}/ap-run-XXXXXX") || { echo "host-run-scope: cannot make a directory under ${TMPDIR:-/tmp}" >&2; exit 1; }
+chmod 0755 "$t"
 cleanup() { for p in "$t"/bin/*.pid; do [ -e "$p" ] && kill -KILL "$(cat "$p")" 2> /dev/null; done; rm -rf -- "$t"
   systemctl stop "ap-gate-bind-$$-stop.service" "ap-gate-bind-$$-kill.service" 2> /dev/null; }
 trap cleanup EXIT
-mkdir -p "$t/bin" "$t/acct" "$t/cwd"
+mkdir -p "$t/bin" "$t/acct" "$t/acctB" "$t/cwd"
 cat > "$t/bin/claude" <<'FAKE'
 #!/usr/bin/env bash
 here=$(cd "$(dirname "$0")" && pwd)
@@ -32,6 +36,24 @@ sid=; prev=; for a in "$@"; do case "$prev" in --session-id|--resume) sid=$a ;; 
 printf '{"type":"system","subtype":"init","session_id":"%s","mcp_servers":[]}\n' "$sid"
 # A shell forked into the background that outlives the answer, as a real session's can.
 /bin/bash -c 'echo $$ > "'"$here"'/sleeper.pid"; sleep 600; :' &
+# Under limits $here is read-only: the fake reports its writes in its answer. On the account
+# `acctB` it is the other stage: it says it is ready in its account and answers when told to.
+if [ "$(cat "$here/mode")" = limits ] && [ "$(basename "$CLAUDE_CONFIG_DIR")" = acctB ]; then
+  : > "$CLAUDE_CONFIG_DIR/ready"
+  for _ in $(seq 300); do [ -e "$CLAUDE_CONFIG_DIR/go" ] && break; sleep 0.2; done
+  printf '{"type":"result","subtype":"success","is_error":false,"num_turns":1,"result":"peer done","session_id":"%s","usage":{"input_tokens":1,"output_tokens":1},"permission_denials":[]}\n' "$sid"
+elif [ "$(cat "$here/mode")" = limits ]; then
+  w() { if e=$( (: > "$1") 2>&1 ); then echo "$2 written"; else echo "$2 refused (${e##*: })"; fi; }
+  # The other stage's files, directly and through the root of each of its processes (host pids).
+  top=${here%/bin}; peer=
+  for p in "$top/scratchB/from-a" "$top/acctB/from-a"; do peer="$peer $(w "$p" peer)"; done
+  for pid in $(cat "$here/peer.pids"); do
+    for p in "$top/scratchB/from-a" "$top/acctB/from-a"; do peer="$peer $(w "/proc/$pid/root$p" peer)"; done
+  done
+  case "$peer" in *written*) peer="peer written:$peer" ;; *) peer="peer refused" ;; esac
+  said="$(w "$PWD/x" cwd); $(w "$TMPDIR/x" scratch); $(w "/proc/1/root$here/x" root); $peer"
+  printf '{"type":"result","subtype":"success","is_error":false,"num_turns":1,"result":"%s","session_id":"%s","usage":{"input_tokens":1,"output_tokens":1},"permission_denials":[]}\n' "$said" "$sid"
+fi
 if [ "$(cat "$here/mode")" = answer ]; then
   printf '{"type":"result","subtype":"success","is_error":false,"num_turns":1,"result":"ready","session_id":"%s","usage":{"input_tokens":1,"output_tokens":1},"permission_denials":[]}\n' "$sid"
 fi
@@ -40,7 +62,7 @@ FAKE
 chmod 0755 "$t/bin/claude"
 printf 'Print the word ready and stop.\n' > "$t/prompt.md"
 # The host's policy (specs/ap/policy.md) is the file of this directory, never /etc/agent-platform/policy.json.
-printf '{"models":{"allowed":["haiku"],"never":[]},"accounts":{"claude":["%s"]}}' "$t/acct" > "$t/policy.json"
+printf '{"models":{"allowed":["haiku"],"never":[]},"accounts":{"claude":["%s","%s"]}}' "$t/acct" "$t/acctB" > "$t/policy.json"
 req() { printf '{"role":"reviewer","account":"%s","model":"haiku","effort":"low","permission_mode":"auto","cwd":"%s","prompt":"%s","out":"%s"%s}' \
   "$t/acct" "$t/cwd" "$t/prompt.md" "$t/$1" "${2:-}"; }
 field() { python3 -I -c 'import json,sys; v=json.load(open(sys.argv[1])); print(v.get(sys.argv[2]))' "$1" "$2"; }
@@ -140,5 +162,39 @@ for how in stop kill; do
     || bad "bind $how: rc=$rc took=${took}s $(cat "$t/d.err") $(field "$t/d$how.md.run.json" state)"
   systemctl stop "$b" 2> /dev/null
 done
+
+# 5. limits (specs/ap/run-limits.md): the real bwrap between the scope and the CLI. Stage B (account
+#    acctB) waits while stage A tries to write B's scratch directory and account, directly and
+#    through /proc/<pid>/root of every process of B's scope (each stage has its own pid namespace).
+#    Under bwrap the CLI is a grandchild of ap run, so the check that it is a child of ap run is not
+#    made here.
+if ! /usr/bin/bwrap --ro-bind / / true 2> /dev/null; then
+  echo "host-run-scope: limits skipped (/usr/bin/bwrap --ro-bind / / true fails here)"
+else
+  echo limits > "$t/bin/mode"
+  printf '{"role":"reviewer","account":"%s","model":"haiku","effort":"low","permission_mode":"auto","cwd":"%s","prompt":"%s","out":"%s","timeout_seconds":90,"limits":{"scratch":"%s"}}' \
+    "$t/acctB" "$t/cwd" "$t/prompt.md" "$t/lb.md" "$t/scratchB" | apr > "$t/lb.out" 2> "$t/lb.err" & bpid=$!
+  for _ in $(seq 100); do [ -e "$t/acctB/ready" ] && break; sleep 0.2; done
+  bunit=$(field "$t/lb.md.run.json" unit)
+  cat "/sys/fs/cgroup$(systemctl show -p ControlGroup --value "$bunit")/cgroup.procs" > "$t/bin/peer.pids" 2> /dev/null
+  [ -e "$t/acctB/ready" ] && [ -s "$t/bin/peer.pids" ] && [ -d "$t/scratchB" ] \
+    && ok "limits: stage B runs in $bunit with $(wc -l < "$t/bin/peer.pids") processes" || bad "limits: stage B did not start: $(tail -c 400 "$t/lb.err")"
+  req l.md ",\"limits\":{\"scratch\":\"$t/scratch\"}" | apr > "$t/l.out" 2> "$t/l.err"; rc=$?
+  ans=$(cat "$t/l.md" 2> /dev/null)
+  { [ "$rc" -eq 0 ] && [ "$(field "$t/l.md.run.json" state)" = ok ] && [ ! -e "$t/cwd/x" ] && [ ! -e "$t/bin/x" ] \
+    && [[ "$ans" == "cwd refused (Read-only file system); scratch written; root refused ("*"); peer refused" ]]; } \
+    && ok "limits: the cwd, /proc/1/root and stage B's files refused, the scratch directory written: $ans" \
+    || bad "limits: rc=$rc $ans $(tail -c 400 "$t/l.err")"
+  { [ ! -e "$t/scratchB/from-a" ] && [ ! -e "$t/acctB/from-a" ] && systemctl is-active --quiet "$bunit"; } \
+    && ok "limits: nothing of stage A reached stage B's scratch directory or account while B ran" \
+    || bad "limits: stage B's files: $(ls -A "$t/scratchB" "$t/acctB" 2> /dev/null | tr '\n' ' ')"
+  python3 -I -c 'import json,sys; t=sys.argv[1]; l=json.load(open(t+"/l.md.run.json"))["limits"]
+sys.exit(l != {"scratch": t+"/scratch", "writable": [t+"/acct", t+"/scratch"], "bwrap": "/usr/bin/bwrap"})' "$t" \
+    && ok "limits: the record names the scratch directory and the two writable paths" || bad "limits member: $(field "$t/l.md.run.json" limits)"
+  [ ! -e "$t/scratch" ] && ok "limits: the scratch directory is gone after the return" || bad "limits: $t/scratch remains"
+  : > "$t/acctB/go"; wait "$bpid"; rc=$?
+  { [ "$rc" -eq 0 ] && [ "$(field "$t/lb.md.run.json" state)" = ok ] && [ ! -e "$t/scratchB" ] && ! systemctl is-active --quiet "$bunit"; } \
+    && ok "limits: stage B answered, its scope ended and its scratch directory is gone" || bad "limits: stage B: rc=$rc $(tail -c 400 "$t/lb.err")"
+fi
 
 [ "$fails" -eq 0 ] && echo "host-run-scope: PASS" || { echo "host-run-scope: $fails FAILED"; exit 1; }
