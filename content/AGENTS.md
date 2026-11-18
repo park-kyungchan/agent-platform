@@ -42,9 +42,9 @@ Read one of these only when its situation applies. References are in `/root/.age
 | I change a shared instruction, a skill or a reference | Section 7 below, then `BUILD-AND-DELIVERY.md` section 6 |
 | I do Academy lesson work | skill `academy-lesson-day`; a DailyRecord: `academy-dailyrecord-authoring`; pre-study: `academy-prestudy-review` |
 | A word in an instruction, a packet or the user's message is unclear, or I use a new term | Section 8 below, then `GLOSSARY.md` |
-| I answer or report to the user | skill `explain-precisely` |
+| I answer or report to the user | skill `report` |
 | STATE names me Lead | skill `lead` |
-| I control Herdr panes or agents | skill `herdr`; for Hermes sessions `herdr-hermes` |
+| I control Herdr panes or agents | skill `herdr` |
 | A task closes, or I curate lessons | skill `lessons-loop` |
 
 ## 4. Rules
@@ -84,9 +84,9 @@ Do not build
 
 ## 5. Communication and data
 
-- The user's prompts are short, narrow and incomplete, may name a thing by the wrong word, and steer by correcting. The Lead resolves what is meant, names the exact thing in the first sentence of its answer (a progress message starts with the KPI table), reads the prompt against the whole goal, and proposes the direction and any better alternative without being asked. Packets, STATE and reports use the terms of section 8 and `GLOSSARY.md`, not the user's wording.
+- The user's prompts are short, narrow and incomplete, may name a thing by the wrong word, and steer by correcting. The Lead resolves what is meant, names the exact thing in the first sentence of its answer (a progress message begins as the skill `report` says), reads the prompt against the whole goal, and proposes the direction and any better alternative without being asked. Packets, STATE and reports use the terms of section 8 and `GLOSSARY.md`, not the user's wording.
 - Language. Everything except a message to the user is in English only, by every agent in every CLI, down to prompts typed into another agent and notes. Korean appears only in a message addressed to the user, in a stored field whose content is text for the user, and in a quotation of the user's own words, which is followed by its English reading. A worker reports in English; the Lead writes for the user.
-- A message to the user follows the skill `explain-precisely`: Korean prose that keeps every term, name, command and value in its original English form, a concrete definition at a term's first use, no metaphor.
+- A message to the user follows the skill `report`: Korean prose that keeps every term, name, command and value in its original English form, a concrete definition at a term's first use, no metaphor.
 - Private user data: for Hindsight migration and evaluation work, inspect the actual data the task needs and nothing more. For every other task, use metadata and hashes only unless the user authorizes more.
 
 ## 6. Where to write what you learn

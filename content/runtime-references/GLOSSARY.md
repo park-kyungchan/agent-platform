@@ -15,22 +15,20 @@ One word for one thing. Read this when a word in an instruction, a packet or the
 
 | Term | Meaning | Example on this host | Do not write |
 | --- | --- | --- | --- |
-| board | A task's items with their state, its objectives and order, printed from the store (its holds: the view `active_holds`); where the store is not in use, an optional file that holds no value a command can produce (`/root/.agents/skills/lead/references/program-board.md`) | `ap backlog <task key> --text` | `dashboard file` |
-| lens file | The one file of a task, about two pages, in which the Lead keeps the whole view: target structure and open decisions | `/home/palantirkc/work/<scope>-<topic>/LENS.md` | `architecture overview` |
-| design note | The Lead's written design of a store format, the schema of an authoritative store, or the order of record and effect on a real target: use, decision, invariants as executables, pull requests, undo | `/root/.agents/skills/lead/references/design.md` | `design doc` |
+| board | A task's items with their state, its objectives and order, printed from the store (its holds: the view `active_holds`); where the store is not in use, an optional file that holds no value a command can produce | `ap backlog <task key> --text` | `dashboard file` |
+| design note | The Lead's written design of a store format, the schema of an authoritative store, or the order of record and effect on a real target: use, decision, invariants as executables, pull requests, undo | `DESIGN-<topic>.md` in the task directory; its form: `/root/.agents/skills/lead/references/judging.md` section 1 | `design doc` |
 | checkpoint | The content of STATE at a moment, complete enough for a new session to continue from it | A STATE whose header carries the time it was written | `snapshot file` |
 | work thread | One line of work inside a task that serves a named KPI or guardrail and has one owner and one next action | A line of STATE's open threads, or a row of a board file where the task keeps one | `workstream` |
 | tier | The amount of reasoning a piece of work needs: mechanical, bounded judgment, open judgment | A packet line `Tier: mechanical` | `difficulty level` |
 | assignment file | Where a task says which runtime, account and model serves which work: each stage's request, written by the Lead; STATE names a standing choice | The `model`, `effort`, `account` and `next_accounts` of a stage's request file | `routing table` |
 | dispatch | Starting one worker run with one packet | `ap unit <page>` for a unit of work, `ap run < <request file>` for one stage; a Herdr pane only for work the user watches (`CONCURRENT-WORK.md` section 5) | — |
-| progress message | A message to the user that says where the task stands; not a worker's report | The KPI table and what changed | — |
+| progress message | A message to the user that says where the task stands; not a worker's report | The board of skill `report` and what changed | — |
 | acceptance | A closed `review` object with the verdict `accept` for a head, written by `ap unit` after the gate, the page's acceptance executable, the write set and one accepting verifier; the status `lead-review=success` on that head is derived from it. For a unit with a real effect, a schema, a store format or a guard of a live request the Lead reads the diff before the merge | The `review` object that `ap unit` closed for a head | `sign-off` |
 | review | A second agent, in a fresh context, judging a frozen candidate against the request and the contracts | The one reviewer session of a pull request (the verifier), which posts its findings there | — |
 | candidate | The exact revision that is offered for review or merge | A commit on a task branch | — |
 | handoff | Passing a piece of work, with a packet, to another agent; also one Lead passing a task to the next Lead | `CONCURRENT-WORK.md` section 2 | `hand-off`, `handover` |
 | closure | Ending a worker run or a task: record, reconcile, close what the task created | `lessons-loop/references/worker-closure.md` | — |
 | write set | The area one writer changes; a change outside it stops the unit until the Lead widens it | The `Write set:` line of a packet | — |
-| build slot | The right to run the one expensive build at a time | Named in STATE at dispatch | — |
 | delegation | Giving a piece of work to a worker | A dispatch | — |
 
 ## 3. Instructions and loading
@@ -60,7 +58,7 @@ Where each kind is written: `/root/.agents/AGENTS.md` section 6.
 
 ## 5. Measurement
 
-Metric, baseline, target, leading and lagging indicator, output and outcome, proxy, acceptance criterion, and the way to build a KPI from the user's words: `/root/.agents/skills/lead/references/measurement.md`.
+Metric, baseline, target, guardrail and proxy, and the way to write the user's wish as an intent's criteria: `/root/.agents/skills/lead/references/interview.md` section 3.
 
 ## 6. Repositories and paths
 
@@ -88,7 +86,7 @@ Only the Lead needs this section. The user speaks Korean, shortens names, and so
 | 라우팅 | Either which file an agent opens for a situation, or which model gets which work | The first is the table in `AGENTS.md` section 3 and `CONTEXT-GOVERNANCE.md`; the second is the assignment file |
 | 컨텍스트 거버넌스, Context Governance | Which context each agent loads, from which one home, in what order, without wasted reads or a wrong choice | `CONTEXT-GOVERNANCE.md` |
 | reference-docs, 레퍼런스 문서 | The local copies of the Anthropic, Palantir, Rust and Spec-Driven Development sources under `/home/palantirkc/external/reference-docs/` | Read only the lines a row of `OFFICIAL-DOCS.md` section 4 names, never the whole corpus |
-| 지표, 메트릭, KPI | A number the user wants watched; often a metric that is not yet a KPI | Define it with the measurement reference of section 5 before using it |
+| 지표, 메트릭, KPI | A number the user wants watched; often a metric that is not yet a KPI | Write it as a criterion of the intent (section 5) before using it |
 | VPS, 코드베이스 전체 | This host: the platform repositories, the task directories and the shared instructions | Scope it with `CODEBASE-ORIENTATION.md` |
 | CI | The required checks that run on a pull request in the platform repositories | Which repository |
 | 보드 | The board of the current task | — |

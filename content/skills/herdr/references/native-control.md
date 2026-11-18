@@ -103,7 +103,7 @@ Both installations must support machine API forwarding, and the remote server mu
 
 Follow the exact topology, worktree and cwd assigned by the current TASK/STATE before using any example below. An assigned Lead follows [lead](../../lead/SKILL.md): one tab per worker, with the task-owned checkout and disjoint write set. Do not replace an assigned tab/worktree with a sibling in the caller's checkout. Only when task topology/location are unspecified may ordinary authorized pane work default to a sibling in the current tab and cwd. Discover creation syntax through native help and use returned IDs; preserve user focus.
 
-Use [Context Governance](../../../runtime-references/CONTEXT-GOVERNANCE.md) for isolation versus same-task continuity, and [lead](../../lead/SKILL.md) for strategy/report rules; do not copy their protocols or infer delegation authority from these links.
+Use [Context Governance](../../../runtime-references/CONTEXT-GOVERNANCE.md) for isolation versus same-task continuity, and [lead](../../lead/SKILL.md) for the rules of a handoff and of a worker's end, [report](../../report/SKILL.md) for messages to the user; do not copy their protocols or infer delegation authority from these links.
 
 For an authorized sibling split only, honor the requested direction. Otherwise inspect the caller pane:
 
