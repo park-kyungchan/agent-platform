@@ -835,7 +835,9 @@ fn r13_the_service_and_the_timer_are_the_ones_the_spec_names() {
     assert_eq!(f.calls.len(), 5);
     let longest = f.bounds.iter().sum::<u64>() + f.waited.as_millis() as u64;
     assert_eq!(longest, 80_000);
-    let timeout = service.iter().find_map(|l| l.strip_prefix("TimeoutStartSec="));
+    let timeout = service
+        .iter()
+        .find_map(|l| l.strip_prefix("TimeoutStartSec="));
     assert!(timeout.unwrap().parse::<u64>().unwrap() * 1000 >= longest);
     // The service runs outside the slice it sets.
     assert!(!service.iter().any(|l| l.starts_with("Slice=")));
