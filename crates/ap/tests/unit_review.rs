@@ -825,12 +825,8 @@ fn r1_the_form_and_a_malformed_request_are_refused_before_any_call() {
             .spawn()
             .unwrap();
         use std::io::Write;
-        child
-            .stdin
-            .take()
-            .unwrap()
-            .write_all(stdin.as_bytes())
-            .unwrap();
+        // A refusal by the arguments comes before standard input is read: the pipe may be closed.
+        let _ = child.stdin.take().unwrap().write_all(stdin.as_bytes());
         child.wait_with_output().unwrap()
     };
     let out = ap(&["unit", "review", "--colour"], "{}");
