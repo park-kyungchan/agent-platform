@@ -258,3 +258,43 @@ systemctl is-active ap-work.service                   # until it answers inactiv
 rm -f /etc/systemd/system/ap-work.service /etc/systemd/system/ap-work.timer
 systemctl daemon-reload
 ```
+
+## The watch
+
+`ap watch` (`specs/ap/watch.md`) is one pass: under the lock `pass.lock` of `/var/lib/agent-platform/watch/` the detectors `delivery`, `login`, `services`, `host` and `records` read the host, and the pass opens, sees again, reopens and closes findings of the store whose detector is `watch:<name>`; it writes nothing else but its `state.json`, and it stops, starts, restarts and kills nothing. `ap-watch.service` (`Type=oneshot`, run of `/usr/local/bin/ap watch`, `Nice=10`, `TZ=UTC` so that `systemctl` prints the times the pass reads in UTC, a `PATH` with `/usr/sbin` for `sshd`, no `Restart=`) is one pass; `ap-watch.timer` starts one at every fifth minute (`OnCalendar=*:0/5`) and makes up no pass missed while the host was down. Each pass is a new process of the installed `ap`: a delivery of `ap` reaches the next pass with no restart. The answer of each pass is one line in the journal.
+
+The detector `login` compares the login path with the reading in `login.json`; until it is recorded every pass keeps one finding `no baseline` open. Record it once after the install, as root, with the path of the TOTP secret file (only its presence is read, by `stat`):
+
+```sh
+ap watch --record-login --totp-file <absolute path of the TOTP secret file>
+```
+
+After a change of the login path made by the user's procedure, record it again with `--replace`; a recorded reading is never replaced without it.
+
+Install, from a clean checkout of the merged commit, as root, after delivery installed an `ap` that has the verb (`ap --help` lists `watch`):
+
+```sh
+install -m 0644 deploy/ap-watch.service deploy/ap-watch.timer /etc/systemd/system/
+systemctl daemon-reload
+systemd-analyze verify /etc/systemd/system/ap-watch.service /etc/systemd/system/ap-watch.timer
+systemctl enable --now ap-watch.timer
+```
+
+Read the state:
+
+```sh
+systemctl list-timers ap-watch.timer
+journalctl -u ap-watch.service -n 5 -o cat            # one answer per pass: detectors, opened, seen, reopened, closed, failed
+ap status                                             # the open findings, act and urgent first
+```
+
+A finding is triaged by the Lead: `dismiss_finding` with a reason, or a unit. A finding `unreadable` of a detector says which source it could not read; that detector closes nothing until it reads again.
+
+Undo: disable the timer, wait until a pass that is going on has ended, remove the two files. The findings stay in the store; `/var/lib/agent-platform/watch/` may be removed.
+
+```sh
+systemctl disable --now ap-watch.timer
+systemctl is-active ap-watch.service                  # until it answers inactive or failed, not activating
+rm -f /etc/systemd/system/ap-watch.service /etc/systemd/system/ap-watch.timer
+systemctl daemon-reload
+```
