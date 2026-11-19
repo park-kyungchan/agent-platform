@@ -1,14 +1,18 @@
-//! `ap watch` (`specs/ap/watch.md`): one pass of the detectors `delivery`, `login`, `services`, `host`
-//! and `records` under the lock `pass.lock` of the watch directory. Each detector reads its sources and
-//! yields signals, or is `unreadable`; per signal the pass opens, sees again or reopens the finding of
-//! its key, and per detector that read it closes each live finding of that detector it did not yield
-//! (`open_finding`, `see_finding_again`, `reopen_finding`, `close_finding`, agent `ap-watch`). A
-//! finding whose detector does not begin with `watch:` is never read for closing and never changed.
+//! `ap watch` (`specs/ap/watch.md`): one pass of the nine detectors under the lock `pass.lock` of
+//! the watch directory. Each detector reads its sources and yields signals, or is `unreadable`; per
+//! signal the pass opens, sees again or reopens the finding of its key, and per detector that read
+//! it closes each live finding of that detector it did not yield (`open_finding`,
+//! `see_finding_again`, `reopen_finding`, `close_finding`, agent `ap-watch`). A finding whose
+//! detector does not begin with `watch:` is never read for closing and never changed.
 //! `ap watch --record-login` records the login reading the detector `login` compares with.
+pub mod accounts;
+pub mod checks;
 pub mod detect;
+pub mod drift;
 pub mod login;
+pub mod runtimes;
 
-use crate::host::{Failure, Host, System, digest, fail, id, new_session_id};
+use crate::host::{Failure, Host, LIMIT, System, digest, fail, id, new_session_id};
 use crate::run::stamp;
 use crate::store::{self, Actor};
 use serde_json::{Map, Value, json};
@@ -16,7 +20,7 @@ use std::{
     collections::{BTreeMap, BTreeSet},
     ffi::OsString,
     fs::File,
-    io::Write,
+    io::{ErrorKind, Write},
     os::unix::fs::{DirBuilderExt, OpenOptionsExt},
     path::Path,
     process::ExitCode,
@@ -25,8 +29,68 @@ use std::{
 
 /// The watch directory of the host (R1); a test passes its own.
 pub const DIRECTORY: &str = "/var/lib/agent-platform/watch";
-/// The detectors in the order of a pass (R3).
-pub const DETECTORS: [&str; 5] = ["delivery", "login", "services", "host", "records"];
+/// The detectors in the order of a pass (R4, R20).
+pub const DETECTORS: [&str; 9] = [
+    "delivery", "login", "services", "host", "records", "accounts", "checks", "runtimes", "drift",
+];
+/// Fixed CLI subcommands and flags `ap run` invokes per runtime (R26).
+pub struct RuntimeSpec {
+    pub name: &'static str,
+    pub subcommands: &'static [&'static str],
+    pub flags: &'static [&'static str],
+}
+/// The runtime CLIs `runtimes` checks (never `codex`).
+pub const RUNTIMES: [RuntimeSpec; 3] = [
+    RuntimeSpec {
+        name: "claude",
+        subcommands: &[],
+        flags: &[
+            "--print",
+            "--output-format",
+            "--verbose",
+            "--model",
+            "--effort",
+            "--permission-mode",
+            "--permission-prompts",
+            "--setting-sources",
+            "--settings",
+            "--disallowedTools",
+            "--strict-mcp-config",
+            "--mcp-config",
+            "--disable-slash-commands",
+            "--json-schema",
+            "--resume",
+            "--session-id",
+        ],
+    },
+    RuntimeSpec {
+        name: "muse",
+        subcommands: &["exec"],
+        flags: &[
+            "--json",
+            "--model",
+            "--reasoning-effort",
+            "--contributor-mode",
+            "--disable-reminders",
+            "--session-id",
+            "--workspace",
+            "--prompt-file",
+            "--yolo",
+        ],
+    },
+    RuntimeSpec {
+        name: "agy",
+        subcommands: &[],
+        flags: &[
+            "--print",
+            "--output-format",
+            "--model",
+            "--dangerously-skip-permissions",
+            "--print-timeout",
+            "--conversation",
+        ],
+    },
+];
 /// A live finding is seen again when its `last_seen_at` is older than this (R4).
 const SEEN_AFTER: u64 = 57 * 60;
 /// The bounds of a summary and of an evidence (R9).
@@ -77,6 +141,10 @@ pub fn families(detector: &str) -> Vec<String> {
         "services" => &["failed", "timer"],
         "host" => &["disk floor", "slice memory high", "apt", "old cli"],
         "records" => &["backup stale", "backup copy stale"],
+        "accounts" => &["sign-in", "limit"],
+        "checks" => &["main red", "dependabot", "settings"],
+        "runtimes" => &["cli"],
+        "drift" => &["drift", "inventory"],
         _ => &[],
     };
     let mut all: Vec<String> = fixed.iter().map(|f| (*f).to_owned()).collect();
@@ -302,7 +370,11 @@ impl Pass {
     /// The actions of one detector (R4, R5): per signal by its finding's state, then the closes.
     fn act(&mut self, s: &mut impl System, d: &str, reading: &Reading) {
         let detector = format!("watch:{d}");
-        let kind = if d == "login" { "security" } else { "incident" };
+        let kind = match d {
+            "login" => "security",
+            "drift" => "drift",
+            _ => "incident",
+        };
         let all = vec![json!({"eq": ["detector", detector]})];
         let found: BTreeMap<String, Value> = match store::search(s, None, "finding", all) {
             Ok(found) => found
@@ -378,7 +450,35 @@ impl Pass {
     }
 }
 
-/// One pass (R3 to R9).
+/// The host's policy file as one JSON object, or None when absent.
+fn read_policy(s: &impl System) -> Result<Option<Value>, String> {
+    let Some(file) = s.policy_file() else {
+        return Ok(None);
+    };
+    let Some(path) = file.to_str() else {
+        let missing = std::fs::metadata(&file).is_err_and(|e| e.kind() == ErrorKind::NotFound);
+        return if missing {
+            Ok(None)
+        } else {
+            Err("policy path is not valid UTF-8".to_owned())
+        };
+    };
+    let bytes = match s.read(path) {
+        Ok(b) => b,
+        Err(e) if e.kind() == ErrorKind::NotFound => return Ok(None),
+        Err(_) => return Err("policy file cannot be read".to_owned()),
+    };
+    if bytes.len() as u64 > LIMIT {
+        return Err("policy file is too large".to_owned());
+    }
+    serde_json::from_slice::<Value>(&bytes)
+        .ok()
+        .filter(Value::is_object)
+        .ok_or_else(|| "policy file is not one JSON object".to_owned())
+        .map(Some)
+}
+
+/// One pass (R3 to R9, R20 to R27).
 fn pass(s: &mut impl System, dir: &Path) -> (Value, u8) {
     let wall = s.wall();
     let (now, at) = (seconds(wall), stamp(wall));
@@ -396,6 +496,7 @@ fn pass(s: &mut impl System, dir: &Path) -> (Value, u8) {
             .and_then(|p| p.get(d))
             .filter(|v| v.is_object())
     };
+    let policy = read_policy(s);
     let mut readings: Vec<(&str, Reading)> = vec![];
     for d in DETECTORS {
         let reading = match d {
@@ -403,7 +504,11 @@ fn pass(s: &mut impl System, dir: &Path) -> (Value, u8) {
             "login" => login::detect(s, dir),
             "services" => detect::services(s, now),
             "host" => detect::host(s, now, member(d)),
-            _ => detect::records(s, now, member(d)),
+            "records" => detect::records(s, now, member(d)),
+            "accounts" => accounts::detect(s, now, &policy),
+            "checks" => checks::detect(s, &policy),
+            "runtimes" => runtimes::detect(s, member(d)),
+            _ => drift::detect(s),
         };
         readings.push((d, reading));
     }

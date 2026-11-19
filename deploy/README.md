@@ -261,7 +261,27 @@ systemctl daemon-reload
 
 ## The watch
 
-`ap watch` (`specs/ap/watch.md`) is one pass: under the lock `pass.lock` of `/var/lib/agent-platform/watch/` the detectors `delivery`, `login`, `services`, `host` and `records` read the host, and the pass opens, sees again, reopens and closes findings of the store whose detector is `watch:<name>`; it writes nothing else but its `state.json`, and it stops, starts, restarts and kills nothing. `ap-watch.service` (`Type=oneshot`, run of `/usr/local/bin/ap watch`, `Nice=10`, `TZ=UTC` so that `systemctl` prints the times the pass reads in UTC, a `PATH` with `/usr/sbin` for `sshd`, no `Restart=`) is one pass; `ap-watch.timer` starts one at every fifth minute (`OnCalendar=*:0/5`) and makes up no pass missed while the host was down. Each pass is a new process of the installed `ap`: a delivery of `ap` reaches the next pass with no restart. The answer of each pass is one line in the journal.
+`ap watch` (`specs/ap/watch.md`) is one pass: under the lock `pass.lock` of `/var/lib/agent-platform/watch/` the nine detectors read the host, and the pass opens, sees again, reopens and closes findings of the store whose detector is `watch:<name>`; it writes nothing else but its `state.json`, and it stops, starts, restarts and kills nothing:
+
+- `delivery`: reads `/var/lib/agent-platform/deliver/last.json` for age, end state and checkout forwarding.
+- `login`: compares the SSH and sudoers login path with `login.json` (the TOTP secret file by `stat` alone).
+- `services`: lists failed systemd units and timers that have not fired within three intervals.
+- `host`: checks disk free space, `agents.slice` `memory.events` `high` rises, `apt` history and old CLI processes.
+- `records`: checks `/var/lib/agent-platform/backup/last.json` and recent store actions for stale local or remote backups.
+- `accounts`: checks Claude account `.credentials.json` expiry (only the expiry timestamp is kept) and recent `run` usage limits (`>= 0.9`).
+- `checks`: checks GitHub `main` workflow conclusions, open Dependabot alerts and `github/apply --check` settings drift for policy repositories.
+- `runtimes`: checks `--version` and `--help` flags of `claude`, `muse` and `agy` against the flags `ap run` invokes.
+- `drift`: compares host files listed in `deployments/host-artifacts.json` at `origin/main` of `agent-vps-operations` by SHA-256 without fetching.
+
+`ap-watch.service` (`Type=oneshot`, run of `/usr/local/bin/ap watch`, `Nice=10`, `TZ=UTC` so that `systemctl` prints the times the pass reads in UTC, a `PATH` with `/usr/sbin` for `sshd`, no `Restart=`) is one pass; `ap-watch.timer` starts one at every fifth minute (`OnCalendar=*:0/5`) and makes up no pass missed while the host was down. Each pass is a new process of the installed `ap`: a delivery of `ap` reaches the next pass with no restart. The answer of each pass is one line in the journal.
+
+Because `gh` reads the root user's GitHub sign-in under `HOME` and `claude` and `agy` lie outside the service's default `PATH`, add the drop-in `/etc/systemd/system/ap-watch.service.d/path.conf`:
+
+```ini
+[Service]
+Environment=HOME=/root
+Environment=PATH=<the directories of the CLIs>:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin
+```
 
 The detector `login` compares the login path with the reading in `login.json`; until it is recorded every pass keeps one finding `no baseline` open. Record it once after the install, as root, with the path of the TOTP secret file (only its presence is read, by `stat`):
 
