@@ -1,0 +1,16 @@
+[Unit]
+Description=ap watch: one pass of the detectors, which opens, sees again and closes findings of the store
+Documentation=https://github.com/park-kyungchan/agent-platform/blob/main/deploy/README.md
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/ap watch
+Nice=10
+# A pass makes at most about 40 calls bound to 10 seconds and the store's calls bound to 30.
+TimeoutStartSec=240
+# No Slice=: the pass reads the slice it watches from outside it.
+# systemctl prints its timestamps in the zone of TZ; the pass reads them as UTC.
+Environment=TZ=UTC
+Environment=HOME=/root
+# sshd is in /usr/sbin.
+Environment=PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
