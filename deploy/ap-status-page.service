@@ -1,0 +1,12 @@
+[Unit]
+Description=ap status page: write ap status --text to the status page file
+Documentation=https://github.com/park-kyungchan/agent-platform/blob/main/deploy/README.md
+
+[Service]
+Type=oneshot
+Nice=10
+TimeoutStartSec=120
+StateDirectory=agent-platform/status-page
+StateDirectoryMode=0755
+Environment=HOME=/root
+ExecStart=/bin/sh -c '/usr/local/bin/ap status --text > /var/lib/agent-platform/status-page/status.txt.new || { rm -f /var/lib/agent-platform/status-page/status.txt.new; exit 1; }; mv -f /var/lib/agent-platform/status-page/status.txt.new /var/lib/agent-platform/status-page/status.txt'

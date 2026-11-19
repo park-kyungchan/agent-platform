@@ -298,3 +298,47 @@ systemctl is-active ap-watch.service                  # until it answers inactiv
 rm -f /etc/systemd/system/ap-watch.service /etc/systemd/system/ap-watch.timer
 systemctl daemon-reload
 ```
+
+## The status page
+
+`ap-status-page.service` (`Type=oneshot`, `Nice=10`, `Environment=HOME=/root`, `TimeoutStartSec=120`, `StateDirectory=agent-platform/status-page` mode `0755`, no `Restart=`) runs `/usr/local/bin/ap status --text` into `/var/lib/agent-platform/status-page/status.txt.new`, removes that file and exits 1 when `ap` fails, and otherwise renames it over `/var/lib/agent-platform/status-page/status.txt`. Nothing else is written, so a failed run keeps the previous page and a reader never sees a half-written file. `ap-status-page.timer` starts it every five minutes (`OnCalendar=*:0/5`, `AccuracySec=10s`, `Persistent=false`: a run missed while the host was down is not made up at boot). Each run is a new process of the installed `ap`, so a delivery of `ap` reaches the next run with no restart.
+
+Install, from a clean checkout of the merged commit, as root, after delivery installed an `ap` with `ap status --text`:
+
+```sh
+install -m 0644 deploy/ap-status-page.service deploy/ap-status-page.timer /etc/systemd/system/
+systemctl daemon-reload
+systemd-analyze verify /etc/systemd/system/ap-status-page.service /etc/systemd/system/ap-status-page.timer
+systemctl enable --now ap-status-page.timer
+systemctl start ap-status-page.service
+systemctl is-failed ap-status-page.service
+stat -c '%y' /var/lib/agent-platform/status-page/status.txt
+head -n 1 /var/lib/agent-platform/status-page/status.txt
+```
+
+Read `stat -c '%y'` and the `status <time>` first line again after the next timer run (`systemctl list-timers ap-status-page.timer`) to verify that the file is rewritten every five minutes.
+
+Save the present `tailscale serve` configuration first in a subshell with `set -C` (so a second install never replaces the saved file), then publish `/var/lib/agent-platform/status-page/status.txt` and read it back:
+
+```sh
+(set -C; tailscale serve status --json > /var/lib/agent-platform/status-page/serve.before.json)
+tailscale serve --bg --yes /var/lib/agent-platform/status-page/status.txt
+tailscale serve status
+curl -sS -D - https://<host>.<tailnet>.ts.net/
+```
+
+The `curl` response answers with `Content-Type: text/plain; charset=utf-8` and the current `status <time>` line. Every device that the tailnet's access policy lets reach this host on port 443 can read the page; it is never offered with `tailscale funnel`.
+
+Undo: reset the serve configuration, replay one `tailscale serve --bg` per handler listed in `/var/lib/agent-platform/status-page/serve.before.json` (none when it is `{}`) with `--https=<port>` for an `HTTPS` port, `--http=<port>` for an `HTTP` port, `--tcp=<port>` for a TCP forward, and `--set-path=<mount>`, compare `tailscale serve status --json` against the saved file with `diff`, then disable the timer and remove the two unit files:
+
+```sh
+tailscale serve reset
+# Replay any handlers from /var/lib/agent-platform/status-page/serve.before.json here when it is not `{}`.
+tailscale serve status --json | diff -u /var/lib/agent-platform/status-page/serve.before.json -
+systemctl disable --now ap-status-page.timer
+systemctl is-active ap-status-page.service            # until it answers inactive or failed, not activating
+rm -f /etc/systemd/system/ap-status-page.service /etc/systemd/system/ap-status-page.timer
+systemctl daemon-reload
+```
+
+`/var/lib/agent-platform/status-page/` (`status.txt` and `serve.before.json`) stays; remove it by hand when no longer needed.

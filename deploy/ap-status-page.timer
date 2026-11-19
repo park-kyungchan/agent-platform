@@ -1,0 +1,11 @@
+[Unit]
+Description=ap status page every five minutes
+Documentation=https://github.com/park-kyungchan/agent-platform/blob/main/deploy/README.md
+
+[Timer]
+OnCalendar=*:0/5
+AccuracySec=10s
+Persistent=false
+
+[Install]
+WantedBy=timers.target
