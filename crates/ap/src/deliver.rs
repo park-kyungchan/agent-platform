@@ -1598,17 +1598,28 @@ pub fn execute(s: &mut impl System, r: &Value) -> (Value, u8) {
     drop(c.lock);
     (c.rec, exit)
 }
+/// `ap deliver check`: the request check of `execute` and nothing after it: no state directory, no
+/// lock, no call, no record on disk (`specs/ap/deliver.md` R8).
+pub fn check_request(r: &Value) -> (Value, u8) {
+    match check(r) {
+        Ok(()) => (json!({"status": "ok"}), 0),
+        Err(field) => invalid(&field),
+    }
+}
 pub fn cli(argv: &[OsString]) -> ExitCode {
+    let only_check = argv.len() == 1 && argv[0] == "check";
     let mut bytes = vec![];
     let read = std::io::stdin()
         .take(LIMIT + 1)
         .read_to_end(&mut bytes)
         .is_ok()
         && bytes.len() as u64 <= LIMIT;
-    let (rec, exit) = if !argv.is_empty() {
+    let (rec, exit) = if !argv.is_empty() && !only_check {
         invalid("args")
     } else if !read {
         invalid("stdin")
+    } else if only_check {
+        check_request(&serde_json::from_slice(&bytes).unwrap_or(Value::Null))
     } else {
         execute(
             &mut Host,

@@ -431,7 +431,7 @@ fn identity(
     env
 }
 /// The host's policy as read (`specs/ap/policy.md`).
-struct Policy {
+pub(crate) struct Policy {
     path: String,
     sha256: String,
     allowed: Vec<String>,
@@ -465,7 +465,7 @@ fn names(
         .ok_or_else(|| invalid(member, "holds an entry of the wrong form"))
 }
 /// The policy file the host names, read once at admission. None: no path or no such file.
-fn policy(s: &impl System) -> Result<Option<Policy>, Failure> {
+pub(crate) fn policy(s: &impl System) -> Result<Option<Policy>, Failure> {
     let Some(file) = s.policy_file() else {
         return Ok(None);
     };

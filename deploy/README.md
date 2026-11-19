@@ -19,7 +19,7 @@ From a clean checkout of the merged commit, as root:
 ```sh
 install -m 0644 deploy/ap-deliver.service deploy/ap-deliver.timer /etc/systemd/system/
 install -d -m 0755 /etc/agent-platform
-install -m 0644 deploy/deliver.json /etc/agent-platform/deliver.json
+ap deliver check < deploy/deliver.json && install -m 0644 deploy/deliver.json /etc/agent-platform/deliver.json
 systemctl daemon-reload
 systemd-analyze verify /etc/systemd/system/ap-deliver.service /etc/systemd/system/ap-deliver.timer
 systemctl enable --now ap-deliver.timer

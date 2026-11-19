@@ -453,3 +453,9 @@ The record of a call with `engine` has one more member, `schema`: null, or `{"fr
 What a Lead does: `engine_not_accepted`: review the engine's commit named (the rule is that of T's chain). An engine attempt that ended `failed_restored` or `failed`: read `code` and `installers`, repair, then a Lead's call (with `by` and `reason`) installs the engine; for `failed`, `scripts/install-ont.sh rollback` of the engine clone puts the previous engine back first. `schema_install_failed`: read the store's version (`ont describe`) and the engine's answer; the next call tries again. `migrate_failed`: as for a marker that cannot clear, above.
 
 Undo. Remove the member `engine` from the request: delivery stops on a difference as before (`engine_differs`, `schema_differs`) and no longer reads the marker. An installed engine goes back with the engine's own `scripts/install-ont.sh rollback`, with the timer stopped. A schema is repaired by a higher version that delivery installs forward, never by delivery restoring a backup.
+
+`ap deliver check < request.json` runs only the request check of the command: it prints `{"status":"ok"}` and exits 0, or the record `ap deliver` prints for that request and exits 2; it makes no state directory, takes no lock and calls no program (`specs/ap/deliver.md` R8 to R10).
+
+## The policy check
+
+`ap policy check [<file>]` reads the policy file (the given one, else `AP_POLICY_FILE`, else `/etc/agent-platform/policy.json`) once and runs it through every reader `ap` has of it, in the order `models`, `quota`, `units`, `reviews`, `repositories`, `work`, the functions the verbs call. It prints `{"status":"ok","path","sha256","readers"}` and exits 0, or on stderr the first refusal, `{"error":{"code","field","detail","reader"}}`, and exits 2; an absent file is `policy_absent`. It writes nothing and calls no program. The rules, each pinned by a test of `tests/policy_check.rs`, are in `specs/ap/policy.md` R12 to R16.

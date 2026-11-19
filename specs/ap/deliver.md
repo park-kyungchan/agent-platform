@@ -17,10 +17,13 @@ Purpose: a file under a platform repository's main checkout on the host equals `
 - R5: No other Git command and no other write touches a checkout: no reset, stash, clean, checkout, commit, push or branch change, and no command after a step that did not pass. A checkout whose result is not `forwarded` is unchanged: its working tree's files, its index's entries, `HEAD` and `refs/heads/*`; step 4 adds objects and moves `refs/remotes/origin/main` and `FETCH_HEAD`.
 - R6: The record has the member `checkouts` only when the request holds it: `null` when the step did not run (R2), otherwise an array in the request's order of `{"path", "from", "to", "result"}`. `from` is the `HEAD` read in step 5, `null` when step 5 did not read it. `to` is equal to `from` for `current`; the `HEAD` read after step 6 for `forwarded` and for a `git_failed` of step 6, `null` when that read failed; `null` for every other result. The `invalid_input` record never has the member. The answer on stdout is the same record.
 - R7: A request without `checkouts` gives exactly the record and the calls it gave before this specification: no `git -C <checkout>` command and no member `checkouts`.
+- R8: `ap deliver check < request.json` runs exactly the request check of `ap deliver` and nothing after it: no state directory, no lock, no fetch, no store action, no `last.json`, no program call. A request that passes exits 0 and prints `{"status":"ok"}`.
+- R9: A request the check refuses exits 2 and prints the record `ap deliver` prints for that request (`end` `refused`, `code` `invalid_input`, `detail` `{"field"}`), with the same `at` form and no other difference.
+- R10: `ap deliver` without an argument is unchanged, and any other argument, `check <x>` included, is refused `invalid_input` with field `args`.
 
 ## Interface
 
-The request member `checkouts`, the record member `checkouts`, the results `forwarded`, `current`, `not_a_checkout`, `not_on_main`, `dirty`, `fetch_failed`, `diverged` and `git_failed`, and the refusal `invalid_input` with field `checkouts`.
+The request member `checkouts`, the record member `checkouts`, the results `forwarded`, `current`, `not_a_checkout`, `not_on_main`, `dirty`, `fetch_failed`, `diverged` and `git_failed`, and the refusal `invalid_input` with field `checkouts`. The form `ap deliver check`.
 
 ## Limits
 
