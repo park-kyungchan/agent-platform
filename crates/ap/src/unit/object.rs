@@ -6,7 +6,7 @@ use crate::store::{self, Actor, at, bad, only, shaped, sized};
 use serde_json::{Map, Value, json};
 use std::{
     ffi::OsString,
-    io::{Read, Write},
+    io::{Read, Seek, SeekFrom, Write},
     os::unix::fs::{DirBuilderExt, PermissionsExt},
     path::{Path, PathBuf},
     process::ExitCode,
@@ -442,6 +442,10 @@ fn write(
     if op == "ready" {
         return ready(s, store, &actor, rid, key, after);
     }
+    // `amend` and `drop` of a unit the store does not have: the actions would answer another refusal.
+    if op != "add" && at(store::get(s, store, "unit", key), "unit")?.is_none() {
+        return Err(error("unknown_unit", "unit"));
+    }
     for d in &depends {
         if at(store::get(s, store, "unit", d), "depends_on")?.is_none() {
             return Err(fail("unknown_dependency", "depends_on", json!(d)));
@@ -683,7 +687,7 @@ fn on_base(s: &mut impl System, u: &Value) -> Result<(Value, Vec<Value>), Failur
         };
         if let Some(code) = code {
             let detail = json!({"index": index, "kind": kind, "check": check, "status": status,
-                "output": tail(s, &output)});
+                "output": tail(&output)});
             return Err(fail(code, "acceptance", detail));
         }
         checks.push(json!({"index": index, "kind": kind, "status": status, "seconds": seconds}));
@@ -691,10 +695,19 @@ fn on_base(s: &mut impl System, u: &Value) -> Result<(Value, Vec<Value>), Failur
     drop(scratch);
     Ok((json!(base), checks))
 }
-/// The last bytes of a check's output, cut forward to a character boundary.
-fn tail(s: &impl System, output: &str) -> String {
-    let bytes = s.read(output).unwrap_or_default();
-    let mut from = bytes.len().saturating_sub(OUTPUT_TAIL);
+/// The last bytes of a check's output, cut forward to a character boundary: the file is opened and read
+/// from its last `OUTPUT_TAIL` bytes by a seek, never whole (a check may write without bound).
+fn tail(output: &str) -> String {
+    let last = || -> std::io::Result<Vec<u8>> {
+        let mut file = std::fs::File::open(output)?;
+        let size = file.metadata()?.len();
+        file.seek(SeekFrom::Start(size.saturating_sub(OUTPUT_TAIL as u64)))?;
+        let mut bytes = vec![];
+        file.take(OUTPUT_TAIL as u64).read_to_end(&mut bytes)?;
+        Ok(bytes)
+    };
+    let bytes = last().unwrap_or_default();
+    let mut from = 0;
     while from < bytes.len() && (bytes[from] & 0xC0) == 0x80 {
         from += 1;
     }

@@ -22,6 +22,8 @@ const FAKE_MUSE: &str = include_str!("fixtures/fake-muse.sh");
 const FAKE_AGY: &str = include_str!("fixtures/fake-agy.sh");
 const BWRAP: &str = "/usr/bin/bwrap";
 
+/// What a pause does: given the word `systemctl is-active` answers from then on.
+type AtPause = Box<dyn FnMut(&mut Option<&'static str>) + Send>;
 struct Fake {
     t: PathBuf,
     env: Vec<(String, String)>,
@@ -59,6 +61,11 @@ struct Fake {
     ont: Option<FakeOnt>,
     /// The launches and the calls to `ont`, in the order they happened.
     events: Vec<String>,
+    /// `systemctl is-active` answers this word (exit 0) for every unit, in place of the fake's own.
+    is_active: Option<&'static str>,
+    /// Every pause of a second or more: it takes no time, and `at_pause` runs in it.
+    pauses: Vec<std::time::Duration>,
+    at_pause: Option<AtPause>,
 }
 /// What one call of the fake `ont` does, in place of the engine's answer.
 #[derive(Clone)]
@@ -84,6 +91,8 @@ struct FakeOnt {
     applied: BTreeMap<String, (Value, Value)>,
     /// The runs and their status.
     runs: BTreeMap<String, String>,
+    /// The fields of the objects `get` reads, by `kind:key` (the engine's shape is made on the read).
+    objects: BTreeMap<String, Value>,
 }
 impl FakeOnt {
     fn with(exist: &[&str]) -> Self {
@@ -126,6 +135,18 @@ impl FakeOnt {
                 id["object_type"].as_str().unwrap(),
                 id["native_key"].as_str().unwrap()
             );
+            if let Some(fields) = self.objects.get(&known) {
+                let fields: serde_json::Map<String, Value> = (fields.as_object().unwrap().iter())
+                    .map(|(k, v)| (k.clone(), json!({"kind": "value", "value": v})))
+                    .collect();
+                let object = json!({"id": object_id(id["object_type"].as_str().unwrap(),
+                    id["native_key"].as_str().unwrap()), "head": "r1",
+                    "observations": [{"revision": "r1", "fields": fields}]});
+                return Ok((
+                    true,
+                    json!({"status": "ok", "result": {"objects": [object]}}),
+                ));
+            }
             return match self.exist.contains(&known) {
                 true => Ok((true, json!({"status": "ok", "result": {"objects": []}}))),
                 false => refuse("unavailable"),
@@ -223,6 +244,9 @@ impl Fake {
             policy: None,
             ont: None,
             events: vec![],
+            is_active: None,
+            pauses: vec![],
+            at_pause: None,
         }
     }
     fn p(&self, rel: &str) -> String {
@@ -351,6 +375,10 @@ impl System for Fake {
                 self.alive.remove(unit);
                 (true, vec![])
             }
+            "is-active" if self.is_active.is_some() => {
+                let word = format!("{}\n", self.is_active.unwrap());
+                (true, word.into_bytes())
+            }
             "is-active" if self.silent => {
                 return Err(Failure {
                     code: "process_failed",
@@ -420,6 +448,17 @@ impl System for Fake {
     }
     fn policy_file(&self) -> Option<PathBuf> {
         self.policy.clone()
+    }
+    /// The polls of a stage (a tenth of a second) pass for real; a longer pause is noted and takes
+    /// no time.
+    fn pause(&mut self, d: std::time::Duration) {
+        if d < std::time::Duration::from_secs(1) {
+            return std::thread::sleep(d);
+        }
+        self.pauses.push(d);
+        if let Some(hook) = self.at_pause.as_mut() {
+            hook(&mut self.is_active);
+        }
     }
     fn environment(&self) -> Vec<(String, String)> {
         if let Some(p) = &self.precreate {
@@ -1409,7 +1448,13 @@ fn item08_the_worktree_check_fails_closed_in_a_clean_environment() {
 #[test]
 fn item09_env_refuses_anthropic_names_and_home() {
     let mut f = Fake::new();
-    for name in ["ANTHROPIC_API_KEY", "ANTHROPIC_BASE_URL", "HOME"] {
+    for name in [
+        "ANTHROPIC_API_KEY",
+        "ANTHROPIC_BASE_URL",
+        "HOME",
+        "BASH_ENV",
+        "ENV",
+    ] {
         let mut r = f.request("n.md");
         r["env"] = json!({name: "x"});
         assert_eq!(code(f.run(&r)), "env_forbidden@env", "{name}");
@@ -6314,6 +6359,8 @@ fn run_object_r2_env_may_not_name_the_actor_or_the_author() {
         "ONT_AGENT",
         "GIT_AUTHOR_NAME",
         "GIT_AUTHOR_EMAIL",
+        "GIT_COMMITTER_NAME",
+        "GIT_COMMITTER_EMAIL",
     ] {
         let mut r = f.request("x.md");
         r["env"] = json!({name: "lead"});
@@ -6322,7 +6369,7 @@ fn run_object_r2_env_may_not_name_the_actor_or_the_author() {
     }
     // Another name of the same families stays a request's own business.
     let mut r = f.request("y.md");
-    r["env"] = json!({"ONT_PROBE": "1", "GIT_COMMITTER_NAME": "c"});
+    r["env"] = json!({"ONT_PROBE": "1", "GIT_COMMITTER_DATE": "c"});
     assert_eq!(f.run(&r).unwrap().1, 0);
 }
 
@@ -6334,6 +6381,9 @@ fn run_object_r3_every_stage_gets_its_role_and_never_lead() {
     f.env.push(("ONT_ROLE".into(), "lead".into()));
     f.env.push(("ONT_AGENT".into(), "someone".into()));
     f.env.push(("GIT_AUTHOR_NAME".into(), "caller".into()));
+    // A file a shell sources before a command: the caller's is not inherited either.
+    f.env.push(("BASH_ENV".into(), "/caller/rc".into()));
+    f.env.push(("ENV".into(), "/caller/rc".into()));
     for (role, ont_role, want) in [
         ("implementer", None, "implementer"),
         ("fixer", None, "fixer"),
@@ -6356,6 +6406,7 @@ fn run_object_r3_every_stage_gets_its_role_and_never_lead() {
             !env.contains_key("GIT_AUTHOR_NAME"),
             "the caller's author is not inherited"
         );
+        assert!(!env.contains_key("BASH_ENV") && !env.contains_key("ENV"));
         assert_eq!(env.keys().filter(|k| k.starts_with("ONT_")).count(), 2);
     }
 }
@@ -6391,8 +6442,11 @@ fn run_object_r4_the_agent_is_a_form_the_engine_accepts() {
 
 // spec: specs/ap/run-object.md#R5
 #[test]
-fn run_object_r5_git_author_names_the_stage_and_leaves_the_committer() {
+fn run_object_r5_git_author_names_the_stage_as_author_and_committer() {
     let mut f = Fake::new();
+    // The caller's committer never reaches the stage.
+    f.env
+        .push(("GIT_COMMITTER_EMAIL".into(), "root@host".into()));
     let mut r = f.request("a.md");
     r["model"] = json!("opus[1m]");
     r["git_author"] = json!(true);
@@ -6400,8 +6454,12 @@ fn run_object_r5_git_author_names_the_stage_and_leaves_the_committer() {
     let env = f.stage_env();
     assert_eq!(env["GIT_AUTHOR_NAME"], "reviewer opus[1m]");
     assert_eq!(env["GIT_AUTHOR_EMAIL"], "reviewer.opus-1m-@agents.invalid");
-    assert!(env.keys().all(|k| !k.starts_with("GIT_COMMITTER")));
-    // The finer role names the author too.
+    assert_eq!(env["GIT_COMMITTER_NAME"], "reviewer opus[1m]");
+    assert_eq!(
+        env["GIT_COMMITTER_EMAIL"],
+        "reviewer.opus-1m-@agents.invalid"
+    );
+    // The finer role names the author and the committer too, on every runtime and role.
     let mut r = f.request("b.md");
     r["ont_role"] = json!("verifier");
     r["git_author"] = json!(true);
@@ -6409,6 +6467,17 @@ fn run_object_r5_git_author_names_the_stage_and_leaves_the_committer() {
     let env = f.stage_env();
     assert_eq!(env["GIT_AUTHOR_NAME"], "verifier sonnet");
     assert_eq!(env["GIT_AUTHOR_EMAIL"], "verifier.sonnet@agents.invalid");
+    assert_eq!(env["GIT_COMMITTER_NAME"], "verifier sonnet");
+    assert_eq!(env["GIT_COMMITTER_EMAIL"], "verifier.sonnet@agents.invalid");
+    let mut r = f.codex("d.md");
+    r["git_author"] = json!(true);
+    assert_eq!(f.run(&r).unwrap().1, 0);
+    let env = f.stage_env();
+    assert_eq!(env["GIT_COMMITTER_NAME"], env["GIT_AUTHOR_NAME"]);
+    assert_eq!(
+        env["GIT_COMMITTER_EMAIL"],
+        "implementer.gpt-6.1-terra@agents.invalid"
+    );
     // Without the member nothing of Git's environment is set.
     assert_eq!(f.run(&f.request("c.md")).unwrap().1, 0);
     assert!(f.stage_env().keys().all(|k| !k.starts_with("GIT_")));
@@ -7228,4 +7297,267 @@ fn limits_r9_a_request_without_limits_runs_as_before() {
     let env = f.text("bin/env.1");
     assert!(env.lines().any(|l| l == "TMPDIR=/caller/tmp"), "{env}");
     assert!(!env.contains("CARGO_TARGET_DIR="));
+}
+
+// ---- R14 the close of an orphan run object --------------------------------------------------
+
+/// The scope a record of `ap run` names.
+const SCOPE: &str = "ap-run-0123abcd-0000-4000-8000-0123456789ab.scope";
+impl Fake {
+    /// A `running` object `run-a` of the role `implementer` in a fake store, whose record
+    /// `<out>.run.json` holds `state`, the scope, the session `s-1` and the object's key, last
+    /// written two minutes ago. The store's path.
+    fn orphan(&mut self, out: &str, state: &str) -> String {
+        let store = self.store_with(&[]);
+        let record = self.p(&format!("{out}.run.json"));
+        let rec = json!({"state": state, "unit": SCOPE, "session": "s-1",
+            "run_object": {"key": "run-a", "start": "applied", "close": null}});
+        std::fs::write(&record, rec.to_string()).unwrap();
+        self.age(&record, 120);
+        let ont = self.ont.as_mut().unwrap();
+        ont.objects.insert(
+            "run:run-a".into(),
+            json!({"status": "running", "role": "implementer", "record": record}),
+        );
+        ont.runs.insert("run-a".into(), "running".into());
+        store
+    }
+    /// The file at `path` last modified `seconds` ago.
+    fn age(&self, path: &str, seconds: u64) {
+        let at = std::time::SystemTime::now() - std::time::Duration::from_secs(seconds);
+        let file = std::fs::File::options().write(true).open(path).unwrap();
+        file.set_modified(at).unwrap();
+    }
+    fn close(&mut self, r: &Value) -> Result<Value, ap::run::Refused> {
+        ap::run::close(self, r)
+    }
+    fn object(&mut self) -> &mut Value {
+        let ont = self.ont.as_mut().unwrap();
+        ont.objects.get_mut("run:run-a").unwrap()
+    }
+}
+/// `code@field` and the exit of a refusal of the close form.
+fn closing(r: Result<Value, ap::run::Refused>) -> (String, u8) {
+    match r {
+        Err(e) => (format!("{}@{}", e.code, e.field), e.status),
+        Ok(v) => panic!("expected a refusal, got {v}"),
+    }
+}
+
+// spec: specs/ap/run-object.md#R14
+#[test]
+fn run_object_r14_an_orphan_is_closed_with_its_record_state() {
+    for (state, want) in [("running", "killed"), ("ok", "ok"), ("cut", "cut")] {
+        let mut f = Fake::new();
+        let store = f.orphan("o.md", state);
+        let before = std::fs::read(f.p("o.md.run.json")).unwrap();
+        let v = f.close(&json!({"close": "run-a", "store": store})).unwrap();
+        assert_eq!(
+            v,
+            json!({"run": "run-a", "closed": true, "reason": "orphan"})
+        );
+        let bodies = f.store().bodies("close_run");
+        assert_eq!(bodies.len(), 1);
+        let b = &bodies[0];
+        assert_eq!(b["request_id"], f.rid("o.md", "close"));
+        assert_eq!(
+            (&b["agent"], &b["role"]),
+            (&json!("ap-run"), &json!("implementer"))
+        );
+        assert_eq!(
+            b["parameters"],
+            json!({"run": object_id("run", "run-a"), "state": want, "session": "s-1"})
+        );
+        assert_eq!(f.store().calls[0].0, ["get", "--store", store.as_str()]);
+        // One second reading, ten seconds after the first; nothing launched and nothing written.
+        assert_eq!(f.pauses, [std::time::Duration::from_secs(10)]);
+        assert!(f.launches.is_empty());
+        assert_eq!(std::fs::read(f.p("o.md.run.json")).unwrap(), before);
+    }
+    // An object already closed answers so before its record is read: here there is none.
+    let mut f = Fake::new();
+    let store = f.orphan("o.md", "running");
+    f.object()["status"] = json!("closed");
+    std::fs::remove_file(f.p("o.md.run.json")).unwrap();
+    let v = f.close(&json!({"close": "run-a", "store": store})).unwrap();
+    assert_eq!(v, json!({"run": "run-a", "closed": false}));
+    assert!(f.store().bodies("close_run").is_empty() && f.pauses.is_empty());
+}
+
+// spec: specs/ap/run-object.md#R14
+#[test]
+fn run_object_r14_a_record_that_is_not_the_objects_is_refused() {
+    type Change = fn(&mut Fake);
+    let cases: [(&str, Change); 6] = [
+        ("no record", |f| {
+            f.object().as_object_mut().unwrap().remove("record");
+        }),
+        ("missing", |f| {
+            std::fs::remove_file(f.p("o.md.run.json")).unwrap()
+        }),
+        ("unreadable", |f| {
+            std::fs::write(f.p("o.md.run.json"), "{not json").unwrap()
+        }),
+        ("another key", |f| {
+            f.rewrite(|r| r["run_object"]["key"] = json!("run-b"))
+        }),
+        ("no scope", |f| f.rewrite(|r| r["unit"] = Value::Null)),
+        ("another scope", |f| {
+            f.rewrite(|r| r["unit"] = json!("ap-run-x.scope"))
+        }),
+    ];
+    for (case, change) in cases {
+        let mut f = Fake::new();
+        let store = f.orphan("o.md", "running");
+        change(&mut f);
+        let r = f.close(&json!({"close": "run-a", "store": store}));
+        assert_eq!(
+            closing(r),
+            ("record_mismatch@close".to_owned(), 2),
+            "{case}"
+        );
+        assert!(
+            f.store().bodies("close_run").is_empty() && f.pauses.is_empty(),
+            "{case}"
+        );
+    }
+}
+impl Fake {
+    /// The orphan's record changed by `change`, still two minutes old.
+    fn rewrite(&mut self, change: impl FnOnce(&mut Value)) {
+        let path = self.p("o.md.run.json");
+        let mut rec: Value = serde_json::from_slice(&std::fs::read(&path).unwrap()).unwrap();
+        change(&mut rec);
+        std::fs::write(&path, rec.to_string()).unwrap();
+        self.age(&path, 120);
+    }
+}
+
+// spec: specs/ap/run-object.md#R14
+#[test]
+fn run_object_r14_a_stage_that_may_still_live_is_refused() {
+    let refused = |f: &mut Fake, store: &str, case: &str, pauses: usize| {
+        let r = f.close(&json!({"close": "run-a", "store": store}));
+        assert_eq!(
+            closing(r),
+            ("run_still_active@close".to_owned(), 2),
+            "{case}"
+        );
+        assert!(f.store().bodies("close_run").is_empty(), "{case}");
+        assert_eq!(f.pauses.len(), pauses, "{case}");
+    };
+    // The five states in which something of the scope may live, at the first reading.
+    for state in [
+        "active",
+        "activating",
+        "deactivating",
+        "reloading",
+        "refreshing",
+    ] {
+        let mut f = Fake::new();
+        let store = f.orphan("o.md", "running");
+        f.is_active = Some(state);
+        refused(&mut f, &store, state, 0);
+    }
+    // A call that fails, and one that answers nothing.
+    let mut f = Fake::new();
+    let store = f.orphan("o.md", "running");
+    f.silent = true;
+    refused(&mut f, &store, "failed", 0);
+    let mut f = Fake::new();
+    let store = f.orphan("o.md", "running");
+    f.is_active = Some("");
+    refused(&mut f, &store, "no answer", 0);
+    // A record younger than 60 seconds.
+    let mut f = Fake::new();
+    let store = f.orphan("o.md", "running");
+    f.age(&f.p("o.md.run.json"), 30);
+    refused(&mut f, &store, "young", 0);
+    // The scope comes back, or the record changes, before the second reading.
+    let mut f = Fake::new();
+    let store = f.orphan("o.md", "running");
+    f.at_pause = Some(Box::new(|active| *active = Some("activating")));
+    refused(&mut f, &store, "scope", 1);
+    for grow in [true, false] {
+        let mut f = Fake::new();
+        let store = f.orphan("o.md", "running");
+        let path = f.p("o.md.run.json");
+        f.at_pause = Some(Box::new(move |_| {
+            let mut bytes = std::fs::read(&path).unwrap();
+            if grow {
+                bytes.push(b'\n');
+            }
+            std::fs::write(&path, bytes).unwrap();
+        }));
+        refused(&mut f, &store, "record", 1);
+    }
+}
+
+// spec: specs/ap/run-object.md#R14
+#[test]
+fn run_object_r14_refusals_of_the_form_and_failures_of_the_store() {
+    let mut f = Fake::new();
+    let store = f.orphan("o.md", "running");
+    let before = std::fs::read(f.p("o.md.run.json")).unwrap();
+    for (r, want) in [
+        (
+            json!({"close": "run-b", "store": store}),
+            "unknown_run@close",
+        ),
+        (
+            json!({"close": "run-a", "store": store, "role": "implementer"}),
+            "invalid_input@role",
+        ),
+        (
+            json!({"close": "run-a", "out": f.p("x.md")}),
+            "invalid_input@out",
+        ),
+        (json!({"close": 5}), "invalid_input@close"),
+        (json!({"close": "run a"}), "invalid_input@close"),
+        (
+            json!({"close": "run-a", "store": "relative"}),
+            "invalid_input@store",
+        ),
+    ] {
+        assert_eq!(closing(f.close(&r)), (want.to_owned(), 2), "{r}");
+    }
+    // A failed store call: exit 3 with the store's code, nothing else written.
+    f.way("get", vec![Way::Lost]);
+    let r = f.close(&json!({"close": "run-a", "store": store}));
+    assert_eq!(closing(r), ("process_failed@close".to_owned(), 3));
+    f.way("close_run", vec![Way::Refuse("run_not_running")]);
+    let r = f.close(&json!({"close": "run-a", "store": store}));
+    assert_eq!(closing(r), ("run_not_running@close".to_owned(), 3));
+    assert_eq!(f.store().runs["run-a"], "running");
+    assert_eq!(std::fs::read(f.p("o.md.run.json")).unwrap(), before);
+    assert!(f.launches.is_empty() && f.calls().is_empty());
+    // The command line: the failure on standard error, exit 3, nothing on standard output.
+    let bin = f.t.join("ont-bin");
+    std::fs::create_dir(&bin).unwrap();
+    let ont = bin.join("ont");
+    let refusal = r#"{"status":"refused","code":"store_not_found"}"#;
+    std::fs::write(
+        &ont,
+        format!("#!/bin/sh\ncat > /dev/null\necho '{refusal}'\nexit 1\n"),
+    )
+    .unwrap();
+    std::fs::set_permissions(&ont, std::fs::Permissions::from_mode(0o755)).unwrap();
+    let mut child = Command::new(env!("CARGO_BIN_EXE_ap"))
+        .arg("run")
+        .env_clear()
+        .env("PATH", format!("{}:/usr/bin:/bin", bin.display()))
+        .stdin(std::process::Stdio::piped())
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped())
+        .spawn()
+        .unwrap();
+    let r = json!({"close": "run-a", "store": f.p("no-store")});
+    std::io::Write::write_all(&mut child.stdin.take().unwrap(), r.to_string().as_bytes()).unwrap();
+    let out = child.wait_with_output().unwrap();
+    assert_eq!((out.status.code(), out.stdout.is_empty()), (Some(3), true));
+    let e: Value = serde_json::from_slice(&out.stderr).unwrap();
+    assert_eq!(
+        (&e["error"]["code"], &e["error"]["field"]),
+        (&json!("store_not_found"), &json!("close"))
+    );
 }

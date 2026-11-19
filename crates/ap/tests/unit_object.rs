@@ -573,6 +573,17 @@ impl System for F {
             other => panic!("no {other} is called"),
         }
     }
+    fn read(&self, path: &str) -> std::io::Result<Vec<u8>> {
+        // A check's output may be of any size: the verb reads its end by a seek, never through the port.
+        assert!(
+            !path.ends_with(".out"),
+            "a check's output is read whole: {path}"
+        );
+        if !std::fs::metadata(path)?.is_file() {
+            return Err(std::io::ErrorKind::InvalidInput.into());
+        }
+        std::fs::read(path)
+    }
     fn units(&self) -> bool {
         self.units
     }
@@ -1453,6 +1464,56 @@ fn r18_drop_applies_drop_unit() {
         with(writer("d2"), json!({"unit": "u-one", "reason": "Again."})),
     );
     assert_eq!((e.code.as_str(), e.field.as_str()), ("unit_ended", "drop"));
+}
+
+// spec: specs/ap/unit.md#R18
+#[test]
+fn r18_amend_and_drop_of_a_unit_the_store_does_not_have_are_unknown_unit() {
+    let mut f = F::new();
+    yes(&mut f, &["add"], added("u-one"));
+    f.calls.clear();
+    for (op, rid, members) in [
+        ("amend", "m1", json!({"notes": "n"})),
+        ("drop", "d1", json!({"reason": "r"})),
+    ] {
+        let q = with(writer(rid), with(members, json!({"unit": "u-none"})));
+        let e = no(&mut f, &[op], q);
+        assert_eq!(
+            (e.code.as_str(), e.field.as_str(), &e.after, &e.unit),
+            ("unknown_unit", "unit", &None, &Some("u-none".to_owned())),
+            "{op}"
+        );
+    }
+    // One read, no apply.
+    assert_eq!(f.names(), ["get unit", "get unit"]);
+    assert!(f.applies().is_empty());
+    // A unit that exists is as before.
+    let q = with(writer("m2"), json!({"unit": "u-one", "notes": "n"}));
+    assert_eq!(yes(&mut f, &["amend"], q)["outcome"], "applied");
+}
+
+// spec: specs/ap/unit.md#R26
+#[test]
+fn r26_the_output_kept_of_a_check_is_its_last_2000_bytes_read_by_a_seek() {
+    let mut f = F::new();
+    // 6 MiB of output, then a last line: the tail is the end only.
+    let big = "head -c 6291456 /dev/zero | tr '\\0' x; echo; echo END; exit 1";
+    plain_unit(&mut f, "u-one", check(big, "invariant"));
+    let e = ready(&mut f, "u-one").unwrap_err();
+    assert_eq!(e.code, "invariant_fails_on_base");
+    let out = e.detail["output"].as_str().unwrap();
+    assert_eq!(out.len(), 2000);
+    assert!(out.ends_with("x\nEND\n") && out.starts_with('x'));
+    // A cut inside a character moves forward to the next boundary (1,999 bytes of 999 `é` and `a`).
+    let cut =
+        "i=0; while [ $i -lt 3000 ]; do printf '\\303\\251'; i=$((i+1)); done; printf a; exit 1";
+    plain_unit(&mut f, "u-two", check(cut, "invariant"));
+    let e = ready(&mut f, "u-two").unwrap_err();
+    assert_eq!(e.detail["output"], format!("{}a", "é".repeat(999)));
+    // Shorter than the bound: all of it.
+    plain_unit(&mut f, "u-three", check("echo short; exit 1", "invariant"));
+    let e = ready(&mut f, "u-three").unwrap_err();
+    assert_eq!(e.detail["output"], "short\n");
 }
 
 // spec: specs/ap/unit.md#R19

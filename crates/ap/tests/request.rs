@@ -43,6 +43,8 @@ struct F {
     unqualified: bool,
     /// Each object of a search answer is padded to the size of the largest head the engine answers.
     heavy: bool,
+    /// How many times each object was written (its observations).
+    written: BTreeMap<String, usize>,
 }
 /// The bound of `Host::call`: an answer over 1 MiB is `process_failed`.
 const LIMIT: usize = 1_048_576;
@@ -77,6 +79,7 @@ impl F {
             refuse: None,
             unqualified: false,
             heavy: false,
+            written: BTreeMap::new(),
         };
         f.files.insert(PATH.into(), RECORD.to_vec());
         for (key, status) in [("open", "draft"), ("met", "met"), ("gone", "retired")] {
@@ -230,6 +233,10 @@ impl F {
                 vec![change(&target, "modification")]
             }
         };
+        for e in &edits {
+            let key = e["id"]["native_key"].as_str().unwrap().to_owned();
+            *self.written.entry(key).or_insert(0) += 1;
+        }
         self.applied
             .insert(derived, (content, json!(edits.clone())));
         ok(json!({"outcome": "applied", "edits": edits}))
@@ -247,12 +254,14 @@ impl F {
         if !self.is(id, kind, |_| true) {
             return refused("unavailable");
         }
-        let o = &self.objects[id["native_key"].as_str().unwrap()];
-        let observation =
-            json!({"revision": "r#1", "change": "initial", "fields": Self::fields(o)});
-        ok(
-            json!({"objects": [{"id": id, "head": "r#1", "observations": [{"revision": "r#0", "fields": {}}, observation]}]}),
-        )
+        let key = id["native_key"].as_str().unwrap();
+        let o = &self.objects[key];
+        // As the engine answers: every observation of the object, the last 100 at most, the head last.
+        let n = self.written.get(key).copied().unwrap_or(1).max(1);
+        let observations: Vec<Value> = (n.saturating_sub(99).max(1)..=n)
+            .map(|i| json!({"revision": format!("r#{i}"), "change": "modification", "fields": Self::fields(o)}))
+            .collect();
+        ok(json!({"objects": [{"id": id, "head": format!("r#{n}"), "observations": observations}]}))
     }
     fn search(&self, body: &Value) -> Answer {
         let all = body["where"]["all"].as_array().unwrap();
@@ -280,8 +289,15 @@ impl F {
         assert!((1..=1000).contains(&page), "the engine's bound of limit");
         let to = (from + page).min(found.len());
         let next = (to < found.len()).then(|| to.to_string());
+        // As the engine answers: a filter on a property that a scanned object of the type lacks is unqualified.
+        let lacks = self.objects.values().any(|o| {
+            o["object_type"] == body["object_type"]
+                && all
+                    .iter()
+                    .any(|c| o.get(c["eq"][0].as_str().unwrap()).is_none())
+        });
         ok(
-            json!({"basis": {"qualified": !self.unqualified}, "objects": found[from..to],
+            json!({"basis": {"qualified": !(self.unqualified || lacks)}, "objects": found[from..to],
             "continuation": next}),
         )
     }
@@ -468,14 +484,14 @@ fn r2_a_malformed_request_is_invalid_input_with_its_field_before_any_call() {
     }
     let route = json!({"op": "route", "request_id": "m1", "agent": "lead", "session": "s1", "request": "rq1"});
     cases.extend([
-        (route.clone(), "intent"),
+        (route.clone(), "route"),
         (
             with(
                 with(route.clone(), "intent", json!("open")),
                 "aside",
                 json!("r"),
             ),
-            "intent",
+            "route",
         ),
         (
             with(without(route.clone(), "request"), "intent", json!("open")),
@@ -778,6 +794,94 @@ fn r9_typed_words_need_said_at_and_are_not_verified() {
     }
     assert_eq!(f.writes(), 1, "no refused words reached the store");
 }
+// spec: specs/ap/request.md#R9
+#[test]
+fn r9_a_words_file_over_one_mebibyte_is_input_too_large_on_the_bytes_read() {
+    let q = with(without(rec(), "words"), "words_file", json!("/w/big.txt"));
+    let mut f = F::new();
+    f.files.insert("/w/big.txt".into(), vec![b'a'; LIMIT + 1]);
+    let e = refusal(&mut f, &q);
+    assert_eq!(
+        (e.code.as_str(), e.field.as_str(), e.after, &e.request),
+        ("input_too_large", "words_file", None, &None)
+    );
+    assert!(f.calls.is_empty());
+    // The bound is on the bytes: exactly 1 MiB is read, then cut as every long words are (R11).
+    f.files.insert("/w/big.txt".into(), vec![b'a'; LIMIT]);
+    let v = run(&mut f, &q);
+    assert_eq!(
+        (v["truncated"].clone(), v["words_bytes"].clone()),
+        (json!(true), json!(4000))
+    );
+    // Words read from a session record are read whole.
+    let mut f = F::new();
+    let line = |t: &str| json!({"type": "user", "timestamp": t, "message": {"content": "hello"}});
+    let mut record = vec![];
+    for i in 0..30_000 {
+        record.extend_from_slice(
+            format!("{}\n", line(&format!("2026-11-16T00:00:{:02}.0Z", i % 3))).as_bytes(),
+        );
+    }
+    assert!(record.len() > LIMIT);
+    record.extend_from_slice(format!("{}\n", line("2026-11-16T03:04:05.1Z")).as_bytes());
+    f.files.insert(PATH.into(), record);
+    assert_eq!(
+        run(&mut f, &from("2026-11-16T03:04:05"))["words_verified"],
+        true
+    );
+}
+// spec: specs/ap/request.md#R13
+#[test]
+fn r13_a_request_routed_often_reads_back_and_can_be_superseded() {
+    // Words of 24,000 quotes: 48,000 bytes as JSON, so 25 observations of the head pass 1 MiB.
+    let words = "\"".repeat(24_000);
+    let mut f = F::new();
+    let q = with(rec(), "words", json!(words));
+    let first = run(&mut f, &q);
+    let key = first["request"].as_str().unwrap().to_owned();
+    for i in 0..25 {
+        let route = json!({"op": "route", "request_id": format!("r{i}"), "agent": "lead", "session": "s1",
+            "request": key, "aside": format!("reason {i}")});
+        run(&mut f, &route);
+    }
+    // `ont get` of it now answers more than the verb's bound: the read is of the head only.
+    let get = f.call(
+        "ont",
+        &["get".to_owned()],
+        &json!({"id": oid("request", &key)}),
+        1000,
+    );
+    assert!(get.is_err(), "an answer over 1 MiB is no answer");
+    f.calls.clear();
+    // The call repeated whole: the record is `already_applied` and reads back.
+    let again = run(&mut f, &q);
+    assert_eq!(
+        (again["record"].as_str(), again["request"].as_str()),
+        (Some("already_applied"), Some(key.as_str()))
+    );
+    // A search of the topic and time, to the end, and no `get` of the request.
+    let last = f.calls.last().unwrap();
+    assert_eq!(
+        last.1["where"],
+        json!({"all": [{"eq": ["topic", "walk/one"]}, {"eq": ["said_at", "2026-11-16T03:04:05Z"]}]})
+    );
+    assert!(f.names().iter().all(|n| n != "get request"));
+    // Superseded: the route it had (aside, with its reason) is read from the superseded rows.
+    let sup = with(with(rec(), "op", json!("supersede")), "request", json!(key));
+    let sup = with(
+        with(sup, "request_id", json!("m2")),
+        "words",
+        json!("corrected"),
+    );
+    let v = run(&mut f, &sup);
+    assert_eq!(
+        (v["record"].as_str(), v["route"].as_str()),
+        (Some("applied"), Some("applied"))
+    );
+    let new = v["request"].as_str().unwrap();
+    assert_eq!(f.request(new)["route_reason"], "reason 24");
+    assert!(f.names().iter().all(|n| n != "get request"));
+}
 // spec: specs/ap/request.md#R10
 #[test]
 fn r10_words_are_never_changed_and_empty_words_are_refused_first() {
@@ -885,6 +989,26 @@ fn r12_a_route_is_checked_before_anything_is_applied() {
 }
 // spec: specs/ap/request.md#R13
 #[test]
+fn r13_read_back_is_qualified_when_a_stored_request_has_no_session() {
+    let mut f = F::new();
+    // A request recorded without the optional `session`: a filter on `session` would answer unqualified.
+    f.objects.insert(
+        "nosession".into(),
+        json!({"object_type": "request", "status": "current", "route": "unrouted",
+            "topic": "walk/other", "said_at": "2026-11-15T01:02:03Z", "words": "older"}),
+    );
+    let v = run(&mut f, &from("2026-11-16T03:04:05"));
+    assert_eq!(v["record"], "applied");
+    assert_eq!(v["words_verified"], true);
+    let last = f.calls.last().unwrap();
+    assert_eq!(last.1["object_type"], "request");
+    assert_eq!(
+        last.1["where"],
+        json!({"all": [{"eq": ["topic", "walk/one"]}, {"eq": ["said_at", "2026-11-16T03:04:05Z"]}]})
+    );
+}
+// spec: specs/ap/request.md#R13
+#[test]
 fn r13_record_applies_reads_back_then_routes() {
     let mut f = F::new();
     run(&mut f, &with(rec(), "route", json!({"intent": "open"})));
@@ -893,11 +1017,16 @@ fn r13_record_applies_reads_back_then_routes() {
         [
             "get intent",
             "apply record_request",
-            "get request",
+            "search request",
             "apply route_request"
         ]
     );
-    assert_eq!(f.calls[2].1["id"], oid("request", "rq3"));
+    // The read-back is a search of the call's topic and time; the row of the key is the one read.
+    assert_eq!(f.calls[2].1["object_type"], "request");
+    assert_eq!(
+        f.calls[2].1["where"],
+        json!({"all": [{"eq": ["topic", "walk/one"]}, {"eq": ["said_at", "2026-11-16T03:04:05Z"]}]})
+    );
     assert_eq!(
         applied_params(&f, "route_request"),
         json!({"request": oid("request", "rq3"), "intent": oid("intent", "open")})
@@ -910,7 +1039,7 @@ fn r13_record_applies_reads_back_then_routes() {
         (e.code.as_str(), e.after, e.request.as_deref()),
         ("readback_differs", Some("record"), Some("rq3"))
     );
-    assert_eq!(f.names(), ["apply record_request", "get request"]);
+    assert_eq!(f.names(), ["apply record_request", "search request"]);
 }
 // spec: specs/ap/request.md#R14
 #[test]
@@ -1035,8 +1164,8 @@ fn r16_supersede_replaces_reads_back_and_keeps_the_route() {
                 assert_eq!(
                     tail,
                     [
-                        "get request",
-                        "get request",
+                        "search request",
+                        "search request",
                         format!("apply {action}").as_str()
                     ]
                 );
@@ -1455,7 +1584,7 @@ fn r18_route_and_the_member_route_take_a_unit_or_a_finding() {
             f.names(),
             [
                 "apply record_request",
-                "get request",
+                "search request",
                 &format!("apply {action}")
             ]
         );
@@ -1497,7 +1626,7 @@ fn r24_a_route_the_verb_does_not_know_is_refused_never_read_as_unrouted() {
             Some(new.as_str())
         )
     );
-    assert_eq!(f.names().last().unwrap(), "get request");
+    assert_eq!(f.names().last().unwrap(), "search request");
     // The same call with a route finishes it.
     let q = with(
         from("2026-11-16T03:04:05"),

@@ -38,6 +38,8 @@ pub enum Call {
     Term(String),
     /// `--wait <intent>` with its timeout in seconds.
     Wait(String, u64),
+    /// `--indicators`, of one intent or of every merged unit.
+    Indicators(Option<String>),
 }
 pub struct Args {
     pub store: Option<String>,
@@ -45,11 +47,11 @@ pub struct Args {
     pub call: Call,
 }
 /// `--store <absolute path>`, `--text`, `--term <word>` and one key, each at most once; or `--wait <intent>`
-/// with `--timeout <seconds>` and `--store`.
+/// with `--timeout <seconds>` and `--store`; or `--indicators` with an optional intent, `--text` and `--store`.
 pub fn parse(argv: &[OsString]) -> Result<Args, Failure> {
     let usage = || error("usage", "args");
     let (mut store, mut text, mut term, mut key) = (None, false, None, None);
-    let (mut wait, mut timeout) = (None, None);
+    let (mut wait, mut timeout, mut indicators) = (None, None, false);
     let plain = |k: &str| {
         !k.starts_with('-') && (1..=512).contains(&k.len()) && !k.chars().any(char::is_control)
     };
@@ -74,6 +76,7 @@ pub fn parse(argv: &[OsString]) -> Result<Args, Failure> {
                         .to_owned(),
                 );
             }
+            "--indicators" if !indicators => indicators = true,
             "--wait" if wait.is_none() => {
                 wait = Some(it.next().flatten().filter(|k| plain(k)).ok_or_else(usage)?);
             }
@@ -87,11 +90,12 @@ pub fn parse(argv: &[OsString]) -> Result<Args, Failure> {
             _ => return Err(usage()),
         }
     }
-    let call = match (term, key, wait, timeout) {
-        (None, None, None, None) => Call::Overview,
-        (None, Some(k), None, None) => Call::Key(k),
-        (Some(w), None, None, None) => Call::Term(w),
-        (None, None, Some(i), t) if !text => Call::Wait(i.to_owned(), t.unwrap_or(14_400)),
+    let call = match (term, key, wait, timeout, indicators) {
+        (None, None, None, None, false) => Call::Overview,
+        (None, Some(k), None, None, false) => Call::Key(k),
+        (Some(w), None, None, None, false) => Call::Term(w),
+        (None, None, Some(i), t, false) if !text => Call::Wait(i.to_owned(), t.unwrap_or(14_400)),
+        (None, k, None, None, true) => Call::Indicators(k),
         _ => return Err(usage()),
     };
     Ok(Args { store, text, call })
@@ -548,27 +552,33 @@ fn term(s: &mut impl System, store: Option<&str>, word: &str) -> Result<Value, F
             format!("{} ({args})", text(&v["object_type"])),
         );
     }
+    // The members belong to the value type: one `ont aggregate` per distinct value type, and a second
+    // property of the type only after a `derive_forbidden` (its object type's grant gives no derive).
     let mut denied: Vec<String> = vec![];
-    for (kind, p) in enumerated {
-        if denied.contains(&kind) {
+    let mut members: Vec<(String, Vec<String>)> = vec![];
+    let mut done: Vec<String> = vec![];
+    for (kind, p) in &enumerated {
+        let typed = value_type(&p["type"]).unwrap_or_default().to_owned();
+        if denied.contains(kind) || done.contains(&typed) {
             continue;
         }
-        let name = text(&p["name"]).to_owned();
-        match store::members(s, store, &kind, &name) {
-            Ok(found) => found.iter().for_each(|m| {
-                add(
-                    "value",
-                    &json!({"name": m}),
-                    Some(&format!("{kind}.{name}")),
-                    described(&p),
-                );
-            }),
-            Err(f) if f.code == store::REFUSED => {
-                if f.detail["code"] == "derive_forbidden" {
-                    denied.push(kind);
-                }
+        match store::members(s, store, kind, text(&p["name"])) {
+            Ok(found) => members.push((typed.clone(), found)),
+            Err(f) if f.code == store::REFUSED && f.detail["code"] == "derive_forbidden" => {
+                denied.push(kind.clone());
+                continue;
             }
+            Err(f) if f.code == store::REFUSED => {}
             Err(f) => return Err(f),
+        }
+        done.push(typed);
+    }
+    for (kind, p) in &enumerated {
+        let typed = value_type(&p["type"]).unwrap_or_default();
+        let found = members.iter().find(|(t, _)| t == typed).map(|(_, m)| m);
+        for m in found.into_iter().flatten() {
+            let of = format!("{kind}.{}", text(&p["name"]));
+            add("value", &json!({"name": m}), Some(&of), described(p));
         }
     }
     let w = word.to_ascii_lowercase();
@@ -603,7 +613,148 @@ pub fn execute(s: &mut impl System, store: Option<&str>, call: &Call) -> Result<
         Call::Key(key) => keyed(s, store, key),
         Call::Term(word) => term(s, store, word),
         Call::Wait(intent, timeout) => wait(s, store, intent, *timeout),
+        Call::Indicators(intent) => indicators(s, store, intent.as_deref()),
     }
+}
+
+/// The sum of one token member over the runs of a role, null where every run has none.
+fn token_sum(runs: &[&Found], member: &str) -> Value {
+    let mut all = runs.iter().filter_map(|r| r.1[member].as_u64()).peekable();
+    match all.peek() {
+        Some(_) => json!(all.sum::<u64>()),
+        None => Value::Null,
+    }
+}
+/// The median of the values (the mean of the two middle ones for an even count), null for none.
+fn median(mut v: Vec<u64>) -> Value {
+    v.sort_unstable();
+    match (v.len(), v.len() / 2) {
+        (0, _) => Value::Null,
+        (n, m) if !n.is_multiple_of(2) => json!(v[m]),
+        (_, m) if (v[m - 1] + v[m]).is_multiple_of(2) => json!((v[m - 1] + v[m]) / 2),
+        (_, m) => json!((v[m - 1] + v[m]) as f64 / 2.0),
+    }
+}
+/// The rows of the action log that name the unit, oldest first (the log answers newest first).
+fn logged_of<'a>(l: &'a store::Logged, unit: &'a str) -> impl Iterator<Item = &'a Value> {
+    let named = move |r: &&Value| r["parameters"]["unit"]["native_key"] == unit;
+    l.rows.iter().rev().filter(named)
+}
+/// The time of the first logged row that names the unit; none where the engine withheld rows.
+fn first_at<'a>(l: &'a store::Logged, unit: &'a str) -> Option<&'a str> {
+    let row = logged_of(l, unit).next();
+    row.and_then(|r| r["submitted_at"].as_str())
+        .filter(|_| l.withheld == 0)
+}
+/// The indicators of one merged unit, read from its log rows, reviews and runs (README "The status").
+fn indicator(
+    s: &mut impl System,
+    store: Option<&str>,
+    (key, u): &Found,
+    [began, merged, stopped]: [&store::Logged; 3],
+) -> Result<Value, Failure> {
+    let mut reviews = of_unit(s, store, ("reviews_of_unit", "review"), key)?;
+    reviews.retain(|(_, r)| {
+        let said = ["accept", "repair"].iter().any(|v| r["verdict"] == *v);
+        r["kind"] == "packet" && r["status"] == "closed" && said
+    });
+    reviews.sort_by_key(|(k, r)| (text(&r["closed_at"]).to_owned(), k.clone()));
+    let runs = of_unit(s, store, ("runs_of_unit", "run"), key)?;
+    let mut tokens = serde_json::Map::new();
+    for role in runs
+        .iter()
+        .map(|r| text(&r.1["role"]))
+        .collect::<BTreeSet<_>>()
+    {
+        let mine: Vec<&Found> = runs.iter().filter(|r| r.1["role"] == role).collect();
+        tokens.insert(role.to_owned(), json!({"input": token_sum(&mine, "input_tokens"),
+            "cache_read": token_sum(&mine, "cache_read_tokens"), "cache_write": token_sum(&mine, "cache_write_tokens"),
+            "output": token_sum(&mine, "output_tokens")}));
+    }
+    // A log the engine withheld rows of reads nothing; a missing row is a member that is null.
+    let (started_at, merged_at) = (first_at(began, key), first_at(merged, key));
+    let minutes = (epoch(started_at.unwrap_or_default()))
+        .zip(epoch(merged_at.unwrap_or_default()))
+        .and_then(|(from, to)| to.checked_sub(from))
+        .map(|secs| secs / 60);
+    let stops = (stopped.withheld == 0).then(|| {
+        logged_of(stopped, key)
+            .map(|r| r["parameters"]["cause"].clone())
+            .collect::<Vec<_>>()
+    });
+    let mut row = json!({"unit": key, "intent": key_of(&u["intent"]), "class": u["class"],
+        "implementer": match u["implementer"].is_object() {
+            true => json!({"runtime": u["implementer"]["runtime"], "model": u["implementer"]["model"], "effort": u["implementer"]["effort"]}),
+            false => Value::Null },
+        "started_at": started_at, "merged_at": merged_at, "minutes": minutes, "rounds": reviews.len(),
+        "repairs": runs.iter().filter(|r| r.1["role"] == "fixer").count(),
+        "first_verdict": reviews.first().map(|r| r.1["verdict"].clone()), "stops": stops, "tokens": tokens});
+    let cut = [began, merged, stopped].iter().any(|l| l.withheld > 0);
+    if cut || started_at.is_none() || merged_at.is_none() {
+        row["log_cut"] = json!(true);
+    }
+    Ok(row)
+}
+/// `ap status --indicators`: one row for each merged unit (of the intent when one is named), from the log
+/// of `start_unit`, `merge_unit` and `stop_unit`, and the unit's reviews and runs; it writes nothing.
+fn indicators(
+    s: &mut impl System,
+    store: Option<&str>,
+    intent: Option<&str>,
+) -> Result<Value, Failure> {
+    let mut seen = Seen::default();
+    if let Some(i) = intent {
+        match at(store::head_now(s, store, "intent", i), "intent")? {
+            Some((_, _, now)) => seen.now = now,
+            None => return Err(error("unknown_intent", "intent")),
+        }
+    }
+    let merged = vec![eq("state", "merged")];
+    let mut units = at(
+        store::search_seen(s, store, "unit", merged, &mut seen),
+        "units",
+    )?;
+    let now = seen
+        .now
+        .ok_or_else(|| error("store_answer_unreadable", "now"))?;
+    units.retain(|(_, u)| intent.is_none_or(|i| u["intent"]["native_key"] == i));
+    units.sort_by_key(|(k, _)| k.clone());
+    let mut logs = [
+        store::Logged::default(),
+        store::Logged::default(),
+        store::Logged::default(),
+    ];
+    if !units.is_empty() {
+        for (log, action) in logs
+            .iter_mut()
+            .zip(["start_unit", "merge_unit", "stop_unit"])
+        {
+            *log = at(store::logged(s, store, action), "log")?;
+        }
+    }
+    let [began, merged_log, stopped] = &logs;
+    let mut rows = vec![];
+    for unit in &units {
+        rows.push(indicator(s, store, unit, [began, merged_log, stopped])?);
+    }
+    let numbers = |m: &str| {
+        rows.iter()
+            .filter_map(|r| r[m].as_u64())
+            .collect::<Vec<_>>()
+    };
+    let verdicts: Vec<&Value> = rows
+        .iter()
+        .map(|r| &r["first_verdict"])
+        .filter(|v| v.is_string())
+        .collect();
+    let share = (!verdicts.is_empty()).then(|| {
+        let accepted = verdicts.iter().filter(|v| **v == "accept").count();
+        (accepted as f64 / verdicts.len() as f64 * 1000.0).round() / 1000.0
+    });
+    let summary = json!({"count": rows.len(), "median_minutes": median(numbers("minutes")),
+        "median_rounds": median(numbers("rounds")), "median_repairs": median(numbers("repairs")),
+        "first_accept_share": share});
+    Ok(json!({"at": utc(now), "units": rows, "summary": summary}))
 }
 
 /// One reading of the wait: the store's clock, the intent's units by key, the keys of the open `act` or
@@ -1000,9 +1151,64 @@ fn labelled(v: &Value, depth: usize, out: &mut String) {
         }
     }
 }
+/// One line a row of the indicators and a last line of the summary, a null member `-`.
+fn indicators_text(v: &Value) -> String {
+    let g = |x: &Value| match x {
+        Value::Null => "-".to_owned(),
+        Value::String(t) => one(t),
+        other => other.to_string(),
+    };
+    let mut out = String::new();
+    for r in v["units"].as_array().into_iter().flatten() {
+        let who = &r["implementer"];
+        let who = match who.is_object() {
+            true => ["runtime", "model", "effort"].map(|m| g(&who[m])).join("/"),
+            false => "-".to_owned(),
+        };
+        let stops = match r["stops"].as_array() {
+            Some(s) if s.is_empty() => "none".to_owned(),
+            Some(s) => s.iter().map(&g).collect::<Vec<_>>().join(","),
+            None => "-".to_owned(),
+        };
+        let tokens: Vec<String> = (r["tokens"].as_object().into_iter().flatten())
+            .map(|(role, t)| {
+                let n = ["input", "cache_read", "cache_write", "output"].map(|m| g(&t[m]));
+                format!("{}:{}", one(role), n.join("/"))
+            })
+            .collect();
+        let tokens = if tokens.is_empty() {
+            "-".to_owned()
+        } else {
+            tokens.join(",")
+        };
+        let cut = if r["log_cut"] == true { " log_cut" } else { "" };
+        out += &format!(
+            "{} {} {} {who} {} {} {} {} {} {} {stops} {tokens}{cut}\n",
+            g(&r["unit"]),
+            g(&r["intent"]),
+            g(&r["class"]),
+            g(&r["started_at"]),
+            g(&r["merged_at"]),
+            g(&r["minutes"]),
+            g(&r["rounds"]),
+            g(&r["repairs"]),
+            g(&r["first_verdict"]),
+        );
+    }
+    let m = &v["summary"];
+    out + &format!(
+        "summary {} units median minutes {} rounds {} repairs {} first accepted {}\n",
+        g(&m["count"]),
+        g(&m["median_minutes"]),
+        g(&m["median_rounds"]),
+        g(&m["median_repairs"]),
+        g(&m["first_accept_share"]),
+    )
+}
 /// The plain lines of an answer.
 pub fn text_of(call: &Call, v: &Value) -> String {
     match call {
+        Call::Indicators(_) => indicators_text(v),
         Call::Overview => overview_text(v),
         Call::Wait(..) => format!("{v}\n"),
         Call::Key(_) => {
@@ -1017,11 +1223,14 @@ pub fn text_of(call: &Call, v: &Value) -> String {
                     .as_str()
                     .map(|o| format!("{o}."))
                     .unwrap_or_default();
+                let said = match text(&m["text"]) {
+                    "" => "(no description)".to_owned(),
+                    t => one(t),
+                };
                 out.push_str(&format!(
-                    "{} {of}{}: {}\n",
+                    "{} {of}{}: {said}\n",
                     text(&m["kind"]),
                     text(&m["name"]),
-                    one(text(&m["text"]))
                 ));
             }
             match v["more"].as_u64() {

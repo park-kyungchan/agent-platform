@@ -148,6 +148,9 @@ fn stage_request(r: &Value, which: &str, prompt: &str) -> Value {
     });
     if which == "verifier" {
         req["expect"] = json!({"first_line": "Verdict: *"});
+    } else {
+        // An author stage commits under its own name, as in `ap unit run` (`specs/ap/run-object.md` R5).
+        req["git_author"] = json!(true);
     }
     // Only a stage on Claude Code has a default mode: a stage on another runtime states its own or is refused.
     let claude = matches!(req["runtime"].as_str(), None | Some("claude"));
@@ -485,6 +488,27 @@ fn git(s: &mut impl System, dir: &str, words: &[&str]) -> Result<String, Stop> {
 fn ok(s: &mut impl System, dir: &str, words: &[&str]) -> bool {
     review::git(s, dir, words).is_ok()
 }
+/// `git fetch origin main` in the clone; one that failed because another fetch held a ref's lock is
+/// tried once more after one second.
+fn fetch_main(s: &mut impl System, clone: &str) -> bool {
+    let words = args(&[
+        "--no-replace-objects",
+        "-C",
+        clone,
+        "fetch",
+        "origin",
+        "main",
+    ]);
+    let mut fetched = s.call("git", &words, &Value::Null, 30_000);
+    if fetched
+        .as_ref()
+        .is_ok_and(|r| !r.success && drive::racing(&r.bytes))
+    {
+        s.pause(Duration::from_secs(1));
+        fetched = s.call("git", &words, &Value::Null, 30_000);
+    }
+    fetched.is_ok_and(|r| r.success)
+}
 /// The worktree is clean and its `HEAD` is the head the gate passed.
 fn at_head(s: &mut impl System, worktree: &str, head: &str) -> Result<(), Stop> {
     let porcelain = ["status", "--porcelain", "--untracked-files=normal"];
@@ -646,11 +670,137 @@ fn create(path: &str, bytes: &[u8]) -> Result<(), Stop> {
 }
 fn gh(s: &mut impl System, words: &[&str]) -> Result<Value, Stop> {
     let reply = s.call("gh", &args(words), &Value::Null, 60_000);
+    // A call that ran and failed keeps its reply, redacted, in the stop's detail.
+    if let Some(r) = reply.as_ref().ok().filter(|r| !r.success) {
+        return Err(stop(
+            "github_unreadable",
+            json!({"reply": redact(&r.bytes)}),
+        ));
+    }
     let value = reply
         .ok()
-        .filter(|r| r.success)
         .and_then(|r| serde_json::from_slice(&r.stdout).ok());
     value.ok_or_else(|| stop("github_unreadable", Value::Null))
+}
+
+/// One `gh pr merge`: `Err` with its redacted reply when it failed (null when no reply came).
+fn merge_call(s: &mut impl System, merge: &[String]) -> Result<(), Value> {
+    match s.call("gh", merge, &Value::Null, 120_000) {
+        Ok(r) if r.success => Ok(()),
+        Ok(r) => Err(json!(redact(&r.bytes))),
+        Err(_) => Err(Value::Null),
+    }
+}
+/// The detail of a stop on a failed `gh` call: `{"reply"}` with its redacted reply, or null when
+/// no reply came (the program did not run or did not end).
+fn said(f: &Failure) -> Value {
+    match f.detail.as_str() {
+        Some(reply) => json!({ "reply": reply }),
+        None => Value::Null,
+    }
+}
+/// The most bytes of a `gh` reply that a detail keeps: its end, where `gh` says why.
+const REPLY: usize = 200;
+/// What replaces a credential in a reply.
+const REDACTED: &str = "<redacted>";
+/// The text of a failed `gh` call as a detail may hold it: every token, password of a URL, `…TOKEN=`
+/// value and value after `token` or `Bearer` replaced by `<redacted>`, then its last 200 bytes cut
+/// at a character boundary. The one redaction of every `gh` reply that reaches a detail.
+pub(crate) fn redact(bytes: &[u8]) -> String {
+    let mut t = String::from_utf8_lossy(bytes).into_owned();
+    for find in [
+        gh_token,
+        github_pat,
+        url_password,
+        token_variable,
+        token_value,
+    ] {
+        t = replaced(&t, find);
+    }
+    let mut from = t.len().saturating_sub(REPLY);
+    while !t.is_char_boundary(from) {
+        from += 1;
+    }
+    t[from..].to_owned()
+}
+/// A matcher of the redaction: at byte `i`, the start and the end of the part a match replaces.
+type Matcher = fn(&[u8], usize) -> Option<(usize, usize)>;
+/// One pass of `find` over `t`: at each character, `find(bytes, i)` gives the start and the end of
+/// the part a match starting at `i` replaces, the text before that start kept.
+fn replaced(t: &str, find: Matcher) -> String {
+    let b = t.as_bytes();
+    let (mut out, mut i) = (String::with_capacity(t.len()), 0);
+    while i < b.len() {
+        if let Some((from, to)) = find(b, i) {
+            out.push_str(&t[i..from]);
+            out.push_str(REDACTED);
+            i = to;
+            continue;
+        }
+        let next = (i + 1..=b.len())
+            .find(|j| t.is_char_boundary(*j))
+            .unwrap_or(b.len());
+        out.push_str(&t[i..next]);
+        i = next;
+    }
+    out
+}
+/// `[[:space:]]` of a POSIX class: no part of a character of more than one byte.
+fn space(c: u8) -> bool {
+    b" \t\n\x0b\x0c\r".contains(&c)
+}
+/// The end of the run from `i` of bytes that `keep` takes.
+fn run_of(b: &[u8], i: usize, keep: impl Fn(u8) -> bool) -> usize {
+    (i..b.len()).find(|j| !keep(b[*j])).unwrap_or(b.len())
+}
+/// The end of a run of at least one byte that `keep` takes, from `i`.
+fn some(b: &[u8], i: usize, keep: impl Fn(u8) -> bool) -> Option<usize> {
+    Some(run_of(b, i, keep)).filter(|end| *end > i)
+}
+/// `gh[opsur]_[A-Za-z0-9]+`.
+fn gh_token(b: &[u8], i: usize) -> Option<(usize, usize)> {
+    let r = b.get(i..)?;
+    let head = r.starts_with(b"gh") && r.get(2).is_some_and(|c| b"opsur".contains(c));
+    let end = some(b, i + 4, |c| c.is_ascii_alphanumeric())
+        .filter(|_| head && r.get(3) == Some(&b'_'))?;
+    Some((i, end))
+}
+/// `github_pat_[A-Za-z0-9_]+`.
+fn github_pat(b: &[u8], i: usize) -> Option<(usize, usize)> {
+    const P: &[u8] = b"github_pat_";
+    let at = b.get(i..)?.starts_with(P).then_some(i + P.len())?;
+    let end = some(b, at, |c| c.is_ascii_alphanumeric() || c == b'_')?;
+    Some((i, end))
+}
+/// `https?://[^:/@[:space:]]+:[^@[:space:]]+@`: a URL that carries a user and a password.
+fn url_password(b: &[u8], i: usize) -> Option<(usize, usize)> {
+    let r = b.get(i..)?;
+    let at = match () {
+        _ if r.starts_with(b"https://") => i + 8,
+        _ if r.starts_with(b"http://") => i + 7,
+        _ => return None,
+    };
+    let user = some(b, at, |c| !space(c) && !b":/@".contains(&c))?;
+    let pass = some(b, user + 1, |c| !space(c) && c != b'@').filter(|_| b[user] == b':')?;
+    (b.get(pass) == Some(&b'@')).then_some((i, pass + 1))
+}
+/// `[A-Z_]*TOKEN=[^[:space:]]+`: `GH_TOKEN=…`, `GITHUB_TOKEN=…`.
+fn token_variable(b: &[u8], i: usize) -> Option<(usize, usize)> {
+    let name = run_of(b, i, |c| c.is_ascii_uppercase() || c == b'_');
+    let named = name >= i + 5 && &b[name - 5..name] == b"TOKEN" && b.get(name) == Some(&b'=');
+    let end = some(b, name + 1, |c| !space(c)).filter(|_| named)?;
+    Some((i, end))
+}
+/// The run of non-space characters after `token` or `Bearer` (any case) and a run of spaces, `:`,
+/// `=` or `"`: `Authorization: Bearer …`, `"token": "…"`; the word and the run before it stay.
+fn token_value(b: &[u8], i: usize) -> Option<(usize, usize)> {
+    let r = b.get(i..)?;
+    let word = ["token", "bearer"]
+        .iter()
+        .find(|w| r.len() >= w.len() && r[..w.len()].eq_ignore_ascii_case(w.as_bytes()))?;
+    let value = some(b, i + word.len(), |c| b" :=\"".contains(&c))?;
+    let end = some(b, value, |c| !space(c))?;
+    Some((value, end))
 }
 
 /// The closed review of kind `packet` that accepted this head of this repository for this task by
@@ -690,7 +840,7 @@ fn steps(
         }
     } else {
         u.step("worktree", |u| {
-            ensure!(ok(s, clone, &["fetch", "origin", "main"]) => "fetch_failed");
+            ensure!(fetch_main(s, clone) => "fetch_failed");
             let mut add = w("worktree add --track -b");
             add.extend([branch, wt, "origin/main"]);
             let base = git(s, clone, &add).and_then(|_| git(s, wt, &["rev-parse", "HEAD"]));
@@ -775,7 +925,7 @@ fn steps(
             // No executable: the block's checks, by the code of `ap accept`; the step's own
             // conditions and the step `write_set` hold the clean tree and the write set.
             at_head(s, wt, &head)?;
-            ensure!(ok(s, clone, &["fetch", "origin", "main"]) => "fetch_failed");
+            ensure!(fetch_main(s, clone) => "fetch_failed");
             u.rec["files"]["acceptance_output"] = json!(log);
             let checks = a.1.ok_or_else(|| stop("acceptance_failed", Value::Null))?;
             let change = page::change(s, wt)?;
@@ -795,7 +945,7 @@ fn steps(
     })?;
     u.step("write_set", |u| {
         // The rulesets require an up-to-date branch: one behind `main` would not merge.
-        ensure!(ok(s, clone, &["fetch", "origin", "main"]) => "fetch_failed");
+        ensure!(fetch_main(s, clone) => "fetch_failed");
         let base = git(s, wt, &["rev-parse", "origin/main"])?;
         let ancestor = ok(s, wt, &["merge-base", "--is-ancestor", &base, &head]);
         ensure!(ancestor => "behind_main", json!(base));
@@ -883,8 +1033,8 @@ fn steps(
         return Ok("accepted");
     }
     u.step("status", |u| {
-        let p = review::pr(s, repo, &json!(number))
-            .map_err(|_| stop("github_unreadable", Value::Null))?;
+        let p =
+            review::pr(s, repo, &json!(number)).map_err(|f| stop("github_unreadable", said(&f)))?;
         let open =
             p["state"] == "OPEN" && p["baseRefName"] == "main" && p["headRefOid"] == head.as_str();
         ensure!(open => "head_differs", json!({"head": p["headRefOid"], "state": p["state"]}));
@@ -892,7 +1042,7 @@ fn steps(
         resolve(s, u)?;
         let target = json!({"repository": repo, "head": head});
         let posted = review::post(s, &target, "success", &format!("review {key} accept"));
-        posted.map_err(|_| stop("status_failed", Value::Null))?;
+        posted.map_err(|f| stop("status_failed", said(&f)))?;
         Ok(Value::Null)
     })?;
     u.step("merge", |u| {
@@ -905,20 +1055,33 @@ fn steps(
         let n = number.to_string();
         let merge = format!("pr merge {n} --repo {repo} --merge --match-head-commit {head}");
         let merge = args(&w(&merge));
-        let called = s
-            .call("gh", &merge, &Value::Null, 120_000)
-            .is_ok_and(|r| r.success);
+        let mut called = merge_call(s, &merge);
         // The read decides, also after a call that failed: it may have merged.
         let view = format!("pr view {n} --repo {repo} --json state,mergeCommit,headRefOid");
-        let p = gh(s, &w(&view)).unwrap_or(Value::Null);
+        let mut p = gh(s, &w(&view)).unwrap_or(Value::Null);
+        // A merge refused for a status GitHub had not yet taken: once more, when the head's
+        // `lead-review` reads `success`, after a pause.
+        let open = p["state"].is_string() && p["state"] != "MERGED";
+        if called.is_err()
+            && open
+            && review::lead_review(s, repo, &head).as_deref() == Some("success")
+        {
+            s.pause(Duration::from_secs(5));
+            called = merge_call(s, &merge);
+            p = gh(s, &w(&view)).unwrap_or(Value::Null);
+        }
         let commit = p["mergeCommit"]["oid"].as_str().filter(|c| c.len() == 40);
         let merged = commit.is_some() && p["state"] == "MERGED" && p["headRefOid"] == head.as_str();
-        let cause = if called {
-            "merge_unconfirmed"
-        } else {
-            "merge_failed"
+        let (cause, reply) = match &called {
+            Ok(()) => ("merge_unconfirmed", None),
+            Err(reply) => ("merge_failed", Some(reply.clone())),
         };
-        ensure!(merged => cause, json!({"state": p["state"]}));
+        let mut detail = json!({"state": p["state"]});
+        if let Some(reply) = reply {
+            detail["reply"] = reply;
+        }
+        ensure!(merged => cause, detail);
+        let called = called.is_ok();
         u.rec["merge_commit"] = json!(commit);
         Ok(json!({"call": called}))
     })?;
@@ -927,7 +1090,7 @@ fn steps(
         crate::backlog::close(s, r, &mut u.rec["item"], &review);
     }
     u.begin("cleanup");
-    let fetched = ok(s, clone, &["fetch", "origin", "main"]);
+    let fetched = fetch_main(s, clone);
     let removed = ok(s, clone, &["worktree", "remove", wt]);
     let deleted = removed && ok(s, clone, &["branch", "-d", branch]);
     let kept = if removed { "failed" } else { "kept" };
@@ -1194,4 +1357,50 @@ pub fn cli(argv: &[OsString]) -> ExitCode {
     } else {
         4
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::redact;
+
+    /// Every pattern of the redaction, each replaced whole (or, after `token` and `Bearer`, its
+    /// value), and the cut to the last 200 bytes at a character boundary.
+    #[test]
+    fn a_gh_reply_is_redacted_then_cut() {
+        for (said, want) in [
+            ("bad ghp_Ab12 end", "bad <redacted> end"),
+            (
+                "x gho_a ghs_b ghu_c ghr_d",
+                "x <redacted> <redacted> <redacted> <redacted>",
+            ),
+            ("ghx_a gh_b", "ghx_a gh_b"),
+            ("p=github_pat_11AB_cd!", "p=<redacted>!"),
+            ("at https://me:pw@github.com/x", "at <redacted>github.com/x"),
+            ("http://me:p:w@h", "<redacted>h"),
+            (
+                "https://github.com/x and a@b",
+                "https://github.com/x and a@b",
+            ),
+            ("GH_TOKEN=abc next", "<redacted> next"),
+            ("aGITHUB_TOKEN=abc", "a<redacted>"),
+            ("TOKEN= x", "TOKEN= <redacted>"),
+            (
+                "Authorization: Bearer abc.def x",
+                "Authorization: Bearer <redacted> x",
+            ),
+            ("{\"token\": \"abc\"}", "{\"token\": \"<redacted>"),
+            ("Token=abc", "Token=<redacted>"),
+            ("tokens are fine", "tokens are fine"),
+            ("no secret here", "no secret here"),
+        ] {
+            assert_eq!(redact(said.as_bytes()), want, "{said}");
+        }
+        let long = format!("{}{}", "é".repeat(150), "x");
+        let cut = redact(long.as_bytes());
+        assert!(
+            cut.len() <= 200 && cut.len() >= 199 && cut.ends_with("éx"),
+            "{cut}"
+        );
+        assert_eq!(redact(b"\xff ok"), "\u{fffd} ok");
+    }
 }

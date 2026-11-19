@@ -15,6 +15,11 @@ Purpose: one file of the host states which models a stage may run on and which C
 - R9: A resumed call applies the same account rule to the account its record names.
 - R10: The policy step is the last check of admission: its refusals come after every refusal `ap run` had without a policy (the request's own members and the checks of the host's state, which only read) and before any effect, so nothing is claimed, launched or written before one.
 - R11: The record `<out>.run.json` holds `policy`, `{"path", "sha256"}` of the file as read, or null when no file was read; the fallback record of a call whose files cannot be opened has no `policy` (it keeps its three members).
+- R12: `ap policy check [<file>]` reads `<file>`, else the path of R1, once, and runs over those bytes every reader `ap` has of the policy file, the functions the verbs call, in this order and stopping at the first refusal: `models` (the stage admission's `models` and `accounts`), `quota` (`ap quota`'s), `units` (`ap unit run`'s), `reviews` (`ap unit review`'s), `repositories` (the clone of `ap unit ready` and `ap unit run`, on each key of `repositories` in the order of the parsed object; an absent member passes, a member that is not an object is refused as the clone's reader refuses it, and an entry without `clone` is `repository_not_mapped`, field `repository`) and `work` (`ap work`'s).
+- R13: When every reader passes, the check exits 0 and prints on stdout `{"status":"ok","path":<the path read>,"sha256":<the digest of the bytes checked>,"readers":["models","quota","units","reviews","repositories","work"]}`.
+- R14: A refusal of a reader exits 2 and prints on stderr `{"error":{"code":<the reader's own code>,"field":<its field>,"detail":<its detail>,"reader":<the reader's name>}}`: the code, field and detail the verb of that reader gives for the same file. A file that is unreadable, not JSON, not one JSON object or too large is the refusal of `models`; a call with another form is `usage`, field `args`, `reader` null, exit 2.
+- R15: An absent file is refused `policy_absent`, field `policy`, `detail` null and `reader` null, exit 2.
+- R16: The check writes nothing, starts nothing, applies no store action and calls no network: the readers get the one read of the file and no program call.
 
 ## Interface
 
@@ -38,4 +43,5 @@ The record's `policy` is `{"path", "sha256"}` of the file as `ap run` read it, s
 - No member of the file beyond `models` and `accounts` is read by `ap run` (`quota` is read by `ap quota` and `ap work` alone, `work` by `ap work` alone): the scheduler's numbers and every later member come with their own units.
 - No check of the model that served: the record's `served_by` is as it was.
 - No change to `ap unit`, to `units.json` or to the composition: a unit's stages meet the policy through `ap run`.
+- `ap policy check` does not run the checks of `ap unit run` that depend on a unit (the account key of a tier, `account_not_mapped`; the required `reviews.task`): they are not properties of the file alone.
 - No installation of the policy file and no default policy: without a file the host allows what `ap run` allowed before.
