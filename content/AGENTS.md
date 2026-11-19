@@ -65,6 +65,6 @@ Everything except a message to the user is in English, by every agent, down to a
 - `/home/palantirkc/platforms/<repo>/`: the platform repositories and the module repositories (`<platform>-<module>`); a file there is read at `origin/main` (`git -C /home/palantirkc/platforms/<repo> show origin/main:<path>`) or in a task's worktree, never from the checkout's files.
 - `/home/palantirkc/work/<scope>-<topic>/`: a task's directory, its worktrees in `wt/<repo>/`; read its `STATE.md`, where one exists, before any effect.
 - `/home/palantirkc/external/`: pinned external source.
-- `/root/.agents/`: these instructions as installed; the skills in `skills/`, each of which says in its first lines when to read it; the tools' official indexes in `OFFICIAL-INDEXES.md`.
+- `/root/.agents/`: these instructions as installed; the skills in `skills/`, each of which says in its first lines when to read it.
 - The store: `ap status` and `ont`.
-- `/home/palantirkc/external/reference-docs/`: the corpus of design sources; read only the lines a row of its `ROUTES.md` names.
+- `/home/palantirkc/external/reference-docs/`: the corpus of design sources and the vendors' documentation indexes; read only the lines a row of its `ROUTES.md` names, and a vendor's tool from its installed `--help` first.

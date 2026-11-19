@@ -62,7 +62,7 @@ It does not rest on the model: `add_unit` in the lane `objective` without an int
 | --- | --- | --- |
 | 하네스, Harness Engineering | The shared instructions, pointer files and how sessions load them | Not the retired repository of a similar name |
 | 지침, 인스트럭션 | The shared instructions; sometimes a skill or a page | Which file |
-| 런타임 레퍼런스, runtime-reference | The retired references; a tool's behaviour: its `--help`, then `/root/.agents/OFFICIAL-INDEXES.md` | — |
+| 런타임 레퍼런스, runtime-reference | The retired references; a tool's behaviour: its `--help`, then the indexes in the corpus's `ROUTES.md` | — |
 | 스킬 | A skill under `/root/.agents/skills/`, or one a single CLI installed | A misspelled name means the nearest one |
 | 메모리 | STATE and its files ("단기"), long-term memory ("중장기"), or private memory ("CLI의 메모리") | Which of the three |
 | 하인드사이트, HindSight | The long-term memory server and its MCP tools | — |

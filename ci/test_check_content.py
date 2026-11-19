@@ -21,7 +21,7 @@ READ_BY_THE_CHECK = (
     "crates/ap/src/main.rs",
     "ci/check-content.py",
 )
-TARGET = "OFFICIAL-INDEXES.md"
+TARGET = "skills/herdr/references/native-control.md"
 
 
 def run_check(root, host=None):
@@ -226,7 +226,7 @@ class Paths(Scratch, unittest.TestCase):
 
     def test_an_installed_path_to_no_file_fails(self):
         root = self.fixture()
-        self.append(root, "Read `/root/.agents/OFFICIAL-INDEXES.md` and `/root/.agents/skills/lead/SKILL.md`.")
+        self.append(root, "Read `/root/.agents/skills/lead/SKILL.md`.")
         code, out = run_check(root)
         self.assertEqual(code, 0, out)
         self.append(root, "Read `/root/.agents/skills/lead/references/gone.md`.")

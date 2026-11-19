@@ -1,7 +1,7 @@
 # Public runtime guidance content
 
-Reviewed distribution source for canonical `AGENTS.md`, the tools' official indexes
-`OFFICIAL-INDEXES.md` and the generic `herdr`, `lead` and `report` skill bundles. Repository source is edited through review and then installed on the host.
+Reviewed distribution source for canonical `AGENTS.md` and the generic `herdr`,
+`lead` and `report` skill bundles. Repository source is edited through review and then installed on the host.
 This README is repository documentation, not an owned host entry.
 
 Generic Academy routing belongs to education-platform; private teaching/reporting
@@ -22,7 +22,7 @@ update. Neither source acceptance nor a merged commit proves host
 synchronization, native discovery or execution.
 The task owner separately authorizes and verifies any host installation.
 
-The owned files are `AGENTS.md`, `OFFICIAL-INDEXES.md` and the three generic
+The owned files are `AGENTS.md` and the three generic
 skill bundles (the Lead's one skill is `lead`). Each skill says in its first lines
 when it is read. Changing values
 (model names, efforts, versions, token windows, counts, dates of approvals) stay

@@ -45,8 +45,8 @@ swap() { local stage=$1 p; shift
   done; }
 # runtime-references is a retired owned path: content no longer names it, but a previous install's .content-paths
 # and its kept copy do, so the install that removes it and the rollback that restores it both pass.
-owned_ok() { case "$1" in *..*|skills/|skills/*/*) return 1 ;; AGENTS.md|OFFICIAL-INDEXES.md|runtime-references|skills/*) return 0 ;; esac; return 1; }
-paths_of() { # <SHA256SUMS> -> the top paths it owns: AGENTS.md, OFFICIAL-INDEXES.md, skills/<name>
+owned_ok() { case "$1" in *..*|skills/|skills/*/*) return 1 ;; AGENTS.md|runtime-references|skills/*) return 0 ;; esac; return 1; }
+paths_of() { # <SHA256SUMS> -> the top paths it owns: AGENTS.md, skills/<name>
   cut -c67- "$1" | awk -F/ '$1=="skills"{print "skills/"$2; next} {print $1}' | sort -u; }
 # The checks of a rollback that do not read the target (rollback-check runs these and nothing else); it sets paths.
 kept_copy_ok() { local p tarball=$1 checksum
@@ -57,7 +57,7 @@ kept_copy_ok() { local p tarball=$1 checksum
   [ "${#checksum_lines[@]}" -eq 1 ] && [[ "$checksum" =~ ^[[:xdigit:]]{64}\ [\ \*] ]] &&
     [ "${checksum:66}" = "$(basename -- "$tarball")" ] || refuse "the checksum file names another file than the tarball"
   (cd "$(dirname -- "$tarball")" && sha256sum -c --quiet "$(basename -- "$tarball").sha256") || refuse "the tarball does not match its checksum"
-  if tar -tf "$tarball" | grep -Ev '^(AGENTS\.md|OFFICIAL-INDEXES\.md|runtime-references(/.*)?|skills/[A-Za-z0-9_-]+(/.*)?)$' | grep -q .; then refuse "the tarball lists a path that is not the installer's"; fi
+  if tar -tf "$tarball" | grep -Ev '^(AGENTS\.md|runtime-references(/.*)?|skills/[A-Za-z0-9_-]+(/.*)?)$' | grep -q .; then refuse "the tarball lists a path that is not the installer's"; fi
   mapfile -t paths < "$tarball.paths"
   for p in "${paths[@]}"; do owned_ok "$p" || refuse "unexpected path in .paths: $p"; done; }
 case "${1:-}" in

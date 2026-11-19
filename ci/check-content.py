@@ -80,7 +80,7 @@ for name, text in texts.items():
         for m in rx.finditer(always):
             fail("changing_value_in_always_loaded_text", name, f"{kind} '{m.group(0)}'")
     # Every route must lead to a file: installed paths and relative links.
-    for m in re.finditer(re.escape(INSTALLED) + r"(skills/[\w./-]*\w|OFFICIAL-INDEXES\.md)", text):
+    for m in re.finditer(re.escape(INSTALLED) + r"(skills/[\w./-]*\w)", text):
         target = m.group(1)
         if not (ROOT / target).exists():
             fail("route_to_missing_file", name, f"{INSTALLED}{target}")
