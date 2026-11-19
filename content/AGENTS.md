@@ -51,7 +51,7 @@ When a request asks for the output of a later stage while the record of an earli
 
 ## 6. The user's standing limits
 
-- The Academy: no `edu-*` directory and no `education-platform` path is opened without the Academy's own task.
+- The Academy: no `edu-*` directory and no path under `education-platform`'s `context/`, `apps/`, `modules/` or `migration/` is opened without the Academy's own task, unless the user lifted this for a task and its STATE says so.
 - Private data: metadata and hashes only, unless the user authorizes more.
 - Models: only those the policy file `/etc/agent-platform/policy.json` allows.
 - Long-term memory (Hindsight) is off until it is rebuilt: call no memory tool. A memory hook's output is a past record, checked against current source.
@@ -62,9 +62,9 @@ Everything except a message to the user is in English, by every agent, down to a
 
 ## 8. Where things are
 
-- `/home/palantirkc/platforms/<repo>/`: the platform and module repositories; a file there is read at `origin/main` (`git -C /home/palantirkc/platforms/<repo> show origin/main:<path>`) or in a task's worktree, never from the checkout's files.
+- `/home/palantirkc/platforms/<repo>/`: the platform repositories and the module repositories (`<platform>-<module>`); a file there is read at `origin/main` (`git -C /home/palantirkc/platforms/<repo> show origin/main:<path>`) or in a task's worktree, never from the checkout's files.
 - `/home/palantirkc/work/<scope>-<topic>/`: a task's directory, its worktrees in `wt/<repo>/`; read its `STATE.md`, where one exists, before any effect.
 - `/home/palantirkc/external/`: pinned external source.
-- `/root/.agents/`: these instructions as installed; the skills in `skills/` and the references in `runtime-references/`, each of which says in its first lines when to read it.
+- `/root/.agents/`: these instructions as installed; the skills in `skills/`, each of which says in its first lines when to read it; the tools' official indexes in `OFFICIAL-INDEXES.md`.
 - The store: `ap status` and `ont`.
-- `/home/palantirkc/external/reference-docs/`: the corpus of design sources; read only the lines a row of `/root/.agents/runtime-references/OFFICIAL-DOCS.md` section 4 names.
+- `/home/palantirkc/external/reference-docs/`: the corpus of design sources; read only the lines a row of its `ROUTES.md` names.

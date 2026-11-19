@@ -53,7 +53,7 @@ Implementer: claude, sonnet, high. Verifier: claude, opus, xhigh. Estimate: 60 l
 - Code with a real effect, authoritative state and the commands every CLI calls are typed Rust; a probe, a browser driver and glue stay in the language that explores fastest until their shape is settled. Nothing is ported tool by tool: a replacement ships to its users and deletes what it replaces in the same change.
 - Tiers: the verifier is never below the implementer; name the model on every start, and the effort where the CLI has a flag; a subagent of your own session is started with an explicit model. Count the working sessions against STATE's limit before each start, and wait on a stage in a background command of your session with a timeout. A page under the bar keeps a lower tier: Sonnet, or Haiku for mechanical work. The cost of a route and the implementer's tier: `evals/readout.py` of `agent-platform`, run from a checkout at `origin/main`.
 - The user's rule on a large page: a page is large at an estimate of 500 changed lines outside tests, or 2,000 removed (estimates run low). Its implementer is Opus at effort high for Rust a verb runs with a real effect, the store's schema, a contract other code builds on, or delivery; it is `muse-wonder-1.0` for content, maps, specifications, removals and plain code. Its bound is four hours (`timeout_seconds` 14400). The verifier is never below it.
-- The reviewer of plans and of `contract` and `effect` pages is Fable at effort xhigh; when Fable's limit is reached, Opus at xhigh.
+- The reviewer of plans and of `contract` and `effect` pages runs on the model the policy file's `reviews.models` names: read the current one there, never from this page.
 
 ## 5. The allowed models
 
@@ -61,7 +61,7 @@ The host's policy file (member `models`) is the authority: `ap run` refuses any 
 
 | CLI | Model | What it is for |
 | --- | --- | --- |
-| Claude Code | Fable | Design and plan work, and the review of plans and of `contract` and `effect` pages |
+| Claude Code | Fable | Design and plan work |
 | Claude Code | Opus | The Lead; verifiers; implementers of large pages with a real effect, a schema, a contract or delivery |
 | Claude Code | Sonnet | Implementers of pages under the bar: plain code, small contracts |
 | Claude Code | Haiku | Mechanical work; a weak reader in the suites |

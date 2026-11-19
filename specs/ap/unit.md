@@ -72,3 +72,4 @@ A refusal of the store passes on the store's code, such as `intent_required`, `i
 
 - No review of a page or a plan (`ap unit review`), no run of a unit, no approval, no map file: `page` reads a `map.json` when the commit has one.
 - No removal of the present forms of `ap unit`; no change of the schema.
+- Around a unit's pull request, `ap` reads no GitHub review thread and removes no worktree: a reader of the threads reads every page of them, and only the Lead resolves one; after the merge the owner of a worktree removes its own, without force, and then its branch.

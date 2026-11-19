@@ -101,9 +101,9 @@ four runtimes inject or retain identically. Tagged models can miss shared
 untagged observations, so platform scope requires actual readback, not just a
 tag name. No retention or refresh operation is performed here. [G3][H1][H2]
 
-Current [Context Governance](../content/runtime-references/CONTEXT-GOVERNANCE.md)
-owns isolation/continuity and source authority. Task handoffs include the Strategy
-link and KPI/guardrail fields from [lead](../content/skills/lead/SKILL.md).
+The [herdr](../content/skills/herdr/SKILL.md) skill owns isolation/continuity of a pane
+handoff, and [the always-loaded file's specification](../specs/content/agents-file.md)
+owns source authority. Task handoffs follow [lead](../content/skills/lead/SKILL.md).
 Task topology/worktrees win over generic pane examples; assigned Leads use one tab
 per worker. Use the worker closure of [lead](../content/skills/lead/SKILL.md) (section "Your own limits")
 for task-local output/effect reconciliation.
@@ -139,16 +139,16 @@ revision, including system-eval tests 01, 06 and 10. No eval was executed.
 
 [A1]: ../crates/ap/src/main.rs "Current command dispatch"
 [G1]: ../content/AGENTS.md "Canonical runtime core and approved task/layout conventions"
-[G2]: ../content/runtime-references/CONCURRENT-WORK.md "Ownership, handoffs, acceptance and Herdr lifecycle meanings"
-[G3]: ../content/runtime-references/CLI-RUNTIMES.md "Per-CLI files, launch, loading, MCP, hooks and skills"
-[G4]: ../content/runtime-references/OFFICIAL-DOCS.md "Verified official per-runtime documentation routes"
+[G2]: ../content/skills/herdr/SKILL.md "Pane handoffs and Herdr lifecycle meanings"
+[G3]: ../specs/content/agents-file.md "What a session loads, by its CLI's pointer file"
+[G4]: ../content/OFFICIAL-INDEXES.md "The tools' official indexes"
 [H1]: https://github.com/vectorize-io/hindsight/blob/a5a619b5ca59c5c39e0f96be6f7a31fabd136bd5/hindsight-integrations/coding-agents/README.md "Official routing/config lifetime, provenance, retention and observation scopes; installed package 0.8.2"
 [H2]: https://github.com/vectorize-io/hindsight/blob/a5a619b5ca59c5c39e0f96be6f7a31fabd136bd5/hindsight-docs/docs/developer/api/knowledge-pages.mdx "Official model/page filtering and refresh semantics; server documentation 1.1.0"
 [Z1]: /home/palantirkc/work/ws-replan/inputs/final-review-20261102/extracted/rust_migration_reassessment_2026-11-02/PROPOSAL.md "Adopted ZIP proposal sections 4.2, 6 and 9; original ZIP SHA256 964845e260a25350823fb42d38a60e7cba973f8af607e10b505727d3bf78915c"
 
-The host counterparts read for this draft are `/root/.agents/AGENTS.md` and
-`/root/.agents/runtime-references/{CLI-RUNTIMES,CONCURRENT-WORK,OFFICIAL-DOCS}.md`
-(named `RUNTIME-LOADING` and `HERDR-ORCHESTRATION` when this draft was written).
+The host counterparts read for this draft are `/root/.agents/AGENTS.md` and the
+reference files then installed beside it, since removed: their rules in force are in
+`specs/content/agents-file.md`, `specs/ap/run.md`, the skill `herdr` and `content/OFFICIAL-INDEXES.md`.
 Hindsight policy is `/docker/hindsight/HINDSIGHT_OFFICIAL_PER_CALL.md`, with
 `/docker/hindsight/{AGENTS,README}.md` and the installed coding-agents skill.
 Repository-owned copies are reviewed distribution content, not a replacement

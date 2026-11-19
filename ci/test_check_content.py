@@ -1,5 +1,5 @@
 """Tests of ci/check-content.py: the verbs of `ap` and the sections of crates/ap/README.md that content/ names,
-the model names and byte limits, the paths and design routes, and the form of AGENTS.md.
+the model names and byte limits, the retired names and the replaced words, the paths, and the form of AGENTS.md.
 
 Each test copies what the check reads into a scratch directory, changes one file of content/ there
 (and its line of SHA256SUMS, so that only the case under test fails) and runs the copied check.
@@ -21,11 +21,11 @@ READ_BY_THE_CHECK = (
     "crates/ap/src/main.rs",
     "ci/check-content.py",
 )
-TARGET = "runtime-references/NAMING.md"
+TARGET = "OFFICIAL-INDEXES.md"
 
 
-def run_check(root, corpus=None, host=None):
-    env = dict(os.environ, CONTENT_CHECK_CORPUS=str(corpus or (root / "no-corpus")), CONTENT_CHECK_HOST=str(host or (root / "no-host")))
+def run_check(root, host=None):
+    env = dict(os.environ, CONTENT_CHECK_HOST=str(host or (root / "no-host")))
     done = subprocess.run([sys.executable, "-I", "-B", str(root / "ci/check-content.py")], capture_output=True, text=True, timeout=120, env=env)
     return done.returncode, done.stdout
 
@@ -102,6 +102,18 @@ class RetiredNames(Scratch, unittest.TestCase):
                 self.assertEqual(code, 1, out)
                 self.assertIn(f"retired_name@content/{TARGET}:{line}: {name}", out)
 
+    def test_a_dissolved_reference_or_removed_skill_fails(self):
+        names = ("runtime-references", "evals/instructions", "explain-precisely", "herdr-hermes", "CLI-RUNTIMES",
+                 "OFFICIAL-DOCS", "CODEBASE-ORIENTATION", "NAMING.md", "BUILD-AND-DELIVERY", "CONCURRENT-WORK",
+                 "ONTOLOGY-USE", "CONTEXT-GOVERNANCE", "GLOSSARY.md")
+        for name in names:
+            with self.subTest(name=name):
+                root = self.fixture()
+                line = self.append(root, f"Read `{name}` section 2.")
+                code, out = run_check(root)
+                self.assertEqual(code, 1, out)
+                self.assertIn(f"retired_name@content/{TARGET}:{line}: {name}", out)
+
     def test_a_retired_name_in_the_readme_fails(self):
         root = self.fixture()
         readme = root / "content/README.md"
@@ -117,6 +129,26 @@ class RetiredNames(Scratch, unittest.TestCase):
         code, out = run_check(root)
         self.assertEqual(code, 0, out)
         self.assertNotIn("retired_name@", out)
+
+
+class ReplacedWords(Scratch, unittest.TestCase):
+    """A word REPLACED_WORDS lists fails in any file of content/, with the word to write instead."""
+
+    def test_a_replaced_word_fails_and_names_its_term(self):
+        for word, term in (("design doc", "design note"), ("hand-off", "handoff"), ("workstream", "work thread")):
+            with self.subTest(word=word):
+                root = self.fixture()
+                self.append(root, f"Write the {word.upper()} first.")
+                code, out = run_check(root)
+                self.assertEqual(code, 1, out)
+                self.assertIn(f"word_the_glossary_replaces@content/{TARGET}: '{word}': write '{term}'", out)
+
+    def test_a_longer_word_that_holds_one_passes(self):
+        root = self.fixture()
+        self.append(root, "The design-docs directory and the workstreams-x label are other words.")
+        code, out = run_check(root)
+        self.assertEqual(code, 0, out)
+        self.assertNotIn("word_the_glossary_replaces@", out)
 
 
 class ModelNamesAndLimits(Scratch, unittest.TestCase):
@@ -167,24 +199,8 @@ class ModelNamesAndLimits(Scratch, unittest.TestCase):
                 self.assertIn(f"file_over_limit@content/{name}: {limit + 1} bytes, limit {limit}", out)
 
 
-class PathsAndDesignRoutes(Scratch, unittest.TestCase):
-    """An elided path, a path into a main checkout's files, and the line ranges of OFFICIAL-DOCS.md section 4."""
-
-    ROUTES = "runtime-references/OFFICIAL-DOCS.md"
-
-    def add_route(self, root, row):
-        path = root / "content" / self.ROUTES
-        head = path.read_text(encoding="utf-8").split("\n## 4. ", 1)[0]
-        path.write_text(head + "\n## 4. Local copies of the design sources\n\n| Question | Start | Also |\n| --- | --- | --- |\n" + row + "\n", encoding="utf-8")
-        sums = root / "content/SHA256SUMS"
-        digest = hashlib.sha256(path.read_bytes()).hexdigest()
-        sums.write_text("".join(f"{digest}  {self.ROUTES}\n" if l.endswith("  " + self.ROUTES) else l + "\n" for l in sums.read_text().splitlines()))
-
-    def corpus(self, root):
-        corpus = root / "corpus"
-        (corpus / "docs/area").mkdir(parents=True)
-        (corpus / "docs/area/one.md").write_text("".join(f"line {n}\n" for n in range(1, 10)), encoding="utf-8")
-        return corpus
+class Paths(Scratch, unittest.TestCase):
+    """An elided path, a path into a main checkout's files, and an installed path that names no file of content/."""
 
     def test_an_elided_path_fails(self):
         root = self.fixture()
@@ -208,56 +224,16 @@ class PathsAndDesignRoutes(Scratch, unittest.TestCase):
         code, out = run_check(root)
         self.assertEqual(code, 0, out)
 
-    def test_design_routes_inside_their_file_pass(self):
+    def test_an_installed_path_to_no_file_fails(self):
         root = self.fixture()
-        self.add_route(root, "| A question | `docs/area/one.md:2-5` | `:7`; `:1-9` |")
-        code, out = run_check(root, self.corpus(root))
-        self.assertEqual(code, 0, out)
-        self.assertIn("design routes:", out)
-
-    def test_a_design_route_past_its_file_or_to_no_file_fails(self):
-        root = self.fixture()
-        self.add_route(root, "| A question | `docs/area/one.md:2-50` | `docs/area/none.md:1-2` |")
-        code, out = run_check(root, self.corpus(root))
-        self.assertEqual(code, 1, out)
-        self.assertIn("design_route_out_of_range@content/runtime-references/OFFICIAL-DOCS.md: docs/area/one.md:2-50", out)
-        self.assertIn("design_route_missing_file@content/runtime-references/OFFICIAL-DOCS.md: docs/area/none.md", out)
-
-    def test_without_the_corpus_the_routes_are_not_read(self):
-        root = self.fixture()
-        self.add_route(root, "| A question | `docs/area/one.md:2-50` | — |")
+        self.append(root, "Read `/root/.agents/OFFICIAL-INDEXES.md` and `/root/.agents/skills/lead/SKILL.md`.")
         code, out = run_check(root)
         self.assertEqual(code, 0, out)
-        self.assertNotIn("design routes:", out)
-
-    def test_bare_ranges_and_several_ranges_in_a_cell_are_checked(self):
-        root = self.fixture()
-        self.add_route(root, "| A question | `docs/area/one.md:2-5, :7, :8-99` | `:12`; `:1-9` |")
-        code, out = run_check(root, self.corpus(root))
+        self.append(root, "Read `/root/.agents/skills/lead/references/gone.md`.")
+        code, out = run_check(root)
         self.assertEqual(code, 1, out)
-        self.assertIn("design_route_out_of_range@content/runtime-references/OFFICIAL-DOCS.md: docs/area/one.md:8-99", out)
-        self.assertIn("design_route_out_of_range@content/runtime-references/OFFICIAL-DOCS.md: docs/area/one.md:12-12", out)
-        self.assertEqual(out.count("design_route_out_of_range@"), 2, out)
-        self.assertIn("design routes: 5 line ranges checked", out)
+        self.assertIn(f"route_to_missing_file@content/{TARGET}: /root/.agents/skills/lead/references/gone.md", out)
 
-    def test_a_range_with_no_path_before_it_fails(self):
-        root = self.fixture()
-        self.add_route(root, "| A question | `:3-4` | `docs/area/one.md:1-2` |")
-        code, out = run_check(root, self.corpus(root))
-        self.assertEqual(code, 1, out)
-        self.assertIn("design_route_missing_file@content/runtime-references/OFFICIAL-DOCS.md: :3-4 (a range with no path before it)", out)
-
-
-    def test_a_missing_route_section_fails_where_the_corpus_is(self):
-        root = self.fixture()
-        path = root / "content" / self.ROUTES
-        path.write_text(path.read_text(encoding="utf-8").replace("\n## 4. ", "\n## 9. "), encoding="utf-8")
-        sums = root / "content/SHA256SUMS"
-        digest = hashlib.sha256(path.read_bytes()).hexdigest()
-        sums.write_text("".join(f"{digest}  {self.ROUTES}\n" if l.endswith("  " + self.ROUTES) else l + "\n" for l in sums.read_text().splitlines()))
-        code, out = run_check(root, self.corpus(root))
-        self.assertEqual(code, 1, out)
-        self.assertIn("design_routes_section_missing@content/runtime-references/OFFICIAL-DOCS.md", out)
 
 class AgentsFile(Scratch, unittest.TestCase):
     """The always-loaded AGENTS.md (specs/content/agents-file.md): its size, its eight sections, prose, existing paths."""

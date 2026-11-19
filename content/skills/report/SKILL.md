@@ -27,7 +27,7 @@ A progress message's board shows what changed, what is not done or not verified,
 Sample (invented values):
 
 ```text
-pull request 하나와 review 하나에 대한 보고입니다.
+pull request 하나와 review 하나에 대한 보고입니다. 지금 ap status <intent key>로 review 상태를 다시 읽습니다.
 ┌─ 상황판 ──────────────────────────────── 10:30Z ─┐
 │ ✔ 설치 확인      installed = merged (checksum 3개)   │
 │ ▶ unit review    실행 12분째 / 90                    │

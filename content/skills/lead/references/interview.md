@@ -44,11 +44,12 @@ The card, in the form of skill `report`: the outcome, the criteria, what is not 
 The user's example: «학원 앱을 지금 당장 내 세션 데이터만 분석해서 만들어줘» (build the Academy app now, analysing only my session data). The answer names the missing stage (an intent: outcome, first use, what "my session data only" excludes), asks with defaults, and drafts meanwhile:
 
 ```text
-"Academy 앱을 만드는 objective"로 읽었습니다. intent¹가 없어 그 질문을 기본값과 함께 드립니다.
+"Academy 앱을 만드는 objective"로 읽었습니다. 지금 session record 파일 하나에서 그 형식을 읽습니다.
+intent¹가 없어 그 질문을 기본값과 함께 드립니다.
 1. Outcome: 끝나면 무엇이 됩니까? 기본값: 세션 기록의 수업 요약을 앱에서 봄
 2. First use: 누가 어느 수업에 처음 씁니까? 기본값: 사용자, 다음 수업
 3. Edges: "내 세션 데이터만"이 빼는 것은? 기본값: 학생 데이터, 다른 계정
-답이 없어도 세션 기록의 형식을 읽고 기본값으로 draft intent를 씁니다.
+답이 없어도 기본값으로 draft intent를 씁니다.
 ───
 ¹ intent: 끝났을 때 참일 결과와 그 확인 방법의 기록
 ```
@@ -61,7 +62,7 @@ It does not rest on the model: `add_unit` in the lane `objective` without an int
 | --- | --- | --- |
 | 하네스, Harness Engineering | The shared instructions, pointer files and how sessions load them | Not the retired repository of a similar name |
 | 지침, 인스트럭션 | The shared instructions; sometimes a skill or a page | Which file |
-| 런타임 레퍼런스, runtime-reference | `/root/.agents/runtime-references/` (plural) | — |
+| 런타임 레퍼런스, runtime-reference | The retired references; a tool's behaviour: its `--help`, then `/root/.agents/OFFICIAL-INDEXES.md` | — |
 | 스킬 | A skill under `/root/.agents/skills/`, or one a single CLI installed | A misspelled name means the nearest one |
 | 메모리 | STATE and its files ("단기"), long-term memory ("중장기"), or private memory ("CLI의 메모리") | Which of the three |
 | 하인드사이트, HindSight | The long-term memory server and its MCP tools | — |
@@ -73,10 +74,10 @@ It does not rest on the model: `add_unit` in the lane `objective` without an int
 | 워커, 서브에이전트, 에이전트들 | Workers; sometimes every agent, Leads too | — |
 | 새 Lead, 새 세션 | The Lead session that takes the task over next | — |
 | 라우팅 | Which file an agent opens, or which model does which work | `AGENTS.md` section 8, or a unit's tiers |
-| 컨텍스트 거버넌스, Context Governance | Which context each agent loads, from which home, in what order | `CONTEXT-GOVERNANCE.md` |
-| reference-docs, 레퍼런스 문서 | The design sources under `/home/palantirkc/external/reference-docs/` | Only the lines `OFFICIAL-DOCS.md` section 4 names |
+| 컨텍스트 거버넌스, Context Governance | Which context each agent loads, from which home, in what order | `agent-platform` `specs/content/agents-file.md` |
+| reference-docs, 레퍼런스 문서 | The design sources under `/home/palantirkc/external/reference-docs/` | Only the lines a row of its `ROUTES.md` names |
 | 지표, 메트릭, KPI | A number the user wants watched | Write it as a criterion |
-| VPS, 코드베이스 전체 | This host: repositories, task directories, shared instructions | `CODEBASE-ORIENTATION.md` |
+| VPS, 코드베이스 전체 | This host: repositories, task directories, shared instructions | Each repository's `AGENTS.md` and `map.json` |
 | CI | The required checks of a pull request | Which repository |
 | 보드 | The board of the current task | — |
 | 정리, 손봐, 개선 | A request whose target and extent are open | Say first what you change and leave |

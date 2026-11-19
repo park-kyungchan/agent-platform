@@ -59,7 +59,7 @@ Purpose: the pair `ap` and content of this repository on the host is the fetched
 
 ## Interface
 
-`ap deliver < request.json` and `ap deliver check < request.json` (R8 to R10); `ap deliver --help` prints its usage (`specs/ap/verbs.md` R2). The request of R12 to R14 and R1, the record of R35, R46 and R6 (on standard output and in `<state>/last.json`), the exits of R36. The results of a checkout: `forwarded`, `current`, `not_a_checkout`, `not_on_main`, `dirty`, `fetch_failed`, `diverged` and `git_failed`. It replaces the install by hand of `BUILD-AND-DELIVERY.md` section 5. The host's request is `/etc/agent-platform/deliver.json` (`deploy/deliver.json`, `state` `/var/lib/agent-platform/deliver`); the timer, its install and the commands of a repair by hand are in `deploy/README.md`.
+`ap deliver < request.json` and `ap deliver check < request.json` (R8 to R10); `ap deliver --help` prints its usage (`specs/ap/verbs.md` R2). The request of R12 to R14 and R1, the record of R35, R46 and R6 (on standard output and in `<state>/last.json`), the exits of R36. The results of a checkout: `forwarded`, `current`, `not_a_checkout`, `not_on_main`, `dirty`, `fetch_failed`, `diverged` and `git_failed`. It replaces the install of `ap` and of the shared instructions by hand. The host's request is `/etc/agent-platform/deliver.json` (`deploy/deliver.json`, `state` `/var/lib/agent-platform/deliver`); the timer, its install and the commands of a repair by hand are in `deploy/README.md`.
 
 Refusal codes, the complete list, each with the requirement that holds it (exit 2 unless R36 says 3):
 
@@ -116,3 +116,4 @@ With `engine`:
 - A repository-local `core.fsmonitor` can still start a program during the checkouts' `git status` (step 3 of R3): the service inherits root's global Git configuration, and the checkouts' commands set no `core.fsmonitor`.
 - A cut fetch's `git-remote-*` helper can outlive the killed `git`.
 - Delivery never restores the store from a backup and never runs `ont compact`; it repairs no checkout and no pair by hand.
+- Delivery restarts no session: a session started before an install keeps the instructions it loaded, and a session whose MCP server `ont` started before an engine install reconnects that server itself (the old process refuses the new store format). The text is loaded when a session started after the install shows it in its own record.

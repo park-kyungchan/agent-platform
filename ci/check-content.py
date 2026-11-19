@@ -4,12 +4,11 @@
 Fails the build when (1) SHA256SUMS and the files disagree, (2) always-loaded text
 (AGENTS.md, skill frontmatter) carries a value that changes over time, (3) an owned file
 names a model (the Lead's table of the allowed models alone excepted), (4) a file that content/ routes a reader to does not exist, (5) a path
-is elided or points into a main checkout's files, (6) on a host that has the corpus of
-design sources, a line range of OFFICIAL-DOCS.md section 4 falls outside its file, (7) a file names a retired name
+is elided or points into a main checkout's files, (6) a file uses a word REPLACED_WORDS replaces, (7) a file names a retired name
 (RETIRED_NAMES), or (8) AGENTS.md
 breaks its form (specs/content/agents-file.md): over 6,500 bytes, its eight section headings not in
 order, a line over 400 characters or a table row, or, on the host, an absolute path that does not exist.
-Reads the repository, and the corpus and the host's paths when they are present. Run: python3 -I -B ci/check-content.py
+Reads the repository, and the host's paths when they are present. Run: python3 -I -B ci/check-content.py
 """
 import hashlib
 import os
@@ -30,7 +29,17 @@ CHANGING = {
 }
 # Names removed from the repository (skills, files): a file under content/ that still names one is a route to nothing.
 # A later removal adds its names here; the rule stays the one fault `retired_name`.
-RETIRED_NAMES = ["lessons-loop", "hindsight-control", "memory/README.md", "publish-memory", "evaluate-memory"]
+RETIRED_NAMES = ["lessons-loop", "hindsight-control", "memory/README.md", "publish-memory", "evaluate-memory",
+                 "runtime-references", "evals/instructions", "explain-precisely", "herdr-hermes",
+                 "CLI-RUNTIMES", "OFFICIAL-DOCS", "CODEBASE-ORIENTATION", "NAMING.md", "BUILD-AND-DELIVERY",
+                 "CONCURRENT-WORK", "ONTOLOGY-USE", "CONTEXT-GOVERNANCE", "GLOSSARY.md"]
+# One word for one thing: a word on the left fails anywhere under content/; the word on the right is the one to write.
+REPLACED_WORDS = {
+    "dashboard file": "board", "design doc": "design note", "snapshot file": "checkpoint", "workstream": "work thread",
+    "difficulty level": "tier", "routing table": "assignment file", "sign-off": "acceptance", "hand-off": "handoff",
+    "handover": "handoff", "canonical rules": "shared instructions", "global rules": "shared instructions",
+    "loader file": "pointer file", "transcript log": "session record", "personal memory": "private memory",
+}
 errors = []
 
 
@@ -70,8 +79,8 @@ for name, text in texts.items():
     for kind, rx in CHANGING.items():
         for m in rx.finditer(always):
             fail("changing_value_in_always_loaded_text", name, f"{kind} '{m.group(0)}'")
-    # Every route must lead to a file: installed paths, relative links, and bare reference names.
-    for m in re.finditer(re.escape(INSTALLED) + r"((?:runtime-references|skills)/[\w./-]*\w)", text):
+    # Every route must lead to a file: installed paths and relative links.
+    for m in re.finditer(re.escape(INSTALLED) + r"(skills/[\w./-]*\w|OFFICIAL-INDEXES\.md)", text):
         target = m.group(1)
         if not (ROOT / target).exists():
             fail("route_to_missing_file", name, f"{INSTALLED}{target}")
@@ -92,77 +101,25 @@ def has_section(target, number):
 
 
 for name, text in texts.items():
-    for m in re.finditer(r"`(?:/root/\.agents/)?(?:runtime-references/)?([A-Za-z][\w-]*\.md)` section (\d+)", text):
-        target = "AGENTS.md" if m.group(1) == "AGENTS.md" else "runtime-references/" + m.group(1)
-        if not has_section(target, m.group(2)):
-            fail("route_to_missing_section", name, f"{m.group(1)} section {m.group(2)}")
+    for m in re.finditer(r"`(?:/root/\.agents/)?AGENTS\.md` section (\d+)", text):
+        if not has_section("AGENTS.md", m.group(1)):
+            fail("route_to_missing_section", name, f"AGENTS.md section {m.group(1)}")
     for m in re.finditer(r"\b[Ss]ection (\d+) (?:below|above)", text):
         if not has_section(name, m.group(1)):
             fail("route_to_missing_section", name, f"section {m.group(1)} of this file")
-references = {p.name for p in (ROOT / "runtime-references").iterdir()}
-for name in [n for n in texts if n.endswith(".md")]:
-    for m in re.finditer(r"`([A-Za-z][\w-]*\.md)`", texts[name]):
-        token = m.group(1)
-        if "_" in token or token in ("STATE.md", "TASK.md", "STRATEGY.md", "LENS.md", "SKILL.md", "MEMORY.md", "AGENTS.md", "CLAUDE.md", "GEMINI.md", "README.md"):
-            continue
-        if token not in references:
-            fail("route_to_missing_reference", name, f"`{token}` is not in content/runtime-references")
-
-# One word for one thing: a word the glossary lists under "Do not write" fails anywhere else.
-GLOSSARY = "runtime-references/GLOSSARY.md"
-banned = {}
-terms = []
-if GLOSSARY not in texts:
-    fail("glossary_missing", GLOSSARY, "the word check needs the glossary")
-in_terms = False
-for line in texts.get(GLOSSARY, "").splitlines():
-    if not line.startswith("|"):
-        in_terms = False
-        continue
-    cells = [c.strip() for c in line.strip().strip("|").split(" | ")]
-    if cells[-1] == "Do not write":
-        in_terms = True
-        continue
-    if not in_terms or set(line) <= set("|- "):
-        continue
-    if len(cells) != 4:
-        fail("glossary_row_malformed", GLOSSARY, f"a term row needs four cells: {line[:60]}")
-        continue
-    for word in re.findall(r"`([^`]+)`", cells[3]):
-        banned[word.lower()] = cells[0]
-    terms.append(cells[0])
 for name, text in texts.items():
-    if name == GLOSSARY:
-        continue
     low = text.lower()
-    for word, term in banned.items():
+    for word, term in REPLACED_WORDS.items():
         if re.search(r"(?<![\w-])" + re.escape(word) + r"(?![\w-])", low):
-            fail("word_the_glossary_replaces", name, f"'{word}': write '{term}' ({GLOSSARY})")
+            fail("word_the_glossary_replaces", name, f"'{word}': write '{term}' (REPLACED_WORDS of ci/check-content.py)")
 
-# The vocabulary is a closed set with a budget, not a list that grows: a term must be used, and the files have limits.
-CORE_TERM_LIMIT, GLOSSARY_BYTE_LIMIT, USER_ROW_LIMIT, AGENTS_BYTE_LIMIT, SKILL_BYTE_LIMIT, LEAD_REFERENCE_BYTE_LIMIT = 16, 12000, 30, 6500, 6500, 8000
-if not terms or not banned:
-    fail("glossary_no_terms", GLOSSARY, "no term table with a last column 'Do not write' was found")
-others = " ".join(text.lower() for name, text in texts.items() if name != GLOSSARY)
-for cell in terms:
-    for term in [w.strip().lower() for w in cell.split(",")]:
-        if not re.search(r"(?<![\w-])" + re.escape(term) + r"s?(?![\w-])", others):
-            fail("glossary_term_unused", GLOSSARY, f"'{term}' is used in no other file: remove the row")
-core = len(re.findall(r"\*\*[^*]+\*\*", texts.get("AGENTS.md", "").split("## 8. ")[-1]))
-if core > CORE_TERM_LIMIT:
-    fail("core_terms_over_limit", "AGENTS.md", f"{core} entries, limit {CORE_TERM_LIMIT}: move one to the glossary before adding one")
-size = len(texts.get(GLOSSARY, "").encode())
-if size > GLOSSARY_BYTE_LIMIT:
-    fail("glossary_over_limit", GLOSSARY, f"{size} bytes, limit {GLOSSARY_BYTE_LIMIT}: remove or move rows before adding")
+AGENTS_BYTE_LIMIT, SKILL_BYTE_LIMIT, LEAD_REFERENCE_BYTE_LIMIT = 6500, 6500, 8000
 LIMITS = [("AGENTS.md", AGENTS_BYTE_LIMIT), ("skills/lead/SKILL.md", SKILL_BYTE_LIMIT), ("skills/report/SKILL.md", SKILL_BYTE_LIMIT)]
 LIMITS += [(f"skills/lead/references/{n}.md", LEAD_REFERENCE_BYTE_LIMIT) for n in ("interview", "unit-page", "judging")]
 for path, limit in LIMITS:
     used = len(texts.get(path, "").encode())
     if used > limit:
         fail("file_over_limit", path, f"{used} bytes, limit {limit}: cut or move text before adding")
-user_rows = [l for l in texts.get(GLOSSARY, "").split("## 7. ")[-1].splitlines() if l.startswith("| ") and not set(l) <= set("|- ")]
-if len(user_rows) - 1 > USER_ROW_LIMIT:
-    fail("user_table_over_limit", GLOSSARY, f"{len(user_rows) - 1} rows, limit {USER_ROW_LIMIT}")
 
 # What content/ says about the command `ap` must exist: a verb in backticks, a section of its README by its heading.
 CRATE = ROOT.parent / "crates/ap"
@@ -235,41 +192,6 @@ if HOST.exists():
                 fail("agents_path_missing", f"AGENTS.md:{number}", f"{path}: name a path that exists, or write it as a pattern (<name> or *)")
 else:
     print(f"agents paths: skipped, {HOST} is absent (not this host)")
-
-# The route table of the design sources (OFFICIAL-DOCS.md section 4): every line range inside its file. The corpus is on
-# the host only, so this runs where it is present (./check on the host) and is skipped in GitHub's CI.
-CORPUS = Path(os.environ.get("CONTENT_CHECK_CORPUS", "/home/palantirkc/external/reference-docs"))
-ROUTES = "runtime-references/OFFICIAL-DOCS.md"
-section = texts.get(ROUTES, "").split("\n## 4. ", 1)
-if CORPUS.is_dir() and len(section) != 2:
-    fail("design_routes_section_missing", ROUTES, "no section '## 4. ' to check against the corpus")
-if CORPUS.is_dir() and len(section) == 2:
-    checked = 0
-    body = section[1].split("\n## ", 1)[0]
-    for row in body.splitlines():
-        if not row.startswith("| ") or row.startswith(("| Question", "| ---")):
-            continue
-        current, present = None, False
-        for span in re.findall(r"`([^`]*)`", row):
-            # A path `docs/<file>.md`, then any number of ranges `:a` or `:a-b` (after the path, or alone after a space,
-            # a comma or a semicolon): each range belongs to the newest path of the row.
-            for m in re.finditer(r"(?<![\w.-])(docs/[^\s`:,;]+\.md)|(?:(?<=\.md)|(?<![^\s,;(]))(?::(\d+)(?:-(\d+))?)(?!\d)", span):
-                if m.group(1):
-                    current, present = m.group(1), (CORPUS / m.group(1)).is_file()
-                    if not present:
-                        fail("design_route_missing_file", ROUTES, current)
-                    continue
-                if not current:
-                    fail("design_route_missing_file", ROUTES, f"{m.group(0)} (a range with no path before it)")
-                    continue
-                if not present:
-                    continue
-                first, last = m.group(2), m.group(3) or m.group(2)
-                lines = (CORPUS / current).read_text(encoding="utf-8", errors="replace").count("\n") + 1
-                checked += 1
-                if not (1 <= int(first) <= int(last) <= lines):
-                    fail("design_route_out_of_range", ROUTES, f"{current}:{first}-{last} (the file has {lines} lines)")
-    print(f"design routes: {checked} line ranges checked against {CORPUS}")
 
 for e in errors:
     print(e)
