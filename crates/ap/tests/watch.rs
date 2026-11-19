@@ -1895,3 +1895,81 @@ fn r19_a_pass_only_reads_and_writes_only_its_directory() {
     files.sort();
     assert_eq!(files, ["login.json", "pass.lock", "state.json"]);
 }
+
+// spec: specs/ap/watch.md#R8
+// spec: specs/ap/watch.md#R10
+#[test]
+fn r8_no_state_json_keeps_a_kept_end_failed_finding_open() {
+    let mut f = F::quiet();
+    f.deliver.as_mut().unwrap()["end"] = json!("failed");
+    f.deliver.as_mut().unwrap()["code"] = json!("restore_failed");
+    f.at(5);
+    f.pass();
+    let kf = k("delivery", "end failed restore_failed");
+    f.deliver.as_mut().unwrap()["end"] = json!("refused");
+    f.deliver.as_mut().unwrap()["code"] = json!("suppressed");
+    f.at(10);
+    f.pass();
+    std::fs::remove_file(f.dir.join("state.json")).unwrap();
+    f.at(15);
+    let v = f.pass();
+    assert_eq!(f.finding(&kf)["state"], "open", "{v}");
+    assert_eq!(v["closed"], json!([]), "{v}");
+    assert_eq!(v["opened"], json!([]), "{v}");
+    // Whether a failure is kept stays unknown until an end `installed`, `current` or `failed`.
+    f.at(20);
+    let v = f.pass();
+    assert_eq!(f.finding(&kf)["state"], "open", "{v}");
+    assert_eq!(
+        (v["closed"].clone(), v["opened"].clone()),
+        (json!([]), json!([])),
+        "{v}"
+    );
+    f.deliver.as_mut().unwrap()["code"] = json!("dirty");
+    f.at(25);
+    let v = f.pass();
+    assert_eq!(
+        v["opened"],
+        json!([k("delivery", "end refused dirty")]),
+        "{v}"
+    );
+    assert_eq!(f.finding(&kf)["state"], "open", "{v}");
+    let d = f.deliver.as_mut().unwrap();
+    (d["end"], d["code"]) = (json!("current"), Value::Null);
+    f.at(30);
+    let v = f.pass();
+    assert!(v["closed"].as_array().unwrap().contains(&json!(kf)), "{v}");
+    assert_eq!(f.state()["delivery"]["failed"], Value::Null);
+}
+
+// spec: specs/ap/watch.md#R8
+// spec: specs/ap/watch.md#R12
+#[test]
+fn r8_no_state_json_keeps_the_host_findings_that_compare_with_it() {
+    let mut f = F::quiet();
+    f.files.insert(MEMORY_EVENTS.into(), b"high 6\n".to_vec());
+    let mut log = f.files[APT].clone();
+    log.extend(b"\nStart-Date: 2026-11-19  00:02:00\nCommandline: apt-get install x\n");
+    f.files.insert(APT.into(), log);
+    f.at(5);
+    let v = f.pass();
+    let (km, ka) = (
+        k("host", "slice memory high"),
+        k("host", "apt 2026-11-19 00:02:00"),
+    );
+    assert_eq!(v["opened"].as_array().unwrap().len(), 2, "{v}");
+    std::fs::remove_file(f.dir.join("state.json")).unwrap();
+    f.at(10);
+    let v = f.pass();
+    assert_eq!(v["closed"], json!([]), "{v}");
+    assert_eq!(f.finding(&km)["state"], "open");
+    assert_eq!(f.finding(&ka)["state"], "open");
+    // The next pass has its baseline: both families are known again.
+    f.at(15);
+    let v = f.pass();
+    let closed = v["closed"].as_array().unwrap();
+    assert!(
+        closed.contains(&json!(km)) && closed.contains(&json!(ka)),
+        "{v}"
+    );
+}

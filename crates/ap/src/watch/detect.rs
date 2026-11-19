@@ -124,13 +124,20 @@ pub(crate) fn delivery(s: &mut impl System, now: u64, prior: Option<&Value>) -> 
         word(&last["to"])
     );
     let ended = end == "installed" || end == "current";
-    // An `end failed` is kept until an end `installed` or `current`.
-    let kept = match (end.as_str(), prior) {
-        ("failed", _) => Some(code.clone()),
-        _ if ended => None,
-        (_, Some(p)) => p["failed"].as_str().map(str::to_owned),
-        (_, None) => None,
+    // An `end failed` is kept until an end `installed` or `current`. Whether one is kept is unknown
+    // (None) after a baseline that read another end, until one of those three ends is read: the
+    // member `failed` is then left out of `state.json`.
+    let known: Option<Option<String>> = match end.as_str() {
+        "failed" => Some(Some(code.clone())),
+        _ if ended => Some(None),
+        _ => prior
+            .and_then(|p| p.get("failed"))
+            .map(|v| v.as_str().map(str::to_owned)),
     };
+    let kept = known.clone().flatten();
+    if known.is_none() {
+        r.unknown.push("end".into());
+    }
     if let Some(k) = &kept {
         let what = "delivery ended failed: a rollback that did not restore; a person acts";
         r.signals.push(Signal::new(
@@ -160,7 +167,7 @@ pub(crate) fn delivery(s: &mut impl System, now: u64, prior: Option<&Value>) -> 
             } else {
                 r.unknown.push("end".into());
             }
-        } else if kept.is_none() || !AFTER_FAILED.contains(&code.as_str()) {
+        } else if known == Some(None) || !AFTER_FAILED.contains(&code.as_str()) {
             let what = format!("the last delivery ended {end} with {code}");
             r.signals.push(Signal::new(
                 format!("end {end} {code}"),
@@ -193,7 +200,11 @@ pub(crate) fn delivery(s: &mut impl System, now: u64, prior: Option<&Value>) -> 
             }
         }
     }
-    r.state = Some(json!({"failed": kept, "refusal": refusal}));
+    let mut state = json!({"refusal": refusal});
+    if let Some(kept) = known {
+        state["failed"] = json!(kept);
+    }
+    r.state = Some(state);
     Ok(r)
 }
 
@@ -348,6 +359,9 @@ pub(crate) fn host(s: &mut impl System, now: u64, prior: Option<&Value>) -> Read
                 .and_then(|n| n.trim().parse().ok())
                 .ok_or("memory.events: no high")?;
             let before = prior.and_then(|p| p["memory_high"].as_u64());
+            if before.is_none() {
+                r.unknown.push("slice memory high".into());
+            }
             let mut rose = prior
                 .and_then(|p| p["memory_rose_at"].as_str())
                 .and_then(epoch);
@@ -382,6 +396,9 @@ pub(crate) fn host(s: &mut impl System, now: u64, prior: Option<&Value>) -> Read
             let before = prior
                 .and_then(|p| p.get("apt_start"))
                 .map(|v| v.as_str().unwrap_or_default().to_owned());
+            if before.is_none() {
+                r.unknown.push("apt".into());
+            }
             if let Some(before) = &before {
                 for start in starts.iter().filter(|st| st.as_str() > before.as_str()) {
                     let what = "a package change in the apt history";
