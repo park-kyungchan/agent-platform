@@ -289,7 +289,7 @@ fn invalid(member: &str, why: &str) -> Failure {
 }
 /// The member `reviews` of the host's policy file, each member checked (R4, R5); empty without a
 /// file or without the member.
-pub(super) fn policy(s: &impl System) -> Result<Map<String, Value>, Failure> {
+pub(crate) fn policy(s: &impl System) -> Result<Map<String, Value>, Failure> {
     let Some(file) = s.policy_file() else {
         return Ok(Map::new());
     };
