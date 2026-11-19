@@ -1,0 +1,12 @@
+[Unit]
+Description=ap watch every five minutes
+Documentation=https://github.com/park-kyungchan/agent-platform/blob/main/deploy/README.md
+
+[Timer]
+OnCalendar=*:0/5
+AccuracySec=1s
+# A pass missed while the host was down is not made up: the next one comes at the next five minutes.
+Persistent=false
+
+[Install]
+WantedBy=timers.target
