@@ -1,8 +1,7 @@
 # Public runtime guidance content
 
 Reviewed distribution source for canonical `AGENTS.md`, runtime references and
-the generic `herdr`, `herdr-hermes`, `explain-precisely`, `hindsight-control`, `lead`,
-`lessons-loop` and `report` skill bundles. Repository source is edited through review and then installed on the host.
+the generic `herdr`, `herdr-hermes`, `explain-precisely`, `lead` and `report` skill bundles. Repository source is edited through review and then installed on the host.
 This README is repository documentation, not an owned host entry.
 
 Generic Academy routing belongs to education-platform; private teaching/reporting
@@ -25,7 +24,7 @@ The task owner separately authorizes and verifies any host installation.
 
 The owned files are `AGENTS.md`, the
 runtime references (including `ONTOLOGY-USE.md` for operational store reads
-and Lead writes) and the seven generic skill bundles (the Lead's one skill is `lead`). Each reference is
+and Lead writes) and the five generic skill bundles (the Lead's one skill is `lead`). Each reference is
 self-contained and says in its first lines when it is read. Changing values
 (model names, efforts, versions, token windows, counts, dates of approvals) stay
 out of `AGENTS.md` and skill frontmatter; they belong in task STATE.

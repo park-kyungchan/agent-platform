@@ -55,7 +55,7 @@ The accepting agent:
 - Integrates only the returned revision. Never fetch, reset or cherry-pick another owner's tree beyond it.
 - Treats commit, push, merge and installation as separate effects, each needing task authority (`BUILD-AND-DELIVERY.md`).
 
-Closure details (roster, owned panes and processes, optional lesson candidate): `/root/.agents/skills/lessons-loop/references/worker-closure.md`.
+Closure (record the result, reconcile child processes, builds and uncertain effects, close the tab, confirm nothing remains): `/root/.agents/skills/lead/SKILL.md`, section "Your own limits".
 
 ## 5. Herdr
 

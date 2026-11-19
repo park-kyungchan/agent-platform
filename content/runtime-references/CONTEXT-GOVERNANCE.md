@@ -1,6 +1,6 @@
 # Context governance: which context to load, from which one home
 
-Read this when you must decide which context to load for a task, above all a kind of task you have not met; which source answers a question; who writes a piece of information; or whether something may go to memory. Where each kind of information is written is the table of section 6 below. How to hand context to another agent: `CONCURRENT-WORK.md`. How the memory server ranks and refreshes: skill `hindsight-control`, `references/runtime.md`.
+Read this when you must decide which context to load for a task, above all a kind of task you have not met; which source answers a question; who writes a piece of information; or whether something may go to memory. Where each kind of information is written is the table of section 6 below. How to hand context to another agent: `CONCURRENT-WORK.md`.
 
 ## 1. The order of loading
 
@@ -83,20 +83,18 @@ When memory and current source disagree, the source wins for current truth. Keep
 ## 8. Reading memory
 
 - Long-term memory is off until it is rebuilt (`/root/.agents/AGENTS.md` section 6): call no memory tool and register no memory hook. When it returns, the route is the knowledge pages through the MCP server `hindsight`; search only when a decision needs it, never on every tool call, and read only the selected pages.
-- The native recall route that `agent-platform` `memory/README.md` prepares for engineering memory is not in use until its owner's task says so.
 - If the memory tool is unavailable or disabled for your task, say so and work from the task's files. Do not start a client or change global configuration to get it back.
 
 ## 9. Writing memory
 
 - A skill or a visible tool is not a write grant. Writing needs the task's authority. A no-write task does not ingest, PATCH, refresh or delete.
-- Engineering capture, correction, publication and retraction follow `agent-platform` `memory/README.md`; it is the operational home. Draft a checked Git original and commit it in the owning closure PR; Hindsight is a retrieval copy, never a second original/history store.
+- Write nothing to Hindsight while it is off. The checked Git originals that were prepared for it are kept under the tag `memory-before-removal` of `agent-platform`; the rebuild starts from them.
 - Do not use MCP `ingest_document` or `capture_initiative`, direct retain/PATCH, generated pages or a copied STATE as the engineering write route. The publisher alone sends reviewed-main publication bytes and derived tags under its authorized maintenance window.
 - Corrections edit the same original through review; preserve Git history and pinned evidence. Retraction proves the listed reads before the owning PR removes the source; uncertain work keeps the route unavailable. No fallback to the mixed bank.
 - The separate private Academy archive keeps its owner and the exception below. This source change does not activate a route or release registration/content holds.
 
 ## 10. Tags and derived pages
 
-- Engineering tags come only from the vocabulary and the publisher of `agent-platform` `memory/README.md`.
 - On retained older material keep the genuine `source:*`, `harness:*`, `project:*` and historical tags; never imitate a plugin's attribution.
 - A tag routes a topic. It is not privacy and not permission. A strict tagged scope can miss shared untagged observations.
 - A generated page is navigation. Never ingest one as new evidence, and do not assume a page exists: list the pages.
@@ -109,5 +107,5 @@ One exception, by the user's decision of 2026-11-06: the Academy lesson archive.
 
 ## 12. Lessons and Ontology
 
-- Lessons are promoted on independent occurrences of a verified mechanism, not on document count. A structural proposal goes to the Lead, who decides it as a `decision` in the store, and to the user; no memory write enacts architecture or policy. Procedure: skill `lessons-loop`.
-- `ontology-platform` owns source-qualified operational state, admission, named actions and recovery; Git owns engineering originals; Hindsight owns their retrieval copy under `agent-platform` `memory/README.md`. Boundary document: `ontology-platform` `docs/hindsight-boundary.md` at `origin/main`. There is no shared database, state replica or automatic promotion of prose into objects between them. Check what `ontology-platform` actually provides at its current revision before relying on it.
+- Lessons are promoted on independent occurrences of a verified mechanism, not on document count. A structural proposal goes to the Lead, who decides it as a `decision` in the store, and to the user; no memory write enacts architecture or policy.
+- `ontology-platform` owns source-qualified operational state, admission, named actions and recovery; Git owns engineering originals; Hindsight holds at most a retrieval copy of them. Boundary document: `ontology-platform` `docs/hindsight-boundary.md` at `origin/main`. There is no shared database, state replica or automatic promotion of prose into objects between them. Check what `ontology-platform` actually provides at its current revision before relying on it.

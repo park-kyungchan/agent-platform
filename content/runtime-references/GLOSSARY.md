@@ -27,7 +27,7 @@ One word for one thing. Read this when a word in an instruction, a packet or the
 | review | A second agent, in a fresh context, judging a frozen candidate against the request and the contracts | The one reviewer session of a pull request (the verifier), which posts its findings there | — |
 | candidate | The exact revision that is offered for review or merge | A commit on a task branch | — |
 | handoff | Passing a piece of work, with a packet, to another agent; also one Lead passing a task to the next Lead | `CONCURRENT-WORK.md` section 2 | `hand-off`, `handover` |
-| closure | Ending a worker run or a task: record, reconcile, close what the task created | `lessons-loop/references/worker-closure.md` | — |
+| closure | Ending a worker run or a task: record, reconcile, close what the task created | `lead/SKILL.md`, section "Your own limits" | — |
 | write set | The area one writer changes; a change outside it stops the unit until the Lead widens it | The `Write set:` line of a packet | — |
 | delegation | Giving a piece of work to a worker | A dispatch | — |
 
@@ -92,4 +92,4 @@ Only the Lead needs this section. The user speaks Korean, shortens names, and so
 | 보드 | The board of the current task | — |
 | 정리, 손봐, 개선 | A request whose target and extent are open | State what you will change and what you will leave before starting |
 
-A new expression is written in the task's STATE under "Words the user used" with what it resolved to. When the same expression appears in a second task, add a row here through a pull request (skill `lessons-loop`); most expressions never need a row, because the three-step resolution above already finds them.
+A new expression is written in the task's STATE under "Words the user used" with what it resolved to. When the same expression appears in a second task, add a row here through a pull request; most expressions never need a row, because the three-step resolution above already finds them.

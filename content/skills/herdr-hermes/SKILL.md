@@ -15,6 +15,6 @@ Read native response and stored-session evidence for a result; keep frontend, pa
 
 Hermes version promotion goes only through the installed target helper's one-shot path. Never edit updater state, receipts, jobs or transactions directly. Source/version inspection grants no promotion or service operation authority.
 
-Use [worker closure](../lessons-loop/references/worker-closure.md) for exact executor/profile/session, actual result, checks/gaps and owned-resource reconciliation. Only authorized student-free engineering lesson candidates may reach its curator; no session-content import or automatic memory capture follows from a handoff.
+Use [the Lead's worker closure](../lead/SKILL.md) (section "Your own limits") for exact executor/profile/session, actual result, checks/gaps and owned-resource reconciliation. No session-content import or automatic memory capture follows from a handoff.
 
 For documentation and installed-version reconciliation, read [documentation.md](references/documentation.md). Past test profiles, pane IDs, hooks and receipts are historical evidence in the verified recovery archive, not current configuration or execution authority. Short user questions receive concise answers.

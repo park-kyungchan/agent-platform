@@ -30,6 +30,6 @@ The installed `herdr --help` and the group without a subcommand (`herdr pane`, `
 | Open a tab or pane for a worker | `herdr tab create --cwd <worktree> --label <name> --no-focus`, or `herdr pane split --current --direction right --cwd <path> --no-focus`; then `herdr agent start <name> --kind <kind> --pane <pane_id>` | A worker the user watches, in the task's worktree |
 | Close a tab you created | `herdr tab close <tab_id>` | At the worker's end, after its result is read and reconciled |
 
-A handoff states the goal, the exact targets, the allowed effects, the expected output and the STATE path. A DONE marker, a successful submission or an idle state is a signal to read the result, not the result: verify the output and the effects ([worker closure](../lessons-loop/references/worker-closure.md)).
+A handoff states the goal, the exact targets, the allowed effects, the expected output and the STATE path. A DONE marker, a successful submission or an idle state is a signal to read the result, not the result: verify the output and the effects ([the Lead's worker closure](../lead/SKILL.md), section "Your own limits").
 
 Everything else (caller and remote IDs, lifecycle states, waits, keys, layout, machines, ordinary commands, recovery): [native-control.md](references/native-control.md), read only for it.

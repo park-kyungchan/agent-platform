@@ -52,4 +52,4 @@ At each moment this file is read for, look at what exists as its opponent. Measu
 
 Every finding gets one disposition: a decision now, a unit, a named later point, or kept with the reason.
 
-A correction of the user: find the one thing it changes and how far it reaches (this task, or every task), change it in the one file that holds it, and say back in one sentence what changed from what to what. A second correction of the same kind becomes a case of the Lead suite: skill `lessons-loop`. When you broke a rule that exists, add no sentence: make the step a command or a check, or record why it cannot be one.
+A correction of the user: find the one thing it changes and how far it reaches (this task, or every task), change it in the one file that holds it, and say back in one sentence what changed from what to what. A second correction of the same kind becomes a case of the Lead suite (`evals/lead/`). When you broke a rule that exists, add no sentence: make the step a command or a check, or record why it cannot be one.
