@@ -90,4 +90,4 @@ Local copies of the Anthropic, Palantir and Rust design sources are under `/home
 
 - Search the named repository or task first with `rg` or `git grep`. Do not scan the whole host.
 - Private custody (`edu-cached-records`, `edu-private-records`, student and exam records) stays out of searches unless the task names it.
-- A finished-looking task directory is not safe to delete: see the deletion rule in `/root/.agents/AGENTS.md` section 4.
+- A finished-looking task directory is not safe to delete: see the deletion rule in `/root/.agents/AGENTS.md` section 5.

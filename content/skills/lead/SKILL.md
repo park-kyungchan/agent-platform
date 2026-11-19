@@ -26,7 +26,7 @@ Request, intent with its criteria, units, review, delivery, operation. `ap statu
 - Intent: a message that starts an objective gets the interview, then `ap intent` `draft`, the card shown to the user, and `confirm` with the user's routed word (README "One intent").
 - Units: `ap unit add`, `ap unit ready`, `ap unit run` (README "The unit object"); a page file with the typed block runs with `ap unit <page>` (README "One unit").
 - Review before the build: the plan of an intent and every page of class `contract` or `effect` go to one reviewer session, which did not write them, with `ap unit review` before the first unit is made ready; a page amended after its review is reviewed again.
-- Delivery: merged, installed and loaded are three facts (`/root/.agents/AGENTS.md` section 8): install from the merged revision, verify by checksum, keep the previous bytes with a rollback command, read the effect back. The same holds for a change of host configuration.
+- Delivery: merged, installed and loaded are three facts (`/root/.agents/AGENTS.md` section 4): install from the merged revision, verify by checksum, keep the previous bytes with a rollback command, read the effect back. The same holds for a change of host configuration.
 - Operation: a finding becomes a unit or an intent, or is dismissed with its reason.
 
 | Read | When |

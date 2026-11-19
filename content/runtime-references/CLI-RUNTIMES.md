@@ -113,7 +113,7 @@ Installed shared path: `/root/.agents/skills/<skill>/SKILL.md`. Change a skill i
 | Antigravity | `~/.gemini/antigravity-cli/brain/` | Per conversation |
 | Codex, Grok Build | None found on this host | — |
 
-This memory is private to one CLI and one directory, so no other agent sees it and nothing reviews it. The rule for what may go there is in `/root/.agents/AGENTS.md` section 6. When an entry there contradicts the task's STATE or the shared instructions, STATE and the shared instructions win; delete the entry.
+This memory is private to one CLI and one directory, so no other agent sees it and nothing reviews it. The rule for what may go there is in `/root/.agents/AGENTS.md` section 5. When an entry there contradicts the task's STATE or the shared instructions, STATE and the shared instructions win; delete the entry.
 
 ## 9. A stage or a unit of work on this host
 

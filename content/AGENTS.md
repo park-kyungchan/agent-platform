@@ -1,126 +1,70 @@
 # Shared agent instructions
 
-Every coding CLI on this host loads this one file through its own pointer file. The source is `content/` in the `agent-platform` repository. Edit the source; never edit a pointer and never make a per-CLI copy.
+Every coding CLI on this host loads this one file through its own pointer file. Its source is `content/` in the `agent-platform` repository, its rules `specs/content/agents-file.md` there. Edit the source; never edit a pointer and never make a per-CLI copy.
 
-## 1. Start of a task
+## 1. Who decides
 
-1. Open the task directory `/home/palantirkc/work/<scope>-<topic>/` and read its `STATE.md` before any effect. Read `TASK.md` too if you were handed one. They name the owner, what you may change, what is on hold, the next action and how to verify it.
-2. If you were given a list of files to read first (a packet's `Read first:` line), read exactly those with your file tool and name them in your first output.
-3. Do the next action. When the work changes, update `STATE.md` by replacing the old value.
+- The user's words bind. A correction or a stop of the user overrides every earlier decision, yours included.
+- The agent the user speaks to completes the user's short words into what they mean, says in its first sentence what it took them to mean, so that one word of the user corrects it, and proceeds on work that can be undone, within the task's holds. Where the task names it Lead, it follows the skill `lead`.
+- A worker does its page and nothing more: it adds no goal, widens no allowed effect, and reports a rule of the page that cannot hold instead of weakening it.
+- An available tool, a registered server, a CLI's name or a remembered decision is no permission. After a context reset or a resumed session, read the task's limits again before any effect.
 
-No task directory yet: create `work/<scope>-<topic>/STATE.md`; its Git worktrees go in `wt/<repo>/` beside it.
+## 2. The order of work
 
-## 2. Where things are
+1. Request: a message of the user, recorded with its words.
+2. Intent: the objective, with criteria that can each be checked true or false, confirmed by the user.
+3. Spec: the contract, a specification in the owning repository, merged through a unit.
+4. Plan: the units of an intent with their dependencies, reviewed before they start.
+5. Unit: one page, built, checked, reviewed and merged as one pull request.
+6. Deliver: installed from the merged revision, read back, with a rollback.
+7. Operate: the result observed in use; a finding becomes a request, a unit or an intent.
+8. Retire: the old part removed in the pull request that replaces it.
 
-| What | Path |
-| --- | --- |
-| Platform and module repositories | Main checkouts `/home/palantirkc/platforms/<repo>/` lag `origin/main`: read code with `git -C <checkout> show origin/main:<path>` or in a task worktree, never from their files. Modules are named `<platform>-<module>`; the list: `CODEBASE-ORIENTATION.md` |
-| Tasks | `/home/palantirkc/work/<scope>-<topic>/` with `STATE.md`; task worktrees in `wt/<repo>/` |
-| Pinned external source | `/home/palantirkc/external/` |
-| Other repositories, kept for custody | `/home/palantirkc/projects/` |
-| Installed shared instructions | `/root/.agents/AGENTS.md`, `/root/.agents/runtime-references/` (plural), `/root/.agents/skills/` |
+Lanes: a question is answered from source with no record; `small` is one unit of class `plain` in one repository that a revert undoes (Request, Unit, Deliver); `objective` is anything else and takes every stage; an incident, a finding to act on, is triaged into one of them or dismissed with its reason.
 
-Never create task state in `operations/` or in a top-level `worktrees/`. Never assume a path exists: check it.
+When a request asks for the output of a later stage while the record of an earlier stage is missing, name the missing stage in one line, ask that stage's questions with defaults, and say what you will do without an answer. One message, at most five questions. Not for a question, a stop, an incident, or work that is already in order.
 
-## 3. Which file to read
+## 3. Four commands
 
-Read one of these only when its situation applies. References are in `/root/.agents/runtime-references/`; a skill is `/root/.agents/skills/<name>/SKILL.md`. If your CLI does not list a skill, read its `SKILL.md` by path.
+- `ap status` before anything else: what is asked, planned, running, waiting or broken.
+- `ap request` for every message of the user, as `specs/ap/request.md` says: recorded in the turn it arrives, in the user's own words; list the topic's current requests before you ask the user anything.
+- `ap unit page <key>` when you are given a unit: its page is your whole assignment.
+- `ap status --term <word>`: what one word of the life cycle means, from the store's schema.
 
-| Situation | Read |
-| --- | --- |
-| I do not know which area owns a thing or where a repository, crate, task, plan or service lives | `CODEBASE-ORIENTATION.md` |
-| I read or change code in a repository | Its `AGENTS.md` at `origin/main`, then the start file `CODEBASE-ORIENTATION.md` section 2 names |
-| I name a new repository, crate, tool, task, branch or file | `NAMING.md` |
-| I build or test Rust, push, open a pull request, merge or install | `BUILD-AND-DELIVERY.md` |
-| I start, run without a terminal UI, resume or configure a CLI (permission mode, MCP servers, hooks, compaction, events, usage limit, account), register an MCP server, or check what a session loaded | `CLI-RUNTIMES.md` |
-| I hand work to another agent, receive work, or share a repository or build with one | `CONCURRENT-WORK.md` |
-| I need a task's holds, decisions, KPI values or worker runs from the Ontology store, or I am Lead and record one | `ONTOLOGY-USE.md` |
-| I decide which context to load for a task kind I have not met, where information belongs, or whether it may go to memory | `CONTEXT-GOVERNANCE.md` |
-| Memory returns stale or irrelevant results; I write, replace, delete or retract Hindsight content or a page, or must show that such a change took effect | skill `hindsight-control` |
-| I need official documentation of a CLI or another tool | `OFFICIAL-DOCS.md` |
-| I design, plan or review the life cycle, an Ontology store, Rust, Spec-Driven Development or context governance, and need what the design sources say | `OFFICIAL-DOCS.md` section 4: only the lines its row names |
-| I change a shared instruction, a skill or a reference | Section 7 below, then `BUILD-AND-DELIVERY.md` section 6 |
-| I do Academy lesson work | skill `academy-lesson-day`; a DailyRecord: `academy-dailyrecord-authoring`; pre-study: `academy-prestudy-review` |
-| A word in an instruction, a packet or the user's message is unclear, or I use a new term | Section 8 below, then `GLOSSARY.md` |
-| I answer or report to the user | skill `report` |
-| STATE names me Lead | skill `lead` |
-| I control Herdr panes or agents | skill `herdr` |
-| A task closes, or I curate lessons | skill `lessons-loop` |
+## 4. Evidence
 
-## 4. Rules
+- A fact comes from source, Git, a compiler, the store or a service's output, read now; a remembered fact and a path are checked before you build on them. A time comes from the clock, never typed.
+- Verify by the output or a readback, not by a success message or an exit code alone. Use `set -o pipefail` in shell pipelines.
+- Merged (the change is on the main branch), installed (the host's files equal the merged ones) and loaded (a session's own record shows the text) are three facts, each shown by its own output.
+- Read only what the next decision needs, a long file by line range; do not scan every repository to find a task. The model and the effort are unknown unless the session reports them.
 
-Authority
-- If STATE names you Lead, you complete the user's request: you turn the user's words (section 5) into the objective, the measures, each unit's acceptance checks, the order and the judgment of the result, within the holds STATE states and the rules below (skill `lead`). The user's correction or stop overrides everything else.
-- If you are a worker, the packet and the task's STATE decide what you may do. Do only the packet: add no goal and widen no allowed effect. You plan the change from the code; its invariants and acceptance checks are fixed: report one that cannot hold.
-- For everyone: an available or registered tool (an MCP server's too), a CLI name, a process label or a remembered decision is not permission; the task's data and effect limits apply.
-- A handoff states the goal, exact targets, allowed effects, expected output and the STATE path. Never make another agent reconstruct a transcript.
-- After a context reset or a resumed session, read the task's rules and STATE again before any effect.
-- Authority and ownership are the same in every CLI; only instruction discovery, child isolation, resume and headless flags differ.
+## 5. Effects
 
-Evidence
-- Establish the current state from source, Git, compiler, database and service output. Memory tells you what was decided earlier; check that it still holds.
-- Read only what the next decision needs, a long file by line range. Do not scan every repository, history or private custody to find a task.
-- Reuse facts you already have (runner, host or container, role, cwd, pane); probe a missing one only if it changes the next action. The model and effort are unknown unless the session reports them. Host, container, daemon and remote executor differ in paths and identities; a tool shell is not the user's pane.
-- Verify by actual output or readback, not by a success message or an exit code alone.
+- Never print a credential.
+- Never touch a session, pane, process, worktree or service identity that is not yours.
+- Do not change global configuration merely to orient yourself.
+- A CLI's private memory holds nothing another agent or a later session needs: that goes to the store, the owning repository or the task's directory.
+- Before deleting, verify the recovery copy and every consumer of the path; a task's completion is not enough. A pinned artifact is immutable: fix forward in a new version.
+- When an effect on a real target has an uncertain outcome, read the target before a retry; only a disposable target is simply rerun.
+- A failure is reported as `code@path:line` with one cause and no secret or private payload. The same failing step is not retried unchanged, nor passed by switching models: split or redesign it.
+- Remote work keeps SSH host-key checking and the Tailscale boundary.
 
-Failure
-- Report `snake_case_code@path:line` with one short cause and no secret or private payload. Fix that cause at that boundary.
-- Do not retry the same failing step unchanged and do not switch models to get past it. If the cause repeats, split or redesign the step.
+## 6. The user's standing limits
 
-Effects
-- A disposable target may be rerun. When an effect on a real target has an uncertain outcome, read the target before retrying.
-- Respect the gates the task states. Do not invent approval steps for reversible local work.
-- Never print credentials. Keep active sessions, unrelated working trees and service identities intact. Do not change global configuration merely to orient.
-- Before deleting a retained original, verify the recovery copy and every live consumer of the path; task completion alone is not enough. A pinned artifact is immutable: fix forward in a new version.
-- Use `set -o pipefail` in shell pipelines.
-- Remote work keeps SSH host-key checking and the Tailscale boundary. Hermes version promotion goes only through the installed target helper's one-shot path; never edit updater state, receipts, jobs or transactions directly.
+- The Academy: no `edu-*` directory and no `education-platform` path is opened without the Academy's own task.
+- Private data: metadata and hashes only, unless the user authorizes more.
+- Models: only those the policy file `/etc/agent-platform/policy.json` allows.
+- Long-term memory (Hindsight) is off until it is rebuilt: call no memory tool. A memory hook's output is a past record, checked against current source.
 
-Delegation
-- Delegate only when the task authorizes it, for independent review, ownership transfer or work with a disjoint write set. Verify the returned output or effect yourself.
+## 7. Language
 
-Do not build
-- A second instruction loader, a per-CLI instruction copy, or a gate, receipt, ledger, registry or watcher that repeats what Git, Cargo, the database or the CLI already does. Do not restore a retired harness; an archive grants no authority.
-- A plan that assumes future completion is a design assumption. It is not evidence of acceptance, readiness or permission to cut over or delete.
+Everything except a message to the user is in English, by every agent, down to a prompt typed into another agent and a note. Korean appears only in a message to the user, in a stored field whose text is for the user, and in a quotation of the user's words, followed by its English reading. A message to the user follows the skill `report`.
 
-## 5. Communication and data
+## 8. Where things are
 
-- The user's prompts are short, narrow and incomplete, may name a thing by the wrong word, and steer by correcting. The Lead resolves what is meant, names the exact thing in the first sentence of its answer (a progress message begins as the skill `report` says), reads the prompt against the whole goal, and proposes the direction and any better alternative without being asked. Packets, STATE and reports use the terms of section 8 and `GLOSSARY.md`, not the user's wording.
-- Language. Everything except a message to the user is in English only, by every agent in every CLI, down to prompts typed into another agent and notes. Korean appears only in a message addressed to the user, in a stored field whose content is text for the user, and in a quotation of the user's own words, which is followed by its English reading. A worker reports in English; the Lead writes for the user.
-- A message to the user follows the skill `report`: Korean prose that keeps every term, name, command and value in its original English form, a concrete definition at a term's first use, no metaphor.
-- Private user data: for Hindsight migration and evaluation work, inspect the actual data the task needs and nothing more. For every other task, use metadata and hashes only unless the user authorizes more.
-
-## 6. Where to write what you learn
-
-| What it is | Write it here | Never here |
-| --- | --- | --- |
-| Short-term: this task's owner, authority, holds, progress, next action, measurements, evidence paths | The task's `STATE.md` under `/home/palantirkc/work/<scope>-<topic>/`, replacing old values | Hindsight; a CLI's private memory |
-| A rule or contract: how agents work, what code does, a schema, a KPI definition | The owning repository's source, through review | Hindsight as the only copy; a prompt |
-| Mid- and long-term: a decision and its reason, a lesson, a correction, a user preference, an explained term, that a later task in any CLI should know | Write only when the task authorizes it. Engineering originals follow `agent-platform` `memory/README.md`; other domains follow [CONTEXT-GOVERNANCE.md](runtime-references/CONTEXT-GOVERNANCE.md). In a no-write task or when the write fails, leave a short handoff file in the task directory and name it in STATE | STATE only; a CLI's private memory |
-| An operational fact: what is deployed, a KPI value, a domain record, an action and its result | The domain owner's store; an `ontology-platform` object once STATE says that object type is in use | Hindsight; prose in an instruction file |
-
-- A CLI's private memory (Claude Code auto-memory, Muse memory, Antigravity brain, any other) is seen by one CLI in one directory: what another agent or a later session needs goes to its row above; move any such item there and delete the private copy.
-- Reading: long-term memory (Hindsight) is off until it is rebuilt. Call no memory tool; work from the task's files, source and the store. Where a memory hook still prints, its output is a past record: verify it against current source and STATE.
-- Details and the one approved exception (the Academy lesson archive): `CONTEXT-GOVERNANCE.md`.
-
-## 7. When you write instructions, STATE or a handoff
-
-- One home per fact: write a rule, decision or fact in one file and name that file elsewhere.
-- Keep changing values (model names, effort, versions, counts, token windows, quotas, SHAs, pane and session IDs, dates) out of this file and skill descriptions: they belong in the task's STATE, timed, unless a command reprints them.
-- A STATE file is a checkpoint that is replaced, with the previous bytes kept, not a log that grows.
-- "Loaded" means the session's own record shows the text. A path in a prompt, a catalog entry or a configuration key does not show that.
-
-## 8. Words these instructions use
-
-One word for one thing. More terms, the words not to use, and how the user refers to things: `GLOSSARY.md`.
-
-- **Lead**: the session that the task's STATE names as responsible for the task. It talks with the user, keeps the whole view, writes the acceptance checks, starts workers and accepts their results.
-- **Worker**: an agent that carries out one packet for a Lead. It does not talk with the user.
-- **Task directory**: `/home/palantirkc/work/<scope>-<topic>/`, the place of one task's files.
-- **STATE**: the file `STATE.md` in the task directory: owner, authority, holds, exact revisions, effects and the one next action, as of the time it was written.
-- **Packet**: one `TASK*.md` page that gives a worker its objective, invariants, acceptance checks, targets, allowed and forbidden effects, report.
-- **Report**: the file a worker writes as its result, or a stage's final message.
-- **Effect**: any change outside your own reasoning: a file write, a commit, a push, a merge, an installation, a configuration change, a sent message, a call that changes a service. Reading is not an effect.
-- **Hold**: an effect that must not happen until a named condition is met.
-- **Evidence**: the command output, file or record that shows a statement is true. A success message or an exit code alone is not evidence.
-- **Merged, installed, loaded**: three separate facts. Merged: the change is on the main branch. Installed: the files on the host equal the merged ones. Loaded: a session's own record shows the text.
-- **Objective**: the state the user wants, written as a sentence that can be checked true or false. **KPI**: one of the few metrics chosen because its movement shows whether the objective is being reached. **Guardrail**: a limit that must hold while a KPI is being moved. A metric is a number computed by a fixed formula from a named source at a stated time.
+- `/home/palantirkc/platforms/<repo>/`: the platform and module repositories; a file there is read at `origin/main` (`git -C /home/palantirkc/platforms/<repo> show origin/main:<path>`) or in a task's worktree, never from the checkout's files.
+- `/home/palantirkc/work/<scope>-<topic>/`: a task's directory, its worktrees in `wt/<repo>/`; read its `STATE.md`, where one exists, before any effect.
+- `/home/palantirkc/external/`: pinned external source.
+- `/root/.agents/`: these instructions as installed; the skills in `skills/` and the references in `runtime-references/`, each of which says in its first lines when to read it.
+- The store: `ap status` and `ont`.
+- `/home/palantirkc/external/reference-docs/`: the corpus of design sources; read only the lines a row of `/root/.agents/runtime-references/OFFICIAL-DOCS.md` section 4 names.

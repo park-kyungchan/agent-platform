@@ -4,9 +4,11 @@
 Fails the build when (1) SHA256SUMS and the files disagree, (2) always-loaded text
 (AGENTS.md, skill frontmatter) carries a value that changes over time, (3) an owned file
 names a model (the Lead's table of the allowed models alone excepted), (4) a file that content/ routes a reader to does not exist, (5) a path
-is elided or points into a main checkout's files, or (6) on a host that has the corpus of
-design sources, a line range of OFFICIAL-DOCS.md section 4 falls outside its file.
-Reads the repository, and the corpus when it is present. Run: python3 -I -B ci/check-content.py
+is elided or points into a main checkout's files, (6) on a host that has the corpus of
+design sources, a line range of OFFICIAL-DOCS.md section 4 falls outside its file, or (7) AGENTS.md
+breaks its form (specs/content/agents-file.md): over 6,500 bytes, its eight section headings not in
+order, a line over 400 characters or a table row, or, on the host, an absolute path that does not exist.
+Reads the repository, and the corpus and the host's paths when they are present. Run: python3 -I -B ci/check-content.py
 """
 import hashlib
 import os
@@ -126,7 +128,7 @@ for name, text in texts.items():
             fail("word_the_glossary_replaces", name, f"'{word}': write '{term}' ({GLOSSARY})")
 
 # The vocabulary is a closed set with a budget, not a list that grows: a term must be used, and the files have limits.
-CORE_TERM_LIMIT, GLOSSARY_BYTE_LIMIT, USER_ROW_LIMIT, AGENTS_BYTE_LIMIT, SKILL_BYTE_LIMIT, LEAD_REFERENCE_BYTE_LIMIT = 16, 12000, 30, 13500, 6500, 8000
+CORE_TERM_LIMIT, GLOSSARY_BYTE_LIMIT, USER_ROW_LIMIT, AGENTS_BYTE_LIMIT, SKILL_BYTE_LIMIT, LEAD_REFERENCE_BYTE_LIMIT = 16, 12000, 30, 6500, 6500, 8000
 if not terms or not banned:
     fail("glossary_no_terms", GLOSSARY, "no term table with a last column 'Do not write' was found")
 others = " ".join(text.lower() for name, text in texts.items() if name != GLOSSARY)
@@ -188,6 +190,39 @@ for name, text in texts.items():
             fail("elided_path", f"{name}:{line_of(m.start())}", f"`{m.group(1)}`: write the path in full or as a <pattern>")
     for m in MAIN_CHECKOUT_FILE.finditer(text):
         fail("main_checkout_path", f"{name}:{line_of(m.start())}", f"{m.group(0)}: read it as `git -C /home/palantirkc/platforms/{m.group(1)} show origin/main:{m.group(2)}`")
+
+# The form of the always-loaded file (specs/content/agents-file.md): its eight sections in order, one page of prose.
+AGENTS_SECTIONS = ("Who decides", "The order of work", "Four commands", "Evidence", "Effects",
+                   "The user's standing limits", "Language", "Where things are")
+AGENTS_LINE_LIMIT = 400
+agents = texts.get("AGENTS.md", "")
+expected = [f"## {n}. {title}" for n, title in enumerate(AGENTS_SECTIONS, 1)]
+found = [line.rstrip() for line in agents.splitlines() if line.startswith("## ")]
+for heading in expected:
+    if heading not in found:
+        fail("agents_section_missing", "AGENTS.md", f"'{heading}'")
+for heading in found:
+    if heading not in expected:
+        fail("agents_section_unexpected", "AGENTS.md", f"'{heading}': the file has the eight sections of specs/content/agents-file.md")
+if sorted(found) == sorted(expected) and found != expected:
+    fail("agents_sections_out_of_order", "AGENTS.md", f"found {' / '.join(found)}")
+for number, line in enumerate(agents.splitlines(), 1):
+    if len(line) > AGENTS_LINE_LIMIT:
+        fail("agents_line_too_long", f"AGENTS.md:{number}", f"{len(line)} characters, limit {AGENTS_LINE_LIMIT}")
+    if line.startswith("|"):
+        fail("agents_table", f"AGENTS.md:{number}", "a table row: the always-loaded file is prose and lists")
+# Every absolute path the file names exists, or is a pattern (`<name>` or `*`). The paths are this host's, so this
+# runs where the host is (the installed file exists, or the tests name a stand-in) and is skipped in GitHub's CI.
+HOST = Path(os.environ.get("CONTENT_CHECK_HOST", INSTALLED + "AGENTS.md"))
+ABSOLUTE = re.compile(r"(?<![\w.~:/<>@$-])/[\w.*<>@+-]+(?:/[\w.*<>@+-]*)*")
+if HOST.exists():
+    for number, line in enumerate(agents.splitlines(), 1):
+        for m in ABSOLUTE.finditer(line):
+            path = m.group(0).rstrip(".")
+            if "<" not in path and "*" not in path and not Path(path).exists():
+                fail("agents_path_missing", f"AGENTS.md:{number}", f"{path}: name a path that exists, or write it as a pattern (<name> or *)")
+else:
+    print(f"agents paths: skipped, {HOST} is absent (not this host)")
 
 # The route table of the design sources (OFFICIAL-DOCS.md section 4): every line range inside its file. The corpus is on
 # the host only, so this runs where it is present (./check on the host) and is skipped in GitHub's CI.
