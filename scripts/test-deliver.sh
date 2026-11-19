@@ -178,6 +178,7 @@ echo 0 > "$W/count"; call lead; N=$(cat "$W/count"); rm -f "$W/count"
 [ "$N" -ge 2 ] || fail "pass a counted $N renames"
 line a 0 "$(pair)" "$(member 'r["outcome"]')"
 
+# spec: specs/ap/deliver.md#R21
 # (b) For every k, highest first: an install killed after the k-th rename, then one call, which repairs
 # the dead attempt or closes it by the read; the last one (k=1) is repaired and rolled back in (e).
 for k in $(seq "$N" -1 1); do
@@ -187,6 +188,8 @@ for k in $(seq "$N" -1 1); do
   line b "$k" "$p" "$(member 'r["closed"]["outcome"]')"
 done
 
+# spec: specs/ap/deliver.md#R18
+# spec: specs/ap/deliver.md#R33
 # (e) A rollback of the attempt pass b repaired: the oldest tarball brings the tree to its from.
 FROM=$(git -C "$O" rev-parse "$M^1")
 echo 0 > "$W/count"; call rollback; NRB=$(cat "$W/count"); rm -f "$W/count"
@@ -194,6 +197,8 @@ p=$(pair)
 [ "$RC" = 0 ] && [ "$(member 'r["end"]')" = installed ] && [ "$p" = "$FROM" ] || fail "pass e: pair $p, exit $RC"
 line e 1 "$p" "$(member 'r["outcome"]')"
 
+# spec: specs/ap/deliver.md#R21
+# spec: specs/ap/deliver.md#R29
 # (c) For every k: an install killed after the k-th rename, the clone's origin/main moved off the
 # attempt's commit so that the repair cannot reach it, then one call: the command's rollback on the real
 # kept copy and tarball, and the call goes on to install the tip.
@@ -205,6 +210,8 @@ for k in $(seq 1 "$N"); do
   line c "$k" "$p" "$(member 'r["closed"]["outcome"]')"
 done
 
+# spec: specs/ap/deliver.md#R21
+# spec: specs/ap/deliver.md#R33
 # (d) For every k: a rollback killed after the k-th rename of its content rollback; one call refuses
 # attempt_running; the two commands of the README with the handles of the attempt it rolls back; the
 # close by hand; then a Lead's install brings the pair to the tip again.
@@ -238,6 +245,7 @@ PY
   [ "$RC" = 0 ] && [ "$(pair)" = "$HERE" ] || fail "pass d k=$k: the install after the close by hand (exit $RC)"
 done
 
+# spec: specs/ap/deliver.md#R16
 # (f) ap killed alone while an installer lives under a slow shim: the installer holds the inherited
 # lock, and the next call ends busy. Then the installer finishes and one call repairs the attempt.
 M=$(merge)
@@ -257,6 +265,7 @@ call lead; p=$(pair)
 [ "$RC" = 0 ] && [ "$p" = "$M" ] || fail "pass f: the call after the installer ended left the pair at $p (exit $RC)"
 
 
+# spec: specs/ap/deliver.md#R18
 # (g) A close records no refused tarball, and a rollback rechecks a recorded one.
 M=$(merge); : > "$W/invalidate"; call lead; rm "$W/invalidate"
 [ "$RC" = 0 ] && [ "$(pair)" = "$M" ] && [ "$(member 'r["rollback_content"]')" = null ] || fail "pass g: a close recorded a refused tarball"
@@ -268,6 +277,7 @@ call rollback
 [ "$RC" = 2 ] && [ "$(member 'r["code"]')" = nothing_to_roll_back ] && [ "$(pair)" = "$M" ] || fail "pass g: rollback used a refused tarball"
 line g 0 "$(pair)" nothing_to_roll_back
 
+# spec: specs/ap/deliver.md#R26
 # (h) Real build-lock contention: release, timeout, and a killed waiter.
 python3 -I - "$W/lead.json" "$W/wait.json" <<'PYWAIT'
 import json, sys
@@ -334,6 +344,7 @@ call lead
 [ ! -s "$W/err" ] || fail "pass h k=3: free lock printed a waiting line"
 line h 3 "$(pair)" installed
 
+# spec: specs/ap/deliver.md#R43
 # (i) The engine: a scratch engine repository at E0 (its fake installer) and one accepted merge E1; the
 # engine file answers E0. A merge moves ontology/ENGINE-PIN to E1; one call installs the engine and ends,
 # the next installs the pair.
@@ -386,6 +397,8 @@ call engine
 [ "$RC" = 0 ] && [ "$(member 'r["target"]')" = /usr/local/bin/ap ] && [ "$(pair)" = "$M" ] || fail "pass i: the pair after the engine (exit $RC)"
 line i 1 "$(pair)" "$(member 'r["outcome"]')"
 
+# spec: specs/ap/deliver.md#R44
+# spec: specs/ap/deliver.md#R45
 # (j) A merged higher version of the work schema with an `ontology/migrate`: one call backs the store up,
 # installs the schema, runs the migration with the store's path and the two versions, installs the pair.
 python3 -I -c 'import json, sys; d = json.load(open(sys.argv[1])); d["version"] += 1; open(sys.argv[2], "w").write(json.dumps(d, indent=1) + "\n")' \
