@@ -279,7 +279,7 @@ Every existing definition is byte-equal; grants gain only additive entries.
 Version 3 adds a cross-task `memory_record` keyed by the stable record id.
 Its only properties are `document_id`, `status`, optional `supersedes` and
 `body_hash` (64 lowercase hex SHA-256). Git owns all title/kind/subject/body
-and provenance; see [../memory/README.md](../memory/README.md). No real record
+and provenance. No real record
 is populated yet. The writer supplies document_id equal to the record key and
 only selects originals from `main`; these are writer contracts.
 `scope_keys` remains empty in namespace `vps://palantirkc` / `root`, with no task

@@ -105,8 +105,8 @@ Current [Context Governance](../content/runtime-references/CONTEXT-GOVERNANCE.md
 owns isolation/continuity and source authority. Task handoffs include the Strategy
 link and KPI/guardrail fields from [lead](../content/skills/lead/SKILL.md).
 Task topology/worktrees win over generic pane examples; assigned Leads use one tab
-per worker. Use [worker closure](../content/skills/lessons-loop/references/worker-closure.md)
-for task-local output/effect reconciliation and optional curator candidates.
+per worker. Use the worker closure of [lead](../content/skills/lead/SKILL.md) (section "Your own limits")
+for task-local output/effect reconciliation.
 These are references to existing conventions, not new executable mechanisms.
 
 ## Rules preserving agent autonomy
