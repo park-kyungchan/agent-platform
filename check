@@ -122,6 +122,16 @@ else
   fail "git_config_test_missing@scripts/test-git-config.sh"
 fi
 
+# (f) The tests of the policy file's installer: a scratch origin, fakes of `ont`, `ap`,
+# `cmp` and `date`, and a scratch root; no network, no root, no host file.
+if [[ -f scripts/test-install-etc.sh ]]; then
+  if ! bash scripts/test-install-etc.sh; then
+    fail "install_etc_test_failed@scripts/test-install-etc.sh"
+  fi
+else
+  fail "install_etc_test_missing@scripts/test-install-etc.sh"
+fi
+
 if [[ $failures -ne 0 ]]; then
   printf 'check: failed (%d)\n' "$failures" >&2
   exit 1

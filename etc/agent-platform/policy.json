@@ -1,0 +1,90 @@
+{
+ "models": {
+  "allowed": [
+   "fable",
+   "opus",
+   "sonnet",
+   "haiku",
+   "muse-wonder-1.0",
+   "muse-ember-1.0",
+   "gemini-4-hydrogen-low",
+   "gemini-4-hydrogen-medium",
+   "gemini-4-hydrogen-high",
+   "gemini-4-hydrogen-xhigh"
+  ],
+  "never": [
+   "muse-spark-*",
+   "*-contributor"
+  ]
+ },
+ "accounts": {
+  "claude": [
+   "/root/.claude"
+  ],
+  "claude/reviewer": [
+   "/root/.claude"
+  ],
+  "claude/sonnet": [
+   "/root/.claude"
+  ],
+  "claude/haiku": [
+   "/root/.claude"
+  ],
+  "muse": [
+   "/root/.config/muse"
+  ],
+  "agy": [
+   "/root/.agy-template"
+  ]
+ },
+ "repositories": {
+  "park-kyungchan/agent-platform": {
+   "clone": "/home/palantirkc/platforms/agent-platform"
+  },
+  "park-kyungchan/ontology-platform": {
+   "clone": "/home/palantirkc/platforms/ontology-platform"
+  },
+  "park-kyungchan/agent-vps-operations": {
+   "clone": "/home/palantirkc/platforms/agent-vps-operations"
+  },
+  "park-kyungchan/education-platform": {
+   "clone": "/home/palantirkc/platforms/education-platform"
+  },
+  "park-kyungchan/education-dc-gang-a": {
+   "clone": "/home/palantirkc/platforms/education-dc-gang-a"
+  }
+ },
+ "reviews": {
+  "runtime": "claude",
+  "model": "opus",
+  "effort": "xhigh",
+  "account": "/root/.claude",
+  "permission_mode": "auto",
+  "compact_window": 800000,
+  "models": [
+   "opus"
+  ],
+  "directory": "/var/lib/agent-platform/reviews",
+  "task": "workspace-strategy-reassessment-20261109"
+ },
+ "units": {
+  "directory": "/var/lib/agent-platform/units",
+  "timeouts": {
+   "implementer": 14400,
+   "verifier": 7200,
+   "fixer": 7200
+  }
+ },
+ "quota": {
+  "slice": "agents.slice",
+  "busy_limit": 95,
+  "margin": 5,
+  "floor": 60,
+  "ceiling": 170
+ },
+ "work": {
+  "slots": 2,
+  "slice": "agents.slice",
+  "prefix": "ap-unit"
+ }
+}

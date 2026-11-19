@@ -1,8 +1,9 @@
 # Host configuration records
 
-Recorded copies of host configuration files and the Herdr network's files.
-Nothing here is built or installed by this repository; agents follow
-[`AGENTS.md`](AGENTS.md).
+Recorded copies of host configuration files, the Herdr network's files, and the
+source of the host's policy file with the script that installs it
+(`scripts/install-etc.sh`), and the system Git configuration. No program is
+built here. Agents follow [`AGENTS.md`](AGENTS.md).
 
 ## Contents
 
@@ -13,6 +14,9 @@ Nothing here is built or installed by this repository; agents follow
 | `deployments/hindsight/compose.yaml` | The Hindsight compose file |
 | `deployments/tsidp/compose.yaml` | The tsidp compose file |
 | `deployments/host-cron/` | The Docker prune cron files |
+| `etc/agent-platform/policy.json` | The source of the host's `/etc/agent-platform/policy.json` (section "The policy file") |
+| `scripts/install-etc.sh` | Installs the policy file from a merged commit, checks it against the host, or puts a kept copy back |
+| `scripts/test-install-etc.sh` | The tests of `install-etc.sh`, run by `./check` |
 | `git/` | The system Git configuration for the engineering scopes: the roster check (`git/hooks/pre-commit`), the configuration files and the alias `git task-new` (section "Git configuration") |
 | `scripts/test-git-config.sh` | The tests of `git/`, run by `./check` |
 | `deployments/herdr-network/` | The Herdr network's sshd drop-in, its installer, the firewall helper, its unit and contract; its `README.md` maps each file to its host path |
@@ -22,8 +26,9 @@ The copies the inventory names are byte copies of the host files as captured on
 
 ## Who uses it
 
-The Lead reads these records. The delivery of host files from this repository
-(unit D3) is not built yet; until it is, a merge here changes nothing on the host.
+The Lead reads these records and runs `scripts/install-etc.sh`. A merge here
+changes nothing on the host until the Lead runs `install-etc.sh install <merge>`;
+no timer reads this repository.
 
 ## Check
 
@@ -36,12 +41,33 @@ host path. It parses every tracked JSON file, runs `bash -n` on every tracked sh
 script, verifies that every inventory row's copy exists and matches its recorded
 SHA-256, and fails on a file under `deployments/` that is not the inventory, a row's
 copy, a `README.md`, or under `deployments/herdr-network/`, and runs
-`scripts/test-git-config.sh`. The GitHub Actions job
+`scripts/test-git-config.sh` and `scripts/test-install-etc.sh`. The GitHub Actions job
 `rust` runs the same command and is the required check of `main`.
 
 The check compares each copy with its recorded digest, never with the host. A copy
 is refreshed only from the host: its bytes unchanged, with its new digest written
 into the inventory in the same commit.
+
+## The policy file
+
+`etc/agent-platform/policy.json` is the source of `/etc/agent-platform/policy.json`.
+A change is a pull request; after the merge the Lead runs
+`scripts/install-etc.sh install <merge>`. The script installs only that one file:
+
+| Form | What it does |
+| --- | --- |
+| `install <commit> [--past <commit>:<reason>]...` | Installs the file from a commit on the first-parent history of `origin/main`, after the accepted check (each merge since the installed one has the tree of its second parent and a closed accepting review in the store) and `ap policy check` on the staged bytes. It keeps the previous bytes in `/var/backups/agent-platform-etc/policy.json.before-<UTC stamp>`, replaces the target by rename, reads it back and records the commit and digest in `/var/lib/agent-platform/etc/installed` |
+| `check [<commit>]` | Prints `same` (exit 0) or `differs <target>` (exit 1) against `<commit>`, by default the tip of `origin/main`; it writes nothing but its own clone |
+| `rollback <kept file>` | Puts one kept `policy.json.before-<stamp>` back, after `ap policy check`, keeping the current bytes first |
+
+The script works in its own clone, `/var/lib/agent-platform/clones/agent-vps-operations`
+(never in a main checkout), holds the lock `/var/lib/agent-platform/etc/lock`, and
+refuses with a code on stderr and exit 2 before any write (`busy`, `not_forward`,
+`not_accepted`, `tree_differs`, `verify_failed`, `target_changed`,
+`target_not_regular` and others). `AP_ETC_ROOT` prefixes every host path for the
+tests. Only the Lead runs it; `deliver.json` is not installed from here (its source
+is `agent-platform` `deploy/deliver.json`). `AGENTS.md` states the rules, including
+the fast path for a change that must take effect at once.
 
 ## Not changed here
 
