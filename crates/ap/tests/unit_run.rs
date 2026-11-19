@@ -36,6 +36,14 @@ const KEY: &str = "widgets-list";
 fn oid(kind: &str, key: &str) -> Value {
     json!({"object_type":kind,"namespace":{"instance":"vps://invented","account":"root"},"native_key":key})
 }
+/// A failed call of `gh` that says `text` on its standard error.
+fn said(text: &str) -> Answer {
+    Ok(Reply {
+        success: false,
+        bytes: text.as_bytes().to_vec(),
+        stdout: vec![],
+    })
+}
 fn reply(success: bool, v: &Value) -> Answer {
     let bytes = serde_json::to_vec(v).unwrap();
     Ok(Reply {
@@ -137,6 +145,12 @@ struct F {
     die_at_push: bool,
     /// After the validate of `merge_unit`, the unit is dropped by another call.
     drop_after_validate: bool,
+    /// The next fetches of `main` fail, each with the next message of Git.
+    fetch_fails: Vec<&'static str>,
+    /// What a failed `gh` call of the fake says (`pr view` with `gh-down`, `pr merge`).
+    gh_says: &'static str,
+    /// The state `lead-review` reads on the head, in place of the newest status posted on it.
+    lead_review: Option<&'static str>,
 }
 impl F {
     fn new() -> Self {
@@ -206,6 +220,9 @@ impl F {
             base_ref: "main".into(),
             die_at_push: false,
             drop_after_validate: false,
+            fetch_fails: vec![],
+            gh_says: "{}",
+            lead_review: None,
         };
         f.policy(json!({}));
         f.put("task", "invented-task", json!({"status": "open"}));
@@ -986,7 +1003,7 @@ impl F {
             ("pr", "view") => {
                 assert_eq!(a[2], "7");
                 if self.t.join("bin/gh-down").exists() {
-                    return reply(false, &json!({}));
+                    return said(self.gh_says);
                 }
                 let (state, head, commit) = match &self.merged {
                     Some((h, c)) => ("MERGED", json!(h), json!({"oid": c})),
@@ -1008,7 +1025,11 @@ impl F {
                     .unwrap()[1]
                     .clone();
                 match self.merge_mode {
-                    "fail" => return reply(false, &json!({})),
+                    "fail" => return said(self.gh_says),
+                    "fail_once" => {
+                        self.merge_mode = "ok";
+                        return said(self.gh_says);
+                    }
                     "unconfirmed" => return ok(json!({})),
                     _ => {}
                 }
@@ -1046,6 +1067,18 @@ impl F {
                     self.dead = true;
                 }
                 ok(json!({}))
+            }
+            // The read of the head's statuses: the newest `lead-review` posted on it.
+            ("api", path) if path.ends_with("/status") => {
+                assert_eq!(a.len(), 2, "a read posts nothing: {a:?}");
+                let head = path.split('/').nth(4).unwrap();
+                let posted = self.statuses.iter().rev().find(|st| st.0 == head);
+                let state = self.lead_review.or(posted.map(|st| st.1.as_str()));
+                let list: Vec<Value> = state
+                    .map(|st| json!({"context": "lead-review", "state": st}))
+                    .into_iter()
+                    .collect();
+                ok(json!({"state": "success", "statuses": list}))
             }
             ("api", "--method") => {
                 let head = a[3].rsplit('/').next().unwrap().to_owned();
@@ -1096,6 +1129,18 @@ impl System for F {
         match program {
             "ont" => self.ont(args, input),
             "gh" => self.gh(args),
+            "git"
+                if !self.fetch_fails.is_empty()
+                    && args.iter().any(|a| a == "fetch")
+                    && args.last().is_some_and(|a| a == "main") =>
+            {
+                let says = self.fetch_fails.remove(0).as_bytes().to_vec();
+                Ok(Reply {
+                    success: false,
+                    bytes: says,
+                    stdout: vec![],
+                })
+            }
             "git" if self.die_at_push && args.iter().any(|a| a == "push") => {
                 self.dead = true;
                 Ok(Reply {
@@ -2235,8 +2280,16 @@ impl F {
 // spec: specs/ap/unit-run.md#R36
 #[test]
 fn r36_a_plain_unit_stops_on_a_protected_path_and_a_contract_unit_goes_on() {
-    let stops: [(&str, &str, &[&str], &str); 9] = [
+    let stops: [(&str, &str, &[&str], &str); 11] = [
         ("ci/**", "ci/x", &[], "mkdir ci; echo x > ci/x"),
+        // A name compared without case, and a root directory of the host's files.
+        ("CI/**", "CI/x", &[], "mkdir CI; echo x > CI/x"),
+        (
+            "deploy/**",
+            "deploy/x.service",
+            &[],
+            "mkdir deploy; echo x > deploy/x.service",
+        ),
         (
             "specs/**",
             "specs/ap/unit.md",
@@ -3509,4 +3562,144 @@ fn walk_the_merge_with_the_real_engine() {
         (a["state"].as_str(), a["cleanup"]["worktree"].as_str()),
         (Some("merged"), Some("worktree_kept"))
     );
+}
+
+/// A failed `gh` call that names credentials: each must leave a detail redacted.
+const LEAKY: &str = "HTTP 401: Bad credentials GH_TOKEN=ghp_Secret0001 \"token\": \"tok-secret-2\" Authorization: Bearer brr-secret-3 https://someone:pw-secret-4@github.com/x github_pat_11Secret_5 gho_Secret6";
+const SECRETS: [&str; 6] = [
+    "Secret0001",
+    "tok-secret-2",
+    "brr-secret-3",
+    "pw-secret-4",
+    "github_pat_11Secret_5",
+    "gho_Secret6",
+];
+fn redacted(detail: &str) {
+    assert!(detail.contains("<redacted>"), "{detail}");
+    for secret in SECRETS {
+        assert!(!detail.contains(secret), "{secret} in {detail}");
+    }
+}
+
+// spec: specs/ap/unit-run.md#R22
+#[test]
+fn r22_a_failed_gh_call_of_a_running_unit_keeps_its_reply_redacted_in_the_stop() {
+    let mut f = F::new();
+    f.gh_says = LEAKY;
+    f.steps(&["implement", "ghdown"]);
+    let a = f.stopped("github_unreadable");
+    let detail = a["stop_detail"].as_str().unwrap();
+    redacted(detail);
+    let d: Value = serde_json::from_str(detail).unwrap();
+    assert_eq!(d["call"], "pr view");
+    assert!(
+        d["reply"]
+            .as_str()
+            .unwrap()
+            .starts_with("HTTP 401: Bad credentials")
+    );
+    assert_eq!(f.unit()["stop_detail"], a["stop_detail"]);
+    // A long reply keeps its last 200 bytes, cut at a character boundary.
+    let mut f = F::new();
+    let long: &'static str = Box::leak(format!("{}é end", "é".repeat(300)).into_boxed_str());
+    f.gh_says = long;
+    f.steps(&["implement", "ghdown"]);
+    let a = f.stopped("github_unreadable");
+    let d: Value = serde_json::from_str(a["stop_detail"].as_str().unwrap()).unwrap();
+    let reply = d["reply"].as_str().unwrap();
+    assert!(
+        reply.len() <= 200 && reply.len() >= 199 && reply.ends_with("é end"),
+        "{reply}"
+    );
+}
+
+// spec: specs/ap/unit-run.md#R31
+#[test]
+fn r31_a_merge_refused_for_a_status_not_yet_taken_is_tried_once_more() {
+    let gh = |f: &F| -> Vec<String> {
+        let calls = f.calls.iter().filter(|c| c.0 == "gh");
+        calls.map(|c| c.1[..2].join(" ")).collect()
+    };
+    // The first merge fails, the head's `lead-review` reads `success`: once more, and it merges.
+    let mut f = F::new();
+    f.merge_mode = "fail_once";
+    f.steps(&["implement", "accept"]);
+    let (a, status) = f.ok();
+    assert_eq!((a["state"].as_str(), status), (Some("merged"), 0), "{a}");
+    assert_eq!(f.merges().0, 2);
+    let states: Vec<&str> = f.statuses.iter().map(|s| s.1.as_str()).collect();
+    assert_eq!(states, ["success"]);
+    let calls = gh(&f);
+    let first = calls.iter().position(|c| c == "pr merge").unwrap();
+    let read = calls.iter().position(|c| c.ends_with("/status")).unwrap();
+    assert_eq!(
+        calls[first..=first + 4]
+            .iter()
+            .map(String::as_str)
+            .collect::<Vec<_>>(),
+        ["pr merge", "pr view", &calls[read], "pr merge", "pr view"]
+    );
+    assert!(calls[read].ends_with(&format!("{}/status", a["head"].as_str().unwrap())));
+    // Both fail: the reply, redacted, beside `refused`, and `failure` posted after the second.
+    let mut f = F::new();
+    f.merge_mode = "fail";
+    f.gh_says = LEAKY;
+    f.steps(&["implement", "accept"]);
+    let (a, status) = f.ok();
+    assert_eq!(
+        (a["state"].as_str(), a["refused"].as_str(), status),
+        (Some("accepted"), Some("merge_failed"), 3)
+    );
+    redacted(a["detail"].as_str().unwrap());
+    assert_eq!(f.merges().0, 2);
+    let states: Vec<&str> = f.statuses.iter().map(|s| s.1.as_str()).collect();
+    assert_eq!(states, ["success", "failure"]);
+    let calls = gh(&f);
+    let last_merge = calls.iter().rposition(|c| c == "pr merge").unwrap();
+    let failure = calls.iter().rposition(|c| c == "api --method").unwrap();
+    assert!(last_merge < failure);
+    // A head whose `lead-review` does not read `success`: no second merge.
+    let mut f = F::new();
+    f.merge_mode = "fail";
+    f.lead_review = Some("pending");
+    f.steps(&["implement", "accept"]);
+    let (a, _) = f.ok();
+    assert_eq!(a["refused"], "merge_failed", "{a}");
+    assert_eq!(f.merges().0, 1);
+    assert!(a["detail"].is_string());
+    // A refusal that no `gh` reply caused has no `detail`.
+    let mut f = F::new();
+    f.merge_mode = "unconfirmed";
+    f.steps(&["implement", "accept"]);
+    let (a, _) = f.ok();
+    assert_eq!(a["refused"], "merge_unconfirmed", "{a}");
+    assert!(a.get("detail").is_none(), "{a}");
+}
+
+// spec: specs/ap/unit-run.md#R8
+#[test]
+fn r8_a_fetch_that_raced_another_is_tried_once_more() {
+    let racing = "error: cannot lock ref 'refs/remotes/origin/main': is at 1 but expected 2";
+    let fetches = |f: &F| {
+        let calls = f.calls.iter().filter(|c| c.0 == "git");
+        calls
+            .filter(|c| c.1.iter().any(|a| a == "fetch") && c.1.last().unwrap() == "main")
+            .count()
+    };
+    let mut f = F::new();
+    f.fetch_fails = vec![racing];
+    f.steps(&["implement", "accept"]);
+    let (a, status) = f.ok();
+    assert_eq!((a["state"].as_str(), status), (Some("merged"), 0), "{a}");
+    assert!(f.fetch_fails.is_empty());
+    // Twice in a row: once more only, then `fetch_failed`.
+    let mut f = F::new();
+    f.fetch_fails = vec![racing, racing];
+    f.stopped("fetch_failed");
+    assert_eq!(fetches(&f), 2);
+    // Any other failure stops at once.
+    let mut f = F::new();
+    f.fetch_fails = vec!["fatal: unable to access the remote"];
+    f.stopped("fetch_failed");
+    assert_eq!(fetches(&f), 1);
 }

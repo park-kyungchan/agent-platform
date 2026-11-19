@@ -60,6 +60,10 @@ struct U {
     move_head_on_close: bool,
     /// `gh pr merge` merges and still exits non-zero.
     merge_call_fails: bool,
+    /// The next calls of `gh pr merge` merge nothing and fail, saying `LEAKY`.
+    merge_refusals: usize,
+    /// The next fetches of `main` fail as a fetch that raced another on the clone.
+    fetch_racing: usize,
     /// The state of the status `lead-review` on the head, when it has one.
     lead_review: Option<&'static str>,
     /// The store refuses `start_review`.
@@ -185,6 +189,8 @@ impl U {
             move_head_after_acceptance: false,
             move_head_on_close: false,
             merge_call_fails: false,
+            merge_refusals: 0,
+            fetch_racing: 0,
             lead_review: None,
             store_refuses: false,
             reviews: vec![],
@@ -362,6 +368,14 @@ impl U {
                     .expect("no head guard");
                 assert_eq!(a[at + 1], head);
                 assert!(a.iter().any(|x| x == "--merge"));
+                if self.merge_refusals > 0 {
+                    self.merge_refusals -= 1;
+                    return Ok(Reply {
+                        success: false,
+                        bytes: LEAKY.as_bytes().to_vec(),
+                        stdout: vec![],
+                    });
+                }
                 let origin = self.t.join("origin.git");
                 let tree = git(&origin, &["rev-parse", &format!("{head}^{{tree}}")]);
                 let merge = git(
@@ -444,6 +458,24 @@ impl U {
                     "statusCheckRollup":{"contexts":{"nodes":nodes}}}}]},
                     "comments":{"nodes":self.comments}}}}}),
                 )
+            }
+            // The read of the head's statuses posts nothing: the newest `lead-review` posted on it.
+            ("api", path) if path.ends_with("/status") => {
+                assert_eq!(a.len(), 2, "{a:?}");
+                let head = path.split('/').nth(4).unwrap();
+                let posted = self.calls.iter().rev().find(|(p, a, _)| {
+                    p == "gh" && a.iter().any(|x| x.ends_with(&format!("/statuses/{head}")))
+                });
+                let state = posted.and_then(|(_, a, _)| {
+                    a.iter()
+                        .find_map(|x| x.strip_prefix("state="))
+                        .map(str::to_owned)
+                });
+                let list: Vec<Value> = state
+                    .map(|st| json!({"context": "lead-review", "state": st}))
+                    .into_iter()
+                    .collect();
+                ok(json!({"state": "success", "statuses": list}))
             }
             ("api", _) => {
                 assert!(a.iter().any(|x| x == "context=lead-review"), "{a:?}");
@@ -750,6 +782,22 @@ impl System for U {
                     success,
                     bytes: stdout.clone(),
                     stdout,
+                })
+            }
+            "git"
+                if self.fetch_racing > 0
+                    && args.iter().any(|a| a == "fetch")
+                    && args.last().is_some_and(|a| a == "main") =>
+            {
+                self.fetch_racing -= 1;
+                self.calls
+                    .push((program.into(), args.to_vec(), input.clone()));
+                let says =
+                    b"error: cannot lock ref 'refs/remotes/origin/main': is at 1 but expected 2";
+                Ok(Reply {
+                    success: false,
+                    bytes: says.to_vec(),
+                    stdout: vec![],
                 })
             }
             _ => {
@@ -1727,6 +1775,89 @@ fn i5_a_merge_that_does_not_read_back_is_not_merged_and_removes_nothing() {
     assert!(v["merge_commit"].is_null());
     assert!(u.wt().exists());
     assert!(branches(&u).contains(BRANCH));
+}
+
+/// A failed `gh` call that names credentials: none of them may reach a detail.
+const LEAKY: &str = "HTTP 405: Base branch was modified GH_TOKEN=ghp_Secret0001 Authorization: Bearer brr-secret-3 https://someone:pw-secret-4@github.com/x";
+
+/// A merge refused while GitHub had not yet taken the status: tried once more after it reads
+/// `success`; refused twice, it stops with the reply redacted.
+#[test]
+fn i5_a_refused_merge_is_tried_once_more_on_a_success_status() {
+    let mut u = U::new();
+    u.merge_refusals = 1;
+    let (v, code) = u.run(&u.request()).unwrap();
+    assert_eq!((v["state"].as_str(), code), (Some("merged"), 0), "{v}");
+    assert_eq!(v["steps"][9]["detail"], json!({"call": true}));
+    assert_eq!(u.merges().len(), 2);
+    let gh: Vec<String> = (u.calls.iter().filter(|(p, ..)| p == "gh"))
+        .map(|(_, a, _)| a[..2].join(" "))
+        .collect();
+    let first = gh.iter().position(|c| c == "pr merge").unwrap();
+    assert_eq!(&gh[first + 1], "pr view");
+    assert!(gh[first + 2].ends_with("/status"), "{gh:?}");
+    assert_eq!(&gh[first + 3..first + 5], ["pr merge", "pr view"]);
+    assert_eq!(u.statuses().len(), 1);
+    let mut u = U::new();
+    u.merge_refusals = 2;
+    let (v, code) = u.run(&u.request()).unwrap();
+    assert_eq!(
+        (v["stopped_at"].as_str(), v["cause"].as_str(), code),
+        (Some("merge"), Some("merge_failed"), 3),
+        "{v}"
+    );
+    assert_eq!(u.merges().len(), 2);
+    let reply = v["detail"]["reply"].as_str().unwrap();
+    assert!(
+        reply.contains("<redacted>") && reply.starts_with("HTTP 405"),
+        "{reply}"
+    );
+    for secret in ["Secret0001", "brr-secret-3", "pw-secret-4"] {
+        assert!(!v.to_string().contains(secret), "{secret}");
+        assert!(
+            !std::fs::read_to_string(u.p("work/task/u1.unit.json"))
+                .unwrap()
+                .contains(secret)
+        );
+    }
+}
+
+/// A fetch of `main` that raced another fetch on the clone is tried once more; twice is a stop.
+#[test]
+fn i5_a_fetch_that_raced_another_is_tried_once_more() {
+    let mut u = U::new();
+    u.fetch_racing = 1;
+    let (v, code) = u.run(&u.request()).unwrap();
+    assert_eq!((v["state"].as_str(), code), (Some("merged"), 0), "{v}");
+    assert_eq!(u.fetch_racing, 0);
+    let mut u = U::new();
+    u.fetch_racing = 2;
+    let (v, code) = u.run(&u.request()).unwrap();
+    assert_eq!(
+        (v["stopped_at"].as_str(), v["cause"].as_str(), code),
+        (Some("worktree"), Some("fetch_failed"), 3),
+        "{v}"
+    );
+}
+
+/// An author stage commits under its own name as author and committer, as in `ap unit run`.
+#[test]
+fn i5_a_stage_commit_carries_the_stage_as_committer() {
+    let mut u = U::new();
+    let (v, code) = u.run(&u.request()).unwrap();
+    assert_eq!((v["state"].as_str(), code), (Some("merged"), 0), "{v}");
+    let who = git(
+        &u.t.join("origin.git"),
+        &["log", "-1", "--format=%an|%ae|%cn|%ce", "main^2"],
+    );
+    let [an, ae, cn, ce] = who.split('|').collect::<Vec<_>>()[..] else {
+        panic!("{who}")
+    };
+    assert_eq!((an, ae), (cn, ce));
+    assert!(
+        ce.starts_with("implementer.") && ce.ends_with("@agents.invalid"),
+        "{ce}"
+    );
 }
 
 /// The merge call fails but the read shows the pull request merged at the head: merged.
@@ -6263,14 +6394,11 @@ fn pc1_a_refusal_of_the_admission_or_of_the_item_leaves_no_file() {
     assert_eq!(code(pc_call(&mut u, &page)), "item_not_ordered@item");
     assert_eq!(tree(&u.t.join("work/task")), before);
     assert_eq!((u.launches, u.effects()), (0, (0, 0, 0)));
-    // The admission: a Muse block without a stated mode is refused as on stdin.
+    // The admission: a Muse block with a mode `ap run` does not take for it is refused as on stdin.
     let mut u = U::new();
     let page = pc_setup(&mut u);
     let mut b = pc_block();
-    b["implementer"]
-        .as_object_mut()
-        .unwrap()
-        .remove("permission_mode");
+    b["implementer"]["permission_mode"] = json!("auto");
     pc_write(&u, &pc_units(&u), &pc_text(&b));
     let before = tree(&u.t.join("work/task"));
     assert_eq!(
@@ -6667,4 +6795,37 @@ fn pc1_a_non_claude_block_gets_no_window_even_for_a_model_the_task_file_names() 
     pc_write(&u, &pc_units(&u), &pc_text(&b));
     let r = ap::unit::compose(&page).unwrap()["request"].clone();
     assert!(r["implementer"].get("compact_window").is_none());
+}
+
+/// A block on Muse, Codex or Antigravity that names no `permission_mode` is composed with the one
+/// mode `ap run` takes for it; a stated mode is passed as it is, and a Claude block gets none.
+#[test]
+fn pc3_a_bare_runtime_without_a_mode_is_composed_with_bypass_permissions() {
+    let mut u = U::new();
+    let page = pc_setup(&mut u);
+    let mut units = pc_units(&u);
+    units["accounts"]["agy"] = json!([u.p("a1")]);
+    for (runtime, model) in [
+        ("muse", "muse-wonder-1.0"),
+        ("codex", "gpt-6.1-terra"),
+        ("agy", "gemini-4-pro-high"),
+    ] {
+        let mut b = pc_block();
+        b["implementer"] = json!({"model": model, "effort": "high", "runtime": runtime});
+        pc_write(&u, &units, &pc_text(&b));
+        let c = ap::unit::compose(&page).unwrap();
+        assert_eq!(
+            c["request"]["implementer"]["permission_mode"], "bypassPermissions",
+            "{runtime}"
+        );
+        assert!(c["request"]["verifier"].get("permission_mode").is_none());
+    }
+    // A stated mode stays what the block says, so `ap run` still judges it.
+    let mut b = pc_block();
+    b["implementer"]["permission_mode"] = json!("auto");
+    b["verifier"]["permission_mode"] = json!("plan");
+    pc_write(&u, &units, &pc_text(&b));
+    let c = ap::unit::compose(&page).unwrap();
+    assert_eq!(c["request"]["implementer"]["permission_mode"], "auto");
+    assert_eq!(c["request"]["verifier"]["permission_mode"], "plan");
 }

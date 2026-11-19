@@ -6,7 +6,7 @@
 //! what the case says from a real child. Every call is recorded in order. No test builds,
 //! installs, fetches or touches the host's store; the lock, the backup directories, the reports
 //! and the state directory are files of a temporary directory.
-use ap::deliver::execute;
+use ap::deliver::{check_request, execute};
 use ap::host::{Answer, Failure, Reply, System};
 use serde_json::{Value, json};
 use sha2::Digest;
@@ -4554,4 +4554,110 @@ fn co_real_git_leaves_a_detached_head_and_a_blocked_merge_alone() {
     assert_eq!(rev(&s.clone, "HEAD"), head);
     assert!(std::fs::metadata(&lock).is_ok());
     assert!(std::fs::metadata(format!("{}/g.txt", s.clone)).is_err());
+}
+
+fn without_at(mut v: Value) -> Value {
+    v.as_object_mut().unwrap().remove("at");
+    v
+}
+
+// spec: specs/ap/deliver.md#R8
+// spec: specs/ap/deliver.md#R9
+#[test]
+fn r8_check_passes_today_s_request_and_is_refused_as_deliver_refuses() {
+    for timer in [false, true] {
+        let w = W::new();
+        let r = if timer { w.timer() } else { w.request() };
+        assert_eq!(check_request(&r), (json!({"status": "ok"}), 0));
+        assert!(!w.t.join("state").exists());
+        assert!(w.calls.is_empty());
+    }
+    // Each refusal is the record `execute` prints for the request, but for `at`.
+    let w = W::new();
+    let mut unknown = w.request();
+    unknown["extra"] = json!(1);
+    let mut missing = w.request();
+    missing.as_object_mut().unwrap().remove("url");
+    for r in [unknown, missing, json!([1]), Value::Null] {
+        let (checked, exit) = check_request(&r);
+        let mut fresh = W::new();
+        let (ran, ran_exit) = fresh.run_with(&r);
+        assert_eq!((exit, ran_exit), (2, 2), "{r}");
+        assert_eq!(without_at(checked.clone()), without_at(ran), "{r}");
+        assert_eq!(
+            (end(&checked), checked["detail"].is_object()),
+            (("refused", "invalid_input"), true)
+        );
+        assert!(fresh.calls.is_empty());
+    }
+    assert!(!w.t.join("state").exists());
+}
+
+fn ap_deliver(args: &[&str], stdin: &[u8], lock: &str) -> std::process::Output {
+    use std::io::Write;
+    let mut child = Command::new(env!("CARGO_BIN_EXE_ap"))
+        .arg("deliver")
+        .args(args)
+        .env("AP_DELIVER_LOCK", lock)
+        .stdin(std::process::Stdio::piped())
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped())
+        .spawn()
+        .unwrap();
+    child.stdin.take().unwrap().write_all(stdin).unwrap();
+    child.wait_with_output().unwrap()
+}
+
+// spec: specs/ap/deliver.md#R8
+// spec: specs/ap/deliver.md#R9
+// spec: specs/ap/deliver.md#R10
+#[test]
+fn r8_the_command_checks_makes_nothing_and_leaves_the_other_forms_alone() {
+    let w = W::new();
+    let lock = w.p("check.lock");
+    let r = w.request();
+    let body = r.to_string();
+    let out = ap_deliver(&["check"], body.as_bytes(), &lock);
+    assert_eq!(out.status.code(), Some(0));
+    assert_eq!(
+        String::from_utf8(out.stdout).unwrap(),
+        "{\"status\":\"ok\"}\n"
+    );
+    // Nothing is made: no state directory (so no `last.json`), no lock file.
+    assert!(!w.t.join("state").exists());
+    assert!(!std::path::Path::new(&lock).exists());
+    // A refused request: exit 2 and the record of `ap deliver` for it.
+    let mut bad = r.clone();
+    bad["extra"] = json!(1);
+    let body = bad.to_string();
+    let checked = ap_deliver(&["check"], body.as_bytes(), &lock);
+    let plain = ap_deliver(&[], body.as_bytes(), &lock);
+    assert_eq!(
+        (checked.status.code(), plain.status.code()),
+        (Some(2), Some(2))
+    );
+    let (a, b): (Value, Value) = (
+        serde_json::from_slice(&checked.stdout).unwrap(),
+        serde_json::from_slice(&plain.stdout).unwrap(),
+    );
+    assert_eq!(without_at(a.clone()), without_at(b));
+    assert_eq!(
+        (a["code"].as_str(), a["detail"].clone()),
+        (Some("invalid_input"), json!({"field": "extra"}))
+    );
+    // Standard input that is not JSON is refused as `stdin`; another argument as `args`.
+    let out = ap_deliver(&["check"], b"{", &lock);
+    let v: Value = serde_json::from_slice(&out.stdout).unwrap();
+    assert_eq!(
+        (out.status.code(), v["detail"].clone()),
+        (Some(2), json!({"field": "stdin"}))
+    );
+    for args in [&["check", "x"][..], &["x"], &["check", "check"]] {
+        let out = ap_deliver(args, body.as_bytes(), &lock);
+        let v: Value = serde_json::from_slice(&out.stdout).unwrap();
+        assert_eq!(out.status.code(), Some(2), "{args:?}");
+        assert_eq!(v["detail"], json!({"field": "args"}), "{args:?}");
+    }
+    assert!(!w.t.join("state").exists());
+    assert!(!std::path::Path::new(&lock).exists());
 }

@@ -55,6 +55,8 @@ pub struct Refusal {
 /// What ends the loop early: a stop the store records, or a refusal or failure that ends the call (R22).
 enum Halt {
     Stop(String, String),
+    /// A stop of a failed `gh` call: the cause, the detail and the call's reply, redacted (R22, R25).
+    Said(String, String, String),
     Fail(Failure),
 }
 impl From<Failure> for Halt {
@@ -63,26 +65,53 @@ impl From<Failure> for Halt {
     }
 }
 type Step<T = ()> = Result<T, Halt>;
-/// A path a unit of class `plain` may not change (R36): `path` is repository-relative.
+/// A path a unit of class `plain` may not change (R36): `path` is repository-relative, and every
+/// name is compared without case (`CI/x`, `.GitHub/…`).
 fn protected(path: &str) -> bool {
-    const EXACT: [&str; 6] = [
+    const EXACT: [&str; 4] = [
         "check",
-        "REVIEW.md",
-        "rust-toolchain",
-        "rust-toolchain.toml",
+        "review.md",
         "ontology/rehearsal.sh",
-        "ontology/ENGINE-PIN",
+        "ontology/engine-pin",
     ];
-    const NAMES: [&str; 4] = [
+    // The last component, in any directory: Cargo, rustfmt and rustup read them below the root too.
+    const NAMES: [&str; 6] = [
         "clippy.toml",
         ".clippy.toml",
         "rustfmt.toml",
         ".rustfmt.toml",
+        "rust-toolchain",
+        "rust-toolchain.toml",
     ];
-    const TREES: [&str; 5] = ["ci", ".github", "specs", "scripts", ".cargo"];
-    let last = path.rsplit('/').next().unwrap_or(path);
-    let first = path.split('/').next().unwrap_or(path);
-    EXACT.contains(&path) || NAMES.contains(&last) || TREES.contains(&first)
+    // The last two components, in any directory: Cargo's configuration below the root.
+    const CONFIGS: [&str; 2] = [".cargo/config.toml", ".cargo/config"];
+    const TREES: [&str; 7] = [
+        "ci", ".github", "specs", "scripts", ".cargo", "deploy", "etc",
+    ];
+    let path = path.to_lowercase();
+    let last = path.rsplit('/').next().unwrap_or(&path);
+    let first = path.split('/').next().unwrap_or(&path);
+    let config = CONFIGS
+        .iter()
+        .any(|c| path == *c || path.ends_with(&format!("/{c}")));
+    EXACT.contains(&path.as_str()) || NAMES.contains(&last) || TREES.contains(&first) || config
+}
+/// `gh pr merge` with `words`: `Err` with the redacted reply when it failed (no reply: empty).
+fn merge_call(s: &mut impl System, words: &str) -> Result<(), String> {
+    match s.call("gh", &args(&w(words)), &Value::Null, 120_000) {
+        Ok(r) if r.success => Ok(()),
+        Ok(r) => Err(crate::unit::redact(&r.bytes)),
+        Err(_) => Err(String::new()),
+    }
+}
+/// Whether Git's message says a ref was locked by another process: two fetches into one clone at
+/// once (two units of one repository), the one cause of a failed fetch that a second try removes.
+pub(crate) fn racing(message: &[u8]) -> bool {
+    message.windows(15).any(|w| w == b"cannot lock ref")
+}
+/// A stop that keeps the redacted reply of the failed `gh` call that caused it.
+fn said<T>(cause: &str, detail: impl ToString, reply: String) -> Step<T> {
+    Err(Halt::Said(cause.to_owned(), detail.to_string(), reply))
 }
 fn stop<T>(cause: &str, detail: impl ToString) -> Step<T> {
     Err(Halt::Stop(cause.to_owned(), detail.to_string()))
@@ -218,23 +247,30 @@ pub fn execute(
         }),
         false => run.drive(s),
     });
+    let driven = driven.map_err(|h| match h {
+        Halt::Said(cause, detail, reply) => (Halt::Stop(cause, detail), Some(reply)),
+        other => (other, None),
+    });
     let answered = match driven {
         Ok(out) => run.answer(s, None, &out),
-        // A unit that is not running is not stopped: the answer names the refusal (R22, R30).
-        Err(Halt::Stop(cause, _)) if run.u["state"] != "running" => {
+        // A unit that is not running is not stopped: the answer names the refusal, and the reply
+        // of a failed `gh` call that caused it as `detail` (R22, R25, R30).
+        Err((Halt::Stop(cause, _), reply)) if run.u["state"] != "running" => {
             let out = Outcome {
                 refused: Some(cause),
+                detail: reply,
                 ..Outcome::default()
             };
             run.answer(s, None, &out)
         }
-        Err(Halt::Stop(cause, detail)) => {
+        Err((Halt::Stop(cause, detail), _)) => {
             let detail = cut(&detail, DETAIL);
             let p = json!({"unit": id("unit", key), "cause": cause, "detail": detail});
             let stopped = run.apply(s, "stop_unit", p);
             stopped.and_then(|_| run.answer(s, Some((&cause, &detail)), &Outcome::default()))
         }
-        Err(Halt::Fail(f)) => Err(f),
+        Err((Halt::Fail(f), _)) => Err(f),
+        Err((Halt::Said(..), _)) => unreachable!("a stop with a reply was taken apart above"),
     };
     let status = if run.applied || ended { 3 } else { 2 };
     answered.map_err(|f| refusal(f, status, true))
@@ -246,6 +282,8 @@ struct Outcome {
     merged_commit: Option<String>,
     cleanup: Option<Value>,
     refused: Option<String>,
+    /// The redacted reply of the failed `gh` call that caused `refused`.
+    detail: Option<String>,
 }
 
 /// An author record under `<directory>/<key>/`: `<n>.implementer.md.run.json` or `<n>.fixer.md.run.json`.
@@ -794,7 +832,16 @@ impl Run {
             "origin",
             what,
         ];
-        let fetched = s.call("git", &args(&words), &Value::Null, 120_000);
+        let mut fetched = s.call("git", &args(&words), &Value::Null, 120_000);
+        // A fetch of `main` that raced another one on the same clone is tried once more (R8).
+        if what == "main"
+            && fetched
+                .as_ref()
+                .is_ok_and(|r| !r.success && racing(&r.bytes))
+        {
+            s.pause(Duration::from_secs(1));
+            fetched = s.call("git", &args(&words), &Value::Null, 120_000);
+        }
         match fetched.is_ok_and(|r| r.success) {
             true => Ok(()),
             false => stop("fetch_failed", what),
@@ -802,7 +849,13 @@ impl Run {
     }
     fn gh(&self, s: &mut impl System, words: &str) -> Step<Value> {
         let reply = s.call("gh", &args(&w(words)), &Value::Null, 60_000);
-        let v = reply.ok().filter(|r| r.success);
+        // A call that ran and failed keeps its reply, redacted, in the detail (R22, R25).
+        if let Some(r) = reply.as_ref().ok().filter(|r| !r.success) {
+            let reply = crate::unit::redact(&r.bytes);
+            let detail = json!({"call": &words[..7], "reply": reply});
+            return said("github_unreadable", detail, reply);
+        }
+        let v = reply.ok();
         let v = v.and_then(|r| serde_json::from_slice::<Value>(&r.stdout).ok());
         v.map_or_else(|| stop("github_unreadable", &words[..7]), Ok)
     }
@@ -1632,25 +1685,38 @@ impl Run {
         let review = v.of(head).map(|(k, _)| k.clone()).unwrap_or_default();
         let target = json!({"repository": self.repo, "head": head});
         let posted = review::post(s, &target, "success", &format!("review {review} accept"));
-        posted.or_else(|_| stop("status_failed", json!({"head": head})))?;
+        if let Err(f) = posted {
+            let reply = f.detail.as_str().unwrap_or_default().to_owned();
+            return said("status_failed", json!({"head": head}), reply);
+        }
         let words = format!(
             "pr merge {n} --repo {} --merge --match-head-commit {head}",
             self.repo
         );
-        let called = s.call("gh", &args(&w(&words)), &Value::Null, 120_000);
-        let called = called.is_ok_and(|r| r.success);
+        let mut called = merge_call(s, &words);
         // The read decides, also after a call that failed: it may have merged.
-        let read = self.pull(s, n).ok();
+        let mut read = self.pull(s, n).ok();
+        // A merge refused for a status GitHub had not yet taken: once more, when the head's
+        // `lead-review` reads `success`, after a pause (R31).
+        let open = read.as_ref().is_some_and(|p| p["state"] != "MERGED");
+        if called.is_err()
+            && open
+            && review::lead_review(s, &self.repo, head).as_deref() == Some("success")
+        {
+            s.pause(Duration::from_secs(5));
+            called = merge_call(s, &words);
+            read = self.pull(s, n).ok();
+        }
         let merged = read.filter(|p| {
             p["state"] == "MERGED" && p["headRefOid"] == head && p["baseRefName"] == "main"
         });
         let commit = merged.and_then(|p| p["mergeCommit"]["oid"].as_str().map(str::to_owned));
         let Some(commit) = commit.filter(|c| hex40(c)) else {
-            if called {
+            let Err(reply) = called else {
                 return stop("merge_unconfirmed", json!({"head": head}));
-            }
+            };
             let _ = review::post(s, &target, "failure", "merge failed");
-            return stop("merge_failed", json!({"head": head}));
+            return said("merge_failed", json!({"head": head}), reply);
         };
         let p = self.merge_parameters(head, &commit);
         self.record_merge(s, rid, p)
@@ -1759,7 +1825,9 @@ impl Run {
         let v = match self.verdicts(s) {
             Ok(v) => v,
             Err(Halt::Fail(f)) => return Err(f),
-            Err(Halt::Stop(..)) => return Err(error("store_answer_unreadable", "reviews")),
+            Err(Halt::Stop(..) | Halt::Said(..)) => {
+                return Err(error("store_answer_unreadable", "reviews"));
+            }
         };
         let one = |(k, r): &(String, Value)| json!({"key": k, "round": r["round"], "head": r["head"], "verdict": r["verdict"]});
         let u = &self.u;
@@ -1780,6 +1848,9 @@ impl Run {
         }
         if let Some(code) = &out.refused {
             a["refused"] = json!(code);
+            if let Some(reply) = &out.detail {
+                a["detail"] = json!(reply);
+            }
             return Ok((a, 3));
         }
         if u["state"] == "accepted" {
@@ -1923,4 +1994,69 @@ pub fn decide(
         json!({"unit": key, "outcome": applied.outcome, "state": back["state"],
         "lead_review": posted}),
     )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::protected;
+
+    /// Every protected path of R36, and the neighbours that are not (`specs/ap/unit-run.md` R36).
+    #[test]
+    fn r36_the_protected_paths_are_pinned() {
+        let held = [
+            "check",
+            "REVIEW.md",
+            "review.md",
+            "rust-toolchain",
+            "rust-toolchain.toml",
+            "crates/x/rust-toolchain.toml",
+            "sub/rust-toolchain",
+            "ontology/rehearsal.sh",
+            "ontology/ENGINE-PIN",
+            "clippy.toml",
+            ".clippy.toml",
+            "crates/x/clippy.toml",
+            "rustfmt.toml",
+            ".rustfmt.toml",
+            "crates/x/.rustfmt.toml",
+            "ci",
+            "ci/x",
+            "CI/x",
+            ".github/workflows/rust.yml",
+            ".GitHub/workflows/rust.yml",
+            "specs/ap/unit.md",
+            "scripts/",
+            "scripts/install-ap.sh",
+            ".cargo",
+            ".cargo/config.toml",
+            "crates/x/.cargo/config.toml",
+            "crates/x/.cargo/config",
+            "crates/x/.Cargo/Config.toml",
+            "deploy",
+            "deploy/ap-deliver.timer",
+            "Deploy/x",
+            "etc",
+            "etc/agent-platform/policy.json",
+        ];
+        for path in held {
+            assert!(protected(path), "{path}");
+        }
+        let free = [
+            "checks/x",
+            "docs/specs/x",
+            "crates/ci/x",
+            "crates/x/deploy/x",
+            "src/etc/x",
+            "REVIEW.md.bak",
+            "ontology/README.md",
+            "crates/x/cargo/config.toml",
+            "crates/x/.cargo/other.toml",
+            "rust-toolchain.txt",
+            "deployment/x",
+            "etcetera",
+        ];
+        for path in free {
+            assert!(!protected(path), "{path}");
+        }
+    }
 }
