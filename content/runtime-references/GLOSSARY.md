@@ -4,7 +4,7 @@ One word for one thing. Read this when a word in an instruction, a packet or the
 
 ## 1. Rules
 
-- The core terms (Lead, worker, task directory, STATE, packet, report, effect, hold, evidence, merged, installed, loaded, objective, KPI, guardrail) are defined in `/root/.agents/AGENTS.md` section 8 and are not repeated here.
+- The core terms are not repeated here: `ap status --term <word>` prints what a word of the life cycle means (`/root/.agents/AGENTS.md` section 3), and merged, installed and loaded are defined in `/root/.agents/AGENTS.md` section 4.
 - Use the term in the first column exactly. Do not write the words in the last column: the content check fails a pull request that contains one of them outside this file.
 - A term that is not here and not in `AGENTS.md` gets a definition at its first use in the file that needs it. Add it here when a second file needs it.
 - Packets, STATE files and reports use these terms. The user's own wording stays in the conversation and in the decision record that quotes it.
@@ -54,7 +54,7 @@ One word for one thing. Read this when a word in an instruction, a packet or the
 | operational fact | What is true of a running system or a domain record now | A deployed revision, a KPI value | — |
 | correction | A dated document that says what an earlier record claimed, what is true now and the evidence | For an engineering record, an edit of the same Git original through review; see `CONTEXT-GOVERNANCE.md` section 9 | — |
 
-Where each kind is written: `/root/.agents/AGENTS.md` section 6.
+Where each kind is written: `CONTEXT-GOVERNANCE.md` section 6.
 
 ## 5. Measurement
 
@@ -83,7 +83,7 @@ Only the Lead needs this section. The user speaks Korean, shortens names, and so
 | 수업 세션 | A CLI session the user runs while teaching | Never send input to it or close it |
 | 워커, 서브에이전트, 에이전트들 | Workers; sometimes every agent on the host including Leads | — |
 | 새 Lead, 새 세션 | The Lead session that takes the task over next | — |
-| 라우팅 | Either which file an agent opens for a situation, or which model gets which work | The first is the table in `AGENTS.md` section 3 and `CONTEXT-GOVERNANCE.md`; the second is the assignment file |
+| 라우팅 | Either which file an agent opens for a situation, or which model gets which work | The first is `AGENTS.md` section 8 and `CONTEXT-GOVERNANCE.md`; the second is the assignment file |
 | 컨텍스트 거버넌스, Context Governance | Which context each agent loads, from which one home, in what order, without wasted reads or a wrong choice | `CONTEXT-GOVERNANCE.md` |
 | reference-docs, 레퍼런스 문서 | The local copies of the Anthropic, Palantir, Rust and Spec-Driven Development sources under `/home/palantirkc/external/reference-docs/` | Read only the lines a row of `OFFICIAL-DOCS.md` section 4 names, never the whole corpus |
 | 지표, 메트릭, KPI | A number the user wants watched; often a metric that is not yet a KPI | Write it as a criterion of the intent (section 5) before using it |
