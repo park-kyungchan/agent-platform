@@ -269,20 +269,18 @@ fn inherited(
     })
 }
 /// The head of the request `key` this call created, from `ont search` of the requests of its
-/// `session`, `topic` and `said_at` (the head only: `ont get` answers every observation of an object,
-/// which passes 1 MiB for a request routed often); no such row is `store_answer_unreadable`.
+/// `topic` and `said_at` (the head only: `ont get` answers every observation of an object, which
+/// passes 1 MiB for a request routed often); no such row is `store_answer_unreadable`. Not filtered
+/// by `session`: it is optional, and the engine answers a search filtered on an optional property
+/// `qualified: false` once a scanned request lacks it.
 fn read_back(
     s: &mut impl System,
     store: Option<&str>,
-    (session, topic, said_at): (&str, &str, &str),
+    (topic, said_at): (&str, &str),
     key: &str,
 ) -> Result<Value, Failure> {
     let eq = |k: &str, v: &str| json!({"eq": [k, v]});
-    let all = vec![
-        eq("session", session),
-        eq("topic", topic),
-        eq("said_at", said_at),
-    ];
+    let all = vec![eq("topic", topic), eq("said_at", said_at)];
     let rows = at(store::search(s, store, "request", all), "request")?;
     let row = rows.into_iter().find(|(k, _)| k == key);
     Ok(row
@@ -351,7 +349,7 @@ fn record(
         .ok_or_else(|| error("store_answer_unreadable", "record"))?
         .to_owned();
     *done = Some(key.clone());
-    let back = read_back(s, store, (actor.session, topic, &w.said_at), &key)?;
+    let back = read_back(s, store, (topic, &w.said_at), &key)?;
     if back["words"].as_str() != Some(w.text.as_str()) {
         return Err(error("readback_differs", "words"));
     }
