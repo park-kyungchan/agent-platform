@@ -90,6 +90,26 @@ class CheckContent(Scratch, unittest.TestCase):
         self.assertIn(f'unknown_readme_section@content/{TARGET}:{line}: "Gone"', out)
 
 
+class RetiredNames(Scratch, unittest.TestCase):
+    """A file of content/ that names a removed skill or path fails, with its file and line."""
+
+    def test_a_retired_skill_or_path_fails(self):
+        for name in ("lessons-loop", "hindsight-control", "memory/README.md", "publish-memory", "evaluate-memory"):
+            with self.subTest(name=name):
+                root = self.fixture()
+                line = self.append(root, f"See {name} for the rest.")
+                code, out = run_check(root)
+                self.assertEqual(code, 1, out)
+                self.assertIn(f"retired_name@content/{TARGET}:{line}: {name}", out)
+
+    def test_no_retired_name_passes(self):
+        root = self.fixture()
+        self.append(root, "See the lead skill for the closure of a worker.")
+        code, out = run_check(root)
+        self.assertEqual(code, 0, out)
+        self.assertNotIn("retired_name@", out)
+
+
 class ModelNamesAndLimits(Scratch, unittest.TestCase):
     """Only the Lead's table of the allowed models may name a model; the Lead's and report's files have byte limits."""
 
