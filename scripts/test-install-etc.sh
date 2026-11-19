@@ -132,7 +132,7 @@ merge_pr() { # <n> <extra file or ->: a feature branch with policy version n, me
   H[$n]=$(git -C "$work" rev-parse HEAD)
   git -C "$work" checkout -q main
   if [[ $n == 9 ]]; then
-    git -C "$work" merge -q --no-ff --no-commit "$branch" >/dev/null
+    git -C "$work" merge -q --no-ff --no-commit "$branch" >/dev/null 2>&1
     echo extra >"$work/extra.txt"
     git -C "$work" add -A
     git -C "$work" commit -q -m "Merge pull request #$n from owner/$branch"
