@@ -10,7 +10,7 @@ A change belongs to the area that owns the fact it changes.
 | --- | --- | --- | --- |
 | Engine | Typed objects and their observations, actions with criteria, authorization, views (the Ontology) | `ontology-platform` | `/usr/local/bin/ont`; store and install state under `/var/lib/ontology-platform/` |
 | Domain | The private-academy teaching domain: reads of the Academy server, the lesson workflow, the teacher's records, the Academy MCP server | `education-platform`; modules `education-dc-gang-a`, `education-problem-edit` | The Academy rows of section 4 |
-| Harness | How agents work here: the command `ap`, the shared instructions and skills, the work schema of the store, the engineering memory records, the evaluation suites, the delivery of its own install | `agent-platform` | `/usr/local/bin/ap`; `/root/.agents/`; state under `/var/lib/agent-platform/`; the timer `ap-deliver.timer` |
+| Harness | How agents work here: the command `ap`, the shared instructions and skills, the work schema of the store, the evaluation suites, the delivery of its own install | `agent-platform` | `/usr/local/bin/ap`; `/root/.agents/`; state under `/var/lib/agent-platform/`; the timer `ap-deliver.timer` |
 | Host operations | Remote host and Hermes operations | `agent-vps-operations` | `/usr/local/bin/vps-ops` |
 | Memory service | Long-term memory (Hindsight), a container on this host; no first-party source | none | `/docker/hindsight/`; agent integration under `/root/.hindsight/` |
 
@@ -29,7 +29,6 @@ Main checkouts are under `/home/palantirkc/platforms/<repository>/` unless a pat
 | `agent-platform` | `crates/ap` | The command `ap`: `unit` (one unit of work in one call, from its page or a request), `run` (one stage), `gate`, `review`, `accept`, `deliver` (the install of an accepted merge of `main`), `backlog` (the board), `state` (a task directory's unit calls and stages; no holds: the view `active_holds`), `row` (one user's row), `version`; `ap --help` names the README section of each | `README.md` (by section; it is long), then the file named after the verb under `src/` |
 | | `content/` | Source of `/root/.agents/`: `AGENTS.md`, `runtime-references/`, `skills/`, with `SHA256SUMS` | `content/README.md` |
 | | `ontology/` | `work.schema.json`: the store's object and action types for tasks (holds, decisions, KPIs and measurements, reviews, install attempts, worker runs); the file is the list | `ontology/README.md` |
-| | `memory/` | Engineering memory: checked originals and their publisher | `memory/README.md` |
 | | `evals/` | The suites and the cost read-out: `instructions/` (weak readers route from the shared instructions; each case scored by the files read and the tokens found), `engineering/` (cases cut from merged units, judged by an executable), `lead/` (frozen situations of a Lead, scored by a model against a rubric), `lesson/` (the lesson replay: recorded daily-record reads against the read store), `readout.py` | `evals/README.md` |
 | | `deploy/` | The systemd units and the request file of the delivery timer | `deploy/README.md` |
 | `education-platform` | `crates/edu-academy-core` | Domain rules and the lesson workflow: intake, review, decision, approval, save, reconciliation and their records | `src/lib.rs`; `src/workflow/` |
@@ -65,7 +64,7 @@ A task's current holds, decisions, KPI values and worker runs are in the Ontolog
 | Ontology store | `/var/lib/ontology-platform/ont/ontology.sqlite`, backups in `backup/` beside it; read and written only through `ont` | The task whose STATE names the object types in use |
 | Academy MCP server in use (`academy_operations`) | install base `/root/.local/share/academy-mcp-host-20261106/`; its `release.json` selects the running generation | `/home/palantirkc/work/edu-mcp-host-restore/STATE.md` |
 | Hindsight | container defined in `/docker/hindsight/`; API on `127.0.0.1:8888` | `/docker/hindsight/STATE.md` and `HINDSIGHT_OFFICIAL_PER_CALL.md` there |
-| Hindsight integration of the CLIs | `/root/.hindsight/coding-agents`; settings `/root/.hindsight/coding-agent.json` (contains a credential: never print it) | skill `hindsight-control` |
+| Hindsight integration of the CLIs | `/root/.hindsight/coding-agents`; settings `/root/.hindsight/coding-agent.json` (contains a credential: never print it) | — |
 | Installed shared instructions | `/root/.agents/AGENTS.md`, `runtime-references/`, `skills/` | `agent-platform` `content/` |
 | Delivery of `ap` and the shared instructions | the timer `ap-deliver.timer`; its request `/etc/agent-platform/deliver.json`; its state under `/var/lib/agent-platform/deliver/` | `agent-platform` `deploy/README.md` |
 | Configuration of each CLI | `CLI-RUNTIMES.md` section 1 | that CLI |

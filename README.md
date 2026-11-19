@@ -9,7 +9,7 @@ earlier installer's verbs were removed; the command refuses them like any
 unknown verb.
 
 `./check` is the one check of this repository and what the CI job `rust` runs:
-the content check, the memory record checks, the test of the install script,
+the content check, the test of the install script,
 format, lints as errors, all tests, and the rehearsal of `ontology/work.schema.json`
 against the engine revision in `ontology/ENGINE-PIN`.
 How an agent works here: [AGENTS.md](AGENTS.md). What blocks a pull request: [REVIEW.md](REVIEW.md).

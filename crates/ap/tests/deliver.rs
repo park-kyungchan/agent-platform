@@ -1679,6 +1679,9 @@ fn d6_a_close_after_an_unrecorded_repair_records_no_partial_tree() {
     assert!(std::fs::exists(w.tarball()).unwrap());
     assert_eq!(v["rollback_content"], Value::Null);
     w.close_fails = false;
+    // The first call launched the content installer with the lock inheritable: wait for any child
+    // another test started in that window to let it go.
+    w.settle();
     let (v, exit) = w.run();
     assert_eq!((end(&v), exit), (("current", ""), 0), "{v}");
     let closes = w.applies("close_install");

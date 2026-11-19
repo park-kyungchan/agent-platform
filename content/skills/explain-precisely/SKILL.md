@@ -74,7 +74,7 @@ chat. These references are CLI-agnostic and do not change task authority.
 
 ## Profile and glossary contract
 
-Check current native source for the requested term/mechanism. Where memory is on, its route is `memory/README.md` of `agent-platform`. Explain in clear Korean with the actual programming terms; use no metaphor. State concrete input, executor and result, then the steps and details needed for the user's learning. Distinguish source fact from inference and do not claim a concept was understood merely because it was explained. Keep a scoped user preference and the terms actually explained, with dated evidence and feedback, in authorized `user-profile`/`glossary` engineering records; do not store the whole conversation, demographics, private payloads or inferred ability. Reuse stable term identity and correct a materially changed meaning with provenance. In a no-write task, make no Hindsight write and leave only the allowed local note. Credit retrieved memory when it contributes.
+Check current native source for the requested term/mechanism. Explain in clear Korean with the actual programming terms; use no metaphor. State concrete input, executor and result, then the steps and details needed for the user's learning. Distinguish source fact from inference and do not claim a concept was understood merely because it was explained. Keep a scoped user preference and the terms actually explained, with dated evidence and feedback, in authorized `user-profile`/`glossary` engineering records; do not store the whole conversation, demographics, private payloads or inferred ability. Reuse stable term identity and correct a materially changed meaning with provenance. In a no-write task, make no Hindsight write and leave only the allowed local note. Credit retrieved memory when it contributes.
 
 If memory is disabled for this worker, use its exact source packet and record the
 retrieval gap rather than enabling a client or changing host configuration.
@@ -83,8 +83,7 @@ in the current context. A recalled definition never replaces current source.
 
 Keep preferences in a scoped profile; glossary records link that profile instead
 of copying it. Record only terms actually explained, never a predicted syllabus.
-`user-profile` and `glossary` are engineering records. Their format, identity
-and write route are in `agent-platform` `memory/README.md`.
+`user-profile` and `glossary` are engineering records.
 A write requires current task authority; a no-write task leaves a local handoff
 in the task directory, named in STATE.
 

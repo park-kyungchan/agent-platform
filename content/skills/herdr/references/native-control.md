@@ -201,7 +201,7 @@ If a larger recent read still does not reveal the completed response, ask the ag
 
 ## Result and closure
 
-Read the actual output/artifact and reconcile owned processes and uncertain effects using [worker closure](../../lessons-loop/references/worker-closure.md). A DONE marker, successful submission or idle state is only a signal to inspect. Preserve native session identity/results within task authority; do not import another transcript or require a lesson for routine success.
+Read the actual output/artifact and reconcile owned processes and uncertain effects using [the Lead's worker closure](../../lead/SKILL.md) (section "Your own limits"). A DONE marker, successful submission or idle state is only a signal to inspect. Preserve native session identity/results within task authority; do not import another transcript or require a lesson for routine success.
 
 ## Safety and coordination rules
 
