@@ -37,7 +37,9 @@ fn flag_in_help(help: &str, flag: &str) -> bool {
 fn run_cli(s: &mut impl System, name: &str, args: &[&str]) -> Option<String> {
     let words: Vec<String> = args.iter().map(|a| (*a).to_owned()).collect();
     match s.call(name, &words, &Value::Null, MS) {
-        Ok(r) if r.success => Some(String::from_utf8_lossy(&r.stdout).into_owned()),
+        // `bytes`: standard output, or standard error when standard output is empty (a CLI may
+        // print its `--help` on standard error with exit 0).
+        Ok(r) if r.success => Some(String::from_utf8_lossy(&r.bytes).into_owned()),
         _ => None,
     }
 }

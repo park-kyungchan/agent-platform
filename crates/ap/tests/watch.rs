@@ -2861,6 +2861,34 @@ impl System for RunFake {
 
 // spec: specs/ap/watch.md#R26
 #[test]
+fn r26_a_help_printed_on_standard_error_is_read() {
+    // A CLI that prints its `--help` on standard error with exit 0 (the installed Antigravity CLI
+    // does): the host's reply then carries the text in `bytes` with an empty `stdout`.
+    fn on_stderr(text: &str) -> Answer {
+        Ok(Reply {
+            success: true,
+            stdout: vec![],
+            bytes: text.as_bytes().to_vec(),
+        })
+    }
+    let mut f = F::quiet();
+    let spec = RUNTIMES.iter().find(|r| r.name == "agy").unwrap();
+    let help = spec
+        .flags
+        .iter()
+        .map(|fl| format!("  {fl}  flag\n"))
+        .collect::<String>();
+    f.cli_version.insert("agy".into(), ok("agy 2.0.0\n"));
+    f.cli_help
+        .insert(("agy".into(), String::new()), on_stderr(&help));
+    f.at(5);
+    let v = f.pass();
+    assert_eq!(v["opened"], json!([]), "{v}");
+    assert_eq!(f.state()["runtimes"]["agy"]["version"], "agy 2.0.0");
+}
+
+// spec: specs/ap/watch.md#R26
+#[test]
 fn r26_runtimes_flag_lists_match_ap_run_stages() {
     let mut rf = RunFake::new();
     let mut requests = vec![];
