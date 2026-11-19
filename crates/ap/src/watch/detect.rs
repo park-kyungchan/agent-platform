@@ -214,6 +214,7 @@ fn show(s: &mut impl System, units: &[&str], props: &[&str]) -> Result<Vec<Value
     for p in props {
         words.extend(["-p", p]);
     }
+    words.push("--");
     words.extend(units);
     let out = output(s, "systemctl", &words)?;
     let blocks: Vec<Value> = out
