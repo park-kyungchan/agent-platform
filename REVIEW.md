@@ -4,7 +4,7 @@ For the one reviewer session of a pull request (and for the automatic reviewer).
 
 ## A finding blocks only when it is one of these, shown by a command, a test or two quoted sentences
 
-1. Wrong behaviour of `ap` or of a script: a request that must be refused is admitted or the reverse; an answer that contradicts `crates/ap/README.md`; an install, a recovery or a close that leaves the host or the store in a state the contract excludes.
+1. Wrong behaviour of `ap` or of a script: a request that must be refused is admitted or the reverse; an answer that contradicts `crates/ap/README.md`, or, for a kept verb, its specification under `specs/ap/` (the README routes to it); an install, a recovery or a close that leaves the host or the store in a state the contract excludes.
 2. Loss or exposure of data: an installation that destroys bytes it does not own or keeps no previous bytes; a credential, a private path's content or student data in the tree.
 3. A broken contract: `ap` parses an engine answer in a shape the engine revision of `ontology/ENGINE-PIN` does not give; the schema `work` changes its installed meaning; `content/SHA256SUMS` and the files of `content/` disagree.
 4. Instructions an agent cannot follow: two sentences of `content/` that contradict each other so that an agent following both cannot act (quote both with file and line); a route to a missing file or section; a sentence that removes a safety rule (holds, never force-push, merge only on the reviewed head, install with readback, privacy limits).

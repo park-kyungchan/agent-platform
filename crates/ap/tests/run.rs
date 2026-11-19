@@ -485,6 +485,9 @@ fn gone(pid_file: &Path) -> bool {
 
 // ---- A1 ------------------------------------------------------------------------------------
 
+// spec: specs/ap/run.md#R17
+// spec: specs/ap/run.md#R18
+// spec: specs/ap/run.md#R25
 #[test]
 fn a1_answer_is_saved_byte_for_byte_and_the_record_has_every_member() {
     let mut f = Fake::new();
@@ -567,6 +570,7 @@ fn a1_answer_is_saved_byte_for_byte_and_the_record_has_every_member() {
     );
 }
 
+// spec: specs/ap/run.md#R11
 #[test]
 fn a1_the_running_record_exists_while_the_cli_runs() {
     let mut f = Fake::new();
@@ -585,6 +589,7 @@ fn a1_the_running_record_exists_while_the_cli_runs() {
 
 // ---- A3 ------------------------------------------------------------------------------------
 
+// spec: specs/ap/run.md#R13
 #[test]
 fn a3_no_herdr_or_inherited_claude_variable_and_hooks_and_mcp_off() {
     let mut f = Fake::new();
@@ -686,6 +691,7 @@ fn a2_account_and_model_from_the_request() {
 /// `next_accounts`, by its path and by an alias that resolves to it. A request that names it as
 /// `account` runs there; one that names it in `next_accounts` reaches it when the first account is
 /// cut before any work.
+// spec: specs/ap/run.md#R7
 #[test]
 fn a1_lead_account_is_admitted_for_every_role() {
     let mut f = Fake::new();
@@ -765,6 +771,8 @@ fn a1_lead_account_is_admitted_for_every_role() {
 
 /// A1: a reviewer changes no file, so a reviewer cut at any point, after tools ran too, is run
 /// again on the next account with a new session, in the same run and its one record.
+// spec: specs/ap/run.md#R14
+// spec: specs/ap/run.md#R20
 #[test]
 fn a1_reviewer_cut_after_work_goes_to_the_next_account() {
     let mut f = Fake::new();
@@ -808,6 +816,7 @@ fn a1_reviewer_cut_after_work_goes_to_the_next_account() {
 
 /// A1: an implementer or a fixer cut after a tool ran goes on at the next account (CUT1), as a
 /// new session.
+// spec: specs/ap/run.md#R20
 #[test]
 fn a1_implementer_cut_after_work_goes_to_the_next_account() {
     let mut f = Fake::new();
@@ -829,6 +838,9 @@ fn a1_implementer_cut_after_work_goes_to_the_next_account() {
 /// (b) cut after work, (c) resume on the recorded account; "an earlier answer under the same
 /// name" becomes: an existing `out` refuses and nothing of it is touched; a failed resume leaves
 /// the session resumable from its own record.
+// spec: specs/ap/run.md#R8
+// spec: specs/ap/run.md#R11
+// spec: specs/ap/run.md#R22
 #[test]
 fn a2_cut_after_work_resume_and_an_existing_out_refuses() {
     let mut f = Fake::new();
@@ -889,6 +901,7 @@ fn a2_cut_after_work_resume_and_an_existing_out_refuses() {
 
 /// "relative prompt and out paths": every path is absolute; a relative one is refused and nothing
 /// starts.
+// spec: specs/ap/run.md#R2
 #[test]
 fn a2_relative_paths_are_refused() {
     let mut f = Fake::new();
@@ -907,6 +920,7 @@ fn a2_relative_paths_are_refused() {
 
 /// "watchdog ends a leftover shell below the reviewer": the session answers and then waits for a
 /// shell it started; the run ends at the answer, and nothing of it is alive after the return.
+// spec: specs/ap/run.md#R15
 #[test]
 fn a2_a_leftover_shell_does_not_hold_the_run() {
     let mut f = Fake::new();
@@ -950,6 +964,8 @@ fn a2_another_sessions_record_does_not_end_the_run() {
 }
 
 /// (b2) cut before any work: the next account takes the prompt; all accounts cut: exit 75.
+// spec: specs/ap/run.md#R18
+// spec: specs/ap/run.md#R20
 #[test]
 fn a2_cut_before_work_tries_the_next_account() {
     let mut f = Fake::new();
@@ -980,6 +996,8 @@ fn f_request_with_next(f: &Fake, out: &str) -> Value {
 
 /// (d) "unknown role" and "out file named in the prompt": refused, nothing started, and a
 /// refusal writes no file at all.
+// spec: specs/ap/run.md#R2
+// spec: specs/ap/run.md#R8
 #[test]
 fn a2_unknown_role_and_out_named_in_prompt() {
     let mut f = Fake::new();
@@ -998,6 +1016,8 @@ fn a2_unknown_role_and_out_named_in_prompt() {
 
 // ---- the other invariants ------------------------------------------------------------------
 
+// spec: specs/ap/run.md#R9
+// spec: specs/ap/run.md#R34
 #[test]
 fn refusals_codex_systemd_members() {
     let mut f = Fake::new();
@@ -1019,6 +1039,7 @@ fn refusals_codex_systemd_members() {
     assert!(f.calls().is_empty() && f.launches.is_empty());
 }
 
+// spec: specs/ap/run.md#R9
 #[test]
 fn a_fresh_implementer_refuses_a_dirty_worktree() {
     let mut f = Fake::new();
@@ -1048,6 +1069,7 @@ fn a_fresh_implementer_refuses_a_dirty_worktree() {
     assert_eq!(f.run(&r).unwrap().0["state"], "ok");
 }
 
+// spec: specs/ap/run.md#R17
 #[test]
 fn ok_means_the_expected_result_and_denials_are_recorded() {
     let mut f = Fake::new();
@@ -1093,6 +1115,8 @@ fn ok_means_the_expected_result_and_denials_are_recorded() {
 
 // ---- repair 1 --------------------------------------------------------------------------------
 
+// spec: specs/ap/run.md#R17
+// spec: specs/ap/run.md#R18
 #[test]
 fn p3_a_preamble_before_the_verdict_is_no_result() {
     for (runtime, role) in [
@@ -1152,6 +1176,7 @@ fn p3_a_preamble_before_the_verdict_is_no_result() {
 
 /// R1: a result is not final while a shell the session started lives. An implementer's stage runs
 /// to the exit and keeps the LAST answer; a reviewer's ends at the first.
+// spec: specs/ap/run.md#R15
 #[test]
 fn r1_an_implementer_runs_to_the_exit_a_reviewer_ends_at_the_first_result() {
     let mut f = Fake::new();
@@ -1196,6 +1221,7 @@ fn r1_an_implementer_runs_to_the_exit_a_reviewer_ends_at_the_first_result() {
 
 /// A fixer whose shell never ends runs to the bound: state `timeout`, the last answer saved, and
 /// the record says whether `expect` was met.
+// spec: specs/ap/run.md#R17
 #[test]
 fn r1_a_fixer_whose_shell_never_ends_times_out_with_its_last_answer() {
     let mut f = Fake::new();
@@ -1230,6 +1256,7 @@ fn r1_a_fixer_whose_shell_never_ends_times_out_with_its_last_answer() {
 
 /// Item 1: a finished answer is never read as a cut. Without `is_error`, the usage-limit text is
 /// a cut only with a rejected rate-limit event in the stream.
+// spec: specs/ap/run.md#R17
 #[test]
 fn item01_a_finished_answer_is_not_a_cut() {
     let mut f = Fake::new();
@@ -1255,6 +1282,7 @@ fn item01_a_finished_answer_is_not_a_cut() {
 
 /// Item 2: `expect.file` is met only by a file this session wrote; a resume keeps the first
 /// launch as the reference.
+// spec: specs/ap/run.md#R19
 #[test]
 fn item02_expect_file_is_met_only_by_a_file_the_session_wrote() {
     let mut f = Fake::new();
@@ -1294,6 +1322,8 @@ fn item02_expect_file_is_met_only_by_a_file_the_session_wrote() {
 
 /// Item 3 (repair 3): a fresh run on an `out` whose record exists is refused by existence; a
 /// resume of a `running` record is refused while its unit is active.
+// spec: specs/ap/run.md#R8
+// spec: specs/ap/run.md#R10
 #[test]
 fn item03_an_existing_record_refuses_and_a_live_unit_refuses_its_resume() {
     let mut f = Fake::new();
@@ -1319,6 +1349,7 @@ fn item03_an_existing_record_refuses_and_a_live_unit_refuses_its_resume() {
 
 /// Item 4: the stream is read through the handle opened before the launch: a file put under its
 /// name cannot feed the run another run's lines, and a pipe under its name cannot block it.
+// spec: specs/ap/run.md#R14
 #[test]
 fn item04_the_stream_is_read_through_its_own_handle() {
     let mut f = Fake::new();
@@ -1341,6 +1372,7 @@ fn item04_the_stream_is_read_through_its_own_handle() {
 
 /// Item 5: after the stop the unit is confirmed not active; a stop that cannot be confirmed is
 /// `failed` with `unmet: stop`, never `ok`.
+// spec: specs/ap/run.md#R15
 #[test]
 fn item05_a_stop_that_is_not_confirmed_is_failed() {
     let mut f = Fake::new();
@@ -1359,6 +1391,7 @@ fn item05_a_stop_that_is_not_confirmed_is_failed() {
 
 /// Item 6: exit 2 is a refusal before any effect; a write that fails after the launch leaves a
 /// final record that is not `running` and exits 5.
+// spec: specs/ap/run.md#R18
 #[test]
 fn item06_a_write_failure_after_the_launch_is_not_a_refusal() {
     let mut f = Fake::new();
@@ -1378,6 +1411,7 @@ fn item06_a_write_failure_after_the_launch_is_not_a_refusal() {
 }
 
 /// Item 7 (repair 3): a refusal writes no file; the earlier record and its session stay.
+// spec: specs/ap/run.md#R7
 #[test]
 fn item07_a_refusal_writes_no_file_and_keeps_the_earlier_record() {
     let mut f = Fake::new();
@@ -1402,6 +1436,7 @@ fn item07_a_refusal_writes_no_file_and_keeps_the_earlier_record() {
 }
 
 /// Item 8: the dirty-worktree rule fails closed and runs `git` in the CLI's clean environment.
+// spec: specs/ap/run.md#R9
 #[test]
 fn item08_the_worktree_check_fails_closed_in_a_clean_environment() {
     let mut f = Fake::new();
@@ -1445,6 +1480,7 @@ fn item08_the_worktree_check_fails_closed_in_a_clean_environment() {
 }
 
 /// Item 9: the request's `env` cannot change the account that answers.
+// spec: specs/ap/run.md#R3
 #[test]
 fn item09_env_refuses_anthropic_names_and_home() {
     let mut f = Fake::new();
@@ -1466,6 +1502,7 @@ fn item09_env_refuses_anthropic_names_and_home() {
 
 /// Item 10: a resume needs the record's `cwd`, and its role or `fixer` over an implementer's or
 /// a fixer's record.
+// spec: specs/ap/run.md#R10
 #[test]
 fn item10_a_resume_keeps_the_cwd_and_the_role() {
     let mut f = Fake::new();
@@ -1502,6 +1539,7 @@ fn item10_a_resume_keeps_the_cwd_and_the_role() {
 }
 
 /// Item 11: a result line without a final newline at the CLI's exit is parsed.
+// spec: specs/ap/run.md#R15
 #[test]
 fn item11_a_last_line_without_newline_is_parsed() {
     let mut f = Fake::new();
@@ -1513,6 +1551,7 @@ fn item11_a_last_line_without_newline_is_parsed() {
 }
 
 /// Item 12: only the account's settings load (`--setting-sources user`), for every role.
+// spec: specs/ap/run.md#R13
 #[test]
 fn item12_project_and_local_settings_are_not_loaded() {
     let mut f = Fake::new();
@@ -1530,6 +1569,7 @@ fn item12_project_and_local_settings_are_not_loaded() {
 
 /// "Two runs start at the same instant on one `out`": the exclusive creation of the record lets
 /// exactly one pass; the record and the answer are the winner's.
+// spec: specs/ap/run.md#R11
 #[test]
 fn same_instant_on_one_out_only_one_run_passes() {
     let (mut a, mut b) = (Fake::new(), Fake::new());
@@ -1568,6 +1608,7 @@ fn same_instant_on_one_out_only_one_run_passes() {
 
 /// "`is-active` does not answer": a resume of a `running` record is refused, and a stop whose
 /// state cannot be read is `failed` with `unmet: stop`.
+// spec: specs/ap/run.md#R15
 #[test]
 fn is_active_that_does_not_answer_refuses_and_fails_the_stop() {
     let mut f = Fake::new();
@@ -1589,6 +1630,7 @@ fn is_active_that_does_not_answer_refuses_and_fails_the_stop() {
 
 /// "A fixer over an `ok` implementer that writes nothing": its reference is its own launch's, so
 /// the implementer's file does not meet its `expect`: `no_result`.
+// spec: specs/ap/run.md#R19
 #[test]
 fn a_fixer_over_an_ok_implementer_that_writes_nothing_is_no_result() {
     let mut f = Fake::new();
@@ -1609,6 +1651,7 @@ fn a_fixer_over_an_ok_implementer_that_writes_nothing_is_no_result() {
 }
 
 /// "A refused request leaves the earlier record and its session resumable".
+// spec: specs/ap/run.md#R7
 #[test]
 fn a_refused_request_leaves_the_earlier_record_resumable() {
     let mut f = Fake::new();
@@ -1642,6 +1685,7 @@ fn a_refused_request_leaves_the_earlier_record_resumable() {
 }
 
 /// "The request's `GIT_DIR` does not skip the dirty check" (nor `GIT_CEILING_DIRECTORIES`).
+// spec: specs/ap/run.md#R9
 #[test]
 fn the_requests_git_dir_does_not_skip_the_dirty_check() {
     let mut f = Fake::new();
@@ -1673,6 +1717,7 @@ fn the_requests_git_dir_does_not_skip_the_dirty_check() {
 
 /// "A later run deletes an earlier run's answer": a run whose `out` is another run's old
 /// temporary name (`a.md.tmp`, `b.md.run.json.tmp`) keeps its files when that other run writes.
+// spec: specs/ap/run.md#R11
 #[test]
 fn a_later_run_never_removes_a_file_named_like_its_temporary() {
     let mut f = Fake::new();
@@ -1697,6 +1742,7 @@ fn a_later_run_never_removes_a_file_named_like_its_temporary() {
 
 /// "A record that says something may still live can be resumed": a resume asks `is-active` for
 /// the earlier unit whatever the record's state (here `failed`, `unmet: stop`).
+// spec: specs/ap/run.md#R10
 #[test]
 fn a_resume_of_a_failed_stop_is_refused_while_its_unit_lives() {
     let mut f = Fake::new();
@@ -1721,6 +1767,7 @@ fn a_resume_of_a_failed_stop_is_refused_while_its_unit_lives() {
 
 /// "Preserve the timeout decision through shutdown": a reviewer whose result arrives only while
 /// the stage is being stopped is `timeout`; the late answer is saved and `expect_met` set.
+// spec: specs/ap/run.md#R17
 #[test]
 fn a_result_written_during_the_shutdown_keeps_the_timeout() {
     let mut f = Fake::new();
@@ -1742,6 +1789,7 @@ fn a_result_written_during_the_shutdown_keeps_the_timeout() {
 }
 
 /// "Drain the stopped stream completely": a result after 40 MiB of other lines is read.
+// spec: specs/ap/run.md#R15
 #[test]
 fn the_stopped_stream_is_read_to_its_end() {
     let mut f = Fake::new();
@@ -1758,6 +1806,7 @@ fn the_stopped_stream_is_read_to_its_end() {
 
 /// "Reserve the answer path against overlapping concurrent runs": an `out` named like a file
 /// `ap run` derives from another `out` is refused, so no answer path is another run's file.
+// spec: specs/ap/run.md#R4
 #[test]
 fn an_out_named_like_a_derived_file_is_refused() {
     let mut f = Fake::new();
@@ -1777,6 +1826,9 @@ fn an_out_named_like_a_derived_file_is_refused() {
 /// Invariant 1 and 3: an implementer's and a fixer's launch carries the CLI's own settings with
 /// nothing in the request: the Bash time limits, no move to the background, no `Monitor`, no
 /// listing of skills and no auto-memory. `skills` and `memory` bring the two back; `bind` binds.
+// spec: specs/ap/run.md#R6
+// spec: specs/ap/run.md#R9
+// spec: specs/ap/run.md#R12
 #[test]
 fn gate_settings_of_every_implementer_and_fixer_launch() {
     let mut f = Fake::new();
@@ -1844,6 +1896,7 @@ fn gate_settings_of_every_implementer_and_fixer_launch() {
 /// Invariant 2, on the skeleton of the real stream that emitted three results (the check moved to
 /// the background, three `Monitor` watches): the second result met `expect`, the third did not. The
 /// stage is `ok` with the second answer; a later result does not unmake it.
+// spec: specs/ap/run.md#R16
 #[test]
 fn gate_a_later_result_does_not_unmake_one_that_met_expect() {
     let mut f = Fake::new();
@@ -1942,6 +1995,7 @@ fn codex_cli(head: &[&str], tail: &[&str]) -> Vec<String> {
     a
 }
 
+// spec: specs/ap/run.md#R35
 #[test]
 fn x1_codex_stage_is_started_headless_without_the_user_configuration() {
     let mut f = Fake::new();
@@ -2015,6 +2069,8 @@ fn x1_codex_stage_is_started_headless_without_the_user_configuration() {
     assert_eq!(std::fs::read_dir(f.t.join("a1")).unwrap().count(), 0);
 }
 
+// spec: specs/ap/run.md#R11
+// spec: specs/ap/run.md#R12
 #[test]
 fn x1_claude_stage_arguments_are_unchanged() {
     let mut f = Fake::new();
@@ -2066,6 +2122,7 @@ fn x1_claude_stage_arguments_are_unchanged() {
     }
 }
 
+// spec: specs/ap/run.md#R34
 #[test]
 fn x2_refusals_of_the_codex_runtime_write_nothing() {
     let mut f = Fake::new();
@@ -2164,6 +2221,7 @@ fn x2_refusals_of_the_codex_runtime_write_nothing() {
     assert_eq!((f.calls().len(), f.launches.len()), (1, 1));
 }
 
+// spec: specs/ap/run.md#R37
 #[test]
 fn x3_stream_becomes_the_record() {
     let mut f = Fake::new();
@@ -2203,6 +2261,7 @@ fn x3_stream_becomes_the_record() {
     );
 }
 
+// spec: specs/ap/run.md#R36
 #[test]
 fn x3_session_enters_the_record_at_the_thread_start() {
     let mut f = Fake::new();
@@ -2236,6 +2295,7 @@ fn x3_session_enters_the_record_at_the_thread_start() {
     );
 }
 
+// spec: specs/ap/run.md#R36
 #[test]
 fn x3_a_message_of_an_unfinished_turn_is_no_answer() {
     let mut f = Fake::new();
@@ -2272,6 +2332,7 @@ fn x3_a_message_of_an_unfinished_turn_is_no_answer() {
     }
 }
 
+// spec: specs/ap/run.md#R36
 #[test]
 fn x4_failed_turn_is_failed() {
     let mut f = Fake::new();
@@ -2290,6 +2351,7 @@ fn x4_failed_turn_is_failed() {
     assert!(stream.contains("not supported"));
 }
 
+// spec: specs/ap/run.md#R36
 #[test]
 fn x4_usage_limit_text_is_cut() {
     let mut f = Fake::new();
@@ -2310,6 +2372,7 @@ fn x4_usage_limit_text_is_cut() {
     }
 }
 
+// spec: specs/ap/run.md#R36
 #[test]
 fn x4_error_event_alone_decides_nothing() {
     let mut f = Fake::new();
@@ -2322,6 +2385,7 @@ fn x4_error_event_alone_decides_nothing() {
     assert_eq!(v["results"], 1);
 }
 
+// spec: specs/ap/run.md#R36
 #[test]
 fn x4_no_turn_end_is_timeout_or_failed() {
     let mut f = Fake::new();
@@ -2347,6 +2411,7 @@ fn x4_no_turn_end_is_timeout_or_failed() {
     );
 }
 
+// spec: specs/ap/run.md#R36
 #[test]
 fn x4_empty_answer_is_no_result() {
     let mut f = Fake::new();
@@ -2361,6 +2426,9 @@ fn x4_empty_answer_is_no_result() {
     assert_eq!(v["tokens"], one_turn());
 }
 
+// spec: specs/ap/run.md#R10
+// spec: specs/ap/run.md#R35
+// spec: specs/ap/run.md#R37
 #[test]
 fn x5_resume_continues_the_recorded_session() {
     let mut f = Fake::new();
@@ -2407,6 +2475,7 @@ fn x5_resume_continues_the_recorded_session() {
     assert_eq!(code(f.run(&r)), "resume_record_missing@resume");
 }
 
+// spec: specs/ap/run.md#R10
 #[test]
 fn x5_resume_of_the_other_runtime_is_refused() {
     let mut f = Fake::new();
@@ -2427,6 +2496,7 @@ fn x5_resume_of_the_other_runtime_is_refused() {
     );
 }
 
+// spec: specs/ap/run.md#R36
 #[test]
 fn x3_a_failed_write_of_the_session_at_the_thread_start_is_a_failed_write() {
     let mut f = Fake::new();
@@ -2439,6 +2509,7 @@ fn x3_a_failed_write_of_the_session_at_the_thread_start_is_a_failed_write() {
     assert_eq!(f.record("b.md"), v);
 }
 
+// spec: specs/ap/run.md#R37
 #[test]
 fn x5_tokens_of_a_resume_whose_chain_cannot_be_followed_are_null() {
     let mut f = Fake::new();
@@ -2519,6 +2590,7 @@ fn without_schema(mut cli: Vec<String>) -> Vec<String> {
 }
 
 /// Point 1: a value that is no such file, and the combinations, refuse before any effect.
+// spec: specs/ap/run.md#R30
 #[test]
 fn v1_p1_an_answer_schema_that_is_not_a_json_object_file_is_refused_before_any_effect() {
     let mut f = Fake::new();
@@ -2582,6 +2654,7 @@ fn v1_p1_an_answer_schema_that_is_not_a_json_object_file_is_refused_before_any_e
 
 /// Point 2: without the member nothing of a call changes: the argument list has no schema flag,
 /// the record no member, and a `structured_output` in the stream is not read.
+// spec: specs/ap/run.md#R33
 #[test]
 fn v1_p2_without_the_member_nothing_changes() {
     let mut f = Fake::new();
@@ -2606,6 +2679,7 @@ fn v1_p2_without_the_member_nothing_changes() {
 
 /// Point 3: the flag and the file's text, for a first run and a resume; nothing else changes; the
 /// record holds the file's path and digest from the launch on.
+// spec: specs/ap/run.md#R31
 #[test]
 fn v1_p3_the_argument_list_gains_the_schema_and_the_record_names_the_file() {
     let mut f = Fake::new();
@@ -2649,6 +2723,7 @@ fn v1_p3_the_argument_list_gains_the_schema_and_the_record_names_the_file() {
 }
 
 /// The record holds `answer_schema` while the CLI is still running (the fake copies it).
+// spec: specs/ap/run.md#R31
 #[test]
 fn v1_p3_the_running_record_names_the_schema_file() {
     let mut f = Fake::new();
@@ -2666,6 +2741,7 @@ fn v1_p3_the_running_record_names_the_schema_file() {
 }
 
 /// Point 4: the object is the answer: pretty-printed with one newline; the digest is the file's.
+// spec: specs/ap/run.md#R32
 #[test]
 fn v1_p4_the_answer_file_holds_the_object() {
     let mut f = Fake::new();
@@ -2698,6 +2774,7 @@ fn v1_p4_the_answer_file_holds_the_object() {
 
 /// Point 4: among several results the last one with an object is chosen, a later one without does
 /// not unmake it (an implementer runs to the exit and sees them all).
+// spec: specs/ap/run.md#R32
 #[test]
 fn v1_p4_among_several_results_the_last_with_an_object_is_chosen() {
     let mut f = Fake::new();
@@ -2735,6 +2812,7 @@ fn v1_p4_among_several_results_the_last_with_an_object_is_chosen() {
 
 /// Point 5: a chosen result without an object ends `no_result` with `unmet: schema`; the text is
 /// saved when it is not empty.
+// spec: specs/ap/run.md#R32
 #[test]
 fn v1_p5_a_result_without_an_object_is_no_result_schema() {
     let mut f = Fake::new();
@@ -2779,6 +2857,7 @@ fn v1_p5_a_result_without_an_object_is_no_result_schema() {
 }
 
 /// Point 5: an error and a cut end as today, also when an object came with them.
+// spec: specs/ap/run.md#R32
 #[test]
 fn v1_p5_an_error_and_a_cut_end_as_today() {
     let mut f = Fake::new();
@@ -2842,6 +2921,8 @@ impl Fake {
     }
 }
 
+// spec: specs/ap/run.md#R26
+// spec: specs/ap/run.md#R27
 #[test]
 fn cut1_limit_of_an_allowed_event_with_windows_ignores_overage_status() {
     let mut f = Fake::new();
@@ -2861,6 +2942,7 @@ fn cut1_limit_of_an_allowed_event_with_windows_ignores_overage_status() {
     assert_eq!(limit["windows"]["five_hour"]["utilization"], 0.5);
 }
 
+// spec: specs/ap/run.md#R26
 #[test]
 fn cut1_limit_of_an_event_without_the_undocumented_members_and_odd_types() {
     let mut f = Fake::new();
@@ -2904,6 +2986,7 @@ fn cut1_limit_of_an_event_without_the_undocumented_members_and_odd_types() {
     assert_eq!(keys, ["w0", "w1", "w2", "w3", "w4", "w5", "w6", "w7"]);
 }
 
+// spec: specs/ap/run.md#R26
 #[test]
 fn cut1_a_rejected_event_is_kept_when_an_allowed_one_follows() {
     let mut f = Fake::new();
@@ -2919,6 +3002,8 @@ fn cut1_a_rejected_event_is_kept_when_an_allowed_one_follows() {
     assert_eq!(limit["resets_at"], 1794790000_u64);
 }
 
+// spec: specs/ap/run.md#R26
+// spec: specs/ap/run.md#R28
 #[test]
 fn cut1_a_stream_without_the_event_has_no_limit_and_attempts_has_one_entry() {
     let mut f = Fake::new();
@@ -2961,6 +3046,7 @@ fn cut1_a_stream_without_the_event_has_no_limit_and_attempts_has_one_entry() {
     assert_eq!(v["attempts"][0]["worked"], false);
 }
 
+// spec: specs/ap/run.md#R28
 #[test]
 fn cut1_while_a_launch_runs_its_entry_is_last_and_running() {
     let mut f = Fake::new();
@@ -2984,6 +3070,7 @@ fn cut1_while_a_launch_runs_its_entry_is_last_and_running() {
     assert_eq!(v["attempts"][0]["state"], "ok");
 }
 
+// spec: specs/ap/run.md#R28
 #[test]
 fn cut1_attempts_of_a_move_before_any_tool_ran() {
     let mut f = Fake::new();
@@ -3023,6 +3110,7 @@ fn cut1_attempts_of_a_move_before_any_tool_ran() {
     assert_eq!(f.record("mv.md"), v);
 }
 
+// spec: specs/ap/run.md#R21
 #[test]
 fn cut1_a_launch_after_work_and_a_cut_gets_the_continuation_for_an_implementer_and_a_fixer() {
     let mut f = Fake::new();
@@ -3078,6 +3166,7 @@ fn cut1_a_launch_after_work_and_a_cut_gets_the_continuation_for_an_implementer_a
     );
 }
 
+// spec: specs/ap/run.md#R21
 #[test]
 fn cut1_a_second_cut_goes_on_with_a_third_account_and_the_text_once() {
     let mut f = Fake::new();
@@ -3119,6 +3208,7 @@ fn cut1_a_second_cut_goes_on_with_a_third_account_and_the_text_once() {
     assert_eq!(v["limit"]["status"], "rejected");
 }
 
+// spec: specs/ap/run.md#R21
 #[test]
 fn cut1_no_continuation_without_a_next_account() {
     let mut f = Fake::new();
@@ -3133,6 +3223,7 @@ fn cut1_no_continuation_without_a_next_account() {
     assert_eq!(v["attempts"][0]["limit"], v["limit"]);
 }
 
+// spec: specs/ap/run.md#R21
 #[test]
 fn cut1_no_continuation_for_a_reviewer() {
     let mut f = Fake::new();
@@ -3151,6 +3242,7 @@ fn cut1_no_continuation_for_a_reviewer() {
     );
 }
 
+// spec: specs/ap/run.md#R23
 #[test]
 fn cut1_a_resumed_stage_has_no_continuation_and_its_limit_says_what_cut_it() {
     let mut f = Fake::new();
@@ -3174,6 +3266,7 @@ fn cut1_a_resumed_stage_has_no_continuation_and_its_limit_says_what_cut_it() {
     assert_eq!(v["limit"]["kind"], "five_hour");
 }
 
+// spec: specs/ap/run.md#R28
 #[test]
 fn cut1_a_launch_that_could_not_start_is_an_entry_of_attempts() {
     let mut f = Fake::new();
@@ -3201,6 +3294,8 @@ fn cut1_a_launch_that_could_not_start_is_an_entry_of_attempts() {
     assert_eq!(f.record("g.md"), v);
 }
 
+// spec: specs/ap/run.md#R18
+// spec: specs/ap/run.md#R29
 #[test]
 fn cut1_a_call_whose_files_cannot_be_opened_writes_the_record_without_the_two_members() {
     let mut f = Fake::new();
@@ -3225,6 +3320,7 @@ fn settings_at(f: &Fake, n: usize) -> Value {
     serde_json::from_str(&cli[at + 1]).unwrap()
 }
 
+// spec: specs/ap/run.md#R5
 #[test]
 fn compact_window_is_an_integer_from_100000_to_1000000() {
     let mut f = Fake::new();
@@ -3261,6 +3357,7 @@ fn compact_window_is_an_integer_from_100000_to_1000000() {
     }
 }
 
+// spec: specs/ap/run.md#R5
 #[test]
 fn compact_window_starts_a_claude_stage_in_its_settings_and_nothing_else() {
     let mut f = Fake::new();
@@ -3298,6 +3395,7 @@ fn compact_window_starts_a_claude_stage_in_its_settings_and_nothing_else() {
     );
 }
 
+// spec: specs/ap/run.md#R5
 #[test]
 fn compact_window_a_resume_and_a_next_account_get_their_own_request_value() {
     let mut f = Fake::new();
@@ -3325,6 +3423,7 @@ fn compact_window_a_resume_and_a_next_account_get_their_own_request_value() {
     }
 }
 
+// spec: specs/ap/run.md#R5
 #[test]
 fn compact_window_a_codex_stage_refuses_it_before_any_effect() {
     let mut f = Fake::new();
@@ -3338,6 +3437,7 @@ fn compact_window_a_codex_stage_refuses_it_before_any_effect() {
     assert_eq!(v["state"], "ok", "{v}");
 }
 
+// spec: specs/ap/run.md#R25
 #[test]
 fn compact_window_the_record_names_it_or_null_for_every_runtime() {
     let mut f = Fake::new();
@@ -3372,6 +3472,7 @@ fn compact_window_a_launch_that_could_not_start_names_it_in_its_record() {
     assert_eq!(f.record("g.md"), v);
 }
 
+// spec: specs/ap/run.md#R29
 #[test]
 fn compact_window_a_call_whose_files_cannot_be_opened_keeps_three_members() {
     let mut f = Fake::new();
@@ -3389,6 +3490,8 @@ fn compact_window_a_call_whose_files_cannot_be_opened_keeps_three_members() {
     assert_eq!(f.count_now(), 0, "no CLI call");
 }
 
+// spec: specs/ap/run.md#R28
+// spec: specs/ap/run.md#R34
 #[test]
 fn cut1_a_codex_stage_has_a_null_limit_and_one_entry() {
     let mut f = Fake::new();
@@ -3452,6 +3555,8 @@ impl Fake {
     }
 }
 
+// spec: specs/ap/run.md#R10
+// spec: specs/ap/run.md#R22
 #[test]
 fn rf1_the_accounts_of_a_resumed_call_are_the_records_then_the_requests_without_repetition() {
     let mut f = Fake::new();
@@ -3487,6 +3592,8 @@ fn rf1_the_accounts_of_a_resumed_call_are_the_records_then_the_requests_without_
     assert_eq!(code(f.run(&r)), "resume_account_differs@account");
 }
 
+// spec: specs/ap/run.md#R23
+// spec: specs/ap/run.md#R24
 #[test]
 fn rf1_a_resumed_launch_cut_goes_on_as_a_new_session_with_the_text_and_the_prompt() {
     let mut f = Fake::new();
@@ -3553,6 +3660,7 @@ fn rf1_a_resumed_launch_cut_goes_on_as_a_new_session_with_the_text_and_the_promp
     }
 }
 
+// spec: specs/ap/run.md#R23
 #[test]
 fn rf1_a_second_cut_goes_on_with_a_third_account_and_the_same_input() {
     let mut f = Fake::new();
@@ -3610,6 +3718,7 @@ fn rf1_a_second_cut_goes_on_with_a_third_account_and_the_same_input() {
     }
 }
 
+// spec: specs/ap/run.md#R23
 #[test]
 fn rf1_no_move_without_another_account() {
     let mut f = Fake::new();
@@ -3631,6 +3740,7 @@ fn rf1_no_move_without_another_account() {
     }
 }
 
+// spec: specs/ap/run.md#R23
 #[test]
 fn rf1_no_move_when_the_record_lacks_a_path_or_a_path_is_unfit() {
     let mut f = Fake::new();
@@ -3692,6 +3802,7 @@ fn rf1_no_move_when_the_record_lacks_a_path_or_a_path_is_unfit() {
     }
 }
 
+// spec: specs/ap/run.md#R23
 #[test]
 fn rf1_no_move_after_a_resumed_launch_that_did_not_end_cut() {
     let mut f = Fake::new();
@@ -3725,6 +3836,7 @@ fn rf1_no_move_after_a_resumed_launch_that_did_not_end_cut() {
     }
 }
 
+// spec: specs/ap/run.md#R24
 #[test]
 fn rf1_a_moved_record_is_resumed_on_its_new_session_and_account() {
     let mut f = Fake::new();
@@ -3759,6 +3871,7 @@ fn rf1_a_moved_record_is_resumed_on_its_new_session_and_account() {
     assert_eq!(v3["resumes"], f.p("r2.md.run.json"));
 }
 
+// spec: specs/ap/run.md#R23
 #[test]
 fn rf1_the_text_holds_each_path_byte_for_byte_whatever_the_other_path_holds() {
     let mut f = Fake::new();
@@ -3888,6 +4001,8 @@ impl Fake {
     }
 }
 
+// spec: specs/ap/run.md#R38
+// spec: specs/ap/run.md#R39
 #[test]
 fn m1_refusals_name_their_field_and_come_before_any_effect() {
     let mut f = Fake::new();
@@ -4029,6 +4144,7 @@ fn m1_refusals_name_their_field_and_come_before_any_effect() {
     }
 }
 
+// spec: specs/ap/run.md#R40
 #[test]
 fn m2_a_fresh_stage_is_started_with_exactly_these_arguments_and_this_environment() {
     let mut f = Fake::new();
@@ -4092,6 +4208,7 @@ fn m2_a_fresh_stage_is_started_with_exactly_these_arguments_and_this_environment
     assert_eq!(std::fs::read_dir(f.t.join("m1")).unwrap().count(), 1);
 }
 
+// spec: specs/ap/run.md#R40
 #[test]
 fn m2_a_resumed_stage_is_the_same_launch_with_the_recorded_session() {
     let mut f = Fake::new();
@@ -4130,6 +4247,7 @@ fn m2_a_resumed_stage_is_the_same_launch_with_the_recorded_session() {
     assert_eq!(f.launches.len(), 2);
 }
 
+// spec: specs/ap/run.md#R40
 #[test]
 fn m2_the_session_is_in_the_record_before_the_launch() {
     let mut f = Fake::new();
@@ -4152,6 +4270,7 @@ fn m2_the_session_is_in_the_record_before_the_launch() {
     );
 }
 
+// spec: specs/ap/run.md#R43
 #[test]
 fn m3_each_role_ends_ok_with_its_answer_in_out() {
     let mut f = Fake::new();
@@ -4176,6 +4295,7 @@ fn m3_each_role_ends_ok_with_its_answer_in_out() {
     }
 }
 
+// spec: specs/ap/run.md#R43
 #[test]
 fn m3_an_empty_answer_is_no_result_and_expect_judges_the_first_line() {
     let mut f = Fake::new();
@@ -4224,6 +4344,7 @@ fn m3_an_empty_answer_is_no_result_and_expect_judges_the_first_line() {
     assert_eq!(std::fs::read(f.p("v2.md")).unwrap(), b"Looks fine\nbody");
 }
 
+// spec: specs/ap/run.md#R43
 #[test]
 fn m4_a_failed_run_is_failed_and_writes_no_answer() {
     let mut f = Fake::new();
@@ -4248,6 +4369,8 @@ fn m4_a_failed_run_is_failed_and_writes_no_answer() {
     assert!(!Path::new(&f.p("g.md")).exists());
 }
 
+// spec: specs/ap/run.md#R41
+// spec: specs/ap/run.md#R43
 #[test]
 fn m4_a_failed_run_with_the_usage_limit_text_is_cut_and_never_moves() {
     let mut f = Fake::new();
@@ -4272,6 +4395,7 @@ fn m4_a_failed_run_with_the_usage_limit_text_is_cut_and_never_moves() {
     assert_eq!((status, f.launches.len()), (75, 2));
 }
 
+// spec: specs/ap/run.md#R43
 #[test]
 fn m5_no_terminal_is_failed_after_the_exit_and_timeout_after_the_bound() {
     let mut f = Fake::new();
@@ -4297,6 +4421,7 @@ fn m5_no_terminal_is_failed_after_the_exit_and_timeout_after_the_bound() {
     );
 }
 
+// spec: specs/ap/run.md#R43
 #[test]
 fn m6_two_terminals_a_reviewer_ends_at_the_first_and_the_others_take_the_last_that_meets_expect() {
     let mut f = Fake::new();
@@ -4349,6 +4474,7 @@ fn m6_two_terminals_a_reviewer_ends_at_the_first_and_the_others_take_the_last_th
     );
 }
 
+// spec: specs/ap/run.md#R43
 #[test]
 fn m6_a_cli_that_outlives_its_terminal_is_timeout_with_the_answer_kept() {
     let mut f = Fake::new();
@@ -4375,6 +4501,7 @@ fn m6_a_cli_that_outlives_its_terminal_is_timeout_with_the_answer_kept() {
     assert_eq!((status, v["state"].as_str()), (0, Some("ok")), "{v}");
 }
 
+// spec: specs/ap/run.md#R44
 #[test]
 fn m7_tokens_and_turns_come_from_the_last_usage_line() {
     let mut f = Fake::new();
@@ -4431,6 +4558,7 @@ fn m7_tokens_and_turns_come_from_the_last_usage_line() {
     }
 }
 
+// spec: specs/ap/run.md#R44
 #[test]
 fn m7_a_resume_holds_its_own_runs_numbers_as_the_cli_gives_them() {
     let mut f = Fake::new();
@@ -4451,6 +4579,7 @@ fn m7_a_resume_holds_its_own_runs_numbers_as_the_cli_gives_them() {
     assert_eq!(v["turns"], 4);
 }
 
+// spec: specs/ap/run.md#R45
 #[test]
 fn m8_limit_is_made_from_the_allowance() {
     let mut f = Fake::new();
@@ -4503,6 +4632,7 @@ fn m8_limit_is_made_from_the_allowance() {
     assert_eq!(limit(json!(5)), Value::Null);
 }
 
+// spec: specs/ap/run.md#R42
 #[test]
 fn m9_work_is_seen_from_a_tool_task_only() {
     let mut f = Fake::new();
@@ -4536,6 +4666,7 @@ fn m9_work_is_seen_from_a_tool_task_only() {
     assert_eq!(v["attempts"][0]["worked"], false);
 }
 
+// spec: specs/ap/run.md#R46
 #[test]
 fn m10_a_line_that_names_another_serving_model_stops_the_stage() {
     let mut f = Fake::new();
@@ -4594,6 +4725,7 @@ fn m10_a_line_that_names_another_serving_model_stops_the_stage() {
     assert!(began.elapsed().as_secs() < 20);
 }
 
+// spec: specs/ap/run.md#R39
 #[test]
 fn m11_a_resume_across_runtimes_is_refused_in_both_directions() {
     let mut f = Fake::new();
@@ -4628,6 +4760,7 @@ fn m11_a_resume_across_runtimes_is_refused_in_both_directions() {
     assert_eq!(f.launches.len(), before + 1);
 }
 
+// spec: specs/ap/run.md#R38
 #[test]
 fn m12_a_model_or_effort_that_looks_like_a_flag_is_refused_for_muse_only() {
     let mut f = Fake::new();
@@ -4772,6 +4905,8 @@ impl Fake {
     }
 }
 
+// spec: specs/ap/run.md#R47
+// spec: specs/ap/run.md#R48
 #[test]
 fn g1_refusals_name_their_field_and_come_before_any_effect() {
     let mut f = Fake::new();
@@ -4978,6 +5113,7 @@ fn g1_refusals_name_their_field_and_come_before_any_effect() {
     }
 }
 
+// spec: specs/ap/run.md#R49
 #[test]
 fn g2_a_fresh_stage_is_started_with_exactly_these_arguments_and_this_environment() {
     let mut f = Fake::new();
@@ -5066,6 +5202,7 @@ fn g2_a_fresh_stage_is_started_with_exactly_these_arguments_and_this_environment
     assert!(!f.t.join("g1/.gemini/config").exists());
 }
 
+// spec: specs/ap/run.md#R50
 #[test]
 fn g9_a_fresh_stage_gets_a_new_home_of_three_links_and_the_record_names_it() {
     let mut f = Fake::new();
@@ -5121,6 +5258,7 @@ fn g9_a_fresh_stage_gets_a_new_home_of_three_links_and_the_record_names_it() {
     assert!(!f.t.join("cwd/homes").exists() && !f.t.join("cwd/.gemini").exists());
 }
 
+// spec: specs/ap/run.md#R49
 #[test]
 fn g2_a_resumed_stage_adds_the_conversation_and_runs_in_the_records_cwd() {
     let mut f = Fake::new();
@@ -5159,6 +5297,7 @@ fn g2_a_resumed_stage_adds_the_conversation_and_runs_in_the_records_cwd() {
     assert_eq!(f.launches.len(), 2);
 }
 
+// spec: specs/ap/run.md#R50
 #[test]
 fn g2_a_resume_refuses_a_home_that_is_absent_no_directory_or_not_under_the_account() {
     let mut f = Fake::new();
@@ -5205,6 +5344,7 @@ fn g2_a_resume_refuses_a_home_that_is_absent_no_directory_or_not_under_the_accou
     assert_eq!(f.run(&r).unwrap().0["state"], "ok");
 }
 
+// spec: specs/ap/run.md#R49
 #[test]
 fn g3_the_conversation_is_in_the_record_at_once_and_stays_in_every_state() {
     let mut f = Fake::new();
@@ -5280,6 +5420,7 @@ fn g3_the_conversation_is_in_the_record_at_once_and_stays_in_every_state() {
     );
 }
 
+// spec: specs/ap/run.md#R51
 #[test]
 fn g4_a_result_with_an_answer_is_ok_and_its_response_is_saved_byte_for_byte() {
     let mut f = Fake::new();
@@ -5359,6 +5500,7 @@ fn g4_a_result_with_an_answer_is_ok_and_its_response_is_saved_byte_for_byte() {
     assert_eq!(std::fs::read(f.p("y.md")).unwrap(), b"first");
 }
 
+// spec: specs/ap/run.md#R51
 #[test]
 fn g4_a_line_step_update_of_the_type_tool_shows_that_the_session_did_work() {
     let mut f = Fake::new();
@@ -5391,6 +5533,7 @@ fn g4_a_line_step_update_of_the_type_tool_shows_that_the_session_did_work() {
     }
 }
 
+// spec: specs/ap/run.md#R51
 #[test]
 fn g5_an_empty_answer_is_no_result_and_expect_judges_the_first_line() {
     let mut f = Fake::new();
@@ -5427,6 +5570,7 @@ fn g5_an_empty_answer_is_no_result_and_expect_judges_the_first_line() {
     assert_eq!(std::fs::read(f.p("v2.md")).unwrap(), b"Looks fine\nbody");
 }
 
+// spec: specs/ap/run.md#R51
 #[test]
 fn g6_an_error_result_is_failed_and_one_with_the_usage_limit_text_is_cut() {
     let mut f = Fake::new();
@@ -5503,6 +5647,7 @@ fn g6_an_error_result_is_failed_and_one_with_the_usage_limit_text_is_cut() {
     assert_eq!((exit, v["state"].as_str()), (0, Some("ok")), "{v}");
 }
 
+// spec: specs/ap/run.md#R51
 #[test]
 fn g6_no_result_is_failed_after_the_exit_and_timeout_after_the_bound() {
     let mut f = Fake::new();
@@ -5532,6 +5677,7 @@ fn g6_no_result_is_failed_after_the_exit_and_timeout_after_the_bound() {
     );
 }
 
+// spec: specs/ap/run.md#R52
 #[test]
 fn g7_tokens_are_the_usage_of_the_result_and_turns_its_num_turns() {
     let mut f = Fake::new();
@@ -5572,6 +5718,7 @@ fn g7_tokens_are_the_usage_of_the_result_and_turns_its_num_turns() {
     assert_eq!(v["turns"], 4);
 }
 
+// spec: specs/ap/run.md#R52
 #[test]
 fn g7_a_resumes_tokens_are_the_results_sums_less_every_earlier_record_of_the_chain() {
     let mut f = Fake::new();
@@ -5628,6 +5775,7 @@ fn g7_a_resumes_tokens_are_the_results_sums_less_every_earlier_record_of_the_cha
     assert_eq!(std::fs::read(f.p("c4.md")).unwrap(), b"four");
 }
 
+// spec: specs/ap/run.md#R47
 #[test]
 fn g8_a_resume_across_runtimes_is_refused_in_both_directions() {
     let mut f = Fake::new();
@@ -5662,6 +5810,7 @@ fn g8_a_resume_across_runtimes_is_refused_in_both_directions() {
 
 // ---- notes of earlier verifiers on `ap run`, taken by unit AGY1 -------------------------------
 
+// spec: specs/ap/run.md#R26
 #[test]
 fn cut1_a_resets_at_in_float_form_is_null() {
     let mut f = Fake::new();
@@ -5674,6 +5823,7 @@ fn cut1_a_resets_at_in_float_form_is_null() {
     );
 }
 
+// spec: specs/ap/run.md#R28
 #[test]
 fn cut1_the_record_on_disk_while_a_second_launch_runs_holds_both_attempts() {
     let mut f = Fake::new();
@@ -5714,6 +5864,7 @@ fn cut1_the_record_on_disk_while_a_second_launch_runs_holds_both_attempts() {
     assert_ne!(attempts[0]["session"], attempts[1]["session"]);
 }
 
+// spec: specs/ap/run.md#R23
 #[test]
 fn rf1_an_implementer_resumed_over_an_implementers_record_moves_with_the_six_sentences() {
     let mut f = Fake::new();
@@ -6160,6 +6311,7 @@ fn policy_the_built_binary_reads_the_file_the_variable_names() {
 }
 
 // spec: specs/ap/policy.md#R10
+// spec: specs/ap/run.md#R8
 #[test]
 fn policy_refusals_come_after_every_refusal_of_the_request_and_nothing_starts_before_one() {
     let mut f = Fake::new();
@@ -6200,6 +6352,7 @@ fn policy_refusals_come_after_every_refusal_of_the_request_and_nothing_starts_be
 }
 
 // spec: specs/ap/policy.md#R10
+// spec: specs/ap/run.md#R9
 #[test]
 fn policy_refusals_come_after_the_refusals_that_ask_the_host() {
     let mut f = Fake::new();
@@ -7560,4 +7713,152 @@ fn run_object_r14_refusals_of_the_form_and_failures_of_the_store() {
         (&e["error"]["code"], &e["error"]["field"]),
         (&json!("store_not_found"), &json!("close"))
     );
+}
+
+// ---- The form of the call and the request's own bounds (specs/ap/run.md) ------------------------
+
+// spec: specs/ap/run.md#R1
+#[test]
+fn run_r1_the_form_of_the_call_is_refused_before_any_effect() {
+    let f = Fake::new();
+    std::fs::create_dir(f.t.join("empty")).unwrap();
+    let ask = |args: &[&str], stdin: std::process::Stdio| {
+        let out = Command::new(env!("CARGO_BIN_EXE_ap"))
+            .arg("run")
+            .args(args)
+            .env_clear()
+            .env("PATH", f.t.join("empty"))
+            .env("AP_POLICY_FILE", f.t.join("no-policy.json"))
+            .stdin(stdin)
+            .output()
+            .unwrap();
+        assert!(out.stdout.is_empty(), "{args:?}");
+        let e: Value = serde_json::from_slice(&out.stderr).unwrap();
+        (
+            out.status.code(),
+            format!(
+                "{}@{}",
+                e["error"]["code"].as_str().unwrap(),
+                e["error"]["field"].as_str().unwrap()
+            ),
+        )
+    };
+    let file = |name: &str, bytes: &[u8]| {
+        let path = f.t.join(name);
+        std::fs::write(&path, bytes).unwrap();
+        std::process::Stdio::from(std::fs::File::open(path).unwrap())
+    };
+    let request = f.request("r1.md").to_string();
+    assert_eq!(
+        ask(&["x"], file("a.json", request.as_bytes())),
+        (Some(2), "usage@args".to_owned())
+    );
+    let large = vec![b' '; 1_048_577];
+    assert_eq!(
+        ask(&[], file("b.json", &large)),
+        (Some(2), "input_too_large@stdin".to_owned())
+    );
+    assert_eq!(
+        ask(&[], file("c.json", b"not json")),
+        (Some(2), "invalid_input@stdin".to_owned())
+    );
+    assert_eq!(
+        ask(&[], file("d.json", b"[]")),
+        (Some(2), "invalid_input@stdin".to_owned())
+    );
+    let directory = std::fs::File::open(f.t.join("empty")).unwrap();
+    assert_eq!(
+        ask(&[], std::process::Stdio::from(directory)),
+        (Some(2), "io_error@stdin".to_owned())
+    );
+    for suffix in ["", ".run.json", ".stream.jsonl", ".err"] {
+        assert!(
+            !Path::new(&f.p(&format!("r1.md{suffix}"))).exists(),
+            "{suffix}"
+        );
+    }
+}
+
+// spec: specs/ap/run.md#R2
+// spec: specs/ap/run.md#R8
+#[test]
+fn run_r2_r8_the_bound_the_pattern_and_the_out_file_are_refused_before_any_effect() {
+    let mut f = Fake::new();
+    std::fs::create_dir(f.t.join("adir")).unwrap();
+    let cases: Vec<(&str, Value, &str)> = vec![
+        ("timeout_seconds", json!(0), "invalid_input@timeout_seconds"),
+        (
+            "timeout_seconds",
+            json!(86_401),
+            "invalid_input@timeout_seconds",
+        ),
+        (
+            "timeout_seconds",
+            json!(1.5),
+            "invalid_input@timeout_seconds",
+        ),
+        (
+            "timeout_seconds",
+            json!("60"),
+            "invalid_input@timeout_seconds",
+        ),
+        ("expect", json!({}), "invalid_input@expect"),
+        (
+            "expect",
+            json!({"first_line": "x".repeat(201)}),
+            "invalid_input@expect",
+        ),
+        (
+            "expect",
+            json!({"first_line": "a\nb"}),
+            "invalid_input@expect",
+        ),
+        ("expect", json!({"other": "x"}), "invalid_input@expect"),
+        ("no_such_member", json!(1), "invalid_input@no_such_member"),
+        ("out", json!(f.p("missing-dir/o.md")), "out_unwritable@out"),
+        ("out", json!(f.p("adir")), "out_unwritable@out"),
+        ("out", json!(f.p("prompt.md")), "out_unwritable@out"),
+    ];
+    for (key, value, expected) in cases {
+        let mut r = f.request("b.md");
+        r[key] = value.clone();
+        assert_eq!(code(f.run(&r)), expected, "{key} {value}");
+    }
+    assert!(f.launches.is_empty());
+    for suffix in ["", ".run.json", ".stream.jsonl", ".err"] {
+        assert!(
+            !Path::new(&f.p(&format!("b.md{suffix}"))).exists(),
+            "{suffix}"
+        );
+    }
+}
+
+// spec: specs/ap/run.md#R41
+#[test]
+fn run_r41_a_muse_stage_writes_no_file_under_its_account() {
+    let mut f = Fake::new();
+    let r = f.muse("w.md");
+    let account = f.t.join("m1");
+    let listing = |dir: &Path| {
+        let mut all = vec![];
+        let mut todo = vec![dir.to_path_buf()];
+        while let Some(d) = todo.pop() {
+            for e in std::fs::read_dir(&d).unwrap() {
+                let p = e.unwrap().path();
+                let m = std::fs::symlink_metadata(&p).unwrap();
+                all.push((p.clone(), m.len(), m.modified().unwrap()));
+                if m.is_dir() {
+                    todo.push(p);
+                }
+            }
+        }
+        all.sort();
+        all
+    };
+    std::fs::write(account.join("muse/settings.json"), "{}").unwrap();
+    let before = listing(&account);
+    f.lines(&m_run("stage ok"));
+    let (v, status) = f.run(&r).unwrap();
+    assert_eq!((status, &v["state"]), (0, &json!("ok")), "{v}");
+    assert_eq!(listing(&account), before);
 }

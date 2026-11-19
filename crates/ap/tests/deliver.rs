@@ -889,6 +889,7 @@ fn kept(w: &W) -> String {
 
 // ---- D1 no effect without a newly applied attempt ------------------------------------------------
 
+// spec: specs/ap/deliver.md#R27
 #[test]
 fn d1_no_installer_when_start_is_refused() {
     let mut w = W::new();
@@ -901,6 +902,7 @@ fn d1_no_installer_when_start_is_refused() {
     assert_eq!(w.applies("start_install").len(), 1);
 }
 
+// spec: specs/ap/deliver.md#R27
 #[test]
 fn d1_no_installer_when_start_is_already_applied() {
     let mut w = W::new();
@@ -914,6 +916,7 @@ fn d1_no_installer_when_start_is_already_applied() {
     assert_eq!(v["install"], Value::Null);
 }
 
+// spec: specs/ap/deliver.md#R27
 #[test]
 fn d1_no_installer_when_the_store_fails() {
     let mut w = W::new();
@@ -930,6 +933,8 @@ fn d1_no_installer_when_the_store_fails() {
 
 // ---- D3 one commit -----------------------------------------------------------------------------
 
+// spec: specs/ap/deliver.md#R15
+// spec: specs/ap/deliver.md#R29
 #[test]
 fn d3_installed_needs_both_reads() {
     let mut w = W::new();
@@ -960,6 +965,8 @@ fn d3_installed_needs_both_reads() {
     assert_eq!(w.launched(), ["ap", "content", "content-rollback"]);
 }
 
+// spec: specs/ap/deliver.md#R29
+// spec: specs/ap/deliver.md#R34
 #[test]
 fn d3_content_failure_rolls_the_binary_back() {
     let mut w = W::new();
@@ -1000,6 +1007,7 @@ fn d3_content_failure_rolls_the_binary_back() {
     );
 }
 
+// spec: specs/ap/deliver.md#R29
 #[test]
 fn d3_rollback_that_fails_ends_failed() {
     let mut w = W::new();
@@ -1034,6 +1042,8 @@ fn d3_rollback_that_fails_ends_failed() {
     );
 }
 
+// spec: specs/ap/deliver.md#R29
+// spec: specs/ap/deliver.md#R34
 #[test]
 fn d3_install_busy_is_not_started() {
     let mut w = W::new();
@@ -1058,6 +1068,7 @@ fn d3_install_busy_is_not_started() {
     );
 }
 
+// spec: specs/ap/deliver.md#R29
 #[test]
 fn d3_no_printed_tarball_no_content_rollback() {
     let mut w = W::new();
@@ -1073,6 +1084,7 @@ fn d3_no_printed_tarball_no_content_rollback() {
 
 /// Tip and `from` have the same `content/SHA256SUMS`, so the tree passes both manifests; the
 /// installers' lock stops the first installer and the file stays at `from`: the pair is at `from`.
+// spec: specs/ap/deliver.md#R15
 #[test]
 fn d3_same_content_install_busy_is_not_started() {
     let mut w = W::new();
@@ -1093,6 +1105,7 @@ fn d3_same_content_install_busy_is_not_started() {
     );
 }
 
+// spec: specs/ap/deliver.md#R15
 #[test]
 fn d3_same_content_failed_build_is_failed_restored() {
     let mut w = W::new();
@@ -1111,6 +1124,8 @@ fn d3_same_content_failed_build_is_failed_restored() {
 
 /// The file is at the tip and the content installer refuses or fails and restores: the tree it
 /// leaves passes the tip's manifest too, so the pair is at the tip.
+// spec: specs/ap/deliver.md#R15
+// spec: specs/ap/deliver.md#R30
 #[test]
 fn d3_same_content_content_installer_fails_is_installed() {
     for (exit_code, code) in [(1, "content_failed_restored"), (2, "content_refused")] {
@@ -1139,6 +1154,7 @@ fn not_accepted(w: &mut W, commit: &str, why: &str) {
     assert_eq!(v["detail"], json!({"commit": commit, "why": why}));
 }
 
+// spec: specs/ap/deliver.md#R25
 #[test]
 fn d4_not_on_chain() {
     let mut w = W::new();
@@ -1146,6 +1162,7 @@ fn d4_not_on_chain() {
     not_accepted(&mut w, &other(), "not_on_chain");
 }
 
+// spec: specs/ap/deliver.md#R25
 #[test]
 fn d4_not_a_merge() {
     let mut w = W::new();
@@ -1153,6 +1170,7 @@ fn d4_not_a_merge() {
     not_accepted(&mut w, &c(1), "not_a_merge");
 }
 
+// spec: specs/ap/deliver.md#R25
 #[test]
 fn d4_tree_differs() {
     let mut w = W::new();
@@ -1160,6 +1178,7 @@ fn d4_tree_differs() {
     not_accepted(&mut w, &c(1), "tree_differs");
 }
 
+// spec: specs/ap/deliver.md#R25
 #[test]
 fn d4_no_accepting_review() {
     let mut w = W::new();
@@ -1170,6 +1189,7 @@ fn d4_no_accepting_review() {
     not_accepted(&mut w, &c(1), "no_accepting_review");
 }
 
+// spec: specs/ap/deliver.md#R25
 #[test]
 fn d4_revoked_review() {
     let mut w = W::new();
@@ -1178,6 +1198,7 @@ fn d4_revoked_review() {
     not_accepted(&mut w, &c(2), "no_accepting_review");
 }
 
+// spec: specs/ap/deliver.md#R25
 #[test]
 fn d4_report_missing_at_tip() {
     // A report that is gone below the tip does not matter.
@@ -1202,6 +1223,7 @@ fn d4_report_missing_at_tip() {
     not_accepted(&mut w, &c(2), "report_missing");
 }
 
+// spec: specs/ap/deliver.md#R25
 #[test]
 fn d4_report_differs_at_tip() {
     let mut w = W::new();
@@ -1215,6 +1237,7 @@ fn d4_report_differs_at_tip() {
     not_accepted(&mut w, &c(2), "report_differs");
 }
 
+// spec: specs/ap/deliver.md#R25
 #[test]
 fn d4_past_exempts() {
     let mut w = W::new();
@@ -1229,6 +1252,7 @@ fn d4_past_exempts() {
     assert_eq!(start["reviews"], json!([w.accepting(2)]));
 }
 
+// spec: specs/ap/deliver.md#R25
 #[test]
 fn d4_tip_in_past_is_checked() {
     let mut w = W::new();
@@ -1243,6 +1267,7 @@ fn d4_tip_in_past_is_checked() {
     );
 }
 
+// spec: specs/ap/deliver.md#R25
 #[test]
 fn d4_past_not_on_chain() {
     let mut w = W::new();
@@ -1259,6 +1284,7 @@ fn d4_past_not_on_chain() {
     refused(&w, &v, exit, "past_not_on_chain");
 }
 
+// spec: specs/ap/deliver.md#R19
 #[test]
 fn d4_search_names_required_properties_only() {
     let mut w = W::new();
@@ -1286,6 +1312,9 @@ fn d4_search_names_required_properties_only() {
 
 // ---- D5 a refusal and `current` apply nothing ---------------------------------------------------
 
+// spec: specs/ap/deliver.md#R20
+// spec: specs/ap/deliver.md#R22
+// spec: specs/ap/deliver.md#R23
 #[test]
 fn d5_refusals_apply_nothing() {
     type Setup = fn(&mut W) -> Value;
@@ -1362,6 +1391,7 @@ fn d5_refusals_apply_nothing() {
     assert_eq!(v["outcome"], Value::Null);
 }
 
+// spec: specs/ap/deliver.md#R26
 #[test]
 fn d5_disk_low() {
     let mut w = W::new();
@@ -1374,6 +1404,7 @@ fn d5_disk_low() {
     assert_eq!((end(&v), exit), (("installed", ""), 0), "{v}");
 }
 
+// spec: specs/ap/deliver.md#R26
 #[test]
 fn d5_build_busy() {
     let mut w = W::new();
@@ -1387,6 +1418,7 @@ fn d5_build_busy() {
     );
 }
 
+// spec: specs/ap/deliver.md#R24
 #[test]
 fn d5_engine_differs() {
     let mut w = W::new();
@@ -1399,6 +1431,7 @@ fn d5_engine_differs() {
     );
 }
 
+// spec: specs/ap/deliver.md#R24
 #[test]
 fn d5_schema_differs() {
     let mut w = W::new();
@@ -1408,6 +1441,7 @@ fn d5_schema_differs() {
     assert_eq!(v["detail"], json!({"tip": 9, "installed": 8}));
 }
 
+// spec: specs/ap/deliver.md#R23
 #[test]
 fn d5_pair_differs() {
     // The file at the tip and the tree at the installed commit; the file at I and the tree at
@@ -1427,6 +1461,7 @@ fn d5_pair_differs() {
 
 // ---- D6 a dead call's attempt is closed only by a read ------------------------------------------
 
+// spec: specs/ap/deliver.md#R21
 #[test]
 fn d6_dead_call_at_from_is_closed_not_started() {
     let mut w = W::new();
@@ -1453,6 +1488,7 @@ fn d6_dead_call_at_from_is_closed_not_started() {
     );
 }
 
+// spec: specs/ap/deliver.md#R21
 #[test]
 fn d6_dead_call_at_commit_is_closed_installed() {
     let mut w = W::new();
@@ -1472,6 +1508,7 @@ fn d6_dead_call_at_commit_is_closed_installed() {
     assert!(w.launched().is_empty());
 }
 
+// spec: specs/ap/deliver.md#R18
 #[test]
 fn d6_dead_call_at_commit_records_the_oldest_tarball() {
     let mut w = W::new();
@@ -1517,6 +1554,7 @@ fn tarball_at(w: &W, stamp: &str, n: Option<u32>) -> String {
     path
 }
 
+// spec: specs/ap/deliver.md#R21
 #[test]
 fn d6_repair_forward_installs_the_missing_part() {
     // The file at the commit and the tree at `from`: only the content installer.
@@ -1559,6 +1597,7 @@ fn d6_repair_forward_installs_the_missing_part() {
     );
 }
 
+// spec: specs/ap/deliver.md#R21
 #[test]
 fn d6_repair_falls_back_to_the_rollback() {
     // The clone's origin/main is not the attempt's commit: no installer, the command's rollback.
@@ -1605,6 +1644,7 @@ fn d6_repair_falls_back_to_the_rollback() {
     );
 }
 
+// spec: specs/ap/deliver.md#R18
 #[test]
 fn d6_repair_uses_the_oldest_tarball() {
     // The dead call's tarball (10:00:05) is the handle: not a tarball of another tree in the start's
@@ -1635,6 +1675,7 @@ fn d6_repair_uses_the_oldest_tarball() {
     }
 }
 
+// spec: specs/ap/deliver.md#R18
 #[test]
 fn d6_handle_is_the_tarball_that_holds_the_tree_of_from() {
     // Two tarballs of the second of `started_at`: the one of another tree is passed over, the one
@@ -1666,6 +1707,7 @@ fn d6_handle_is_the_tarball_that_holds_the_tree_of_from() {
     );
 }
 
+// spec: specs/ap/deliver.md#R21
 #[test]
 fn d6_a_close_after_an_unrecorded_repair_records_no_partial_tree() {
     // The repair keeps a tarball of the half-swapped tree, installs the tree, and its close is not
@@ -1688,6 +1730,7 @@ fn d6_a_close_after_an_unrecorded_repair_records_no_partial_tree() {
     );
 }
 
+// spec: specs/ap/deliver.md#R18
 #[test]
 fn d6_repair_never_records_its_own_tarball_of_a_partial_tree() {
     // No tarball of the dead call, and the tree at no manifest: the repair's content install keeps a
@@ -1726,6 +1769,7 @@ fn d6_repair_never_records_its_own_tarball_of_a_partial_tree() {
     );
 }
 
+// spec: specs/ap/deliver.md#R29
 #[test]
 fn d3_first_installer_fails_after_it_replaced_the_file() {
     // Different manifests: the file is rolled back; the pair is at `from`.
@@ -1760,6 +1804,7 @@ fn d3_first_installer_fails_after_it_replaced_the_file() {
     );
 }
 
+// spec: specs/ap/deliver.md#R21
 #[test]
 fn d6_repair_that_fails_ends_the_call_failed() {
     let mut w = W::new();
@@ -1801,6 +1846,7 @@ fn d6_repair_that_fails_ends_the_call_failed() {
     assert_eq!(w.last(), Some(v));
 }
 
+// spec: specs/ap/deliver.md#R21
 #[test]
 fn d6_dead_rollback_at_neither_refuses() {
     let mut w = W::new();
@@ -1832,6 +1878,7 @@ fn d6_dead_rollback_at_neither_refuses() {
     );
 }
 
+// spec: specs/ap/deliver.md#R21
 #[test]
 fn d6_clone_that_cannot_answer_refuses() {
     for (file, tree) in [(Some(1), Some(1)), (Some(2), Some(0)), (None, None)] {
@@ -1864,6 +1911,8 @@ fn rolls(w: &mut W) -> (Value, u8) {
     w.run_with(&r)
 }
 
+// spec: specs/ap/deliver.md#R19
+// spec: specs/ap/deliver.md#R33
 #[test]
 fn d12_rollback_exact_calls() {
     let mut w = W::new();
@@ -1972,6 +2021,7 @@ fn d12_rollback_exact_calls() {
     assert_eq!(members(&v), sorted());
 }
 
+// spec: specs/ap/deliver.md#R33
 #[test]
 fn d12_nothing_to_roll_back() {
     let setups: [fn(&mut W); 4] = [
@@ -2008,6 +2058,8 @@ fn d12_nothing_to_roll_back() {
     refused(&w, &v, exit, "pair_differs");
 }
 
+// spec: specs/ap/deliver.md#R17
+// spec: specs/ap/deliver.md#R33
 #[test]
 fn d12_kept_copy_digest_differs() {
     let mut w = W::new();
@@ -2022,6 +2074,7 @@ fn d12_kept_copy_digest_differs() {
     refused(&w, &v, exit, "nothing_to_roll_back");
 }
 
+// spec: specs/ap/deliver.md#R33
 #[test]
 fn d12_no_content_handle_and_content_differs() {
     let mut w = W::new();
@@ -2045,6 +2098,8 @@ fn d12_no_content_handle_and_content_differs() {
     assert_eq!(w.launched(), ["ap-rollback"]);
 }
 
+// spec: specs/ap/deliver.md#R18
+// spec: specs/ap/deliver.md#R33
 #[test]
 fn d12_recorded_tarball_that_does_not_hold_the_tree_counts_as_absent() {
     // The recorded tarball holds another tree: absent; the manifests differ, so nothing to roll back.
@@ -2065,6 +2120,8 @@ fn d12_recorded_tarball_that_does_not_hold_the_tree_counts_as_absent() {
     assert_eq!(w.launched(), ["ap-rollback"]);
 }
 
+// spec: specs/ap/deliver.md#R33
+// spec: specs/ap/deliver.md#R34
 #[test]
 fn d12_content_refusal_is_not_started() {
     let mut w = W::new();
@@ -2085,6 +2142,8 @@ fn d12_content_refusal_is_not_started() {
     );
 }
 
+// spec: specs/ap/deliver.md#R33
+// spec: specs/ap/deliver.md#R34
 #[test]
 fn d12_content_exit_1_skips_the_binary() {
     let mut w = W::new();
@@ -2112,6 +2171,7 @@ fn d12_content_exit_1_skips_the_binary() {
     assert_eq!(w.launched(), ["content-rollback"]);
 }
 
+// spec: specs/ap/deliver.md#R33
 #[test]
 fn d12_binary_failure_ends_failed() {
     let mut w = W::new();
@@ -2127,6 +2187,8 @@ fn d12_binary_failure_ends_failed() {
     assert_eq!(w.launched(), ["content-rollback", "ap-rollback"]);
 }
 
+// spec: specs/ap/deliver.md#R12
+// spec: specs/ap/deliver.md#R13
 #[test]
 fn d12_request_forms() {
     let cases: [(&[&str], Value, &str); 9] = [
@@ -2187,6 +2249,7 @@ fn at_one(w: &mut W) {
     (w.file, w.tree, w.bytes) = (Some(c(1)), Some(c(1)), binary(&c(1)));
 }
 
+// spec: specs/ap/deliver.md#R32
 #[test]
 fn d2_timer_is_suppressed_after_a_failure() {
     for outcome in ["failed_restored", "failed"] {
@@ -2204,6 +2267,7 @@ fn d2_timer_is_suppressed_after_a_failure() {
     assert_eq!((end(&v), exit), (("installed", ""), 0), "{v}");
 }
 
+// spec: specs/ap/deliver.md#R32
 #[test]
 fn d2_not_started_does_not_lift_the_suppression() {
     let mut w = W::new();
@@ -2214,6 +2278,7 @@ fn d2_not_started_does_not_lift_the_suppression() {
     limited(&w, &v, exit, "suppressed", 3, &failed);
 }
 
+// spec: specs/ap/deliver.md#R32
 #[test]
 fn d2_timer_is_held_by_a_rollback() {
     let mut w = W::new();
@@ -2231,6 +2296,7 @@ fn d2_timer_is_held_by_a_rollback() {
     assert_eq!((end(&v), exit), (("installed", ""), 0), "{v}");
 }
 
+// spec: specs/ap/deliver.md#R32
 #[test]
 fn d2_timer_attempt_exists() {
     for outcome in ["installed", "failed_restored", "failed"] {
@@ -2243,6 +2309,7 @@ fn d2_timer_attempt_exists() {
     }
 }
 
+// spec: specs/ap/deliver.md#R32
 #[test]
 fn d2_timer_attempts_exhausted() {
     let mut w = W::new();
@@ -2265,6 +2332,7 @@ fn d2_timer_attempts_exhausted() {
     );
 }
 
+// spec: specs/ap/deliver.md#R32
 #[test]
 fn d2_limits_count_forward_attempts_only() {
     let mut w = W::new();
@@ -2277,6 +2345,7 @@ fn d2_limits_count_forward_attempts_only() {
     assert_eq!((end(&v), exit), (("installed", ""), 0), "{v}");
 }
 
+// spec: specs/ap/deliver.md#R32
 #[test]
 fn d2_lead_request_has_no_limits() {
     let setups: [fn(&mut W); 4] = [
@@ -2304,6 +2373,7 @@ fn d2_lead_request_has_no_limits() {
     }
 }
 
+// spec: specs/ap/deliver.md#R12
 #[test]
 fn d2_timer_by_is_the_invocation() {
     for (invocation, by) in [
@@ -2325,6 +2395,8 @@ fn d2_timer_by_is_the_invocation() {
     }
 }
 
+// spec: specs/ap/deliver.md#R32
+// spec: specs/ap/deliver.md#R36
 #[test]
 fn d2_pair_differs_of_the_timer_exits_3_and_names_the_attempt() {
     // After `failed` the pair is at no commit: the timer's call ends at step 4, exit 3, and names the
@@ -2360,6 +2432,7 @@ fn d2_pair_differs_of_the_timer_exits_3_and_names_the_attempt() {
 /// `pair_differs` does, so that `ap-deliver.service` stays failed until a call settled it; a Lead's
 /// request keeps exit 2. The three ways: a dead rollback at neither commit, a clone that cannot
 /// answer, a close the store did not apply.
+// spec: specs/ap/deliver.md#R36
 #[test]
 fn d2_attempt_running_of_the_timer_exits_3() {
     type Setup = fn(&mut W) -> Value;
@@ -2404,6 +2477,7 @@ fn d2_attempt_running_of_the_timer_exits_3() {
     }
 }
 
+// spec: specs/ap/deliver.md#R36
 #[test]
 fn d2_exit_codes_of_the_limits() {
     type Setup = fn(&mut W);
@@ -2480,6 +2554,9 @@ fn sorted() -> Vec<String> {
     m
 }
 
+// spec: specs/ap/deliver.md#R11
+// spec: specs/ap/deliver.md#R31
+// spec: specs/ap/deliver.md#R35
 #[test]
 fn d7_record_members_and_last_json() {
     let mut w = W::new();
@@ -2514,6 +2591,7 @@ fn d7_record_members_and_last_json() {
     assert!(w.calls.is_empty());
 }
 
+// spec: specs/ap/deliver.md#R36
 #[test]
 fn d7_exit_codes() {
     let mut w = W::new();
@@ -2543,6 +2621,8 @@ fn d7_exit_codes() {
     assert_eq!((end(&v), exit), (("unrecorded", ""), 5), "{v}");
 }
 
+// spec: specs/ap/deliver.md#R30
+// spec: specs/ap/deliver.md#R35
 #[test]
 fn d7_unrecorded_keeps_the_outcome() {
     let mut w = W::new();
@@ -2557,6 +2637,7 @@ fn d7_unrecorded_keeps_the_outcome() {
     assert_eq!(w.last(), Some(v));
 }
 
+// spec: specs/ap/deliver.md#R36
 #[test]
 fn d7_unrecorded_failed_exits_4() {
     let mut w = W::new();
@@ -2571,6 +2652,7 @@ fn d7_unrecorded_failed_exits_4() {
     );
 }
 
+// spec: specs/ap/deliver.md#R35
 #[test]
 fn d7_detail_per_code() {
     let mut w = W::new();
@@ -2619,6 +2701,8 @@ fn d7_detail_per_code() {
 
 // ---- D9 one call at a time ---------------------------------------------------------------------
 
+// spec: specs/ap/deliver.md#R16
+// spec: specs/ap/deliver.md#R20
 #[test]
 fn d9_second_call_is_busy() {
     // While a call runs (at its `df`), a second call with another `state` and the same host lock.
@@ -2648,6 +2732,7 @@ fn d9_second_call_is_busy() {
     assert!(free);
 }
 
+// spec: specs/ap/deliver.md#R16
 #[test]
 fn d9_installers_inherit_the_lock() {
     let mut w = W::new();
@@ -2658,6 +2743,13 @@ fn d9_installers_inherit_the_lock() {
 
 // ---- D10 the exact calls of one install ---------------------------------------------------------
 
+// spec: specs/ap/deliver.md#R11
+// spec: specs/ap/deliver.md#R19
+// spec: specs/ap/deliver.md#R22
+// spec: specs/ap/deliver.md#R27
+// spec: specs/ap/deliver.md#R28
+// spec: specs/ap/deliver.md#R30
+// spec: specs/ap/deliver.md#R31
 #[test]
 fn d10_exact_calls_of_an_install() {
     let mut w = W::new();
@@ -2801,6 +2893,7 @@ fn d10_exact_calls_of_an_install() {
 /// members hold the tree of `from`: the oldest one the installer accepts is, and none is when it
 /// refuses every one, or when the script does not know the verb. The check is asked of the script of
 /// the clone, only for a tarball whose members pass.
+// spec: specs/ap/deliver.md#R18
 #[test]
 fn d6_a_tarball_the_installer_would_refuse_is_no_handle() {
     let mut w = W::new();
@@ -2852,6 +2945,7 @@ fn d6_a_tarball_the_installer_would_refuse_is_no_handle() {
 /// A recorded tarball the installer would refuse counts as absent when a rollback request reads it:
 /// where the manifests differ nothing is rolled back, where they are the same the file alone is, and
 /// never is the refused tarball given to the installer.
+// spec: specs/ap/deliver.md#R18
 #[test]
 fn d12_recorded_tarball_the_installer_would_refuse_counts_as_absent() {
     let mut w = W::new();
@@ -2885,6 +2979,7 @@ fn locks(w: &W) -> Vec<Vec<String>> {
         .collect()
 }
 
+// spec: specs/ap/deliver.md#R12
 #[test]
 fn w1_build_wait_outside_its_range_is_refused() {
     for value in [
@@ -2907,6 +3002,7 @@ fn w1_build_wait_outside_its_range_is_refused() {
     }
 }
 
+// spec: specs/ap/deliver.md#R26
 #[test]
 fn w1_free_lock_is_taken_without_waiting() {
     for bound in [0, 3, 900] {
@@ -2919,6 +3015,7 @@ fn w1_free_lock_is_taken_without_waiting() {
     }
 }
 
+// spec: specs/ap/deliver.md#R26
 #[test]
 fn w1_held_lock_is_waited_for_and_the_call_goes_on() {
     let mut w = W::new();
@@ -2936,6 +3033,7 @@ fn w1_held_lock_is_waited_for_and_the_call_goes_on() {
     );
 }
 
+// spec: specs/ap/deliver.md#R26
 #[test]
 fn w1_lock_held_past_the_bound_is_build_busy() {
     for bound in [0, 3] {
@@ -2950,6 +3048,7 @@ fn w1_lock_held_past_the_bound_is_build_busy() {
     }
 }
 
+// spec: specs/ap/deliver.md#R26
 #[test]
 fn w2_waiting_line_only_when_the_call_waits() {
     const CASE: &str = "AP_TEST_WAIT_CASE";
@@ -3204,6 +3303,9 @@ fn ekept(w: &W) -> String {
     ))
 }
 
+// spec: specs/ap/deliver.md#R37
+// spec: specs/ap/deliver.md#R42
+// spec: specs/ap/deliver.md#R43
 #[test]
 fn e_engine_at_the_pin_after_the_installer_is_installed_and_the_call_ends() {
     let mut w = W::engine();
@@ -3259,6 +3361,7 @@ fn e_engine_at_the_pin_after_the_installer_is_installed_and_the_call_ends() {
     assert_eq!(rows(&v), [row("ap", 0, None), row("content", 0, None)]);
 }
 
+// spec: specs/ap/deliver.md#R43
 #[test]
 fn e_engine_clone_has_the_remote_origin() {
     let mut w = W::engine();
@@ -3295,6 +3398,7 @@ fn e_engine_clone_has_the_remote_origin() {
             ])));
 }
 
+// spec: specs/ap/deliver.md#R43
 #[test]
 fn e_engine_at_from_after_the_installer_is_failed_restored() {
     let mut w = W::engine();
@@ -3313,6 +3417,7 @@ fn e_engine_at_from_after_the_installer_is_failed_restored() {
     assert_eq!(w.launched(), ["ont"]);
 }
 
+// spec: specs/ap/deliver.md#R43
 #[test]
 fn e_engine_at_neither_is_rolled_back_once() {
     let mut w = W::engine();
@@ -3344,6 +3449,7 @@ fn e_engine_at_neither_is_rolled_back_once() {
     assert_eq!(w.launched(), ["ont", "ont-rollback"]);
 }
 
+// spec: specs/ap/deliver.md#R43
 #[test]
 fn e_engine_chain_not_accepted_installs_nothing() {
     // The pin not under the engine's origin/main.
@@ -3388,6 +3494,7 @@ fn e_engine_chain_not_accepted_installs_nothing() {
     );
 }
 
+// spec: specs/ap/deliver.md#R40
 #[test]
 fn e_engine_refusals_before_the_first_effect() {
     // The engine unreadable, or a pin that is not 40 hex: engine_differs, as without `engine`.
@@ -3414,6 +3521,7 @@ fn e_engine_refusals_before_the_first_effect() {
     }
 }
 
+// spec: specs/ap/deliver.md#R41
 #[test]
 fn e_engine_limits_of_the_timer() {
     let pin = ec(2);
@@ -3464,6 +3572,7 @@ fn e_engine_limits_of_the_timer() {
     }
 }
 
+// spec: specs/ap/deliver.md#R38
 #[test]
 fn e_dead_engine_attempt_is_closed_by_a_read() {
     let dead = |w: &mut W| {
@@ -3525,6 +3634,9 @@ fn e_dead_engine_attempt_is_closed_by_a_read() {
     assert_eq!(v["detail"], json!({ "install": id }));
 }
 
+// spec: specs/ap/deliver.md#R42
+// spec: specs/ap/deliver.md#R44
+// spec: specs/ap/deliver.md#R46
 #[test]
 fn e_schema_higher_is_backed_up_then_installed_and_the_pair_follows() {
     let mut w = W::at_pin();
@@ -3553,6 +3665,7 @@ fn e_schema_higher_is_backed_up_then_installed_and_the_pair_follows() {
     assert_eq!(w.applies("start_install").len(), 1);
 }
 
+// spec: specs/ap/deliver.md#R40
 #[test]
 fn e_schema_equal_goes_on_and_lower_is_refused() {
     let mut w = W::at_pin();
@@ -3576,6 +3689,8 @@ fn e_schema_equal_goes_on_and_lower_is_refused() {
     assert!(w.at("backup").is_none());
 }
 
+// spec: specs/ap/deliver.md#R44
+// spec: specs/ap/deliver.md#R46
 #[test]
 fn e_schema_install_failed_installs_nothing_else() {
     let setups: [fn(&mut W); 3] = [
@@ -3600,6 +3715,7 @@ fn e_schema_install_failed_installs_nothing_else() {
     }
 }
 
+// spec: specs/ap/deliver.md#R44
 #[test]
 fn e_migrate_present_runs_after_the_install_and_clears_the_marker() {
     let mut w = W::at_pin();
@@ -3626,6 +3742,8 @@ fn e_migrate_present_runs_after_the_install_and_clears_the_marker() {
     assert!(w.migrates.is_empty());
 }
 
+// spec: specs/ap/deliver.md#R44
+// spec: specs/ap/deliver.md#R46
 #[test]
 fn e_migrate_failing_leaves_the_marker_and_the_next_call_retries_first() {
     let mut w = W::at_pin();
@@ -3661,6 +3779,7 @@ fn e_migrate_failing_leaves_the_marker_and_the_next_call_retries_first() {
     );
 }
 
+// spec: specs/ap/deliver.md#R45
 #[test]
 fn e_marker_with_the_store_at_to_is_migrated_first() {
     // A call killed between the schema install and the migration: the marker, the store at `to`.
@@ -3680,6 +3799,7 @@ fn e_marker_with_the_store_at_to_is_migrated_first() {
     assert!(w.at("backup").is_none());
 }
 
+// spec: specs/ap/deliver.md#R45
 #[test]
 fn e_marker_with_the_store_at_from_is_removed_and_the_schema_step_runs() {
     let mut w = W::at_pin();
@@ -3706,6 +3826,7 @@ fn e_marker_with_the_store_at_from_is_removed_and_the_schema_step_runs() {
     assert_eq!(w.marker(), None);
 }
 
+// spec: specs/ap/deliver.md#R45
 #[test]
 fn e_marker_that_cannot_be_acted_on_is_migrate_failed() {
     // The tip holds no `ontology/migrate`; the store at a third version; a marker unreadable.
@@ -3733,6 +3854,7 @@ fn e_marker_that_cannot_be_acted_on_is_migrate_failed() {
     }
 }
 
+// spec: specs/ap/deliver.md#R45
 #[test]
 fn e_marker_waits_for_the_refusals_before_an_effect() {
     type Setup = fn(&mut W) -> Value;
@@ -3765,6 +3887,7 @@ fn e_marker_waits_for_the_refusals_before_an_effect() {
     }
 }
 
+// spec: specs/ap/deliver.md#R39
 #[test]
 fn e_marker_with_the_pair_at_the_tip_is_acted_on_before_current() {
     let mut w = W::at_pin();
@@ -3808,6 +3931,7 @@ fn e_marker_with_the_pair_at_the_tip_is_acted_on_before_current() {
     assert!(!w.calls.iter().any(|(p, _, _)| p == "df"));
 }
 
+// spec: specs/ap/deliver.md#R45
 #[test]
 fn e_rollback_request_is_not_subject_to_the_marker() {
     let mut w = W::at_pin();
@@ -3820,6 +3944,7 @@ fn e_rollback_request_is_not_subject_to_the_marker() {
     assert!(w.migrates.is_empty() && w.marker_present());
 }
 
+// spec: specs/ap/deliver.md#R45
 #[test]
 fn e_without_engine_the_marker_is_not_read_and_the_record_is_unchanged() {
     let mut w = W::new();
@@ -3839,6 +3964,7 @@ fn e_without_engine_the_marker_is_not_read_and_the_record_is_unchanged() {
     assert_eq!(w.last(), Some(v));
 }
 
+// spec: specs/ap/deliver.md#R14
 #[test]
 fn e_engine_member_is_checked() {
     let w = W::engine();
@@ -3864,6 +3990,7 @@ fn e_engine_member_is_checked() {
     assert_eq!(v["detail"], json!({"field": "repository"}));
 }
 
+// spec: specs/ap/deliver.md#R44
 #[test]
 fn e_schema_with_an_unreadable_migrate_entry_installs_nothing() {
     // Whether the tip owes a migration cannot be read: no backup, no install, no marker; the next
@@ -4660,4 +4787,34 @@ fn r8_the_command_checks_makes_nothing_and_leaves_the_other_forms_alone() {
     }
     assert!(!w.t.join("state").exists());
     assert!(!std::path::Path::new(&lock).exists());
+}
+
+// ---- The request and the service (specs/ap/deliver.md) ------------------------------------------
+
+// spec: specs/ap/deliver.md#R13
+#[test]
+fn deliver_r13_the_clone_may_not_take_a_name_of_the_state_directory() {
+    for name in [".", "..", "target", "last.json"] {
+        let mut w = W::new();
+        let mut r = w.request();
+        r["repository"] = json!(format!("o/{name}"));
+        let (v, exit) = w.run_with(&r);
+        assert_eq!(
+            (v["code"].as_str(), exit, v["detail"].clone()),
+            (Some("invalid_input"), 2, json!({"field": "repository"})),
+            "{name}"
+        );
+        assert!(w.calls.is_empty(), "{name}");
+    }
+}
+
+// spec: specs/ap/deliver.md#R36
+#[test]
+fn deliver_r36_the_service_counts_exit_2_as_no_failure_of_the_unit() {
+    let unit = include_str!("../../../deploy/ap-deliver.service");
+    let success: Vec<_> = unit
+        .lines()
+        .filter(|l| l.starts_with("SuccessExitStatus="))
+        .collect();
+    assert_eq!(success, ["SuccessExitStatus=2"]);
 }

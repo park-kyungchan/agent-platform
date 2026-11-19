@@ -30,16 +30,19 @@ fn assert_version_line(output: &std::process::Output) {
     }
 }
 
+// spec: specs/ap/verbs.md#R3
 #[test]
 fn version_flag_prints_build_revision() {
     assert_version_line(&run(&["--version"]));
 }
 
+// spec: specs/ap/verbs.md#R3
 #[test]
 fn version_word_prints_build_revision() {
     assert_version_line(&run(&["version"]));
 }
 
+// spec: specs/ap/verbs.md#R3
 #[test]
 fn version_revision_matches_git_head_when_available() {
     let git = Command::new("git")
@@ -66,6 +69,7 @@ fn version_revision_matches_git_head_when_available() {
     assert_eq!(revision, head, "line: {line:?}");
 }
 
+// spec: specs/ap/verbs.md#R4
 #[test]
 fn no_arguments_keeps_usage_error() {
     let output = run(&[]);

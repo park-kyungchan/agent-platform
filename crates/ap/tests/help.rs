@@ -24,6 +24,8 @@ fn quoted_after(source: &str, needle: &str, out: &mut BTreeSet<String>) {
         }
     }
 }
+// spec: specs/ap/verbs.md#R1
+// spec: specs/ap/verbs.md#R2
 #[test]
 fn r2_help_lists_every_verb() {
     let help = ap(&["--help"]);
@@ -93,4 +95,74 @@ fn r34_the_help_of_status_names_the_indicators_form() {
     assert!(help.contains(form));
     let status = String::from_utf8(ap(&["status", "--help"]).stdout).unwrap();
     assert!(status.contains(form));
+}
+
+// spec: specs/ap/verbs.md#R4
+#[test]
+fn verbs_r4_an_argument_list_that_reaches_no_verb_is_refused_usage() {
+    let refusal = b"{\"error\":{\"code\":\"usage\",\"field\":\"args\"}}\n";
+    for args in [
+        &[][..],
+        &["install"][..],
+        &["doctor"][..],
+        &["render"][..],
+        &["no-such-verb"][..],
+        &["--help", "run"][..],
+        &["-h", "x"][..],
+        &["--version", "x"][..],
+        &["version", "x"][..],
+    ] {
+        let answer = ap(args);
+        assert_eq!(answer.status.code(), Some(2), "ap {args:?}");
+        assert!(answer.stdout.is_empty(), "ap {args:?}");
+        assert_eq!(answer.stderr, refusal, "ap {args:?}");
+    }
+}
+
+// spec: specs/ap/verbs.md#R1
+// spec: specs/ap/verbs.md#R2
+#[test]
+fn verbs_r1_r2_the_list_begins_with_the_usage_and_a_verb_without_a_usage_prints_its_line() {
+    let help = String::from_utf8(ap(&["-h"]).stdout).unwrap();
+    let mut lines = help.lines();
+    assert_eq!(lines.next(), Some("Usage: ap <verb> [< request.json]"));
+    assert_eq!(
+        lines.next(),
+        Some("Verbs; the section is of crates/ap/README.md:")
+    );
+    for verb in ["version", "accept", "row"] {
+        let line = help
+            .lines()
+            .find(|l| l.starts_with(&format!("  {verb}: ")))
+            .unwrap();
+        let answer = ap(&[verb, "--help"]);
+        assert_eq!(answer.status.code(), Some(0), "ap {verb} --help");
+        assert_eq!(answer.stdout, format!("{line}\n").into_bytes(), "{verb}");
+    }
+}
+
+// spec: specs/ap/verbs.md#R5
+#[test]
+fn verbs_r5_an_answer_that_cannot_be_written_exits_4() {
+    let Ok(full) = std::fs::OpenOptions::new().write(true).open("/dev/full") else {
+        eprintln!("skipped: no /dev/full");
+        return;
+    };
+    for args in [
+        &["--version"][..],
+        &["--help"][..],
+        &["version", "--help"][..],
+    ] {
+        let answer = Command::new(env!("CARGO_BIN_EXE_ap"))
+            .args(args)
+            .stdin(std::process::Stdio::null())
+            .stdout(full.try_clone().unwrap())
+            .output()
+            .unwrap();
+        assert_eq!(answer.status.code(), Some(4), "ap {args:?}");
+        assert_eq!(
+            answer.stderr, b"{\"error\":{\"code\":\"io_error\",\"field\":\"stdout\"}}\n",
+            "ap {args:?}"
+        );
+    }
 }

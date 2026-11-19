@@ -22,6 +22,8 @@ python3 -I -B -m unittest discover -s ci -p 'test_routing_suite.py'
 python3 -I -B -m unittest discover -s github -p 'test_*.py'
 python3 -I -B ci/check-map.py crates/ ci/ content/ deploy/ evals/ github/ ontology/ scripts/ specs/ .github/ check rust-toolchain.toml Cargo.toml Cargo.lock
 python3 -I -B -m unittest discover -s ci -p 'test_check_map.py'
+python3 -I -B ci/check-spec-trace.py
+python3 -I -B -m unittest discover -s ci -p 'test_check_spec_trace.py'
 if [ "$mode" = content ]; then echo "check: ok (content)"; exit 0; fi
 
 if [ "${CI:-}" != true ] && [ -z "${CHECK_LOCKED:-}" ]; then
