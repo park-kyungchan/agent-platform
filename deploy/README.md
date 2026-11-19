@@ -261,7 +261,27 @@ systemctl daemon-reload
 
 ## The watch
 
-`ap watch` (`specs/ap/watch.md`) is one pass: under the lock `pass.lock` of `/var/lib/agent-platform/watch/` the detectors `delivery`, `login`, `services`, `host` and `records` read the host, and the pass opens, sees again, reopens and closes findings of the store whose detector is `watch:<name>`; it writes nothing else but its `state.json`, and it stops, starts, restarts and kills nothing. `ap-watch.service` (`Type=oneshot`, run of `/usr/local/bin/ap watch`, `Nice=10`, `TZ=UTC` so that `systemctl` prints the times the pass reads in UTC, a `PATH` with `/usr/sbin` for `sshd`, no `Restart=`) is one pass; `ap-watch.timer` starts one at every fifth minute (`OnCalendar=*:0/5`) and makes up no pass missed while the host was down. Each pass is a new process of the installed `ap`: a delivery of `ap` reaches the next pass with no restart. The answer of each pass is one line in the journal.
+`ap watch` (`specs/ap/watch.md`) is one pass: under the lock `pass.lock` of `/var/lib/agent-platform/watch/` the nine detectors read the host, and the pass opens, sees again, reopens and closes findings of the store whose detector is `watch:<name>`; it writes nothing else but its `state.json`, and it stops, starts, restarts and kills nothing:
+
+- `delivery`: reads `/var/lib/agent-platform/deliver/last.json` for age, end state and checkout forwarding.
+- `login`: compares the SSH and sudoers login path with `login.json` (the TOTP secret file by `stat` alone).
+- `services`: lists failed systemd units and timers that have not fired within three intervals.
+- `host`: checks disk free space, `agents.slice` `memory.events` `high` rises, `apt` history and old CLI processes.
+- `records`: checks `/var/lib/agent-platform/backup/last.json` and recent store actions for stale local or remote backups.
+- `accounts`: checks Claude account `.credentials.json` expiry (only the expiry timestamp is kept) and recent `run` usage limits (`>= 0.9`).
+- `checks`: checks GitHub `main` workflow conclusions, open Dependabot alerts and `github/apply --check` settings drift for policy repositories.
+- `runtimes`: checks `--version` and `--help` flags of `claude`, `muse` and `agy` against the flags `ap run` invokes.
+- `drift`: compares host files listed in `deployments/host-artifacts.json` at `origin/main` of `agent-vps-operations` by SHA-256 without fetching.
+
+`ap-watch.service` (`Type=oneshot`, run of `/usr/local/bin/ap watch`, `Nice=10`, `TZ=UTC` so that `systemctl` prints the times the pass reads in UTC, a `PATH` with `/usr/sbin` for `sshd`, no `Restart=`) is one pass; `ap-watch.timer` starts one at every fifth minute (`OnCalendar=*:0/5`) and makes up no pass missed while the host was down. Each pass is a new process of the installed `ap`: a delivery of `ap` reaches the next pass with no restart. The answer of each pass is one line in the journal.
+
+Because `gh` reads the root user's GitHub sign-in under `HOME` and `claude` and `agy` lie outside the service's default `PATH`, add the drop-in `/etc/systemd/system/ap-watch.service.d/path.conf`:
+
+```ini
+[Service]
+Environment=HOME=/root
+Environment=PATH=<the directories of the CLIs>:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin
+```
 
 The detector `login` compares the login path with the reading in `login.json`; until it is recorded every pass keeps one finding `no baseline` open. Record it once after the install, as root, with the path of the TOTP secret file (only its presence is read, by `stat`):
 
@@ -298,3 +318,47 @@ systemctl is-active ap-watch.service                  # until it answers inactiv
 rm -f /etc/systemd/system/ap-watch.service /etc/systemd/system/ap-watch.timer
 systemctl daemon-reload
 ```
+
+## The status page
+
+`ap-status-page.service` (`Type=oneshot`, `Nice=10`, `Environment=HOME=/root`, `TimeoutStartSec=120`, `StateDirectory=agent-platform/status-page` mode `0755`, no `Restart=`) runs `/usr/local/bin/ap status --text` into `/var/lib/agent-platform/status-page/status.txt.new`, removes that file and exits 1 when `ap` fails, and otherwise renames it over `/var/lib/agent-platform/status-page/status.txt`. Nothing else is written, so a failed run keeps the previous page and a reader never sees a half-written file. `ap-status-page.timer` starts it every five minutes (`OnCalendar=*:0/5`, `AccuracySec=10s`, `Persistent=false`: a run missed while the host was down is not made up at boot). Each run is a new process of the installed `ap`, so a delivery of `ap` reaches the next run with no restart.
+
+Install, from a clean checkout of the merged commit, as root, after delivery installed an `ap` with `ap status --text`:
+
+```sh
+install -m 0644 deploy/ap-status-page.service deploy/ap-status-page.timer /etc/systemd/system/
+systemctl daemon-reload
+systemd-analyze verify /etc/systemd/system/ap-status-page.service /etc/systemd/system/ap-status-page.timer
+systemctl enable --now ap-status-page.timer
+systemctl start ap-status-page.service
+systemctl is-failed ap-status-page.service
+stat -c '%y' /var/lib/agent-platform/status-page/status.txt
+head -n 1 /var/lib/agent-platform/status-page/status.txt
+```
+
+Read `stat -c '%y'` and the `status <time>` first line again after the next timer run (`systemctl list-timers ap-status-page.timer`) to verify that the file is rewritten every five minutes.
+
+Save the present `tailscale serve` configuration first in a subshell with `set -C` (so a second install never replaces the saved file), then publish `/var/lib/agent-platform/status-page/status.txt` and read it back:
+
+```sh
+(set -C; tailscale serve status --json > /var/lib/agent-platform/status-page/serve.before.json)
+tailscale serve --bg --yes /var/lib/agent-platform/status-page/status.txt
+tailscale serve status
+curl -sS -D - https://<host>.<tailnet>.ts.net/
+```
+
+The `curl` response answers with `Content-Type: text/plain; charset=utf-8` and the current `status <time>` line. Every device that the tailnet's access policy lets reach this host on port 443 can read the page; it is never offered with `tailscale funnel`.
+
+Undo: reset the serve configuration, replay one `tailscale serve --bg` per handler listed in `/var/lib/agent-platform/status-page/serve.before.json` (none when it is `{}`) with `--https=<port>` for an `HTTPS` port, `--http=<port>` for an `HTTP` port, `--tcp=<port>` for a TCP forward, and `--set-path=<mount>`, compare `tailscale serve status --json` against the saved file with `diff`, then disable the timer and remove the two unit files:
+
+```sh
+tailscale serve reset
+# Replay any handlers from /var/lib/agent-platform/status-page/serve.before.json here when it is not `{}`.
+tailscale serve status --json | diff -u /var/lib/agent-platform/status-page/serve.before.json -
+systemctl disable --now ap-status-page.timer
+systemctl is-active ap-status-page.service            # until it answers inactive or failed, not activating
+rm -f /etc/systemd/system/ap-status-page.service /etc/systemd/system/ap-status-page.timer
+systemctl daemon-reload
+```
+
+`/var/lib/agent-platform/status-page/` (`status.txt` and `serve.before.json`) stays; remove it by hand when no longer needed.
