@@ -72,3 +72,4 @@ A refusal of the store passes on the store's code, such as `intent_required`, `i
 
 - No review of a page or a plan (`ap unit review`), no run of a unit, no approval, no map file: `page` reads a `map.json` when the commit has one.
 - No removal of the present forms of `ap unit`; no change of the schema.
+- The agents' rule around a unit's pull request, which no test holds: an agent that reads its review threads reads every page of them, and only the Lead resolves a thread; the owner of a merged worktree removes it without force, then its branch. What `ap unit run` itself does with threads and with its own worktree is `specs/ap/unit-run.md` R17 and R32.

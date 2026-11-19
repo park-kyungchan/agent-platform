@@ -93,4 +93,17 @@ fresh; mkdir -p "$t/evil" && echo e > "$t/evil/evil.txt" && tar -C "$t/evil" -cf
 fresh; echo '../escape' >> "$ck/k.tar.paths"; rcheck "an entry of .paths that is not owned" "unexpected path in .paths"
 fresh; rm "$ck/k.tar"; rcheck "a missing tarball" "tarball, .sha256 or .paths missing"
 AP_CONTENT_DST=$absent inst rollback-check; rc=$?; [ "$rc" -eq 2 ] && grep -q '^refuse: usage: rollback-check' "$t/err" && ok "rollback-check wants one tarball" || bad "rollback-check usage rc=$rc"
+# a retired top path that is not a skill: content that no longer names runtime-references removes the directory a
+# previous install owned (it stays in the installer's owned paths for this); the rollback restores it.
+mkdir -p content/runtime-references; echo ref8 > content/runtime-references/A.md; c8=$(commit eight)
+rm -rf "$t/dst6"; AP_CONTENT_DST=$t/dst6 inst install "$c8"; rc=$?; h8=$(tree "$t/dst6")
+{ [ "$rc" -eq 0 ] && [ -f "$t/dst6/runtime-references/A.md" ] && grep -qx runtime-references "$t/dst6/.content-paths"; } || bad "install before the retirement rc=$rc $(cat "$t/err")"
+git rm -q -r content/runtime-references; echo nine > content/AGENTS.md; c9=$(commit nine)
+AP_CONTENT_DST=$t/dst6 inst install "$c9"; rc=$?; tar9=$(sed -n 's/.*backup=//p' "$t/out")
+{ [ "$rc" -eq 0 ] && [ ! -e "$t/dst6/runtime-references" ] && [ "$(cat "$t/dst6/AGENTS.md")" = nine ] \
+  && ! grep -qx runtime-references "$t/dst6/.content-paths" \
+  && grep -qx runtime-references "$tar9.paths"; } && ok "retired runtime-references removed by the next install" || bad "retirement of runtime-references rc=$rc $(cat "$t/err")"
+AP_CONTENT_DST=$t/dst6 inst rollback "$tar9"; rc=$?
+{ [ "$rc" -eq 0 ] && [ "$(tree "$t/dst6")" = "$h8" ] && [ -f "$t/dst6/runtime-references/A.md" ] && grep -qx runtime-references "$t/dst6/.content-paths"; } \
+  && ok "rollback restores runtime-references" || bad "rollback of the retirement rc=$rc $(cat "$t/err")"
 [ "$fails" -eq 0 ] && echo "test-install-content: PASS" || { echo "test-install-content: $fails FAILED"; exit 1; }

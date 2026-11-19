@@ -94,7 +94,7 @@ sed "s|^LOCK_FILE=\".*\"$|LOCK_FILE=\"$W/build.lock\"|" "$REPO/scripts/install-a
 [ "$(diff "$REPO/scripts/install-ap.sh" "$O/scripts/install-ap.sh" | grep -c '^[<>]')" = 2 ] || fail "the build lock line of install-ap.sh"
 
 # The origin: content of four top paths, so that one content install renames eight times.
-FILES="AGENTS.md runtime-references/walk.md skills/a/SKILL.md skills/b/SKILL.md"
+FILES="AGENTS.md skills/a/SKILL.md skills/b/SKILL.md skills/c/SKILL.md"
 content() {
   local f
   for f in $FILES; do mkdir -p "$O/content/$(dirname "$f")"; printf 'walk %s revision %s\n' "$f" "$1" > "$O/content/$f"; done

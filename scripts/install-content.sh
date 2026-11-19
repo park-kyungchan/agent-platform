@@ -43,8 +43,10 @@ swap() { local stage=$1 p; shift
     mkdir -p -- "$(dirname -- "$DST/$p")" || return 1
     mv -- "$stage/$p" "$DST/$p" || return 1; placed+=("$p")
   done; }
+# runtime-references is a retired owned path: content no longer names it, but a previous install's .content-paths
+# and its kept copy do, so the install that removes it and the rollback that restores it both pass.
 owned_ok() { case "$1" in *..*|skills/|skills/*/*) return 1 ;; AGENTS.md|runtime-references|skills/*) return 0 ;; esac; return 1; }
-paths_of() { # <SHA256SUMS> -> the top paths it owns: AGENTS.md, runtime-references, skills/<name>
+paths_of() { # <SHA256SUMS> -> the top paths it owns: AGENTS.md, skills/<name>
   cut -c67- "$1" | awk -F/ '$1=="skills"{print "skills/"$2; next} {print $1}' | sort -u; }
 # The checks of a rollback that do not read the target (rollback-check runs these and nothing else); it sets paths.
 kept_copy_ok() { local p tarball=$1 checksum
