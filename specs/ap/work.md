@@ -44,6 +44,7 @@ The timer, its install, the switch and the undo: `deploy/README.md`, "The dispat
 - A `stopped` unit is never a candidate (the Lead amends it and makes it ready), and it holds no write set: a `ready` unit that overlaps it may start while its pull request is open.
 - The overlap rule is stricter than the write-set matcher for a `*` that is not `<dir>/**` (R11): two such units of one repository may wait on each other where their paths would not meet.
 - The shared attempt on a unit's lock (R6) can meet a run's own exclusive attempt at the same instant; that run answers `unit_run_active` and the next pass sees it not in flight.
+- A start that keeps failing (R15) is noted `start failed` on every pass, a clear and a note each time, since the store takes `note_unit_wait` only on a `ready` unit and so a clear after the start cannot be applied; the Lead holds or drops that unit (`ap status` shows `start failed`).
 
 ## Not included
 

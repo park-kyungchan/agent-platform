@@ -7,6 +7,10 @@ use serde_json::{Value, json};
 use std::path::Path;
 
 const UNITS: &str = "task_key clones accounts timeouts compact_window prompts judge_threads";
+/// The runtimes whose stage `ap run` admits only with the mode `bypassPermissions`: a block on one
+/// of them that names no `permission_mode` is composed with it (README "A unit from its page" 3).
+const BARE: [&str; 3] = ["muse", "codex", "agy"];
+const BYPASS: &str = "bypassPermissions";
 
 /// What a call from a page holds in memory: the page's bytes as read, the composed request and the
 /// three files (request, prompt, verify prompt: path and bytes), and the record's `composed`.
@@ -188,8 +192,11 @@ pub(super) fn compose(page: &str) -> Result<Composed, Failure> {
         let mut s = json!({"model": b["model"], "effort": b["effort"], "runtime": runtime,
             "account": list[0], "prompt": format!("{out}{file}"),
             "timeout_seconds": b.get("timeout_seconds").unwrap_or(&units["timeouts"][which])});
-        if let Some(mode) = b.get("permission_mode") {
-            s["permission_mode"] = mode.clone();
+        // A block on another runtime that states no mode gets the one `ap run` requires for it.
+        match b.get("permission_mode") {
+            Some(mode) => s["permission_mode"] = mode.clone(),
+            None if BARE.contains(&runtime) => s["permission_mode"] = json!(BYPASS),
+            None => (),
         }
         if list.len() > 1 {
             s["next_accounts"] = json!(&list[1..]);
