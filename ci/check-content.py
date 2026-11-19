@@ -79,7 +79,8 @@ for name, text in texts.items():
     for m in re.finditer(r"\]\((?!https?:|#)([^)\s]+)\)", prose):
         if not (ROOT / name).parent.joinpath(m.group(1).split("#")[0]).exists():
             fail("broken_relative_link", name, m.group(1))
-for name in owned:
+# Every file under content/ but the list of checksums, README.md included (it is not an owned file, but a reader loads it).
+for name in sorted(str(p.relative_to(ROOT)) for p in ROOT.rglob("*") if p.is_file() and p.name != "SHA256SUMS"):
     for number, line in enumerate((ROOT / name).read_text(encoding="utf-8", errors="replace").splitlines(), 1):
         for retired in RETIRED_NAMES:
             if retired in line:

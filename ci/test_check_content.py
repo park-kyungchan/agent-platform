@@ -102,6 +102,15 @@ class RetiredNames(Scratch, unittest.TestCase):
                 self.assertEqual(code, 1, out)
                 self.assertIn(f"retired_name@content/{TARGET}:{line}: {name}", out)
 
+    def test_a_retired_name_in_the_readme_fails(self):
+        root = self.fixture()
+        readme = root / "content/README.md"
+        text = readme.read_text(encoding="utf-8")
+        readme.write_text(text + "The skill lessons-loop is gone.\n", encoding="utf-8")
+        code, out = run_check(root)
+        self.assertEqual(code, 1, out)
+        self.assertIn(f"retired_name@content/README.md:{text.count(chr(10)) + 1}: lessons-loop", out)
+
     def test_no_retired_name_passes(self):
         root = self.fixture()
         self.append(root, "See the lead skill for the closure of a worker.")
