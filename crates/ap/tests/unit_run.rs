@@ -2280,7 +2280,7 @@ impl F {
 // spec: specs/ap/unit-run.md#R36
 #[test]
 fn r36_a_plain_unit_stops_on_a_protected_path_and_a_contract_unit_goes_on() {
-    let stops: [(&str, &str, &[&str], &str); 11] = [
+    let stops: [(&str, &str, &[&str], &str); 13] = [
         ("ci/**", "ci/x", &[], "mkdir ci; echo x > ci/x"),
         // A name compared without case, and a root directory of the host's files.
         ("CI/**", "CI/x", &[], "mkdir CI; echo x > CI/x"),
@@ -2321,6 +2321,20 @@ fn r36_a_plain_unit_stops_on_a_protected_path_and_a_contract_unit_goes_on() {
             "ontology/ENGINE-PIN",
             &[],
             "mkdir ontology; echo x > ontology/ENGINE-PIN",
+        ),
+        // Trees that delivery runs or installs as root: a changed file, and a file added beside
+        // `ontology/migrate` that Python would load in its place.
+        (
+            "content/**",
+            "content/SHA256SUMS",
+            &[],
+            "mkdir content; echo x > content/SHA256SUMS",
+        ),
+        (
+            "ontology/**",
+            "ontology/json.py",
+            &[],
+            "mkdir ontology; echo x > ontology/json.py",
         ),
         // Without rename detection the old path of a file moved away is a changed path.
         (
