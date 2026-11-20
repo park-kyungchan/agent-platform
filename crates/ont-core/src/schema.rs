@@ -1211,10 +1211,13 @@ impl FunctionDef {
         if required.is_none() {
             faults.push(format!("{at}/required"));
         }
+        // A parsed type is kept even when `required` is at fault, so that
+        // `check` still reports a fault of the type: one diagnostic per
+        // fault. A fault recorded here refuses the schema either way.
         Some(FunctionParameter {
             description,
             ty: ty?,
-            required: required?,
+            required: required.unwrap_or(false),
         })
     }
 

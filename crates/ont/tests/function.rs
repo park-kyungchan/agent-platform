@@ -183,7 +183,9 @@ fn schema_check_refuses_each_malformed_member_once() {
             "noreq":{"type":"string"},
             "dangling":{"type":{"ref":"missing"},"required":false},
             "deep":{"type":{"array":{"value_type":"missing"}},"required":false},
-            "loose":{"type":"string","required":true,"max_bytes":3}
+            "loose":{"type":"string","required":true,"max_bytes":3},
+            "both":{"type":{"ref":"missing"}},
+            "both_bad":{"type":"text","required":"yes"}
         },"program":"/bin/true","answer_bytes":1,"timeout_ms":1},
         "notobj":3,
         "Bad":{"parameters":{},"program":"/bin/true","answer_bytes":1,"timeout_ms":1}
@@ -220,6 +222,20 @@ fn schema_check_refuses_each_malformed_member_once() {
             f(
                 "invalid_function",
                 "/functions/params/parameters/loose/max_bytes"
+            ),
+            // Two faults of one parameter are two diagnostics.
+            f("invalid_function", "/functions/params/parameters/both/type"),
+            f(
+                "invalid_function",
+                "/functions/params/parameters/both/required"
+            ),
+            f(
+                "invalid_function",
+                "/functions/params/parameters/both_bad/type"
+            ),
+            f(
+                "invalid_function",
+                "/functions/params/parameters/both_bad/required"
             ),
             f("invalid_function", "/functions/notobj"),
             f("invalid_name", "/functions/Bad"),
