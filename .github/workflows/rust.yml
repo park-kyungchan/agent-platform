@@ -78,6 +78,15 @@ jobs:
           fi
           git config --global url."ssh://git@github.com/park-kyungchan/ontology-platform".insteadOf https://github.com/park-kyungchan/ontology-platform
           git config --global core.sshCommand "ssh -i $key_file -o IdentitiesOnly=yes -o UserKnownHostsFile=$known_hosts -o StrictHostKeyChecking=yes"
+      - name: Restore the engine of ontology/ENGINE-PIN (cargo install of ./check then builds nothing)
+        if: steps.scope.outputs.run_rust == 'true'
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
+        with:
+          path: |
+            target/engine-pin/bin
+            target/engine-pin/.crates.toml
+            target/engine-pin/.crates2.json
+          key: engine-pin-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('ontology/ENGINE-PIN', 'rust-toolchain.toml') }}
       - name: Check
         if: steps.scope.outputs.run_rust == 'true'
         env:
