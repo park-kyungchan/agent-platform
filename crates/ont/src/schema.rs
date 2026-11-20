@@ -141,6 +141,7 @@ pub fn check(ctx: &Context, req: &CheckRequest) -> Result<Answer, Failure> {
 /// file is created with mode 0600 (`create_new`) before SQLite opens it, and
 /// only when its parent directory exists.
 pub fn install(ctx: &Context, req: &InstallRequest) -> Result<Answer, Failure> {
+    crate::refuse_read_only(ctx)?;
     install_at_default(ctx, req, std::path::Path::new(crate::DEFAULT_STORE))
 }
 
@@ -187,6 +188,7 @@ fn install_at_default(
 
 /// Install the schema at a merged commit of a repository checkout.
 pub fn install_commit(ctx: &Context, req: &CommitInstallRequest) -> Result<Answer, Failure> {
+    crate::refuse_read_only(ctx)?;
     let got = crate::gitread::read_schema(&req.checkout, &req.commit, &req.path)?;
     install_bytes(
         ctx,
@@ -435,6 +437,20 @@ pub(crate) fn schema_input_refusal(
         "invalid_name" => {
             "1 to 64 ASCII characters: lowercase letter first; then lowercase letters, digits or underscore"
         }
+        "invalid_function" => match last {
+            "program" => "program must be an absolute path of at most 4096 bytes without NUL",
+            "answer_bytes" => "answer_bytes must be an integer from 1 to 1048576",
+            "timeout_ms" => "timeout_ms must be an integer from 1 to 600000",
+            "parameters" => "parameters must be an object of declared parameters",
+            "type" => {
+                "parameter type must be a type an action parameter declares, its names declared in this schema"
+            }
+            "required" => "parameter required must be a boolean",
+            "description" => "description must be a string of at most 300 UTF-8 bytes",
+            _ => {
+                "a function is {description?, parameters: {name: {type, required, description?}}, program, answer_bytes, timeout_ms}; parameter names follow action parameter names"
+            }
+        },
         "reserved_domain" => "program is a reserved domain name",
         "unknown_source_kind" => "source kind must be markdown_fields, file_digest or records",
         "invalid_source_option" => {

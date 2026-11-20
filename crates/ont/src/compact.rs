@@ -21,6 +21,7 @@ pub fn checksum(store: &mut Store) -> Result<String, StoreRefusal> {
 
 /// Compact an existing store without binding a principal, as for backup.
 pub fn compact(ctx: &Context, _req: &CompactRequest) -> Result<Answer, Failure> {
+    crate::refuse_read_only(ctx)?;
     let mut store = open_store(&ctx.store, true)?;
     let page_size_before = st!(store.page_size());
     let bytes_before = io!(std::fs::metadata(&ctx.store), "store_stat_failed").len();

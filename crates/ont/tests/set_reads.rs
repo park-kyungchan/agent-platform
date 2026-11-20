@@ -81,6 +81,7 @@ impl Temp {
             store: self.store(),
             now: Some(10),
             client: "test".into(),
+            read_only: false,
         };
         let mut server = ont::mcp::Server::new(config, &ont::cli::execute);
         let out = server.handle_line(json!({"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"ont_search","arguments":request}}).to_string().as_bytes()).unwrap();

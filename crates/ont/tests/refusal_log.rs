@@ -394,6 +394,7 @@ fn the_library_and_the_mcp_tool_record() {
         store: t.store().into(),
         now: Some(NOW),
         client: "test".into(),
+        read_only: false,
     };
     let mut server = ont::mcp::Server::new(config, &ont::cli::execute);
     let response = server
@@ -838,6 +839,7 @@ fn the_mcp_tool_answers_what_the_subcommand_prints() {
         store: t.store().into(),
         now: Some(NOW),
         client: "test".into(),
+        read_only: false,
     };
     let mut server = ont::mcp::Server::new(config, &ont::cli::execute);
     for request in [
@@ -936,6 +938,7 @@ fn the_role_comes_from_the_request_or_the_environment() {
         store: t.store().into(),
         now: Some(NOW),
         client: "test".into(),
+        read_only: false,
     };
     let mut server = ont::mcp::Server::new(config, &ont::cli::execute);
     for (request_id, role) in [("m1", Some("mcp-role")), ("m2", None)] {
@@ -998,6 +1001,7 @@ fn the_role_has_the_bounds_of_agent() {
         store: t.store().into(),
         now: Some(NOW),
         client: "test".into(),
+        read_only: false,
     };
     let mut server = ont::mcp::Server::new(config, &ont::cli::execute);
     for role in [json!(5), json!("a b")] {

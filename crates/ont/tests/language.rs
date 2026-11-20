@@ -103,6 +103,7 @@ impl Temp {
                 store: self.store(),
                 now: Some(now),
                 client: "language".into(),
+                read_only: false,
             },
             &ont::cli::execute,
         );
@@ -405,7 +406,7 @@ fn descriptions_keep_mcp_response_and_tool_list_bounds() {
     assert_eq!(answer["code"], "response_too_large", "{answer}");
     let described = t.tool("ont_describe", json!({}), NOW);
     assert_eq!(described["code"], "response_too_large", "{described}");
-    assert!(ont::mcp::tools_list().to_string().len() <= 6000);
+    assert!(ont::mcp::tools_list().to_string().len() <= 6500);
     assert!(t.logs().is_empty());
 }
 

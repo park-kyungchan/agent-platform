@@ -154,6 +154,7 @@ impl Peer {
             store: store.into(),
             now: Some(NOW),
             client: client.unwrap_or_default().into(),
+            read_only: false,
         };
         let handle = std::thread::spawn(move || {
             ont::mcp::serve(&config, BufReader::new(request_reader), response_writer)
@@ -277,18 +278,18 @@ fn initialize_notification_and_ping() {
 }
 
 #[test]
-fn tools_list_is_constant_small_and_has_eight_tools() {
+fn tools_list_is_constant_small_and_has_nine_tools() {
     // spec: specs/ont/mcp.md#R8
     // spec: specs/ont/mcp.md#R15
     let t = Temp::new();
     let mut p = Peer::spawn(&t.store("absent.sqlite"));
     p.send_raw(br#"{"jsonrpc":"2.0","id":7,"method":"tools/list"}"#);
     let line = p.recv_line();
-    assert!(line.len() <= 6000, "tools/list wire: {}", line.len());
+    assert!(line.len() <= 6500, "tools/list wire: {}", line.len());
     let r: Value = serde_json::from_str(&line).unwrap();
     let result = r["result"].to_string();
     eprintln!("tools/list result bytes: {}", result.len());
-    assert!(result.len() <= 6000, "{}", result.len());
+    assert!(result.len() <= 6500, "{}", result.len());
     let tools = r["result"]["tools"].as_array().unwrap();
     let names: Vec<&str> = tools.iter().map(|t| t["name"].as_str().unwrap()).collect();
     assert_eq!(
@@ -301,7 +302,8 @@ fn tools_list_is_constant_small_and_has_eight_tools() {
             "ont_action_list",
             "ont_action_validate",
             "ont_action_apply",
-            "ont_log"
+            "ont_log",
+            "ont_fn"
         ]
     );
     for tool in tools {
@@ -654,6 +656,7 @@ fn a_panic_in_one_call_answers_that_call_and_the_server_goes_on() {
         store: store.clone().into(),
         now: Some(NOW),
         client: "unit".into(),
+        read_only: false,
     };
     let exec = |op: Op, request: &[u8], ctx: &ont::Context| {
         if op == Op::Get {
@@ -737,6 +740,7 @@ fn serve_bytes(input: &[u8]) -> Vec<Value> {
         store: "/nonexistent-ont-mcp-test/s.sqlite".into(),
         now: Some(NOW),
         client: "unit".into(),
+        read_only: false,
     };
     let mut out = Vec::new();
     ont::mcp::serve(&config, Cursor::new(input.to_vec()), &mut out).unwrap();
@@ -787,6 +791,7 @@ fn an_internal_failure_is_a_tool_result_with_a_located_code() {
         store: "/nonexistent-ont-mcp-test/s.sqlite".into(),
         now: Some(NOW),
         client: "unit".into(),
+        read_only: false,
     };
     let exec = |_op: Op, _request: &[u8], _ctx: &ont::Context| {
         Err(ont::Failure::Internal(ont::internal!("seam_failure")))
@@ -917,6 +922,7 @@ fn action_config(store: &str, client: &str) -> ont::mcp::Config {
         store: store.into(),
         now: Some(NOW),
         client: client.into(),
+        read_only: false,
     }
 }
 

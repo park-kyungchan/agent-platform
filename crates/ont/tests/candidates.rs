@@ -626,6 +626,7 @@ fn upgrade_refusal_case(mode: &str) {
         store: f.path(),
         now: Some(10),
         client: "cli".into(),
+        read_only: false,
     };
     let exec = ont::cli::execute;
     let mut server = ont::mcp::Server::new(config, &exec);

@@ -697,6 +697,7 @@ pub fn write_file(
     req: &RenderRequest,
     preimage_dir: &Path,
 ) -> Result<Answer, Failure> {
+    crate::refuse_read_only(ctx)?;
     let _lock = writer_lock(path)?;
     let (text, meta) = target(path)?;
     let found = blocks(&text)
