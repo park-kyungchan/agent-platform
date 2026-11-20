@@ -201,20 +201,8 @@ impl Fake {
             NEXT.fetch_add(1, Ordering::SeqCst)
         ));
         let _ = std::fs::remove_dir_all(&t);
-        for d in [
-            "bin",
-            "a1",
-            "a2",
-            "cwd",
-            "home/.ssh",
-            "work/edu-a",
-            "work/other",
-        ] {
+        for d in ["bin", "a1", "a2", "cwd"] {
             std::fs::create_dir_all(t.join(d)).unwrap();
-        }
-        // What `limits` hides under the home and the work root: a directory and a file of each.
-        for f in ["home/.netrc", "work/edu-b"] {
-            std::fs::write(t.join(f), "").unwrap();
         }
         for (name, text) in [
             ("claude", FAKE),
@@ -7490,6 +7478,15 @@ const FAKE_LIMITS: &str = include_str!("fixtures/run_limits/fake-claude.sh");
 impl Fake {
     /// A reviewer request on `out` whose `limits` name the scratch directory `<t>/scratch`.
     fn limited(&self, out: &str) -> Value {
+        // What `limits` hides under the home and the work root: a directory and a file of each.
+        for d in ["home/.ssh", "work/edu-a", "work/other"] {
+            std::fs::create_dir_all(self.t.join(d)).unwrap();
+        }
+        for f in ["home/.netrc", "work/edu-b"] {
+            if !self.t.join(f).exists() {
+                std::fs::write(self.t.join(f), "").unwrap();
+            }
+        }
         let mut r = self.request(out);
         r["limits"] = json!({"scratch": self.p("scratch")});
         r
