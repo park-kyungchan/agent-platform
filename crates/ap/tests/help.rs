@@ -97,6 +97,17 @@ fn r34_the_help_of_status_names_the_indicators_form() {
     assert!(status.contains(form));
 }
 
+// spec: specs/ap/status.md#R43
+#[test]
+fn r43_the_help_of_status_names_the_brief_and_requests_forms() {
+    let form = "ap status --brief <intent> [--store <path>]";
+    let help = String::from_utf8(ap(&["--help"]).stdout).unwrap();
+    assert!(help.contains(form));
+    let status = String::from_utf8(ap(&["status", "--help"]).stdout).unwrap();
+    assert!(status.contains(form));
+    assert!(status.contains("<key> [--requests]"));
+}
+
 // spec: specs/ap/verbs.md#R4
 #[test]
 fn verbs_r4_an_argument_list_that_reaches_no_verb_is_refused_usage() {
