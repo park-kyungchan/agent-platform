@@ -5,7 +5,9 @@ Reads records that already exist and nothing else; stores nothing, writes no fil
   Claude session records   <account>/projects/**/*.jsonl   keys: type, sessionId, cwd, gitBranch, timestamp,
                            message.id, message.model, message.usage (top-level members and cache_creation),
                            the name of a tool_use block
-  Stage records            <work>/*/**/*.run.json          role, model, session, state, start, answer.path, resumes, cut
+  Stage records            <work>/*/**/*.run.json and, per --stage-dir, <dir>/*.run.json and <dir>/*/*.run.json
+                           (the store's unit and review directories by default; nothing deeper is read)
+                           role, model, session, state, start, answer.path, prompt.path, resumes, cut
   Codex session records    <dir>/**/*.jsonl                session_meta.id and cwd, turn_context.model, token_count totals
   Merged pull requests     gh pr list --state merged       number, headRefName, mergedAt
   Reviewer answers         the first line of the answer file of a reviewer stage
@@ -18,13 +20,17 @@ import bisect
 import collections
 import datetime
 import json
+import re
 import statistics
 import subprocess
 import sys
 from pathlib import Path
 
 KINDS = ("input", "output", "cache_read", "cache_write_5m", "cache_write_1h")
-ROUTES = ("engineering", "lesson", "other")
+ROUTES = ("engineering", "lesson", "temporary", "other")
+REVIEW_KINDS = ("page", "plan", "packet", "other")
+STAGE_DIRS = ("/var/lib/agent-platform/units", "/var/lib/agent-platform/reviews")  # the store's stage records
+TEMP_ROOTS = ("/tmp", "/var/tmp")
 UNCOUNTED = (("agy", "no usage record exists under its state directory"),)  # CLIs whose sessions this command cannot count
 REPOS = ("park-kyungchan/agent-platform", "park-kyungchan/ontology-platform", "park-kyungchan/education-platform")
 
@@ -160,9 +166,28 @@ def read_codex(codex_dir, since_epoch):
     return out, lines
 
 
-def read_stages(work_root):
-    stages, lines = [], collections.Counter()
-    for f in sorted(Path(work_root).glob("*/**/*.run.json")):
+def review_kind(path):
+    """page, plan or packet from the prompt file of a stage record; anything else is `other`."""
+    if not isinstance(path, str):
+        return "other"
+    p = path.split("/")
+    if p[-1].startswith("page-"):
+        return "page"
+    if p[-1].startswith("plan-"):
+        return "plan"
+    return "packet" if len(p) >= 3 and p[-3] == "units" and re.fullmatch(r"\d+\.verifier\.prompt\.md", p[-1]) else "other"
+
+
+def read_stages(work_root, stage_dirs=()):
+    """A record read from a stage directory is marked `store`; a file reached by both ways is read once."""
+    stages, lines, found = [], collections.Counter(), {}
+    for f in Path(work_root).glob("*/**/*.run.json"):
+        found[f.resolve()] = (f, False)
+    for d in stage_dirs:
+        d = Path(d)
+        for f in (*d.glob("*.run.json"), *d.glob("*/*.run.json")) if d.is_dir() else ():
+            found[f.resolve()] = (f, True)
+    for f, store in sorted(found.values(), key=lambda v: str(v[0])):
         try:
             o = json.loads(f.read_text(encoding="utf-8", errors="replace"))
         except (ValueError, OSError):
@@ -171,26 +196,39 @@ def read_stages(work_root):
             lines["unreadable"] += 1
             continue
         lines["records"] += 1
-        a = o.get("answer")
+        if store:
+            lines["stage_dir_records"] += 1
+        a, pr = o.get("answer"), o.get("prompt")
         stages.append({"role": str(o.get("role") or "unknown"), "model": str(o.get("model") or "unknown"), "session": o["session"], "cwd": str(o.get("cwd") or ""),
                        "state": "cut" if o.get("state") == "cut" or o.get("cut") is True else str(o.get("state")),
                        "start": str(o.get("start") or ""), "answer": a.get("path") if isinstance(a, dict) else None,
+                       "kind": review_kind(pr.get("path") if isinstance(pr, dict) else None), "store": store,
                        "ap": "tokens" in o and "resumes" in o, "first_run": o.get("resumes", "x") is None, "file": str(f)})
     return stages, lines
 
 
-def route_of(cwd, work, platforms, lesson):
+def route_of(cwd, work, platforms, lesson, stage=None):
+    """The rules in order: lesson; a stage record read from a stage directory; the work and platforms roots;
+    a session with no stage record under a temporary directory; else `other`."""
     def under(root):
         return cwd == root or cwd.startswith(root.rstrip("/") + "/")
-    return "lesson" if under(lesson) else "engineering" if under(work) or under(platforms) else "other"
+    if under(lesson):
+        return "lesson"
+    if (stage or {}).get("store") or under(work) or under(platforms):
+        return "engineering"
+    return "temporary" if stage is None and any(under(t) for t in TEMP_ROOTS) else "other"
 
 
 def role_without_stage(cwd, a):
-    """lead: the Lead's own directory; worker, no record: a task worktree or a platform checkout; else interactive."""
+    """lead: the Lead's own directory, or (no --lead-cwd given) a task directory under the work root outside the lesson
+    directory; worker, no record: a task worktree or a platform checkout; else interactive."""
     work, platforms, here = a.work_root.rstrip("/") + "/", a.platforms_root.rstrip("/") + "/", cwd + "/"
     if cwd in a.lead_cwd:
         return "lead"
-    return "worker, no record" if (here.startswith(work) and "/wt/" in here[len(work) - 1:]) or here.startswith(platforms) else "interactive"
+    if (here.startswith(work) and "/wt/" in here[len(work) - 1:]) or here.startswith(platforms):
+        return "worker, no record"
+    task = here.startswith(work) and here != work and not here.startswith(a.lesson_dir.rstrip("/") + "/")
+    return "lead" if task and not a.lead_cwd else "interactive"
 
 
 def week_of(ts, since, until):
@@ -214,6 +252,7 @@ def aggregate(msgs, a):
         by_session[s["session"]].append(s)
     totals, rows = collections.defaultdict(collections.Counter), collections.defaultdict(lambda: collections.defaultdict(collections.Counter))
     leads, outside, session_usd = collections.defaultdict(collections.Counter), 0, collections.defaultdict(float)
+    kinds = collections.defaultdict(collections.Counter)
     lesson_files = collections.defaultdict(set)
     for m in msgs:
         usd = cost(m["model"], m["tok"], a.rates)
@@ -223,18 +262,21 @@ def aggregate(msgs, a):
             outside += 1
             continue
         ss = by_session.get(m["session"])
-        role = ss[max(bisect.bisect_right([s["start"] for s in ss], m["ts"]) - 1, 0)]["role"] if ss else role_without_stage(m["cwd"], a)
-        route = route_of(m["cwd"], a.work_root, a.platforms_root, a.lesson_dir)
+        st = ss[max(bisect.bisect_right([s["start"] for s in ss], m["ts"]) - 1, 0)] if ss else None
+        role = st["role"] if st else role_without_stage(m["cwd"], a)
+        route = route_of(m["cwd"], a.work_root, a.platforms_root, a.lesson_dir, st)
         fam = family(m["model"], a.rates)
         add(totals[(week, route)], m["tok"], usd)
         add(rows[(week, route)][("*" if fam == "unknown" else role, fam)], m["tok"], usd)  # one line for every role of an unknown model
+        if role == "reviewer":
+            add(kinds[(week, st["kind"])], m["tok"], usd)  # outside the route blocks: no route total changes
         if route == "lesson":
             lesson_files[m["src"]].add(m["file"])
         if role == "lead" and m["src"] == "claude":
             name = "__".join(m["tool"].split("__")[:2])  # mcp__server__tool -> mcp__server
             leads[name]["calls"] += 1
             leads[name]["usd"] += usd
-    return totals, rows, leads, outside, session_usd, lesson_files
+    return totals, rows, leads, outside, session_usd, lesson_files, kinds
 
 
 def first_line(path):
@@ -321,6 +363,8 @@ def main(argv=None):
     ap.add_argument("--codex-dir", default=str(Path.home() / ".codex" / "sessions"))
     ap.add_argument("--work-root", default="/home/palantirkc/work")
     ap.add_argument("--platforms-root", default="/home/palantirkc/platforms")
+    ap.add_argument("--stage-dir", action="append", help="a directory of stage records, read at depth <dir>/*.run.json and <dir>/*/*.run.json, "
+                    "beside the work root; repeatable (default: the store's unit and review directories)")
     ap.add_argument("--lesson-dir", help="default: <work-root>/edu-lessons")
     ap.add_argument("--lead-cwd", action="append", default=[], help="a cwd whose interactive calls are listed by first tool")
     ap.add_argument("--repo", action="append", help="owner/name (default: the three platform repositories)")
@@ -332,13 +376,14 @@ def main(argv=None):
     for d in (a.since, a.until):
         datetime.date.fromisoformat(d)
     a.lesson_dir = a.lesson_dir or a.work_root.rstrip("/") + "/edu-lessons"
+    a.stage_dir = a.stage_dir or list(STAGE_DIRS)
     a.rates = load_prices(a.prices)
-    a.stages, st_lines = read_stages(a.work_root)
+    a.stages, st_lines = read_stages(a.work_root, a.stage_dir)
     accounts = a.accounts if a.accounts is not None else [str(p.parent) for p in sorted(Path.home().glob(".claude*/projects"))]
     since_epoch = datetime.datetime.fromisoformat(a.since).replace(tzinfo=datetime.timezone.utc).timestamp()
     c_msgs, branches, session_cwd, c_lines = read_claude([Path(x) / "projects" for x in accounts if (Path(x) / "projects").is_dir()], since_epoch)
     x_msgs, x_lines = read_codex(a.codex_dir, since_epoch)
-    totals, rows, leads, outside, session_usd, lesson_files = aggregate(c_msgs + x_msgs, a)
+    totals, rows, leads, outside, session_usd, lesson_files, kinds = aggregate(c_msgs + x_msgs, a)
     prs = [(r, p) for r in (a.repo or REPOS) for p in run_gh(r, a.since, a.until) if a.since <= str(p.get("mergedAt"))[:10] <= a.until]
 
     print(f"readout window {a.since}..{a.until} (UTC, inclusive); weights evals/prices.tsv; weeks start on Monday")
@@ -358,6 +403,10 @@ def main(argv=None):
             for (role, fam), c in sorted(rows[key].items()):
                 print(f"  role={role} family={fam} msgs={c['msgs']} {fmt(c)}")
     print("route lesson session files in the window: " + " ".join(f"{s}={len(lesson_files[s])}" for s in ("claude", "codex")))
+    for w in weeks:
+        for kind in REVIEW_KINDS:
+            c = kinds.get((w, kind))
+            print(f"week {w} reviewer kind {kind} " + (f"msgs={c['msgs']} {fmt(c)}" if c else "msgs=0"))
     print("uncounted: " + "; ".join(f"{cli} ({why})" for cli, why in UNCOUNTED))
     for w in weeks:
         mine = [(r, p) for r, p in prs if week_of(str(p["mergedAt"]), a.since, a.until) == w]

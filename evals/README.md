@@ -2,6 +2,11 @@
 
 `readout.py` reads the cost of the same work (K1) and the field reading of the implementer tier (K2) from records that already exist; its prices are `prices.tsv`.
 
+- Stage records are read from the work root and from every `--stage-dir <directory>` (repeatable; the default is the store's unit and review directories, `/var/lib/agent-platform/units` and `/var/lib/agent-platform/reviews`, and a given `--stage-dir` replaces both). A stage directory is read at a fixed depth, `<dir>/*.run.json` and `<dir>/*/*.run.json`, so no copy inside a unit's worktree or a review's clone is read; a file reached twice is read once. A session takes the role of its stage record wherever the record lies, and a record read from a stage directory puts the session in the route `engineering` (the lesson directory still comes first). The read-out calls no store.
+- The routes, by the first rule that holds: `lesson` (the lesson directory); `engineering` (a stage record read from a stage directory, or the work root, or the platforms root); `temporary` (a session with no stage record that ran under `/tmp` or `/var/tmp`; no path is printed); else `other`.
+- Role of a session with no stage record: `lead` for a directory given by `--lead-cwd` and, when no `--lead-cwd` is given, for a task directory under the work root (not a `wt/` worktree, not the lesson directory); `worker, no record` for a worktree or a platform checkout; else `interactive`.
+- The spend of the role `reviewer` is also printed by review kind, `week <w> reviewer kind page|plan|packet|other`, outside the route blocks, so no route total changes. The kind is read from the stage record's `prompt.path`: a file name that begins `page-` or `plan-`; a path `units/<unit>/<n>.verifier.prompt.md` is `packet`; anything else is `other`.
+
 ## The lesson replay
 
 `lesson/replay` counts how many recorded daily-record reads of real lesson days the read store answers equal (K3's first value): `python3 -I -B evals/lesson/replay --store PATH --day YYYY-MM-DD [--day ...] [--sessions GLOB] [--lesson-cwd DIR] [--ont BIN] [--cut-marker TEXT]`. It reads Claude session records (default: every `~/.claude*/projects`; only lines whose `cwd` is at or under the lesson directory and whose time is on an asked day in Asia/Seoul) and the store's `lesson_record` objects through `ont` (`describe`, `search`), and writes nothing.
