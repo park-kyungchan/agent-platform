@@ -1115,10 +1115,12 @@ fn ok_means_the_expected_result_and_denials_are_recorded() {
 
 // ---- repair 1 --------------------------------------------------------------------------------
 
+// spec: specs/ap/run.md#R16
 // spec: specs/ap/run.md#R17
 // spec: specs/ap/run.md#R18
+// spec: specs/ap/run.md#R25
 #[test]
-fn p3_a_preamble_before_the_verdict_is_no_result() {
+fn p3_answer_trimmed_from_the_first_line_that_meets_the_pattern() {
     for (runtime, role) in [
         ("claude", "reviewer"),
         ("claude", "implementer"),
@@ -1128,10 +1130,11 @@ fn p3_a_preamble_before_the_verdict_is_no_result() {
     ] {
         for newline in ["\n", "\r\n"] {
             let mut f = Fake::new();
-            let answer = format!(
-                "I have read the change.{newline}Verdict: accept{newline}{}{newline}body «ü» \t {newline}",
+            let tail = format!(
+                "Verdict: accept{newline}{}{newline}body «ü» \t {newline}",
                 "a".repeat(40)
             );
+            let answer = format!("I have read the change.{newline}{newline}{tail}");
             std::fs::write(f.t.join("bin/answer"), &answer).unwrap();
             f.mode("a1", "answer");
             let mut r = if runtime == "codex" {
@@ -1144,34 +1147,304 @@ fn p3_a_preamble_before_the_verdict_is_no_result() {
             let (v, status) = f.run(&r).unwrap();
             assert_eq!(
                 (status, v["state"].as_str(), v["unmet"].as_str()),
-                (3, Some("no_result"), Some("first_line")),
+                (0, Some("ok"), None),
                 "{v}"
             );
-            assert_eq!(std::fs::read(f.p("p.md")).unwrap(), answer.as_bytes());
-            assert_eq!(v["expect_met"], false);
-            assert_eq!(v["answer"]["sha256"], f.sha("bin/answer"));
+            // `out` and the digest hold the answer from the line on; two lines were dropped.
+            assert_eq!(std::fs::read(f.p("p.md")).unwrap(), tail.as_bytes());
+            assert_eq!(v["answer"]["sha256"], f.sha("p.md"));
+            assert_eq!(
+                (v["expect_met"].as_bool(), v["dropped_lines"].as_u64()),
+                (Some(true), Some(2))
+            );
+            assert_eq!(f.launches.len(), 1, "a trimmed answer asks nothing again");
             assert_eq!(v, f.record("p.md"));
         }
     }
-    // A later result with a preamble does not replace an earlier matching result.
+    // The last result with such a line is the answer, trimmed; a later result without one does
+    // not unmake it.
+    for (answers, out, dropped) in [
+        (
+            "Verdict: accept\\nfirst\npreamble\\nVerdict: accept\\nsecond",
+            "Verdict: accept\nsecond",
+            1,
+        ),
+        (
+            "one\\nVerdict: accept\\nfirst\nno verdict at all",
+            "Verdict: accept\nfirst",
+            1,
+        ),
+    ] {
+        let mut f = Fake::new();
+        std::fs::write(f.t.join("bin/skeleton"), "result success\nresult success\n").unwrap();
+        std::fs::write(f.t.join("bin/answers"), answers).unwrap();
+        f.mode("a1", "skeleton");
+        let mut r = f.request("p.md");
+        r["role"] = json!("implementer");
+        r["expect"] = json!({"first_line": "Verdict: *"});
+        let (v, status) = f.run(&r).unwrap();
+        assert_eq!((status, v["state"].as_str()), (0, Some("ok")), "{v}");
+        assert_eq!(std::fs::read_to_string(f.p("p.md")).unwrap(), out);
+        assert_eq!(
+            (v["results"].as_u64(), v["dropped_lines"].as_u64()),
+            (Some(2), Some(dropped))
+        );
+    }
+    // A line inside a line does not count: the pattern meets a whole line or nothing.
     let mut f = Fake::new();
-    std::fs::write(f.t.join("bin/skeleton"), "result success\nresult success\n").unwrap();
-    std::fs::write(
-        f.t.join("bin/answers"),
-        "Verdict: accept\\nfirst\npreamble\\nVerdict: accept\\nsecond",
-    )
-    .unwrap();
-    f.mode("a1", "skeleton");
-    let mut r = f.request("p.md");
-    r["role"] = json!("implementer");
+    std::fs::write(f.t.join("bin/answer"), "So: Verdict: accept\nhead\n").unwrap();
+    f.mode("a1", "answer");
+    let mut r = f.codex("p.md");
+    r["expect"] = json!({"first_line": "Verdict: *"});
+    let (v, _) = f.run(&r).unwrap();
+    assert_eq!(
+        (
+            v["state"].as_str(),
+            v["unmet"].as_str(),
+            v["dropped_lines"].clone()
+        ),
+        (Some("no_result"), Some("first_line"), Value::Null)
+    );
+}
+
+/// The invariant: an answer whose first line meets the pattern is what it was, and a request
+/// without `expect.first_line` has no trimmed answer and no member for it.
+// spec: specs/ap/run.md#R17
+// spec: specs/ap/run.md#R25
+#[test]
+fn p3_answer_trimmed_never_when_the_first_line_meets_or_there_is_no_pattern() {
+    let answer = "Verdict: accept\nsecond line\r\nVerdict: accept\n";
+    for expect in [json!({"first_line": "Verdict: *"}), Value::Null] {
+        let mut f = Fake::new();
+        std::fs::write(f.t.join("bin/answer"), answer).unwrap();
+        f.mode("a1", "answer");
+        let mut r = f.request("n.md");
+        if !expect.is_null() {
+            r["expect"] = expect.clone();
+        }
+        let (v, status) = f.run(&r).unwrap();
+        assert_eq!((status, v["state"].as_str()), (0, Some("ok")), "{v}");
+        assert_eq!(std::fs::read(f.p("n.md")).unwrap(), answer.as_bytes());
+        assert_eq!(v["answer"]["sha256"], f.sha("n.md"));
+        assert_eq!(f.launches.len(), 1);
+        assert_eq!(v["attempts"].as_array().unwrap().len(), 1);
+        assert_eq!(v["attempts"][0]["asked"], false);
+        match expect.is_null() {
+            true => assert!(v.get("dropped_lines").is_none(), "{v}"),
+            false => assert_eq!(v["dropped_lines"], 0),
+        }
+    }
+    // Without a pattern a preamble is part of the answer, as before.
+    let mut f = Fake::new();
+    std::fs::write(f.t.join("bin/answer"), "Hello.\nVerdict: accept\n").unwrap();
+    f.mode("a1", "answer");
+    let (v, _) = f.run(&f.request("w.md")).unwrap();
+    assert_eq!(v["state"], "ok");
+    assert_eq!(
+        std::fs::read(f.p("w.md")).unwrap(),
+        b"Hello.\nVerdict: accept\n"
+    );
+}
+
+/// What the session reads when it is asked again: the one sentence of R16 and a newline.
+const ASK: &str = "Your last answer did not hold the line your task asks the answer to begin with: give the whole answer again in that form, beginning with that line and with nothing before it, and post, push, send or change nothing a second time.\n";
+
+impl Fake {
+    /// The fake answers by `script-a1.sh`: its `n`-th call prints `answers[n - 1]` and, when
+    /// `then` names one, sets the mode of the calls after the first.
+    fn asked(&self, answers: &[&str], then: Option<&str>) {
+        let bin = self.t.join("bin");
+        let mut script = format!("n=$(cat '{}/count')\n", bin.display());
+        if let Some(mode) = then {
+            script += &format!("echo {mode} > '{}/mode-a1'\n", bin.display());
+        }
+        for (i, a) in answers.iter().enumerate() {
+            script += &format!("[ \"$n\" = {} ] && printf '%s' '{a}'\n", i + 1);
+        }
+        script += "exit 0\n";
+        std::fs::write(bin.join("script-a1.sh"), script).unwrap();
+        self.mode("a1", "script");
+    }
+    /// The `RuntimeMaxSec` of every launch, in order.
+    fn runtime_max(&self) -> Vec<u64> {
+        let max = |l: &Vec<String>| {
+            let p = l.iter().find_map(|a| a.strip_prefix("RuntimeMaxSec="))?;
+            p.strip_suffix('s')?.parse().ok()
+        };
+        self.launches.iter().filter_map(max).collect()
+    }
+}
+
+/// An answer of a Claude stage with no whole line that meets the pattern is asked again once, in
+/// its own session on its own account, with the one sentence alone on stdin; the second answer is
+/// judged and trimmed as any answer is, and the entry of the ask is marked `asked`, not a move.
+// spec: specs/ap/run.md#R16
+// spec: specs/ap/run.md#R17
+// spec: specs/ap/run.md#R24
+// spec: specs/ap/run.md#R25
+// spec: specs/ap/run.md#R28
+#[test]
+fn asked_again_once_in_its_own_session_and_the_second_answer_is_trimmed() {
+    assert_eq!(ASK.matches(". ").count() + ASK.matches(": ").count(), 1);
+    assert!(ASK.ends_with(".\n") && !ASK[..ASK.len() - 1].contains('\n'));
+    for role in ["reviewer", "implementer", "fixer"] {
+        let mut f = Fake::new();
+        f.asked(
+            &[
+                "I read the change and found nothing wrong.",
+                "Understood.\nVerdict: accept\nhead",
+            ],
+            None,
+        );
+        let mut r = f.with_next(role, "q.md", &["a2"]);
+        r["expect"] = json!({"first_line": "Verdict: *"});
+        let (v, status) = f.run(&r).unwrap();
+        assert_eq!((status, v["state"].as_str()), (0, Some("ok")), "{role} {v}");
+        assert_eq!(
+            std::fs::read_to_string(f.p("q.md")).unwrap(),
+            "Verdict: accept\nhead"
+        );
+        assert_eq!(v["answer"]["sha256"], f.sha("q.md"));
+        assert_eq!(
+            (v["dropped_lines"].as_u64(), v["expect_met"].as_bool()),
+            (Some(1), Some(true))
+        );
+        // Two launches on a1, one session: the second resumes it and reads the sentence alone.
+        assert_eq!(f.accounts(), ["a1", "a1"], "{role}");
+        let session = v["session"].as_str().unwrap();
+        let calls = f.calls();
+        assert!(
+            calls[0].ends_with(&format!("--session-id {session}")),
+            "{role}"
+        );
+        assert!(calls[1].ends_with(&format!("--resume {session}")), "{role}");
+        assert_eq!(f.input(1), b"review this\n");
+        assert_eq!(f.input(2), ASK.as_bytes());
+        let attempts = v["attempts"].as_array().unwrap();
+        assert_eq!(attempts.len(), 2);
+        let pick = |k: &str| attempts.iter().map(|a| a[k].clone()).collect::<Vec<_>>();
+        assert_eq!(pick("asked"), [json!(false), json!(true)]);
+        assert_eq!(pick("continued"), [json!(false), json!(false)]);
+        assert_eq!(pick("state"), [json!("no_result"), json!("ok")]);
+        assert_eq!(pick("session"), [json!(session), json!(session)]);
+        assert_eq!(pick("account"), [json!(f.p("a1")), json!(f.p("a1"))]);
+        assert_eq!(v, f.record("q.md"));
+    }
+}
+
+/// Only when the second answer has no such line either is the state `no_result`; that answer is
+/// the one saved. An empty answer, a missed `expect.file` and a stage of another runtime are not
+/// asked again.
+// spec: specs/ap/run.md#R16
+// spec: specs/ap/run.md#R17
+#[test]
+fn asked_again_and_still_without_the_line_is_no_result() {
+    let mut f = Fake::new();
+    f.asked(&["No verdict here.", "Still no verdict."], None);
+    let mut r = f.request("s.md");
     r["expect"] = json!({"first_line": "Verdict: *"});
     let (v, status) = f.run(&r).unwrap();
-    assert_eq!((status, v["state"].as_str()), (0, Some("ok")), "{v}");
     assert_eq!(
-        std::fs::read(f.p("p.md")).unwrap(),
-        b"Verdict: accept\nfirst"
+        (status, v["state"].as_str(), v["unmet"].as_str()),
+        (3, Some("no_result"), Some("first_line")),
+        "{v}"
     );
-    assert_eq!(v["results"], 2);
+    assert_eq!(
+        std::fs::read_to_string(f.p("s.md")).unwrap(),
+        "Still no verdict."
+    );
+    assert_eq!(
+        (v["expect_met"].as_bool(), v["dropped_lines"].clone()),
+        (Some(false), Value::Null)
+    );
+    assert_eq!(f.launches.len(), 2, "asked once, never twice");
+    assert_eq!(v["attempts"][1]["asked"], true);
+    // An empty answer is `no_result` with `unmet: answer` at once.
+    let mut f = Fake::new();
+    std::fs::write(f.t.join("bin/answer"), "").unwrap();
+    f.mode("a1", "answer");
+    let mut r = f.request("e.md");
+    r["expect"] = json!({"first_line": "Verdict: *"});
+    let (v, _) = f.run(&r).unwrap();
+    assert_eq!(
+        (v["state"].as_str(), v["unmet"].as_str()),
+        (Some("no_result"), Some("answer"))
+    );
+    assert_eq!(f.launches.len(), 1);
+    // A missed `expect.file` is judged before the line: no ask.
+    let mut f = Fake::new();
+    f.asked(&["No verdict here."], None);
+    let mut r = f.request("m.md");
+    r["role"] = json!("implementer");
+    r["expect"] = json!({"first_line": "Verdict: *", "file": f.p("cwd/never.txt")});
+    let (v, _) = f.run(&r).unwrap();
+    assert_eq!(
+        (v["state"].as_str(), v["unmet"].as_str()),
+        (Some("no_result"), Some("file"))
+    );
+    assert_eq!(f.launches.len(), 1);
+    // A Codex stage gets the trim alone.
+    let mut f = Fake::new();
+    std::fs::write(f.t.join("bin/answer"), "No verdict here.\n").unwrap();
+    f.mode("a1", "answer");
+    let mut r = f.codex("c.md");
+    r["expect"] = json!({"first_line": "Verdict: *"});
+    let (v, status) = f.run(&r).unwrap();
+    assert_eq!(
+        (status, v["state"].as_str(), v["unmet"].as_str()),
+        (3, Some("no_result"), Some("first_line"))
+    );
+    assert_eq!(
+        (f.launches.len(), v["attempts"].as_array().unwrap().len()),
+        (1, 1)
+    );
+}
+
+/// An ask that ends cut, failed or at the bound ends the call with that state on its account: no
+/// move to a next account; `timeout_seconds` bounds the first launch and the ask together.
+// spec: specs/ap/run.md#R16
+// spec: specs/ap/run.md#R20
+// spec: specs/ap/run.md#R24
+#[test]
+fn asked_again_that_ends_cut_failed_or_timed_out_ends_the_call() {
+    for (mode, state, exit, unmet) in [
+        ("limit1", "cut", 75, None),
+        ("noout", "failed", 3, Some("result_event")),
+        ("other", "timeout", 3, None),
+    ] {
+        let mut f = Fake::new();
+        f.asked(&["No verdict here."], Some(mode));
+        let mut r = f.with_next("reviewer", "c.md", &["a2"]);
+        r["expect"] = json!({"first_line": "Verdict: *"});
+        r["timeout_seconds"] = json!(3);
+        let s0 = Instant::now();
+        let (v, status) = f.run(&r).unwrap();
+        assert_eq!(
+            (status, v["state"].as_str(), v["unmet"].as_str()),
+            (exit, Some(state), unmet),
+            "{mode} {v}"
+        );
+        assert!(
+            s0.elapsed().as_secs_f64() < 3.0 + 2.5,
+            "{mode}: the bound is the call's"
+        );
+        assert_eq!(f.accounts(), ["a1", "a1"], "{mode}: no move after an ask");
+        let attempts = v["attempts"].as_array().unwrap();
+        assert_eq!(attempts.len(), 2, "{mode}");
+        assert_eq!(
+            (
+                attempts[1]["asked"].as_bool(),
+                attempts[1]["state"].as_str()
+            ),
+            (Some(true), Some(state))
+        );
+        let max = f.runtime_max();
+        assert_eq!((max.len(), max[0]), (2, 13), "{mode}");
+        assert!(
+            max[1] <= 13,
+            "{mode}: the ask has what is left of the bound"
+        );
+    }
 }
 
 /// R1: a result is not final while a shell the session started lives. An implementer's stage runs
@@ -3021,6 +3294,7 @@ fn cut1_a_stream_without_the_event_has_no_limit_and_attempts_has_one_entry() {
         "state",
         "worked",
         "continued",
+        "asked",
         "limit",
     ];
     let mut keys: Vec<&str> = attempts[0]
@@ -3831,8 +4105,14 @@ fn rf1_no_move_after_a_resumed_launch_that_did_not_end_cut() {
             (want, Some(state)),
             "{what} {v}"
         );
-        assert_eq!(f.count_now(), before + 1, "{what}");
-        assert_eq!(v["attempts"].as_array().unwrap().len(), 1, "{what}");
+        // An answer without the line is asked again once, in its own session on its own account:
+        // an ask, not a move (R16, R24).
+        let launches = if what == "no_result" { 2 } else { 1 };
+        assert_eq!(f.count_now(), before + launches, "{what}");
+        let attempts = v["attempts"].as_array().unwrap();
+        assert_eq!(attempts.len(), launches, "{what}");
+        assert!(attempts.iter().all(|a| a["account"] == f.p("a1")), "{what}");
+        assert_eq!(attempts[launches - 1]["asked"], launches == 2, "{what}");
     }
 }
 
