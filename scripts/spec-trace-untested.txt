@@ -1,11 +1,8 @@
 specs/ont/action.md#R100
-specs/ont/action.md#R18
 specs/ont/action.md#R27
 specs/ont/action.md#R44
 specs/ont/action.md#R46
 specs/ont/action.md#R5
-specs/ont/action.md#R67
-specs/ont/action.md#R78
 specs/ont/action.md#R79
 specs/ont/action.md#R83
 specs/ont/action.md#R86
@@ -24,7 +21,6 @@ specs/ont/read.md#R52
 specs/ont/read.md#R65
 specs/ont/read.md#R75
 specs/ont/read.md#R79
-specs/ont/read.md#R87
 specs/ont/read.md#R93
 specs/ont/render.md#R16
 specs/ont/render.md#R26

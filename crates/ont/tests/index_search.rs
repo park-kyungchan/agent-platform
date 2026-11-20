@@ -1977,6 +1977,7 @@ fn changed_bytes_coverage_or_pin_still_refresh() {
 
 #[test]
 fn stale_reads_follow_renewal() {
+    // spec: specs/ont/read.md#R87
     // spec: specs/ont/index.md#R30
     let t = Temp::new();
     t.task("a", "# a\nOwner: x\n");

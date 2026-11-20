@@ -285,6 +285,7 @@ fn rule_only_reference_basis_conflicts_and_criteria_operands_cli_and_mcp() {
 
 #[test]
 fn optional_presence_create_and_modify_cli_and_mcp() {
+    // spec: specs/ont/action.md#R67
     // spec: specs/ont/action.md#R64
     // spec: specs/ont/action.md#R65
     for mcp in [false, true] {
@@ -778,6 +779,7 @@ fn optional_required_create_and_incompatible_now_patterns_refuse_schema() {
 
 #[test]
 fn exists_optional_reference_empty_string_and_reference_array_presence() {
+    // spec: specs/ont/action.md#R78
     // spec: specs/ont/action.md#R68
     for mcp in [false, true] {
         let t = Temp::new();
@@ -1652,6 +1654,7 @@ fn ordered_all_guards_optional_and_stale_operands_cli_and_mcp() {
 
 #[test]
 fn criterion_and_modify_reads_hide_unreadable_heads_cli_and_mcp() {
+    // spec: specs/ont/action.md#R78
     // spec: specs/ont/action.md#R69
     // spec: specs/ont/action.md#R89
     for mcp in [false, true] {

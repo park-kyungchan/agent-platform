@@ -396,6 +396,7 @@ fn create_or_modify_creates_then_modifies_and_tag_key_from_action_id() {
 
 #[test]
 fn idempotent_retry_reused_validate_equals_apply_and_log_line() {
+    // spec: specs/ont/action.md#R18
     // spec: specs/ont/action.md#R9
     // spec: specs/ont/action.md#R10
     // spec: specs/ont/action.md#R11

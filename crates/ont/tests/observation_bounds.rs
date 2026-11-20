@@ -260,6 +260,7 @@ fn array_bound_includes_nested_values() {
 }
 #[test]
 fn legacy_byte_array_and_utf8_poison_excluded_by_set_reads_get_refuses() {
+    // spec: specs/ont/read.md#R87
     // spec: specs/ont/read.md#R18
     // spec: specs/ont/read.md#R24
     for kind in ["bytes", "array", "nested", "utf8"] {
