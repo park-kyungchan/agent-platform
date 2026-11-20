@@ -50,12 +50,14 @@ class Readout(unittest.TestCase):
         os.utime(self.tmp / "acct1" / "projects" / "p9" / "s-early.jsonl", (old, old))
         readout.run_gh = lambda repo, since, until: PRS.get(repo, [])
 
-    def run_readout(self, *extra):
+    def run_readout(self, *extra, lead_flag=True, stage_dirs=None):
         out = io.StringIO()
+        stage_dirs = [self.tmp / "stage-none"] if stage_dirs is None else stage_dirs  # a scratch directory: no test reads the host's records
         args = ["--since", "2026-11-11", "--until", "2026-11-13", "--prices", str(self.tmp / "prices.tsv"),
                 "--accounts", str(self.tmp / "acct1"), str(self.tmp / "acct2"), str(self.tmp / "acct1"),
                 "--codex-dir", str(self.tmp / "codex"), "--work-root", str(self.tmp / "work"),
-                "--platforms-root", str(self.tmp / "platforms"), "--lead-cwd", str(self.tmp / "work" / "lead"),
+                "--platforms-root", str(self.tmp / "platforms"), *(["--lead-cwd", str(self.tmp / "work" / "lead")] if lead_flag else []),
+                *[x for d in stage_dirs for x in ("--stage-dir", str(d))],
                 "--repo", "park-kyungchan/agent-platform", "--repo", "park-kyungchan/ontology-platform", *extra]
         with contextlib.redirect_stdout(out):
             readout.main(args)
@@ -99,7 +101,9 @@ class Readout(unittest.TestCase):
         self.assertRegex(text, r"role=\* family=unknown msgs=1 input=100 ")  # an unknown model keeps its tokens
         self.assertRegex(text, r"input stages records=10 unreadable=1 without_session_record=7")
         self.assertRegex(text, r"input codex events=2 files=1 other=2 .*read=5 repeat=1")
-        for route in ("engineering", "lesson", "other"):
+        for route in ("engineering", "lesson", "temporary", "other"):  # temporary: msgs=0 here, so no block
+            if f"route {route} msgs=0" in text:
+                continue
             block = re.search(rf"^week \S+ route {route} TOTAL.*?(?=^week|^route lesson|^K2|\Z)", text, re.M | re.S).group(0).splitlines()
             total, rows = block[0], block[1:]
             for kind in ("msgs", "input", "output", "cache_read", "cache_write_5m", "cache_write_1h", "usd"):
@@ -186,7 +190,7 @@ class Readout(unittest.TestCase):
 
     def test_empty_route_and_uncounted_cli_are_shown(self):
         text = self.run_readout("--since", "2026-11-16", "--until", "2026-11-16")
-        for route in ("engineering", "lesson", "other"):
+        for route in ("engineering", "lesson", "temporary", "other"):
             self.assertIn(f"week 2026-11-16 route {route} msgs=0\n", text)
         self.assertRegex(text, r"(?m)^uncounted: agy \(no usage record")
         self.assertIn("route lesson session files in the window: claude=0 codex=0", text)
@@ -207,6 +211,103 @@ class Readout(unittest.TestCase):
     def test_reviewer_answer_other_than_a_verdict_line_is_not_printed(self):
         self.assertEqual(readout.first_line(self.tmp / "work" / "t1" / "rev0.md"), "no-verdict-line")
         self.assertEqual(readout.first_line(self.tmp / "work" / "t1" / "missing.md"), "unknown")
+
+    # w0-cost: stage records of the store, the Lead without a flag, review kinds, the temporary route.
+    def session(self, sid, cwd, mid, usd_input, ts="2026-11-12T20:00:00Z", model="claude-opus-9-9"):
+        line = {"type": "assistant", "sessionId": sid, "timestamp": ts, "cwd": cwd, "gitBranch": "main",
+                "message": {"id": mid, "model": model, "usage": {"input_tokens": usd_input, "output_tokens": 0, "cache_read_input_tokens": 0,
+                                                                  "cache_creation_input_tokens": 0}}}
+        (self.tmp / "acct1" / "projects" / "p8" / f"{sid}.jsonl").write_text(json.dumps(line) + "\n")
+
+    def stage_record(self, path, role, sid, prompt, cwd, start="2026-11-12T19:00:00Z"):
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps({"role": role, "model": "claude-opus-9-9", "session": sid, "cwd": cwd, "start": start, "state": "ok",
+                                    "prompt": {"path": prompt}, "tokens": {}, "resumes": None, "answer": None}) + "\n")
+
+    def store(self):
+        """Stage records as the store lays them: reviews at the top level, a unit's records one level down, a copy deeper."""
+        root, u = self.tmp / "store", "/var/lib/x/units/u1/1.verifier.prompt.md"
+        elsewhere = str(self.tmp / "elsewhere")  # a cwd under no root: only the stage directory makes these engineering
+        self.stage_record(root / "reviews" / "a.md.run.json", "reviewer", "s-pg", "/r/prompts/page-a-1.md", elsewhere)
+        self.stage_record(root / "reviews" / "b.md.run.json", "reviewer", "s-pl", "/r/prompts/plan-b-1.md", elsewhere)
+        self.stage_record(root / "units" / "u1" / "2.verifier.md.run.json", "reviewer", "s-pk", u, elsewhere)
+        self.stage_record(root / "reviews" / "c.md.run.json", "reviewer", "s-ot", "/r/prompts/label-1.md", elsewhere)
+        self.stage_record(root / "units" / "u1" / "1.implementer.md.run.json", "implementer", "s-im", "/x/1.implementer.prompt.md", elsewhere)
+        self.stage_record(root / "units" / "u1" / "wt" / "deep" / "d.md.run.json", "reviewer", "s-deep", "/r/prompts/page-d-1.md", elsewhere)
+        for sid, n in (("s-pg", 1), ("s-pl", 2), ("s-pk", 3), ("s-ot", 4), ("s-im", 5), ("s-deep", 6)):
+            self.session(sid, elsewhere, "m-" + sid, n * 1000000)
+        return [root / "reviews", root / "units"]
+
+    def test_stage_record_outside_work_gives_role_route_and_review_kind(self):
+        text = self.run_readout(stage_dirs=self.store())
+        eng = re.search(r"^week 2026-11-09 route engineering TOTAL.*?(?=^week)", text, re.M | re.S).group(0)
+        self.assertRegex(eng, r"role=implementer family=opus msgs=2 .* usd=9.10")  # 4.10 of the fixture and s-im 5.00
+        self.assertRegex(eng, r"role=reviewer family=opus msgs=5 .* usd=12.00")  # the fixture's 2.00 and four store reviews 1+2+3+4
+        self.assertEqual(self.route(text, "other")[0], 1)  # s-other stays; none of the store's
+        self.assertEqual(self.route(text, "engineering")[0], 20)  # 15 + five store sessions; the one deeper than the depth is not read
+        self.assertIn("stage_dir_records=5", text)
+        for kind, usd in (("page", "1.00"), ("plan", "2.00"), ("packet", "3.00"), ("other", "6.00")):
+            self.assertRegex(text, rf"(?m)^week 2026-11-09 reviewer kind {kind} msgs=\d+ .* usd={usd}$")
+        self.assertNotIn("s-deep", text)
+
+    def test_stage_dir_depth_is_fixed_and_the_default_is_replaced(self):
+        # the copy below a unit's worktree is not read; --stage-dir replaces the defaults, it does not add to them
+        text = self.run_readout(stage_dirs=self.store())
+        self.assertNotRegex(text, r"reviewer kind page msgs=\d+ .* usd=7.00")  # 1.00 only: the deep copy (6.00) is not counted
+        none = self.run_readout()
+        self.assertNotIn("stage_dir_records", none)
+        self.assertEqual(self.route(none, "engineering")[0], 15)
+
+    def test_review_kinds_do_not_change_a_route_total(self):
+        text = self.run_readout(stage_dirs=self.store())
+        base = self.run_readout()
+        self.assertEqual(self.route(text, "lesson"), self.route(base, "lesson"))
+        rows = lambda t: sum(float(x) for x in re.findall(r"^  role=reviewer .* usd=([\d.]+)$", t, re.M))
+        kinds = sum(float(x) for x in re.findall(r"^week \S+ reviewer kind \w+ msgs=\d+ .* usd=([\d.]+)$", text, re.M))
+        self.assertAlmostEqual(kinds, rows(text))
+        self.assertIn("week 2026-11-09 reviewer kind packet msgs=0", base)  # no store: the fixture's reviewer has no kind of the store
+
+    def test_lead_without_flag(self):
+        # no --lead-cwd: the sessions of a task directory below the work root with no record are the Lead's; a worktree,
+        # the lesson directory, a platform checkout and a directory of no root are not
+        text = self.run_readout(lead_flag=False)
+        eng = re.search(r"^week \S+ route engineering TOTAL.*?(?=^week)", text, re.M | re.S).group(0)
+        self.assertRegex(eng, r"role=lead family=opus msgs=5 .* usd=7.00")
+        self.assertRegex(eng, r"role=lead family=haiku msgs=2 .* usd=15.90")
+        self.assertRegex(eng, r"role=worker, no record family=opus msgs=2 .* usd=11.00")
+        self.assertIn("role=interactive family=opus msgs=1 input=3,000,000", text)  # the lesson session
+        self.assertIn("lead calls first_tool=Bash calls=1 usd=15.00", text)
+        # a flag that names another directory keeps the old rule: only that directory is the Lead's
+        other = self.run_readout("--lead-cwd", str(self.tmp / "work" / "nowhere"), lead_flag=False)
+        self.assertNotIn("role=lead", other)
+
+    def test_a_session_without_a_stage_record_under_a_temporary_directory_is_temporary(self):
+        for n, d in enumerate(("/tmp/x", "/var/tmp/y/z", "/tmp")):
+            self.session(f"s-t{n}", d, f"m-t{n}", 1000000)
+        self.session("s-tl", "/tmp/l", "m-tl", 7000000)  # has a stage record of the work root: the rule of the temporary route does not apply
+        self.stage_record(self.tmp / "work" / "t6" / "x.md.run.json", "worker", "s-tl", "/p/other-1.md", "/tmp/l")
+        self.session("s-tmpx", "/tmpx/a", "m-tmpx", 1000000)  # not a temporary directory
+        text = self.run_readout()
+        self.assertEqual(self.route(text, "temporary")[:1] + self.route(text, "temporary")[6:], [3, 3.0])
+        self.assertEqual(self.route(text, "other")[0], 3)  # s-other, s-tl, s-tmpx
+        self.assertRegex(text, r"week 2026-11-09 route temporary TOTAL msgs=3 .*\n  role=interactive family=opus msgs=3 ")
+
+    def test_work_root_and_platforms_root_come_before_the_temporary_route(self):
+        route = lambda cwd, stage=None: readout.route_of(cwd, "/tmp/w", "/var/tmp/p", "/tmp/w/edu", stage)  # roots that lie under temporary directories
+        self.assertEqual(route("/tmp/w/t"), "engineering")
+        self.assertEqual(route("/var/tmp/p/repo"), "engineering")
+        self.assertEqual(route("/tmp/w/edu/x"), "lesson")
+        self.assertEqual(route("/tmp/other"), "temporary")
+        self.assertEqual(route("/tmp/other", {"store": True}), "engineering")  # a record of a stage directory comes first
+        self.assertEqual(route("/tmp/other", {"store": False}), "other")  # a record of the work root: not a session without one
+        self.assertEqual(route("/elsewhere"), "other")
+
+    def test_readout_with_stage_dirs_prints_no_path_and_is_repeatable(self):
+        dirs = self.store()
+        text = self.run_readout("--detail", stage_dirs=dirs)
+        self.assertEqual(text, self.run_readout("--detail", stage_dirs=dirs))
+        for secret in (str(self.tmp), "/var/lib/x", "prompts"):
+            self.assertNotIn(secret, text)
 
 
 if __name__ == "__main__":
