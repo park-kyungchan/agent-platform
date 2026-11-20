@@ -109,6 +109,7 @@ fn sample(ty: &PropertyType) -> (Value, bool) {
 }
 #[test]
 fn key_parameter_type_table() {
+    // spec: specs/ont/action.md#R34
     let mut failures = Vec::new();
     for raw in [
         json!("string"),
@@ -172,6 +173,8 @@ fn key_parameter_type_table() {
 }
 #[test]
 fn key_parameter_name_order_and_other_type() {
+    // spec: specs/ont/action.md#R34
+    // spec: specs/ont/action.md#R35
     for other_name in ["a_other", "zz_other"] {
         for same_type in [true, false] {
             let t = Temp::new();
@@ -208,6 +211,8 @@ fn key_parameter_name_order_and_other_type() {
 }
 #[test]
 fn duplicate_key_parameters_and_create_rules_refuse() {
+    // spec: specs/ont/action.md#R34
+    // spec: specs/ont/action.md#R37
     let mut failures = Vec::new();
     for mode in [
         "parameters",
@@ -265,6 +270,9 @@ fn duplicate_key_parameters_and_create_rules_refuse() {
 }
 #[test]
 fn other_ontology_key_pointers_refuse_but_installed_bytes_open() {
+    // spec: specs/ont/action.md#R32
+    // spec: specs/ont/action.md#R33
+    // spec: specs/ont/action.md#R40
     let mut failures = Vec::new();
     for pointer in [
         "/key",
@@ -296,6 +304,8 @@ fn other_ontology_key_pointers_refuse_but_installed_bytes_open() {
 }
 #[test]
 fn key_namespace_and_id_bounds_agree_without_writes() {
+    // spec: specs/ont/action.md#R36
+    // spec: specs/ont/action.md#R38
     let mut failures = Vec::new();
     for mode in [
         "instance",
@@ -359,6 +369,8 @@ fn key_namespace_and_id_bounds_agree_without_writes() {
 
 #[test]
 fn key_preview_matches_create_update_and_resurrection() {
+    // spec: specs/ont/action.md#R28
+    // spec: specs/ont/action.md#R39
     let t = Temp::new();
     let mut s = schema();
     s["action_types"]["delete"] = json!({"parameters":{"key":{"type":{"ref":"item"},"required":true}},"rules":[{"delete_object":"item"}]});

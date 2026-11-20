@@ -123,6 +123,8 @@ fn canonical(v: &Value) -> String {
 // canonical line with the members of the page, in mode 0600.
 #[test]
 fn refused_applies_append_one_canonical_line_each() {
+    // spec: specs/ont/action.md#R91
+    // spec: specs/ont/action.md#R93
     let t = installed();
     let id = probe(&t);
     let (code, _) = apply(
@@ -204,6 +206,7 @@ fn refused_applies_append_one_canonical_line_each() {
 // A1: a grant refusal is recorded as well.
 #[test]
 fn a_grant_refusal_is_recorded() {
+    // spec: specs/ont/action.md#R91
     let t = Temp::new();
     let mut schema = fixture();
     schema["grants"][0]["actions"] = json!(["create_probe"]);
@@ -226,6 +229,7 @@ fn a_grant_refusal_is_recorded() {
 // runs after the transaction has ended (another apply commits meanwhile).
 #[test]
 fn the_append_takes_the_lock_after_the_transaction() {
+    // spec: specs/ont/action.md#R95
     use std::os::unix::fs::OpenOptionsExt;
     let t = installed();
     let lock = std::fs::OpenOptions::new()
@@ -268,6 +272,7 @@ fn the_append_takes_the_lock_after_the_transaction() {
 // replay that answers `already_applied`.
 #[test]
 fn nothing_is_recorded_before_the_type_is_known_for_validate_or_a_replay() {
+    // spec: specs/ont/action.md#R94
     let t = installed();
     for (request, code, field) in [
         (
@@ -313,6 +318,7 @@ fn nothing_is_recorded_before_the_type_is_known_for_validate_or_a_replay() {
 // A3: a store failure is not recorded.
 #[test]
 fn store_busy_is_not_recorded() {
+    // spec: specs/ont/action.md#R94
     let t = installed();
     let sql = rusqlite::Connection::open(t.store()).unwrap();
     sql.execute_batch("BEGIN IMMEDIATE").unwrap();
@@ -329,6 +335,8 @@ fn store_busy_is_not_recorded() {
 // A4: the answer is the same whether or not the line could be appended.
 #[test]
 fn a_failed_append_leaves_the_answer_byte_for_byte() {
+    // spec: specs/ont/action.md#R97
+    // spec: specs/ont/action.md#R98
     let written = installed();
     let failing = installed();
     let elsewhere = failing.0.join("elsewhere");
@@ -364,6 +372,7 @@ fn a_failed_append_leaves_the_answer_byte_for_byte() {
 // A5: the library's apply records, and so does the MCP tool.
 #[test]
 fn the_library_and_the_mcp_tool_record() {
+    // spec: specs/ont/action.md#R92
     let t = installed();
     let mut ctx = Context::new(PathBuf::from(t.store()), NOW);
     ctx.client = "domain-server".into();
@@ -413,6 +422,7 @@ fn the_library_and_the_mcp_tool_record() {
 // reads or changes `refusals.jsonl`.
 #[test]
 fn backup_and_compact_leave_the_refusals_alone() {
+    // spec: specs/ont/action.md#R99
     let t = installed();
     apply(
         &t,
@@ -442,6 +452,11 @@ fn backup_and_compact_leave_the_refusals_alone() {
 // the page; `parameters` only on request.
 #[test]
 fn log_reads_applied_rows_newest_first_from_the_table() {
+    // spec: specs/ont/log.md#R1
+    // spec: specs/ont/log.md#R3
+    // spec: specs/ont/log.md#R7
+    // spec: specs/ont/log.md#R10
+    // spec: specs/ont/log.md#R11
     let t = installed();
     let mut applied = Vec::new();
     for (now, label, role) in [
@@ -482,6 +497,9 @@ fn log_reads_applied_rows_newest_first_from_the_table() {
 // B1: filters, paging and the refusals of the request.
 #[test]
 fn log_filters_pages_and_refuses_malformed_requests() {
+    // spec: specs/ont/log.md#R1
+    // spec: specs/ont/log.md#R2
+    // spec: specs/ont/log.md#R12
     let t = installed();
     for (now, label, role) in [
         (1000, "a", "lead"),
@@ -601,6 +619,8 @@ fn log_filters_pages_and_refuses_malformed_requests() {
 // rows, a bad line is skipped and counted, an incomplete last line unread.
 #[test]
 fn log_reads_refusals_and_skips_bad_lines() {
+    // spec: specs/ont/log.md#R4
+    // spec: specs/ont/log.md#R11
     let t = installed();
     let empty = log(&t, json!({"outcome":"refused"}));
     assert_eq!(empty["rows"], json!([]));
@@ -667,6 +687,9 @@ fn version(mut schema: Value, version: u64, actions: &[&str], read: &[&str]) -> 
 // type; a removed action type is admitted by its edits' read grants alone.
 #[test]
 fn log_withholds_rows_outside_the_grants_and_keeps_removed_types_readable() {
+    // spec: specs/ont/log.md#R5
+    // spec: specs/ont/log.md#R6
+    // spec: specs/ont/log.md#R7
     let t = Temp::new();
     install(&t, &fixture());
     let id = probe(&t);
@@ -739,6 +762,8 @@ fn log_withholds_rows_outside_the_grants_and_keeps_removed_types_readable() {
 // B1 bound: one call reads at most 10,000 lines of the file.
 #[test]
 fn log_stops_at_the_scan_bound_of_the_file() {
+    // spec: specs/ont/log.md#R8
+    // spec: specs/ont/log.md#R9
     let t = installed();
     let line = r#"{"action_type":"create_tag","actor":{"actor_trust":"self_reported","client":"cli","principal":"agent"},"code":"invalid_parameter","domain":"work","outcome":"refused","parameters":{"label":5},"schema_version":1,"submitted_at":1000}"#;
     let mut bytes = String::new();
@@ -799,6 +824,7 @@ fn help_lists_log_with_its_fields() {
 // B5: `ont_log` answers the line `ont log` prints.
 #[test]
 fn the_mcp_tool_answers_what_the_subcommand_prints() {
+    // spec: specs/ont/log.md#R1
     let t = installed();
     apply(
         &t,
@@ -839,6 +865,9 @@ fn the_mcp_tool_answers_what_the_subcommand_prints() {
 // log row, `edits.jsonl` and `refusals.jsonl`.
 #[test]
 fn the_role_comes_from_the_request_or_the_environment() {
+    // spec: specs/ont/action.md#R12
+    // spec: specs/ont/action.md#R15
+    // spec: specs/ont/action.md#R17
     // Set the environment only in a child, never in the threaded test process.
     if std::env::var_os("ONT_ROLE_TEST").is_none() {
         let output = Command::new(std::env::current_exe().unwrap())
@@ -933,6 +962,8 @@ fn the_role_comes_from_the_request_or_the_environment() {
 // C1: the bounds of `role` are those of `agent`, refused at `/role`.
 #[test]
 fn the_role_has_the_bounds_of_agent() {
+    // spec: specs/ont/action.md#R14
+    // spec: specs/ont/action.md#R17
     let t = installed();
     let long = "r".repeat(65);
     for role in [
@@ -1004,6 +1035,8 @@ fn the_role_has_the_bounds_of_agent() {
 // apply alike.
 #[test]
 fn a_role_criterion_holds_for_that_actor() {
+    // spec: specs/ont/action.md#R6
+    // spec: specs/ont/action.md#R15
     let t = installed();
     let request = |role: Option<&str>| {
         let mut r = json!({"action_type":"lead_tag","parameters":{"label":"l"},"request_id":"l1"});
@@ -1028,6 +1061,7 @@ fn a_role_criterion_holds_for_that_actor() {
 // line; C3: the trust stays `self_reported`.
 #[test]
 fn without_a_role_ids_and_lines_are_as_before() {
+    // spec: specs/ont/action.md#R16
     let with = installed();
     let without = installed();
     let request = json!({"action_type":"create_tag","parameters":{"label":"same"},"request_id":"same","agent":"ag"});

@@ -817,6 +817,7 @@ mod tests {
 
     #[test]
     fn exclude_prunes_a_directory_before_it_is_read() {
+        // spec: specs/ont/index.md#R8
         let d = temp();
         std::fs::create_dir_all(d.join("keep/x")).unwrap();
         std::fs::write(d.join("keep/x/a.md"), "x").unwrap();
@@ -842,6 +843,7 @@ mod tests {
 
     #[test]
     fn a_swapped_parent_is_not_read_and_aggregate_bounds_hold() {
+        // spec: specs/ont/index.md#R11
         let d = temp();
         std::fs::create_dir_all(d.join("real")).unwrap();
         std::fs::write(d.join("real/a.md"), "hello\n").unwrap();

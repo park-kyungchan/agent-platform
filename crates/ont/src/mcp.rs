@@ -621,6 +621,7 @@ mod tests {
 
     #[test]
     fn an_over_long_line_is_consumed_to_its_newline_without_being_buffered() {
+        // spec: specs/ont/mcp.md#R13
         let mut data = vec![b'a'; 10_000];
         data.extend_from_slice(b"\nnext\nlast");
         // A reader that hands out 8 bytes at a time.

@@ -217,6 +217,8 @@ fn argument_refusal(code: i32, answer: &Value, argument: &str, property: &str) {
 
 #[test]
 fn a1_argument_against_a_pattern_is_refused_for_eq_and_ordering() {
+    // spec: specs/ont/render.md#R14
+    // spec: specs/ont/render.md#R15
     let t = Temp::new();
     t.install(constrained_schema());
     for (key, day, rank) in [
@@ -257,6 +259,7 @@ fn a1_argument_against_a_pattern_is_refused_for_eq_and_ordering() {
 
 #[test]
 fn a1_argument_over_max_bytes_outside_allowed_values_or_bounds_is_refused() {
+    // spec: specs/ont/render.md#R15
     let t = Temp::new();
     t.install(constrained_schema());
     let mut f = fields("bounds", 1);
@@ -292,6 +295,7 @@ fn a1_argument_over_max_bytes_outside_allowed_values_or_bounds_is_refused() {
 
 #[test]
 fn a1_prefix_and_reference_arguments_are_read_as_before() {
+    // spec: specs/ont/render.md#R17
     let t = Temp::new();
     t.install(constrained_schema());
     let key = "/synthetic/item-1";
@@ -326,6 +330,8 @@ fn a1_prefix_and_reference_arguments_are_read_as_before() {
 
 #[test]
 fn a1_argument_in_a_list_and_in_two_leaves_is_checked_in_each() {
+    // spec: specs/ont/render.md#R14
+    // spec: specs/ont/render.md#R20
     let t = Temp::new();
     t.install(constrained_schema());
     let (code, answer) = t.render("day_in", json!({"a":"2040-06-15","z":"2040"}));
@@ -353,6 +359,8 @@ fn a1_argument_in_a_list_and_in_two_leaves_is_checked_in_each() {
 
 #[test]
 fn a1_refusal_names_argument_and_property_and_holds_no_value() {
+    // spec: specs/ont/render.md#R18
+    // spec: specs/ont/render.md#R19
     let t = Temp::new();
     t.install(constrained_schema());
     let marker = "REJECTED_VALUE_MARKER";
@@ -411,6 +419,7 @@ fn a1_refusal_names_argument_and_property_and_holds_no_value() {
 
 #[test]
 fn a1_check_reports_a_refused_block_as_drift() {
+    // spec: specs/ont/render.md#R23
     let t = Temp::new();
     t.install(constrained_schema());
     let block = "<!-- ont:render day_eq when=2040 schema=board@1 -->\nold\n<!-- /ont:render -->";
@@ -429,6 +438,9 @@ fn a1_check_reports_a_refused_block_as_drift() {
 
 #[test]
 fn deterministic_order_ties_arguments_and_actions() {
+    // spec: specs/ont/render.md#R2
+    // spec: specs/ont/render.md#R5
+    // spec: specs/ont/render.md#R24
     let t = Temp::setup();
     append(&t, "z", fields("last", 10), Change::Initial, 2000);
     append(&t, "b", fields("equal", 2), Change::Initial, 2000);
@@ -484,6 +496,10 @@ fn deterministic_order_ties_arguments_and_actions() {
 }
 #[test]
 fn every_cell_form_and_escaping_and_stale() {
+    // spec: specs/ont/render.md#R6
+    // spec: specs/ont/render.md#R7
+    // spec: specs/ont/render.md#R8
+    // spec: specs/ont/render.md#R30
     let t = Temp::new();
     let mut s = schema();
     let names = [
@@ -526,6 +542,8 @@ fn every_cell_form_and_escaping_and_stale() {
 }
 #[test]
 fn exact_truncation_and_pagination() {
+    // spec: specs/ont/render.md#R3
+    // spec: specs/ont/render.md#R25
     let t = Temp::new();
     let mut s = schema();
     s["views"]["items"]["limit"] = json!(1);
@@ -545,6 +563,10 @@ fn exact_truncation_and_pagination() {
 }
 #[test]
 fn write_check_preserves_outside_mode_and_preimage_and_is_idempotent() {
+    // spec: specs/ont/render.md#R10
+    // spec: specs/ont/render.md#R11
+    // spec: specs/ont/render.md#R12
+    // spec: specs/ont/render.md#R22
     let t = Temp::setup();
     append(&t, "a", fields("equal", 2), Change::Initial, 2000);
     let original = b"before\r\n\xff\n<!-- ont:render items schema=board@0 -->\nold\n<!-- /ont:render -->\nafter\r\n";
@@ -589,6 +611,8 @@ fn write_check_preserves_outside_mode_and_preimage_and_is_idempotent() {
 }
 #[test]
 fn missing_duplicate_unclosed_unknown_symlink_and_preimage_failure() {
+    // spec: specs/ont/render.md#R10
+    // spec: specs/ont/render.md#R22
     let t = Temp::setup();
     let block = "<!-- ont:render items schema=board@0 -->\nstale\n<!-- /ont:render -->";
     for (text, expected) in [
@@ -659,6 +683,8 @@ fn forbidden_type_and_old_schema() {
 }
 #[test]
 fn schema_refuses_each_invalid_view_and_duplicate_domain_names() {
+    // spec: specs/ont/render.md#R1
+    // spec: specs/ont/render.md#R4
     let changes = [
         ("/views/items/extra", json!(true)),
         ("/views/items/object_type", json!("absent")),
@@ -736,6 +762,8 @@ fn schema_refuses_each_invalid_view_and_duplicate_domain_names() {
 
 #[test]
 fn sorted_arguments_write_only_matching_section_and_check_all_blocks() {
+    // spec: specs/ont/render.md#R21
+    // spec: specs/ont/render.md#R22
     let t = Temp::new();
     let mut s = schema();
     s["views"]["named_items"]["args"] = json!(["z", "a"]);
@@ -802,6 +830,8 @@ fn sorted_arguments_write_only_matching_section_and_check_all_blocks() {
 
 #[test]
 fn pagination_uses_one_snapshot_and_concurrent_action_commits_after_read() {
+    // spec: specs/ont/render.md#R27
+    // spec: specs/ont/render.md#R28
     let t = Temp::new();
     let mut s = schema();
     s["views"]["items"]["limit"] = json!(2);
@@ -909,6 +939,8 @@ fn schema_view_names_and_nested_unknown_keys_and_filter_types() {
 
 #[test]
 fn descending_order_reverses_key_scan_and_breaks_ties_by_key() {
+    // spec: specs/ont/render.md#R5
+    // spec: specs/ont/render.md#R50
     let t = Temp::new();
     let mut s = schema();
     s["views"]["items"]["order"][0]["direction"] = json!("desc");
@@ -925,6 +957,7 @@ fn descending_order_reverses_key_scan_and_breaks_ties_by_key() {
 
 #[test]
 fn check_distinguishes_refusal_from_byte_drift() {
+    // spec: specs/ont/render.md#R41
     let t = Temp::setup();
     let (_, rendered) = t.render("items", json!({}));
     let good = rendered["markdown"].as_str().unwrap();
@@ -947,6 +980,7 @@ fn check_distinguishes_refusal_from_byte_drift() {
 
 #[test]
 fn fenced_markers_and_readme_examples_are_ignored() {
+    // spec: specs/ont/render.md#R38
     let t = Temp::setup();
     for fence in ["```markdown", "~~~markdown"] {
         let text = format!(
@@ -1009,6 +1043,9 @@ fn fenced_markers_and_readme_examples_are_ignored() {
 
 #[test]
 fn writer_lock_wait_is_bounded_and_hardlinks_are_refused() {
+    // spec: specs/ont/render.md#R31
+    // spec: specs/ont/render.md#R32
+    // spec: specs/ont/render.md#R36
     let t = Temp::setup();
     let original = b"<!-- ont:render items schema=board@0 -->\nold\n<!-- /ont:render -->";
     let file = t.file("write.md", original);
@@ -1036,6 +1073,8 @@ fn writer_lock_wait_is_bounded_and_hardlinks_are_refused() {
 
 #[test]
 fn cells_escape_backslashes_pipes_comments_and_crlf_and_headers() {
+    // spec: specs/ont/render.md#R8
+    // spec: specs/ont/render.md#R40
     let t = Temp::new();
     let mut s = schema();
     s["views"]["items"]["columns"][1]["header"] = json!("<!--Title-->");
@@ -1090,6 +1129,7 @@ fn conflicting_preimage_crlf_and_eof_without_newline() {
 
 #[test]
 fn schema_argument_type_refusals_name_the_filter_pointer() {
+    // spec: specs/ont/render.md#R42
     for property in ["rank", "flag", "tags", "meta"] {
         for filter in [
             json!({"eq":[property,"$title"]}),
@@ -1126,6 +1166,7 @@ const FENCE_EXAMPLE_BLOCK: &str =
 
 #[test]
 fn unclosed_fence_above_real_block_refuses_check_and_write() {
+    // spec: specs/ont/render.md#R39
     let t = Temp::setup();
     for opener in ["```", "   ~~~~text"] {
         let text = format!("intro\n{opener}\n{FENCE_EXAMPLE_BLOCK}\n");
@@ -1146,6 +1187,7 @@ fn unclosed_fence_above_real_block_refuses_check_and_write() {
 
 #[test]
 fn four_backtick_fence_keeps_three_backtick_line_as_content() {
+    // spec: specs/ont/render.md#R37
     let t = Temp::setup();
     let text = format!("````markdown\n```\n{FENCE_EXAMPLE_BLOCK}\n````\n");
     let file = t.file("four.md", text.as_bytes());
@@ -1159,6 +1201,7 @@ fn four_backtick_fence_keeps_three_backtick_line_as_content() {
 
 #[test]
 fn tilde_line_inside_backtick_fence_does_not_close_it() {
+    // spec: specs/ont/render.md#R37
     let t = Temp::setup();
     let text = format!("```markdown\n~~~\n{FENCE_EXAMPLE_BLOCK}\n```\n");
     let file = t.file("mixed.md", text.as_bytes());
@@ -1171,6 +1214,7 @@ fn tilde_line_inside_backtick_fence_does_not_close_it() {
 
 #[test]
 fn indented_closing_fence_accepts_up_to_three_spaces() {
+    // spec: specs/ont/render.md#R37
     let t = Temp::setup();
     for indent in ["", " ", "  ", "   "] {
         let text = format!("   ~~~markdown\n{FENCE_EXAMPLE_BLOCK}\n{indent}~~~~  \n");
@@ -1213,6 +1257,12 @@ fn real_block_after_correctly_closed_fence_is_checked_and_written() {
 
 #[test]
 fn reference_view_argument_native_key_without_mirror_and_unsafe_key_refusal() {
+    // spec: specs/ont/render.md#R46
+    // spec: specs/ont/render.md#R13
+    // spec: specs/ont/render.md#R43
+    // spec: specs/ont/render.md#R44
+    // spec: specs/ont/render.md#R45
+    // spec: specs/ont/render.md#R47
     let t = Temp::new();
     let mut s = schema();
     s["views"]["named_items"]["filter"] = json!({"all":[{"eq":["ref","$title"]}]});
@@ -1271,6 +1321,7 @@ fn reference_view_argument_native_key_without_mirror_and_unsafe_key_refusal() {
 
 #[test]
 fn expect_blocks_detects_balanced_fence_hiding_a_real_block() {
+    // spec: specs/ont/cli.md#R13
     let t = Temp::setup();
     let (_, rendered) = t.render("items", json!({}));
     let block = rendered["markdown"].as_str().unwrap();
@@ -1386,6 +1437,7 @@ fn expect_blocks_refuses_write_and_section_combinations_without_writing() {
 
 #[test]
 fn describe_discovers_readable_views_and_arguments_on_cli_and_mcp() {
+    // spec: specs/ont/store.md#R2
     let t = Temp::new();
     let mut schema = schema();
     schema["object_types"]["hidden"] = json!({"owner":"ontology","primary_key":{"from":"$action_id"},"properties":{"title":{"type":"string"}}});

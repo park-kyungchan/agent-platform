@@ -168,6 +168,7 @@ fn cause(ans: &Value) -> String {
 
 #[test]
 fn rule_1_a_time_later_than_now_fails_the_source() {
+    // spec: specs/ont/index.md#R20
     let e = Env::setup(true);
     e.put("a.jsonl", &[rec("k1", "x", 1001)]);
     let ans = e.index(1000);
@@ -182,6 +183,7 @@ fn rule_1_a_time_later_than_now_fails_the_source() {
 
 #[test]
 fn rule_2_no_head_is_an_initial_observation_at_the_record_time() {
+    // spec: specs/ont/index.md#R21
     let e = Env::setup(true);
     e.put("a.jsonl", &[rec("k1", "x", 900)]);
     let ans = e.index(1000);
@@ -194,6 +196,7 @@ fn rule_2_no_head_is_an_initial_observation_at_the_record_time() {
 
 #[test]
 fn rule_2_a_retracted_head_is_initial_again_whatever_the_retraction_time() {
+    // spec: specs/ont/index.md#R21
     let e = Env::setup(true);
     e.put("a.jsonl", &[rec("k1", "x", 900)]);
     e.index(1000);
@@ -212,6 +215,7 @@ fn rule_2_a_retracted_head_is_initial_again_whatever_the_retraction_time() {
 
 #[test]
 fn rule_3_different_fields_update_at_the_record_time() {
+    // spec: specs/ont/index.md#R22
     let e = Env::setup(true);
     e.put("a.jsonl", &[rec("k1", "x", 900)]);
     e.index(1000);
@@ -230,6 +234,7 @@ fn rule_3_different_fields_update_at_the_record_time() {
 
 #[test]
 fn rule_3_older_content_over_newer_fails_the_source_and_appends_nothing() {
+    // spec: specs/ont/index.md#R22
     let e = Env::setup(true);
     e.put("a.jsonl", &[rec("k1", "x", 900), rec("k2", "x", 900)]);
     e.index(1000);
@@ -245,6 +250,7 @@ fn rule_3_older_content_over_newer_fails_the_source_and_appends_nothing() {
 
 #[test]
 fn rule_4_a_changed_digest_with_equal_fields_refreshes_with_the_later_time() {
+    // spec: specs/ont/index.md#R23
     let e = Env::setup(true);
     let line = |t: u64, note: &str| {
         json!({"type":"attempt","key":"k1","observed_at":t,"label":"x","note":note}).to_string()
@@ -266,6 +272,7 @@ fn rule_4_a_changed_digest_with_equal_fields_refreshes_with_the_later_time() {
 
 #[test]
 fn rule_4_a_raised_schema_version_refreshes_with_the_later_time() {
+    // spec: specs/ont/index.md#R23
     let e = Env::setup(true);
     e.put("a.jsonl", &[rec("k1", "x", 900)]);
     e.index(1000);
@@ -282,6 +289,7 @@ fn rule_4_a_raised_schema_version_refreshes_with_the_later_time() {
 
 #[test]
 fn rule_5_a_later_time_renews_in_place() {
+    // spec: specs/ont/index.md#R24
     let e = Env::setup(true);
     e.put("a.jsonl", &[rec("k1", "x", 900)]);
     e.index(1000);
@@ -298,6 +306,7 @@ fn rule_5_a_later_time_renews_in_place() {
 
 #[test]
 fn rule_5_staleness_renews_in_place_and_keeps_the_time() {
+    // spec: specs/ont/index.md#R24
     let e = Env::setup(true);
     e.put("a.jsonl", &[rec("k1", "x", 900)]);
     e.index(1000);
@@ -313,6 +322,7 @@ fn rule_5_staleness_renews_in_place_and_keeps_the_time() {
 
 #[test]
 fn rule_5_equal_and_fresh_changes_nothing() {
+    // spec: specs/ont/index.md#R24
     let e = Env::setup(true);
     e.put("a.jsonl", &[rec("k1", "x", 900)]);
     e.index(1000);
@@ -333,6 +343,7 @@ fn rule_5_equal_and_fresh_changes_nothing() {
 
 #[test]
 fn removing_a_file_retracts_and_putting_it_back_is_initial_again() {
+    // spec: specs/ont/index.md#R27
     let e = Env::setup(true);
     e.put("a.jsonl", &[rec("k1", "x", 900)]);
     e.put("b.jsonl", &[rec("k2", "y", 910)]);
@@ -356,6 +367,7 @@ fn removing_a_file_retracts_and_putting_it_back_is_initial_again() {
 
 #[test]
 fn member_order_other_files_and_later_times_append_nothing() {
+    // spec: specs/ont/index.md#R26
     let e = Env::setup(false);
     e.put(
         "a.jsonl",
@@ -378,6 +390,7 @@ fn member_order_other_files_and_later_times_append_nothing() {
 
 #[test]
 fn a_repeated_member_or_an_integer_beyond_64_bits_fails_the_source() {
+    // spec: specs/ont/index.md#R17
     let e = Env::setup(true);
     e.put("good.jsonl", &[rec("k0", "x", 900)]);
     e.index(1000);
@@ -427,6 +440,8 @@ fn a_repeated_member_or_an_integer_beyond_64_bits_fails_the_source() {
 
 #[test]
 fn every_failure_names_file_and_line_and_leaves_the_observation_count() {
+    // spec: specs/ont/index.md#R15
+    // spec: specs/ont/index.md#R17
     let e = Env::setup(true);
     e.put("a-good.jsonl", &[rec("k0", "x", 900)]);
     e.index(1000);
@@ -541,6 +556,7 @@ fn a_failed_source_does_not_stop_the_other_sources_of_the_command() {
 
 #[test]
 fn an_empty_file_is_zero_records_and_a_last_line_without_newline_is_one() {
+    // spec: specs/ont/index.md#R18
     let e = Env::setup(true);
     e.put_raw("a.jsonl", b"");
     let ans = e.index(1000);
@@ -562,6 +578,7 @@ fn an_empty_file_is_zero_records_and_a_last_line_without_newline_is_one() {
 
 #[test]
 fn complete_listing_retracts_what_no_record_of_the_run_names() {
+    // spec: specs/ont/index.md#R14
     let e = Env::setup(true);
     e.put("a.jsonl", &[rec("k1", "x", 900), rec("k2", "x", 900)]);
     e.put("b.jsonl", &[rec("k3", "x", 900)]);
@@ -596,6 +613,7 @@ fn complete_listing_retracts_what_no_record_of_the_run_names() {
 
 #[test]
 fn without_complete_listing_nothing_is_retracted() {
+    // spec: specs/ont/index.md#R14
     let e = Env::setup(false);
     e.put("a.jsonl", &[rec("k1", "x", 900), rec("k2", "x", 900)]);
     e.index(1000);
@@ -612,6 +630,7 @@ fn without_complete_listing_nothing_is_retracted() {
 
 #[test]
 fn the_view_column_observed_at_shows_the_head_time() {
+    // spec: specs/ont/index.md#R25
     let e = Env::setup(true);
     e.put(
         "a.jsonl",
@@ -667,6 +686,8 @@ fn an_equality_search_over_12000_objects_after_renewal_is_not_too_large() {
 
 #[test]
 fn the_schema_check_refuses_a_records_source_without_one_owner_or_a_time_member() {
+    // spec: specs/ont/index.md#R15
+    // spec: specs/ont/index.md#R16
     let e = Env::new();
     let check = |s: &Value| -> Vec<(String, String)> {
         let file = e.file("c.json", &serde_json::to_vec(s).unwrap());
@@ -750,6 +771,7 @@ fn the_schema_check_refuses_a_records_source_without_one_owner_or_a_time_member(
 
 #[test]
 fn twenty_thousand_records_in_two_hundred_files_are_read() {
+    // spec: specs/ont/index.md#R14
     let e = Env::setup(true);
     for f in 0..200 {
         let lines: Vec<String> = (0..100)
@@ -766,6 +788,8 @@ fn twenty_thousand_records_in_two_hundred_files_are_read() {
 
 #[test]
 fn over_the_bounds_the_source_fails_with_a_code_and_nothing_is_truncated() {
+    // spec: specs/ont/index.md#R12
+    // spec: specs/ont/index.md#R19
     let e = Env::setup(true);
     // 201 files.
     for f in 0..201 {

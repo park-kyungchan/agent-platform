@@ -5,174 +5,95 @@ Purpose: The store file, its opening rules and compact.
 Moved from crates/ont/README.md (opening text, "compact"); crates/ont-store/README.md (whole file) at cf328f3c07623d39f300cb3a84599bed30ca258a; requirement ids, "Not included" and "Open" are added when a section's contract changes.
 
 
-The `ont` command: `schema check|install`, `describe`, `get`, `backup`, `compact`, `index`, `search`, `around`, `aggregate`, `log`, `action list|validate|apply` over a format 4 store (format 3 upgrades only on a writable open; a read refuses with `store_upgrade_required`).
+- R1: The `ont` command: `schema check|install`, `describe`, `get`, `backup`, `compact`, `index`, `search`, `around`, `aggregate`, `log`, `action list|validate|apply` over a format 4 store (format 3 upgrades only on a writable open; a read refuses with `store_upgrade_required`).
 
-`describe` lists readable views with their `name`, `args` and `object_type`,
-including through `ont_describe`. Empty or whitespace-only stdin defaults to `{}`
-for `describe` and `action list`; commands with required fields report the first
-missing field. Reference search filters require a full Id, obtainable by searching
-the referenced type. Refusals may include a top-level `hint`; submission hints use
-fixed recovery text selected by failed criterion codes (unknown codes get a generic
-repair), without request values. Store creation and existing-store opens refuse
-symbolic links at the store file, its containing directory, or that directory's
-parent (exactly two directory levels; aliases above them are allowed), SQLite sidecars
-(`-journal`, `-wal`, `-shm`), `edits.jsonl` or its lock with
-`store_path_is_symlink` and field `--store`. SQLite opens use
-`SQLITE_OPEN_NOFOLLOW` against a swapped final database path; the parent path is
-canonicalized after the guard so host aliases above the two checked directory
-levels can open normally. Parent and adjacent file checks are pre-open checks: concurrent replacement after inspection remains
-outside this guarantee; edit-log descriptors separately use `O_NOFOLLOW`. Default-store aliases retain
-`install_requires_commit`. Git provenance strips userinfo only when its host boundary is
-certain. Raw-slash credentials and ambiguous port/path-`@` forms use the checkout
-path as provenance instead; `strip_credentials` returns `None` for ambiguity.
-Scp-like userinfo requires exactly one `@` and no `/` before the first `:`;
-a `:` before the first `@` falls back rather than assuming a password boundary.
-Ordinary ports and local paths remain intact.
+- R2: `describe` lists readable views with their `name`, `args` and `object_type`, including through `ont_describe`.
+- R3: Empty or whitespace-only stdin defaults to `{}` for `describe` and `action list`; commands with required fields report the first missing field.
+- R4: Reference search filters require a full Id, obtainable by searching the referenced type.
+- R5: Refusals may include a top-level `hint`; submission hints use fixed recovery text selected by failed criterion codes (unknown codes get a generic repair), without request values.
+- R6: Store creation and existing-store opens refuse symbolic links at the store file, its containing directory, or that directory's parent (exactly two directory levels; aliases above them are allowed), SQLite sidecars (`-journal`, `-wal`, `-shm`), `edits.jsonl` or its lock with `store_path_is_symlink` and field `--store`.
+- R7: SQLite opens use `SQLITE_OPEN_NOFOLLOW` against a swapped final database path; the parent path is canonicalized after the guard so host aliases above the two checked directory levels can open normally.
+- R8: Parent and adjacent file checks are pre-open checks: concurrent replacement after inspection remains outside this guarantee; edit-log descriptors separately use `O_NOFOLLOW`.
+- R9: Default-store aliases retain `install_requires_commit`.
+- R10: Git provenance strips userinfo only when its host boundary is certain.
+- R11: Raw-slash credentials and ambiguous port/path-`@` forms use the checkout path as provenance instead; `strip_credentials` returns `None` for ambiguity.
+- R12: Scp-like userinfo requires exactly one `@` and no `/` before the first `:`; a `:` before the first `@` falls back rather than assuming a password boundary.
+- R13: Ordinary ports and local paths remain intact.
 
 
-Consumers: the `ont` command and domain crates that pin this repository. Public contract: isolated memory/file Store, trusted
-atomic seed/append_batch, transaction-bound ReadSnapshot. Uses rusqlite 0.32.1 with
-bundled libsqlite3-sys 0.30.1 (SQLite source 3.46.0); no system install.
-Schema version 1, application ID 1330533430, composite BINARY keys, FULL synchronous,
-DELETE journal, 250ms busy timeout, foreign keys. Unknown existing databases refuse;
-Not an Academy journal, Hindsight database or authorization entrypoint.
+Consumers: the `ont` command and domain crates that pin this repository.
+- R14: Public contract: isolated memory/file Store, trusted atomic seed/append_batch, transaction-bound ReadSnapshot.
+- R15: Uses rusqlite 0.32.1 with bundled libsqlite3-sys 0.30.1 (SQLite source 3.46.0); no system install.
+- R16: Schema version 1, application ID 1330533430, composite BINARY keys, FULL synchronous, DELETE journal, 250ms busy timeout, foreign keys.
+- R17: Unknown existing databases refuse; Not an Academy journal, Hindsight database or authorization entrypoint.
 
-`Store::open` / `Store::memory` retain the Education-only schema-v1 contract.
-`Store::open_program` / `Store::memory_program` explicitly select a separate
-Program-only schema-v2 projection. V2 uses the same application ID and object,
-observation and link tables; it installs no action tables. Both modes validate the selected scope domain, required keys and
-exact Id namespace during intake and snapshot reads, including link endpoints.
-A failed seed/append rolls back the entire transaction.
+- R18: `Store::open` / `Store::memory` retain the Education-only schema-v1 contract.
+- R19: `Store::open_program` / `Store::memory_program` explicitly select a separate Program-only schema-v2 projection.
+- R20: V2 uses the same application ID and object, observation and link tables; it installs no action tables.
+- R21: Both modes validate the selected scope domain, required keys and exact Id namespace during intake and snapshot reads, including link endpoints.
+- R22: A failed seed/append rolls back the entire transaction.
 
-Opening the other mode's existing version, a future version or an unknown database
-refuses with `store_failure` before reading object rows. Neither mode upgrades,
-downgrades, rewrites scopes or eagerly repairs corrupt rows. Use only an explicitly
-task-owned new path for Program projections. Older binaries reject v2 at open.
+- R23: Opening the other mode's existing version, a future version or an unknown database refuses with `store_failure` before reading object rows.
+- R24: Neither mode upgrades, downgrades, rewrites scopes or eagerly repairs corrupt rows.
+Use only an explicitly task-owned new path for Program projections.
+- R25: Older binaries reject v2 at open.
 
 ## Schema mode (format 3)
 
-`Store::open_schema(path)` / `Store::memory_schema()` explicitly select format
-3 (`user_version` 3, the same `application_id` as formats 1 and 2, checked the
-same way; a busy lock at open refuses with `store_busy`). Format 1 or 2 files
-refuse with `store_failure`, and a format 3 file refuses in the old modes; no
-mode converts another. Its tables are `objects`, `observations` (the v1
-columns plus `ingested_at`, `schema_domain`, `schema_version` and
-`change_kind`), `links` (created, unused), `schema_installs` and `action_log`
-(see `schema-v3.sql`).
-Opening an existing store: `open_schema` is the only open that creates or
-initialises a file. `open_schema_existing` (read-only) and
-`open_schema_existing_writable` (read-write, for `Store::write`) have no create
-flag and never initialise: a missing path is `store_not_found`, an empty or
-foreign file is `store_failure` with its bytes unchanged.
+- R26: `Store::open_schema(path)` / `Store::memory_schema()` explicitly select format 3 (`user_version` 3, the same `application_id` as formats 1 and 2, checked the same way; a busy lock at open refuses with `store_busy`).
+- R27: Format 1 or 2 files refuse with `store_failure`, and a format 3 file refuses in the old modes; no mode converts another.
+- R28: Its tables are `objects`, `observations` (the v1 columns plus `ingested_at`, `schema_domain`, `schema_version` and `change_kind`), `links` (created, unused), `schema_installs` and `action_log` (see `schema-v3.sql`).
+- R29: Opening an existing store: `open_schema` is the only open that creates or initialises a file.
+- R30: `open_schema_existing` (read-only) and `open_schema_existing_writable` (read-write, for `Store::write`) have no create flag and never initialise: a missing path is `store_not_found`, an empty or foreign file is `store_failure` with its bytes unchanged.
 
-An observation and an action-log row refer to the install they were written
-under by `(schema_domain, schema_version)`, a foreign key to
-`schema_installs(domain, version)`; the pin is read from that install row (one
-home for the pin). Schema change in v1: installing a newer version does not
-re-validate stored observations; an old observation keeps its own pin; a type
-removed by the newer version is still readable by `head` and `history` and
-refuses `unknown_type` for ingest and `scan_heads`.
+- R31: An observation and an action-log row refer to the install they were written under by `(schema_domain, schema_version)`, a foreign key to `schema_installs(domain, version)`; the pin is read from that install row (one home for the pin).
+- R32: Schema change in v1: installing a newer version does not re-validate stored observations; an old observation keeps its own pin; a type removed by the newer version is still readable by `head` and `history` and refuses `unknown_type` for ingest and `scan_heads`.
 
-`install_schema(bytes, InstallArgs { installed_at, source_repository,
-source_commit })` keeps, per install, the domain, version, sha256, the exact
-schema bytes, the caller-given install time and the optional source
-repository/commit. A domain's version only grows; the same (domain, version)
-with a different sha256 refuses with `schema_version_conflict`; installing
-the exact bytes of the latest installed version again is a no-op; a candidate
-is checked (including the type-name clash) against the set read inside its
-IMMEDIATE transaction before it is written. Opening the store rebuilds the
-`SchemaSet` from each domain's latest stored bytes and re-verifies each pin;
-stored bytes that no longer hash to their row's sha256 refuse the open with
-`schema_pin_mismatch`. The cached set is never trusted across a transaction
-boundary: every transaction (read or write) compares the latest install rows
-with the cache and rebuilds inside that transaction when they differ, and the
-cache is replaced only after a successful commit. `schema_set()` and
-`schema_pins()` refresh the same way.
+- R33: `install_schema(bytes, InstallArgs { installed_at, source_repository, source_commit })` keeps, per install, the domain, version, sha256, the exact schema bytes, the caller-given install time and the optional source repository/commit.
+- R34: A domain's version only grows; the same (domain, version) with a different sha256 refuses with `schema_version_conflict`; installing the exact bytes of the latest installed version again is a no-op; a candidate is checked (including the type-name clash) against the set read inside its IMMEDIATE transaction before it is written.
+- R35: Opening the store rebuilds the `SchemaSet` from each domain's latest stored bytes and re-verifies each pin; stored bytes that no longer hash to their row's sha256 refuse the open with `schema_pin_mismatch`.
+- R36: The cached set is never trusted across a transaction boundary: every transaction (read or write) compares the latest install rows with the cache and rebuilds inside that transaction when they differ, and the cache is replaced only after a successful commit.
+- R37: `schema_set()` and `schema_pins()` refresh the same way.
 
-One public write transaction covers observations and the action log:
-`Store::write(now, |tx| ...)` runs the closure in one IMMEDIATE transaction
-with a `SchemaWrite` handle (`append`, `renew`, `log_action`, `head`, `schema_set`),
-commits when the closure returns `Ok` and rolls back otherwise.
-`append_schema(items, ingested_at)` and `append_action_log(entry)` are thin
-callers of it. Ingest rules (per item, inside the transaction): the object
-type must be declared and its `fields` must pass `SchemaSet::validate_fields`;
-the scope must be `Scope::Domain` of the declaring domain, in that schema's
-namespace, with a key set equal to the domain's `scope_keys` exactly (an empty
-scope key or value is `scope_keys_mismatch`); the object `Id.namespace` must
-equal the schema's namespace; and every `ref` value's `Id.namespace` must
-equal the namespace of the schema that declares its target type. A reference
-to an object that does not exist in the store is accepted: sources are
-indexed independently, and the reference is only a value. The legacy
-`seed`/`append_batch` refuse with `schema_violation` in this mode (the old
-modes have no dedicated wrong-mode refusal besides `store_failure` at open,
-so that code is kept). Refusals are `StoreRefusal { code, violation }`:
-validation failures carry code `schema_violation` with the violation code and
-pointer available; a moved head carries `revision_conflict`; a repeated
-revision carries `duplicate_revision`. Change rules: `initial` only for an
-object with no observation (or after a retraction head, which is treated as
-having no head; the full history is kept), and it must not name a superseded
-head; `update`, `refresh`, `correction` and `retraction` only when
-`supersedes` equals the current head; `refresh` must carry fields equal to
-the head's fields. A `retraction` observation has empty `fields`, so field
-validation is skipped for it. `action_log.action_id` is UNIQUE (a duplicate
-refuses with `duplicate_action_id`).
+- R38: One public write transaction covers observations and the action log: `Store::write(now, |tx| ...)` runs the closure in one IMMEDIATE transaction with a `SchemaWrite` handle (`append`, `renew`, `log_action`, `head`, `schema_set`), commits when the closure returns `Ok` and rolls back otherwise.
+- R39: `append_schema(items, ingested_at)` and `append_action_log(entry)` are thin callers of it.
+- R40: Ingest rules (per item, inside the transaction): the object type must be declared and its `fields` must pass `SchemaSet::validate_fields`; the scope must be `Scope::Domain` of the declaring domain, in that schema's namespace, with a key set equal to the domain's `scope_keys` exactly (an empty scope key or value is `scope_keys_mismatch`); the object `Id.namespace` must equal the schema's namespace; and every `ref` value's `Id.namespace` must equal the namespace of the schema that declares its target type.
+- R41: A reference to an object that does not exist in the store is accepted: sources are indexed independently, and the reference is only a value.
+- R42: The legacy `seed`/`append_batch` refuse with `schema_violation` in this mode (the old modes have no dedicated wrong-mode refusal besides `store_failure` at open, so that code is kept).
+- R43: Refusals are `StoreRefusal { code, violation }`: validation failures carry code `schema_violation` with the violation code and pointer available; a moved head carries `revision_conflict`; a repeated revision carries `duplicate_revision`.
+- R44: Change rules: `initial` only for an object with no observation (or after a retraction head, which is treated as having no head; the full history is kept), and it must not name a superseded head; `update`, `refresh`, `correction` and `retraction` only when `supersedes` equals the current head; `refresh` must carry fields equal to the head's fields.
+- R45: A `retraction` observation has empty `fields`, so field validation is skipped for it.
+- R46: `action_log.action_id` is UNIQUE (a duplicate refuses with `duplicate_action_id`).
 
-Reads: `head(id)` returns the head and reports a retracted head with
-`retracted: true` instead of as absent; an objects row whose head observation
-is missing, and decoded rows that fail validation, are `store_failure`, not
-absence. `history(id)` returns every observation in append order with its
-`ingested_at` and its own pin. `scan_heads(object_type, limit, after)` returns
-non-retracted heads in primary-key order `(instance, account, native_key)`,
-continuing from the last returned `Id`; a limit above 10,000 refuses with
-`limit_too_large`. Every integer crossing into SQLite goes through
-`i64::try_from` (`value_out_of_range`).
+- R47: Reads: `head(id)` returns the head and reports a retracted head with `retracted: true` instead of as absent; an objects row whose head observation is missing, and decoded rows that fail validation, are `store_failure`, not absence.
+- R48: `history(id)` returns every observation in append order with its `ingested_at` and its own pin.
+- R49: `scan_heads(object_type, limit, after)` returns non-retracted heads in primary-key order `(instance, account, native_key)`, continuing from the last returned `Id`; a limit above 10,000 refuses with `limit_too_large`.
+- R50: Every integer crossing into SQLite goes through `i64::try_from` (`value_out_of_range`).
 
-The busy timeout is 250 ms for the old modes (unchanged) and 10 s for mode
-`Schema` at open (`open_schema_with_busy_timeout` selects another value). A
-writer that cannot take the lock within it refuses with `store_busy`; it is
-not retried automatically.
+- R51: The busy timeout is 250 ms for the old modes (unchanged) and 10 s for mode `Schema` at open (`open_schema_with_busy_timeout` selects another value).
+- R52: A writer that cannot take the lock within it refuses with `store_busy`; it is not retried automatically.
 
-`Store::backup_to(target)` runs `VACUUM INTO` with a bound parameter and
-refuses an existing target with `backup_target_exists`; the caller chooses
-the path, verifies the copy and rotates old copies. `log_action` refuses an
-entry whose `domain` differs from its schema domain
-(`action_domain_mismatch`) or whose schema version is not the current pin of
-that domain in the transaction's set (`action_schema_mismatch`); a duplicate
-`action_id` is recognised by the unique-constraint extended result code.
+- R53: `Store::backup_to(target)` runs `VACUUM INTO` with a bound parameter and refuses an existing target with `backup_target_exists`; the caller chooses the path, verifies the copy and rotates old copies.
+- R54: `log_action` refuses an entry whose `domain` differs from its schema domain (`action_domain_mismatch`) or whose schema version is not the current pin of that domain in the transaction's set (`action_schema_mismatch`);
+- R55: a duplicate `action_id` is recognised by the unique-constraint extended result code.
 ## compact
 
-New stores have 16,384-byte SQLite pages. `ont compact` opens an existing store
-read-write without creating one. When its page size is already 16,384 it returns
-`compacted: false` without a backup or rebuild. Otherwise it takes a verified
-backup, rebuilds the candidate projection to remove dead expiry postings, and
-runs `VACUUM` with 16,384-byte pages. A typed canonical SHA-256 stream verifies
-all tables except the derived `head_candidates` and `candidate_generation`
-tables before and after the rewrite.
+- R56: New stores have 16,384-byte SQLite pages.
+- R57: `ont compact` opens an existing store read-write without creating one.
+- R58: When its page size is already 16,384 it returns `compacted: false` without a backup or rebuild.
+- R59: Otherwise it takes a verified backup, rebuilds the candidate projection to remove dead expiry postings, and runs `VACUUM` with 16,384-byte pages.
+- R60: A typed canonical SHA-256 stream verifies all tables except the derived `head_candidates` and `candidate_generation` tables before and after the rewrite.
 
-For `compacted: true`, the result includes `page_size_before` and `page_size`
-(page bytes before and after), `bytes_before` and `bytes` (store file bytes before
-and after), `backup` (copy path), `backup_sha256` (copy digest), and
-`retention_failure` (rotation failure location, or null).
-For `compacted: false`, the result contains only `compacted`, `page_size` and
-`bytes` (the unchanged store's page and file sizes).
+- R61: For `compacted: true`, the result includes `page_size_before` and `page_size` (page bytes before and after), `bytes_before` and `bytes` (store file bytes before and after), `backup` (copy path), `backup_sha256` (copy digest), and `retention_failure` (rotation failure location, or null).
+- R62: For `compacted: false`, the result contains only `compacted`, `page_size` and `bytes` (the unchanged store's page and file sizes).
 
-An interrupted run can leave SQLite's rollback journal beside the store, after
-which every read-only command answers `store_failure` although no row is lost;
-running `ont compact` again (or any command opening the store read-write) rolls
-the journal back.
-`compact_rows_changed` means the authoritative rows differ between the two
-checksums, which with a concurrent writer means a newer or renewed row rather than a loss
-(a renewal changes an existing row, so the row counts can be equal):
-the store is already rebuilt and vacuumed, and the backup is older than the
-store, so do not restore it without comparing row counts.
-When the store is busy, the command answers `store_busy` after its wait; the file
-is unchanged only if the lock was held before the rebuild. A reader blocking the
-vacuum leaves the projection rebuilt with authoritative rows equal, and a backup
-already taken has used a rotation slot. An interruption during backup can leave
-a partial file in `backup/`.
-A format 3 store is upgraded to format 4 by the read-write open before the
-backup. No format change applies to an already format 4 store.
-The command needs free disk of about three times the store's size (the backup,
-the vacuum's copy and the journal) and no concurrent writer.
-Its backup follows the normal rotation (newest three kept).
+- R63: An interrupted run can leave SQLite's rollback journal beside the store, after which every read-only command answers `store_failure` although no row is lost; running `ont compact` again (or any command opening the store read-write) rolls the journal back.
+- R64: `compact_rows_changed` means the authoritative rows differ between the two checksums, which with a concurrent writer means a newer or renewed row rather than a loss (a renewal changes an existing row, so the row counts can be equal): the store is already rebuilt and vacuumed, and the backup is older than the store, so do not restore it without comparing row counts.
+- R65: When the store is busy, the command answers `store_busy` after its wait; the file is unchanged only if the lock was held before the rebuild.
+- R66: A reader blocking the vacuum leaves the projection rebuilt with authoritative rows equal, and a backup already taken has used a rotation slot.
+- R67: An interruption during backup can leave a partial file in `backup/`.
+- R68: A format 3 store is upgraded to format 4 by the read-write open before the backup.
+- R69: No format change applies to an already format 4 store.
+- R70: The command needs free disk of about three times the store's size (the backup, the vacuum's copy and the journal) and no concurrent writer.
+- R71: Its backup follows the normal rotation (newest three kept).
 

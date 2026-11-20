@@ -1873,6 +1873,7 @@ mod observation_bound_tests {
     }
     #[test]
     fn sql_byte_guard_reads_column_length_metadata_only() {
+        // spec: specs/ont/read.md#R16
         let db = Connection::open_in_memory().unwrap();
         db.execute_batch("CREATE TABLE observations(payload TEXT)")
             .unwrap();
@@ -1895,6 +1896,7 @@ mod observation_bound_tests {
     }
     #[test]
     fn sql_guard_returns_null_not_an_over_bound_payload() {
+        // spec: specs/ont/read.md#R17
         let db = Connection::open_in_memory().unwrap();
         db.execute_batch("CREATE TABLE observations(payload TEXT)")
             .unwrap();

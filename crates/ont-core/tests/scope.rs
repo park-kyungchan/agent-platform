@@ -17,6 +17,8 @@ fn namespace() -> Namespace {
 
 #[test]
 fn exact_legacy_and_program_bytes_and_old_reader_refusal() {
+    // spec: specs/ont/schema-language.md#R4
+    // spec: specs/ont/schema-language.md#R7
     let education = Scope::education(namespace(), "C1", "001").unwrap();
     let program = Scope::program(namespace(), "001").unwrap();
     for (scope, literal) in [(education, EDUCATION), (program, PROGRAM)] {
@@ -47,6 +49,8 @@ fn exact_legacy_and_program_bytes_and_old_reader_refusal() {
 
 #[test]
 fn rejects_duplicate_mixed_unknown_missing_null_and_invalid_fields() {
+    // spec: specs/ont/schema-language.md#R4
+    // spec: specs/ont/schema-language.md#R8
     // Raw JSON is essential: a Value intermediary would erase duplicate keys.
     let ns = r#""namespace":{"instance":"synthetic://same-host","account":"A"}"#;
     let education = r#""class_key":"C1","student_key":"001""#;
@@ -130,6 +134,8 @@ fn rejects_duplicate_mixed_unknown_missing_null_and_invalid_fields() {
 
 #[test]
 fn constructors_validate_without_normalizing_identity() {
+    // spec: specs/ont/schema-language.md#R5
+    // spec: specs/ont/schema-language.md#R6
     assert_eq!(
         Scope::education(namespace(), "", "001"),
         Err(Error::InvalidRequest)
@@ -362,6 +368,8 @@ fn domain_grant_matching_named_omitted_and_wrong_domain() {
 
 #[test]
 fn grants_isolate_account_instance_domain_program_and_derive() {
+    // spec: specs/ont/schema-language.md#R2
+    // spec: specs/ont/schema-language.md#R9
     let scopes = vec![
         Scope::program(namespace(), "001").unwrap(),
         Scope::program(namespace(), "002").unwrap(),

@@ -3068,6 +3068,8 @@ mod tests {
 
     #[test]
     fn present_parameter_fetches_no_metadata_payload_or_scans() {
+        // spec: specs/ont/action.md#R76
+        // spec: specs/ont/action.md#R82
         let mut wire: Value =
             serde_json::from_slice(include_bytes!("../tests/fixtures/action-work.json")).unwrap();
         wire["scope_keys"] = json!(["tenant"]);
@@ -3180,6 +3182,8 @@ mod tests {
 
     #[test]
     fn application_time_utc_boundaries() {
+        // spec: specs/ont/action.md#R52
+        // spec: specs/ont/action.md#R55
         assert_eq!(application_time(0).unwrap(), "1970-01-01T00:00:00Z");
         assert_eq!(
             application_time(951_782_400).unwrap(),
@@ -3194,6 +3198,7 @@ mod tests {
 
     #[test]
     fn planner_refuses_source_owned() {
+        // spec: specs/ont/action.md#R8
         let fixture: &[u8] = include_bytes!("../tests/fixtures/action-work.json");
         let checked = Schema::check_bytes(fixture, &BTreeSet::new()).unwrap();
         let schema = checked.schema().clone();
@@ -3236,6 +3241,7 @@ mod tests {
 
     #[test]
     fn retry_id_length_prefixed() {
+        // spec: specs/ont/action.md#R9
         assert_ne!(
             derive_request_action_id("a:b", None, "rid-1"),
             derive_request_action_id("a", Some("b:"), "rid-1")
@@ -3410,6 +3416,8 @@ mod tests {
 
     #[test]
     fn unresolved_optional_reference_value_skips_and_clear_needs_no_value() {
+        // spec: specs/ont/action.md#R65
+        // spec: specs/ont/action.md#R73
         let id = Id {
             object_type: "item".into(),
             namespace: ont_core::Namespace {

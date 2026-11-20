@@ -212,6 +212,7 @@ fn timed_validate(t: &Fixture, count: usize) {
 
 #[test]
 fn reverse_link_skips_heads_without_a_value() {
+    // spec: specs/ont/action.md#R29
     let mut baseline = None;
     for count in [0, 1000] {
         let t = Fixture::new(false);
@@ -295,6 +296,7 @@ fn search_answers_are_unchanged() {
 
 #[test]
 fn mixed_projection_same_verdicts() {
+    // spec: specs/ont/read.md#R28
     let t = Fixture::new(false);
     t.closed(4);
     t.open_two();
@@ -350,6 +352,7 @@ fn older_pin_value_still_fences() {
 
 #[test]
 fn oversized_head_stays_uncertain() {
+    // spec: specs/ont/read.md#R26
     let t = Fixture::new(false);
     let note = t.create("oversized-open", "me", "a");
     assert_eq!(t.validate("a")["valid"], false);

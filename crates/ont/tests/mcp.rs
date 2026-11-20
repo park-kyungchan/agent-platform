@@ -251,6 +251,9 @@ fn initialize(version: &str) -> Value {
 
 #[test]
 fn initialize_notification_and_ping() {
+    // spec: specs/ont/mcp.md#R5
+    // spec: specs/ont/mcp.md#R6
+    // spec: specs/ont/mcp.md#R16
     let t = Temp::new();
     let mut p = Peer::spawn(&t.store("absent.sqlite"));
     let r = p.request(json!(0), "initialize", initialize("2025-06-18"));
@@ -275,6 +278,8 @@ fn initialize_notification_and_ping() {
 
 #[test]
 fn tools_list_is_constant_small_and_has_eight_tools() {
+    // spec: specs/ont/mcp.md#R8
+    // spec: specs/ont/mcp.md#R15
     let t = Temp::new();
     let mut p = Peer::spawn(&t.store("absent.sqlite"));
     p.send_raw(br#"{"jsonrpc":"2.0","id":7,"method":"tools/list"}"#);
@@ -332,6 +337,10 @@ fn assert_same(
 
 #[test]
 fn each_tool_answers_what_its_subcommand_prints() {
+    // spec: specs/ont/mcp.md#R9
+    // spec: specs/ont/mcp.md#R10
+    // spec: specs/ont/mcp.md#R11
+    // spec: specs/ont/mcp.md#R12
     let t = Temp::new();
     for n in ["alpha", "beta", "gamma"] {
         t.task(n, &format!("# State of {n}\nOwner: lead\n"));
@@ -453,6 +462,8 @@ fn each_tool_answers_what_its_subcommand_prints() {
 
 #[test]
 fn protocol_errors_and_framing() {
+    // spec: specs/ont/mcp.md#R6
+    // spec: specs/ont/mcp.md#R13
     let t = Temp::new();
     let store = install(&t, "s.sqlite");
     let mut p = Peer::spawn(&store);
@@ -521,6 +532,7 @@ fn protocol_errors_and_framing() {
 
 #[test]
 fn a_line_at_the_bound_is_parsed() {
+    // spec: specs/ont/mcp.md#R13
     // Exactly 1,048,576 bytes is accepted (it is valid JSON here).
     let t = Temp::new();
     let mut p = Peer::spawn(&t.store("absent.sqlite"));
@@ -536,6 +548,7 @@ fn a_line_at_the_bound_is_parsed() {
 
 #[test]
 fn a_response_over_the_bound_is_response_too_large() {
+    // spec: specs/ont/mcp.md#R14
     let t = Temp::new();
     for i in 0..1000 {
         t.task(
@@ -566,6 +579,7 @@ fn a_response_over_the_bound_is_response_too_large() {
 
 #[test]
 fn a_store_that_does_not_exist_is_a_tool_result_and_is_not_created() {
+    // spec: specs/ont/mcp.md#R9
     let t = Temp::new();
     let store = t.store("absent.sqlite");
     let mut p = Peer::spawn(&store);
@@ -593,6 +607,8 @@ fn a_store_that_does_not_exist_is_a_tool_result_and_is_not_created() {
 
 #[test]
 fn two_servers_on_one_store_and_the_run_lock() {
+    // spec: specs/ont/index.md#R2
+    // spec: specs/ont/mcp.md#R9
     let t = Temp::new();
     t.task("a", "# a\nOwner: lead\n");
     let store = install(&t, "shared.sqlite");
@@ -629,6 +645,7 @@ fn two_servers_on_one_store_and_the_run_lock() {
 
 #[test]
 fn a_panic_in_one_call_answers_that_call_and_the_server_goes_on() {
+    // spec: specs/ont/mcp.md#R11
     use ont::cli::Op;
     ont::mcp::install_panic_recorder();
     let t = Temp::new();
@@ -679,6 +696,8 @@ fn a_panic_in_one_call_answers_that_call_and_the_server_goes_on() {
 
 #[test]
 fn client_name_uid_and_now_rules() {
+    // spec: specs/ont/mcp.md#R1
+    // spec: specs/ont/mcp.md#R4
     let run = |args: &[&str], uid: u32| {
         let args: Vec<String> = args.iter().map(|s| s.to_string()).collect();
         ont::run(&args, &b""[..], uid, uid)
@@ -730,6 +749,7 @@ fn serve_bytes(input: &[u8]) -> Vec<Value> {
 
 #[test]
 fn framing_edges_eof_blank_null_id_and_bad_utf8() {
+    // spec: specs/ont/mcp.md#R7
     let ping = br#"{"jsonrpc":"2.0","id":1,"method":"ping"}"#;
     // (b) A last line without a newline is answered.
     let r = serve_bytes(ping);
@@ -760,6 +780,8 @@ fn framing_edges_eof_blank_null_id_and_bad_utf8() {
 
 #[test]
 fn an_internal_failure_is_a_tool_result_with_a_located_code() {
+    // spec: specs/ont/mcp.md#R10
+    // spec: specs/ont/mcp.md#R11
     use ont::cli::Op;
     let config = ont::mcp::Config {
         store: "/nonexistent-ont-mcp-test/s.sqlite".into(),
@@ -900,6 +922,8 @@ fn action_config(store: &str, client: &str) -> ont::mcp::Config {
 
 #[test]
 fn action_validate_apply_passthrough_and_refusals_write_nothing() {
+    // spec: specs/ont/action.md#R2
+    // spec: specs/ont/action.md#R13
     let t = Temp::new();
     let store = action_fixture::install(&t);
     let mut server = ont::mcp::Server::new(action_config(&store, "test"), &ont::cli::execute);
@@ -977,6 +1001,7 @@ fn action_validate_apply_passthrough_and_refusals_write_nothing() {
 
 #[test]
 fn cancellation_between_apply_and_retry_yields_two_answers_and_one_log_row() {
+    // spec: specs/ont/mcp.md#R16
     let t = Temp::new();
     let store = action_fixture::install(&t);
     let request = json!({"jsonrpc":"2.0","id":1,"method":"tools/call","params":{
@@ -1008,6 +1033,9 @@ fn cancellation_between_apply_and_retry_yields_two_answers_and_one_log_row() {
 
 #[test]
 fn action_actor_uses_initialize_fallback_and_explicit_client() {
+    // spec: specs/ont/mcp.md#R2
+    // spec: specs/ont/mcp.md#R3
+    // spec: specs/ont/action.md#R12
     // Set the environment only in a child, never mutate the threaded test process.
     if std::env::var_os("ONT_MCP_ACTOR_TEST").is_none() {
         for environment_agent in ["environment-agent", ""] {
@@ -1089,6 +1117,7 @@ fn action_actor_uses_initialize_fallback_and_explicit_client() {
 
 #[test]
 fn every_listed_tool_is_callable_and_unknown_names_are_not_callable() {
+    // spec: specs/ont/mcp.md#R8
     let t = Temp::new();
     let mut server = ont::mcp::Server::new(
         action_config(&t.store("absent"), "test"),
@@ -1117,6 +1146,7 @@ fn every_listed_tool_is_callable_and_unknown_names_are_not_callable() {
 
 #[test]
 fn action_list_parameters_criteria_domain_and_unknown_argument() {
+    // spec: specs/ont/action.md#R75
     let t = Temp::new();
     let store = action_fixture::install(&t);
     let mut peer = Peer::spawn(&store);
@@ -1180,6 +1210,8 @@ fn action_list_parameters_criteria_domain_and_unknown_argument() {
 
 #[test]
 fn peer_cli_optional_client_uses_initialize_and_explicit_client_wins() {
+    // spec: specs/ont/mcp.md#R1
+    // spec: specs/ont/mcp.md#R2
     let t = Temp::new();
     let store = action_fixture::install(&t);
     for (client, expected, request_id) in [
@@ -1217,6 +1249,7 @@ fn peer_cli_optional_client_uses_initialize_and_explicit_client_wins() {
 
 #[test]
 fn missing_initialize_client_name_uses_mcp_context() {
+    // spec: specs/ont/mcp.md#R1
     let t = Temp::new();
     let exec = |_op, _request: &[u8], ctx: &ont::Context| {
         assert_eq!(ctx.client, "mcp");
@@ -1248,6 +1281,7 @@ fn missing_initialize_client_name_uses_mcp_context() {
 
 #[test]
 fn request_id_forms_and_validate_unknown_argument_refuse_without_writing() {
+    // spec: specs/ont/mcp.md#R17
     let t = Temp::new();
     let store = action_fixture::install(&t);
     let mut server = ont::mcp::Server::new(action_config(&store, "test"), &ont::cli::execute);
@@ -1296,6 +1330,8 @@ fn request_id_forms_and_validate_unknown_argument_refuse_without_writing() {
 
 #[test]
 fn invalid_absent_empty_and_reserved_client_names_validate_and_apply_as_mcp() {
+    // spec: specs/ont/mcp.md#R1
+    // spec: specs/ont/mcp.md#R2
     let t = Temp::new();
     let store = action_fixture::install(&t);
     for (i, name) in [
@@ -1349,6 +1385,7 @@ fn invalid_absent_empty_and_reserved_client_names_validate_and_apply_as_mcp() {
 
 #[test]
 fn action_schemas_match_request_and_actor_bounds_and_validate_expected() {
+    // spec: specs/ont/mcp.md#R18
     let list = ont::mcp::tools_list();
     for tool in list["tools"]
         .as_array()
@@ -1386,6 +1423,7 @@ fn action_schemas_match_request_and_actor_bounds_and_validate_expected() {
 
 #[test]
 fn oversized_committed_apply_retains_action_identity_and_outcome() {
+    // spec: specs/ont/mcp.md#R19
     let t = Temp::new();
     let store = t.store("bulk.sqlite");
     let mut schema: Value =

@@ -168,6 +168,10 @@ fn task() -> Value {
 
 #[test]
 fn reference_properties_now_optional_and_descriptions_cli_and_mcp() {
+    // spec: specs/ont/action.md#R45
+    // spec: specs/ont/action.md#R52
+    // spec: specs/ont/action.md#R53
+    // spec: specs/ont/action.md#R74
     for mcp in [false, true] {
         let t = Temp::new();
         t.install(schema());
@@ -235,6 +239,7 @@ fn reference_properties_now_optional_and_descriptions_cli_and_mcp() {
 
 #[test]
 fn rule_only_reference_basis_conflicts_and_criteria_operands_cli_and_mcp() {
+    // spec: specs/ont/action.md#R47
     for mcp in [false, true] {
         let t = Temp::new();
         t.install(schema());
@@ -280,6 +285,9 @@ fn rule_only_reference_basis_conflicts_and_criteria_operands_cli_and_mcp() {
 
 #[test]
 fn optional_presence_create_and_modify_cli_and_mcp() {
+    // spec: specs/ont/action.md#R67
+    // spec: specs/ont/action.md#R64
+    // spec: specs/ont/action.md#R65
     for mcp in [false, true] {
         let t = Temp::new();
         t.install(schema());
@@ -341,6 +349,8 @@ fn optional_presence_create_and_modify_cli_and_mcp() {
 
 #[test]
 fn schema_refuses_unsupported_expressions_and_description_bytes() {
+    // spec: specs/ont/action.md#R46
+    // spec: specs/ont/action.md#R74
     let t = Temp::new();
     for (expression, code) in [
         ("$source.unknown", "unknown_property"),
@@ -401,6 +411,8 @@ fn descriptions_keep_mcp_response_and_tool_list_bounds() {
 
 #[test]
 fn referenced_rule_values_use_original_basis_across_atomic_rules() {
+    // spec: specs/ont/action.md#R45
+    // spec: specs/ont/action.md#R47
     for mcp in [false, true] {
         let t = Temp::new();
         let mut s = schema();
@@ -483,6 +495,7 @@ fn put(t: &Temp, id: Value, keys: &[(&str, &str)], fields: Value, until: u64, re
 
 #[test]
 fn reference_expressions_require_read_in_every_action_grant() {
+    // spec: specs/ont/action.md#R48
     let t = Temp::new();
     let mut s = schema();
     s["grants"][0]["read"]
@@ -513,6 +526,7 @@ fn reference_expressions_require_read_in_every_action_grant() {
 
 #[test]
 fn reference_read_scope_and_unavailable_sources_refuse_identically() {
+    // spec: specs/ont/action.md#R49
     for mcp in [false, true] {
         let t = Temp::new();
         let mut s = schema();
@@ -579,6 +593,7 @@ fn reference_read_scope_and_unavailable_sources_refuse_identically() {
 
 #[test]
 fn stale_source_rule_and_criterion_fail_preconditions_cli_and_mcp() {
+    // spec: specs/ont/action.md#R51
     for mcp in [false, true] {
         let t = Temp::new();
         let mut s = schema();
@@ -663,6 +678,8 @@ fn missing_and_retracted_rule_references_have_distinct_refusal() {
 
 #[test]
 fn absent_rule_inputs_do_not_change_object_revision_or_conflict() {
+    // spec: specs/ont/action.md#R65
+    // spec: specs/ont/action.md#R66
     for mcp in [false, true] {
         let t = Temp::new();
         let mut s = schema();
@@ -725,6 +742,8 @@ fn absent_rule_inputs_do_not_change_object_revision_or_conflict() {
 
 #[test]
 fn optional_required_create_and_incompatible_now_patterns_refuse_schema() {
+    // spec: specs/ont/action.md#R56
+    // spec: specs/ont/action.md#R66
     let t = Temp::new();
     for mode in ["create_object", "create_or_modify_object"] {
         let mut s = schema();
@@ -761,6 +780,8 @@ fn optional_required_create_and_incompatible_now_patterns_refuse_schema() {
 
 #[test]
 fn exists_optional_reference_empty_string_and_reference_array_presence() {
+    // spec: specs/ont/action.md#R78
+    // spec: specs/ont/action.md#R68
     for mcp in [false, true] {
         let t = Temp::new();
         let mut s = schema();
@@ -823,6 +844,7 @@ fn exists_optional_reference_empty_string_and_reference_array_presence() {
 
 #[test]
 fn unavailable_references_are_byte_identical_before_other_refusals() {
+    // spec: specs/ont/action.md#R49
     for mcp in [false, true] {
         let t = Temp::new();
         let mut s = schema();
@@ -932,6 +954,7 @@ fn unavailable_references_are_byte_identical_before_other_refusals() {
 
 #[test]
 fn skipped_modify_and_reference_rules_still_require_live_targets() {
+    // spec: specs/ont/action.md#R88
     for mcp in [false, true] {
         let t = Temp::new();
         let mut s = schema();
@@ -987,6 +1010,7 @@ fn skipped_modify_and_reference_rules_still_require_live_targets() {
 
 #[test]
 fn stale_validation_preserves_independent_criteria_and_basis() {
+    // spec: specs/ont/action.md#R51
     for mcp in [false, true] {
         let t = Temp::new();
         let mut s = schema();
@@ -1065,6 +1089,9 @@ fn clock_schema() -> Value {
 
 #[test]
 fn now_criterion_boundary_and_retry_cli_and_mcp() {
+    // spec: specs/ont/action.md#R53
+    // spec: specs/ont/action.md#R57
+    // spec: specs/ont/action.md#R60
     for mcp in [false, true] {
         for reversed in [false, true] {
             let t = Temp::new();
@@ -1136,6 +1163,7 @@ fn now_criterion_boundary_and_retry_cli_and_mcp() {
 
 #[test]
 fn now_all_comparisons_explicit_properties_and_literals_cli_and_mcp() {
+    // spec: specs/ont/action.md#R57
     let equal = "2026-11-12T00:00:00Z";
     for mcp in [false, true] {
         let t = Temp::new();
@@ -1218,6 +1246,8 @@ fn now_all_comparisons_explicit_properties_and_literals_cli_and_mcp() {
 
 #[test]
 fn now_criterion_rejects_non_strings_and_other_contexts_with_pointers() {
+    // spec: specs/ont/action.md#R58
+    // spec: specs/ont/action.md#R61
     let t = Temp::new();
     for op in ["eq", "ne", "lt", "le", "gt", "ge"] {
         for reversed in [false, true] {
@@ -1281,6 +1311,7 @@ fn now_criterion_rejects_non_strings_and_other_contexts_with_pointers() {
 
 #[test]
 fn now_criterion_library_constructor_uses_injected_clock() {
+    // spec: specs/ont/action.md#R60
     let t = Temp::new();
     t.install(clock_schema());
     let req: ont::action::ValidateActionRequest = serde_json::from_value(
@@ -1301,6 +1332,7 @@ fn now_criterion_library_constructor_uses_injected_clock() {
 
 #[test]
 fn now_refused_throughout_linked_where_with_operand_pointers() {
+    // spec: specs/ont/action.md#R61
     let t = Temp::new();
     let nesting: &[&[&str]] = &[&[], &["all"], &["any"], &["none"], &["all", "any", "none"]];
     for op in ["eq", "ne", "lt", "le", "gt", "ge"] {
@@ -1350,6 +1382,7 @@ fn now_refused_throughout_linked_where_with_operand_pointers() {
 
 #[test]
 fn now_literal_parameter_names_require_dollar_with_message() {
+    // spec: specs/ont/action.md#R59
     let t = Temp::new();
     for op in ["eq", "ne", "lt", "le", "gt", "ge"] {
         for reversed in [false, true] {
@@ -1398,6 +1431,7 @@ fn now_literal_parameter_names_require_dollar_with_message() {
 
 #[test]
 fn now_changed_parameter_retry_refuses_request_id_reused_cli_and_mcp() {
+    // spec: specs/ont/action.md#R11
     for mcp in [false, true] {
         let t = Temp::new();
         t.install(clock_schema());
@@ -1421,6 +1455,7 @@ fn now_changed_parameter_retry_refuses_request_id_reused_cli_and_mcp() {
 
 #[test]
 fn now_criterion_only_any_none_validation_marker_cli_and_mcp() {
+    // spec: specs/ont/action.md#R60
     for mcp in [false, true] {
         let t = Temp::new();
         let mut s = clock_schema();
@@ -1457,6 +1492,8 @@ fn now_criterion_only_any_none_validation_marker_cli_and_mcp() {
 
 #[test]
 fn now_string_order_examples_and_full_utc_parameter_pattern_cli_and_mcp() {
+    // spec: specs/ont/action.md#R62
+    // spec: specs/ont/action.md#R63
     let counterexamples = ["", "2026-11-12", "2026-11-11T23:30:00-02:00"];
     for mcp in [false, true] {
         let t = Temp::new();
@@ -1493,6 +1530,8 @@ fn now_string_order_examples_and_full_utc_parameter_pattern_cli_and_mcp() {
 
 #[test]
 fn ordered_all_guards_optional_and_stale_operands_cli_and_mcp() {
+    // spec: specs/ont/action.md#R50
+    // spec: specs/ont/action.md#R71
     for mcp in [false, true] {
         let t = Temp::new();
         let mut s = schema();
@@ -1616,6 +1655,9 @@ fn ordered_all_guards_optional_and_stale_operands_cli_and_mcp() {
 
 #[test]
 fn criterion_and_modify_reads_hide_unreadable_heads_cli_and_mcp() {
+    // spec: specs/ont/action.md#R78
+    // spec: specs/ont/action.md#R69
+    // spec: specs/ont/action.md#R89
     for mcp in [false, true] {
         for action in [
             "read_exists",
@@ -1756,6 +1798,8 @@ fn scoped_action_schema() -> Value {
 
 #[test]
 fn remaining_action_reads_admit_before_values_or_mutation_cli_and_mcp() {
+    // spec: specs/ont/action.md#R69
+    // spec: specs/ont/action.md#R89
     for mcp in [false, true] {
         for action in [
             "bare_title",
@@ -1913,6 +1957,7 @@ fn remaining_action_reads_admit_before_values_or_mutation_cli_and_mcp() {
 
 #[test]
 fn stale_values_precede_expected_revision_mismatches_cli_and_mcp() {
+    // spec: specs/ont/action.md#R90
     for mcp in [false, true] {
         let t = Temp::new();
         let mut s = schema();
@@ -1965,6 +2010,8 @@ fn stale_values_precede_expected_revision_mismatches_cli_and_mcp() {
 
 #[test]
 fn decisive_any_none_still_evaluate_unevaluable_operands_cli_and_mcp() {
+    // spec: specs/ont/action.md#R72
+    // spec: specs/ont/action.md#R85
     for mcp in [false, true] {
         let t = Temp::new();
         let mut s = schema();
@@ -2013,6 +2060,7 @@ fn decisive_any_none_still_evaluate_unevaluable_operands_cli_and_mcp() {
 
 #[test]
 fn linked_where_all_guards_unevaluable_candidate_property_cli_and_mcp() {
+    // spec: specs/ont/action.md#R84
     for mcp in [false, true] {
         let t = Temp::new();
         let mut s = schema();
@@ -2056,6 +2104,7 @@ fn linked_where_all_guards_unevaluable_candidate_property_cli_and_mcp() {
 
 #[test]
 fn skipped_reverse_link_scans_still_count_toward_snapshot_bound() {
+    // spec: specs/ont/action.md#R31
     let t = Temp::new();
     let mut s = schema();
     s["action_types"]["scan_guard"] = json!({
@@ -2120,6 +2169,9 @@ fn skipped_reverse_link_scans_still_count_toward_snapshot_bound() {
 // Each pair has the same request bytes. Only the synthetic store differs.
 #[test]
 fn snapshot_admission_parity_at_default_and_minimal_bounds_cli_and_mcp() {
+    // spec: specs/ont/action.md#R30
+    // spec: specs/ont/action.md#R31
+    // spec: specs/ont/action.md#R88
     for mcp in [false, true] {
         for case in [
             "present_parameter",
@@ -2307,6 +2359,7 @@ fn snapshot_admission_parity_at_default_and_minimal_bounds_cli_and_mcp() {
 
 #[test]
 fn unreadable_creation_occupancy_exception_survives_minimal_bound_cli_and_mcp() {
+    // spec: specs/ont/action.md#R70
     for mcp in [false, true] {
         for op in ["validate", "apply"] {
             for create_only in [false, true] {
@@ -2362,6 +2415,9 @@ fn unreadable_creation_occupancy_exception_survives_minimal_bound_cli_and_mcp() 
 
 #[test]
 fn present_parameter_presence_and_discovery_cli_and_mcp() {
+    // spec: specs/ont/action.md#R76
+    // spec: specs/ont/action.md#R80
+    // spec: specs/ont/action.md#R82
     for mcp in [false, true] {
         for required in [false, true] {
             let t = Temp::new();
@@ -2465,6 +2521,8 @@ fn present_parameter_presence_and_discovery_cli_and_mcp() {
 
 #[test]
 fn present_predecessor_self_reference_validate_apply_cli_and_mcp() {
+    // spec: specs/ont/action.md#R71
+    // spec: specs/ont/action.md#R81
     for mcp in [false, true] {
         for state in ["omitted", "new_self", "existing_self", "another"] {
             let t = Temp::new();
@@ -2525,6 +2583,8 @@ fn present_predecessor_self_reference_validate_apply_cli_and_mcp() {
 
 #[test]
 fn present_property_value_states_and_ordered_guard_cli_and_mcp() {
+    // spec: specs/ont/action.md#R77
+    // spec: specs/ont/action.md#R71
     use ont_core::{Change, Knowledge};
     for mcp in [false, true] {
         for state in [
@@ -2643,6 +2703,8 @@ fn present_property_value_states_and_ordered_guard_cli_and_mcp() {
 
 #[test]
 fn present_schema_operands_and_unsupported_positions_are_located_invalid_rule() {
+    // spec: specs/ont/action.md#R80
+    // spec: specs/ont/action.md#R81
     let t = Temp::new();
     for operand in [
         json!("$missing"),
@@ -2689,6 +2751,8 @@ fn present_schema_operands_and_unsupported_positions_are_located_invalid_rule() 
 
 #[test]
 fn present_nested_groups_and_linked_where_cli_and_mcp() {
+    // spec: specs/ont/action.md#R6
+    // spec: specs/ont/action.md#R81
     for mcp in [false, true] {
         for outer in ["all", "any", "none"] {
             for inner in ["all", "any", "none"] {
@@ -2820,6 +2884,7 @@ fn pointer_key_schema() -> Value {
 
 #[test]
 fn pointer_create_key_ignores_other_parameter_name() {
+    // spec: specs/ont/action.md#R35
     for kind in ["create_object", "create_or_modify_object"] {
         for other_name in ["a_other", "zz_other"] {
             let t = Temp::new();
@@ -2855,6 +2920,8 @@ fn pointer_create_key_ignores_other_parameter_name() {
 
 #[test]
 fn pointer_create_key_schema_refuses_undetermined_parameter() {
+    // spec: specs/ont/action.md#R33
+    // spec: specs/ont/action.md#R37
     for mode in ["two", "none", "optional_only"] {
         let t = Temp::new();
         let mut s = pointer_key_schema();
@@ -2908,6 +2975,10 @@ fn replace_installed_schema(t: &Temp, s: &Value) {
 
 #[test]
 fn installed_ambiguous_key_preserves_store_and_allows_repair() {
+    // spec: specs/ont/action.md#R40
+    // spec: specs/ont/action.md#R41
+    // spec: specs/ont/action.md#R42
+    // spec: specs/ont/action.md#R43
     let t = Temp::new();
     let mut s = pointer_key_schema();
     s["action_types"]["write_record"]["parameters"]["a_spec"] =

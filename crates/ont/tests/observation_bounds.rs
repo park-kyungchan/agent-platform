@@ -112,6 +112,10 @@ fn pad(obs: &mut Observation, bytes: usize) {
 }
 #[test]
 fn ingest_exact_byte_bound_and_batch_rollback() {
+    // spec: specs/ont/read.md#R10
+    // spec: specs/ont/read.md#R12
+    // spec: specs/ont/read.md#R13
+    // spec: specs/ont/read.md#R25
     let t = Temp::new();
     let mut exact = row("exact", "");
     pad(&mut exact.observation, BYTES);
@@ -142,6 +146,8 @@ fn ingest_exact_byte_bound_and_batch_rollback() {
 }
 #[test]
 fn index_exact_byte_bound_and_source_rollback() {
+    // spec: specs/ont/read.md#R12
+    // spec: specs/ont/read.md#R14
     for extra in [0, 1] {
         let t = Temp::new();
         let mut obs = row("probe", "").observation;
@@ -178,6 +184,8 @@ fn index_exact_byte_bound_and_source_rollback() {
 }
 #[test]
 fn action_exact_byte_bound_and_all_edits_rollback() {
+    // spec: specs/ont/read.md#R12
+    // spec: specs/ont/read.md#R14
     let probe = Temp::new();
     let request = |text: String| json!({"action_type":"write","request_id":"fixed","parameters":{"text":text}});
     let applied = probe.cli("action apply", request(String::new()));
@@ -220,6 +228,8 @@ fn action_exact_byte_bound_and_all_edits_rollback() {
 }
 #[test]
 fn array_bound_includes_nested_values() {
+    // spec: specs/ont/read.md#R10
+    // spec: specs/ont/read.md#R13
     let mut item = row("arrays", "");
     item.observation
         .fields
@@ -250,6 +260,9 @@ fn array_bound_includes_nested_values() {
 }
 #[test]
 fn legacy_byte_array_and_utf8_poison_excluded_by_set_reads_get_refuses() {
+    // spec: specs/ont/read.md#R87
+    // spec: specs/ont/read.md#R18
+    // spec: specs/ont/read.md#R24
     for kind in ["bytes", "array", "nested", "utf8"] {
         let t = Temp::new();
         t.put(&[row("bad", ""), row("good", "ok")]);
@@ -327,6 +340,8 @@ fn legacy_byte_array_and_utf8_poison_excluded_by_set_reads_get_refuses() {
 }
 #[test]
 fn get_150_observations_returns_latest_100_and_omitted_50() {
+    // spec: specs/ont/read.md#R11
+    // spec: specs/ont/read.md#R22
     let t = Temp::new();
     let mut item = row("history", "ok");
     let mut rows = vec![item.clone()];
@@ -394,6 +409,7 @@ fn get_150_observations_returns_latest_100_and_omitted_50() {
 
 #[test]
 fn repeated_links_count_one_oversized_head_once() {
+    // spec: specs/ont/read.md#R18
     let t = Temp::new();
     let mut root = row("root", "root");
     root.observation.fields.insert(
@@ -415,6 +431,9 @@ fn repeated_links_count_one_oversized_head_once() {
 
 #[test]
 fn get_excludes_superseded_oversized_observation() {
+    // spec: specs/ont/read.md#R22
+    // spec: specs/ont/read.md#R23
+    // spec: specs/ont/read.md#R24
     let t = Temp::new();
     t.put(&[row("history", "old")]);
     t.legacy("history", &"!".repeat(BYTES + 1));
@@ -445,6 +464,7 @@ fn get_excludes_superseded_oversized_observation() {
 
 #[test]
 fn render_refuses_oversized_legacy_heads_instead_of_omitting_rows() {
+    // spec: specs/ont/read.md#R20
     for count in [1, 1001] {
         let t = Temp::new();
         let mut rows: Vec<_> = (0..count).map(|i| row(&format!("a{i:04}"), "ok")).collect();
@@ -460,6 +480,7 @@ fn render_refuses_oversized_legacy_heads_instead_of_omitting_rows() {
 
 #[test]
 fn array_bound_is_per_array_not_total_items() {
+    // spec: specs/ont/read.md#R10
     let mut observation = row("two-arrays", "").observation;
     observation.fields.insert(
         "values".into(),
@@ -472,6 +493,8 @@ fn array_bound_is_per_array_not_total_items() {
 
 #[test]
 fn hidden_oversized_head_changes_no_set_read_answer_or_counter() {
+    // spec: specs/ont/read.md#R18
+    // spec: specs/ont/read.md#R19
     let mut t = Temp::new();
     t.schema["version"] = json!(2);
     // This fixture needs only Ontology-owned types; file-source schemas have
@@ -533,10 +556,13 @@ fn hidden_oversized_head_changes_no_set_read_answer_or_counter() {
 
 #[test]
 fn legacy_projection_semantics_upgrade_excludes_oversized_heads() {
+    // spec: specs/ont/read.md#R26
     assert_old_projection_upgrade(true);
 }
 #[test]
 fn old_engine_checkpoint_reopen_excludes_oversized_heads() {
+    // spec: specs/ont/read.md#R26
+    // spec: specs/ont/read.md#R54
     assert_old_projection_upgrade(false);
 }
 fn assert_old_projection_upgrade(remove_version_marker: bool) {

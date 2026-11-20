@@ -3,6 +3,9 @@ use super::*;
 
 #[test]
 fn format_barrier_restore_and_two_openers() {
+    // spec: specs/ont/read.md#R45
+    // spec: specs/ont/read.md#R46
+    // spec: specs/ont/read.md#R62
     let dir = std::env::temp_dir().join(format!("ont-format4-{}", std::process::id()));
     std::fs::create_dir(&dir).unwrap();
     let path = dir.join("store.sqlite");
@@ -37,6 +40,9 @@ fn format_barrier_restore_and_two_openers() {
 
 #[test]
 fn visible_keyset_work_is_bounded_with_hidden_and_retracted_heads() {
+    // spec: specs/ont/read.md#R35
+    // spec: specs/ont/read.md#R39
+    // spec: specs/ont/read.md#R42
     let mut counts = Vec::new();
     for hidden in [512, 1024, 2048] {
         let mut store = Store::memory_schema().unwrap();
@@ -159,6 +165,8 @@ fn visible_keyset_work_is_bounded_with_hidden_and_retracted_heads() {
 
 #[test]
 fn candidate_access_read_write_parity() {
+    // spec: specs/ont/read.md#R35
+    // spec: specs/ont/read.md#R36
     let mut store = Store::memory_schema().unwrap();
     let schema = include_bytes!("../../ont/tests/fixtures/action-work.json");
     store
@@ -271,6 +279,7 @@ fn expiry_fixture() -> (Store, Vec<HeadAccess>) {
 
 #[test]
 fn never_stale_head_has_no_stale_postings() {
+    // spec: specs/ont/read.md#R37
     let (store, heads) = expiry_fixture();
     for head in heads {
         let count: u64 = store
@@ -296,6 +305,7 @@ fn never_stale_head_has_no_stale_postings() {
 
 #[test]
 fn candidates_equal_on_old_new_and_mixed_postings() {
+    // spec: specs/ont/read.md#R28
     let (store, heads) = expiry_fixture();
     store
         .connection
@@ -374,6 +384,7 @@ fn candidates_equal_on_old_new_and_mixed_postings() {
 
 #[test]
 fn clock_above_never_stale_is_refused() {
+    // spec: specs/ont/read.md#R38
     let (mut store, heads) = expiry_fixture();
     for now in [crate::NEVER_STALE + 1, u64::MAX] {
         assert_eq!(
@@ -411,6 +422,7 @@ fn clock_above_never_stale_is_refused() {
 
 #[test]
 fn postings_tell_no_value_from_unposted_value() {
+    // spec: specs/ont/read.md#R39
     let (mut store, heads) = expiry_fixture();
     let head = head_in(&store.connection, &heads[0].id).unwrap().unwrap();
     let bytes: Vec<u8> = store
@@ -489,6 +501,7 @@ fn postings_tell_no_value_from_unposted_value() {
 
 #[test]
 fn readers_see_the_same_candidates() {
+    // spec: specs/ont/read.md#R4
     let (store, heads) = expiry_fixture();
     // Reconstruct the old writer's rows, record its answers, then rebuild.
     store

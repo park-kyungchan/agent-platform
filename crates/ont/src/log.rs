@@ -567,6 +567,8 @@ mod tests {
     // The table scan stops at its bound (`specs/ont/log.md` "Reading the action log").
     #[test]
     fn the_table_scan_stops_at_its_bound() {
+        // spec: specs/ont/log.md#R8
+        // spec: specs/ont/log.md#R9
         let nonce = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap()
@@ -636,6 +638,7 @@ mod tests {
 
     #[test]
     fn continuations_name_their_outcome() {
+        // spec: specs/ont/log.md#R12
         assert_eq!(
             decode_continuation(&encode_continuation(true, 42), true).ok(),
             Some(42)

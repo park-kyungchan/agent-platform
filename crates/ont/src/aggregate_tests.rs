@@ -92,6 +92,10 @@ impl AroundSource for Probe<'_, '_> {
 }
 #[test]
 fn example_zero_buckets_two_keys_and_unresolved() {
+    // spec: specs/ont/read.md#R80
+    // spec: specs/ont/read.md#R82
+    // spec: specs/ont/read.md#R86
+    // spec: specs/ont/read.md#R91
     let mut s = schema();
     s["object_types"]["node"]["properties"]["name"]["type"] = json!({"value_type":"status"});
     let mut store = memory(&s);
@@ -122,6 +126,8 @@ fn example_zero_buckets_two_keys_and_unresolved() {
 }
 #[test]
 fn hidden_poison_parity_and_preflight_reads_no_heads() {
+    // spec: specs/ont/read.md#R83
+    // spec: specs/ont/read.md#R84
     let mut outputs = vec![];
     for hidden in [false, true] {
         let mut store = memory(&schema());
@@ -193,6 +199,7 @@ fn hidden_poison_parity_and_preflight_reads_no_heads() {
 }
 #[test]
 fn historical_enum_reference_and_value_type_upgrades() {
+    // spec: specs/ont/read.md#R90
     for (property, ty) in [
         ("status", json!({"value_type":"status"})),
         ("link", json!({"ref":"other"})),
@@ -227,6 +234,8 @@ fn historical_enum_reference_and_value_type_upgrades() {
 }
 #[test]
 fn keys_metrics_value_bytes_and_bucket_bounds() {
+    // spec: specs/ont/read.md#R8
+    // spec: specs/ont/read.md#R85
     let mut store = memory(&schema());
     assert_eq!(
         answer(&mut store, &request(&["status", "name"]))["status"],
@@ -281,6 +290,8 @@ fn keys_metrics_value_bytes_and_bucket_bounds() {
 }
 #[test]
 fn admitted_scan_and_dynamic_bucket_limits_before_payload_or_growth() {
+    // spec: specs/ont/read.md#R8
+    // spec: specs/ont/read.md#R85
     let mut store = memory(&schema());
     store
         .write(10, |tx| {
@@ -318,6 +329,8 @@ fn admitted_scan_and_dynamic_bucket_limits_before_payload_or_growth() {
 
 #[test]
 fn filter_membership_equals_search_and_historical_filter_is_excluded() {
+    // spec: specs/ont/read.md#R88
+    // spec: specs/ont/read.md#R89
     let root = std::env::temp_dir();
     let path = root.join(format!("r1-filter-{}.sqlite", std::process::id()));
     let mut store = Store::open_schema(&path).unwrap();
@@ -373,6 +386,16 @@ fn filter_membership_equals_search_and_historical_filter_is_excluded() {
 }
 #[test]
 fn declared_types_and_stored_group_bytes_are_bounded_end_to_end() {
+    // spec: specs/ont/read.md#R90
+    // spec: specs/ont/read.md#R92
+    // spec: specs/ont/read.md#R94
+    // spec: specs/ont/read.md#R95
+    // spec: specs/ont/read.md#R96
+    // spec: specs/ont/read.md#R97
+    // spec: specs/ont/read.md#R98
+    // spec: specs/ont/read.md#R99
+    // spec: specs/ont/read.md#R100
+    // spec: specs/ont/read.md#R101
     for (ty, max, ok) in [
         (json!("boolean"), None, true),
         (json!("integer"), None, true),
@@ -437,6 +460,9 @@ fn declared_types_and_stored_group_bytes_are_bounded_end_to_end() {
 }
 #[test]
 fn enum_product_precedes_expansion_order_and_key_identity_are_stable() {
+    // spec: specs/ont/read.md#R86
+    // spec: specs/ont/read.md#R102
+    // spec: specs/ont/read.md#R103
     let mut s = schema();
     let values: Vec<_> = (0..1000).map(|i| i.to_string()).collect();
     s["value_types"]["status"]["enum"] = json!(values);

@@ -159,6 +159,7 @@ fn check_example_and_two_violations() {
 
 #[test]
 fn install_describe_get_and_backup_flow() {
+    // spec: specs/ont/store.md#R1
     let t = Temp::new();
     let (code, ans) = install_example(&t);
     assert_eq!(code, 0, "{ans}");
@@ -381,6 +382,7 @@ fn describe_lists_only_what_one_grant_view_admits() {
 
 #[test]
 fn only_install_creates_or_initialises_a_store() {
+    // spec: specs/ont/store.md#R29
     let t = Temp::new();
     let file = t.file("example.json", EXAMPLE);
     let empty = t.0.join("empty.sqlite");
@@ -530,6 +532,7 @@ fn refusal_codes() {
 
 #[test]
 fn uid_and_version_contracts() {
+    // spec: specs/ont/schema-language.md#R24
     assert_eq!(ont::check_uid(0, 0), Ok(()));
     assert_eq!(ont::check_uid(1000, 1000), Err("principal_not_trusted"));
     assert_eq!(ont::check_uid(0, 1000), Err("principal_not_trusted"));
@@ -739,6 +742,9 @@ fn commit_install_args<'a>(
 
 #[test]
 fn commit_install_installs_and_describe_shows_provenance() {
+    // spec: specs/ont/schema-language.md#R11
+    // spec: specs/ont/schema-language.md#R13
+    // spec: specs/ont/schema-language.md#R19
     let t = Temp::new();
     let (repo, commit) = setup_git(&t);
     let store = t.store();
@@ -770,6 +776,7 @@ fn commit_install_installs_and_describe_shows_provenance() {
 
 #[test]
 fn commit_install_refusals_write_nothing() {
+    // spec: specs/ont/schema-language.md#R12
     let t = Temp::new();
     let (repo, commit) = setup_git(&t);
     let store = t.store();
@@ -827,6 +834,8 @@ fn commit_install_refusals_write_nothing() {
 
 #[test]
 fn file_install_on_default_store_path_is_refused_by_the_decision() {
+    // spec: specs/ont/store.md#R9
+    // spec: specs/ont/schema-language.md#R16
     assert_eq!(
         ont::DEFAULT_STORE,
         "/var/lib/ontology-platform/ont/ontology.sqlite"
@@ -864,6 +873,7 @@ fn schema_check_against_an_existing_store_reports_what_it_checked() {
 
 #[test]
 fn existing_store_commit_refusals_leave_no_backup_or_rows() {
+    // spec: specs/ont/schema-language.md#R12
     let t = Temp::new();
     assert_eq!(install_example(&t).0, 0);
     let (repo, first) = setup_git(&t);
@@ -915,6 +925,7 @@ fn existing_store_commit_refusals_leave_no_backup_or_rows() {
 
 #[test]
 fn commit_oversize_refuses_without_a_store() {
+    // spec: specs/ont/schema-language.md#R12
     let t = Temp::new();
     let (repo, _) = setup_git(&t);
     let path = std::path::Path::new(&repo);
@@ -937,6 +948,7 @@ fn commit_oversize_refuses_without_a_store() {
 
 #[test]
 fn empty_stdin_defaults_optional_requests_and_names_required_fields() {
+    // spec: specs/ont/store.md#R3
     let t = Temp::new();
     assert_eq!(install_example(&t).0, 0);
     for bytes in [&b""[..], &b" \t\r\n"[..]] {
@@ -967,6 +979,7 @@ fn empty_stdin_defaults_optional_requests_and_names_required_fields() {
 
 #[test]
 fn file_install_refuses_dangling_and_existing_store_links() {
+    // spec: specs/ont/store.md#R6
     let t = Temp::new();
     let file = t.file("example.json", EXAMPLE);
     let target = t.0.join("target.sqlite");
@@ -1092,6 +1105,9 @@ fn git_reads_committed_bytes_despite_every_local_environment_override() {
 
 #[test]
 fn provenance_records_only_certain_remotes_or_checkout_fallback() {
+    // spec: specs/ont/store.md#R10
+    // spec: specs/ont/store.md#R13
+    // spec: specs/ont/schema-language.md#R13
     let t = Temp::new();
     let (repo, commit) = setup_git(&t);
     for (remote, expected) in [
@@ -1126,6 +1142,7 @@ fn provenance_records_only_certain_remotes_or_checkout_fallback() {
 
 #[test]
 fn commit_install_refuses_dangling_and_existing_store_links() {
+    // spec: specs/ont/store.md#R6
     let t = Temp::new();
     let (repo, commit) = setup_git(&t);
     let target = t.0.join("target.sqlite");
@@ -1179,6 +1196,8 @@ fn commit_install_refuses_dangling_and_existing_store_links() {
 
 #[test]
 fn scp_provenance_strips_certain_userinfo_and_falls_back_on_password_shape() {
+    // spec: specs/ont/store.md#R12
+    // spec: specs/ont/schema-language.md#R13
     let t = Temp::new();
     let (repo, commit) = setup_git(&t);
     for (remote, expected) in [
@@ -1204,6 +1223,8 @@ fn scp_provenance_strips_certain_userinfo_and_falls_back_on_password_shape() {
 
 #[test]
 fn store_open_refuses_linked_parents_and_adjacent_files() {
+    // spec: specs/ont/store.md#R6
+    // spec: specs/ont/action.md#R90
     for existing in [false, true] {
         for entry in [
             "parent",
@@ -1315,6 +1336,8 @@ fn store_open_refuses_linked_parents_and_adjacent_files() {
 
 #[test]
 fn store_parent_guard_checks_two_levels_but_allows_host_alias_above_them() {
+    // spec: specs/ont/store.md#R6
+    // spec: specs/ont/store.md#R7
     for existing in [false, true] {
         for level in [1, 2, 3] {
             let t = Temp::new();

@@ -3,6 +3,9 @@ use super::*;
 
 #[test]
 fn preopened_old_statements_cannot_hide_mutations_and_repair_is_atomic() {
+    // spec: specs/ont/read.md#R55
+    // spec: specs/ont/read.md#R59
+    // spec: specs/ont/read.md#R61
     let dir = std::env::temp_dir().join(format!("ont-old-generation-{}", std::process::id()));
     std::fs::create_dir(&dir).unwrap();
     let path = dir.join("store.sqlite");
@@ -177,6 +180,7 @@ fn preopened_old_statements_cannot_hide_mutations_and_repair_is_atomic() {
 
 #[test]
 fn native_write_and_read_stay_current_without_rebuilding() {
+    // spec: specs/ont/read.md#R56
     let dir = std::env::temp_dir().join(format!("ont-native-generation-{}", std::process::id()));
     std::fs::create_dir(&dir).unwrap();
     let path = dir.join("store.sqlite");
@@ -260,6 +264,7 @@ fn projection_snapshot(c: &Connection) -> String {
 }
 #[test]
 fn current_projection_open_does_not_rebuild() {
+    // spec: specs/ont/read.md#R48
     let f = SemanticsFixture::new("current");
     super::super::PAYLOAD_COPIES.set(0);
     INTERRUPT_REBUILD.set(true);
@@ -307,6 +312,7 @@ fn current_projection_open_does_not_rebuild() {
 }
 #[test]
 fn semantics_rebuild_failure_preserves_projection_and_version() {
+    // spec: specs/ont/read.md#R60
     for absent in [true, false] {
         let f = SemanticsFixture::new(if absent { "absent" } else { "different" });
         let old = Connection::open(&f.path).unwrap();
@@ -369,6 +375,7 @@ fn semantics_rebuild_failure_preserves_projection_and_version() {
 
 #[test]
 fn old_engine_checkpoint_stales_preopened_reader() {
+    // spec: specs/ont/read.md#R54
     let f = SemanticsFixture::new("old-checkpoint-reader");
     let mut reader = Store::open_schema_existing(&f.path).unwrap();
     let head = reader.scan_heads("record", 1, None).unwrap().remove(0);
