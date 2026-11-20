@@ -2436,14 +2436,15 @@ fn r18_two_repairs_inside_one_call_and_the_third_is_the_limit() {
 #[test]
 fn r19_a_report_without_the_form_abandons_the_review() {
     let mut f = F::new();
-    f.steps(&["implement", "noform", "accept"]);
+    // The verifier answers without the form, and again when `ap run` asks it again once.
+    f.steps(&["implement", "noform", "noform", "accept"]);
     f.stopped("verifier_failed");
     assert_eq!(f.packets()[0].1["verdict"], "abandoned");
     f.set_unit(json!({"state": "stopped"}));
     let (a, _) = f.ok();
     assert_eq!(a["state"], "merged");
-    // The abandoned review's session is not asked again.
-    assert!(f.launch(3).0.contains("--session-id"));
+    // The abandoned review's session is not asked again: launch 4 is a new session.
+    assert!(f.launch(4).0.contains("--session-id"));
     let start = f.bodies("start_unit_review");
     let p = &start[1]["parameters"];
     assert_eq!(
