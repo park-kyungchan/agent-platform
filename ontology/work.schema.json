@@ -1,7 +1,7 @@
 {
   "format": "ontology-schema/v1",
   "domain": "work",
-  "version": 12,
+  "version": 13,
   "namespace": {
     "instance": "vps://palantirkc",
     "account": "root"
@@ -101,6 +101,7 @@
     "request_status": {"base": "string", "enum": ["current", "superseded"]},
     "request_route": {"base": "string", "enum": ["unrouted", "intent", "aside", "unit", "finding"]},
     "intent_status": {"base": "string", "enum": ["draft", "assumed", "confirmed", "met", "retired"]},
+    "principle_status": {"base": "string", "enum": ["current", "retired"]},
     "criterion_state": {"base": "string", "enum": ["open", "pass", "fail", "waived"]},
     "unit_lane": {"base": "string", "enum": ["small", "objective"]},
     "unit_class": {"base": "string", "enum": ["plain", "contract", "effect"]},
@@ -1159,7 +1160,24 @@
         "directory": {"type": "string", "required": false, "max_bytes": 300, "description": "The task directory of the work for this intent."},
         "notes": {"type": "string", "required": false, "max_bytes": 4000, "description": "The Lead's free text for the next Lead: the state, the next step, where things are. Replaced whole by note_intent."},
         "closed_at": {"type": {"value_type": "utc_time"}, "required": false, "description": "When the intent was closed met or retired."},
-        "closed_reason": {"type": "string", "required": false, "max_bytes": 600, "description": "Why it was closed: how the outcome was shown, or why it was retired."}
+        "closed_reason": {"type": "string", "required": false, "max_bytes": 600, "description": "Why it was closed: how the outcome was shown, or why it was retired."},
+        "principles": {"type": {"array": {"ref": "principle"}}, "required": false, "description": "The principles the intent obeys; set whole by set_intent_principles."}
+      }
+    },
+    "principle": {
+      "description": "A want of the user that outlives one intent: a pillar, or a want under one. Record it from the requests that state it; an intent names the principles it obeys.",
+      "owner": "ontology",
+      "primary_key": {"from": "/native_key"},
+      "properties": {
+        "order_key": {"type": "string", "required": true, "max_bytes": 40, "description": "The place in the hierarchy: two-digit segments joined by a dot, such as 01 for a pillar and 01.02 for a want under it. The engine orders it as a string and does not check the form."},
+        "statement": {"type": "string", "required": true, "max_bytes": 1000, "description": "The want, in the user's sense."},
+        "parent": {"type": {"ref": "principle"}, "required": false, "description": "The pillar or want this one is under; none for a pillar."},
+        "requests": {"type": {"array": {"ref": "request"}}, "required": true, "description": "The requests that state it."},
+        "status": {"type": {"value_type": "principle_status"}, "required": true, "description": "current, or retired when the user no longer wants it."},
+        "recorded_at": {"type": {"value_type": "utc_time"}, "required": true, "description": "Time of record_principle."},
+        "amended_at": {"type": {"value_type": "utc_time"}, "required": true, "description": "Time of record_principle or of the last amend_principle."},
+        "retired_at": {"type": {"value_type": "utc_time"}, "required": false, "description": "When the principle was retired."},
+        "retired_reason": {"type": "string", "required": false, "max_bytes": 600, "description": "Why it was retired."}
       }
     },
     "criterion": {
@@ -1486,7 +1504,10 @@
     "hold_unit": {"from": "hold", "via": "unit", "to": "unit", "cardinality": "many_to_one", "names": {"forward": "hold_unit", "reverse": "unit_holds"}},
     "hold_intent": {"from": "hold", "via": "intent", "to": "intent", "cardinality": "many_to_one", "names": {"forward": "hold_intent", "reverse": "intent_holds"}},
     "request_unit": {"from": "request", "via": "unit", "to": "unit", "cardinality": "many_to_one", "names": {"forward": "request_unit", "reverse": "unit_requests"}},
-    "request_finding": {"from": "request", "via": "finding", "to": "finding", "cardinality": "many_to_one", "names": {"forward": "request_finding", "reverse": "finding_requests"}}
+    "request_finding": {"from": "request", "via": "finding", "to": "finding", "cardinality": "many_to_one", "names": {"forward": "request_finding", "reverse": "finding_requests"}},
+    "principle_parent": {"from": "principle", "via": "parent", "to": "principle", "cardinality": "many_to_one", "names": {"forward": "principle_parent", "reverse": "principle_children"}},
+    "principle_requests": {"from": "principle", "via": "requests", "to": "request", "cardinality": "many_to_many", "names": {"forward": "principle_requests", "reverse": "request_principles"}},
+    "intent_principles": {"from": "intent", "via": "principles", "to": "principle", "cardinality": "many_to_many", "names": {"forward": "intent_principles", "reverse": "principle_intents"}}
   },
   "action_types": {
     "set_hold": {
@@ -4031,6 +4052,70 @@
         {"clear_reference": {"object_type": "request", "property": "intent"}},
         {"clear_reference": {"object_type": "request", "property": "unit"}}
       ]
+    },
+    "record_principle": {
+      "description": "Record a principle: a want of the user that outlives one intent, under its parent, with the requests that state it. The key is the native key of the parameter principle (lower-case letters, digits and -, at most 60 bytes); a used key is refused by the engine (revision_conflict).",
+      "parameters": {
+        "principle": {"type": {"ref": "principle"}, "required": true, "description": "The new principle: an Id of type principle whose native_key is the new key."},
+        "order_key": {"type": "string", "required": true, "max_bytes": 40, "description": "Its place: two-digit segments joined by a dot, such as 01 or 01.02."},
+        "statement": {"type": "string", "required": true, "max_bytes": 1000, "description": "The want, in the user's sense."},
+        "requests": {"type": {"array": {"ref": "request"}}, "required": true, "description": "The requests that state it."},
+        "parent": {"type": {"ref": "principle"}, "required": false, "description": "The current principle it is under; leave out for a pillar."}
+      },
+      "submission_criteria": [
+        {"code": "statement_empty", "message": "State the want.", "all": [{"ne": ["$statement", ""]}]},
+        {"code": "order_key_empty", "message": "Give the order key.", "all": [{"ne": ["$order_key", ""]}]},
+        {"code": "parent_not_current", "message": "Name a parent principle that exists and is current, or leave the parent out.", "all": [{"none": [{"all": [{"present": "$parent"}, {"none": [{"all": [{"exists": "$parent"}, {"eq": ["$parent.status", "current"]}]}]}]}]}]},
+        {"code": "requests_empty", "message": "Name the requests that state the principle.", "all": [{"ne": ["$requests", []]}]}
+      ],
+      "rules": [
+        {"create_object": "principle", "set": {"order_key": "$order_key", "statement": "$statement", "parent": "$parent", "requests": "$requests", "status": "current", "recorded_at": "$now", "amended_at": "$now"}}
+      ]
+    },
+    "amend_principle": {
+      "description": "Amend a current principle: the members given replace their values; the parent cannot be cleared.",
+      "parameters": {
+        "principle": {"type": {"ref": "principle"}, "required": true, "description": "The principle: its full Id, with the principle's key as native_key."},
+        "order_key": {"type": "string", "required": false, "max_bytes": 40, "description": "Its place: two-digit segments joined by a dot, such as 01 or 01.02."},
+        "statement": {"type": "string", "required": false, "max_bytes": 1000, "description": "The want, in the user's sense."},
+        "requests": {"type": {"array": {"ref": "request"}}, "required": false, "description": "The requests that state it, given whole; replaces the list."},
+        "parent": {"type": {"ref": "principle"}, "required": false, "description": "The current principle it is under."}
+      },
+      "submission_criteria": [
+        {"code": "principle_not_current", "message": "Name a principle that exists and is current.", "all": [{"exists": "$principle"}, {"eq": ["$principle.status", "current"]}]},
+        {"code": "statement_empty", "message": "A statement given is not empty; omit it to keep the statement.", "none": [{"all": [{"present": "$statement"}, {"eq": ["$statement", ""]}]}]},
+        {"code": "parent_not_current", "message": "Name a parent principle that exists and is current, or leave the parent out.", "all": [{"none": [{"all": [{"present": "$parent"}, {"none": [{"all": [{"exists": "$parent"}, {"eq": ["$parent.status", "current"]}]}]}]}]}]},
+        {"code": "requests_empty", "message": "A list of requests given is not empty; omit it to keep the list.", "none": [{"all": [{"present": "$requests"}, {"eq": ["$requests", []]}]}]}
+      ],
+      "rules": [
+        {"modify_object": "principle", "set": {"order_key": "$order_key", "statement": "$statement", "parent": "$parent", "requests": "$requests", "amended_at": "$now"}}
+      ]
+    },
+    "retire_principle": {
+      "description": "Retire a current principle: the user no longer wants it.",
+      "parameters": {
+        "principle": {"type": {"ref": "principle"}, "required": true, "description": "The principle: its full Id, with the principle's key as native_key."},
+        "reason": {"type": "string", "required": true, "max_bytes": 600, "description": "Why it is retired."}
+      },
+      "submission_criteria": [
+        {"code": "principle_not_current", "message": "Name a principle that exists and is current.", "all": [{"exists": "$principle"}, {"eq": ["$principle.status", "current"]}]}
+      ],
+      "rules": [
+        {"modify_object": "principle", "set": {"status": "retired", "retired_at": "$now", "retired_reason": "$reason"}}
+      ]
+    },
+    "set_intent_principles": {
+      "description": "Set the principles an open intent obeys, given whole; replaces the list.",
+      "parameters": {
+        "intent": {"type": {"ref": "intent"}, "required": true, "description": "The intent: its full Id, with the intent's key as native_key."},
+        "principles": {"type": {"array": {"ref": "principle"}}, "required": true, "description": "The principles it obeys."}
+      },
+      "submission_criteria": [
+        {"code": "intent_not_open", "message": "Name an intent that exists and is neither met nor retired.", "all": [{"exists": "$intent"}, {"none": [{"in": ["$intent.status", ["met", "retired"]]}]}]}
+      ],
+      "rules": [
+        {"modify_object": "intent", "set": {"principles": "$principles"}}
+      ]
     }
   },
   "functions": {},
@@ -4062,7 +4147,8 @@
         "criterion",
         "unit",
         "run",
-        "finding"
+        "finding",
+        "principle"
       ],
       "derive": [
         "hold",
@@ -4080,7 +4166,8 @@
         "criterion",
         "unit",
         "run",
-        "finding"
+        "finding",
+        "principle"
       ],
       "actions": [
         "set_hold",
@@ -4166,7 +4253,11 @@
         "close_finding",
         "set_hold_on",
         "route_request_to_unit",
-        "route_request_to_finding"
+        "route_request_to_finding",
+        "record_principle",
+        "amend_principle",
+        "retire_principle",
+        "set_intent_principles"
       ]
     }
   ],
@@ -4629,6 +4720,20 @@
         {"header": "State", "property": "state"},
         {"header": "Started at", "property": "started_at"},
         {"header": "Ended at", "property": "ended_at"}
+      ]
+    },
+    "principles": {
+      "object_type": "principle",
+      "args": [],
+      "filter": {"all": [{"eq": ["status", "current"]}]},
+      "order": [{"property": "order_key", "direction": "asc"}],
+      "limit": 1000,
+      "columns": [
+        {"header": "Order", "property": "order_key"},
+        {"header": "Key", "property": "$key"},
+        {"header": "Parent", "property": "parent"},
+        {"header": "Statement", "property": "statement"},
+        {"header": "Requests", "property": "requests"}
       ]
     }
   }

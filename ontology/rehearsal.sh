@@ -834,10 +834,13 @@ gate('add_item', 'multiline-title', dict(item_params, key='k-multiline', title='
 print('v9_gate_rows_complete')
 PY
 
+python3 -I -B "$repo/ontology/memory-index-walk.py" "$ont_binary" "$rehearsal_root/memory-walk" --records 2
+
 # Version 10 on a second store: the user's rows of version 9 carried by ontology/migrate, then the walk of the
 # requests, intents and criteria, on version 10 pinned in Git. Then version 11, pinned in Git, over the objects
-# made under version 10, and the walk of the units, runs and findings. Then version 12, the repository's file, over
-# the objects made under version 11, and the walk of the page digest.
+# made under version 10, and the walk of the units, runs and findings. Then version 12, pinned in Git, over the
+# objects made under version 11, and the walk of the page digest. Then version 13, the repository's file, over the
+# objects made under version 12, and the walk of the principles.
 mkdir -- "$rehearsal_root/v10"
 python3 - "$ont_binary" "$repo" "$rehearsal_root/v10/store.sqlite" "$work_root/" "$rehearsal_root/copies" "$rehearsal_root/lib" <<'PY'
 import datetime, hashlib, json, os, pathlib, subprocess, sys
@@ -938,7 +941,7 @@ apply('triage_decision', 'v9-after-carry', dict(decision=third, triage='none', r
 unchanged = fingerprint()
 assert migrate(9, 10) == dict(carried=0, already=3)
 assert fingerprint() == unchanged and fields(third_request)['route_reason'] == 'carried from version 9'
-for before, after in [(9, 13), (10, 10), (10, 9)]:
+for before, after in [(9, 14), (10, 10), (10, 9)]:
     assert migrate(before, after, 2) == dict(status='unknown_pair')
 assert fingerprint() == unchanged
 assert migrate(9, 10) == dict(carried=0, already=3)
@@ -1454,8 +1457,8 @@ refused = call(['log'], dict(outcome='refused', action_type='ready_unit', parame
 assert any(r.get('failed') == ['page_not_reviewed'] and r['parameters']['unit'] == contract for r in refused), refused
 print('v11_gate_rows_complete')
 
-# Version 12: the repository's file over the objects made under version 11. A unit of class contract made under
-# version 11, with a dependency and a page review accepted after its last amendment, waits for it as a draft.
+# Version 12, pinned in Git by the commit of main that holds it, over the objects made under version 11. A unit of
+# class contract made under version 11, with a dependency and a page review accepted after its last amendment, waits for it as a draft.
 tick(); digested, PAGE = unit('fixture-digest'), digest('page digest')
 apply('add_unit', 'digest', dict(op, unit=digested, depends_on=[dep], estimate_lines=200, **{'class': 'contract'}))
 accepted_page = review('page-digest', 'page', PAGE, unit=digested)
@@ -1466,14 +1469,15 @@ v11_views = [(view, args, call(['render'], dict(view=view, args=args))) for view
     ('intents_open', {}), ('criteria_of_intent', dict(intent='gadget-board')), ('requests_unrouted', {}), ('units_of_intent', dict(intent='gadget-board')),
     ('units_live', {}), ('reviews_of_unit', dict(unit='fixture-digest')), ('reviews_of_unit', dict(unit='fixture-contract')),
     ('runs_of_unit', dict(unit='fixture-stopped')), ('findings_open', {}), ('holds_on_work', {})]]
-schema = json.loads(pathlib.Path(repo, 'ontology/work.schema.json').read_text())
+V12_PIN = ('60b52b1ccc99f50ac04fba7f3c472d5dc16261f9', '2310273cccfceae52d352ba112340ef695b5f959a48b89b6b2453173c7cf4ee1')
+schema = install(*V12_PIN)
 assert schema['version'] == 12
+v12_schema = schema
 # Every action but ready_unit, and every other part of the schema, reads the same as at version 11.
 assert {k: v for k, v in schema.items() if k not in ('version', 'action_types')} == {k: v for k, v in v11_schema.items() if k not in ('version', 'action_types')}
 assert sorted(schema['action_types']) == sorted(v11_schema['action_types'])
 assert [a for a in schema['action_types'] if schema['action_types'][a] != v11_schema['action_types'][a]] == ['ready_unit']
 print('gate_row=v12-only-ready-unit-changed expected=admitted actions=' + str(len(schema['action_types'])))
-call(['schema', 'install', str(redirected(pathlib.Path(repo, 'ontology/work.schema.json'), 'repository.json'))])
 redirect.trace(work, copies)
 assert [obj(i) for i in v11_objects] == v11_before
 for view, args, before in v11_views:
@@ -1489,7 +1493,6 @@ print('v12_mcp_bytes=' + ','.join(map(str, sizes)), file=sys.stderr)
 unchanged = fingerprint()
 assert migrate(11, 12) == dict(carried=0, already=0)
 assert migrate(9, 12) == dict(carried=0, already=3)
-assert migrate(12, 13, 2) == dict(status='unknown_pair')
 assert fingerprint() == unchanged and [obj(i) for i in v11_objects] == v11_before
 print('v12_migration_rows_complete')
 phase = 'v12'
@@ -1516,6 +1519,116 @@ plain12 = unit('fixture-plain-12'); apply('add_unit', 'plain-12', dict(op, unit=
 refused = call(['log'], dict(outcome='refused', action_type='ready_unit', parameters=True))['rows']
 assert any(r.get('failed') == ['page_not_reviewed'] and r['parameters']['unit'] == digested and r['parameters'].get('page_digest') == digest('another page') for r in refused), refused
 print('v12_gate_rows_complete')
-PY
 
-python3 -I -B "$repo/ontology/memory-index-walk.py" "$ont_binary" "$rehearsal_root/memory-walk" --records 2
+# Version 13: the repository's file over the objects made under version 12. Every object type, link type, action,
+# view, value type and source of version 12 reads the same, but the optional property principles of intent.
+v12_objects = [o['id'] for t in ('task', 'decision', 'request', 'intent', 'criterion', 'unit', 'review', 'run', 'finding', 'hold')
+               for o in call(['search'], dict(object_type=t, limit=1000))['objects']]
+v12_before = [obj(i) for i in v12_objects]
+v12_views = [(view, args, call(['render'], dict(view=view, args=args))) for view, args in [
+    ('intents_open', {}), ('criteria_of_intent', dict(intent='gadget-board')), ('requests_unrouted', {}), ('units_of_intent', dict(intent='gadget-board')),
+    ('units_live', {}), ('reviews_of_unit', dict(unit='fixture-digest')), ('reviews_of_unit', dict(unit='fixture-effect-12')),
+    ('runs_of_unit', dict(unit='fixture-stopped')), ('findings_open', {}), ('holds_on_work', {})]]
+schema = json.loads(pathlib.Path(repo, 'ontology/work.schema.json').read_text())
+assert schema['version'] == 13
+head = json.loads(json.dumps(schema))
+assert head['object_types']['intent']['properties'].pop('principles') == {'type': {'array': {'ref': 'principle'}}, 'required': False, 'description': 'The principles the intent obeys; set whole by set_intent_principles.'}
+for kind in ('object_types', 'link_types', 'action_types', 'views', 'value_types', 'sources'):
+    assert all(head[kind].get(name) == body for name, body in v12_schema[kind].items()), kind
+assert sorted(set(schema['object_types']) - set(v12_schema['object_types'])) == ['principle']
+assert sorted(set(schema['link_types']) - set(v12_schema['link_types'])) == ['intent_principles', 'principle_parent', 'principle_requests']
+assert sorted(set(schema['action_types']) - set(v12_schema['action_types'])) == ['amend_principle', 'record_principle', 'retire_principle', 'set_intent_principles']
+assert sorted(set(schema['views']) - set(v12_schema['views'])) == ['principles'] and sorted(set(schema['value_types']) - set(v12_schema['value_types'])) == ['principle_status']
+print('gate_row=v13-only-principles-added expected=admitted actions=' + str(len(schema['action_types'])))
+call(['schema', 'install', str(redirected(pathlib.Path(repo, 'ontology/work.schema.json'), 'repository.json'))])
+redirect.trace(work, copies)
+assert [obj(i) for i in v12_objects] == v12_before
+for view, args, before in v12_views:
+    answer = call(['render'], dict(view=view, args=args))
+    assert answer['rows'] == before['rows'] and answer['markdown'] == before['markdown'].replace('schema=work@12', 'schema=work@13'), view
+print('gate_row=v13-v12-objects-and-views-unchanged expected=admitted objects=' + str(len(v12_objects)) + ' views=' + str(len(v12_views)))
+sizes = []
+for name in ('ont_describe', 'ont_action_list'):
+    wire = subprocess.run([binary, '--store', store, 'mcp'], input=json.dumps(dict(jsonrpc='2.0', id=1, method='tools/call', params=dict(name=name, arguments={}))) + '\n', text=True, capture_output=True, timeout=60)
+    answer = json.loads(wire.stdout.splitlines()[0])['result']; assert wire.returncode == 0 and not answer['isError'], answer
+    sizes.append(len(answer['content'][0]['text'].encode())); assert sizes[-1] <= 262144, (name, sizes[-1])
+print('v13_mcp_bytes=' + ','.join(map(str, sizes)), file=sys.stderr)
+unchanged = fingerprint()
+assert migrate(12, 13) == dict(carried=0, already=0)
+assert migrate(11, 13) == dict(carried=0, already=0)
+assert migrate(9, 13) == dict(carried=0, already=3)
+assert migrate(13, 14, 2) == dict(status='unknown_pair')
+assert fingerprint() == unchanged and [obj(i) for i in v12_objects] == v12_before
+print('v13_migration_rows_complete')
+phase = 'v13'
+# The walk of the principles. Each refusal row is before the action it guards; a refusal writes nothing.
+def principle(key): return oid('principle', key)
+tick(); said_a = request('principle-said-a', 'order', topic='v13-principles'); tick(); said_b = request('principle-said-b', 'decision', topic='v13-principles')
+pillar, want = principle('fixture-pillar'), principle('fixture-want')
+pp = dict(principle=pillar, order_key='01', statement='The invented widgets stay green.', requests=[said_a])
+apply('record_principle', 'statement-empty', dict(pp, statement=''), 'statement_empty')
+apply('record_principle', 'order-key-empty', dict(pp, order_key=''), 'order_key_empty')
+apply('record_principle', 'requests-empty', dict(pp, requests=[]), 'requests_empty')
+apply('record_principle', 'parent-absent', dict(pp, parent=principle('absent-v13-principle')), 'parent_not_current')
+apply('record_principle', 'itself-as-parent', dict(pp, parent=pillar), 'parent_not_current')
+tick(); apply('record_principle', 'pillar', pp)
+f = fields(pillar)
+assert f['status'] == 'current' and f['order_key'] == '01' and f['statement'] == pp['statement'] and f['requests'] == [said_a] and f.get('parent') is None, f
+assert f['recorded_at'] == f['amended_at'] == stamp() and f.get('retired_at') is None, f
+apply('record_principle', 'pillar-key-used', dict(pp, statement='Another want.'), 'revision_conflict')
+tick(); apply('record_principle', 'want', dict(principle=want, order_key='01.01', statement='The invented widgets are a light green.', requests=[said_b], parent=pillar))
+f = fields(want); assert f['status'] == 'current' and f['parent'] == pillar and f['requests'] == [said_b] and f['recorded_at'] == stamp(), f
+# The view: current principles in order_key order; a pillar has no parent, so the engine's text for an absent reference stands there.
+view = call(['render'], dict(view='principles', args={}))
+rows = [l for l in view['markdown'].splitlines() if l.startswith('| ') and not l.startswith('| Order') and not l.startswith('| ---')]
+assert view['rows'] == 2 and len(rows) == 2, view
+cells = [[c.strip() for c in l.strip().strip('|').split('|')] for l in rows]
+assert [c[0] for c in cells] == ['01', '01.01'] and [c[1] for c in cells] == ['fixture-pillar', 'fixture-want'], cells
+assert cells[0][2] == '(missing)' and cells[1][2] == 'fixture-pillar' and cells[0][3] == pp['statement'], cells
+print(view['markdown'])
+# ont around: from the child by principle_requests to the request that states it; from the intent by intent_principles to the principle.
+def around(source, where, path):
+    return call(['around'], dict(**{'from': dict(object_type=source, where=where)}, path=path))
+reached = around('principle', {'eq': ['order_key', '01.01']}, ['principle_requests'])
+assert [o['id'] for o in reached['objects']] == [said_b], reached
+reached = around('request', {'eq': ['topic', 'v13-principles']}, ['request_principles'])
+assert sorted(o['id']['native_key'] for o in reached['objects']) == ['fixture-pillar', 'fixture-want'], reached
+reached = around('principle', {'eq': ['order_key', '01.01']}, ['principle_parent'])
+assert [o['id'] for o in reached['objects']] == [pillar], reached
+reached = around('principle', {'eq': ['order_key', '01']}, ['principle_children'])
+assert [o['id'] for o in reached['objects']] == [want], reached
+# set_intent_principles: only an intent that is neither met nor retired.
+apply('set_intent_principles', 'closed', dict(intent=covered, principles=[pillar]), 'intent_not_open')
+apply('set_intent_principles', 'absent', dict(intent=oid('intent', 'absent-v13-intent'), principles=[pillar]), 'intent_not_open')
+assert fields(gadget)['status'] in ('draft', 'assumed', 'confirmed') and fields(gadget).get('principles') is None
+apply('set_intent_principles', 'gadget', dict(intent=gadget, principles=[pillar, want])); assert fields(gadget)['principles'] == [pillar, want]
+reached = around('intent', {'eq': ['status', fields(gadget)['status']]}, ['intent_principles'])
+assert sorted(o['id']['native_key'] for o in reached['objects']) == ['fixture-pillar', 'fixture-want'], reached
+reached = around('principle', {'eq': ['order_key', '01']}, ['principle_intents'])
+assert [o['id'] for o in reached['objects']] == [gadget], reached
+apply('set_intent_principles', 'gadget-one', dict(intent=gadget, principles=[pillar])); assert fields(gadget)['principles'] == [pillar]
+# amend_principle: the members given replace their values; the others stay.
+amend = dict(principle=want)
+apply('amend_principle', 'absent', dict(principle=principle('absent-v13-principle'), statement='x'), 'principle_not_current')
+apply('amend_principle', 'statement-empty', dict(amend, statement=''), 'statement_empty')
+apply('amend_principle', 'requests-empty', dict(amend, requests=[]), 'requests_empty')
+apply('amend_principle', 'parent-absent', dict(amend, parent=principle('absent-v13-principle')), 'parent_not_current')
+tick(); apply('amend_principle', 'want', dict(amend, order_key='01.02', statement='The invented widgets are a dark green.', requests=[said_a, said_b]))
+f = fields(want)
+assert f['order_key'] == '01.02' and f['statement'] == 'The invented widgets are a dark green.' and f['requests'] == [said_a, said_b] and f['parent'] == pillar, f
+assert f['amended_at'] == stamp() and f['recorded_at'] != f['amended_at'] and f['status'] == 'current', f
+tick(); apply('amend_principle', 'want-statement-only', dict(amend, statement='The invented widgets are a pale green.'))
+f = fields(want); assert f['statement'] == 'The invented widgets are a pale green.' and f['order_key'] == '01.02' and f['requests'] == [said_a, said_b] and f['parent'] == pillar, f
+apply('amend_principle', 'want-reparent', dict(amend, parent=pillar)); assert fields(want)['parent'] == pillar
+# retire_principle: the view lists current principles only; a retired principle takes no parent and no amendment.
+apply('retire_principle', 'absent', dict(principle=principle('absent-v13-principle'), reason='gone'), 'principle_not_current')
+tick(); apply('retire_principle', 'want', dict(principle=want, reason='The user no longer wants a green shade.'))
+f = fields(want); assert f['status'] == 'retired' and f['retired_at'] == stamp() and f['retired_reason'] == 'The user no longer wants a green shade.' and f['statement'] == 'The invented widgets are a pale green.', f
+apply('retire_principle', 'want-again', dict(principle=want, reason='again'), 'principle_not_current')
+apply('amend_principle', 'retired', dict(amend, statement='x'), 'principle_not_current')
+apply('record_principle', 'retired-parent', dict(pp, principle=principle('fixture-under-retired'), parent=want), 'parent_not_current')
+apply('amend_principle', 'retired-parent', dict(principle=pillar, parent=want), 'parent_not_current')
+view = call(['render'], dict(view='principles', args={})); assert view['rows'] == 1 and 'fixture-want' not in view['markdown'] and 'fixture-pillar' in view['markdown'], view
+print('v13_gate_rows_complete')
+print('v13 principles: ok')
+PY
