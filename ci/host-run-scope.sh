@@ -189,8 +189,10 @@ else
     && ok "limits: nothing of stage A reached stage B's scratch directory or account while B ran" \
     || bad "limits: stage B's files: $(ls -A "$t/scratchB" "$t/acctB" 2> /dev/null | tr '\n' ' ')"
   python3 -I -c 'import json,sys; t=sys.argv[1]; l=json.load(open(t+"/l.md.run.json"))["limits"]
-sys.exit(l != {"scratch": t+"/scratch", "writable": [t+"/acct", t+"/scratch"], "bwrap": "/usr/bin/bwrap"})' "$t" \
-    && ok "limits: the record names the scratch directory and the two writable paths" || bad "limits member: $(field "$t/l.md.run.json" limits)"
+hidden = l.pop("hidden", None)
+sys.exit(l != {"scratch": t+"/scratch", "writable": [t+"/acct", t+"/scratch"], "bwrap": "/usr/bin/bwrap"}
+         or not isinstance(hidden, list))' "$t" \
+    && ok "limits: the record names the scratch directory, the two writable paths and the hidden list" || bad "limits member: $(field "$t/l.md.run.json" limits)"
   [ ! -e "$t/scratch" ] && ok "limits: the scratch directory is gone after the return" || bad "limits: $t/scratch remains"
   : > "$t/acctB/go"; wait "$bpid"; rc=$?
   { [ "$rc" -eq 0 ] && [ "$(field "$t/lb.md.run.json" state)" = ok ] && [ ! -e "$t/scratchB" ] && ! systemctl is-active --quiet "$bunit"; } \

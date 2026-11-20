@@ -47,6 +47,14 @@ pub trait System {
     fn work_root(&self) -> PathBuf {
         PathBuf::from(ROOT)
     }
+    /// The home directory of the passwd entry of the user this process runs as (its effective
+    /// user id), not `HOME`; None when no entry of `/etc/passwd` names that id. A test replaces it.
+    fn home(&self) -> Option<PathBuf> {
+        passwd_home(
+            &std::fs::read_to_string("/proc/self/status").ok()?,
+            &std::fs::read_to_string("/etc/passwd").ok()?,
+        )
+    }
     fn cwd(&self) -> std::io::Result<PathBuf> {
         std::env::current_dir()
     }
@@ -106,6 +114,19 @@ pub trait System {
             .filter_map(|(k, v)| Some((k.into_string().ok()?, v.into_string().ok()?)))
             .collect()
     }
+}
+/// The home of the passwd entry whose user id is the effective one of a `/proc/<pid>/status` text
+/// (its line `Uid:`, the second number): the sixth field of the first such line of the passwd text.
+pub fn passwd_home(status: &str, passwd: &str) -> Option<PathBuf> {
+    let uid = status
+        .lines()
+        .find_map(|l| l.strip_prefix("Uid:"))?
+        .split_whitespace()
+        .nth(1)?;
+    passwd.lines().find_map(|l| {
+        let f: Vec<&str> = l.split(':').collect();
+        (f.len() == 7 && f[2] == uid && f[5].starts_with('/')).then(|| PathBuf::from(f[5]))
+    })
 }
 pub(crate) fn args(words: &[&str]) -> Vec<String> {
     words.iter().map(|s| (*s).into()).collect()

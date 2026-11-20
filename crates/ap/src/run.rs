@@ -11,7 +11,10 @@ use std::{
     ffi::OsString,
     fs::File,
     io::{Read, Seek, SeekFrom, Write},
-    os::unix::fs::{FileExt, MetadataExt},
+    os::unix::{
+        ffi::OsStrExt,
+        fs::{FileExt, MetadataExt},
+    },
     path::{Component, Path, PathBuf},
     process::{Child, ExitCode},
     time::{Duration, SystemTime, UNIX_EPOCH},
@@ -273,8 +276,83 @@ struct Request {
     store: Option<String>,
     /// The stage's role as the actor's claim: `verifier` for a reviewer that says so.
     actor_role: String,
-    /// The scratch directory of `limits`, as written (`specs/ap/run-limits.md`).
-    limits: Option<String>,
+    /// The scratch directory of `limits`, as written, and the home its hidden paths are under
+    /// (`specs/ap/run-limits.md`).
+    limits: Option<Limits>,
+}
+/// What a request with `limits` holds: its scratch directory, and the home of the passwd entry of
+/// the user `ap run` runs as, where the hidden list's `~` points (R10).
+struct Limits {
+    scratch: String,
+    home: String,
+}
+/// The hidden list's paths under the home, in the list's order (R10).
+const HIDDEN_HOME: [&str; 4] = [".config/gh", ".git-credentials", ".netrc", ".ssh"];
+/// The hidden list's host paths, after those under the home (R10).
+const HIDDEN_HOST: [&str; 8] = [
+    "/etc/agent-platform/credentials",
+    "/etc/agent-platform/ci",
+    "/run/user",
+    "/run/docker.sock",
+    "/run/containerd/containerd.sock",
+    "/run/tailscale",
+    "/run/systemd/private",
+    "/run/dbus/system_bus_socket",
+];
+/// The hidden list's last entry is every name under the work root that begins with this (`edu-*`).
+const HIDDEN_PREFIX: &[u8] = b"edu-";
+/// The fixed paths of the hidden list, `~` replaced by `home`, in the list's order (R10).
+fn hidden_fixed(home: &str) -> Vec<String> {
+    let at = |rel: &str| Path::new(home).join(rel).to_string_lossy().into_owned();
+    (HIDDEN_HOME.iter().map(|r| at(r)))
+        .chain(HIDDEN_HOST.iter().map(|p| (*p).to_owned()))
+        .collect()
+}
+/// Whether `p` is equal to or inside a path of the hidden list, by its components as written:
+/// a fixed path, or a name under the work root that the pattern `edu-*` matches (R1, R10).
+fn in_hidden(p: &str, home: &str, work_root: &Path) -> bool {
+    let p = Path::new(p);
+    let pattern = p
+        .strip_prefix(work_root)
+        .ok()
+        .and_then(|r| r.components().next());
+    let pattern =
+        matches!(pattern, Some(Component::Normal(n)) if n.as_bytes().starts_with(HIDDEN_PREFIX));
+    pattern || hidden_fixed(home).iter().any(|h| p.starts_with(h))
+}
+/// The paths of the hidden list that exist now, each with whether it is a directory (a link
+/// followed): the fixed paths in the list's order, then the names under the work root that begin
+/// with `edu-`, by name (R10).
+fn hidden_now(home: &str, work_root: &Path) -> Vec<(String, bool)> {
+    let mut edu: Vec<PathBuf> = std::fs::read_dir(work_root)
+        .into_iter()
+        .flatten()
+        .filter_map(Result::ok)
+        .filter(|e| e.file_name().as_bytes().starts_with(HIDDEN_PREFIX))
+        .map(|e| e.path())
+        .collect();
+    edu.sort();
+    let edu = edu.iter().map(|p| p.to_string_lossy().into_owned());
+    hidden_fixed(home)
+        .into_iter()
+        .chain(edu)
+        .filter_map(|p| {
+            let dir = std::fs::metadata(&p).ok()?.is_dir();
+            Some((p, dir))
+        })
+        .collect()
+}
+/// The `bwrap` arguments that hide these paths: a directory becomes an empty one the stage cannot
+/// write, any other path `/dev/null` (R10).
+fn hiding(hidden: &[(String, bool)]) -> Vec<String> {
+    let mut words = vec![];
+    for (p, dir) in hidden {
+        match dir {
+            true => words.extend(args(&["--tmpfs", p, "--remount-ro", p])),
+            false => words.extend(args(&["--ro-bind", "/dev/null", p])),
+        }
+    }
+    words
 }
 
 fn path(r: &Value, key: &str) -> Result<String, Failure> {
@@ -368,11 +446,12 @@ fn target(r: &Value) -> Result<Option<(&'static str, String)>, Failure> {
 /// without `..`, apart from the accounts, the cwd, the out and the prompt by its components as
 /// written, and never with `expect.file` (`specs/ap/run-limits.md` R1).
 fn scratch(
+    s: &impl System,
     v: &Value,
     (role, runtime, expect_file): (&str, Runtime, bool),
     accounts: &[String],
     [cwd, out, prompt]: [&str; 3],
-) -> Result<String, Failure> {
+) -> Result<Limits, Failure> {
     let one = v.as_object().is_some_and(|o| o.len() == 1);
     let p = path(v, "scratch").map_err(|_| error("invalid_input", "limits"))?;
     let at = Path::new(&p);
@@ -385,7 +464,15 @@ fn scratch(
         .any(|h| Path::new(h).starts_with(at));
     let stage = role == "reviewer" && runtime == Runtime::Claude && !expect_file;
     require!(one && stage && !up && !inside && !holds => "invalid_input", "limits");
-    Ok(p)
+    // The hidden list's `~`: without a passwd entry for this user there is no list to hide (R10).
+    let home = s.home().map(|h| h.to_string_lossy().into_owned());
+    let home = home.ok_or_else(|| error("limits_unavailable", "limits"))?;
+    let root = s.work_root();
+    let hidden = (accounts.iter().map(String::as_str))
+        .chain([cwd, p.as_str()])
+        .any(|a| in_hidden(a, &home, &root));
+    require!(!hidden => "invalid_input", "limits");
+    Ok(Limits { scratch: p, home })
 }
 /// One `mkdir` of the scratch directory that fails when the path exists (mode 0700), then its
 /// `tmp` and `target`: whether this call made it, and whether all three were made (R4).
@@ -761,6 +848,7 @@ fn request_at(s: &mut impl System, r: &Value, at_cwd: bool) -> Result<Request, F
     let limits = match r.get("limits") {
         None => None,
         Some(v) => Some(scratch(
+            s,
             v,
             (role, runtime, expect_file.is_some()),
             &accounts,
@@ -827,7 +915,7 @@ fn request_at(s: &mut impl System, r: &Value, at_cwd: bool) -> Result<Request, F
         &format!("{out}.err"),
     ];
     require!(names.iter().all(|n| std::fs::symlink_metadata(n).is_err()) => "out_exists", "out");
-    if let Some(scratch) = &limits {
+    if let Some(Limits { scratch, .. }) = &limits {
         // The host's state for `limits`, before the policy step: nothing at the path, a parent
         // that is a directory and not a link, and a `bwrap` that answers (R2, R3).
         require!(std::fs::symlink_metadata(scratch).is_err() => "scratch_exists", "limits");
@@ -1782,9 +1870,16 @@ fn attempt(
     if let Some((path, _, sha256)) = &q.schema {
         record["answer_schema"] = json!({"path": path, "sha256": sha256});
     }
-    if let Some(scratch) = &q.limits {
-        record["limits"] =
-            json!({"scratch": scratch, "writable": [account, scratch], "bwrap": BWRAP});
+    // The hidden paths of this launch, as they exist when it is prepared (R7, R10).
+    let hidden = q
+        .limits
+        .as_ref()
+        .map(|l| hidden_now(&l.home, &s.work_root()))
+        .unwrap_or_default();
+    if let Some(Limits { scratch, .. }) = &q.limits {
+        let paths: Vec<&String> = hidden.iter().map(|(p, _)| p).collect();
+        record["limits"] = json!({"scratch": scratch, "writable": [account, scratch],
+            "bwrap": BWRAP, "hidden": paths});
     }
     let not_launched = |mut record: Value, unmet: &str| {
         record["state"] = json!("failed");
@@ -1901,7 +1996,7 @@ fn attempt(
             env.push(("AGY_CLI_DISABLE_AUTO_UPDATE".into(), "1".into()));
         }
     }
-    if let Some(scratch) = &q.limits {
+    if let Some(Limits { scratch, .. }) = &q.limits {
         // After `systemd-run … --`, in front of the CLI: its own pid namespace (no other stage
         // in its `/proc`), everything read-only but the launch's account and the scratch
         // directory, no capability (R5); temporary files and builds go to the scratch directory
@@ -1922,6 +2017,8 @@ fn attempt(
         bwrap.extend(args(&[
             "--bind", account, account, "--bind", scratch, scratch,
         ]));
+        // After the binds: the host's credentials and sockets, hidden (R10).
+        bwrap.extend(hiding(&hidden));
         bwrap.extend(args(&["--cap-drop", "ALL", "--chdir", &q.cwd, "--"]));
         argv.splice(cli + 1..cli + 1, bwrap);
         env.retain(|(k, _)| k != "TMPDIR" && k != "CARGO_TARGET_DIR");
@@ -2219,7 +2316,8 @@ pub fn execute(s: &mut impl System, r: &Value) -> Result<(Value, u8), Failure> {
             object.begin(s, &q, &accounts[0]);
         }
         // The scratch directory: made once, after the claim and before the first launch (R4).
-        let (made, ready) = q.limits.as_deref().map_or((false, true), make_scratch);
+        let scratch = q.limits.as_ref().map(|l| l.scratch.as_str());
+        let (made, ready) = scratch.map_or((false, true), make_scratch);
         // When the last launch began: it and its ask share one `timeout_seconds` (R20).
         let mut began = s.now();
         for (i, account) in accounts.iter().enumerate() {
@@ -2291,7 +2389,7 @@ pub fn execute(s: &mut impl System, r: &Value) -> Result<(Value, u8), Failure> {
             last = record;
         }
         // Only the call whose `mkdir` made it removes it, after its last launch (R8).
-        if let Some(scratch) = q.limits.as_deref().filter(|_| made) {
+        if let Some(scratch) = scratch.filter(|_| made) {
             remove_scratch(scratch);
         }
     } else {
