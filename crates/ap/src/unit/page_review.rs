@@ -406,7 +406,7 @@ fn json_file(path: &str) -> Option<Value> {
     let v: Value = serde_json::from_slice(&std::fs::read(path).ok()?).ok()?;
     v.is_object().then_some(v)
 }
-/// A new look (R5 to R14, R20, R21).
+/// A new look (R5 to R14, R20, R21, R23).
 fn look_at(
     s: &mut impl System,
     look: &Look,
@@ -467,7 +467,6 @@ fn look_at(
                 "the review {running} of this subject is running"
             )));
         }
-        remove_tree(&wd);
         for k in ["runtime", "model", "effort", "account"] {
             if let Some(v) = rec.get(k).filter(|v| v.is_string()) {
                 stage.insert(k.to_owned(), v.clone());
@@ -519,7 +518,16 @@ fn look_at(
         let head = digest(part.as_bytes());
         (format!("{part}\n{rest}\n{PLAN_REVIEWER}"), head, None)
     };
-    if resumed.is_some() {
+    // The checks `ap unit ready` runs on the base, at the commit the text names (R23).
+    if look.page {
+        object::complete(&subject)?;
+        let at = copy
+            .as_ref()
+            .map(|(clone, commit)| (clone.as_str(), commit.as_str()));
+        object::checks_on_base(s, &subject, at.map(|a| a.0), at.map(|a| a.1))?;
+    }
+    if let Some((_, _, wd)) = &resumed {
+        remove_tree(wd);
         text.push('\n');
         text.push_str(REPAIR_LOOK);
     }

@@ -653,11 +653,46 @@ fn on_base(s: &mut impl System, u: &Value) -> Result<(Value, Vec<Value>), Failur
         Some(repository) => Some(clone_of(s, repository)?),
         None => None,
     };
+    checks_on_base(s, u, clone.as_deref(), None)
+}
+/// The criteria of the store's `ready_unit` on the page itself, in the store's order, judged from the
+/// unit as read (`ap unit review`, `specs/ap/unit-review.md` R23): the first that fails, with every
+/// failed code in `detail`.
+pub(super) fn complete(u: &Value) -> Result<(), Failure> {
+    let absent = |k: &str| u.get(k).is_none_or(Value::is_null);
+    let empty = |k: &str| absent(k) || u[k].as_array().is_some_and(Vec::is_empty);
+    let mut failed = vec![];
+    if empty("write_set") {
+        failed.push("write_set_missing");
+    }
+    if empty("acceptance") {
+        failed.push("acceptance_missing");
+    }
+    if absent("implementer") || absent("verifier") {
+        failed.push("tiers_missing");
+    }
+    match failed.first() {
+        Some(code) => Err(fail(code, "unit", json!({"failed": failed}))),
+        None => Ok(()),
+    }
+}
+/// The acceptance checks of `u` (R23 to R27): with `clone`, in a throwaway copy of it at `fetched` (the
+/// commit `origin/main` named after a fetch the caller made), or at the commit a fetch made here names;
+/// without, in an empty directory. The base and the checks.
+pub(super) fn checks_on_base(
+    s: &mut impl System,
+    u: &Value,
+    clone: Option<&str>,
+    fetched: Option<&str>,
+) -> Result<(Value, Vec<Value>), Failure> {
     let scratch = Scratch::new(s)?;
     let dir = scratch.at("base");
-    let base = match &clone {
+    let base = match clone {
         Some(clone) => {
-            let base = fetch(s, clone)?;
+            let base = match fetched {
+                Some(commit) => commit.to_owned(),
+                None => fetch(s, clone)?,
+            };
             copy(s, clone, &dir, &base)?;
             Some(base)
         }
