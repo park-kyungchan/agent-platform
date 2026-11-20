@@ -10,7 +10,14 @@
    "gemini-4-hydrogen-low",
    "gemini-4-hydrogen-medium",
    "gemini-4-hydrogen-high",
-   "gemini-4-hydrogen-xhigh"
+   "gemini-4-hydrogen-xhigh",
+   "gemini-4-neon-low",
+   "gemini-4-neon-medium",
+   "gemini-4-neon-high",
+   "gemini-4-neon-xhigh",
+   "gemini-4-argon-low",
+   "gemini-4-argon-medium",
+   "gemini-4-argon-high"
   ],
   "never": [
    "muse-spark-*",
@@ -57,12 +64,12 @@
  "reviews": {
   "runtime": "claude",
   "model": "opus",
-  "effort": "xhigh",
+  "effort": "high",
   "account": "/root/.claude",
   "permission_mode": "auto",
-  "compact_window": 800000,
   "models": [
-   "opus"
+   "opus",
+   "gemini-4-argon-high"
   ],
   "directory": "/var/lib/agent-platform/reviews",
   "task": "workspace-strategy-reassessment-20261109"
