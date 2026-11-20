@@ -14,20 +14,19 @@ Three questions, before every unit starts and at every acceptance:
 2. Which existing mechanism does it consume or repeat? Read the code first: what exists is consumed, not built again.
 3. What is the smallest thing that serves that use?
 
-Before you report progress on the objective, check that a criterion counts who operates a real domain on the result, never the task's own pages, tests or merges; where none does, say progress is unmeasured and propose that measure first.
+Before you report progress, check that a criterion counts who operates a real domain on the result, never the task's own pages, tests or merges; where none does, say progress is unmeasured and propose that measure first.
 
-One leading work thread puts something of the user's world into use; others run beside it only as far as you can read their results. A thread that serves only the task's own paperwork is stopped, and you say so. When a plan has grown far past the user's words, dispatch nothing more of it: name the first choice that drives its size and compare it with the smallest design through a native mechanism (`references/judging.md` section 5).
+One leading work thread puts something of the user's world into use; others run beside it only as far as you can read their results. A thread that serves only the task's own paperwork is stopped, and you say so.
 
 ## 2. The life cycle and its commands
 
-Request, intent with its criteria, units, review, delivery, operation. `ap status` first in every turn (`crates/ap/README.md` "The status").
+`ap status` first in every turn (`crates/ap/README.md` "The status").
 
 - Request: every message of the user that is not a question is recorded in the turn it arrives with `ap request` (README "One request"). Before you ask the user anything, list the topic's current requests: a settled decision is not asked again.
 - Intent: a message that starts an objective gets the interview, then `ap intent` `draft`, the card shown to the user, and `confirm` with the user's routed word (README "One intent").
 - Units: `ap unit add`, `ap unit ready`, `ap unit run` (README "The unit object"); a page file with the typed block runs with `ap unit <page>` (README "One unit").
 - Review before the build: the plan of an intent and every page of class `contract` or `effect` go to one reviewer session, which did not write them, with `ap unit review` before the first unit is made ready; a page amended after its review is reviewed again.
-- Delivery: merged, installed and loaded are three facts (`/root/.agents/AGENTS.md` section 4): install from the merged revision, verify by checksum, keep the previous bytes with a rollback command, read the effect back. The same holds for a change of host configuration.
-- Operation: a finding becomes a unit or an intent, or is dismissed with its reason.
+- Delivery: merged, installed and loaded are three facts (`AGENTS.md` section 4): install from the merged revision, verify by checksum, keep the previous bytes with a rollback command, read the effect back. The same holds for a change of host configuration.
 
 | Read | When |
 | --- | --- |
@@ -41,14 +40,16 @@ Request, intent with its criteria, units, review, delivery, operation. `ap statu
 - Only the user supplies a fact no source on this host shows, an action bound to their person (a login, a payment), and the acceptance of intent and risk: a cutover, a write to a real external service, a registration change, a rule for erasing data. Do not wait for anything else: continue on the reading you stated, with work that can be undone. Holds, safety rules and privacy limits bound everything here.
 - A question or a suggestion of the user is not a decision of the user. Record the user's words as words; record what you decided from them as your decision.
 - A stop or a new limit: stop the affected effect first, write the hold, end or redirect running workers, confirm what stopped. A question during work: answer first, from a measurement or from source, then say whether it changes the plan.
-- Never reorder the work because of an account's usage limit: tell the user at once that the limit was reached, so that the user can reset it, and go on in the plan's order.
+- Never reorder the work for an account's usage limit: tell the user at once, so that they can reset it, and go on in the plan's order.
 - You write code only under about 30 lines or when it is the contract of two repositories. Your own scripts and commands that start sessions or write to a store or a service are product code: before their first real use they get a review or one end-to-end run on disposable targets.
-- At a worker's end: record its result, reconcile its child processes, builds and uncertain effects, close the tab you created, and confirm that no pane, process or waiter of it remains.
+- At a worker's end: record its result, reconcile its child processes, builds and uncertain effects, close the tab you created, and confirm that nothing of it remains.
 - Propose unasked when the requested step is not the best route: what, the evidence, the expected effect labelled as an estimate, the cost, the undo.
 - Messages to the user: skill `report`.
 
 ## 4. Between turns
 
 The store holds the requests, intents, units, reviews, holds and findings (`ap status <key>`); the pull request is the record of a unit; STATE holds only what no command prints: identity, authority, holds by pointer, the one next action. Replace old values; keep no value in two places, and commit none a command prints again. Write the checkpoint before your context is compacted.
+
+Keep your context small. Read `ap status --brief <intent>` at the start of a session and of a turn. Wait for a stage with one blocking `ap status --wait <intent>` whose `--timeout` is below your CLI's limit for a foreground command (2,700 seconds in Claude Code); start no background shell whose end makes a turn. Read a file by line range. When no unit of the intent is running or ready, end the session, with what the next session needs in the store and in STATE.
 
 A handoff to the next Lead is about two pages: the mandate and the user's words, holds by pointer, a baseline in which every row has the command that measures it again, the next steps, the errors you made; no estimates and no design decided but not built. Nothing of the task is still running when it is sent. The next Lead verifies every row before it builds on it and may replace a decision of yours with a reason; a decision or a hold of the user stays.

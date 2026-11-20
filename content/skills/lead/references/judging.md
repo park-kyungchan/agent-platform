@@ -37,9 +37,9 @@ A finding blocks only when it is one of: wrong behaviour shown by a command or a
 
 ## 3. Judging an accepted unit
 
+- A machine check comes before a session's look: what a check, a test or the gate can show is not left to a reviewer's reading.
 - A unit of class `plain` is accepted by its verifier and merged by `ap unit run`; you read its report.
 - A unit of class `contract` or `effect`, and any unit with a real effect, a schema, a store format or a guard of a live request, stops at `accepted`: you read the production diff yourself, then `ap unit approve` with the reason, or `ap unit reject`. A page file run with `ap unit <page>` gets `merge: false` for the same units: read the diff, then call again with `pull_request` and `verdict`.
-- Acceptance is the `review` object `ap unit` closes for a head, not a merge.
 - Before you build on several merged units as one base: accepts of single units do not show that the whole works. One real run shows the first use end to end, and each cited contract is pinned and executed in its consumer.
 
 ## 4. Judging a stopped unit
