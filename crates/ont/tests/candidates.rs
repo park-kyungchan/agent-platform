@@ -108,6 +108,7 @@ fn current() -> Value {
 
 #[test]
 fn history_does_not_consume_candidates_or_make_a_tail_continuation() {
+    // spec: specs/ont/read.md#R29
     for count in [201, 1000, 1001] {
         for mode in ["visible", "hidden", "stale"] {
             let f = Fixture::new();
@@ -180,6 +181,8 @@ fn history_does_not_consume_candidates_or_make_a_tail_continuation() {
 
 #[test]
 fn unresolved_stale_partial_and_historical_heads_remain_candidates() {
+    // spec: specs/ont/read.md#R2
+    // spec: specs/ont/read.md#R32
     let f = Fixture::new();
     let mut rows: Vec<_> = (0..10001)
         .map(|i| row(&format!("z-{i:05}"), status("superseded"), false, false))
@@ -215,6 +218,8 @@ fn unresolved_stale_partial_and_historical_heads_remain_candidates() {
 
 #[test]
 fn all_preserves_other_unresolved_properties_and_unsupported_forms_stay_raw() {
+    // spec: specs/ont/read.md#R31
+    // spec: specs/ont/read.md#R44
     let f = Fixture::new();
     f.append(vec![
         row("a", status("superseded"), false, false),
@@ -259,6 +264,8 @@ fn all_preserves_other_unresolved_properties_and_unsupported_forms_stay_raw() {
 
 #[test]
 fn previous_binary_store_migrates_once_and_preserves_existing_answer_fields() {
+    // spec: specs/ont/read.md#R50
+    // spec: specs/ont/schema-language.md#R21
     let f = Fixture::new();
     std::fs::write(f.path(), include_bytes!("fixtures/o22-previous.sqlite")).unwrap();
     let before = std::fs::read(f.path()).unwrap();
@@ -287,6 +294,8 @@ fn previous_binary_store_migrates_once_and_preserves_existing_answer_fields() {
 
 #[test]
 fn hidden_population_has_byte_equal_search_answers() {
+    // spec: specs/ont/read.md#R3
+    // spec: specs/ont/read.md#R19
     let clean = Fixture::new();
     clean.append(vec![row("visible", status("ready"), false, false)]);
     let expected = clean.search(current(), Value::Null).to_string();
@@ -313,6 +322,8 @@ fn hidden_population_has_byte_equal_search_answers() {
 
 #[test]
 fn update_retraction_resurrection_and_action_apply_maintain_postings() {
+    // spec: specs/ont/read.md#R34
+    // spec: specs/ont/read.md#R49
     let f = Fixture::new();
     f.append(vec![row("mut", status("superseded"), false, false)]);
     assert_eq!(
@@ -361,10 +372,15 @@ fn update_retraction_resurrection_and_action_apply_maintain_postings() {
 
 #[test]
 fn preopened_connection_stales_search_until_identical_schema_install() {
+    // spec: specs/ont/read.md#R57
+    // spec: specs/ont/read.md#R58
+    // spec: specs/ont/read.md#R59
     preopened_case(false);
 }
 #[test]
 fn dropped_trigger_invalidates_cached_protection_until_repaired() {
+    // spec: specs/ont/read.md#R63
+    // spec: specs/ont/read.md#R64
     preopened_case(true);
 }
 fn preopened_case(drop_trigger: bool) {
@@ -488,18 +504,27 @@ fn reader_parity(command: &str) {
 }
 #[test]
 fn around_candidates_match_small_store_and_keep_raw_bound() {
+    // spec: specs/ont/read.md#R4
+    // spec: specs/ont/read.md#R71
     reader_parity("around");
 }
 #[test]
 fn aggregate_candidates_match_small_store_and_keep_raw_bound() {
+    // spec: specs/ont/read.md#R4
     reader_parity("aggregate");
 }
 #[test]
 fn render_candidates_match_small_store_and_keep_raw_bound() {
+    // spec: specs/ont/read.md#R4
+    // spec: specs/ont/read.md#R5
+    // spec: specs/ont/read.md#R9
+    // spec: specs/ont/render.md#R9
+    // spec: specs/ont/render.md#R29
     reader_parity("render");
 }
 #[test]
 fn stale_projection_refuses_all_three_readers() {
+    // spec: specs/ont/read.md#R57
     let f = Fixture::new();
     f.append(vec![row("a", status("ready"), false, false)]);
     let sql = rusqlite::Connection::open(f.path()).unwrap();
@@ -538,10 +563,14 @@ fn stored_heads(f: &Fixture) -> Vec<String> {
 
 #[test]
 fn format3_upgrade_refusal_preserves_bytes_and_owner_write_preserves_heads() {
+    // spec: specs/ont/read.md#R45
+    // spec: specs/ont/schema-language.md#R21
     upgrade_refusal_case("format3");
 }
 #[test]
 fn old_projection_upgrade_refusal_preserves_bytes_and_owner_write_preserves_heads() {
+    // spec: specs/ont/read.md#R45
+    // spec: specs/ont/read.md#R51
     for mode in ["missing", "different", "uncertified"] {
         upgrade_refusal_case(mode);
     }

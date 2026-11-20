@@ -143,6 +143,9 @@ fn keys(answer: &Value) -> Vec<&str> {
 }
 #[test]
 fn around_one_two_three_hops_both_directions_dedup_and_limit() {
+    // spec: specs/ont/read.md#R66
+    // spec: specs/ont/read.md#R67
+    // spec: specs/ont/read.md#R70
     let t = Temp::new();
     t.put("a", &["b", "b", "c"], false);
     t.put("b", &["c"], false);
@@ -193,6 +196,8 @@ fn around_one_two_three_hops_both_directions_dedup_and_limit() {
 }
 #[test]
 fn around_hidden_missing_retracted_parity_forward_and_reverse() {
+    // spec: specs/ont/read.md#R69
+    // spec: specs/ont/read.md#R70
     let missing = Temp::new();
     let hidden = Temp::new();
     let retracted = Temp::new();
@@ -222,6 +227,8 @@ fn around_hidden_missing_retracted_parity_forward_and_reverse() {
 }
 #[test]
 fn around_located_path_limit_and_command_refusals() {
+    // spec: specs/ont/read.md#R7
+    // spec: specs/ont/read.md#R67
     let t = Temp::new();
     for (path, code, field) in [
         (vec![], "invalid_path", "/path"),
@@ -255,6 +262,8 @@ fn around_located_path_limit_and_command_refusals() {
 }
 #[test]
 fn around_qualification_includes_filters_links_partial_and_stale() {
+    // spec: specs/ont/read.md#R73
+    // spec: specs/ont/read.md#R74
     for state in ["filter", "filter_unresolved", "link", "partial", "stale"] {
         let t = Temp::new();
         let mut a = row("a", &["b"], false);
@@ -291,6 +300,8 @@ fn around_qualification_includes_filters_links_partial_and_stale() {
 }
 #[test]
 fn around_result_default_maximum_and_admitted_scan_bound() {
+    // spec: specs/ont/read.md#R7
+    // spec: specs/ont/read.md#R72
     let t = Temp::new();
     let targets: Vec<String> = (0..1001).map(|n| format!("n{n:05}")).collect();
     let refs: Vec<&str> = targets.iter().map(String::as_str).collect();
@@ -347,6 +358,8 @@ fn around_single_reference_forward_and_reverse() {
 
 #[test]
 fn around_reference_entries_at_and_above_bound_forward_and_reverse() {
+    // spec: specs/ont/read.md#R76
+    // spec: specs/ont/read.md#R78
     let bound = ont::around::MAX_REFERENCE_ENTRIES;
     for reverse in [false, true] {
         for missing in [false, true] {
@@ -413,6 +426,7 @@ fn around_reference_entries_at_and_above_bound_forward_and_reverse() {
 
 #[test]
 fn around_reference_budget_is_shared_across_hops_and_heads() {
+    // spec: specs/ont/read.md#R76
     let bound = ont::around::MAX_REFERENCE_ENTRIES;
     for reverse in [false, true] {
         for extra in [0, 1] {
@@ -447,6 +461,7 @@ fn around_reference_budget_is_shared_across_hops_and_heads() {
 
 #[test]
 fn around_reference_bound_hidden_missing_parity_ignores_hidden_source_entries() {
+    // spec: specs/ont/read.md#R77
     let bound = 500; // Bounded observations still exercise hidden-source parity.
     for reverse in [false, true] {
         let missing = Temp::new();
@@ -469,6 +484,7 @@ fn around_reference_bound_hidden_missing_parity_ignores_hidden_source_entries() 
 
 #[test]
 fn around_reverse_scan_bound_on_type_different_from_start() {
+    // spec: specs/ont/read.md#R72
     let t = Temp::new();
     let mut leaf = row("start", &[], false);
     leaf.id.object_type = "leaf".into();
@@ -642,6 +658,8 @@ fn around_upgraded_reference_targets_are_excluded_and_keep_hidden_missing_parity
 
 #[test]
 fn aggregate_cli_mcp_count_filter_refusals_and_hints() {
+    // spec: specs/ont/read.md#R80
+    // spec: specs/ont/read.md#R81
     let t = Temp::new();
     upgrade_schema(&t, |schema| {
         schema["grants"][0]["derive"] = json!(["node"]);

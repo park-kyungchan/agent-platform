@@ -34,6 +34,7 @@ fn id(key: &str) -> Id {
 }
 #[test]
 fn hidden_101_history_is_unavailable_without_count_before_admission() {
+    // spec: specs/ont/read.md#R21
     let mut store = Store::memory_schema().unwrap();
     let schema = json!({"format":"ontology-schema/v1","domain":"test","version":1,
         "namespace":{"instance":"test","account":"root"},"scope_keys":["tenant"],

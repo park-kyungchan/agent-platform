@@ -147,6 +147,10 @@ fn counts(t: &Temp) -> (usize, usize) {
 
 #[test]
 fn list_validate_apply_and_failed_criterion_writes_nothing() {
+    // spec: specs/ont/action.md#R1
+    // spec: specs/ont/action.md#R2
+    // spec: specs/ont/action.md#R3
+    // spec: specs/ont/action.md#R4
     let t = setup();
     let (code, ans) = run_store(&t, &["action", "list"], &json!({"op":"list_actions"}));
     assert_eq!(code, 0, "{ans}");
@@ -230,6 +234,7 @@ fn list_validate_apply_and_failed_criterion_writes_nothing() {
 
 #[test]
 fn expected_conflict_forbidden_and_invalid_parameters() {
+    // spec: specs/ont/action.md#R4
     let t = setup();
     let (code, ans) = apply(
         &t,
@@ -303,6 +308,8 @@ fn expected_conflict_forbidden_and_invalid_parameters() {
 
 #[test]
 fn create_modify_delete_history_and_search() {
+    // spec: specs/ont/action.md#R7
+    // spec: specs/ont/action.md#R87
     let t = setup();
     let (code, ans) = apply(
         &t,
@@ -362,6 +369,7 @@ fn create_modify_delete_history_and_search() {
 
 #[test]
 fn create_or_modify_creates_then_modifies_and_tag_key_from_action_id() {
+    // spec: specs/ont/action.md#R7
     let t = setup();
     let (code, ans) = apply(
         &t,
@@ -388,6 +396,9 @@ fn create_or_modify_creates_then_modifies_and_tag_key_from_action_id() {
 
 #[test]
 fn idempotent_retry_reused_validate_equals_apply_and_log_line() {
+    // spec: specs/ont/action.md#R9
+    // spec: specs/ont/action.md#R10
+    // spec: specs/ont/action.md#R11
     let t = setup();
     // validate == apply edits (deterministic allocation, no request_id).
     let (code, v) = run_store(
@@ -450,6 +461,7 @@ fn idempotent_retry_reused_validate_equals_apply_and_log_line() {
 
 #[test]
 fn crash_between_commit_and_append_is_repaired_by_next_write() {
+    // spec: specs/ont/action.md#R19
     let t = setup();
     let ctx = Context::new(t.store_path(), NOW);
     let req = ont::action::ApplyActionRequest {
@@ -547,6 +559,8 @@ fn source_owned_rule_refused_by_schema_check_and_old_store_opens() {
 
 #[test]
 fn embedding_uses_only_public_library_items() {
+    // spec: specs/ont/schema-language.md#R20
+    // spec: specs/ont/schema-language.md#R22
     let t = Temp::new();
     // A domain server opens its own store file and installs its schema
     // through the store, then uses only `ont` public items.
@@ -686,6 +700,10 @@ fn make_note(t: &Temp, title: &str) -> (String, Value) {
 
 #[test]
 fn b1_unwritable_log_is_pending_and_retry_already_applied() {
+    // spec: specs/ont/action.md#R10
+    // spec: specs/ont/action.md#R13
+    // spec: specs/ont/action.md#R19
+    // spec: specs/ont/action.md#R25
     let t = setup();
     std::fs::remove_file(t.edits()).ok();
     std::fs::create_dir(t.edits()).unwrap();
@@ -709,6 +727,8 @@ fn b1_unwritable_log_is_pending_and_retry_already_applied() {
 
 #[test]
 fn b2_truncated_extra_changed_and_non_utf8_are_repaired() {
+    // spec: specs/ont/action.md#R19
+    // spec: specs/ont/action.md#R21
     // Truncated mid-line.
     let t = setup();
     let (_, _) = make_note(&t, "one");
@@ -797,6 +817,7 @@ fn b2_truncated_extra_changed_and_non_utf8_are_repaired() {
 
 #[test]
 fn b2_concurrent_repair_no_duplicates() {
+    // spec: specs/ont/action.md#R20
     let t = setup();
     let (_, _) = make_note(&t, "one");
     let mut store = Store::open_schema(&t.store_path()).unwrap();
@@ -820,6 +841,8 @@ fn b2_concurrent_repair_no_duplicates() {
 
 #[test]
 fn b3_criteria_tri_state_and_literal_operands() {
+    // spec: specs/ont/action.md#R6
+    // spec: specs/ont/action.md#R85
     let t = setup();
     // Missing label property: ge, none and any are unevaluable.
     let (_, note_id) = make_note(&t, "first");
@@ -968,6 +991,8 @@ fn b4_pattern_optional_and_create_or_modify_pointer_key() {
 
 #[test]
 fn b5_same_request_id_different_agent_is_own_action() {
+    // spec: specs/ont/action.md#R9
+    // spec: specs/ont/action.md#R12
     let t = setup();
     let body_a = json!({"op":"apply_action","action_type":"record_note","agent":"agent-a","request_id":"shared-1","parameters":{"title":"once","task":task_id()}});
     let (code, a) = apply(&t, body_a.clone());
@@ -988,6 +1013,7 @@ fn b5_same_request_id_different_agent_is_own_action() {
 
 #[test]
 fn refusals_write_nothing() {
+    // spec: specs/ont/action.md#R4
     let t = setup();
     let (_, note_id) = make_note(&t, "first");
     let cases: Vec<(Value, &str)> = vec![
@@ -1079,6 +1105,8 @@ fn lib_apply(ctx: &Context, body: Value) -> Result<Value, Failure> {
 
 #[test]
 fn b6_paged_linked_scan_still_refuses_and_snapshot_too_large() {
+    // spec: specs/ont/action.md#R30
+    // spec: specs/ont/action.md#R31
     let t = setup();
     let mut key_effect: Vec<(String, String)> = Vec::new();
     for effect in ["merge", "freeze", "audit"] {
@@ -1118,6 +1146,8 @@ fn b6_paged_linked_scan_still_refuses_and_snapshot_too_large() {
 
 #[test]
 fn b4_validate_with_request_id_equals_apply_and_actor_bounds() {
+    // spec: specs/ont/action.md#R2
+    // spec: specs/ont/action.md#R14
     let t = setup();
     let ctx = Context::new(t.store_path(), NOW);
     let vreq = ont::action::ValidateActionRequest {
@@ -1163,6 +1193,7 @@ fn b4_validate_with_request_id_equals_apply_and_actor_bounds() {
 
 #[test]
 fn n2_retry_id_length_prefixed_distinguishes_colon_fields() {
+    // spec: specs/ont/action.md#R9
     let t = setup();
     let mut ctx_a = Context::new(t.store_path(), NOW);
     ctx_a.client = "a:b".into();
@@ -1187,6 +1218,8 @@ fn n2_retry_id_length_prefixed_distinguishes_colon_fields() {
 
 #[test]
 fn n1_interleaved_apply_sync_never_rebuilt() {
+    // spec: specs/ont/action.md#R20
+    // spec: specs/ont/action.md#R24
     let t = setup();
     ont::action::__reset_pause_after_commit();
     let path_a = t.store_path();
@@ -1244,6 +1277,7 @@ fn n1_interleaved_apply_sync_never_rebuilt() {
 
 #[test]
 fn n1b_two_diverged_repairs_leave_two_asides() {
+    // spec: specs/ont/action.md#R21
     let t = setup();
     let (_, _) = make_note(&t, "one");
     for _ in 0..2 {
@@ -1266,6 +1300,7 @@ fn n1b_two_diverged_repairs_leave_two_asides() {
 
 #[test]
 fn g2a_earlier_changed_line_is_left_by_a_write_and_found_by_verify() {
+    // spec: specs/ont/action.md#R22
     let t = setup();
     for title in ["one", "two", "three"] {
         make_note(&t, title);
@@ -1328,6 +1363,8 @@ fn g2a_rows_missing_after_the_tail_are_appended() {
 
 #[test]
 fn backup_verifies_the_export() {
+    // spec: specs/ont/action.md#R23
+    // spec: specs/ont/action.md#R26
     let t = setup();
     for title in ["one", "two", "three"] {
         make_note(&t, title);
@@ -1423,6 +1460,7 @@ fn g4_request(task: Value) -> Value {
 }
 #[test]
 fn g4_linked_loads_only_the_targets_heads() {
+    // spec: specs/ont/action.md#R29
     let t = g4_setup();
     let ctx = Context::with_snapshot_bounds(t.store_path(), NOW, 2, 3);
     let result = lib_apply(&ctx, g4_request(task_id())).unwrap();
@@ -1438,6 +1476,7 @@ fn g4_linked_still_refuses_on_a_duplicate() {
 }
 #[test]
 fn g4_partial_or_old_pin_head_is_still_counted() {
+    // spec: specs/ont/action.md#R29
     let t = g4_setup();
     g4_append_hold(&t, "a-partial", task_id(), true);
     let connection = rusqlite::Connection::open(t.store_path()).unwrap();
@@ -1467,6 +1506,7 @@ fn g4_reference_key_order() {
 
 #[test]
 fn g4_list_reference_retains_type_scan() {
+    // spec: specs/ont/action.md#R29
     let t = Temp::new();
     let mut schema: Value = serde_json::from_slice(FIXTURE).unwrap();
     schema["object_types"]["hold"]["properties"]["task"]["type"] = json!({"array":{"ref":"task"}});
@@ -1602,6 +1642,7 @@ fn g4_page_merge_keeps_the_smallest_ids() {
 
 #[test]
 fn g2a_complete_tail_with_unterminated_fragment_is_truncated() {
+    // spec: specs/ont/action.md#R20
     let t = setup();
     make_note(&t, "one");
     let mut bytes = std::fs::read(t.edits()).unwrap();

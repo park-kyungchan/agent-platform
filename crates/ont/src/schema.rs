@@ -487,6 +487,8 @@ mod tests {
     use super::*;
     #[test]
     fn existing_default_aliases_refuse_without_rows_or_backups() {
+        // spec: specs/ont/store.md#R9
+        // spec: specs/ont/schema-language.md#R16
         let root = std::env::temp_dir().join(format!("ont-default-aliases-{}", std::process::id()));
         std::fs::create_dir_all(root.join("real")).unwrap();
         let default = root.join("real/store.sqlite");

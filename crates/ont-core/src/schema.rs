@@ -3202,6 +3202,7 @@ mod source_tests {
 
     #[test]
     fn glob_syntax_is_refused_or_matched() {
+        // spec: specs/ont/index.md#R4
         for bad in [
             "rel/*.md", "/a/{x,y}", "/a/[ab]", "/a/**", "/a/x**/f", "/a//f", "/a/./f", "/a/../f",
             "/a/\\f", "/a/f/",
@@ -3222,6 +3223,7 @@ mod source_tests {
 
     #[test]
     fn double_star_matching_is_polynomial_and_capped() {
+        // spec: specs/ont/index.md#R4
         // Eight `**` against a 64-segment path that does not match: the
         // time bound (5 s) is generous; the old matcher took exponential time.
         let glob = format!("/{}x", "**/".repeat(8));

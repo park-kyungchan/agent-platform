@@ -89,6 +89,7 @@ ONT_INSTALL_TEST=1 ONT_INSTALL_BIN_DIR="$BIN1" ONT_INSTALL_STATE_DIR="$STATE1" \
 ONT_INSTALL_TEST=1 ONT_INSTALL_BIN_DIR="$BIN1" ONT_INSTALL_STATE_DIR="$STATE1" \
   "$INSTALL" check >/dev/null || fail "check failed after rollback"
 
+# spec: specs/ont/cli.md#R10
 # Refusals.
 set +e
 ONT_INSTALL_TEST=1 ONT_INSTALL_BIN_DIR="$BIN1" ONT_INSTALL_STATE_DIR="$STATE1" \
@@ -147,6 +148,7 @@ chmod 0700 "$STATE1/ont"
 run_test_install "$TMP/ont-v2"
 rm "$STATE1/install/ont.before-$PREV12"
 expect_refusal 'previous binary not found' fixture rollback
+# spec: specs/ont/cli.md#R9
 # Bad previous version must leave binary/state intact and remove temporary names.
 printf '#!/bin/sh\nexit 1\n' >"$TMP/bad-version"
 cp "$TMP/bad-version" "$BIN1/ont"
@@ -156,6 +158,7 @@ expect_refusal 'previous binary does not print a version line' fixture rollback
 cmp "$TMP/before.json" "$STATE1/install/installed.json" || fail 'rollback changed state before version validation'
 [ "$(sha256sum "$BIN1/ont" | awk '{print $1}')" = "$SHA_V2" ] || fail 'bad version replaced binary'
 [ -z "$(find "$BIN1" -name '.ont.*' -print)" ] || fail 'stray rollback temporary'
+# spec: specs/ont/cli.md#R5
 # Keep at most three previous copies, only after state is written.
 for n in 3 4 5 6; do
   make_standin "$TMP/ont-next" "v$n"
@@ -175,6 +178,7 @@ mv "$BIN1" "$TMP/bin-before-rollback"
 fixture rollback >/dev/null || fail 'rollback did not create missing binary directory'
 fixture check >/dev/null || fail 'check failed after recreating binary directory'
 
+# spec: specs/ont/cli.md#R1
 # Refresh a stale ref before checking ancestry.
 git -C "$TMP/checkout" -c user.name=Test -c user.email=test@example.invalid commit -qm newer --allow-empty
 git -C "$TMP/checkout" push -q origin main
@@ -192,6 +196,7 @@ run_test_install "$TMP/new-head"
 git -C "$TMP/checkout" config remote.origin.fetch '+refs/heads/*:refs/ont-test/*'
 run_test_install "$TMP/new-head"
 [ -z "$(git -C "$TMP/checkout" for-each-ref refs/ont-test/)" ] || fail 'fetch used the configured refspec'
+# spec: specs/ont/cli.md#R6
 # inherited_git_environment_does_not_change_other_repository_refs.
 mkdir "$TMP/other"
 git -C "$TMP/other" init -q
@@ -200,6 +205,7 @@ other_before=$(git -C "$TMP/other" for-each-ref)
 env GIT_DIR="$TMP/other/.git" GIT_WORK_TREE="$TMP/other" GIT_INDEX_FILE="$TMP/other/index" GIT_COMMON_DIR="$TMP/other/.git" \
   ONT_INSTALL_TEST=1 ONT_INSTALL_BIN_DIR="$BIN1" ONT_INSTALL_STATE_DIR="$STATE1" ONT_INSTALL_PREBUILT="$TMP/new-head" "$INSTALL" install "$GOOD" >/dev/null
 [ "$(git -C "$TMP/other" for-each-ref)" = "$other_before" ] || fail 'inherited Git environment changed another repository ref'
+# spec: specs/ont/cli.md#R7
 # unknown_commit_has_its_own_refusal after a successful fetch.
 expect_refusal 'commit_unknown: 0000000000000000000000000000000000000000' fixture install 0000000000000000000000000000000000000000
 
@@ -208,12 +214,14 @@ printf '#!/bin/sh\ncase "$*" in *merge-base*) exit 128 ;; esac\nexec /usr/bin/gi
 chmod +x "$TMP/tools/git"
 expect_refusal 'git_unavailable: ancestor check failed (status 128)' env PATH="$TMP/tools:$PATH" ONT_INSTALL_TEST=1 ONT_INSTALL_BIN_DIR="$BIN1" ONT_INSTALL_STATE_DIR="$STATE1" ONT_INSTALL_PREBUILT="$TMP/new-head" "$INSTALL" install "$GOOD"
 rm "$TMP/tools/git"
+# spec: specs/ont/cli.md#R4
 # A corrupted backup copy must be refused before replacement.
 printf '#!/bin/sh\n/usr/bin/cp "$@" || exit $?\nprintf x >>"$2"\n' >"$TMP/tools/cp"
 chmod +x "$TMP/tools/cp"
 expect_refusal 'previous binary copy is missing or has the wrong sha256' env PATH="$TMP/tools:$PATH" ONT_INSTALL_TEST=1 ONT_INSTALL_BIN_DIR="$BIN1" ONT_INSTALL_STATE_DIR="$STATE1" ONT_INSTALL_PREBUILT="$TMP/new-head" "$INSTALL" install "$GOOD"
 cmp "$TMP/new-head" "$BIN1/ont" || fail 'bad backup replaced binary'
 rm "$TMP/tools/cp"
+# spec: specs/ont/cli.md#R8
 # Failed state rename after replacement prints exact recovery and cleans temp files.
 printf '#!/bin/sh\ncase "$2" in */installed.json) exit 1 ;; esac\nexec /usr/bin/mv "$@"\n' >"$TMP/tools/mv"
 chmod +x "$TMP/tools/mv"
@@ -256,6 +264,7 @@ set -e
 [ "$code" -ne 0 ] || fail 'temporary install failure succeeded'
 [ -z "$(find "$BIN1" -name '.ont.*')" ] || fail 'stray failed-install temporary'
 rm "$TMP/tools/install"
+# spec: specs/ont/cli.md#R3
 # Refuse before cargo, and record that df received the mktemp build path.
 printf '#!/bin/sh\nprintf "%%s\\n" "$3" >"$ONT_DF_LOG"\nprintf "Avail\\n${ONT_TEST_AVAIL:-9}G\\n"\n' >"$TMP/tools/df"
 chmod +x "$TMP/tools/df"

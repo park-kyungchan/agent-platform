@@ -5,218 +5,133 @@ Purpose: The contract of action list, validate and apply, their values, criteria
 Moved from crates/ont/README.md ("actions", "Action values and parameter descriptions", "Presence operators", "How a criterion names a property", "Refusal records") at cf328f3c07623d39f300cb3a84599bed30ca258a; requirement ids, "Not included" and "Open" are added when a section's contract changes.
 
 ## actions
-- Requests are one JSON object on stdin, one JSON line on stdout; exit 0 ok, 2 refused, 1 internal. `ont [--store PATH] [--client NAME] action list` takes `{"op":"list_actions","domain"?}` and lists each granted action type with its parameters (name, type, required, allowed values), criteria codes, messages and condition expressions (including `present`), and the object types its rules edit. `action validate` takes `{"op":"validate_action","action_type","parameters":{…},"agent"?,"session"?,"request_id"?}` and answers `valid`, every criterion with `passed`, `basis` (the heads read with their revisions), `edits` (what apply would write; with a `request_id`, the same revisions apply would write) and the schema pin in the envelope; it writes nothing. `action apply` takes the same fields plus `"expected":[{"id","revision"}]?` and `"request_id"?`.
-- Apply runs in ONE IMMEDIATE transaction: grant check (`action_forbidden`), parameter typing (`invalid_parameter` with the parameter name), every head named in `expected` re-read and compared (`revision_conflict` naming the id), every criterion re-evaluated (`submission_criteria` with the failed codes and their declared messages), action id allocated, the observations of every rule appended, the `action_log` row inserted, commit; then the `edits.jsonl` append. When `expected` is absent, the transaction itself still guarantees that the criteria were evaluated on the heads it wrote against, because both happen inside the same IMMEDIATE transaction.
-- Criteria forms evaluated: the criterion arms `all`/`any`/`none` and the conditions `present`, `exists`, `fresh`, `eq`, `ne`, `in`, `lt`, `le`, `gt`, `ge`, `linked` (on the reference properties of the current heads; no link table), `actor`, and nested `all`/`any`/`none`. Rules: create object (key from a parameter or the action id), modify, create-or-modify, delete (appends a `retraction`), set and clear a reference property. Only Ontology-owned types are edited; a source-owned target refuses defensively at apply with `action_edits_source_owned`. An Ontology-owned value has no freshness horizon (`fresh_until` is 9999-12-31); its lineage points to the action-log record (`/edits/<n>`).
-- Idempotent retry: with `request_id` (1 to 64 characters of `[A-Za-z0-9._-]`), the action id is `act-rq-` plus the first 32 hex characters of the SHA-256 over the client, the agent (empty when absent) and the `request_id`, each field prefixed by its byte length, so the same `request_id` from another client or agent is another request; a second apply with the same `request_id`, action type and canonical parameters returns the first result with `"outcome":"already_applied"` and writes nothing; the same derived id with different content is the refusal `request_id_reused`.
-- Attribution: the actor `{principal, client, agent, session, role}` reaches the log: `client` from `--client NAME` of the command (default `cli`), `agent` from the request field or the environment variable `ONT_AGENT`, `session` if given, `role` from the request field `role` of `action validate` and `action apply` or the environment variable `ONT_ROLE` (the request wins; an empty `ONT_ROLE` is no role); all self-reported. The log row and the apply answer mark this with `"actor_trust": "self_reported"`: the actor is a claim, not authentication. On the library path `agent`, `session`, `role` and `client` are each 1 to 64 characters of `[A-Za-z0-9._:-]` (`invalid_request` with the field `/agent`, `/session`, `/role` or `/client` otherwise), and the total size of `parameters` is bounded as on the command path (`invalid_request` otherwise).
-- The role: a given role is the member `role` of the actor that the `action_log` row, the `edits.jsonl` line and the `refusals.jsonl` line record and that criteria read, so the criterion condition `{"actor":{"role":"lead"}}` holds for an actor whose role is `lead` (the object form of `actor` compares every member it names). The role does not enter the derived action id: a retry with the same `request_id` under another role is the same request. Without a role every answer, log line and action id is as before. `actor_trust` stays `self_reported`: the role is a claim. In the library the role is the member `role` of `Context` (`None` from `Context::new`); `ValidateActionRequest` and `ApplyActionRequest` have no `role` member, so the command and the MCP server take `role` out of the request object (a string, or null for none; another type is `invalid_request` at `/role`) before they parse the rest.
-- `edits.jsonl` beside the store (0600, opened without following a symlink): one canonical JSON line per applied action after the commit, with `fsync`. After the commit the action stands whatever happens to the file: the answer is `"outcome":"applied"` with `"edits_log"` = `written`, `pending` (the append failed; the next write repairs it) or `rebuilt`. Every write takes an exclusive `flock` on `edits.jsonl.lock` beside the store, compares the file's last complete line with its row and appends the rows after it, writes each line with its newline in one write, and truncates an incomplete trailing line before appending. A file that is absent, empty, or whose last complete line does not equal its row (an extra, changed or unparseable last line, invalid UTF-8 in it, or a missing row) is compared in full, renamed to `edits.jsonl.diverged-<UTC yyyymmddThhmmssZ>-<n>` when it diverged (`n` counting up from 0 until the name is free, never replacing an existing aside), and rewritten from the table (the database wins, nothing is lost). A last line that repeats an earlier row is not found by apply (which compares only the last complete line with its row); `ont backup` compares the whole file and repairs it. A changed line before the last one is found by `ont::action::verify_edits_file`, which runs the full comparison on demand, not by a write. `ont backup` runs this full comparison and reports `edits_log` in its answer. The table is read only after the `flock` is held, so no caller passes a reading taken before the lock. An existing file that is not 0600 owned by the caller is not appended to (`edits_log: pending`, one warning on stderr).
-- `ont backup` opens the store read-only and returns `path`, `sha256`, `retention_failure` and `edits_log` (`written`, `rebuilt` or `pending`) in `result`. A `pending` export status does not fail the backup; the store copy is still taken and reported.
-- Creating an object over a retracted key is allowed: it starts a new history for that key with an `initial` observation, and the retracted history stays in the object's history.
+- R1: Requests are one JSON object on stdin, one JSON line on stdout; exit 0 ok, 2 refused, 1 internal. `ont [--store PATH] [--client NAME] action list` takes `{"op":"list_actions","domain"?}` and lists each granted action type with its parameters (name, type, required, allowed values), criteria codes, messages and condition expressions (including `present`), and the object types its rules edit.
+- R2: `action validate` takes `{"op":"validate_action","action_type","parameters":{…},"agent"?,"session"?,"request_id"?}` and answers `valid`, every criterion with `passed`, `basis` (the heads read with their revisions), `edits` (what apply would write; with a `request_id`, the same revisions apply would write) and the schema pin in the envelope; it writes nothing.
+- R3: `action apply` takes the same fields plus `"expected":[{"id","revision"}]?` and `"request_id"?`.
+- R4: Apply runs in ONE IMMEDIATE transaction: grant check (`action_forbidden`), parameter typing (`invalid_parameter` with the parameter name), every head named in `expected` re-read and compared (`revision_conflict` naming the id), every criterion re-evaluated (`submission_criteria` with the failed codes and their declared messages), action id allocated, the observations of every rule appended, the `action_log` row inserted, commit; then the `edits.jsonl` append.
+- R5: When `expected` is absent, the transaction itself still guarantees that the criteria were evaluated on the heads it wrote against, because both happen inside the same IMMEDIATE transaction.
+- R6: Criteria forms evaluated: the criterion arms `all`/`any`/`none` and the conditions `present`, `exists`, `fresh`, `eq`, `ne`, `in`, `lt`, `le`, `gt`, `ge`, `linked` (on the reference properties of the current heads; no link table), `actor`, and nested `all`/`any`/`none`.
+- R7: Rules: create object (key from a parameter or the action id), modify, create-or-modify, delete (appends a `retraction`), set and clear a reference property.
+- R8: Only Ontology-owned types are edited; a source-owned target refuses defensively at apply with `action_edits_source_owned`. An Ontology-owned value has no freshness horizon (`fresh_until` is 9999-12-31); its lineage points to the action-log record (`/edits/<n>`).
+- R9: Idempotent retry: with `request_id` (1 to 64 characters of `[A-Za-z0-9._-]`), the action id is `act-rq-` plus the first 32 hex characters of the SHA-256 over the client, the agent (empty when absent) and the `request_id`, each field prefixed by its byte length, so the same `request_id` from another client or agent is another request;
+- R10: a second apply with the same `request_id`, action type and canonical parameters returns the first result with `"outcome":"already_applied"` and writes nothing;
+- R11: the same derived id with different content is the refusal `request_id_reused`.
+- R12: Attribution: the actor `{principal, client, agent, session, role}` reaches the log: `client` from `--client NAME` of the command (default `cli`), `agent` from the request field or the environment variable `ONT_AGENT`, `session` if given, `role` from the request field `role` of `action validate` and `action apply` or the environment variable `ONT_ROLE` (the request wins; an empty `ONT_ROLE` is no role); all self-reported.
+- R13: The log row and the apply answer mark this with `"actor_trust": "self_reported"`: the actor is a claim, not authentication.
+- R14: On the library path `agent`, `session`, `role` and `client` are each 1 to 64 characters of `[A-Za-z0-9._:-]` (`invalid_request` with the field `/agent`, `/session`, `/role` or `/client` otherwise), and the total size of `parameters` is bounded as on the command path (`invalid_request` otherwise).
+- R15: The role: a given role is the member `role` of the actor that the `action_log` row, the `edits.jsonl` line and the `refusals.jsonl` line record and that criteria read, so the criterion condition `{"actor":{"role":"lead"}}` holds for an actor whose role is `lead` (the object form of `actor` compares every member it names).
+- R16: The role does not enter the derived action id: a retry with the same `request_id` under another role is the same request. Without a role every answer, log line and action id is as before. `actor_trust` stays `self_reported`: the role is a claim.
+- R17: In the library the role is the member `role` of `Context` (`None` from `Context::new`); `ValidateActionRequest` and `ApplyActionRequest` have no `role` member, so the command and the MCP server take `role` out of the request object (a string, or null for none; another type is `invalid_request` at `/role`) before they parse the rest.
+- R18: `edits.jsonl` beside the store (0600, opened without following a symlink): one canonical JSON line per applied action after the commit, with `fsync`.
+- R19: After the commit the action stands whatever happens to the file: the answer is `"outcome":"applied"` with `"edits_log"` = `written`, `pending` (the append failed; the next write repairs it) or `rebuilt`.
+- R20: Every write takes an exclusive `flock` on `edits.jsonl.lock` beside the store, compares the file's last complete line with its row and appends the rows after it, writes each line with its newline in one write, and truncates an incomplete trailing line before appending.
+- R21: A file that is absent, empty, or whose last complete line does not equal its row (an extra, changed or unparseable last line, invalid UTF-8 in it, or a missing row) is compared in full, renamed to `edits.jsonl.diverged-<UTC yyyymmddThhmmssZ>-<n>` when it diverged (`n` counting up from 0 until the name is free, never replacing an existing aside), and rewritten from the table (the database wins, nothing is lost).
+- R22: A last line that repeats an earlier row is not found by apply (which compares only the last complete line with its row); `ont backup` compares the whole file and repairs it. A changed line before the last one is found by `ont::action::verify_edits_file`, which runs the full comparison on demand, not by a write.
+- R23: `ont backup` runs this full comparison and reports `edits_log` in its answer.
+- R24: The table is read only after the `flock` is held, so no caller passes a reading taken before the lock.
+- R25: An existing file that is not 0600 owned by the caller is not appended to (`edits_log: pending`, one warning on stderr).
+- R26: `ont backup` opens the store read-only and returns `path`, `sha256`, `retention_failure` and `edits_log` (`written`, `rebuilt` or `pending`) in `result`.
+- R27: A `pending` export status does not fail the backup; the store copy is still taken and reported.
+- R28: Creating an object over a retracted key is allowed: it starts a new history for that key with an `initial` observation, and the retracted history stays in the object's history.
 
-- A reverse `linked` condition loads the heads of the link's source type whose backing property has the target as a known value, every head of that type whose backing property holds a value that cannot be posted (partial coverage, or a schema pin older than the installed one: after a new domain install every earlier head WITH a value in that property is unresolved until it is written again), every head whose legacy observation is too large to project at rebuild, and every stale head of that type. For a scalar backing property, heads with no value (cleared or never set) are not loaded unless stale. The snapshot bound counts these heads; a link backed by a list property retains the scan of the whole type.
+- R29: A reverse `linked` condition loads the heads of the link's source type whose backing property has the target as a known value, every head of that type whose backing property holds a value that cannot be posted (partial coverage, or a schema pin older than the installed one: after a new domain install every earlier head WITH a value in that property is unresolved until it is written again), every head whose legacy observation is too large to project at rebuild, and every stale head of that type. For a scalar backing property, heads with no value (cleared or never set) are not loaded unless stale. The snapshot bound counts these heads; a link backed by a list property retains the scan of the whole type.
 
-- Snapshot: apply and validate load parameter objects (except parameters used only by bare `present` and not needed for rule planning), expected-revision objects, one reference hop from the initially loaded heads, the objects a rule edits, and paged reverse `linked` scans. Admission reads only identity, scope and liveness before loading observation payloads; only admitted live heads are traversed or start reverse scans. Heads a scan filters out are never loaded or counted against the hard snapshot bound; every admitted loaded head counts, and exceeding it refuses with `snapshot_too_large` and writes nothing. Snapshot loading includes reverse-link scans from admitted sources in every written criterion operand, including an operand that ordered `all` later skips; the bound limits loading, not just evaluation.
+- R30: Snapshot: apply and validate load parameter objects (except parameters used only by bare `present` and not needed for rule planning), expected-revision objects, one reference hop from the initially loaded heads, the objects a rule edits, and paged reverse `linked` scans.
+- R31: Admission reads only identity, scope and liveness before loading observation payloads; only admitted live heads are traversed or start reverse scans. Heads a scan filters out are never loaded or counted against the hard snapshot bound; every admitted loaded head counts, and exceeding it refuses with `snapshot_too_large` and writes nothing. Snapshot loading includes reverse-link scans from admitted sources in every written criterion operand, including an operand that ordered `all` later skips; the bound limits loading, not just evaluation.
 
-For Ontology-owned types, `primary_key.from` is `$action_id` or `/native_key`.
-Other pointers refuse `schema check` with `ambiguous_create_key` at the type's
-`/object_types/<type>/primary_key/from`. Source-owned key extraction is unchanged.
-For `create_object` and `create_or_modify_object` with `/native_key`, exactly one
-**required reference to the created type** supplies its `native_key`. Structs,
-scalars, arrays, value types, optional references and references to another type
-never supply the key. Zero or multiple required references refuse with
-`ambiguous_create_key` at `/action_types/<action>`. Parameter names never select
-keys: with required `z_record: ref(record)` and optional `a_predecessor: ref(record)`,
-`z_record.native_key` is the key.
+- R32: For Ontology-owned types, `primary_key.from` is `$action_id` or `/native_key`.
+- R33: Other pointers refuse `schema check` with `ambiguous_create_key` at the type's `/object_types/<type>/primary_key/from`. Source-owned key extraction is unchanged.
+- R34: For `create_object` and `create_or_modify_object` with `/native_key`, exactly one **required reference to the created type** supplies its `native_key`. Structs, scalars, arrays, value types, optional references and references to another type never supply the key. Zero or multiple required references refuse with `ambiguous_create_key` at `/action_types/<action>`.
+- R35: Parameter names never select keys: with required `z_record: ref(record)` and optional `a_predecessor: ref(record)`, `z_record.native_key` is the key.
 
 Three constraints keep schema admission and execution consistent:
-- The key reference's namespace must equal the domain namespace. Both validate
-  and apply refuse a foreign namespace with `invalid_parameter` at
-  `/parameters/<key-parameter>/namespace`, without writing.
-- An action has at most one create/upsert rule for a given pointer-keyed type;
-  a second rule refuses `ambiguous_create_key` at the action.
-- Id parameter validation ensures `native_key` is a string of 1 to 512 bytes,
-  so a key accepted by validate is also usable by apply. Other criteria and
-  revision conflicts may still prevent apply. Upsert modifies the live object
-  under that key, or creates it if missing or retracted.
+- R36: The key reference's namespace must equal the domain namespace. Both validate and apply refuse a foreign namespace with `invalid_parameter` at `/parameters/<key-parameter>/namespace`, without writing.
+- R37: An action has at most one create/upsert rule for a given pointer-keyed type; a second rule refuses `ambiguous_create_key` at the action.
+- R38: Id parameter validation ensures `native_key` is a string of 1 to 512 bytes, so a key accepted by validate is also usable by apply. Other criteria and revision conflicts may still prevent apply.
+- R39: Upsert modifies the live object under that key, or creates it if missing or retracted.
 
-Installed bytes load through `Schema::check_installed_bytes`: parsing, all other
-semantic checks and exact-byte pin verification still run, but only
-`ambiguous_create_key` is exempted. Reads, backup, compact and unaffected actions
-remain available. After authorization, validate/apply of an affected action
-refuse `ambiguous_create_key` with `pointer: /action_types/<action>`, without
-writing. Apply checks again inside its transaction, before idempotent replay.
-Schema-set composition rechecks every other rule. Strict `Schema::check_bytes`
-is required for every new install, including identical-byte reinstall and
-provenance-only updates of a schema with this violation. To repair, install a
-higher version using `/native_key` and exactly one required reference to the
-created type and one create/upsert rule per type. Other affected domains can
-await their own upgrades. No store format change; installed `work` version 7
-already uses the admitted shape. `$action_id` behavior is unchanged.
+- R40: Installed bytes load through `Schema::check_installed_bytes`: parsing, all other semantic checks and exact-byte pin verification still run, but only `ambiguous_create_key` is exempted. Reads, backup, compact and unaffected actions remain available.
+- R41: After authorization, validate/apply of an affected action refuse `ambiguous_create_key` with `pointer: /action_types/<action>`, without writing. Apply checks again inside its transaction, before idempotent replay.
+- R42: Schema-set composition rechecks every other rule. Strict `Schema::check_bytes` is required for every new install, including identical-byte reinstall and provenance-only updates of a schema with this violation.
+- R43: To repair, install a higher version using `/native_key` and exactly one required reference to the created type and one create/upsert rule per type. Other affected domains can await their own upgrades.
+- R44: No store format change; installed `work` version 7 already uses the admitted shape. `$action_id` behavior is unchanged.
 
 ## Action values and parameter descriptions
 
-A rule's `set` value or `set_reference.value` may use `$parameter.property`
-when `parameter` is a reference. For example,
-`"set":{"task":"$decision.task","topic":"$decision.topic"}` copies the
-reference and topic from the decision. Only one property level is supported;
-unknown properties, non-reference parameters and incompatible destination
-property types refuse at `schema check`. The value comes from the original
-snapshot, even when an earlier rule in the same action modifies that object.
-The referenced head and revision are included in `validate`'s `basis` and the
-applied action's log. Pass that `basis` as `expected` to apply: any intervening
-change refuses with `revision_conflict`. Without `expected`, apply reads the
-current value inside its transaction and logs that application basis. A copied
-value needs a fresh, readable source: every grant listing the action must include
-the referenced type in `read` (`reference_read_forbidden` at the expression's
-schema pointer otherwise). At runtime the native read admission policy also
-checks the object's grant scope. At the reference-admission boundary, missing,
-retracted and inadmissible sources refuse `rule_reference_unavailable` with the
-same detail-free answer. Availability of all rule reference inputs is checked before staleness or
-expected revisions. Criterion `$parameter.property` admission and freshness
-checks run only when reached in evaluation order, after snapshot loading. A
-present object whose requested property has no value refuses `rule_value_unavailable`. A source past `fresh_until` refuses
-`rule_value_stale`; `validate` returns `valid:false`, no edits and a failed
-`preconditions` entry with that code, while retaining the criteria results and
-computed basis. A criterion that needs a stale property is marked `passed:false`
-with `precondition:rule_value_stale`; independent criteria are still evaluated.
-The freshness boundary is inclusive; Ontology-owned objects retain their existing
-indefinite freshness.
+- R45: A rule's `set` value or `set_reference.value` may use `$parameter.property` when `parameter` is a reference.
+For example, `"set":{"task":"$decision.task","topic":"$decision.topic"}` copies the reference and topic from the decision.
+- R46: Only one property level is supported; unknown properties, non-reference parameters and incompatible destination property types refuse at `schema check`.
+- R47: The value comes from the original snapshot, even when an earlier rule in the same action modifies that object. The referenced head and revision are included in `validate`'s `basis` and the applied action's log. Pass that `basis` as `expected` to apply: any intervening change refuses with `revision_conflict`. Without `expected`, apply reads the current value inside its transaction and logs that application basis.
+- R48: A copied value needs a fresh, readable source: every grant listing the action must include the referenced type in `read` (`reference_read_forbidden` at the expression's schema pointer otherwise). At runtime the native read admission policy also checks the object's grant scope.
+- R49: At the reference-admission boundary, missing, retracted and inadmissible sources refuse `rule_reference_unavailable` with the same detail-free answer. Availability of all rule reference inputs is checked before staleness or expected revisions.
+- R50: Criterion `$parameter.property` admission and freshness checks run only when reached in evaluation order, after snapshot loading. A present object whose requested property has no value refuses `rule_value_unavailable`.
+- R51: A source past `fresh_until` refuses `rule_value_stale`; `validate` returns `valid:false`, no edits and a failed `preconditions` entry with that code, while retaining the criteria results and computed basis. A criterion that needs a stale property is marked `passed:false` with `precondition:rule_value_stale`; independent criteria are still evaluated. The freshness boundary is inclusive; Ontology-owned objects retain their existing indefinite freshness.
 
-`"set":{"closed_at":"$now"}` writes the trusted application time as a UTC
-string such as `"2026-11-12T00:00:00Z"`. It uses the same time as the existing
-log's `submitted_at` and the observations' `observed_at`; no log or store format
-changes. Validation returns `"application_time":"set_at_application"` and does
-not fix that time. A retry with the same `request_id` returns the original edits
-and leaves the original value and time intact. `$now` requires a string or
-string-based value-type destination, and reserves the parameter name `now`.
-Times beyond year 9999 refuse with
-`application_time_out_of_range`. For a patterned string value type, schema
-checking accepts the canonical UTC shape
-`[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z` (also with `\d`,
-optional `^`/`$`), or `.*`. Other patterns refuse `invalid_rule` at the `$now`
-expression: arbitrary regex/time-language intersection is not supported.
-The actual applied value must still satisfy the value type's other constraints.
+- R52: `"set":{"closed_at":"$now"}` writes the trusted application time as a UTC string such as `"2026-11-12T00:00:00Z"`.
+- R53: It uses the same time as the existing log's `submitted_at` and the observations' `observed_at`; no log or store format changes. Validation returns `"application_time":"set_at_application"` and does not fix that time. A retry with the same `request_id` returns the original edits and leaves the original value and time intact.
+- R54: `$now` requires a string or string-based value-type destination, and reserves the parameter name `now`.
+- R55: Times beyond year 9999 refuse with `application_time_out_of_range`.
+- R56: For a patterned string value type, schema checking accepts the canonical UTC shape `[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z` (also with `\d`, optional `^`/`$`), or `.*`. Other patterns refuse `invalid_rule` at the `$now` expression: arbitrary regex/time-language intersection is not supported. The actual applied value must still satisfy the value type's other constraints.
 
-Submission comparisons `eq`, `ne`, `lt`, `le`, `gt`, and `ge` also accept `$now`
-on either side, for example `{"le":["$observed_at","$now"]}`. The other operand
-must be a string parameter, a string `$parameter.property`, or a string literal
-(string-based value types are accepted, including patterned ones). In these
-comparisons unprefixed strings on either side are literals; name a referenced
-property explicitly with `$parameter.property`: `["$source.observed_at","$now"]`
-reads the source property, while `["observed_at","$now"]` compares the literal
-word `observed_at`. A literal equal to a declared action parameter name refuses
-`invalid_criterion` with a message to write `$<name>` instead.
-Comparisons use the existing string ordering and the same full UTC text that a
-rule value `$now` stores.
-`validate` evaluates against its validation time and returns
-`"application_time":"set_at_application"`, including when the criterion fails;
-it does not promise the same result at a later apply. Apply evaluates against
-its application time, once inside the write transaction. An applied request's
-retry returns `already_applied` with its original edits without evaluating the
-criteria again. Both `--now` and the library's injected clock drive this value.
-`$now` remains unavailable in view filters, anywhere inside `linked ... where`
-(including nested `all`/`any`/`none`), and other criterion forms.
+- R57: Submission comparisons `eq`, `ne`, `lt`, `le`, `gt`, and `ge` also accept `$now` on either side, for example `{"le":["$observed_at","$now"]}`.
+- R58: The other operand must be a string parameter, a string `$parameter.property`, or a string literal (string-based value types are accepted, including patterned ones). In these comparisons unprefixed strings on either side are literals; name a referenced property explicitly with `$parameter.property`: `["$source.observed_at","$now"]` reads the source property, while `["observed_at","$now"]` compares the literal word `observed_at`.
+- R59: A literal equal to a declared action parameter name refuses `invalid_criterion` with a message to write `$<name>` instead. Comparisons use the existing string ordering and the same full UTC text that a rule value `$now` stores.
+- R60: `validate` evaluates against its validation time and returns `"application_time":"set_at_application"`, including when the criterion fails; it does not promise the same result at a later apply. Apply evaluates against its application time, once inside the write transaction. An applied request's retry returns `already_applied` with its original edits without evaluating the criteria again. Both `--now` and the library's injected clock drive this value.
+- R61: `$now` remains unavailable in view filters, anywhere inside `linked ... where` (including nested `all`/`any`/`none`), and other criterion forms.
 
-String ordering has chronological meaning only when both operands use the same
-full UTC form, such as `2026-11-12T00:00:00Z`. With that application time, `le`
-accepts the empty string `""`, the date without time `"2026-11-12"`, and the offset
-time `"2026-11-11T23:30:00-02:00"`. The last value represents a later instant;
-the language compares text and does not parse or normalize times. A schema that
-needs chronological safety gives the parameter a string value type with the
-full UTC pattern, for example
-`"utc_observed_time":{"base":"string","pattern":"^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$"}`
-and `"observed_at":{"type":{"value_type":"utc_observed_time"},"required":true}`.
+- R62: String ordering has chronological meaning only when both operands use the same full UTC form, such as `2026-11-12T00:00:00Z`.
+- R63: With that application time, `le` accepts the empty string `""`, the date without time `"2026-11-12"`, and the offset time `"2026-11-11T23:30:00-02:00"`. The last value represents a later instant; the language compares text and does not parse or normalize times.
+A schema that needs chronological safety gives the parameter a string value type with the full UTC pattern, for example `"utc_observed_time":{"base":"string","pattern":"^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$"}` and `"observed_at":{"type":{"value_type":"utc_observed_time"},"required":true}`.
 This fixes the representation; calendar validity requires tighter ranges too.
 
-A parameter declared `"required":false` accepts omission or JSON null. A rule
-value using that absent parameter leaves its destination unset on create and
-unchanged on modify; if nested in an array or struct, the entire destination
-property is skipped. A nonempty rule set whose values are all skipped produces
-no edit or object revision. A create rule whose inputs are all absent creates no
-object. Modify and reference rules still resolve their targets before skipping:
-a missing or retracted target refuses just as it would with supplied inputs.
-An action whose rules all skip still records one action-log entry with `edits:[]` for idempotency, with no per-object observation;
-its retry returns `already_applied` with the same empty edits. An optional
-parameter feeding a required property on create refuses `invalid_rule` at its
-expression during schema checking. Required destination properties also undergo
-the ordinary field check. Omission and null have the same canonical request content for
-idempotency. Criteria use the existing `{"exists":"$label"}` form to test a
-scalar or array parameter's presence (empty strings and empty arrays are present;
-array elements are not tested for liveness). For a single reference, `exists`
-checks that the referenced object exists and is live. An absent optional reference
-therefore fails `exists`.
-Bare-parameter `exists`/`fresh`, bare-property comparisons, `linked` source and
-candidate reads, modify/delete/`set_reference`/`clear_reference` target reads, and
-`expected` revision reads give byte-equal answers for a missing and an unreadable
-object, including at the snapshot bound; creation inherits scope only from
-admitted parameter objects. At the target-read boundary, missing, retracted and unreadable modify, delete and
-reference targets refuse with the detail-free `rule_reference_unavailable` used
-by `$parameter.property`. `create_or_modify_object` is an exception:
-it creates when missing and refuses when unreadable, because creating a missing
-object must not overwrite an existing object the caller cannot read. Comparisons
-with an absent parameter remain unevaluable
-and refuse when evaluated. `all` evaluates operands in written order and stops
-at the first false operand, so a presence test can guard a later comparison:
-`{"none":[{"all":[{"present":"$supersedes"},{"eq":["$record","$supersedes"]}]}]}`
-permits an absent optional `supersedes` and refuses self-supersession, including
-a brand-new `record` id naming itself before its target exists. Using `exists`
-here would let that new id pass because its target is not live yet. `any` and
-`none` keep evaluating every operand; a stale or unevaluable operand still fails
-the criterion even after an earlier operand determines its Boolean result.
-A requirement of freshness or read access must stand in its own criterion or
-before any operand a caller can make false, because `all` skips everything after
-its first false operand. Ordinary properties cannot be cleared by a `set` value:
-absent/null parameters mean skip, not clear, and no scalar clear rule exists.
-Reference properties can still use the existing explicit `clear_reference` rule.
+- R64: A parameter declared `"required":false` accepts omission or JSON null.
+- R65: A rule value using that absent parameter leaves its destination unset on create and unchanged on modify; if nested in an array or struct, the entire destination property is skipped. A nonempty rule set whose values are all skipped produces no edit or object revision. A create rule whose inputs are all absent creates no object. Modify and reference rules still resolve their targets before skipping: a missing or retracted target refuses just as it would with supplied inputs.
+- R66: An action whose rules all skip still records one action-log entry with `edits:[]` for idempotency, with no per-object observation; its retry returns `already_applied` with the same empty edits. An optional parameter feeding a required property on create refuses `invalid_rule` at its expression during schema checking. Required destination properties also undergo the ordinary field check.
+- R67: Omission and null have the same canonical request content for idempotency.
+- R68: Criteria use the existing `{"exists":"$label"}` form to test a scalar or array parameter's presence (empty strings and empty arrays are present; array elements are not tested for liveness). For a single reference, `exists` checks that the referenced object exists and is live. An absent optional reference therefore fails `exists`.
+- R69: Bare-parameter `exists`/`fresh`, bare-property comparisons, `linked` source and candidate reads, modify/delete/`set_reference`/`clear_reference` target reads, and `expected` revision reads give byte-equal answers for a missing and an unreadable object, including at the snapshot bound; creation inherits scope only from admitted parameter objects. At the target-read boundary, missing, retracted and unreadable modify, delete and reference targets refuse with the detail-free `rule_reference_unavailable` used by `$parameter.property`.
+- R70: `create_or_modify_object` is an exception: it creates when missing and refuses when unreadable, because creating a missing object must not overwrite an existing object the caller cannot read. Comparisons with an absent parameter remain unevaluable and refuse when evaluated.
+- R71: `all` evaluates operands in written order and stops at the first false operand, so a presence test can guard a later comparison: `{"none":[{"all":[{"present":"$supersedes"},{"eq":["$record","$supersedes"]}]}]}` permits an absent optional `supersedes` and refuses self-supersession, including a brand-new `record` id naming itself before its target exists. Using `exists` here would let that new id pass because its target is not live yet.
+- R72: `any` and `none` keep evaluating every operand; a stale or unevaluable operand still fails the criterion even after an earlier operand determines its Boolean result. A requirement of freshness or read access must stand in its own criterion or before any operand a caller can make false, because `all` skips everything after its first false operand.
+- R73: Ordinary properties cannot be cleared by a `set` value: absent/null parameters mean skip, not clear, and no scalar clear rule exists. Reference properties can still use the existing explicit `clear_reference` rule.
 
-Object properties and action parameters accept an optional `description` string
-of at most 300 UTF-8 bytes, for example
-`"reason":{"type":"string","required":false,"description":"Why the hold ended."}`.
-`describe` shows both; `action list` and `ont_action_list` show parameter
-descriptions. The existing MCP response and tool-list bounds still apply.
+- R74: Object properties and action parameters accept an optional `description` string of at most 300 UTF-8 bytes, for example `"reason":{"type":"string","required":false,"description":"Why the hold ended."}`.
+- R75: `describe` shows both; `action list` and `ont_action_list` show parameter descriptions. The existing MCP response and tool-list bounds still apply.
 
 ## Presence operators
 
 | Operator | True when | Reads |
 | --- | --- | --- |
-| `{"present":"$name"}` | The request supplies a non-null parameter, including a required parameter, empty string or empty array. | None; a missing, retracted or unreadable reference target still counts as supplied. This operator adds no snapshot heads or basis. |
-| `{"present":"$name.property"}` | The referenced head holds the declared property in the value state. | None if the parameter is omitted; otherwise the ordinary admitted reference read. Missing, retracted and unreadable targets refuse `rule_reference_unavailable` without an id. An absent property or any other knowledge state is false. Freshness is a separate check. |
-| `{"exists":"$name"}` | A scalar/array parameter is supplied, or a single reference resolves to a live readable head. | Single reference targets are read. |
-| `{"fresh":"$name"}` | The existing `exists` check passes and any referenced head is fresh. | Single reference targets are read. |
+- R76: | `{"present":"$name"}` | The request supplies a non-null parameter, including a required parameter, empty string or empty array. | None; a missing, retracted or unreadable reference target still counts as supplied. This operator adds no snapshot heads or basis. |
+- R77: | `{"present":"$name.property"}` | The referenced head holds the declared property in the value state. | None if the parameter is omitted; otherwise the ordinary admitted reference read. Missing, retracted and unreadable targets refuse `rule_reference_unavailable` without an id. An absent property or any other knowledge state is false. Freshness is a separate check. |
+- R78: | `{"exists":"$name"}` | A scalar/array parameter is supplied, or a single reference resolves to a live readable head. | Single reference targets are read. |
+- R79: | `{"fresh":"$name"}` | The existing `exists` check passes and any referenced head is fresh. | Single reference targets are read. |
 
-`present` accepts only `$parameter` or `$parameter.property`, declared on the
-same action. It works in submission criteria, every nested `all`/`any`/`none`,
-and `linked.where`; it never returns `criterion_not_evaluable`. Action rules
-have no criterion guard grammar: `present` in that position is a located
-`invalid_rule`. `action list` and `describe` include each criterion's expression
-in `criteria`, for example
-`{"code":"no_self","message":"Choose another predecessor.","none":[{"all":[{"present":"$supersedes"},{"eq":["$record","$supersedes"]}]}]}`.
-A later operator or rule may independently require a head named by a bare
-`present`; its usual reads and snapshot bound still apply.
+- R80: `present` accepts only `$parameter` or `$parameter.property`, declared on the same action.
+- R81: It works in submission criteria, every nested `all`/`any`/`none`, and `linked.where`; it never returns `criterion_not_evaluable`. Action rules have no criterion guard grammar: `present` in that position is a located `invalid_rule`. `action list` and `describe` include each criterion's expression in `criteria`, for example `{"code":"no_self","message":"Choose another predecessor.","none":[{"all":[{"present":"$supersedes"},{"eq":["$record","$supersedes"]}]}]}`.
+- R82: A later operator or rule may independently require a head named by a bare `present`; its usual reads and snapshot bound still apply.
 
 ## How a criterion names a property
-In a comparison (`eq`, `ne`, `in`, `lt`, `le`, `gt`, `ge`) only the first operand is the property reference; the second operand is a literal (or a `$parameter`), and a literal is never replaced by a property value. A bare property name in the first operand resolves against the object of the action's reference parameter, and only when the action type has exactly one reference parameter; with more than one, the explicit form `$<parameter>.<property>` is required, a bare name is `criterion_not_evaluable` at evaluation, and `schema check` refuses such a schema where it can know. Inside a `linked` condition's `where`, a bare name names a property of the linked candidate object. A property reference that does not resolve (missing property, null, a retracted or absent object, or a type mismatch that cannot be ordered) is unevaluable: comparison is tri-state (true, false, unevaluable), and an evaluated unevaluable condition under `all`, `any`, `none` or a negation refuses with `criterion_not_evaluable` and never passes. Numbers are compared numerically with and without a candidate context, so 1 equals 1.0 in both.
-- `get` and `search` on an Ontology-owned type return what actions wrote, with `basis` and history as for indexed types, and `describe` lists action types.
+- R83: In a comparison (`eq`, `ne`, `in`, `lt`, `le`, `gt`, `ge`) only the first operand is the property reference; the second operand is a literal (or a `$parameter`), and a literal is never replaced by a property value.
+- R84: A bare property name in the first operand resolves against the object of the action's reference parameter, and only when the action type has exactly one reference parameter; with more than one, the explicit form `$<parameter>.<property>` is required, a bare name is `criterion_not_evaluable` at evaluation, and `schema check` refuses such a schema where it can know. Inside a `linked` condition's `where`, a bare name names a property of the linked candidate object.
+- R85: A property reference that does not resolve (missing property, null, a retracted or absent object, or a type mismatch that cannot be ordered) is unevaluable: comparison is tri-state (true, false, unevaluable), and an evaluated unevaluable condition under `all`, `any`, `none` or a negation refuses with `criterion_not_evaluable` and never passes.
+- R86: Numbers are compared numerically with and without a candidate context, so 1 equals 1.0 in both.
+- R87: `get` and `search` on an Ontology-owned type return what actions wrote, with `basis` and history as for indexed types, and `describe` lists action types.
 
-Wire behavior: a missing or retracted modify, delete, `set_reference` or
-`clear_reference` target answers
-`rule_reference_unavailable` without `id` (previously `revision_conflict` with
-`id`); unreadable targets give the same refusal. Unavailable `expected` objects
-now give that same detail-free refusal before their revisions are compared.
-Bare-property comparisons on unreadable objects now give
-`criterion_not_evaluable`, just as missing objects do, without testing the hidden
-value. When an expected-revision mismatch coincides with a stale value, both
-validate and apply refuse `rule_value_stale`. Store-link refusals use the expanded
-`store_path_is_symlink` message and also apply to existing-store reads.
+- R88: Wire behavior: a missing or retracted modify, delete, `set_reference` or `clear_reference` target answers `rule_reference_unavailable` without `id` (previously `revision_conflict` with `id`); unreadable targets give the same refusal.
+- R89: Unavailable `expected` objects now give that same detail-free refusal before their revisions are compared. Bare-property comparisons on unreadable objects now give `criterion_not_evaluable`, just as missing objects do, without testing the hidden value.
+- R90: When an expected-revision mismatch coincides with a stale value, both validate and apply refuse `rule_value_stale`. Store-link refusals use the expanded `store_path_is_symlink` message and also apply to existing-store reads.
 
 ## Refusal records
 
-- When `action apply` of an installed action type is refused after the action type was found, one line is appended to the file `refusals.jsonl` in the store's directory, beside `edits.jsonl`, after the transaction has ended. Every refusal of that stage is recorded: a grant (`action_forbidden`), a parameter (`invalid_parameter`, and `invalid_request` at `/parameters` when `parameters` is not an object), a create key (`ambiguous_create_key`), a reused request id (`request_id_reused`), a reference input, a stale value (`rule_value_stale`), an expected revision (`revision_conflict`), the submission criteria (`submission_criteria`), and the other refusals of evaluation and planning (`criterion_not_evaluable`, `snapshot_too_large`, `schema_violation` of a planned observation and the like). The record is made inside the library's `ont::action::apply_action`, so the command, the MCP tool `ont_action_apply` and a consumer that links the crate all record.
-- A line is one canonical JSON object (members in name order): `action_type`; `actor` in the form of an `edits.jsonl` line (with `role` when given); `code` (the refusal's code); `domain`; `failed`, only for `submission_criteria` (the codes of the failed criteria, in evaluation order); `outcome` with the value `refused`; `parameters` (the request's parameters as given, canonical); `request_id`, when the request gave one; `schema_version` (the installed version of the action type's domain); `submitted_at` (the request's `now` in seconds, as in `edits.jsonl`).
-- Nothing is recorded for: a refusal before the action type is known (`invalid_request` of the request form or of the actor bounds, `unknown_action`), a store or internal failure (`store_busy`, `store_not_found`, `store_upgrade_required`, `store_path_is_symlink`, `projection_stale`, the store's consistency refusals `action_domain_mismatch`, `action_schema_mismatch`, `duplicate_action_id` and `schema_pin_mismatch`, and every exit-1 failure), `action validate`, and a replay that answers `already_applied`.
-- Every append takes an exclusive `flock` on `refusals.jsonl.lock` beside the store, as a write of `edits.jsonl` does on its lock, opens `refusals.jsonl` for appending without following a symbolic link (created with mode 0600) and writes the line with its newline in one write. When the file's last byte is not a newline (an interrupted earlier write), a newline is written first, so the damaged line stays one line that a reader skips. An existing file that is not 0600 owned by the caller is not appended to. The append is not `fsync`ed.
-- The answer of a refused apply is unchanged, byte for byte. A failure to append the line (a lock or file that cannot be opened, a full disk) never changes it either: the refusal is answered as without the record, and nothing is printed.
-- `refusals.jsonl` is not part of `ont backup` and is not read by `ont compact`. Nothing rotates or trims it: it grows by one line per recorded refusal, and a line holds at most the 65,536 bytes of canonical parameters plus the other members.
+- R91: When `action apply` of an installed action type is refused after the action type was found, one line is appended to the file `refusals.jsonl` in the store's directory, beside `edits.jsonl`, after the transaction has ended. Every refusal of that stage is recorded: a grant (`action_forbidden`), a parameter (`invalid_parameter`, and `invalid_request` at `/parameters` when `parameters` is not an object), a create key (`ambiguous_create_key`), a reused request id (`request_id_reused`), a reference input, a stale value (`rule_value_stale`), an expected revision (`revision_conflict`), the submission criteria (`submission_criteria`), and the other refusals of evaluation and planning (`criterion_not_evaluable`, `snapshot_too_large`, `schema_violation` of a planned observation and the like).
+- R92: The record is made inside the library's `ont::action::apply_action`, so the command, the MCP tool `ont_action_apply` and a consumer that links the crate all record.
+- R93: A line is one canonical JSON object (members in name order): `action_type`; `actor` in the form of an `edits.jsonl` line (with `role` when given); `code` (the refusal's code); `domain`; `failed`, only for `submission_criteria` (the codes of the failed criteria, in evaluation order); `outcome` with the value `refused`; `parameters` (the request's parameters as given, canonical); `request_id`, when the request gave one; `schema_version` (the installed version of the action type's domain); `submitted_at` (the request's `now` in seconds, as in `edits.jsonl`).
+- R94: Nothing is recorded for: a refusal before the action type is known (`invalid_request` of the request form or of the actor bounds, `unknown_action`), a store or internal failure (`store_busy`, `store_not_found`, `store_upgrade_required`, `store_path_is_symlink`, `projection_stale`, the store's consistency refusals `action_domain_mismatch`, `action_schema_mismatch`, `duplicate_action_id` and `schema_pin_mismatch`, and every exit-1 failure), `action validate`, and a replay that answers `already_applied`.
+- R95: Every append takes an exclusive `flock` on `refusals.jsonl.lock` beside the store, as a write of `edits.jsonl` does on its lock, opens `refusals.jsonl` for appending without following a symbolic link (created with mode 0600) and writes the line with its newline in one write. When the file's last byte is not a newline (an interrupted earlier write), a newline is written first, so the damaged line stays one line that a reader skips.
+- R96: An existing file that is not 0600 owned by the caller is not appended to. The append is not `fsync`ed.
+- R97: The answer of a refused apply is unchanged, byte for byte.
+- R98: A failure to append the line (a lock or file that cannot be opened, a full disk) never changes it either: the refusal is answered as without the record, and nothing is printed.
+- R99: `refusals.jsonl` is not part of `ont backup` and is not read by `ont compact`.
+- R100: Nothing rotates or trims it: it grows by one line per recorded refusal, and a line holds at most the 65,536 bytes of canonical parameters plus the other members.
 

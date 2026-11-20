@@ -74,6 +74,7 @@ fn diagnostic(answer: &Value, code: &str, field: &str) {
 
 #[test]
 fn every_help_form_is_json_without_stdin_or_a_store() {
+    // spec: specs/ont/cli.md#R11
     for args in [vec!["help"], vec!["--help"], vec!["-h"]] {
         let out = ont::run(
             &args.iter().map(|s| s.to_string()).collect::<Vec<_>>(),
@@ -219,6 +220,7 @@ fn request_id_colon_and_parameter_refusals_name_the_field_without_value_cli_and_
 
 #[test]
 fn invalid_argument_options_have_rules_and_unknown_inputs_have_help_hint() {
+    // spec: specs/ont/cli.md#R12
     let t = Temp::new();
     for (args, field) in [
         (vec!["--now", "secret-value", "get"], "--now"),
@@ -319,6 +321,7 @@ fn schema_and_render_argument_diagnostics_name_fields() {
 
 #[test]
 fn tools_list_wire_answer_is_at_most_6000_bytes() {
+    // spec: specs/ont/mcp.md#R15
     let config = ont::mcp::Config {
         store: PathBuf::from("/unused-o17-store"),
         now: Some(1000),
@@ -396,6 +399,7 @@ fn unknown_lookup_codes_name_fields_and_do_not_echo_values_cli_and_mcp() {
 
 #[test]
 fn action_parameter_now_is_reserved_but_ordinary_name_is_valid() {
+    // spec: specs/ont/action.md#R54
     let t = Temp::new();
     for name in ["now", "payload"] {
         let mut schema: Value =
@@ -750,6 +754,7 @@ fn planned_field_origins_are_request_pointers_cli_and_mcp() {
 
 #[test]
 fn string_reference_filter_hint_preserves_refusal_and_full_id_admission() {
+    // spec: specs/ont/store.md#R4
     let t = Temp::new();
     for filter in [
         json!({"eq":["ref","secret-native-key"]}),
@@ -791,6 +796,7 @@ fn string_reference_filter_hint_preserves_refusal_and_full_id_admission() {
 
 #[test]
 fn submission_hints_use_only_fixed_code_text_and_keep_failure_details() {
+    // spec: specs/ont/store.md#R5
     for codes in [
         vec!["decision_already_current"],
         vec!["older_measurement"],
@@ -890,6 +896,7 @@ fn transform_feedback_distinguishes_primary_keys_and_parameters() {
 
 #[test]
 fn action_tool_descriptions_keep_call_guidance() {
+    // spec: specs/ont/action.md#R75
     let list = ont::mcp::tools_list();
     let tools = list["tools"].as_array().unwrap();
     let tool = |name: &str| tools.iter().find(|t| t["name"] == name).unwrap();

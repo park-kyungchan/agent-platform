@@ -689,6 +689,8 @@ mod tests {
 
     #[test]
     fn transforms_and_pointers() {
+        // spec: specs/ont/index.md#R34
+        // spec: specs/ont/index.md#R38
         let named = |n: &str| Some(Transform::Named(n.to_string()));
         let rec = json!({"a":"  hello world ","n":"42","m":" -7 ","x":"4x","k":null,"i":5});
         assert_eq!(

@@ -124,6 +124,7 @@ fn appended(entry: &Value) -> [u64; 4] {
 
 #[test]
 fn three_tasks_then_one_removed() {
+    // spec: specs/ont/index.md#R1
     let t = Temp::new();
     for n in ["alpha", "beta", "gamma"] {
         t.task(n, &format!("# State of {n}\nOwner: lead\n"));
@@ -187,6 +188,8 @@ fn three_tasks_then_one_removed() {
 
 #[test]
 fn change_refresh_and_stale_report() {
+    // spec: specs/ont/read.md#R2
+    // spec: specs/ont/index.md#R27
     let t = Temp::new();
     t.task("alpha", "# a\nOwner: lead\n");
     t.task("beta", "# b\nOwner: lead\n");
@@ -228,6 +231,7 @@ fn change_refresh_and_stale_report() {
 
 #[test]
 fn exclude_symlinks_and_head_lines() {
+    // spec: specs/ont/index.md#R9
     let t = Temp::new();
     t.task("keep", "# k\nOwner: x\n");
     t.task("skip-me", "# s\n");
@@ -274,6 +278,7 @@ fn exclude_symlinks_and_head_lines() {
 
 #[test]
 fn sixteen_mebibyte_bound_by_a_sparse_file() {
+    // spec: specs/ont/index.md#R12
     let t = Temp::new();
     t.task("ok", "# fine\n");
     install(&t, &schema(&t));
@@ -314,6 +319,7 @@ fn sixteen_mebibyte_bound_by_a_sparse_file() {
 
 #[test]
 fn file_digest_with_a_missing_listed_path() {
+    // spec: specs/ont/index.md#R7
     let t = Temp::new();
     let a = t.file("a.txt", b"hello");
     std::fs::set_permissions(&a, std::os::unix::fs::PermissionsExt::from_mode(0o644)).unwrap();
@@ -355,6 +361,7 @@ fn file_digest_with_a_missing_listed_path() {
 
 #[test]
 fn unresolved_required_property_is_missing_and_partial() {
+    // spec: specs/ont/read.md#R2
     let t = Temp::new();
     t.task("a", "# a\n");
     let mut s = schema(&t);
@@ -387,6 +394,7 @@ fn unresolved_required_property_is_missing_and_partial() {
 
 #[test]
 fn one_failed_source_beside_a_good_one() {
+    // spec: specs/ont/read.md#R15
     let t = Temp::new();
     t.task("a", "# a\n");
     let bad = t.0.join("bad");
@@ -537,6 +545,7 @@ fn every_filter_operator_and_combinator() {
 
 #[test]
 fn continuation_over_two_pages() {
+    // spec: specs/ont/read.md#R29
     let t = Temp::new();
     for i in 1..=5 {
         t.task(&format!("t{i}"), "x\n");
@@ -569,6 +578,8 @@ fn continuation_over_two_pages() {
 
 #[test]
 fn scan_limit_is_ten_thousand_heads() {
+    // spec: specs/ont/read.md#R6
+    // spec: specs/ont/read.md#R30
     use ont_core::{Coverage, Id, Knowledge, Lineage, Namespace, Observation, Scope};
     use std::collections::BTreeMap;
     let t = Temp::new();
@@ -785,6 +796,8 @@ fn refusal_codes_of_index_and_search() {
 
 #[test]
 fn schema_check_refuses_bad_source_options_globs_and_transforms() {
+    // spec: specs/ont/index.md#R3
+    // spec: specs/ont/index.md#R4
     let t = Temp::new();
     let base = schema(&t);
     let check = |s: &Value| -> Vec<(String, String)> {
@@ -947,6 +960,7 @@ fn schema_check_and_backup_never_read_stdin() {
 
 #[test]
 fn backup_keeps_three_and_reports_no_retention_failure() {
+    // spec: specs/ont/store.md#R71
     // Four backups are taken; the newest three are kept and nothing fails.
     let t = Temp::new();
     install(&t, &schema(&t));
@@ -963,6 +977,7 @@ fn backup_keeps_three_and_reports_no_retention_failure() {
 
 #[test]
 fn a_replaced_glob_root_fails_the_source_and_retracts_nothing() {
+    // spec: specs/ont/index.md#R9
     let t = Temp::new();
     for n in ["a", "b", "c"] {
         t.task(n, "# x\n");
@@ -985,6 +1000,8 @@ fn a_replaced_glob_root_fails_the_source_and_retracts_nothing() {
 
 #[test]
 fn file_digest_literal_paths_symlinked_parent_and_fifo() {
+    // spec: specs/ont/index.md#R7
+    // spec: specs/ont/index.md#R9
     let t = Temp::new();
     let real = t.0.join("real");
     std::fs::create_dir_all(&real).unwrap();
@@ -1053,6 +1070,7 @@ fn bytes_that_differ_outside_the_mapped_fields_refresh_the_lineage() {
 
 #[test]
 fn one_index_run_at_a_time_per_store() {
+    // spec: specs/ont/index.md#R2
     let t = Temp::new();
     t.task("a", "# a\n");
     install(&t, &schema(&t));
@@ -1082,6 +1100,7 @@ fn one_index_run_at_a_time_per_store() {
 
 #[test]
 fn same_second_changes_get_distinct_revisions_and_double_star_globs_index() {
+    // spec: specs/ont/index.md#R4
     let t = Temp::new();
     t.task("a", "# one\n");
     install(&t, &schema(&t));
@@ -1110,6 +1129,7 @@ fn same_second_changes_get_distinct_revisions_and_double_star_globs_index() {
 
 #[test]
 fn filter_limits_and_none_counts_unresolved() {
+    // spec: specs/ont/read.md#R33
     let t = operator_fixture();
     let mut deep = json!({"eq":["count",1]});
     for _ in 0..9 {
@@ -1143,6 +1163,7 @@ fn index_request_parse() {
 
 #[test]
 fn a_missing_glob_root_with_complete_listing_fails_and_retracts_nothing() {
+    // spec: specs/ont/index.md#R10
     let t = Temp::new();
     for n in ["a", "b", "c"] {
         t.task(n, "# x\n");
@@ -1164,6 +1185,7 @@ fn a_missing_glob_root_with_complete_listing_fails_and_retracts_nothing() {
 
 #[test]
 fn a_missing_literal_parent_fails_a_complete_listing_file_digest_source() {
+    // spec: specs/ont/index.md#R10
     let t = Temp::new();
     let dir = t.0.join("mounted");
     std::fs::create_dir_all(&dir).unwrap();
@@ -1205,6 +1227,7 @@ fn a_missing_literal_parent_fails_a_complete_listing_file_digest_source() {
 
 #[test]
 fn a_run_lock_that_cannot_be_opened_is_a_refusal_not_an_internal_failure() {
+    // spec: specs/ont/index.md#R2
     let t = Temp::new();
     t.task("a", "# a\n");
     install(&t, &schema(&t));
@@ -1223,6 +1246,7 @@ fn a_run_lock_that_cannot_be_opened_is_a_refusal_not_an_internal_failure() {
 
 #[test]
 fn a_literal_prefix_that_is_not_a_directory_fails_a_complete_listing_source() {
+    // spec: specs/ont/index.md#R10
     let t = Temp::new();
     t.task("a", "# a\n");
     install(&t, &schema(&t));
@@ -1280,6 +1304,9 @@ fn ref_id(key: &str) -> Value {
 
 #[test]
 fn several_globs_union_dedup_exclude_retract_and_missing_root() {
+    // spec: specs/ont/index.md#R5
+    // spec: specs/ont/index.md#R6
+    // spec: specs/ont/index.md#R8
     let t = Temp::new();
     let base = t.tasks();
     std::fs::create_dir_all(base.join("a/b/c")).unwrap();
@@ -1351,6 +1378,13 @@ fn several_globs_union_dedup_exclude_retract_and_missing_root() {
 
 #[test]
 fn key_template_and_references_from_record_strings() {
+    // spec: specs/ont/index.md#R35
+    // spec: specs/ont/index.md#R36
+    // spec: specs/ont/index.md#R37
+    // spec: specs/ont/index.md#R38
+    // spec: specs/ont/index.md#R40
+    // spec: specs/ont/index.md#R41
+    // spec: specs/ont/index.md#R43
     let t = Temp::new();
     t.task("alpha", "# Alpha\nOwner: lead\n");
     let packets = t.0.join("packets");
@@ -1500,6 +1534,9 @@ fn key_template_and_references_from_record_strings() {
 
 #[test]
 fn schema_check_refuses_templates_glob_arrays_and_new_transforms() {
+    // spec: specs/ont/index.md#R5
+    // spec: specs/ont/index.md#R35
+    // spec: specs/ont/index.md#R39
     let t = Temp::new();
     let base = schema(&t);
     let check = |s: &Value| -> Vec<(String, String)> {
@@ -1739,6 +1776,11 @@ fn observation_count(t: &Temp) -> u64 {
 
 #[test]
 fn unchanged_file_renews_without_revision() {
+    // spec: specs/ont/index.md#R28
+    // spec: specs/ont/index.md#R29
+    // spec: specs/ont/index.md#R30
+    // spec: specs/ont/index.md#R31
+    // spec: specs/ont/index.md#R32
     let t = Temp::new();
     t.task("a", "# a\nOwner: x\n");
     install(&t, &schema(&t));
@@ -1760,6 +1802,8 @@ fn unchanged_file_renews_without_revision() {
 
 #[test]
 fn near_bound_renewal_fails_one_source_only() {
+    // spec: specs/ont/read.md#R12
+    // spec: specs/ont/read.md#R15
     let t = Temp::new();
     t.task("good", "# good\nOwner: x\n");
     let bad = t.0.join("bad");
@@ -1871,6 +1915,7 @@ fn near_bound_renewal_fails_one_source_only() {
 
 #[test]
 fn changed_bytes_coverage_or_pin_still_refresh() {
+    // spec: specs/ont/index.md#R28
     for cause in ["bytes", "coverage", "pin"] {
         let t = Temp::new();
         t.task("a", "# a\nOwner: x\n");
@@ -1932,6 +1977,7 @@ fn changed_bytes_coverage_or_pin_still_refresh() {
 
 #[test]
 fn stale_reads_follow_renewal() {
+    // spec: specs/ont/index.md#R30
     let t = Temp::new();
     t.task("a", "# a\nOwner: x\n");
     let mut s = schema(&t);
@@ -1962,6 +2008,7 @@ fn stale_reads_follow_renewal() {
 
 #[test]
 fn renewal_equals_refresh_for_readers() {
+    // spec: specs/ont/index.md#R30
     let renewed = Temp::new();
     let refreshed = Temp::new();
     renewed.task("a", "# a\nOwner: x\nNext: a\n");

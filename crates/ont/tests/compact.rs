@@ -80,6 +80,11 @@ fn backups(t: &Temp) -> Vec<std::path::PathBuf> {
 }
 #[test]
 fn compact_keeps_every_row() {
+    // spec: specs/ont/store.md#R57
+    // spec: specs/ont/store.md#R58
+    // spec: specs/ont/store.md#R59
+    // spec: specs/ont/store.md#R61
+    // spec: specs/ont/store.md#R62
     use ont_store::schema_mode::CandidateCondition;
     use sha2::{Digest, Sha256};
     use std::collections::{BTreeMap, BTreeSet};
@@ -215,6 +220,7 @@ fn compact_keeps_every_row() {
 }
 #[test]
 fn compact_reports_a_row_changed_during_the_run() {
+    // spec: specs/ont/store.md#R64
     use std::time::{Duration, Instant};
     let t = Temp::new();
     drop(old_store(&t));
@@ -284,6 +290,7 @@ fn compact_reports_a_row_changed_during_the_run() {
 }
 #[test]
 fn compact_refuses_while_busy() {
+    // spec: specs/ont/store.md#R65
     let t = Temp::new();
     let store = old_store(&t);
     let before = std::fs::read(t.path()).unwrap();
@@ -299,6 +306,7 @@ fn compact_refuses_while_busy() {
 }
 #[test]
 fn search_clock_above_never_stale_is_refused() {
+    // spec: specs/ont/read.md#R38
     let t = Temp::new();
     drop(old_store(&t));
     let args = [

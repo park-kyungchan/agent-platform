@@ -108,6 +108,9 @@ fn schema(store: &Store) -> Vec<(String, String)> {
 }
 #[test]
 fn explicit_program_mode_uses_same_tables_and_application_id_without_actions() {
+    // spec: specs/ont/store.md#R16
+    // spec: specs/ont/store.md#R19
+    // spec: specs/ont/store.md#R20
     let education = Store::memory().unwrap();
     let program = Store::memory_program().unwrap();
     assert_eq!(version(&education), 1);
@@ -124,6 +127,11 @@ fn explicit_program_mode_uses_same_tables_and_application_id_without_actions() {
 }
 #[test]
 fn file_modes_reopen_their_own_version_and_never_convert_each_other() {
+    // spec: specs/ont/store.md#R18
+    // spec: specs/ont/store.md#R19
+    // spec: specs/ont/store.md#R23
+    // spec: specs/ont/store.md#R24
+    // spec: specs/ont/schema-language.md#R10
     let temp = Temp::new();
     for mode in [StoreMode::Education, StoreMode::Program] {
         let path = temp.0.join(format!("v{}.sqlite", mode.version()));
@@ -146,6 +154,9 @@ fn file_modes_reopen_their_own_version_and_never_convert_each_other() {
 }
 #[test]
 fn incompatible_versions_refuse_before_object_tables_exist_and_preserve_file() {
+    // spec: specs/ont/store.md#R17
+    // spec: specs/ont/store.md#R23
+    // spec: specs/ont/store.md#R24
     let temp = Temp::new();
     for (name, app, version) in [
         ("v2-no-tables", APPLICATION_ID, 2),
@@ -184,6 +195,8 @@ fn incompatible_versions_refuse_before_object_tables_exist_and_preserve_file() {
 }
 #[test]
 fn seed_and_append_roll_back_domain_namespace_and_invalid_scope_failures() {
+    // spec: specs/ont/store.md#R21
+    // spec: specs/ont/store.md#R22
     for mode in [StoreMode::Education, StoreMode::Program] {
         let good = object(mode, "good");
         let other = if mode == StoreMode::Education {
@@ -226,6 +239,7 @@ fn seed_and_append_roll_back_domain_namespace_and_invalid_scope_failures() {
 }
 #[test]
 fn schema_only_change_kinds_refused_in_both_store_modes() {
+    // spec: specs/ont/store.md#R44
     fn counts(store: &Store) -> (i64, i64) {
         let objects: i64 = store
             .connection

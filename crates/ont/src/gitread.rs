@@ -228,6 +228,7 @@ mod tests {
     use super::*;
     #[test]
     fn ambiguous_credentials_are_not_returned_to_future_callers() {
+        // spec: specs/ont/store.md#R11
         for remote in [
             "https://u:12/34@h/x",
             "https://u:p/w@x/y@h/z",
@@ -243,6 +244,8 @@ mod tests {
     }
     #[test]
     fn credentials_are_stripped_and_paths_checked() {
+        // spec: specs/ont/store.md#R11
+        // spec: specs/ont/store.md#R13
         for (remote, stripped) in [
             (
                 "https://user:secret@example.com/a/b.git",

@@ -87,13 +87,15 @@
    ],
    "entry": [
     "scripts/install-ont.sh:1-30",
-    "scripts/check-map.py:1-30"
+    "scripts/check-map.py:1-30",
+    "scripts/check-spec-trace.py:1-30"
    ],
    "spec": [
     "specs/ont/cli.md"
    ],
    "tests": [
     "scripts/test_check_map.py",
+    "scripts/test_check_spec_trace.py",
     "scripts/test-install-ont.sh"
    ]
   },

@@ -149,6 +149,8 @@ fn store_with_work() -> Store {
 
 #[test]
 fn format4_refuses_old_files_and_old_modes_refuse_format4() {
+    // spec: specs/ont/read.md#R53
+    // spec: specs/ont/store.md#R27
     let temp = Temp::new();
     let v1 = temp.0.join("v1.sqlite");
     drop(Store::open(&v1).unwrap());
@@ -176,6 +178,8 @@ fn format4_refuses_old_files_and_old_modes_refuse_format4() {
 
 #[test]
 fn schema_install_rules() {
+    // spec: specs/ont/store.md#R33
+    // spec: specs/ont/store.md#R34
     let mut store = Store::memory_schema().unwrap();
     let pin = store
         .install_schema(
@@ -301,6 +305,8 @@ fn schema_install_rules() {
 
 #[test]
 fn tampered_stored_bytes_refuse_the_open() {
+    // spec: specs/ont/store.md#R35
+    // spec: specs/ont/schema-language.md#R18
     let temp = Temp::new();
     let path = temp.0.join("v3.sqlite");
     let mut store = Store::open_schema(&path).unwrap();
@@ -332,6 +338,8 @@ fn tampered_stored_bytes_refuse_the_open() {
 
 #[test]
 fn typed_ingest_refusals_have_exact_codes() {
+    // spec: specs/ont/store.md#R40
+    // spec: specs/ont/store.md#R43
     let mut store = store_with_work();
     let thing = id("thing", "k1");
     store
@@ -503,6 +511,10 @@ fn typed_ingest_refusals_have_exact_codes() {
 
 #[test]
 fn change_kinds_and_retraction_lifecycle() {
+    // spec: specs/ont/store.md#R44
+    // spec: specs/ont/store.md#R45
+    // spec: specs/ont/store.md#R47
+    // spec: specs/ont/store.md#R48
     let mut store = store_with_work();
     let thing = id("thing", "k1");
     let heads = |store: &mut Store| store.scan_heads("thing", 10, None).unwrap().len();
@@ -666,6 +678,7 @@ fn reopen_keeps_installs_rows_and_heads() {
 
 #[test]
 fn head_scan_orders_limits_and_continues() {
+    // spec: specs/ont/store.md#R49
     let mut store = store_with_work();
     let items: Vec<Append> = (0..25)
         .map(|i| {
@@ -740,6 +753,7 @@ fn action_log_assigns_seq_and_reads_back() {
 
 #[test]
 fn reader_sees_committed_state_and_second_writer_gets_store_busy() {
+    // spec: specs/ont/store.md#R52
     let temp = Temp::new();
     let path = temp.0.join("v3.sqlite");
     let mut first =
@@ -788,6 +802,8 @@ fn reader_sees_committed_state_and_second_writer_gets_store_busy() {
 
 #[test]
 fn schema_apis_refuse_old_modes_and_legacy_paths_refuse_schema_mode() {
+    // spec: specs/ont/store.md#R27
+    // spec: specs/ont/store.md#R42
     let mut legacy = Store::memory().unwrap();
     assert_eq!(
         legacy
@@ -857,6 +873,7 @@ fn log_entry(action_id: &str) -> ActionLogEntry {
 
 #[test]
 fn second_connection_install_refreshes_first_connections_next_append() {
+    // spec: specs/ont/store.md#R36
     let temp = Temp::new();
     let path = temp.0.join("v3.sqlite");
     let mut a = Store::open_schema(&path).unwrap();
@@ -898,6 +915,7 @@ fn second_connection_install_refreshes_first_connections_next_append() {
 
 #[test]
 fn two_connections_installing_clashing_types_second_refuses_and_store_opens() {
+    // spec: specs/ont/store.md#R34
     let temp = Temp::new();
     let path = temp.0.join("v3.sqlite");
     let mut a = Store::open_schema(&path).unwrap();
@@ -921,6 +939,7 @@ fn two_connections_installing_clashing_types_second_refuses_and_store_opens() {
 
 #[test]
 fn older_pin_stays_readable_after_v2_and_removed_type_refuses_new_writes() {
+    // spec: specs/ont/store.md#R32
     let mut store = Store::memory_schema().unwrap();
     let pin1 = install(&mut store, &work_bytes(1), 100);
     let other = id("other", "o1");
@@ -992,6 +1011,7 @@ fn older_pin_stays_readable_after_v2_and_removed_type_refuses_new_writes() {
 
 #[test]
 fn write_transaction_is_atomic_and_sees_its_own_appends() {
+    // spec: specs/ont/store.md#R38
     let mut store = store_with_work();
     let thing = id("thing", "k1");
     store
@@ -1029,6 +1049,7 @@ fn write_transaction_is_atomic_and_sees_its_own_appends() {
 
 #[test]
 fn corrupt_head_or_history_is_store_failure_not_absent() {
+    // spec: specs/ont/store.md#R47
     let temp = Temp::new();
     let path = temp.0.join("v3.sqlite");
     let thing = id("thing", "k1");
@@ -1060,6 +1081,8 @@ fn corrupt_head_or_history_is_store_failure_not_absent() {
 
 #[test]
 fn scan_continues_by_primary_key_across_namespaces_and_special_keys() {
+    // spec: specs/ont/store.md#R49
+    // spec: specs/ont/store.md#R50
     let mut store = Store::memory_schema().unwrap();
     install(&mut store, &work_bytes(1), 100);
     for key in ["k%", "k_", "ké", "k~"] {
@@ -1130,6 +1153,8 @@ fn scan_continues_by_primary_key_across_namespaces_and_special_keys() {
 
 #[test]
 fn busy_open_with_exclusive_lock_is_store_busy() {
+    // spec: specs/ont/store.md#R26
+    // spec: specs/ont/store.md#R51
     let temp = Temp::new();
     let path = temp.0.join("v3.sqlite");
     drop(Store::open_schema(&path).unwrap());
@@ -1144,6 +1169,9 @@ fn busy_open_with_exclusive_lock_is_store_busy() {
 
 #[test]
 fn duplicate_action_id_outcome_check_and_install_source_are_recorded() {
+    // spec: specs/ont/store.md#R46
+    // spec: specs/ont/store.md#R55
+    // spec: specs/ont/schema-language.md#R17
     let mut store = Store::memory_schema().unwrap();
     let pin = store
         .install_schema(
@@ -1184,6 +1212,8 @@ fn duplicate_action_id_outcome_check_and_install_source_are_recorded() {
 
 #[test]
 fn scope_conflict_duplicate_revision_seed_and_nested_refs() {
+    // spec: specs/ont/store.md#R40
+    // spec: specs/ont/store.md#R43
     let mut store = store_with_work();
     let thing = id("thing", "k1");
     store
@@ -1365,6 +1395,7 @@ fn busy_writer_holds_transaction_while_reader_reads_committed_row() {
 
 #[test]
 fn panic_inside_write_closure_leaves_nothing_written() {
+    // spec: specs/ont/store.md#R38
     let mut store = store_with_work();
     let thing = id("thing", "panic");
     let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
@@ -1388,6 +1419,7 @@ fn panic_inside_write_closure_leaves_nothing_written() {
 
 #[test]
 fn log_action_refuses_domain_and_stale_schema_version() {
+    // spec: specs/ont/store.md#R54
     let mut store = store_with_work();
     let mut wrong_domain = log_entry("act-x");
     wrong_domain.domain = "academy".into();
@@ -1406,6 +1438,7 @@ fn log_action_refuses_domain_and_stale_schema_version() {
 
 #[test]
 fn backup_to_refuses_existing_target_and_copy_opens_with_same_pins() {
+    // spec: specs/ont/store.md#R53
     let temp = Temp::new();
     let path = temp.0.join("v3.sqlite");
     let mut store = Store::open_schema(&path).unwrap();
@@ -1429,6 +1462,8 @@ fn open_err(path: &std::path::Path) -> &'static str {
 
 #[test]
 fn open_schema_existing_never_creates_or_initialises() {
+    // spec: specs/ont/store.md#R29
+    // spec: specs/ont/store.md#R30
     let temp = Temp::new();
     // Missing file: refusal, nothing created.
     let missing = temp.0.join("missing.sqlite");
@@ -1470,6 +1505,7 @@ fn open_schema_existing_never_creates_or_initialises() {
 
 #[test]
 fn open_schema_existing_writable_writes_but_never_creates_or_initialises() {
+    // spec: specs/ont/store.md#R30
     let temp = Temp::new();
     let missing = temp.0.join("missing.sqlite");
     assert_eq!(
@@ -1516,6 +1552,7 @@ fn open_schema_existing_writable_writes_but_never_creates_or_initialises() {
 
 #[test]
 fn creating_sqlite_open_refuses_final_symlink_at_open_time() {
+    // spec: specs/ont/store.md#R7
     let temp = Temp::new();
     let target = temp.0.join("target.sqlite");
     let link = temp.0.join("link.sqlite");
@@ -1668,6 +1705,7 @@ fn action_count_and_log_from() {
 
 #[test]
 fn new_store_has_16k_pages() {
+    // spec: specs/ont/store.md#R56
     let temp = Temp::new();
     for mode in [StoreMode::Education, StoreMode::Program, StoreMode::Schema] {
         let path = temp.0.join(format!("mode-{}.sqlite", mode.version()));
@@ -1721,6 +1759,7 @@ fn new_store_has_16k_pages() {
 
 #[test]
 fn canonical_stream_orders_keys_frames_types_and_skips_tables() {
+    // spec: specs/ont/store.md#R60
     let mut store = Store::memory_schema().unwrap();
     store.connection.execute_batch("CREATE TABLE \"stream\"\"pk\" (a TEXT,b INTEGER,payload BLOB,PRIMARY KEY(b,a)) WITHOUT ROWID;
         CREATE TABLE stream_no_pk (v);
@@ -1778,6 +1817,7 @@ fn canonical_stream_orders_keys_frames_types_and_skips_tables() {
 
 #[test]
 fn renewal_preserves_rows_and_payload_except_freshness_and_projects_expiry() {
+    // spec: specs/ont/index.md#R32
     let mut store = store_with_work();
     let key = id("thing", "renew");
     store
@@ -1900,6 +1940,7 @@ fn renewal_rows(store: &Store) -> Vec<Vec<rusqlite::types::Value>> {
 
 #[test]
 fn renewed_row_is_the_shared_payload() {
+    // spec: specs/ont/read.md#R12
     let mut store = store_with_work();
     let key = id("thing", "renew");
     let mut expected = name_obs("r0", Change::Initial, None, "a");
@@ -1918,6 +1959,8 @@ fn renewed_row_is_the_shared_payload() {
 
 #[test]
 fn renewal_respects_the_payload_bound() {
+    // spec: specs/ont/read.md#R12
+    // spec: specs/ont/read.md#R13
     let mut store = store_with_work();
     let key = id("thing", "renew");
     let mut observation = name_obs("r0", Change::Initial, None, "");

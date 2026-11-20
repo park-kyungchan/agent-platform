@@ -131,6 +131,7 @@ fn ctx() -> Context {
 
 #[test]
 fn around_admits_hidden_target_before_poison_payload_read() {
+    // spec: specs/ont/read.md#R69
     let mut answers = vec![];
     for hidden in [false, true] {
         let mut store = memory(hidden);
@@ -158,6 +159,7 @@ fn around_admits_hidden_target_before_poison_payload_read() {
 
 #[test]
 fn around_validates_entire_path_before_any_head_metadata_or_payload_read() {
+    // spec: specs/ont/read.md#R68
     let mut store = memory(false);
     store
         .read_schema(|tx| {
@@ -185,6 +187,8 @@ fn around_validates_entire_path_before_any_head_metadata_or_payload_read() {
 
 #[test]
 fn around_named_target_type_head_cap_is_independent_of_start_and_reference_budget() {
+    // spec: specs/ont/read.md#R5
+    // spec: specs/ont/read.md#R72
     let mut store = memory(false);
     store
         .write(10, |tx| {
@@ -207,6 +211,7 @@ fn around_named_target_type_head_cap_is_independent_of_start_and_reference_budge
 
 #[test]
 fn around_reference_limit_refuses_before_iteration() {
+    // spec: specs/ont/read.md#R77
     let mut store = memory(false);
     store.read_schema(|tx| {
         let head = tx.head_after_access(&tx.head_access(&id("node", "a")).unwrap().unwrap()).unwrap().unwrap();
@@ -218,6 +223,7 @@ fn around_reference_limit_refuses_before_iteration() {
 
 #[test]
 fn around_historical_reference_type_is_excluded_before_named_lookup() {
+    // spec: specs/ont/read.md#R74
     let mut store = memory(false);
     let mut schema =
         serde_json::to_value(store.schema_set().unwrap().schema("test").unwrap()).unwrap();
