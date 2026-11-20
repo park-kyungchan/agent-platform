@@ -87,9 +87,10 @@ pub fn page_text(
     }
     Ok((out, commit))
 }
-/// The SHA-256 of the page part as built for the reviewer: the unit's own page properties only.
+/// The SHA-256 of the page part as built for the reviewer, without its line `Depends on: ...`: the
+/// unit's own page properties but its dependencies, and neither its tiers nor its estimate (R34).
 pub fn page_digest(key: &str, u: &Value) -> String {
-    digest(page_part(key, u, true).as_bytes())
+    digest(part(key, u, true, false).as_bytes())
 }
 /// A nonempty string property.
 fn text<'a>(u: &'a Value, k: &str) -> Option<&'a str> {
@@ -115,6 +116,10 @@ fn list(u: &Value, k: &str) -> Option<String> {
 }
 /// The page part: the header lines and the sections of the unit's page properties (R30).
 pub fn page_part(key: &str, u: &Value, questions: bool) -> String {
+    part(key, u, questions, true)
+}
+/// The page part, with its line `Depends on: ...` only when `with_depends` (R30, R34).
+fn part(key: &str, u: &Value, questions: bool, with_depends: bool) -> String {
     let class = u["class"].as_str().unwrap_or_default();
     let lane = u["lane"].as_str().unwrap_or_default();
     let repository = text(u, "repository").unwrap_or("no repository");
@@ -124,7 +129,7 @@ pub fn page_part(key: &str, u: &Value, questions: bool) -> String {
     }
     let depends = u["depends_on"].as_array().into_iter().flatten();
     let depends: Vec<&str> = depends.filter_map(|d| d["native_key"].as_str()).collect();
-    if !depends.is_empty() {
+    if !depends.is_empty() && with_depends {
         out.push_str(&format!("Depends on: {}\n", depends.join(", ")));
     }
     let body = |k: &str| text(u, k).map(lines);

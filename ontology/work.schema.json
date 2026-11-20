@@ -1,7 +1,7 @@
 {
   "format": "ontology-schema/v1",
   "domain": "work",
-  "version": 11,
+  "version": 12,
   "namespace": {
     "instance": "vps://palantirkc",
     "account": "root"
@@ -3555,7 +3555,8 @@
       "description": "A draft unit becomes ready: its page is complete and reviewed.",
       "parameters": {
         "unit": {"type": {"ref": "unit"}, "required": true, "description": "The unit: an Id of type unit whose native_key is the unit's key."},
-        "intent": {"type": {"ref": "intent"}, "required": false, "description": "The unit's own intent; required in the lane objective, left out in the lane small."}
+        "intent": {"type": {"ref": "intent"}, "required": false, "description": "The unit's own intent; required in the lane objective, left out in the lane small."},
+        "page_digest": {"type": {"value_type": "sha256_hex"}, "required": false, "description": "The digest of the unit's page as the caller computed it (ap unit page <key> --digest); a unit of class contract or effect needs a closed accepting page review whose head is this digest."}
       },
       "submission_criteria": [
         {"code": "unit_not_draft", "message": "Choose a draft unit.", "all": [{"exists": "$unit"}, {"in": ["$unit.state", ["draft"]]}]},
@@ -3567,7 +3568,7 @@
         {"code": "intent_differs", "message": "Give the unit's own intent, or none in the lane small.", "none": [{"all": [{"present": "$intent"}, {"none": [{"all": [{"exists": "$unit"}, {"present": "$unit.intent"}, {"eq": ["$unit.intent", "$intent"]}]}]}]}]},
         {"code": "intent_parameter_required", "message": "A unit of the lane objective names its intent in the parameter intent.", "none": [{"all": [{"exists": "$unit"}, {"eq": ["$unit.lane", "objective"]}, {"none": [{"present": "$intent"}]}]}]},
         {"code": "plan_not_reviewed", "message": "Review the intent's plan first: a review of kind plan of the intent, closed accept.", "none": [{"all": [{"exists": "$unit"}, {"eq": ["$unit.lane", "objective"]}, {"present": "$intent"}, {"none": [{"linked": {"from": "$intent", "link": "intent_reviews", "where": {"all": [{"eq": ["kind", "plan"]}, {"eq": ["status", "closed"]}, {"eq": ["verdict", "accept"]}]}}}]}]}]},
-        {"code": "page_not_reviewed", "message": "Review the page first: a review of kind page of the unit, started after its last amendment, closed accept.", "none": [{"all": [{"exists": "$unit"}, {"in": ["$unit.class", ["contract", "effect"]]}, {"none": [{"linked": {"from": "$unit", "link": "unit_reviews", "where": {"all": [{"eq": ["kind", "page"]}, {"eq": ["status", "closed"]}, {"eq": ["verdict", "accept"]}, {"gt": ["started_at", "$unit.amended_at"]}]}}}]}]}]}
+        {"code": "page_not_reviewed", "message": "Review the page first: a review of kind page of the unit, closed accept, whose head is the page_digest given.", "none": [{"all": [{"exists": "$unit"}, {"in": ["$unit.class", ["contract", "effect"]]}, {"none": [{"linked": {"from": "$unit", "link": "unit_reviews", "where": {"all": [{"eq": ["kind", "page"]}, {"eq": ["status", "closed"]}, {"eq": ["verdict", "accept"]}, {"present": "$page_digest"}, {"eq": ["head", "$page_digest"]}]}}}]}]}]}
       ],
       "rules": [
         {"modify_object": "unit", "set": {"state": "ready", "ready_at": "$now"}}

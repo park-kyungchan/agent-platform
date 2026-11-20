@@ -835,8 +835,9 @@ print('v9_gate_rows_complete')
 PY
 
 # Version 10 on a second store: the user's rows of version 9 carried by ontology/migrate, then the walk of the
-# requests, intents and criteria, on version 10 pinned in Git. Then version 11, the repository's file, over the
-# objects made under version 10, and the walk of the units, runs and findings.
+# requests, intents and criteria, on version 10 pinned in Git. Then version 11, pinned in Git, over the objects
+# made under version 10, and the walk of the units, runs and findings. Then version 12, the repository's file, over
+# the objects made under version 11, and the walk of the page digest.
 mkdir -- "$rehearsal_root/v10"
 python3 - "$ont_binary" "$repo" "$rehearsal_root/v10/store.sqlite" "$work_root/" "$rehearsal_root/copies" "$rehearsal_root/lib" <<'PY'
 import datetime, hashlib, json, os, pathlib, subprocess, sys
@@ -879,6 +880,7 @@ def install(commit, digest):
     assert hashlib.sha256(pinned).hexdigest() == digest
     path = pathlib.Path(store).with_name('pinned-' + commit + '.json'); path.write_bytes(pinned)
     call(['schema', 'install', str(redirected(path))])
+    return json.loads(pinned)
 # The store starts at version 2 with a row of the user without words, and is carried through the pinned versions to 9.
 install('2b9417c8bc96b0cbeb4ab7913aa44cb49ad8d604', '27de5fd02c20299897720ab34543e04e6db685438c3dd7409691cb8ddae11f24')
 call(['index', '--source', 'task_states'])
@@ -936,7 +938,7 @@ apply('triage_decision', 'v9-after-carry', dict(decision=third, triage='none', r
 unchanged = fingerprint()
 assert migrate(9, 10) == dict(carried=0, already=3)
 assert fingerprint() == unchanged and fields(third_request)['route_reason'] == 'carried from version 9'
-for before, after in [(9, 12), (10, 10), (10, 9)]:
+for before, after in [(9, 13), (10, 10), (10, 9)]:
     assert migrate(before, after, 2) == dict(status='unknown_pair')
 assert fingerprint() == unchanged
 assert migrate(9, 10) == dict(carried=0, already=3)
@@ -1092,14 +1094,15 @@ view = call(['render'], dict(view='requests_unrouted', args={}))
 assert view['rows'] == len(unrouted) > 0 and 'v10 v10-widget-colour' not in view['markdown'] and 'The user corrects r2.' in view['markdown'], view
 print(view['markdown'])
 print('v10_gate_rows_complete')
-# Version 11: the repository's file over the objects made under version 10.
+# Version 11, pinned in Git by the commit of main that holds it, over the objects made under version 10; the
+# repository's file comes after its walk.
 v10_objects = [task, *decisions, third, *[o['id'] for t in ('request', 'intent', 'criterion') for o in call(['search'], dict(object_type=t, limit=1000))['objects']]]
 v10_before = [obj(i) for i in v10_objects]
 v10_views = [(view, args, call(['render'], dict(view=view, args=args))) for view, args in [('intents_open', {}), ('criteria_of_intent', dict(intent='widget-board')),
              ('requests_by_topic', dict(topic='v10-widget-colour')), ('requests_unrouted', {})]]
-schema = json.loads(pathlib.Path(repo, 'ontology/work.schema.json').read_text())
-assert schema['version'] == 11
-call(['schema', 'install', str(redirected(pathlib.Path(repo, 'ontology/work.schema.json'), 'repository.json'))])
+V11_PIN = ('eb4963d5fa0ff697a9f6743df38a03bbd20b233d', '62062852a76a173dc7a51625b1ccfdd806432d086a7350b9b3d2a12b6aeb1d34')
+v11_schema = install(*V11_PIN)
+assert v11_schema['version'] == 11
 redirect.trace(work, copies)
 assert [obj(i) for i in v10_objects] == v10_before
 for view, args, before in v10_views:
@@ -1115,7 +1118,6 @@ print('v11_mcp_bytes=' + ','.join(map(str, sizes)), file=sys.stderr)
 unchanged = fingerprint()
 assert migrate(10, 11) == dict(carried=0, already=0)
 assert migrate(9, 11) == dict(carried=0, already=3)
-assert migrate(11, 12, 2) == dict(status='unknown_pair')
 assert fingerprint() == unchanged and [obj(i) for i in v10_objects] == v10_before
 print('v11_migration_rows_complete')
 phase = 'v11'
@@ -1451,6 +1453,69 @@ assert any(r.get('failed') == ['intent_not_open_for_units'] and r['parameters'][
 refused = call(['log'], dict(outcome='refused', action_type='ready_unit', parameters=True))['rows']
 assert any(r.get('failed') == ['page_not_reviewed'] and r['parameters']['unit'] == contract for r in refused), refused
 print('v11_gate_rows_complete')
+
+# Version 12: the repository's file over the objects made under version 11. A unit of class contract made under
+# version 11, with a dependency and a page review accepted after its last amendment, waits for it as a draft.
+tick(); digested, PAGE = unit('fixture-digest'), digest('page digest')
+apply('add_unit', 'digest', dict(op, unit=digested, depends_on=[dep], estimate_lines=200, **{'class': 'contract'}))
+accepted_page = review('page-digest', 'page', PAGE, unit=digested)
+v11_objects = [o['id'] for t in ('task', 'decision', 'request', 'intent', 'criterion', 'unit', 'review', 'run', 'finding', 'hold')
+               for o in call(['search'], dict(object_type=t, limit=1000))['objects']]
+v11_before = [obj(i) for i in v11_objects]
+v11_views = [(view, args, call(['render'], dict(view=view, args=args))) for view, args in [
+    ('intents_open', {}), ('criteria_of_intent', dict(intent='gadget-board')), ('requests_unrouted', {}), ('units_of_intent', dict(intent='gadget-board')),
+    ('units_live', {}), ('reviews_of_unit', dict(unit='fixture-digest')), ('reviews_of_unit', dict(unit='fixture-contract')),
+    ('runs_of_unit', dict(unit='fixture-stopped')), ('findings_open', {}), ('holds_on_work', {})]]
+schema = json.loads(pathlib.Path(repo, 'ontology/work.schema.json').read_text())
+assert schema['version'] == 12
+# Every action but ready_unit, and every other part of the schema, reads the same as at version 11.
+assert {k: v for k, v in schema.items() if k not in ('version', 'action_types')} == {k: v for k, v in v11_schema.items() if k not in ('version', 'action_types')}
+assert sorted(schema['action_types']) == sorted(v11_schema['action_types'])
+assert [a for a in schema['action_types'] if schema['action_types'][a] != v11_schema['action_types'][a]] == ['ready_unit']
+print('gate_row=v12-only-ready-unit-changed expected=admitted actions=' + str(len(schema['action_types'])))
+call(['schema', 'install', str(redirected(pathlib.Path(repo, 'ontology/work.schema.json'), 'repository.json'))])
+redirect.trace(work, copies)
+assert [obj(i) for i in v11_objects] == v11_before
+for view, args, before in v11_views:
+    answer = call(['render'], dict(view=view, args=args))
+    assert answer['rows'] == before['rows'] and answer['markdown'] == before['markdown'].replace('schema=work@11', 'schema=work@12'), view
+print('gate_row=v12-v11-objects-and-views-unchanged expected=admitted objects=' + str(len(v11_objects)) + ' views=' + str(len(v11_views)))
+sizes = []
+for name in ('ont_describe', 'ont_action_list'):
+    wire = subprocess.run([binary, '--store', store, 'mcp'], input=json.dumps(dict(jsonrpc='2.0', id=1, method='tools/call', params=dict(name=name, arguments={}))) + '\n', text=True, capture_output=True, timeout=60)
+    answer = json.loads(wire.stdout.splitlines()[0])['result']; assert wire.returncode == 0 and not answer['isError'], answer
+    sizes.append(len(answer['content'][0]['text'].encode())); assert sizes[-1] <= 262144, (name, sizes[-1])
+print('v12_mcp_bytes=' + ','.join(map(str, sizes)), file=sys.stderr)
+unchanged = fingerprint()
+assert migrate(11, 12) == dict(carried=0, already=0)
+assert migrate(9, 12) == dict(carried=0, already=3)
+assert migrate(12, 13, 2) == dict(status='unknown_pair')
+assert fingerprint() == unchanged and [obj(i) for i in v11_objects] == v11_before
+print('v12_migration_rows_complete')
+phase = 'v12'
+# ready_unit: a unit of class contract or effect needs a closed accepting page review whose head is page_digest.
+apply('ready_unit', 'digest-no-page-digest', dict(unit=digested, intent=gadget), 'page_not_reviewed')
+apply('ready_unit', 'digest-other-digest', dict(unit=digested, intent=gadget, page_digest=digest('another page')), 'page_not_reviewed')
+apply('ready_unit', 'digest-not-hex', dict(unit=digested, intent=gadget, page_digest=PAGE.upper()), 'invalid_parameter')
+# An amendment of the dependencies, the estimate and a tier keeps the accept: the review started before it.
+tick(); apply('amend_unit', 'digest-tiers', dict(unit=digested, depends_on=[], estimate_lines=120, implementer=dict(page['implementer'], model='fixture-model-2')))
+f = fields(digested); assert f['state'] == 'draft' and f['amended_at'] == stamp() > fields(accepted_page)['started_at'] and f['estimate_lines'] == 120, f
+apply('ready_unit', 'digest', dict(unit=digested, intent=gadget, page_digest=PAGE)); assert fields(digested)['state'] == 'ready'
+apply('ready_unit', 'digest-again', dict(unit=digested, intent=gadget, page_digest=PAGE), 'unit_not_draft')
+apply('ready_unit', 'digest-again-other', dict(unit=digested, intent=gadget, page_digest=digest('another page')), ('unit_not_draft', 'page_not_reviewed'))
+apply('start_unit', 'digest', dict(unit=digested, intent=gadget)); assert fields(digested)['state'] == 'running'
+# A review that is running, or closed repair, of the digest given does not count; a plain unit needs none.
+effect12 = unit('fixture-effect-12'); apply('add_unit', 'effect-12', dict(op, unit=effect12, **{'class': 'effect'}))
+running_page = review('page-effect-12-running', 'page', digest('page effect 12'), close=False, unit=effect12)
+apply('ready_unit', 'effect-12-running', dict(unit=effect12, intent=gadget, page_digest=digest('page effect 12')), 'page_not_reviewed')
+apply('close_unit_review', 'page-effect-12-running', dict(review=running_page, verdict='repair', session='fixture-verifier', unit=effect12, **REPORT))
+apply('ready_unit', 'effect-12-repair', dict(unit=effect12, intent=gadget, page_digest=digest('page effect 12')), 'page_not_reviewed')
+review('page-effect-12', 'page', digest('page effect 12 b'), unit=effect12)
+apply('ready_unit', 'effect-12', dict(unit=effect12, intent=gadget, page_digest=digest('page effect 12 b'))); assert fields(effect12)['state'] == 'ready'
+plain12 = unit('fixture-plain-12'); apply('add_unit', 'plain-12', dict(op, unit=plain12)); apply('ready_unit', 'plain-12', dict(unit=plain12, intent=gadget))
+refused = call(['log'], dict(outcome='refused', action_type='ready_unit', parameters=True))['rows']
+assert any(r.get('failed') == ['page_not_reviewed'] and r['parameters']['unit'] == digested and r['parameters'].get('page_digest') == digest('another page') for r in refused), refused
+print('v12_gate_rows_complete')
 PY
 
 python3 -I -B "$repo/ontology/memory-index-walk.py" "$ont_binary" "$rehearsal_root/memory-walk" --records 2

@@ -1335,6 +1335,166 @@ fn asked_again_and_still_missing_the_first_line_is_no_result() {
     );
 }
 
+/// What the session reads when its answer met `expect.first_line` and missed `expect.second_line`.
+const ASK_SECOND: &str = "Your last answer did not have as its second line the line your task asks for: give the whole answer again with the same first line, that line as its second line and nothing before them, and post, push, send or change nothing a second time.\n";
+
+/// `expect.second_line` is a pattern of the form of `first_line`, admitted only beside it, and
+/// refused with `answer_schema` as `first_line` is; every refusal is before any effect.
+// spec: specs/ap/run.md#R2
+// spec: specs/ap/run.md#R30
+#[test]
+fn second_line_is_admitted_only_beside_first_line() {
+    let mut f = Fake::new();
+    let bad = [
+        json!({"second_line": "Digest: *"}),
+        json!({"file": f.p("cwd/a.txt"), "second_line": "Digest: *"}),
+        json!({"first_line": "Verdict: *", "second_line": "x".repeat(201)}),
+        json!({"first_line": "Verdict: *", "second_line": "Digest:\n*"}),
+        json!({"first_line": "Verdict: *", "second_line": 7}),
+        json!({"first_line": "Verdict: *", "second_line": null}),
+    ];
+    for expect in bad {
+        let mut r = f.request("s.md");
+        r["expect"] = expect.clone();
+        assert_eq!(
+            code(f.run(&r)),
+            "invalid_input@expect.second_line",
+            "{expect}"
+        );
+    }
+    let mut r = f.request("s.md");
+    r["expect"] = json!({"first_line": "Verdict: *", "third_line": "x"});
+    assert_eq!(code(f.run(&r)), "invalid_input@expect");
+    let mut r = f.typed("s.md");
+    r["expect"] = json!({"first_line": "Verdict: *", "second_line": "*"});
+    assert_eq!(code(f.run(&r)), "invalid_input@answer_schema");
+    assert!(f.calls().is_empty(), "nothing started");
+    // A pattern of 200 bytes is admitted.
+    std::fs::write(f.t.join("bin/answer"), "Verdict: accept\nDigest: abc\n").unwrap();
+    f.mode("a1", "answer");
+    let mut r = f.request("ok.md");
+    r["expect"] =
+        json!({"first_line": "Verdict: *", "second_line": format!("*{}", "c".repeat(199))});
+    let (v, _) = f.run(&r).unwrap();
+    assert_eq!(v["unmet"], "second_line", "{v}");
+}
+
+/// A Claude answer whose first line meets and whose second line misses is `no_result` with `unmet`
+/// `second_line` and is asked again once, in its own session, with the sentence of the second line;
+/// an answer that misses the first line keeps the sentence of R20. A Codex stage is not asked.
+// spec: specs/ap/run.md#R16
+// spec: specs/ap/run.md#R17
+// spec: specs/ap/run.md#R20
+#[test]
+fn a_missed_second_line_is_asked_again_with_its_own_sentence() {
+    assert!(ASK_SECOND.ends_with(".\n") && !ASK_SECOND[..ASK_SECOND.len() - 1].contains('\n'));
+    assert!(!ASK_SECOND.contains(". "), "one sentence");
+    let expect = json!({"first_line": "Verdict: *", "second_line": "*abc*"});
+    // Asked, and the ask names it: ok.
+    let mut f = Fake::new();
+    std::fs::write(f.t.join("bin/answer"), "Verdict: accept\nDigest: abc\n").unwrap();
+    f.asked("Verdict: accept\nDigest: none", "answer");
+    let mut r = f.request("q.md");
+    r["expect"] = expect.clone();
+    let (v, status) = f.run(&r).unwrap();
+    assert_eq!((status, v["state"].as_str()), (0, Some("ok")), "{v}");
+    assert_eq!(f.accounts(), ["a1", "a1"]);
+    let session = v["session"].as_str().unwrap();
+    assert!(f.calls()[1].ends_with(&format!("--resume {session}")));
+    assert_eq!(f.input(2), ASK_SECOND.as_bytes());
+    let attempts = v["attempts"].as_array().unwrap();
+    let pick = |k: &str| attempts.iter().map(|a| a[k].clone()).collect::<Vec<_>>();
+    assert_eq!(pick("asked"), [json!(false), json!(true)]);
+    assert_eq!(pick("state"), [json!("no_result"), json!("ok")]);
+    assert_eq!(
+        std::fs::read_to_string(f.p("q.md")).unwrap(),
+        "Verdict: accept\nDigest: abc\n"
+    );
+    // Asked, and the ask misses it again: no_result, asked once only.
+    let mut f = Fake::new();
+    std::fs::write(f.t.join("bin/answer"), "Verdict: accept\nDigest: none\n").unwrap();
+    f.asked("Verdict: accept\nDigest: none", "answer");
+    let mut r = f.request("n.md");
+    r["expect"] = expect.clone();
+    let (v, status) = f.run(&r).unwrap();
+    assert_eq!(
+        (status, v["state"].as_str(), v["unmet"].as_str()),
+        (3, Some("no_result"), Some("second_line")),
+        "{v}"
+    );
+    assert_eq!(
+        (f.launches.len(), v["expect_met"].clone()),
+        (2, json!(false))
+    );
+    // The first line missed: the sentence of R20, and the ask is judged on both lines.
+    let mut f = Fake::new();
+    std::fs::write(f.t.join("bin/answer"), "Verdict: accept\nDigest: abc\n").unwrap();
+    f.asked("No verdict here.", "answer");
+    let mut r = f.request("p.md");
+    r["expect"] = expect.clone();
+    let (v, status) = f.run(&r).unwrap();
+    assert_eq!((status, v["state"].as_str()), (0, Some("ok")), "{v}");
+    assert_eq!(f.input(2), ASK.as_bytes());
+    // An answer of one line has an empty second line.
+    let mut f = Fake::new();
+    std::fs::write(f.t.join("bin/answer"), "Verdict: accept").unwrap();
+    f.mode("a1", "answer");
+    let mut r = f.request("one.md");
+    r["expect"] = json!({"first_line": "Verdict: *", "second_line": "?*"});
+    let (v, _) = f.run(&r).unwrap();
+    assert_eq!(v["unmet"], "second_line");
+    r["out"] = json!(f.p("one2.md"));
+    r["expect"] = json!({"first_line": "Verdict: *", "second_line": "*"});
+    let (v, status) = f.run(&r).unwrap();
+    assert_eq!((status, v["state"].as_str()), (0, Some("ok")));
+    // A Codex stage is not asked again.
+    let mut f = Fake::new();
+    std::fs::write(f.t.join("bin/answer"), "Verdict: accept\nDigest: none\n").unwrap();
+    f.mode("a1", "answer");
+    let mut r = f.codex("c.md");
+    r["expect"] = expect;
+    let (v, status) = f.run(&r).unwrap();
+    assert_eq!(
+        (status, v["state"].as_str(), v["unmet"].as_str()),
+        (3, Some("no_result"), Some("second_line"))
+    );
+    assert_eq!(f.launches.len(), 1);
+}
+
+/// The result a stage is judged by meets both lines: a later result that meets only the first
+/// line does not unmake one that met both.
+// spec: specs/ap/run.md#R16
+#[test]
+fn the_result_judged_meets_the_second_line_too() {
+    let mut f = Fake::new();
+    std::fs::copy(
+        Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/three-results.skeleton"),
+        f.t.join("bin/skeleton"),
+    )
+    .unwrap();
+    let answers = "the check is still running\nDONE AP-GATE one\\nsecond ok\nDONE AP-GATE two\\nsecond missing";
+    std::fs::write(f.t.join("bin/answers"), answers).unwrap();
+    f.mode("a1", "skeleton");
+    let mut r = f.request("s.md");
+    r["role"] = json!("implementer");
+    r["expect"] = json!({"first_line": "DONE AP-GATE *", "second_line": "second ok"});
+    let (v, status) = f.run(&r).unwrap();
+    assert_eq!((status, v["state"].as_str()), (0, Some("ok")), "{v}");
+    assert_eq!(
+        std::fs::read_to_string(f.p("s.md")).unwrap(),
+        "DONE AP-GATE one\nsecond ok"
+    );
+    // Without `second_line`, the last result that meets the first line, as before.
+    r["out"] = json!(f.p("s2.md"));
+    r["expect"] = json!({"first_line": "DONE AP-GATE *"});
+    let (v, status) = f.run(&r).unwrap();
+    assert_eq!((status, v["state"].as_str()), (0, Some("ok")), "{v}");
+    assert_eq!(
+        std::fs::read_to_string(f.p("s2.md")).unwrap(),
+        "DONE AP-GATE two\nsecond missing"
+    );
+}
+
 /// An ask that ends cut, failed or at the bound ends the call with that state on its account: no
 /// move to a next account. The asked launch and its ask share one `timeout_seconds`. An ask that
 /// wrote no answer leaves the first answer in `out` and its `answer` in the record.

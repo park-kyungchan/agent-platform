@@ -467,7 +467,9 @@ fn write(
     let mut answer = json!({"unit": key, "outcome": applied.outcome, "state": back["state"],
         "amended_at": back["amended_at"]});
     if op == "amend" {
-        let outdated = back["class"] == "contract" || back["class"] == "effect";
+        // True when the class needs a page review and none accepted names the digest read back (R17).
+        let outdated = (back["class"] == "contract" || back["class"] == "effect")
+            && !accepted_page(s, store, key, &render::page_digest(key, &back))?;
         answer["page_review_outdated"] = json!(outdated);
     }
     Ok(answer)
@@ -487,14 +489,18 @@ fn ready(
 ) -> Result<Value, Failure> {
     let read = at(store::head(s, store, "unit", key), "unit")?;
     let (revision, u) = read.ok_or_else(|| error("unknown_unit", "unit"))?;
-    let mut p = json!({"unit": id("unit", key)});
+    // The digest goes with every unit, so that the store names its first failed criterion (R21).
+    let digest = render::page_digest(key, &u);
+    let mut p = json!({"unit": id("unit", key), "page_digest": digest});
     if u["lane"] == "objective" {
         p["intent"] = u["intent"].clone();
     }
     let (mut base, mut checks) = (Value::Null, vec![]);
     if u["state"] == "draft" {
-        if u["class"] == "contract" || u["class"] == "effect" {
-            page_reviewed(s, store, key, &u)?;
+        if (u["class"] == "contract" || u["class"] == "effect")
+            && !accepted_page(s, store, key, &digest)?
+        {
+            return Err(fail("page_not_reviewed", "unit", json!({"digest": digest})));
         }
         (base, checks) = on_base(s, &u)?;
     }
@@ -509,33 +515,30 @@ fn ready(
         "checks": checks}),
     )
 }
-/// Some accepting review of kind `page`, started after the last amendment, names the page's digest (R21).
-fn page_reviewed(
+/// Some review of kind `page` of the unit, closed `accept`, names `digest` as its head, whenever it
+/// started (R17, R21).
+fn accepted_page(
     s: &mut impl System,
     store: Option<&str>,
     key: &str,
-    u: &Value,
-) -> Result<(), Failure> {
-    let digest = render::page_digest(key, u);
+    digest: &str,
+) -> Result<bool, Failure> {
     let keys = at(
         store::view_keys(s, store, "reviews_of_unit", json!({"unit": key})),
         "reviews",
     )?;
-    let amended = u["amended_at"].as_str().unwrap_or_default();
     for k in keys {
         let review = at(store::get(s, store, "review", &k), "reviews")?;
         let Some(v) = review else { continue };
-        let started = v["started_at"].as_str().unwrap_or_default();
         if v["kind"] == "page"
             && v["status"] == "closed"
             && v["verdict"] == "accept"
-            && started > amended
-            && v["head"] == digest.as_str()
+            && v["head"] == digest
         {
-            return Ok(());
+            return Ok(true);
         }
     }
-    Err(fail("page_not_reviewed", "unit", json!({"digest": digest})))
+    Ok(false)
 }
 fn invalid(member: &str, why: &str) -> Failure {
     fail("policy_invalid", "policy", json!(format!("{member} {why}")))

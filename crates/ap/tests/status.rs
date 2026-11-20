@@ -826,7 +826,7 @@ fn r4_the_time_and_the_schema_are_the_first_answers_of_the_store() {
     let v = run(&mut f, &Call::Overview);
     // The fake's clock moves with every answer: the first one is the verb's `at`.
     assert_eq!(v["at"], "2026-11-17T12:00:00Z");
-    assert_eq!(v["schema"], 11);
+    assert_eq!(v["schema"], 12);
     let members: Vec<&str> = v.as_object().unwrap().keys().map(String::as_str).collect();
     assert_eq!(
         members,
@@ -846,9 +846,9 @@ fn r4_the_time_and_the_schema_are_the_first_answers_of_the_store() {
     assert_eq!(f.calls[0].1["object_type"], "request");
     // The time is not a clock of the host: another envelope, another print.
     let mut f = fixture();
-    f.schema["version"] = json!(12);
+    f.schema["version"] = json!(13);
     let v = run(&mut f, &Call::Overview);
-    assert_eq!(v["schema"], 12);
+    assert_eq!(v["schema"], 13);
 }
 
 // spec: specs/ap/status.md#R5
@@ -1334,7 +1334,7 @@ fn r17_the_overview_text_is_one_golden_text() {
     assert!(text.is_ascii());
 }
 const GOLDEN: &str = "\
-status 2026-11-17T12:00:00Z schema work@11
+status 2026-11-17T12:00:00Z schema work@12
 NEEDS THE LEAD
 finding f-urgent: Summary of f-urgent.
 unit u-stop: ci_failed
@@ -1462,7 +1462,7 @@ fn r17_the_text_stays_within_80_lines_and_says_what_it_cut() {
     assert!(text.ends_with("DELIVERY\nunreadable\n"), "{text}");
     assert_eq!(
         text.lines().next(),
-        Some("status 2026-11-17T12:00:00Z schema work@11")
+        Some("status 2026-11-17T12:00:00Z schema work@12")
     );
 }
 

@@ -131,6 +131,8 @@ struct F {
     dead: bool,
     /// When a stage launches, or when a start is validated, this unit is amended (another session's).
     amend_at_launch: Option<&'static str>,
+    /// When a stage launches, this unit's tiers and estimate are amended, and nothing else.
+    tiers_at_launch: Option<&'static str>,
     amend_at_validate: Option<&'static str>,
     /// When `close_run` is applied, the run's report is replaced.
     replace_report: bool,
@@ -194,6 +196,7 @@ impl F {
             die_after: None,
             dead: false,
             amend_at_launch: None,
+            tiers_at_launch: None,
             amend_at_validate: None,
             replace_report: false,
             stage_writes: false,
@@ -285,7 +288,7 @@ impl F {
     fn mode(&self, account: &str, mode: &str) {
         std::fs::write(self.t.join(format!("bin/mode-{account}")), mode).unwrap();
     }
-    /// A file of the reviewer's directory: `verdict`, `digest`, `none` or `touch`.
+    /// A file of the reviewer's directory: `verdict`, `digest`, `digest-once`, `none` or `touch`.
     fn answer(&self, name: &str, text: Option<&str>) {
         let path = self.t.join("bin").join(name);
         match text {
@@ -642,13 +645,15 @@ impl F {
                 if u["state"] != "draft" {
                     failed.push("unit_not_draft");
                 }
+                // Version 12: an accept whose head is `page_digest`, whenever it started.
                 let reviewed = self.reviews_of("unit", &key).iter().any(|(_, r)| {
                     r["kind"] == "page"
                         && r["status"] == "closed"
                         && r["verdict"] == "accept"
-                        && r["started_at"].as_str() > u["amended_at"].as_str()
+                        && p.get("page_digest").is_some_and(|d| &r["head"] == d)
                 });
-                if !reviewed {
+                let class = &u["class"];
+                if (class == "contract" || class == "effect") && !reviewed {
                     failed.push("page_not_reviewed");
                 }
                 if !failed.is_empty() {
@@ -737,6 +742,15 @@ impl System for F {
         }
         if let Some(key) = self.amend_at_launch.take() {
             self.amend(key);
+        }
+        if let Some(key) = self.tiers_at_launch.take() {
+            let now = stamp(self.clock);
+            self.modify(
+                "unit",
+                key,
+                json!({"implementer": {"runtime": "codex", "model": "m9", "effort": "low"},
+                    "estimate_lines": 77, "amended_at": now}),
+            );
         }
         self.launches += 1;
         let at = argv.iter().position(|a| a == "--").unwrap();
@@ -1490,22 +1504,21 @@ fn r10_the_start_is_validated_and_the_stage_admitted_before_anything_is_written(
 
 // spec: specs/ap/unit-review.md#R11
 #[test]
-fn r11_the_start_names_the_page_it_read_and_comes_after_the_amendment() {
+fn r11_the_start_names_the_page_it_read_and_makes_no_pause() {
     let mut f = F::new();
     let unit = f.get("unit", "u1");
-    // The read in the second of the amendment: one pause before the apply.
-    let (v, _) = f.ok(&f.req("unit", "u1"));
-    // The verb's own pause; the stage's polling pauses are shorter.
+    // The read in the second of the amendment: no pause before the apply, as an accept counts by
+    // its digest and not by when it started.
+    f.ok(&f.req("unit", "u1"));
+    // A pause of the verb's own would be one second; the stage's polling pauses are shorter.
     let seconds = |f: &F| {
         f.pauses
             .iter()
             .filter(|d| **d == Duration::from_secs(1))
             .count()
     };
-    assert_eq!(seconds(&f), 1);
+    assert_eq!(seconds(&f), 0);
     let body = &f.bodies("apply", "start_unit_review")[0];
-    let review = f.get("review", v["review"].as_str().unwrap());
-    assert!(review["started_at"].as_str() > unit["amended_at"].as_str());
     let p = &body["parameters"];
     assert_eq!(
         body["expected"],
@@ -1549,11 +1562,7 @@ fn r11_the_start_names_the_page_it_read_and_comes_after_the_amendment() {
     );
     f.tick(3);
     f.ok(&f.req("unit", "u1"));
-    assert_eq!(
-        seconds(&f),
-        1,
-        "a read later than the amendment needs no pause"
-    );
+    assert_eq!(seconds(&f), 0, "nor a read later than the amendment");
     // Amended between the read and the start: nothing started.
     f.amend_at_validate = Some("u1");
     let n = f.reviews_of("unit", "u1").len();
@@ -1653,6 +1662,48 @@ fn r13_the_stage_is_ap_run_s_and_a_stage_refused_at_its_start_abandons() {
     );
     assert_eq!(rec["prompt"]["path"], f.get("review", key)["prompt"]);
     assert_eq!(rec["run_object"]["start"], "applied");
+    // The stage's `expect`: the verdict line, and the digest within the second line
+    // (`second_line`): a second line without the digest is asked again in the same session, and
+    // the ask that names it closes the review.
+    let digest = page_digest("u1", &f.get("unit", "u1"));
+    f.answer("digest-once", Some(&"0".repeat(64)));
+    let before = f.launches;
+    let (asked, status) = f.ok(&f.req("unit", "u1"));
+    f.answer("digest-once", None);
+    assert_eq!(
+        (status, &asked["verdict"], f.launches - before),
+        (0, &json!("accept"), 2)
+    );
+    assert_eq!(
+        f.seen("prompt"),
+        "Your last answer did not have as its second line the line your task asks for: give the whole answer again with the same first line, that line as its second line and nothing before them, and post, push, send or change nothing a second time.\n"
+    );
+    let asked_rec = record(asked["report"].as_str().unwrap());
+    assert_eq!(
+        (&asked_rec["state"], &asked_rec["attempts"][1]["asked"]),
+        (&json!("ok"), &json!(true))
+    );
+    let report = std::fs::read_to_string(asked["report"].as_str().unwrap()).unwrap();
+    assert_eq!(
+        report.lines().nth(1),
+        Some(format!("Digest: {digest}").as_str())
+    );
+    // A plan's stage has the same `expect`: missed twice, the review closes `abandoned`.
+    let mut g = F::new();
+    plan_fixture(&mut g);
+    g.answer("digest", Some(&"0".repeat(64)));
+    let (plan, status) = g.ok(&g.req("intent", "widgets"));
+    assert_eq!(
+        (status, &plan["verdict"], &plan["cause"], g.launches),
+        (3, &json!("abandoned"), &json!("no_result"), 2)
+    );
+    let plan_rec = record(
+        g.dir()
+            .join(format!("{}.md", plan["review"].as_str().unwrap()))
+            .to_str()
+            .unwrap(),
+    );
+    assert_eq!(plan_rec["unmet"], "second_line");
     let run = f.get("run", rec["run_object"]["key"].as_str().unwrap());
     assert_eq!(
         (&run["unit"], &run["status"]),
@@ -1689,18 +1740,29 @@ fn r14_only_a_report_of_the_form_naming_the_digest_closes_accept_or_repair() {
         (&rec["session"], &json!("a1"), &oid("unit", "u1"))
     );
     assert!(close["request_id"].as_str().unwrap().ends_with("-close"));
-    let cases: [(&str, Option<&str>, &str); 6] = [
-        ("verdict", Some("repair"), "repair"),
-        ("none", Some(""), "no_result"),
-        ("digest", Some(&"0".repeat(64)), "report_form"),
-        ("digest", Some(&format!("{digest} {digest}")), "report_form"),
-        ("digest", Some(&digest[..63]), "report_form"),
-        ("verdict", Some("accepted"), "report_form"),
+    // The second line the stage's `expect.second_line` (`*<digest>*`) misses is asked again and,
+    // missed again, ends `no_result`; one it matches but the close refuses is `report_form`, with no
+    // ask (R13).
+    let cases: [(&str, Option<&str>, &str, usize); 7] = [
+        ("verdict", Some("repair"), "repair", 1),
+        ("none", Some(""), "no_result", 2),
+        ("digest", Some(&"0".repeat(64)), "no_result", 2),
+        (
+            "digest",
+            Some(&format!("{digest} {digest}")),
+            "report_form",
+            1,
+        ),
+        ("digest", Some(&format!("{digest}a")), "report_form", 1),
+        ("digest", Some(&digest[..63]), "no_result", 2),
+        ("verdict", Some("accepted"), "report_form", 1),
     ];
-    for (file, text, want) in cases {
+    for (file, text, want, launches) in cases {
         f.answer(file, text);
+        let before = f.launches;
         let (v, status) = f.ok(&f.req("unit", "u1"));
         f.answer(file, None);
+        assert_eq!(f.launches - before, launches, "{file} {text:?}");
         match want {
             "repair" => assert_eq!(
                 (status, &v["verdict"], &v["report"]),
@@ -1992,9 +2054,11 @@ fn r17_r19_a_call_cut_after_the_stage_is_finished_from_its_report() {
         close["parameters"]["report_sha256"],
         json!(sha(&std::fs::read(v["report"].as_str().unwrap()).unwrap()))
     );
-    // A report that does not name the review's own head.
+    // A report whose second line the stage's pattern matches but that does not name the review's
+    // own head as one run of 64 hexadecimal characters (here joined to a letter).
     f.die_after = Some("close_run");
-    f.answer("digest", Some(&"1".repeat(64)));
+    let joined = format!("{}z", page_digest("u1", &f.get("unit", "u1")));
+    f.answer("digest", Some(&joined));
     f.refusal(&f.req("unit", "u1"));
     f.answer("digest", None);
     (f.dead, f.die_after) = (false, None);
@@ -2181,7 +2245,7 @@ fn r20_the_answer_names_the_review_and_every_review_of_the_subject() {
     let (v, status) = f.ok(&f.req("unit", "u1"));
     assert_eq!(
         (status, &v["cause"], v["reviews"].as_array().unwrap().len()),
-        (3, &json!("report_form"), 2)
+        (3, &json!("no_result"), 2)
     );
     let rounds: Vec<&Value> = v["reviews"]
         .as_array()
@@ -2214,9 +2278,15 @@ fn r21_a_page_amended_while_its_review_ran_is_not_made_ready() {
     );
     let e = ready(&mut f).unwrap_err();
     assert_eq!(e.code, "page_not_reviewed");
-    f.tick(1);
+    // Amended while it ran, but only its tiers and estimate: the digest is the one reviewed, and the
+    // accept counts although the amendment is later than its start.
+    f.tiers_at_launch = Some("u2");
     let (v, _) = f.ok(&f.req("unit", "u2"));
-    assert_eq!(v["page_amended_during_review"], false);
+    assert_eq!(v["page_amended_during_review"], false, "{v}");
+    let unit = f.get("unit", "u2");
+    let review = f.get("review", v["review"].as_str().unwrap());
+    assert_eq!(unit["estimate_lines"], 77);
+    assert!(unit["amended_at"].as_str() >= review["started_at"].as_str());
     let answer: Value = serde_json::from_str(&ready(&mut f).unwrap()).unwrap();
     assert_eq!(answer["state"], "ready", "{answer}");
 }
