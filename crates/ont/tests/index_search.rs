@@ -188,6 +188,7 @@ fn three_tasks_then_one_removed() {
 
 #[test]
 fn change_refresh_and_stale_report() {
+    // spec: specs/ont/read.md#R75
     // spec: specs/ont/read.md#R2
     // spec: specs/ont/index.md#R27
     let t = Temp::new();
@@ -1534,6 +1535,7 @@ fn key_template_and_references_from_record_strings() {
 
 #[test]
 fn schema_check_refuses_templates_glob_arrays_and_new_transforms() {
+    // spec: specs/ont/index.md#R42
     // spec: specs/ont/index.md#R5
     // spec: specs/ont/index.md#R35
     // spec: specs/ont/index.md#R39

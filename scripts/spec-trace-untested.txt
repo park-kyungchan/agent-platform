@@ -1,7 +1,6 @@
 specs/ont/action.md#R100
 specs/ont/action.md#R27
 specs/ont/action.md#R44
-specs/ont/action.md#R46
 specs/ont/action.md#R5
 specs/ont/action.md#R79
 specs/ont/action.md#R83
@@ -10,7 +9,6 @@ specs/ont/action.md#R96
 specs/ont/cli.md#R2
 specs/ont/index.md#R13
 specs/ont/index.md#R33
-specs/ont/index.md#R42
 specs/ont/read.md#R1
 specs/ont/read.md#R27
 specs/ont/read.md#R40
@@ -19,7 +17,6 @@ specs/ont/read.md#R43
 specs/ont/read.md#R47
 specs/ont/read.md#R52
 specs/ont/read.md#R65
-specs/ont/read.md#R75
 specs/ont/read.md#R79
 specs/ont/read.md#R93
 specs/ont/render.md#R16
@@ -27,7 +24,6 @@ specs/ont/render.md#R26
 specs/ont/render.md#R33
 specs/ont/render.md#R34
 specs/ont/render.md#R35
-specs/ont/render.md#R46
 specs/ont/render.md#R48
 specs/ont/render.md#R49
 specs/ont/schema-language.md#R1

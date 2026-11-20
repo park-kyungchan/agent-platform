@@ -349,6 +349,7 @@ fn optional_presence_create_and_modify_cli_and_mcp() {
 
 #[test]
 fn schema_refuses_unsupported_expressions_and_description_bytes() {
+    // spec: specs/ont/action.md#R46
     // spec: specs/ont/action.md#R74
     let t = Temp::new();
     for (expression, code) in [
