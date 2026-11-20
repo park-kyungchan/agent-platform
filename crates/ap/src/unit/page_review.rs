@@ -85,6 +85,10 @@ impl Look<'_> {
     fn work(&self, k: &str) -> PathBuf {
         self.dir.join("work").join(k)
     }
+    /// The scratch directory of the look of review `k` under `limits` (R13).
+    fn scratch(&self, k: &str) -> PathBuf {
+        self.dir.join("scratch").join(k)
+    }
     fn out(&self, k: &str) -> String {
         self.dir
             .join(format!("{k}.md"))
@@ -537,7 +541,7 @@ fn look_at(
     let round = list.len() + 1;
     let mut dirs = std::fs::DirBuilder::new();
     dirs.recursive(true).mode(0o700);
-    for sub in ["prompts", "work"] {
+    for sub in ["prompts", "work", "scratch"] {
         dirs.create(look.dir.join(sub))
             .map_err(|_| io("the reviews directory cannot be made"))?;
     }
@@ -624,6 +628,12 @@ fn look_at(
     }
     if let Some((record, ..)) = &resumed {
         req["resume"] = json!({"record": record});
+    }
+    // A reviewer on the Claude CLI runs under `limits`: it writes only its account and its own
+    // scratch directory, and the working directory is read-only to it (R13).
+    if req.get("runtime").is_none_or(|r| r == "claude") {
+        let scratch = look.scratch(&review).to_string_lossy().into_owned();
+        req["limits"] = json!({ "scratch": scratch });
     }
     crate::run::admit_stage(s, &req).map_err(|f| match REVIEWER.contains(&f.field.as_str()) {
         true => fail(f.code, &format!("reviewer.{}", f.field), f.detail),
@@ -938,6 +948,8 @@ fn ended(
     if let Some(wd) = wd {
         remove_tree(&wd);
     }
+    // The scratch directory a killed `ap run` left, by the review's own key (R18).
+    remove_tree(&look.scratch(key));
     let head = v["head"].as_str().unwrap_or_default();
     let mut ending = match which {
         "finish" => judge(rec, &out, head, look.actor.session),

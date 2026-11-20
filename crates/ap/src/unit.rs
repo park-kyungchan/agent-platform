@@ -225,6 +225,9 @@ impl<S: System> System for Rendered<'_, S> {
     fn work_root(&self) -> std::path::PathBuf {
         self.s.work_root()
     }
+    fn home(&self) -> Option<std::path::PathBuf> {
+        self.s.home()
+    }
     fn units(&self) -> bool {
         self.s.units()
     }

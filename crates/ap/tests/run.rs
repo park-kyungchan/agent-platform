@@ -66,6 +66,8 @@ struct Fake {
     /// Every pause of a second or more: it takes no time, and `at_pause` runs in it.
     pauses: Vec<std::time::Duration>,
     at_pause: Option<AtPause>,
+    /// The home of the passwd entry (`home()`): `<t>/home`, or none.
+    home: Option<PathBuf>,
 }
 /// What one call of the fake `ont` does, in place of the engine's answer.
 #[derive(Clone)]
@@ -199,8 +201,20 @@ impl Fake {
             NEXT.fetch_add(1, Ordering::SeqCst)
         ));
         let _ = std::fs::remove_dir_all(&t);
-        for d in ["bin", "a1", "a2", "cwd"] {
+        for d in [
+            "bin",
+            "a1",
+            "a2",
+            "cwd",
+            "home/.ssh",
+            "work/edu-a",
+            "work/other",
+        ] {
             std::fs::create_dir_all(t.join(d)).unwrap();
+        }
+        // What `limits` hides under the home and the work root: a directory and a file of each.
+        for f in ["home/.netrc", "work/edu-b"] {
+            std::fs::write(t.join(f), "").unwrap();
         }
         for (name, text) in [
             ("claude", FAKE),
@@ -223,6 +237,7 @@ impl Fake {
             ("CLAUDE_CODE_ENTRYPOINT".into(), "cli".into()),
             ("FOO".into(), "bar".into()),
         ];
+        let home = Some(t.join("home"));
         Self {
             t,
             env,
@@ -247,6 +262,7 @@ impl Fake {
             is_active: None,
             pauses: vec![],
             at_pause: None,
+            home,
         }
     }
     fn p(&self, rel: &str) -> String {
@@ -448,6 +464,12 @@ impl System for Fake {
     }
     fn policy_file(&self) -> Option<PathBuf> {
         self.policy.clone()
+    }
+    fn home(&self) -> Option<PathBuf> {
+        self.home.clone()
+    }
+    fn work_root(&self) -> PathBuf {
+        self.t.join("work")
     }
     /// The polls of a stage (a tenth of a second) pass for real; a longer pause is noted and takes
     /// no time.
@@ -7498,14 +7520,47 @@ impl Fake {
             "--bind",
             &scratch,
             &scratch,
-            "--cap-drop",
-            "ALL",
-            "--chdir",
-            &cwd,
-            "--",
         ]
         .map(str::to_owned)
-        .to_vec()
+        .into_iter()
+        .chain(self.hiding())
+        .chain(["--cap-drop", "ALL", "--chdir", &cwd, "--"].map(str::to_owned))
+        .collect()
+    }
+    /// The hidden list as it exists now (`specs/ap/run-limits.md` R10): each path with whether it
+    /// is a directory. Under the fake's home and work root what `Fake::new` made; the host's own
+    /// paths as this host has them.
+    fn hidden(&self) -> Vec<(String, bool)> {
+        let host = [
+            "/etc/agent-platform/credentials",
+            "/etc/agent-platform/ci",
+            "/run/user",
+            "/run/docker.sock",
+            "/run/containerd/containerd.sock",
+            "/run/tailscale",
+            "/run/systemd/private",
+            "/run/dbus/system_bus_socket",
+        ];
+        let host = host
+            .into_iter()
+            .filter_map(|p| Some((p.to_owned(), std::fs::metadata(p).ok()?.is_dir())));
+        [(self.p("home/.netrc"), false), (self.p("home/.ssh"), true)]
+            .into_iter()
+            .chain(host)
+            .chain([(self.p("work/edu-a"), true), (self.p("work/edu-b"), false)])
+            .collect()
+    }
+    /// The `bwrap` words that hide the paths of `hidden()`.
+    fn hiding(&self) -> Vec<String> {
+        let mut words = vec![];
+        for (p, dir) in self.hidden() {
+            let w: Vec<&str> = match dir {
+                true => vec!["--tmpfs", &p, "--remount-ro", &p],
+                false => vec!["--ro-bind", "/dev/null", &p],
+            };
+            words.extend(w.into_iter().map(str::to_owned));
+        }
+        words
     }
     /// The words of launch `n` after `systemd-run … --`.
     fn after_unit(&self, n: usize) -> Vec<String> {
@@ -7769,7 +7824,8 @@ fn limits_r7_the_record_names_the_limits_before_the_launch_and_at_the_end() {
     f.mode("a1", "watch");
     let (v, _) = f.run(&f.limited("w.md")).unwrap();
     let s = f.p("scratch");
-    let want = json!({"scratch": s, "writable": [f.p("a1"), s], "bwrap": BWRAP});
+    let hidden: Vec<String> = f.hidden().into_iter().map(|(p, _)| p).collect();
+    let want = json!({"scratch": s, "writable": [f.p("a1"), s], "bwrap": BWRAP, "hidden": hidden});
     assert_eq!((&v["state"], &v["limits"]), (&json!("ok"), &want), "{v}");
     assert_eq!(f.record("w.md"), v);
     // What a call killed during its stage leaves: the record names the scratch directory.
@@ -8248,4 +8304,135 @@ fn run_r41_a_muse_stage_writes_no_file_under_its_account() {
     let (v, status) = f.run(&r).unwrap();
     assert_eq!((status, &v["state"]), (0, &json!("ok")), "{v}");
     assert_eq!(listing(&account), before);
+}
+
+// spec: specs/ap/run-limits.md#R10
+#[test]
+fn limits_r10_the_hidden_paths_come_after_the_binds_each_by_its_kind() {
+    let mut f = Fake::new();
+    let (v, _) = f.run(&f.limited("x.md")).unwrap();
+    assert_eq!(v["state"], "ok", "{v}");
+    let after = f.after_unit(0);
+    let want = f.bwrap("a1");
+    assert_eq!(after[..want.len()], want[..], "{after:?}");
+    let at = |w: &[String]| after.windows(w.len()).position(|x| x == w);
+    let words = |w: &[&str]| w.iter().map(|x| (*x).to_owned()).collect::<Vec<_>>();
+    let (ssh, netrc) = (f.p("home/.ssh"), f.p("home/.netrc"));
+    let (a, b) = (f.p("work/edu-a"), f.p("work/edu-b"));
+    let scratch = f.p("scratch");
+    let binds = at(&words(&["--bind", &scratch, &scratch])).unwrap();
+    let drop = at(&words(&["--cap-drop", "ALL"])).unwrap();
+    for hidden in [
+        words(&["--tmpfs", &ssh, "--remount-ro", &ssh]),
+        words(&["--ro-bind", "/dev/null", &netrc]),
+        words(&["--tmpfs", &a, "--remount-ro", &a]),
+        words(&["--ro-bind", "/dev/null", &b]),
+    ] {
+        let n = at(&hidden).unwrap_or_else(|| panic!("{hidden:?} in {after:?}"));
+        assert!(binds < n && n < drop, "{hidden:?}");
+    }
+    // A name the pattern does not match, and the caller's `HOME`, are not hidden.
+    assert!(!after.iter().any(|w| w.ends_with("/work/other")));
+    let hidden: Vec<String> = v["limits"]["hidden"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|p| p.as_str().unwrap().to_owned())
+        .collect();
+    assert!(
+        !hidden.iter().any(|p| p.starts_with("/root/")),
+        "{hidden:?}"
+    );
+    assert_eq!(hidden[..2], [netrc.clone(), ssh.clone()]);
+    assert_eq!(hidden[hidden.len() - 2..], [a.clone(), b.clone()]);
+    // What exists at the launch: a path made since, a link followed to its kind, a dangling link
+    // left out.
+    std::fs::write(f.t.join("home/.git-credentials"), "").unwrap();
+    std::os::unix::fs::symlink(f.p("work/other"), f.p("work/edu-c")).unwrap();
+    std::os::unix::fs::symlink(f.p("nowhere"), f.p("work/edu-d")).unwrap();
+    let (v, _) = f.run(&f.limited("y.md")).unwrap();
+    let c = f.p("work/edu-c");
+    let names = v["limits"]["hidden"].as_array().unwrap();
+    assert_eq!(names[0], json!(f.p("home/.git-credentials")), "{v}");
+    assert_eq!(names[names.len() - 1], json!(c), "{v}");
+    assert!(!names.contains(&json!(f.p("work/edu-d"))));
+    let after = f.after_unit(1);
+    let c_words = words(&["--tmpfs", &c, "--remount-ro", &c]);
+    assert!(after.windows(4).any(|x| x == c_words), "{after:?}");
+    // Without a passwd entry for the user there is no list: refused before the probe.
+    f.home = None;
+    let probes = f.probes.len();
+    assert_eq!(code(f.run(&f.limited("z.md"))), "limits_unavailable@limits");
+    assert_eq!((f.probes.len(), f.launches.len()), (probes, 2));
+    assert!(!Path::new(&f.p("z.md.run.json")).exists());
+}
+
+// spec: specs/ap/run-limits.md#R10
+#[test]
+fn limits_r10_the_home_is_the_passwd_entry_of_the_effective_user() {
+    use ap::host::passwd_home;
+    let status = "Name:\tap\nUid:\t1000\t0\t0\t0\nGid:\t0\t0\t0\t0\n";
+    let passwd = "user:x:1000:1000::/home/user:/bin/sh\nroot:x:0:0:root:/root:/bin/bash\n";
+    assert_eq!(passwd_home(status, passwd), Some(PathBuf::from("/root")));
+    assert_eq!(
+        passwd_home(status, "user:x:1000:1000::/home/user:/bin/sh\n"),
+        None
+    );
+    assert_eq!(passwd_home("Name:\tap\n", passwd), None);
+    // The real lookup names an absolute directory for the user the tests run as.
+    let home = ap::host::Host.home().unwrap();
+    assert!(home.is_absolute(), "{home:?}");
+}
+
+// spec: specs/ap/run-limits.md#R1
+// spec: specs/ap/run-limits.md#R10
+#[test]
+fn limits_r1_a_path_equal_to_or_inside_a_hidden_path_is_refused() {
+    let mut f = Fake::new();
+    type Change<'a> = Box<dyn Fn(&mut Value) + 'a>;
+    let at = |r: &mut Value, k: &str, p: String| r[k] = json!(p);
+    let root = f.t.clone();
+    let p = move |rel: &str| root.join(rel).to_str().unwrap().to_owned();
+    let cases: Vec<(&str, Change)> = vec![
+        (
+            "cwd in ~/.ssh",
+            Box::new(|r| at(r, "cwd", p("home/.ssh/x"))),
+        ),
+        (
+            "cwd an edu- name",
+            Box::new(|r| at(r, "cwd", p("work/edu-a"))),
+        ),
+        (
+            "account ~/.config/gh",
+            Box::new(|r| at(r, "account", p("home/.config/gh"))),
+        ),
+        (
+            "next_accounts in /run/user",
+            Box::new(|r| r["next_accounts"] = json!(["/run/user/0/claude"])),
+        ),
+        (
+            "scratch in an edu- name that does not exist",
+            Box::new(|r| r["limits"]["scratch"] = json!(p("work/edu-z/s"))),
+        ),
+        (
+            "scratch is a hidden path",
+            Box::new(|r| r["limits"]["scratch"] = json!("/etc/agent-platform/ci")),
+        ),
+        (
+            "scratch in ~/.netrc as written",
+            Box::new(|r| r["limits"]["scratch"] = json!(p("home//.netrc/./s"))),
+        ),
+    ];
+    for (name, change) in cases {
+        let mut r = f.limited("x.md");
+        change(&mut r);
+        assert_eq!(code(f.run(&r)), "invalid_input@limits", "{name}");
+    }
+    assert!(f.probes.is_empty() && f.launches.is_empty());
+    f.untouched("x.md");
+    // A name the pattern does not match is no hidden path.
+    let mut r = f.limited("x.md");
+    r["limits"]["scratch"] = json!(f.p("work/other/edu-s"));
+    let (v, _) = f.run(&r).unwrap();
+    assert_eq!(v["state"], "ok", "{v}");
 }
