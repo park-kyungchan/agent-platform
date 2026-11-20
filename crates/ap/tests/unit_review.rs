@@ -140,6 +140,10 @@ struct F {
     block_out: bool,
     /// The apply of a start names another key than its validate.
     other_key: bool,
+    /// Every call of `git`, by its arguments.
+    git: Vec<Vec<String>>,
+    /// The unit of a check of the base is read as active after its stop.
+    checks_alive: bool,
 }
 impl F {
     fn new() -> Self {
@@ -195,6 +199,8 @@ impl F {
             stage_writes: false,
             block_out: false,
             other_key: false,
+            git: vec![],
+            checks_alive: false,
         };
         f.write_policy(json!({}));
         f.put("task", "invented-task", json!({"status": "open"}));
@@ -692,7 +698,12 @@ impl System for F {
                         self.alive.remove(unit);
                         (true, vec![])
                     }
-                    "is-active" if self.alive.contains(unit) => (true, b"active\n".to_vec()),
+                    "is-active"
+                        if self.alive.contains(unit)
+                            || (self.checks_alive && unit.starts_with("ap-check-")) =>
+                    {
+                        (true, b"active\n".to_vec())
+                    }
                     "is-active" => (false, b"inactive\n".to_vec()),
                     _ => (false, vec![]),
                 };
@@ -701,6 +712,10 @@ impl System for F {
                     bytes: stdout.clone(),
                     stdout,
                 })
+            }
+            "git" => {
+                self.git.push(args.to_vec());
+                Host.call(program, args, input, ms)
             }
             // A check of `ap unit ready`: the command after `--`, run here (no unit is started).
             "systemd-run" => {
@@ -2246,4 +2261,250 @@ fn r22_the_verb_writes_only_its_actions_and_removes_only_its_own() {
             .all(|n| n == "prompts" || n == "work" || n.starts_with("act-rq-")),
         "{names:?}"
     );
+}
+
+/// What a refused look must leave as it was: the unit, its revision and digest, the reviews, the
+/// sessions started, the prompts and the validates.
+fn untouched(f: &F, key: &str) -> (Value, u64, String, usize, usize, usize, usize) {
+    let unit = f.get("unit", key);
+    let prompts = std::fs::read_dir(f.dir().join("prompts")).map_or(0, |d| d.count());
+    (
+        unit.clone(),
+        f.revisions[&k("unit", key)],
+        page_digest(key, &unit),
+        f.reviews_of("unit", key).len(),
+        f.launches,
+        prompts,
+        f.bodies("validate", "start_unit_review").len(),
+    )
+}
+/// A look at `key` with these acceptance checks: refused before anything is validated or started.
+fn refused_look(f: &mut F, key: &str, acceptance: Value) -> Refusal {
+    f.modify("unit", key, json!({"acceptance": acceptance}));
+    let before = untouched(f, key);
+    let e = f.refusal(&f.req("unit", key));
+    assert_eq!(e.after, None, "{e:?}");
+    assert_eq!(untouched(f, key), before, "{e:?}");
+    e
+}
+
+// spec: specs/ap/unit-review.md#R23
+// spec: specs/ap/unit.md#R36
+#[test]
+fn r23_a_look_runs_the_checks_of_ready_on_the_base_at_the_commit_of_its_text() {
+    let mut f = F::new();
+    // A commit on the origin the clone has not fetched: the one fetch of the look serves both.
+    std::fs::write(f.t.join("origin/AGENTS.md"), "# Invented widgets, second\n").unwrap();
+    git(&f.t.join("origin"), &["commit", "--quiet", "-am", "second"]);
+    let commit = git(&f.t.join("origin"), &["rev-parse", "HEAD"]);
+    let seen = f.t.join("seen");
+    std::fs::create_dir(&seen).unwrap();
+    let seen = seen.display();
+    let record = format!(
+        "git rev-parse HEAD > {seen}/head && pwd > {seen}/pwd && printf '%s %s' \"$AP_BASE\" \"$AP_HEAD\" > {seen}/env"
+    );
+    f.modify(
+        "unit",
+        "u1",
+        json!({"acceptance": [{"check": record, "kind": "invariant"},
+            {"check": "test -e src/widgets.rs", "kind": "fails_on_base"}]}),
+    );
+    let before = f.get("unit", "u1");
+    let (v, status) = f.ok(&f.req("unit", "u1"));
+    assert_eq!((status, &v["verdict"]), (0, &json!("accept")), "{v}");
+    // The unit is as it was: state, `amended_at`, digest; no `page_not_reviewed` of a contract page.
+    assert_eq!(f.get("unit", "u1"), before);
+    let read = |name: &str| std::fs::read_to_string(format!("{seen}/{name}")).unwrap();
+    assert_eq!(read("head").trim(), commit);
+    assert_eq!(read("env"), format!("{commit} {commit}"));
+    let prompt = std::fs::read_to_string(
+        f.get("review", v["review"].as_str().unwrap())["prompt"]
+            .as_str()
+            .unwrap(),
+    )
+    .unwrap();
+    assert!(prompt.contains(&format!("## The repository at {commit}\n")));
+    let fetches = f.git.iter().filter(|a| a.iter().any(|w| w == "fetch"));
+    assert_eq!(fetches.count(), 1, "{:?}", f.git);
+    // `ready`'s temporary directory, removed after the checks.
+    let pwd = PathBuf::from(read("pwd").trim());
+    let name = pwd.parent().unwrap().file_name().unwrap().to_string_lossy();
+    assert!(
+        pwd.starts_with(std::env::temp_dir())
+            && name.starts_with("ap-ready-")
+            && pwd.ends_with("base"),
+        "{pwd:?}"
+    );
+    assert!(!pwd.parent().unwrap().exists());
+    // Each check in its own unit, stopped and read as ended, before the start is validated.
+    let validate = f
+        .calls
+        .iter()
+        .position(|c| c.1.get(1).is_some_and(|w| w == "validate"))
+        .unwrap();
+    let checks: Vec<&Vec<String>> = f.calls[..validate]
+        .iter()
+        .filter(|c| c.0 == "systemctl")
+        .map(|c| &c.1)
+        .collect();
+    assert_eq!(checks.len(), 4, "{checks:?}");
+    assert!(checks.iter().all(|a| a[1].starts_with("ap-check-")));
+    assert_eq!(
+        checks.iter().map(|a| a[0].as_str()).collect::<Vec<_>>(),
+        ["stop", "is-active", "stop", "is-active"]
+    );
+}
+
+// spec: specs/ap/unit-review.md#R23
+// spec: specs/ap/unit.md#R36
+#[test]
+fn r23_a_check_that_does_not_hold_on_the_base_refuses_the_look_before_anything_starts() {
+    let mut f = F::new();
+    let e = refused_look(
+        &mut f,
+        "u1",
+        json!([{"check": "true", "kind": "fails_on_base"}]),
+    );
+    assert_eq!(
+        (code(&e), &e.detail["index"], &e.detail["status"]),
+        (
+            ("acceptance_passes_on_base".into(), "acceptance".into()),
+            &json!(1),
+            &json!(0)
+        )
+    );
+    let e = refused_look(
+        &mut f,
+        "u1",
+        json!([{"check": "true", "kind": "invariant"},
+            {"check": "echo invented-output; exit 3", "kind": "invariant"}]),
+    );
+    assert_eq!(
+        (code(&e), &e.detail["index"], &e.detail["status"]),
+        (
+            ("invariant_fails_on_base".into(), "acceptance".into()),
+            &json!(2),
+            &json!(3)
+        )
+    );
+    assert!(
+        e.detail["output"]
+            .as_str()
+            .unwrap()
+            .contains("invented-output")
+    );
+    let e = refused_look(
+        &mut f,
+        "u1",
+        json!([{"check": "exit 127", "kind": "fails_on_base"}]),
+    );
+    assert_eq!(code(&e).0, "acceptance_not_runnable");
+    let e = refused_look(
+        &mut f,
+        "u1",
+        json!([{"check": "exit 124", "kind": "invariant"}]),
+    );
+    assert_eq!(code(&e).0, "acceptance_timeout");
+    f.checks_alive = true;
+    let e = refused_look(
+        &mut f,
+        "u1",
+        json!([{"check": "false", "kind": "fails_on_base"}]),
+    );
+    assert_eq!(code(&e), ("check_not_stopped".into(), "acceptance".into()));
+    assert!(e.detail.as_str().unwrap().starts_with("ap-check-"));
+    f.checks_alive = false;
+    // The store's criteria, from the unit read, in the store's order; no check runs.
+    let never = json!([{"check": "exit 99", "kind": "invariant"}]);
+    let e = refused_look(&mut f, "u1", json!([]));
+    assert_eq!(
+        (code(&e), &e.detail),
+        (
+            ("acceptance_missing".into(), "unit".into()),
+            &json!({"failed": ["acceptance_missing"]})
+        )
+    );
+    f.modify("unit", "u1", json!({"verifier": null}));
+    let e = refused_look(&mut f, "u1", never.clone());
+    assert_eq!(
+        (code(&e), &e.detail),
+        (
+            ("tiers_missing".into(), "unit".into()),
+            &json!({"failed": ["tiers_missing"]})
+        )
+    );
+    f.modify("unit", "u1", json!({"write_set": []}));
+    let e = refused_look(&mut f, "u1", json!([]));
+    assert_eq!(
+        (code(&e), &e.detail),
+        (
+            ("write_set_missing".into(), "unit".into()),
+            &json!({"failed": ["write_set_missing", "acceptance_missing", "tiers_missing"]})
+        )
+    );
+    // A unit without a repository: an empty directory, `AP_BASE` and `AP_HEAD` empty.
+    f.unit("u2", "contract", false);
+    let empty = r#"test -z "$(ls -A)" && test -z "$AP_BASE$AP_HEAD" && exit 1"#;
+    let e = refused_look(&mut f, "u2", json!([{"check": empty, "kind": "invariant"}]));
+    assert_eq!(code(&e).0, "invariant_fails_on_base");
+    // A `plain` page, a `ready` and a `stopped` unit are checked alike.
+    for (key, class, state) in [
+        ("u3", "plain", "draft"),
+        ("u4", "contract", "ready"),
+        ("u5", "effect", "stopped"),
+    ] {
+        f.unit(key, class, true);
+        f.modify("unit", key, json!({"state": state}));
+        let e = refused_look(
+            &mut f,
+            key,
+            json!([{"check": "false", "kind": "invariant"}]),
+        );
+        assert_eq!(code(&e).0, "invariant_fails_on_base", "{key}");
+        f.modify(
+            "unit",
+            key,
+            json!({"acceptance": [{"check": "true", "kind": "invariant"}]}),
+        );
+        let (v, _) = f.ok(&f.req("unit", key));
+        assert_eq!(v["verdict"], "accept", "{key}");
+        assert_eq!(f.get("unit", key)["state"], state);
+    }
+}
+
+// spec: specs/ap/unit-review.md#R23
+// spec: specs/ap/unit-review.md#R8
+#[test]
+fn r23_a_look_that_resumes_runs_the_same_checks_first() {
+    let mut f = F::new();
+    let first = first_look(&mut f, "repair");
+    let leftover = f.dir().join("work").join(first["review"].as_str().unwrap());
+    std::fs::create_dir_all(&leftover).unwrap();
+    f.modify(
+        "unit",
+        "u1",
+        json!({"acceptance": [{"check": "false", "kind": "invariant"}]}),
+    );
+    let before = untouched(&f, "u1");
+    let e = f.refusal(&resume(&f, &first["review"]));
+    assert_eq!(
+        (code(&e), e.after),
+        (
+            ("invariant_fails_on_base".into(), "acceptance".into()),
+            None
+        )
+    );
+    assert_eq!(untouched(&f, "u1"), before);
+    assert!(leftover.is_dir(), "nothing removed before the checks pass");
+    f.modify(
+        "unit",
+        "u1",
+        json!({"acceptance": [{"check": "true", "kind": "invariant"}]}),
+    );
+    let (v, _) = f.ok(&resume(&f, &first["review"]));
+    assert_eq!(
+        (&v["verdict"], &v["session"]),
+        (&json!("accept"), &first["session"])
+    );
+    assert!(!leftover.exists());
 }
