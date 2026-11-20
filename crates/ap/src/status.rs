@@ -31,27 +31,35 @@ const MATCHES: usize = 12;
 /// Entries a section of the text form holds, and the oldest requests it names.
 const ENTRIES: usize = 9;
 const OLDEST: usize = 5;
+/// The requests of an intent `ap status <intent>` names without `--requests`.
+const NEWEST: usize = 5;
 
 pub enum Call {
     Overview,
     Key(String),
+    /// A key with `--requests`: an intent's every request, not the newest five.
+    KeyAll(String),
     Term(String),
     /// `--wait <intent>` with its timeout in seconds.
     Wait(String, u64),
     /// `--indicators`, of one intent or of every merged unit.
     Indicators(Option<String>),
+    /// `--brief <intent>`: the forty lines a Lead reads first.
+    Brief(String),
 }
 pub struct Args {
     pub store: Option<String>,
     pub text: bool,
     pub call: Call,
 }
-/// `--store <absolute path>`, `--text`, `--term <word>` and one key, each at most once; or `--wait <intent>`
-/// with `--timeout <seconds>` and `--store`; or `--indicators` with an optional intent, `--text` and `--store`.
+/// `--store <absolute path>`, `--text`, `--term <word>`, one key and `--requests` (with a key only), each at
+/// most once; or `--wait <intent>` with `--timeout <seconds>` and `--store`; or `--indicators` with an optional
+/// intent, `--text` and `--store`; or `--brief <intent>` with `--store` alone.
 pub fn parse(argv: &[OsString]) -> Result<Args, Failure> {
     let usage = || error("usage", "args");
     let (mut store, mut text, mut term, mut key) = (None, false, None, None);
     let (mut wait, mut timeout, mut indicators) = (None, None, false);
+    let (mut brief, mut requests) = (None, false);
     let plain = |k: &str| {
         !k.starts_with('-') && (1..=512).contains(&k.len()) && !k.chars().any(char::is_control)
     };
@@ -77,6 +85,10 @@ pub fn parse(argv: &[OsString]) -> Result<Args, Failure> {
                 );
             }
             "--indicators" if !indicators => indicators = true,
+            "--requests" if !requests => requests = true,
+            "--brief" if brief.is_none() => {
+                brief = Some(it.next().flatten().filter(|k| plain(k)).ok_or_else(usage)?);
+            }
             "--wait" if wait.is_none() => {
                 wait = Some(it.next().flatten().filter(|k| plain(k)).ok_or_else(usage)?);
             }
@@ -90,12 +102,16 @@ pub fn parse(argv: &[OsString]) -> Result<Args, Failure> {
             _ => return Err(usage()),
         }
     }
-    let call = match (term, key, wait, timeout, indicators) {
-        (None, None, None, None, false) => Call::Overview,
-        (None, Some(k), None, None, false) => Call::Key(k),
-        (Some(w), None, None, None, false) => Call::Term(w),
-        (None, None, Some(i), t, false) if !text => Call::Wait(i.to_owned(), t.unwrap_or(14_400)),
-        (None, k, None, None, true) => Call::Indicators(k),
+    let call = match (term, key, wait, timeout, indicators, brief, requests) {
+        (None, None, None, None, false, None, false) => Call::Overview,
+        (None, Some(k), None, None, false, None, false) => Call::Key(k),
+        (None, Some(k), None, None, false, None, true) => Call::KeyAll(k),
+        (Some(w), None, None, None, false, None, false) => Call::Term(w),
+        (None, None, Some(i), t, false, None, false) if !text => {
+            Call::Wait(i.to_owned(), t.unwrap_or(14_400))
+        }
+        (None, k, None, None, true, None, false) => Call::Indicators(k),
+        (None, None, None, None, false, Some(i), false) if !text => Call::Brief(i.to_owned()),
         _ => return Err(usage()),
     };
     Ok(Args { store, text, call })
@@ -358,12 +374,19 @@ fn overview(s: &mut impl System, store: Option<&str>) -> Result<Value, Failure> 
 }
 
 /// An intent or a unit in full; a key that names neither is `unknown_key`.
-fn keyed(s: &mut impl System, store: Option<&str>, key: &str) -> Result<Value, Failure> {
+/// With `every` an intent keeps all its requests, else the newest `NEWEST` and their count.
+fn keyed(
+    s: &mut impl System,
+    store: Option<&str>,
+    key: &str,
+    every: bool,
+) -> Result<Value, Failure> {
     let intent = at(store::get(s, store, "intent", key), "intent")?;
     let unit = at(store::get(s, store, "unit", key), "unit")?;
     match (intent, unit) {
         (Some(i), also) => {
             let mut v = intent_in_full(s, store, key, i)?;
+            newest_requests(&mut v, every);
             if also.is_some() {
                 v["also_unit"] = json!(true);
             }
@@ -372,6 +395,18 @@ fn keyed(s: &mut impl System, store: Option<&str>, key: &str) -> Result<Value, F
         (None, Some(u)) => unit_in_full(s, store, key, u),
         (None, None) => Err(error("unknown_key", "key")),
     }
+}
+/// The member `requests` of an intent keeps its newest `NEWEST` rows (they come oldest first) unless `every`;
+/// `requests_count` is the count of all of them.
+fn newest_requests(v: &mut Value, every: bool) {
+    let Some(rows) = v["requests"].as_array_mut() else {
+        return;
+    };
+    let all = rows.len();
+    if !every {
+        rows.drain(..all.saturating_sub(NEWEST));
+    }
+    v["requests_count"] = json!(all);
 }
 fn intent_in_full(
     s: &mut impl System,
@@ -467,6 +502,195 @@ fn unit_in_full(
     v["holds"] = holds.iter().map(hold_row).collect();
     v["blocked_by"] = json!(blocked);
     Ok(v)
+}
+
+/// The lines of the brief, and the bytes of one with its line break.
+const BRIEF_LINES: usize = 40;
+const BRIEF_BYTES: usize = 120;
+/// The lines of the sections that keep a share; the units take the rest (their own share is 16).
+const SHARE_CRITERIA: usize = 8;
+const SHARE_UNITS: usize = 16;
+const SHARE_NEEDS: usize = 6;
+const SHARE_HOLDS: usize = 5;
+
+/// A section's lines cut to `cap`: past it, the last line is `<label> (+N more)` for the entries not shown.
+fn capped(label: &str, mut lines: Vec<String>, cap: usize) -> Vec<String> {
+    if lines.len() > cap {
+        let keep = cap.saturating_sub(1);
+        let more = lines.len() - keep;
+        lines.truncate(keep);
+        lines.push(format!("{label} (+{more} more)"));
+    }
+    lines
+}
+/// `ap status --brief <intent>`: at most `BRIEF_LINES` lines of `BRIEF_BYTES` bytes, in sections: the status
+/// and the Lead, the criteria, the units that are not ended, what needs the Lead, the holds and the last
+/// delivery. It reads what `ap status <intent>` and `ap status` read, and writes nothing.
+fn brief(s: &mut impl System, store: Option<&str>, key: &str) -> Result<Value, Failure> {
+    let Some(i) = at(store::get(s, store, "intent", key), "intent")? else {
+        return Err(error("unknown_intent", "intent"));
+    };
+    let mut seen = Seen::default();
+    let unrouted = vec![eq("status", "current"), eq("route", "unrouted")];
+    let mut requests = at(
+        store::search_seen(s, store, "request", unrouted, &mut seen),
+        "requests",
+    )?;
+    let now = seen
+        .now
+        .ok_or_else(|| error("store_answer_unreadable", "now"))?;
+    requests.sort_by_key(|(k, f)| (text(&f["said_at"]).to_owned(), k.clone()));
+    let mine = vec![json!({"eq": ["intent", crate::host::id("intent", key)]})];
+    let mut criteria = list(s, store, "criterion", "criteria", mine)?;
+    criteria.sort_by_key(|(k, f)| (text(&f["added_at"]).to_owned(), k.clone()));
+    let mut every = all_units(s, store)?;
+    sort_units(&mut every);
+    let mut findings = open_findings(s, store)?;
+    sort_findings(&mut findings);
+    let mut holds = active_holds(s, store)?;
+    sort_holds(&mut holds);
+    let delivered = delivery(s);
+
+    let mut names: Vec<&String> = vec![];
+    let units: Vec<&Found> = every
+        .iter()
+        .filter(|(_, u)| u["intent"]["native_key"] == key)
+        .inspect(|u| names.push(&u.0))
+        .collect();
+    let mine = |f: &Found| {
+        f.1["unit"]["native_key"]
+            .as_str()
+            .is_some_and(|u| names.iter().any(|n| *n == u))
+            || f.1["intent"]["native_key"] == key
+    };
+    let neither = |f: &Found| f.1["unit"].is_null() && f.1["intent"].is_null();
+    let value = |v: &Value| one(v.as_str().unwrap_or("-"));
+
+    let confirmed = store::confirmed(&i);
+    let status = vec![
+        format!(
+            "status {key} {}, confirmed {confirmed}",
+            value(&i["status"])
+        ),
+        format!("status lead {}", value(&i["lead_session"])),
+    ];
+    let criteria: Vec<String> = (criteria.iter())
+        .map(|(k, c)| format!("criterion {} {}", one(k), value(&c["state"])))
+        .collect();
+    let open: Vec<String> = units
+        .iter()
+        .filter(|(_, u)| {
+            !["merged", "done", "dropped"]
+                .iter()
+                .any(|e| u["state"] == *e)
+        })
+        .map(|(k, u)| {
+            let more = match u["state"].as_str() {
+                Some("ready") => match u["waits_on"].as_str() {
+                    Some(w) => format!(" waits on {}", one(w)),
+                    None => String::new(),
+                },
+                Some("stopped") => format!(" stopped: {}", value(&u["stop_cause"])),
+                _ => {
+                    let blocked: Vec<String> = (u["depends_on"].as_array().into_iter().flatten())
+                        .map(|d| text(&d["native_key"]))
+                        .filter_map(|d| {
+                            let state = every.iter().find(|e| e.0 == d).map(|e| &e.1["state"]);
+                            let done = state.is_some_and(|st| st == "merged" || st == "done");
+                            let state = state.map_or("missing", |st| text(st));
+                            (!done).then(|| format!("{} ({state})", one(d)))
+                        })
+                        .collect();
+                    match blocked.is_empty() {
+                        true => String::new(),
+                        false => format!(" blocked by {}", blocked.join(", ")),
+                    }
+                }
+            };
+            format!(
+                "unit {} {} {}{more}",
+                one(k),
+                value(&u["state"]),
+                value(&u["class"])
+            )
+        })
+        .collect();
+
+    let mut need = vec![];
+    let mut push = |kind: &str, key: &str, why: &str| {
+        need.push(format!("needs {kind} {}: {}", one(key), one(why)));
+    };
+    let severe = |f: &&Found, v: &str| f.1["severity"] == v && f.1["state"] == "open";
+    let near: Vec<&Found> = findings.iter().filter(|f| mine(f) || neither(f)).collect();
+    near.iter()
+        .filter(|f| severe(f, "urgent"))
+        .for_each(|f| push("finding", &f.0, text(&f.1["summary"])));
+    for state in ["stopped", "accepted"] {
+        let why = match state {
+            "stopped" => None,
+            _ => Some("waits for the Lead's reading or merge"),
+        };
+        for u in units.iter().filter(|u| u.1["state"] == state) {
+            push("unit", &u.0, why.unwrap_or(text(&u.1["stop_cause"])));
+        }
+    }
+    near.iter()
+        .filter(|f| severe(f, "act"))
+        .for_each(|f| push("finding", &f.0, text(&f.1["summary"])));
+    for r in requests.iter().filter(|r| neither(r)) {
+        if epoch(text(&r.1["said_at"])).is_some_and(|t| t + DAY < now) {
+            push(
+                "request",
+                &r.0,
+                &format!("unrouted since {}", text(&r.1["said_at"])),
+            );
+        }
+    }
+
+    let hold_line = |h: &Found| {
+        let on = |k: &str| match h.1[k]["native_key"].as_str().or(h.1[k].as_str()) {
+            Some(x) => format!(" {k} {}", one(x)),
+            None => String::new(),
+        };
+        let (unit, intent) = (on("unit"), on("intent"));
+        let scope = on("scope");
+        format!(
+            "hold {} until {}{unit}{intent}{scope}",
+            value(&h.1["effect"]),
+            value(&h.1["until"])
+        )
+    };
+    let (here, rest): (Vec<&Found>, Vec<&Found>) = holds
+        .iter()
+        .filter(|h| mine(h) || neither(h))
+        .partition(|h| mine(h));
+    let held: Vec<String> = here.into_iter().chain(rest).map(hold_line).collect();
+
+    let last = vec![match &delivered {
+        Some(d) => format!(
+            "delivery {} {} tip {} target {}",
+            value(&d["at"]),
+            value(&d["end"]),
+            value(&d["tip"]),
+            value(&d["target"])
+        ),
+        None => "delivery unreadable".to_owned(),
+    }];
+
+    let criteria = capped("criterion", criteria, SHARE_CRITERIA);
+    let need = capped("needs", need, SHARE_NEEDS);
+    let held = capped("hold", held, SHARE_HOLDS);
+    // A section that does not use its lines gives them to the units.
+    let spare =
+        (SHARE_CRITERIA - criteria.len()) + (SHARE_NEEDS - need.len()) + (SHARE_HOLDS - held.len());
+    let open = capped("unit", open, SHARE_UNITS + spare);
+    let lines: Vec<String> = [status, criteria, open, need, held, last]
+        .into_iter()
+        .flatten()
+        .take(BRIEF_LINES)
+        .map(|l| cut(&l, BRIEF_BYTES - 1).0.to_owned())
+        .collect();
+    Ok(json!({"brief": lines}))
 }
 
 /// One thing the word may match: its kind (an index of `KINDS`), name, owner, text and the name of
@@ -610,7 +834,9 @@ fn term(s: &mut impl System, store: Option<&str>, word: &str) -> Result<Value, F
 pub fn execute(s: &mut impl System, store: Option<&str>, call: &Call) -> Result<Value, Failure> {
     match call {
         Call::Overview => overview(s, store),
-        Call::Key(key) => keyed(s, store, key),
+        Call::Key(key) => keyed(s, store, key, false),
+        Call::KeyAll(key) => keyed(s, store, key, true),
+        Call::Brief(intent) => brief(s, store, intent),
         Call::Term(word) => term(s, store, word),
         Call::Wait(intent, timeout) => wait(s, store, intent, *timeout),
         Call::Indicators(intent) => indicators(s, store, intent.as_deref()),
@@ -1211,7 +1437,11 @@ pub fn text_of(call: &Call, v: &Value) -> String {
         Call::Indicators(_) => indicators_text(v),
         Call::Overview => overview_text(v),
         Call::Wait(..) => format!("{v}\n"),
-        Call::Key(_) => {
+        Call::Brief(_) => {
+            let lines = v["brief"].as_array().into_iter().flatten();
+            lines.map(|l| format!("{}\n", text(l))).collect()
+        }
+        Call::Key(_) | Call::KeyAll(_) => {
             let mut out = String::new();
             labelled(v, 0, &mut out);
             out
@@ -1254,7 +1484,7 @@ pub fn cli(argv: &[OsString]) -> ExitCode {
         .is_ok_and(|a| matches!(a.call, Call::Wait(..)));
     let result = parsed.and_then(|a| {
         let v = execute(&mut Host, a.store.as_deref(), &a.call)?;
-        Ok(if a.text {
+        Ok(if a.text || matches!(a.call, Call::Brief(_)) {
             text_of(&a.call, &v)
         } else {
             format!("{v}\n")
