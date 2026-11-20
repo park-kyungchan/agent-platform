@@ -78,11 +78,36 @@ jobs:
           fi
           git config --global url."ssh://git@github.com/park-kyungchan/ontology-platform".insteadOf https://github.com/park-kyungchan/ontology-platform
           git config --global core.sshCommand "ssh -i $key_file -o IdentitiesOnly=yes -o UserKnownHostsFile=$known_hosts -o StrictHostKeyChecking=yes"
+      - name: Restore the engine of ontology/ENGINE-PIN
+        if: steps.scope.outputs.run_rust == 'true'
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
+        with:
+          path: ~/.engine-pin/bin
+          key: engine-pin-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('ontology/ENGINE-PIN') }}
+      - name: Put the cached engine on PATH (./check uses an ont that reports the pin)
+        if: steps.scope.outputs.run_rust == 'true'
+        shell: bash
+        run: echo "$HOME/.engine-pin/bin" >> "$GITHUB_PATH"
       - name: Check
         if: steps.scope.outputs.run_rust == 'true'
         env:
           CARGO_NET_GIT_FETCH_WITH_CLI: 'true'
         run: ./check
+      - name: Keep the engine ./check built for the cache
+        if: steps.scope.outputs.run_rust == 'true' && success()
+        shell: bash
+        run: |
+          set -euo pipefail
+          pin=$(tr -d '[:space:]' < ontology/ENGINE-PIN)
+          built=target/engine-pin/bin/ont
+          if [ -x "$HOME/.engine-pin/bin/ont" ]; then
+            echo "engine restored from the cache"
+          elif [ -x "$built" ] && [ "$("$built" --version)" = "ont 0.1.0 $pin" ]; then
+            mkdir -p "$HOME/.engine-pin/bin"
+            cp "$built" "$HOME/.engine-pin/bin/ont"
+          else
+            echo "engine_not_cached@.github/workflows/rust.yml: no built engine that reports the pin"
+          fi
       - name: Remove the deploy key
         if: always()
         shell: bash
