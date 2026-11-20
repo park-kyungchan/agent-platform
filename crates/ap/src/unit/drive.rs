@@ -65,36 +65,42 @@ impl From<Failure> for Halt {
     }
 }
 type Step<T = ()> = Result<T, Halt>;
+/// The paths a unit of class `plain` may not change (R36), every name lower-case: exactly these
+/// whole paths.
+const PROTECTED_EXACT: [&str; 2] = ["check", "review.md"];
+/// The last component, in any directory: Cargo, rustfmt and rustup read the configuration files
+/// below the root too, and a build script or a manifest of any package runs or steers a build that
+/// delivery makes as root.
+const PROTECTED_NAMES: [&str; 9] = [
+    "clippy.toml",
+    ".clippy.toml",
+    "rustfmt.toml",
+    ".rustfmt.toml",
+    "rust-toolchain",
+    "rust-toolchain.toml",
+    "build.rs",
+    "cargo.toml",
+    "cargo.lock",
+];
+/// The last two components, in any directory: Cargo's configuration below the root.
+const PROTECTED_CONFIGS: [&str; 2] = [".cargo/config.toml", ".cargo/config"];
+/// The first component: the path itself or anything under it.
+const PROTECTED_TREES: [&str; 10] = [
+    "ci", ".github", "specs", "scripts", ".cargo", "deploy", "etc", "content", "github", "ontology",
+];
 /// A path a unit of class `plain` may not change (R36): `path` is repository-relative, and every
 /// name is compared without case (`CI/x`, `.GitHub/…`).
 fn protected(path: &str) -> bool {
-    const EXACT: [&str; 4] = [
-        "check",
-        "review.md",
-        "ontology/rehearsal.sh",
-        "ontology/engine-pin",
-    ];
-    // The last component, in any directory: Cargo, rustfmt and rustup read them below the root too.
-    const NAMES: [&str; 6] = [
-        "clippy.toml",
-        ".clippy.toml",
-        "rustfmt.toml",
-        ".rustfmt.toml",
-        "rust-toolchain",
-        "rust-toolchain.toml",
-    ];
-    // The last two components, in any directory: Cargo's configuration below the root.
-    const CONFIGS: [&str; 2] = [".cargo/config.toml", ".cargo/config"];
-    const TREES: [&str; 7] = [
-        "ci", ".github", "specs", "scripts", ".cargo", "deploy", "etc",
-    ];
     let path = path.to_lowercase();
     let last = path.rsplit('/').next().unwrap_or(&path);
     let first = path.split('/').next().unwrap_or(&path);
-    let config = CONFIGS
+    let config = PROTECTED_CONFIGS
         .iter()
         .any(|c| path == *c || path.ends_with(&format!("/{c}")));
-    EXACT.contains(&path.as_str()) || NAMES.contains(&last) || TREES.contains(&first) || config
+    PROTECTED_EXACT.contains(&path.as_str())
+        || PROTECTED_NAMES.contains(&last)
+        || PROTECTED_TREES.contains(&first)
+        || config
 }
 /// `gh pr merge` with `words`: `Err` with the redacted reply when it failed (no reply: empty).
 fn merge_call(s: &mut impl System, words: &str) -> Result<(), String> {
@@ -1998,12 +2004,54 @@ pub fn decide(
 
 #[cfg(test)]
 mod tests {
-    use super::protected;
+    use super::{PROTECTED_CONFIGS, PROTECTED_EXACT, PROTECTED_NAMES, PROTECTED_TREES, protected};
 
     /// Every protected path of R36, and the neighbours that are not (`specs/ap/unit-run.md` R36).
     #[test]
     fn r36_the_protected_paths_are_pinned() {
+        // The lists themselves, so that a path added or taken away fails here without this change.
+        assert_eq!(PROTECTED_EXACT, ["check", "review.md"]);
+        assert_eq!(
+            PROTECTED_NAMES,
+            [
+                "clippy.toml",
+                ".clippy.toml",
+                "rustfmt.toml",
+                ".rustfmt.toml",
+                "rust-toolchain",
+                "rust-toolchain.toml",
+                "build.rs",
+                "cargo.toml",
+                "cargo.lock",
+            ]
+        );
+        assert_eq!(PROTECTED_CONFIGS, [".cargo/config.toml", ".cargo/config"]);
+        assert_eq!(
+            PROTECTED_TREES,
+            [
+                "ci", ".github", "specs", "scripts", ".cargo", "deploy", "etc", "content",
+                "github", "ontology",
+            ]
+        );
         let held = [
+            "content/SHA256SUMS",
+            "Content/AGENTS.md",
+            "content/skills/lead/SKILL.md",
+            "github/apply",
+            "github/ruleset-main.json",
+            "ontology",
+            "ontology/migrate",
+            "ontology/json.py",
+            "ontology/work.schema.json",
+            "Ontology/README.md",
+            "build.rs",
+            "crates/ap/build.rs",
+            "crates/x/Build.rs",
+            "Cargo.toml",
+            "crates/ap/Cargo.toml",
+            "crates/x/CARGO.TOML",
+            "Cargo.lock",
+            "sub/Cargo.lock",
             "check",
             "REVIEW.md",
             "review.md",
@@ -2048,12 +2096,20 @@ mod tests {
             "crates/x/deploy/x",
             "src/etc/x",
             "REVIEW.md.bak",
-            "ontology/README.md",
             "crates/x/cargo/config.toml",
             "crates/x/.cargo/other.toml",
             "rust-toolchain.txt",
             "deployment/x",
             "etcetera",
+            "contents/x",
+            "github.md",
+            "githubs/x",
+            "ontologies/x",
+            "docs/content/x",
+            "crates/ap/src/main.rs",
+            "crates/x/build.rs.bak",
+            "crates/x/cargo.lock.txt",
+            "crates/x/mybuild.rs",
         ];
         for path in free {
             assert!(!protected(path), "{path}");
