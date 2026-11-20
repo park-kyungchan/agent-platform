@@ -10,7 +10,9 @@ Reads records that already exist and nothing else; stores nothing, writes no fil
                            role, model, session, state, start, answer.path, prompt.path, resumes, cut
   Codex session records    <dir>/**/*.jsonl                session_meta.id and cwd, turn_context.model, token_count totals
   Merged pull requests     gh pr list --state merged       number, headRefName, mergedAt
-  Reviewer answers         the first line of the answer file of a reviewer stage
+  Reviewer answers         the first line of the answer file of a reviewer stage; of a page or plan review of the
+                           window, the lines that begin `blocking` (after leading spaces, `-`, `*`, `<digits>.`),
+                           counted by the kind they name and never printed
   --calibrate also reads   total_cost_usd of the `result` lines of the stream of first-run stages
 It prints no message text, no tool input and no path. Prices: evals/prices.tsv.
 Run: python3 -I -B evals/readout.py --since 2026-11-11 --until 2026-11-14
@@ -32,6 +34,11 @@ REVIEW_KINDS = ("page", "plan", "packet", "other")
 STAGE_DIRS = ("/var/lib/agent-platform/units", "/var/lib/agent-platform/reviews")  # the store's stage records
 TEMP_ROOTS = ("/tmp", "/var/tmp")
 UNCOUNTED = (("agy", "no usage record exists under its state directory"),)  # CLIs whose sessions this command cannot count
+BLOCKING_KINDS = {  # the closed lists of the frames reviewer.md and plan-reviewer.md, in the order of the frames
+    "page": ("unbuildable", "contradiction", "check", "write_set", "unguarded_effect"),
+    "plan": ("unreached_criterion", "dependency", "conflict", "unguarded_effect"),
+}
+BLOCKING_LINE = re.compile(r"(?:[ \-*]|\d+\.)*blocking(?:[ ]([a-z_]+):)?")
 REPOS = ("park-kyungchan/agent-platform", "park-kyungchan/ontology-platform", "park-kyungchan/education-platform")
 
 
@@ -288,6 +295,30 @@ def first_line(path):
     return line[:40] if line.startswith("Verdict:") else "no-verdict-line"
 
 
+def blocking_counts(stages, since, until):
+    """{kind: (reviews, Counter of names and `unnamed`)} for the page and plan reviews that started in the window.
+
+    A line counts when it begins `blocking` (case-sensitive) after the leading marks; it is of a kind's name when
+    `blocking <name>:` names one of that kind's list, else `unnamed`. An answer that cannot be read is a review and adds nothing."""
+    out = {}
+    for s in stages:
+        if s["kind"] not in BLOCKING_KINDS or not since <= s["start"][:10] <= until:
+            continue
+        row = out.setdefault(s["kind"], [0, collections.Counter()])
+        row[0] += 1
+        counts = row[1]
+        try:
+            with open(s["answer"], encoding="utf-8", errors="replace") as fh:
+                text = fh.read()
+        except (OSError, TypeError, ValueError):
+            continue
+        for line in text.split("\n"):
+            m = BLOCKING_LINE.match(line)
+            if m:
+                counts[m.group(1) if m.group(1) in BLOCKING_KINDS[s["kind"]] else "unnamed"] += 1
+    return out
+
+
 DETACHED = {"HEAD", "main", "master"}  # a reviewer's branch when it ran on a detached head or on the base
 
 
@@ -444,6 +475,11 @@ def main(argv=None):
             cut[(s["role"], s["model"])] += 1
     show = lambda c: ", ".join(f"{r}/{m}={n}" for (r, m), n in sorted(c.items()))
     print("stages cut: " + (show(cut) or "none") + (f"; no date: {show(undated)}" if undated else ""))
+    found = blocking_counts(a.stages, a.since, a.until)
+    for kind in BLOCKING_KINDS:
+        if kind in found:
+            n, c = found[kind]
+            print(f"BLOCKING {kind} reviews={n} " + " ".join(f"{k}={c[k]}" for k in (*BLOCKING_KINDS[kind], "unnamed")))
     ranked = sorted(leads.items(), key=lambda kv: (-kv[1]["usd"], kv[0]))
     for tool, c in ranked[:6]:
         print(f"lead calls first_tool={tool} calls={c['calls']} usd={c['usd']:.2f}")

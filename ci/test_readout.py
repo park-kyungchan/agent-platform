@@ -45,7 +45,7 @@ class Readout(unittest.TestCase):
             if src.is_file():
                 dst = self.tmp / src.relative_to(FIXTURES)
                 dst.parent.mkdir(parents=True, exist_ok=True)
-                dst.write_text(src.read_text().replace("@WORK@", str(self.tmp / "work")).replace("@PLATFORMS@", str(self.tmp / "platforms")))
+                dst.write_text(src.read_text().replace("@WORK@", str(self.tmp / "work")).replace("@PLATFORMS@", str(self.tmp / "platforms")).replace("@BLOCKING@", str(self.tmp / "blocking")))
         old = datetime.datetime(2026, 11, 10, 11, tzinfo=datetime.timezone.utc).timestamp()  # the day before the window
         os.utime(self.tmp / "acct1" / "projects" / "p9" / "s-early.jsonl", (old, old))
         readout.run_gh = lambda repo, since, until: PRS.get(repo, [])
@@ -308,6 +308,33 @@ class Readout(unittest.TestCase):
         self.assertEqual(text, self.run_readout("--detail", stage_dirs=dirs))
         for secret in (str(self.tmp), "/var/lib/x", "prompts"):
             self.assertNotIn(secret, text)
+
+    # rev-kinds: blocking findings of page and plan reviews, counted by kind (the subtree blocking/ is passed by this test alone).
+    def test_blocking_by_kind(self):
+        frames = HERE.parent / "crates" / "ap" / "src" / "unit" / "frames"
+        for kind, frame in (("page", "reviewer.md"), ("plan", "plan-reviewer.md")):
+            text = (frames / frame).read_text()
+            for name in readout.BLOCKING_KINDS[kind]:
+                self.assertIn(f"blocking {name}:", text, f"{frame} names {name}")
+        self.assertEqual(readout.BLOCKING_KINDS["page"], ("unbuildable", "contradiction", "check", "write_set", "unguarded_effect"))
+        self.assertEqual(readout.BLOCKING_KINDS["plan"], ("unreached_criterion", "dependency", "conflict", "unguarded_effect"))
+        dirs = [self.tmp / "blocking" / "reviews"]
+        text = self.run_readout(stage_dirs=dirs)
+        blocking = [l for l in text.splitlines() if l.startswith("BLOCKING")]
+        self.assertEqual(blocking, [
+            # page1, page2 and page3 (its answer file is missing: a review, nothing else); page4 starts after the window; the packet is no page
+            "BLOCKING page reviews=3 unbuildable=1 contradiction=1 check=1 write_set=2 unguarded_effect=1 unnamed=2",
+            # plan1 and plan2 (no answer file); plan3 starts after the window
+            "BLOCKING plan reviews=2 unreached_criterion=1 dependency=1 conflict=1 unguarded_effect=1 unnamed=1",
+        ])
+        later = self.run_readout("--since", "2026-11-14", "--until", "2026-11-20", stage_dirs=dirs)
+        self.assertEqual([l for l in later.splitlines() if l.startswith("BLOCKING")], [
+            "BLOCKING page reviews=1 unbuildable=0 contradiction=0 check=1 write_set=0 unguarded_effect=0 unnamed=0",
+            "BLOCKING plan reviews=1 unreached_criterion=0 dependency=1 conflict=0 unguarded_effect=0 unnamed=0"])
+        self.assertEqual(blocking, [l for l in self.run_readout(stage_dirs=dirs).splitlines() if l.startswith("BLOCKING")])
+        for secret in ("SECRET", str(self.tmp), "mid-line"):  # counts only: no finding's text
+            self.assertNotIn(secret, text + later)
+        self.assertFalse([l for l in self.run_readout().splitlines() if l.startswith("BLOCKING")])  # no review in the window, no line
 
 
 if __name__ == "__main__":

@@ -1,0 +1,17 @@
+{
+ "role": "reviewer",
+ "model": "claude-opus-9-9",
+ "session": "s-page3",
+ "cwd": "@BLOCKING@/elsewhere",
+ "start": "2026-11-12T12:00:00Z",
+ "state": "ok",
+ "prompt": {
+  "path": "/r/prompts/page-c-1.md"
+ },
+ "tokens": {},
+ "resumes": null,
+ "answer": {
+  "path": "@BLOCKING@/answers/missing.md",
+  "sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+ }
+}

@@ -1,0 +1,17 @@
+{
+ "role": "reviewer",
+ "model": "claude-opus-9-9",
+ "session": "s-plan1",
+ "cwd": "@BLOCKING@/elsewhere",
+ "start": "2026-11-13T10:00:00Z",
+ "state": "ok",
+ "prompt": {
+  "path": "/r/prompts/plan-a-1.md"
+ },
+ "tokens": {},
+ "resumes": null,
+ "answer": {
+  "path": "@BLOCKING@/answers/plan1.md",
+  "sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+ }
+}

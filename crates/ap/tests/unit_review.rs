@@ -2578,3 +2578,34 @@ fn r23_a_look_that_resumes_runs_the_same_checks_first() {
     );
     assert!(!leftover.exists());
 }
+
+// spec: specs/ap/unit-review.md#R24
+#[test]
+fn r24_the_frames_name_the_kinds_of_a_blocking_finding() {
+    let page = include_str!("../src/unit/frames/reviewer.md");
+    for name in [
+        "unbuildable",
+        "contradiction",
+        "check",
+        "write_set",
+        "unguarded_effect",
+    ] {
+        assert!(page.contains(&format!("`blocking {name}:`")), "{name}");
+    }
+    for name in [
+        "unreached_criterion",
+        "dependency",
+        "conflict",
+        "unguarded_effect",
+    ] {
+        assert!(
+            PLAN_REVIEWER.contains(&format!("`blocking {name}:`")),
+            "{name}"
+        );
+    }
+    for frame in [page, PLAN_REVIEWER] {
+        assert!(frame.contains("`note:`") && frame.contains("case-sensitive"));
+    }
+    assert!(REPAIR_LOOK.contains("`earlier <kind>: closed`"));
+    assert!(REPAIR_LOOK.contains("`earlier <kind>: open`"));
+}

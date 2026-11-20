@@ -1,0 +1,17 @@
+{
+ "role": "reviewer",
+ "model": "claude-opus-9-9",
+ "session": "s-packet1",
+ "cwd": "@BLOCKING@/elsewhere",
+ "start": "2026-11-12T10:00:00Z",
+ "state": "ok",
+ "prompt": {
+  "path": "/x/units/u1/1.verifier.prompt.md"
+ },
+ "tokens": {},
+ "resumes": null,
+ "answer": {
+  "path": "@BLOCKING@/answers/packet1.md",
+  "sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+ }
+}
