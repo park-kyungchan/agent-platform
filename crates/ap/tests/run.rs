@@ -1174,6 +1174,226 @@ fn p3_a_preamble_before_the_verdict_is_no_result() {
     assert_eq!(v["results"], 2);
 }
 
+/// What the session reads when it is asked again: the one sentence of R20 and a newline.
+const ASK: &str = "Your last answer did not begin with the line your task asks it to begin with: give the whole answer again with that line as its first line and nothing before it, and post, push, send or change nothing a second time.\n";
+
+impl Fake {
+    /// The first call of the fake on a1 answers `first` (by `script-a1.sh`, after a tool ran) and
+    /// switches the mode of a1 to `then` for the calls after it.
+    fn asked(&self, first: &str, then: &str) {
+        let bin = self.t.join("bin");
+        let script = format!(
+            "echo {then} > '{}/mode-a1'\nprintf '%s' '{first}'\n",
+            bin.display()
+        );
+        std::fs::write(bin.join("script-a1.sh"), script).unwrap();
+        self.mode("a1", "script");
+    }
+    /// The `RuntimeMaxSec` of every launch, in order.
+    fn runtime_max(&self) -> Vec<u64> {
+        let max = |l: &Vec<String>| {
+            let p = l.iter().find_map(|a| a.strip_prefix("RuntimeMaxSec="))?;
+            p.strip_suffix('s')?.parse().ok()
+        };
+        self.launches.iter().filter_map(max).collect()
+    }
+}
+
+/// A Claude stage whose answer's first line misses the pattern is asked again once, in its own
+/// session on its own account, with the one sentence alone on stdin; the second answer is judged on
+/// its first line, and the entry of the ask is marked `asked`, not a move. `turns` and `tokens` are
+/// the sums of both launches.
+// spec: specs/ap/run.md#R16
+// spec: specs/ap/run.md#R17
+// spec: specs/ap/run.md#R20
+// spec: specs/ap/run.md#R24
+// spec: specs/ap/run.md#R28
+#[test]
+fn asked_again_once_in_its_own_session_and_judged_on_its_first_line() {
+    assert!(ASK.ends_with(".\n") && !ASK[..ASK.len() - 1].contains('\n'));
+    assert!(!ASK.contains(". "), "one sentence");
+    for role in ["reviewer", "implementer", "fixer"] {
+        let mut f = Fake::new();
+        std::fs::write(f.t.join("bin/answer"), "Verdict: accept\nhead\n").unwrap();
+        f.asked(
+            "I read the change and found nothing wrong.\nVerdict: accept",
+            "answer",
+        );
+        let mut r = f.with_next(role, "q.md", &["a2"]);
+        r["expect"] = json!({"first_line": "Verdict: *"});
+        let (v, status) = f.run(&r).unwrap();
+        assert_eq!((status, v["state"].as_str()), (0, Some("ok")), "{role} {v}");
+        assert_eq!(
+            std::fs::read_to_string(f.p("q.md")).unwrap(),
+            "Verdict: accept\nhead\n"
+        );
+        assert_eq!(v["answer"]["sha256"], f.sha("q.md"));
+        assert_eq!(v["expect_met"], true);
+        // Two launches on a1, one session: the second resumes it and reads the sentence alone.
+        assert_eq!(f.accounts(), ["a1", "a1"], "{role}");
+        let session = v["session"].as_str().unwrap();
+        let calls = f.calls();
+        assert!(
+            calls[0].ends_with(&format!("--session-id {session}")),
+            "{role}"
+        );
+        assert!(calls[1].ends_with(&format!("--resume {session}")), "{role}");
+        assert_eq!(f.input(1), b"review this\n");
+        assert_eq!(f.input(2), ASK.as_bytes());
+        // The same scope bound for both launches (R11).
+        assert_eq!(f.runtime_max().len(), 2);
+        assert!(f.runtime_max().iter().all(|m| *m == f.runtime_max()[0]));
+        let attempts = v["attempts"].as_array().unwrap();
+        let pick = |k: &str| attempts.iter().map(|a| a[k].clone()).collect::<Vec<_>>();
+        assert_eq!(pick("asked"), [json!(false), json!(true)]);
+        assert_eq!(pick("continued"), [json!(false), json!(false)]);
+        assert_eq!(pick("state"), [json!("no_result"), json!("ok")]);
+        assert_eq!(pick("session"), [json!(session), json!(session)]);
+        assert_eq!(pick("account"), [json!(f.p("a1")), json!(f.p("a1"))]);
+        // The script's result: 2 turns, 1 + 1 tokens; the answer's: 2 turns, 7 + 9 tokens.
+        assert_eq!(
+            (v["turns"].as_u64(), v["results"].as_u64()),
+            (Some(4), Some(1))
+        );
+        assert_eq!(
+            v["tokens"],
+            json!({"input": 8, "output": 10, "cache_read": null, "cache_creation": null})
+        );
+        assert_eq!(v, f.record("q.md"));
+    }
+}
+
+/// Only when the second answer's first line misses too is the state `no_result`; a line quoted
+/// lower in it is never the verdict. An answer whose first line meets the pattern, a missed
+/// `expect.file` and a stage of another runtime are not asked again.
+// spec: specs/ap/run.md#R16
+// spec: specs/ap/run.md#R17
+// spec: specs/ap/run.md#R20
+#[test]
+fn asked_again_and_still_missing_the_first_line_is_no_result() {
+    let mut f = Fake::new();
+    let second = "The form is:\nVerdict: accept\nhead\n";
+    std::fs::write(f.t.join("bin/answer"), second).unwrap();
+    f.asked("No verdict here.", "answer");
+    let mut r = f.request("s.md");
+    r["expect"] = json!({"first_line": "Verdict: *"});
+    let (v, status) = f.run(&r).unwrap();
+    assert_eq!(
+        (status, v["state"].as_str(), v["unmet"].as_str()),
+        (3, Some("no_result"), Some("first_line")),
+        "{v}"
+    );
+    assert_eq!(std::fs::read_to_string(f.p("s.md")).unwrap(), second);
+    assert_eq!(v["answer"]["sha256"], f.sha("s.md"));
+    assert_eq!(v["expect_met"], false);
+    assert_eq!(f.launches.len(), 2, "asked once, never twice");
+    assert_eq!(v["attempts"][1]["asked"], true);
+    // A first line that meets: no ask, the same bytes, as without the ask.
+    let mut f = Fake::new();
+    let answer = "Verdict: accept\nhead\r\nVerdict: repair\n";
+    std::fs::write(f.t.join("bin/answer"), answer).unwrap();
+    f.mode("a1", "answer");
+    let mut r = f.request("o.md");
+    r["expect"] = json!({"first_line": "Verdict: *"});
+    let (v, status) = f.run(&r).unwrap();
+    assert_eq!((status, v["state"].as_str()), (0, Some("ok")));
+    assert_eq!(std::fs::read(f.p("o.md")).unwrap(), answer.as_bytes());
+    assert_eq!(
+        (f.launches.len(), v["attempts"][0]["asked"].clone()),
+        (1, json!(false))
+    );
+    // A missed `expect.file` is judged before the line: no ask.
+    let mut f = Fake::new();
+    f.asked("No verdict here.", "answer");
+    let mut r = f.request("m.md");
+    r["role"] = json!("implementer");
+    r["expect"] = json!({"first_line": "Verdict: *", "file": f.p("cwd/never.txt")});
+    let (v, _) = f.run(&r).unwrap();
+    assert_eq!(
+        (v["state"].as_str(), v["unmet"].as_str()),
+        (Some("no_result"), Some("file"))
+    );
+    assert_eq!(f.launches.len(), 1);
+    // A Codex stage is handled as before.
+    let mut f = Fake::new();
+    std::fs::write(
+        f.t.join("bin/answer"),
+        "No verdict here.\nVerdict: accept\n",
+    )
+    .unwrap();
+    f.mode("a1", "answer");
+    let mut r = f.codex("c.md");
+    r["expect"] = json!({"first_line": "Verdict: *"});
+    let (v, status) = f.run(&r).unwrap();
+    assert_eq!(
+        (status, v["state"].as_str(), v["unmet"].as_str()),
+        (3, Some("no_result"), Some("first_line"))
+    );
+    assert_eq!(
+        (f.launches.len(), v["attempts"].as_array().unwrap().len()),
+        (1, 1)
+    );
+}
+
+/// An ask that ends cut, failed or at the bound ends the call with that state on its account: no
+/// move to a next account. The asked launch and its ask share one `timeout_seconds`. An ask that
+/// wrote no answer leaves the first answer in `out` and its `answer` in the record.
+// spec: specs/ap/run.md#R11
+// spec: specs/ap/run.md#R20
+// spec: specs/ap/run.md#R24
+// spec: specs/ap/run.md#R28
+#[test]
+fn asked_again_that_ends_cut_failed_or_timed_out_ends_the_call() {
+    let first = "No verdict here.";
+    for (mode, state, exit, unmet) in [
+        ("limit1", "cut", 75, None),
+        ("noout", "failed", 3, Some("result_event")),
+        ("other", "timeout", 3, None),
+    ] {
+        let mut f = Fake::new();
+        f.asked(first, mode);
+        let mut r = f.with_next("reviewer", "c.md", &["a2"]);
+        r["expect"] = json!({"first_line": "Verdict: *"});
+        r["timeout_seconds"] = json!(3);
+        let s0 = Instant::now();
+        let (v, status) = f.run(&r).unwrap();
+        assert_eq!(
+            (status, v["state"].as_str(), v["unmet"].as_str()),
+            (exit, Some(state), unmet),
+            "{mode} {v}"
+        );
+        assert!(
+            s0.elapsed().as_secs_f64() < 3.0 + 2.5,
+            "{mode}: one bound for both"
+        );
+        assert_eq!(f.accounts(), ["a1", "a1"], "{mode}: no move after an ask");
+        let attempts = v["attempts"].as_array().unwrap();
+        assert_eq!(attempts.len(), 2, "{mode}");
+        assert_eq!(
+            (
+                attempts[1]["asked"].as_bool(),
+                attempts[1]["state"].as_str()
+            ),
+            (Some(true), Some(state))
+        );
+        assert_eq!(
+            f.runtime_max(),
+            [13, 13],
+            "{mode}: the scope's backstop is unchanged"
+        );
+        // The first answer stays in `out` and in the record; the turns and tokens include it.
+        assert_eq!(
+            std::fs::read_to_string(f.p("c.md")).unwrap(),
+            first,
+            "{mode}"
+        );
+        assert_eq!(v["answer"]["sha256"], f.sha("c.md"), "{mode}");
+        assert!(v["turns"].as_u64().unwrap() >= 2, "{mode} {v}");
+        assert!(v["tokens"]["input"].as_u64().unwrap() >= 1, "{mode} {v}");
+        assert_eq!(v, f.record("c.md"));
+    }
+}
+
 /// R1: a result is not final while a shell the session started lives. An implementer's stage runs
 /// to the exit and keeps the LAST answer; a reviewer's ends at the first.
 // spec: specs/ap/run.md#R15
@@ -3021,6 +3241,7 @@ fn cut1_a_stream_without_the_event_has_no_limit_and_attempts_has_one_entry() {
         "state",
         "worked",
         "continued",
+        "asked",
         "limit",
     ];
     let mut keys: Vec<&str> = attempts[0]
@@ -3831,8 +4052,14 @@ fn rf1_no_move_after_a_resumed_launch_that_did_not_end_cut() {
             (want, Some(state)),
             "{what} {v}"
         );
-        assert_eq!(f.count_now(), before + 1, "{what}");
-        assert_eq!(v["attempts"].as_array().unwrap().len(), 1, "{what}");
+        // An answer without the line is asked again once, in its own session on its own account:
+        // an ask, not a move (R16, R24).
+        let launches = if what == "no_result" { 2 } else { 1 };
+        assert_eq!(f.count_now(), before + launches, "{what}");
+        let attempts = v["attempts"].as_array().unwrap();
+        assert_eq!(attempts.len(), launches, "{what}");
+        assert!(attempts.iter().all(|a| a["account"] == f.p("a1")), "{what}");
+        assert_eq!(attempts[launches - 1]["asked"], launches == 2, "{what}");
     }
 }
 

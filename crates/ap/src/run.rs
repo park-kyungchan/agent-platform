@@ -93,6 +93,9 @@ const CONTINUATION: &str = "A session of this stage on another account was cut b
 /// sentences are for an implementer or a fixer only.
 const MOVED: &str = "This stage was to resume an earlier session, and a usage limit cut that session on its account. You are a new session and hold nothing of what it read or wrote: before anything else read completely the prompt it was given, the file {P}, and the answer it gave, the file {A}. The task below was written for that session: where it speaks of what you did, wrote or were told, it means that session, its answer and its prompt.";
 const MOVED_WORK: &str = " This directory holds its work, committed or not. Read the state it left: in a Git worktree `git status`, `git log --oneline origin/main..HEAD` and `git diff HEAD`. Keep what serves the task, do not start over, and go on until the task below is done.";
+/// What the session of a Claude stage reads when it is asked again (R20): its answer's first line
+/// did not meet `expect.first_line`. One sentence, one newline; no prompt file follows.
+const ASK: &str = "Your last answer did not begin with the line your task asks it to begin with: give the whole answer again with that line as its first line and nothing before it, and post, push, send or change nothing a second time.\n";
 /// The exit of a run whose stage may have run but whose answer or record could not be written.
 const WRITE_FAILED: u8 = 5;
 /// The states `systemctl is-active` answers while something of a unit may live.
@@ -1675,8 +1678,8 @@ fn mirror(record: &mut Value, worked: bool) {
 }
 /// What the launch reads on stdin: the prompt file, or with a `lead` (the continuation, or the
 /// line of a move) that text, an empty line and the file's bytes, through a pipe that a thread
-/// fills (no file).
-fn input(q: &Request, lead: Option<&str>) -> std::io::Result<File> {
+/// fills (no file); an ask reads its sentence alone.
+fn input(q: &Request, lead: Option<&str>, ask: bool) -> std::io::Result<File> {
     // A Muse stage reads its prompt from the file the argument names, an `agy` stage has its text
     // as an argument, and neither reads stdin.
     let file = match q.runtime {
@@ -1687,28 +1690,52 @@ fn input(q: &Request, lead: Option<&str>) -> std::io::Result<File> {
         return Ok(file);
     };
     let mut bytes = lead.as_bytes().to_vec();
-    file.take(LIMIT + 1).read_to_end(&mut bytes)?;
+    if !ask {
+        file.take(LIMIT + 1).read_to_end(&mut bytes)?;
+    }
     let (reader, mut writer) = std::io::pipe()?;
     // The write ends with the pipe: when the CLI is gone, the reader is closed and the write fails.
     std::thread::spawn(move || writer.write_all(&bytes));
     Ok(File::from(std::os::fd::OwnedFd::from(reader)))
 }
+/// What one launch of a call is given besides the request.
+struct Launch<'a> {
+    /// The entries of `attempts` of the launches before it.
+    earlier: &'a [Value],
+    /// The text its input holds first (with `ask`, its whole input).
+    lead: Option<&'a str>,
+    /// The session it resumes; without one it is a new session.
+    resume: Option<&'a str>,
+    /// It asks the session of the launch before it again (R20).
+    ask: bool,
+    /// The scratch directory, if the request has one, could be made.
+    ready: bool,
+    /// Its time bound.
+    bound: Duration,
+}
 /// One launch on one account, after the launches `earlier` (their entries of `attempts`); with a
-/// `lead` its input holds that text first; a launch of a resumed call resumes the record's
-/// session only when `resumes`, else it is a new session. Returns the final record, whether the session did
-/// work, and whether every write after the first effect succeeded.
+/// `lead` its input holds that text first; it resumes the session `resume` when one is given, else
+/// it is a new session. Returns the final record, whether the session did work, and whether every
+/// write after the first effect succeeded.
 fn attempt(
     s: &mut impl System,
     q: &Request,
     account: &str,
     (output, errs): &(File, File),
-    (earlier, lead, resumes, ready): (&[Value], Option<&str>, bool, bool),
+    launch: &Launch,
     object: &Object,
 ) -> (Value, bool, bool) {
-    let resume = q.resume.as_ref().filter(|_| resumes);
-    let resume = resume.map(|(session, _, _)| session.as_str());
-    // The continuation is the text of a fresh call; a resumed call's text is a move's.
-    let continued = lead.is_some() && q.resume.is_none();
+    let Launch {
+        earlier,
+        lead,
+        resume,
+        ask,
+        ready,
+        bound,
+    } = *launch;
+    // The continuation is the text of a fresh call; a resumed call's text is a move's; an ask is
+    // neither.
+    let continued = lead.is_some() && q.resume.is_none() && !ask;
     let mut record = json!({
         "role": q.role, "runtime": q.runtime.word(),
         "model": q.model, "effort": q.effort,
@@ -1725,7 +1752,7 @@ fn attempt(
         "run_object": object.member(),
     });
     let mut attempts = earlier.to_vec();
-    attempts.push(json!({"continued": continued}));
+    attempts.push(json!({"continued": continued, "asked": ask}));
     record["attempts"] = json!(attempts);
     mirror(&mut record, false);
     if let Some((path, _, sha256)) = &q.schema {
@@ -1780,7 +1807,8 @@ fn attempt(
         f.seek(SeekFrom::Start(0))?;
         f.try_clone()
     };
-    let (Ok(prompt), Ok(stdout), Ok(stderr)) = (input(q, lead), empty(output), empty(errs)) else {
+    let (Ok(prompt), Ok(stdout), Ok(stderr)) = (input(q, lead, ask), empty(output), empty(errs))
+    else {
         return not_launched(record, "launch");
     };
     let reader = output;
@@ -1881,7 +1909,6 @@ fn attempt(
         Ok(child) => child,
         Err(_) => return not_launched(record, "launch"),
     };
-    let bound = Duration::from_secs(q.timeout);
     // A reviewer's stage ends at its first result; an implementer's or a fixer's only at the
     // CLI's exit or the bound, because a result is not final while a shell it started lives.
     let mut seen = Seen {
@@ -2097,6 +2124,22 @@ fn limit_text_of(limit: &Value) -> Option<String> {
         fits(one.to_string())
     })
 }
+/// The record after an ask (R28): `turns` and `tokens` are the sums of the asked launch and its ask
+/// (a member null in both stays null, else a null counts 0), and an ask that wrote no answer keeps
+/// the asked launch's `answer`, which is what `out` still holds.
+fn asked_after(record: &mut Value, asked: &Value) {
+    let add = |a: &Value, b: &Value| match (a.as_u64(), b.as_u64()) {
+        (None, None) => Value::Null,
+        (a, b) => json!(a.unwrap_or(0) + b.unwrap_or(0)),
+    };
+    record["turns"] = add(&record["turns"], &asked["turns"]);
+    for k in TOKENS {
+        record["tokens"][k] = add(&record["tokens"][k], &asked["tokens"][k]);
+    }
+    if record["answer"].is_null() {
+        record["answer"] = asked["answer"].clone();
+    }
+}
 /// One `ap run` request. A refusal (exit 2) comes before any effect and writes no file.
 pub fn execute(s: &mut impl System, r: &Value) -> Result<(Value, u8), Failure> {
     let q = request(s, r)?;
@@ -2153,6 +2196,8 @@ pub fn execute(s: &mut impl System, r: &Value) -> Result<(Value, u8), Failure> {
         }
         // The scratch directory: made once, after the claim and before the first launch (R4).
         let (made, ready) = q.limits.as_deref().map_or((false, true), make_scratch);
+        // When the last launch began: it and its ask share one `timeout_seconds` (R20).
+        let mut began = s.now();
         for (i, account) in accounts.iter().enumerate() {
             // Once a launch of an implementer or a fixer has worked, every later one gets the text;
             // a launch of a resumed call after the first is a move and gets its own.
@@ -2164,8 +2209,18 @@ pub fn execute(s: &mut impl System, r: &Value) -> Result<(Value, u8), Failure> {
                 _ => None,
             };
             let earlier = last["attempts"].as_array().cloned().unwrap_or_default();
-            let launch = (&earlier[..], lead, i == 0, ready);
-            let (record, worked, saved) = attempt(s, &q, account, &files, launch, &object);
+            // Only the first launch of a resumed call resumes the record's session.
+            let resume = q.resume.as_ref().filter(|_| i == 0);
+            let launch = Launch {
+                earlier: &earlier,
+                lead,
+                resume: resume.map(|(session, _, _)| session.as_str()),
+                ask: false,
+                ready,
+                bound: Duration::from_secs(q.timeout),
+            };
+            began = s.now();
+            let (record, worked, saved) = attempt(s, &q, account, &files, &launch, &object);
             clean &= saved;
             worked_before |= worked;
             // A run cut at any point goes on at the next account: before any tool ran, and after
@@ -2178,6 +2233,32 @@ pub fn execute(s: &mut impl System, r: &Value) -> Result<(Value, u8), Failure> {
             if !next || !saved {
                 break;
             }
+        }
+        // A Claude stage whose answer's first line missed `expect.first_line` is asked once more, in
+        // its own session on its own account, within what is left of the bound of the launch that
+        // answered; whatever the ask ends in ends the call (R20).
+        let left = Duration::from_secs(q.timeout).saturating_sub(s.now().duration_since(began));
+        let asked = q.runtime == Runtime::Claude
+            && clean
+            && last["state"] == "no_result"
+            && last["unmet"] == "first_line"
+            && !left.is_zero();
+        if let (true, Some(session), Some(account)) =
+            (asked, last["session"].as_str(), last["account"].as_str())
+        {
+            let earlier = last["attempts"].as_array().cloned().unwrap_or_default();
+            let launch = Launch {
+                earlier: &earlier,
+                lead: Some(ASK),
+                resume: Some(session),
+                ask: true,
+                ready,
+                bound: left,
+            };
+            let (mut record, _, saved) = attempt(s, &q, account, &files, &launch, &object);
+            asked_after(&mut record, &last);
+            clean &= saved && persist(&q.out, &record);
+            last = record;
         }
         // Only the call whose `mkdir` made it removes it, after its last launch (R8).
         if let Some(scratch) = q.limits.as_deref().filter(|_| made) {
