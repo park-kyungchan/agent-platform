@@ -1459,6 +1459,7 @@ fn describe_discovers_readable_views_and_arguments_on_cli_and_mcp() {
             store: t.0.join("store.sqlite"),
             now: Some(1000),
             client: "test".into(),
+            read_only: false,
         };
         let mut server = ont::mcp::Server::new(config, &ont::cli::execute);
         let response = server.handle_line(json!({"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"ont_describe","arguments":input}}).to_string().as_bytes()).unwrap();

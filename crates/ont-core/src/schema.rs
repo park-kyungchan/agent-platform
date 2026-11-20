@@ -71,6 +71,7 @@ pub mod codes {
     pub const REFERENCE_ARRAY_FROM_SOURCE_UNSUPPORTED: &str =
         "reference_array_from_source_unsupported";
     pub const RECORDS_SOURCE_OWNER: &str = "records_source_owner";
+    pub const INVALID_FUNCTION: &str = "invalid_function";
     pub const ALL: &[&str] = &[
         INVALID_FORMAT,
         INVALID_VERSION,
@@ -131,6 +132,7 @@ pub mod codes {
         TEMPLATE_FIELD_NOT_STRING,
         REFERENCE_ARRAY_FROM_SOURCE_UNSUPPORTED,
         RECORDS_SOURCE_OWNER,
+        INVALID_FUNCTION,
     ];
 }
 const SOURCE_KINDS: &[&str] = &["markdown_fields", "file_digest", "records"];
@@ -1076,11 +1078,191 @@ impl ActionType {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
+/// Most bytes a function's answer may declare (`answer_bytes`).
+pub const MAX_ANSWER_BYTES: u64 = 1_048_576;
+/// Longest time limit a function may declare (`timeout_ms`).
+pub const MAX_TIMEOUT_MS: u64 = 600_000;
+/// Longest `program` path, in bytes.
+pub const MAX_PROGRAM_BYTES: usize = 4096;
+
+/// A function a domain declares (`specs/ont/fn.md`): its signature and the
+/// program the engine starts. It is read from any JSON value, so that
+/// [`check`] reports each malformed member as one `invalid_function`
+/// diagnostic instead of one parse error; a member at fault keeps its
+/// default here and is listed in the faults that `check` reports.
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct FunctionDef {
-    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub description: Option<String>,
+    pub parameters: BTreeMap<String, FunctionParameter>,
+    /// The absolute path of the program.
+    pub program: String,
+    /// The bound on the bytes of the program's standard output.
+    pub answer_bytes: u64,
+    /// The time limit of one call, in milliseconds.
+    pub timeout_ms: u64,
+    /// JSON pointers, relative to the entry, of the members at fault.
+    faults: Vec<String>,
+}
+
+/// One declared parameter of a function: a type as an action parameter
+/// declares it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FunctionParameter {
+    pub description: Option<String>,
+    pub ty: PropertyType,
+    pub required: bool,
+}
+
+const FUNCTION_MEMBERS: &[&str] = &[
+    "description",
+    "parameters",
+    "program",
+    "answer_bytes",
+    "timeout_ms",
+];
+const FUNCTION_PARAMETER_MEMBERS: &[&str] = &["type", "required", "description"];
+
+fn description_member(value: Option<&Value>) -> Result<Option<String>, ()> {
+    match value {
+        None => Ok(None),
+        Some(Value::String(s)) if s.len() <= 300 => Ok(Some(s.clone())),
+        Some(_) => Err(()),
+    }
+}
+
+fn bounded_member(value: Option<&Value>, max: u64) -> Option<u64> {
+    value
+        .and_then(Value::as_u64)
+        .filter(|n| (1..=max).contains(n))
+}
+
+/// An absolute path of at most [`MAX_PROGRAM_BYTES`] bytes without NUL.
+pub fn valid_program(path: &str) -> bool {
+    path.starts_with('/') && path.len() <= MAX_PROGRAM_BYTES && !path.contains('\0')
+}
+
+impl FunctionDef {
+    /// Read an entry of `functions`, noting each member at fault.
+    pub fn from_value(value: &Value) -> Self {
+        let mut def = Self::default();
+        let Some(entry) = value.as_object() else {
+            def.faults.push(String::new());
+            return def;
+        };
+        for key in entry.keys() {
+            if !FUNCTION_MEMBERS.contains(&key.as_str()) {
+                def.faults.push(format!("/{}", esc(key)));
+            }
+        }
+        match description_member(entry.get("description")) {
+            Ok(d) => def.description = d,
+            Err(()) => def.faults.push("/description".into()),
+        }
+        match entry.get("parameters") {
+            Some(Value::Object(parameters)) => {
+                for (name, declared) in parameters {
+                    let at = format!("/parameters/{}", esc(name));
+                    if !valid_name(name) || name == "now" {
+                        def.faults.push(at.clone());
+                    }
+                    if let Some(p) = Self::parameter(declared, &at, &mut def.faults) {
+                        def.parameters.insert(name.clone(), p);
+                    }
+                }
+            }
+            _ => def.faults.push("/parameters".into()),
+        }
+        match entry.get("program") {
+            Some(Value::String(p)) if valid_program(p) => def.program = p.clone(),
+            _ => def.faults.push("/program".into()),
+        }
+        match bounded_member(entry.get("answer_bytes"), MAX_ANSWER_BYTES) {
+            Some(n) => def.answer_bytes = n,
+            None => def.faults.push("/answer_bytes".into()),
+        }
+        match bounded_member(entry.get("timeout_ms"), MAX_TIMEOUT_MS) {
+            Some(n) => def.timeout_ms = n,
+            None => def.faults.push("/timeout_ms".into()),
+        }
+        def
+    }
+
+    fn parameter(value: &Value, at: &str, faults: &mut Vec<String>) -> Option<FunctionParameter> {
+        let Some(declared) = value.as_object() else {
+            faults.push(at.to_string());
+            return None;
+        };
+        for key in declared.keys() {
+            if !FUNCTION_PARAMETER_MEMBERS.contains(&key.as_str()) {
+                faults.push(format!("{at}/{}", esc(key)));
+            }
+        }
+        let description = description_member(declared.get("description"))
+            .map_err(|()| faults.push(format!("{at}/description")))
+            .ok()
+            .flatten();
+        let ty = declared
+            .get("type")
+            .and_then(|t| serde_json::from_value::<PropertyType>(t.clone()).ok());
+        if ty.is_none() {
+            faults.push(format!("{at}/type"));
+        }
+        let required = declared.get("required").and_then(Value::as_bool);
+        if required.is_none() {
+            faults.push(format!("{at}/required"));
+        }
+        Some(FunctionParameter {
+            description,
+            ty: ty?,
+            required: required?,
+        })
+    }
+
+    /// The pointers, relative to the entry, of the members at fault.
+    pub fn faults(&self) -> &[String] {
+        &self.faults
+    }
+
+    /// The declared form of this entry (members at fault left out).
+    pub fn to_value(&self) -> Value {
+        let mut entry = serde_json::Map::new();
+        if let Some(d) = &self.description {
+            entry.insert("description".into(), Value::String(d.clone()));
+        }
+        let parameters: serde_json::Map<String, Value> = self
+            .parameters
+            .iter()
+            .map(|(name, p)| {
+                let mut declared = serde_json::Map::new();
+                declared.insert(
+                    "type".into(),
+                    serde_json::to_value(&p.ty).unwrap_or(Value::Null),
+                );
+                declared.insert("required".into(), Value::Bool(p.required));
+                if let Some(d) = &p.description {
+                    declared.insert("description".into(), Value::String(d.clone()));
+                }
+                (name.clone(), Value::Object(declared))
+            })
+            .collect();
+        entry.insert("parameters".into(), Value::Object(parameters));
+        entry.insert("program".into(), Value::String(self.program.clone()));
+        entry.insert("answer_bytes".into(), Value::from(self.answer_bytes));
+        entry.insert("timeout_ms".into(), Value::from(self.timeout_ms));
+        Value::Object(entry)
+    }
+}
+
+impl<'de> Deserialize<'de> for FunctionDef {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        Ok(Self::from_value(&Value::deserialize(deserializer)?))
+    }
+}
+
+impl Serialize for FunctionDef {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        self.to_value().serialize(serializer)
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -2023,13 +2205,22 @@ pub fn check(schema: &Schema, other_domains_types: &BTreeSet<String>) -> Vec<Vio
             }
         }
     }
-    for name in schema.functions.keys() {
+    for (name, def) in &schema.functions {
+        let base = format!("/functions/{}", esc(name));
         if !valid_name(name) {
-            v(
-                codes::INVALID_NAME,
-                format!("/functions/{}", esc(name)),
-                &mut out,
-            );
+            v(codes::INVALID_NAME, base.clone(), &mut out);
+        }
+        for fault in def.faults() {
+            v(codes::INVALID_FUNCTION, format!("{base}{fault}"), &mut out);
+        }
+        for (pname, param) in &def.parameters {
+            // One diagnostic for a type at fault, whatever its depth.
+            let pointer = format!("{base}/parameters/{}/type", esc(pname));
+            let mut type_faults = Vec::new();
+            check_type(schema, &param.ty, &pointer, false, &mut type_faults);
+            if !type_faults.is_empty() {
+                v(codes::INVALID_FUNCTION, pointer, &mut out);
+            }
         }
     }
     // Link types.

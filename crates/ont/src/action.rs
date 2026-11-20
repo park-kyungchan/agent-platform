@@ -431,24 +431,39 @@ fn value_matches(schema: &Schema, ty: &PropertyType, v: &Value) -> bool {
         }
     }
 }
-fn validate_parameters(
+/// One declared parameter, as [`check_parameter_values`] reads it: of an
+/// action type or of a function.
+pub(crate) struct DeclaredParameter<'a> {
+    pub name: &'a str,
+    pub ty: &'a PropertyType,
+    pub required: bool,
+    pub max_bytes: Option<u64>,
+}
+
+/// Check supplied parameters against their declarations, in declaration
+/// order: an undeclared one, a missing required one and a value of the
+/// wrong type are `invalid_parameter` (`declared_by` names where the
+/// caller finds the declarations); a `null` optional one is left out.
+pub(crate) fn check_parameter_values(
     schema: &Schema,
-    at: &ActionType,
+    declared: &[DeclaredParameter<'_>],
     params: &Value,
+    declared_by: &str,
 ) -> Result<BTreeMap<String, Value>, Failure> {
     let Some(obj) = params.as_object() else {
         return Err(Refusal::input("invalid_request", "/parameters", "a JSON object").into());
     };
     for key in obj.keys() {
-        if !at.parameters.contains_key(key) {
+        if !declared.iter().any(|d| d.name == key) {
             return Err(invalid_parameter(
                 &parameter_field(key),
-                "parameter must be declared by action list",
+                &format!("parameter must be declared by {declared_by}"),
             ));
         }
     }
     let mut out = BTreeMap::new();
-    for (name, def) in &at.parameters {
+    for def in declared {
+        let name = def.name;
         match obj.get(name) {
             None => {
                 if def.required {
@@ -460,12 +475,12 @@ fn validate_parameters(
             }
             Some(Value::Null) if !def.required => {}
             Some(v) => {
-                if !value_matches(schema, &def.ty, v) {
+                if !value_matches(schema, def.ty, v) {
                     return Err(invalid_parameter(
                         &parameter_field(name),
                         &format!(
                             "must satisfy declared type {} and its value-type constraints",
-                            serde_json::to_value(&def.ty).unwrap_or(Value::Null)
+                            serde_json::to_value(def.ty).unwrap_or(Value::Null)
                         ),
                     ));
                 }
@@ -477,10 +492,29 @@ fn validate_parameters(
                         &format!("string at most {limit} UTF-8 bytes"),
                     ));
                 }
-                out.insert(name.clone(), v.clone());
+                out.insert(name.to_string(), v.clone());
             }
         }
     }
+    Ok(out)
+}
+
+fn validate_parameters(
+    schema: &Schema,
+    at: &ActionType,
+    params: &Value,
+) -> Result<BTreeMap<String, Value>, Failure> {
+    let declared: Vec<DeclaredParameter<'_>> = at
+        .parameters
+        .iter()
+        .map(|(name, def)| DeclaredParameter {
+            name,
+            ty: &def.ty,
+            required: def.required,
+            max_bytes: def.max_bytes,
+        })
+        .collect();
+    let out = check_parameter_values(schema, &declared, params, "action list")?;
     // The validated id supplies the local creation key, so its namespace must
     // name this domain too. Both entry points and the apply transaction use this.
     for rule in &at.rules {
@@ -2731,6 +2765,7 @@ fn records_refusal(code: &str) -> bool {
 /// appends one line to `refusals.jsonl` (`specs/ont/action.md` "Refusal records"); the
 /// answer is the same whether or not the append succeeds.
 pub fn apply_action(ctx: &Context, req: &ApplyActionRequest) -> Result<Answer, Failure> {
+    crate::refuse_read_only(ctx)?;
     let mut found: Option<(String, u64)> = None;
     let result = apply_found(ctx, req, &mut found);
     if let (Err(Failure::Refused(refusal)), Some((domain, version))) = (&result, found)

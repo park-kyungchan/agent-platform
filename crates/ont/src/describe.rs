@@ -8,7 +8,8 @@
 //! admitted: that is a stated limit of the claim); a link type only when
 //! both of its ends are admitted; an action type when `actions` admits it; a
 //! source only when an admitted object type names it as owner; the
-//! functions of a listed domain (no function grant exists yet).
+//! functions of a listed domain with their signatures, not their programs
+//! (no function grant exists yet).
 use crate::principal::Principal;
 use crate::refusal::{open_store, st};
 use crate::{Answer, Context, Failure, Refusal};
@@ -164,8 +165,22 @@ pub fn describe(ctx: &Context, req: &DescribeRequest) -> Result<Answer, Failure>
                     "args":definition.args,"object_type":definition.object_type}));
             }
         }
-        for name in schema.functions.keys() {
-            functions.push(json!({"domain":domain,"name":name}));
+        for (name, def) in &schema.functions {
+            functions.push(json!({
+                "domain":domain,
+                "name":name,
+                "description":def.description,
+                "parameters":def.parameters.iter().map(|(pname,p)| {
+                    json!({
+                        "name":pname,
+                        "description":p.description,
+                        "type":serde_json::to_value(&p.ty).unwrap_or(Value::Null),
+                        "required":p.required
+                    })
+                }).collect::<Vec<_>>(),
+                "answer_bytes":def.answer_bytes,
+                "timeout_ms":def.timeout_ms
+            }));
         }
         for (name, src) in &schema.sources {
             if owning_sources.contains(name) {

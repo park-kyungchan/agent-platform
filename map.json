@@ -39,7 +39,7 @@
   },
   {
    "name": "ont-command",
-   "purpose": "The ont command and its library: schema, reads, actions, log, render, index and the MCP server.",
+   "purpose": "The ont command and its library: schema, reads, actions, log, render, index, functions and the MCP server.",
    "paths": [
     "crates/ont/"
    ],
@@ -57,13 +57,15 @@
     "specs/ont/index.md",
     "specs/ont/mcp.md",
     "specs/ont/render.md",
-    "specs/ont/cli.md"
+    "specs/ont/cli.md",
+    "specs/ont/fn.md"
    ],
    "tests": [
     "crates/ont/tests/action.rs",
     "crates/ont/tests/render.rs",
     "crates/ont/tests/mcp.rs",
-    "crates/ont/tests/refusal_log.rs"
+    "crates/ont/tests/refusal_log.rs",
+    "crates/ont/tests/function.rs"
    ]
   },
   {

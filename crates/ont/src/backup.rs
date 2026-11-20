@@ -25,6 +25,7 @@ pub(crate) struct Taken {
 /// and repairing the edits export beside it in full. No principal is bound:
 /// a backup needs no grant.
 pub fn backup(ctx: &Context, _req: &BackupRequest) -> Result<Answer, Failure> {
+    crate::refuse_read_only(ctx)?;
     let mut store = open_store(&ctx.store, false)?;
     let revision = fresh_revision()?;
     let pins = st!(store.schema_pins());

@@ -101,6 +101,7 @@ struct Mapped {
 }
 
 pub fn index(ctx: &Context, req: &IndexRequest) -> Result<Answer, Failure> {
+    crate::refuse_read_only(ctx)?;
     if let Some(names) = &req.sources {
         let distinct: BTreeSet<&String> = names.iter().collect();
         if names.is_empty() || distinct.len() != names.len() {

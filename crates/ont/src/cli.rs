@@ -15,7 +15,8 @@ use crate::schema::{
 };
 use crate::search::{SearchRequest, search};
 use crate::{
-    Answer, Context, DEFAULT_STORE, Failure, MAX_REQUEST, Refusal, TRUST_LIMIT, check_uid,
+    Answer, Context, DEFAULT_STORE, Failure, MAX_REQUEST, READ_ONLY_ENV, Refusal, TRUST_LIMIT,
+    check_uid, read_only_refusal,
 };
 use serde::Deserialize;
 use serde_json::{Map, Value, json};
@@ -244,6 +245,7 @@ pub fn execute(op: Op, request: &[u8], ctx: &Context) -> Result<Answer, Failure>
         }
         Op::Index => index(ctx, &IndexRequest::parse(request)?),
         Op::Log => log(ctx, &LogRequest::parse(request)?),
+        Op::Fn => crate::function::call(ctx, &crate::function::FnRequest::parse(request)?),
     }
 }
 
@@ -283,6 +285,19 @@ pub enum Op {
     SetRead,
     Index,
     Log,
+    /// `ont_fn`: the request is `{"name", "domain"?, "parameters"?}`.
+    Fn,
+}
+
+/// Whether the command writes to a store, installs or writes a file: each
+/// is refused `read_only_call` inside a function's program.
+fn writes(cli: &Cli) -> bool {
+    use crate::usage::Command::*;
+    match crate::usage::resolve(&cli.command) {
+        Ok(SchemaInstall | Backup | Compact | Index | ActionApply) => true,
+        Ok(Render) => cli.render_options.contains_key("--write"),
+        _ => false,
+    }
 }
 
 fn dispatch(cli: &Cli, stdin: impl Read, ctx: &Context) -> Result<Answer, Failure> {
@@ -448,6 +463,10 @@ fn dispatch(cli: &Cli, stdin: impl Read, ctx: &Context) -> Result<Answer, Failur
             let (request, ctx) = action_request(stdin, ctx)?;
             apply_action(&ctx, &ApplyActionRequest::parse(&request)?)
         }
+        Fn => crate::function::call(
+            ctx,
+            &crate::function::FnRequest::parse_stdin(&cli.command[1], &read_request(stdin)?)?,
+        ),
         Mcp => Err(invalid_argument("command").into()),
     }
 }
@@ -537,6 +556,12 @@ pub fn run(args: &[String], stdin: impl Read, real_uid: u32, effective_uid: u32)
             code: 0,
         };
     }
+    // Read once: inside a function's program `ont` only reads. A writing
+    // command is refused here, before the uid check.
+    let read_only = std::env::var_os(READ_ONLY_ENV).is_some_and(|v| v == "1");
+    if read_only && writes(&cli) {
+        return render(Err(read_only_refusal().into()), 0);
+    }
     if cli.now.is_some() && !cli.store_given {
         return render(
             Err(Refusal::input(
@@ -552,7 +577,7 @@ pub fn run(args: &[String], stdin: impl Read, real_uid: u32, effective_uid: u32)
         return render(Err(Refusal::new(code).into()), 0);
     }
     if crate::usage::resolve(&cli.command).is_ok_and(|c| c == crate::usage::Command::Mcp) {
-        return run_mcp(&cli, stdin);
+        return run_mcp(&cli, stdin, read_only);
     }
     let now = cli.now.unwrap_or_else(now_seconds);
     let is_action_cmd = crate::usage::resolve(&cli.command).is_ok_and(|c| {
@@ -573,6 +598,7 @@ pub fn run(args: &[String], stdin: impl Read, real_uid: u32, effective_uid: u32)
         "cli".to_string()
     };
     let mut ctx = Context::new(cli.store.clone(), now);
+    ctx.read_only = read_only;
     ctx.client = client;
     ctx.agent = std::env::var("ONT_AGENT").ok().filter(|s| !s.is_empty());
     ctx.role = std::env::var("ONT_ROLE").ok().filter(|s| !s.is_empty());
@@ -583,7 +609,7 @@ pub fn run(args: &[String], stdin: impl Read, real_uid: u32, effective_uid: u32)
 /// and the process's standard output (the one subcommand that writes while it
 /// runs). An explicit client name is checked before anything is read; absent
 /// --client leaves attribution to initialize clientInfo.name.
-fn run_mcp(cli: &Cli, stdin: impl Read) -> Outcome {
+fn run_mcp(cli: &Cli, stdin: impl Read, read_only: bool) -> Outcome {
     if let Some(option) = cli
         .given_options
         .iter()
@@ -608,6 +634,7 @@ fn run_mcp(cli: &Cli, stdin: impl Read) -> Outcome {
         store: cli.store.clone(),
         now: cli.now,
         client: client.to_string(),
+        read_only,
     };
     let mut out = std::io::stdout().lock();
     match crate::mcp::serve(&config, std::io::BufReader::new(stdin), &mut out) {

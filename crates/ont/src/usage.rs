@@ -19,6 +19,7 @@ pub(crate) enum Command {
     ActionList,
     ActionValidate,
     ActionApply,
+    Fn,
     Mcp,
 }
 struct Spec {
@@ -197,6 +198,16 @@ const SPECS: &[Spec] = &[
         example: "echo '{\"action_type\":\"create_tag\",\"parameters\":{\"label\":\"demo\"},\"request_id\":\"demo-1\"}' | ont action apply",
     },
     Spec {
+        command: Fn,
+        words: &["fn"],
+        files: &[1],
+        form: "fn NAME",
+        options: &[],
+        stdin: true,
+        fields: "parameters?: object (functions in describe); domain?: string",
+        example: "echo '{\"parameters\":{\"word\":\"demo\"}}' | ont fn lookup",
+    },
+    Spec {
         command: Mcp,
         words: &["mcp"],
         files: &[0],
@@ -299,8 +310,9 @@ mod tests {
     fn usage_and_dispatch_have_the_same_commands_and_options() {
         let help = help(&[]).unwrap_or(Value::Null);
         assert_eq!(help["commands"].as_array().map(Vec::len), Some(SPECS.len()));
-        // Help text budget in bytes, raised from 5000 when compact was added (2026-11-13).
-        assert!(help.to_string().len() < 5200);
+        // Help text budget in bytes, raised from 5000 when compact was added (2026-11-13)
+        // and from 5200 when fn was added (2026-11-20).
+        assert!(help.to_string().len() < 5500);
         for spec in SPECS {
             for files in spec.files {
                 let mut words: Vec<String> = spec.words.iter().map(|s| s.to_string()).collect();

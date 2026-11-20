@@ -31,6 +31,7 @@ pub mod backup;
 pub mod cli;
 pub mod compact;
 pub mod describe;
+pub mod function;
 pub mod get;
 pub mod gitread;
 pub mod index;
@@ -58,6 +59,25 @@ pub const TRUST_LIMIT: &str = "OS-account principal only; on this host every age
 pub const MAX_REQUEST: usize = 65_536;
 /// The store `ont` uses without `--store`.
 pub const DEFAULT_STORE: &str = "/var/lib/ontology-platform/ont/ontology.sqlite";
+/// The variable a function's program finds set to `1`: `ont` then only reads.
+pub const READ_ONLY_ENV: &str = "ONT_FN_READ_ONLY";
+
+/// The refusal of a writing command or tool while [`READ_ONLY_ENV`] is `1`.
+pub fn read_only_refusal() -> Refusal {
+    Refusal::new("read_only_call").with(
+        "rule",
+        json!("inside a function's program (ONT_FN_READ_ONLY=1) ont only reads"),
+    )
+}
+
+/// `read_only_call` when the context is read only: the first step of every
+/// operation that writes to a store or installs.
+pub(crate) fn refuse_read_only(ctx: &Context) -> Result<(), Failure> {
+    if ctx.read_only {
+        return Err(read_only_refusal().into());
+    }
+    Ok(())
+}
 
 /// Real = effective = 0, else `principal_not_trusted`.
 pub fn check_uid(real: u32, effective: u32) -> Result<(), &'static str> {
@@ -89,6 +109,10 @@ pub struct Context {
     /// constructor.
     pub snapshot_page_size: usize,
     pub snapshot_max_heads: usize,
+    /// Set by `run` when `ONT_FN_READ_ONLY` is `1` (the caller is a
+    /// function's program): every operation that writes refuses
+    /// `read_only_call`. `Context::new` leaves it false.
+    pub read_only: bool,
 }
 thread_local! {
     static TEST_SNAPSHOT_BOUNDS: std::cell::Cell<Option<(usize, usize)>> = const { std::cell::Cell::new(None) };
@@ -121,6 +145,7 @@ impl Context {
             role: None,
             snapshot_page_size: page,
             snapshot_max_heads: max,
+            read_only: false,
         }
     }
     /// Test-only constructor: a small snapshot page size (and hard head

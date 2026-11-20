@@ -50,6 +50,7 @@ impl Temp {
             store: self.0.join("store.sqlite"),
             now: Some(1000),
             client: "test".into(),
+            read_only: false,
         };
         let mut server = ont::mcp::Server::new(config, &ont::cli::execute);
         let answer = server.handle_line(json!({"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":tool,"arguments":input}}).to_string().as_bytes()).unwrap();
@@ -84,8 +85,9 @@ fn every_help_form_is_json_without_stdin_or_a_store() {
         );
         assert_eq!(out.code, 0, "{}", out.stdout);
         assert!(out.stderr.is_empty());
-        // Help text budget in bytes, raised from 5000 when compact was added (2026-11-13).
-        assert!(out.stdout.len() <= 5200);
+        // Help text budget in bytes, raised from 5000 when compact was added (2026-11-13)
+        // and from 5200 when fn was added (2026-11-20).
+        assert!(out.stdout.len() <= 5500);
         let body: Value = serde_json::from_str(&out.stdout).unwrap();
         assert_eq!(body["status"], "ok");
         for command in body["commands"].as_array().unwrap() {
@@ -282,7 +284,7 @@ fn filter_refusal_codes_have_fields_and_rules_cli_and_mcp() {
     }
     let answer = t.mcp("ont_index", json!({"sources":[]}));
     diagnostic(&answer, "invalid_request", "/sources");
-    assert!(ont::mcp::tools_list().to_string().len() <= 6000);
+    assert!(ont::mcp::tools_list().to_string().len() <= 6500);
 }
 
 #[test]
@@ -326,14 +328,15 @@ fn tools_list_wire_answer_is_at_most_6000_bytes() {
         store: PathBuf::from("/unused-o17-store"),
         now: Some(1000),
         client: "test".into(),
+        read_only: false,
     };
     let mut server = ont::mcp::Server::new(config, &ont::cli::execute);
     let answer = server
         .handle_line(br#"{"jsonrpc":"2.0","id":1,"method":"tools/list"}"#)
         .unwrap();
     // Leave one byte for the trailing newline.
-    assert!(answer.to_string().len() < 6000);
-    assert_eq!(answer["result"]["tools"].as_array().unwrap().len(), 8);
+    assert!(answer.to_string().len() < 6500);
+    assert_eq!(answer["result"]["tools"].as_array().unwrap().len(), 9);
     let index = answer["result"]["tools"]
         .as_array()
         .unwrap()

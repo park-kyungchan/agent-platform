@@ -13,14 +13,14 @@ Moved from crates/ont/README.md ("mcp") at cf328f3c07623d39f300cb3a84599bed30ca2
 - R5: Methods: `initialize` (answers the asked protocol version when it is `2025-11-25`, `2025-06-18`, `2025-03-26` or `2024-11-05`, else `2025-11-25`; `capabilities` `{"tools":{}}`; `serverInfo` `ont` and the build commit), `ping`, `tools/list`, `tools/call`.
 - R6: Notifications get no response. Another method is `-32601`; a line that is not JSON is `-32700` (id null); a JSON value that is not a request object, a batch array included, is `-32600`; an unknown tool or `arguments` that is not an object is `-32602`.
 - R7: Ids (string or number) are echoed. End of input exits 0.
-- R8: Tools (eight): `ont_describe`, `ont_get`, `ont_search`, `ont_index`, `ont_action_list`, `ont_action_validate`, `ont_action_apply`, `ont_log`. The arguments are the JSON object that the subcommand reads on stdin (for `ont_index`, the object `index` takes: `{"sources":[...]}`).
+- R8: Tools (nine): `ont_describe`, `ont_get`, `ont_search`, `ont_index`, `ont_action_list`, `ont_action_validate`, `ont_action_apply`, `ont_log`, `ont_fn`. The arguments are the JSON object that the subcommand reads on stdin (for `ont_index`, the object `index` takes: `{"sources":[...]}`).
 - R9: Each call opens the store, runs the same operation as the subcommand, closes it and binds the principal for that call; the server never creates a store and holds nothing between calls. `ont_index` takes the same run lock (`index_busy`).
 - R10: Result: `{"content":[{"type":"text","text":T}],"isError":B}`. `T` is the line the subcommand prints for the same request, store and `now`, without its trailing newline; an internal failure (exit 1, which prints no stdout) is `{"status":"internal","code":"<code>@<file>:<line>"}`.
 - R11: `isError` is true exactly when the subcommand's exit code would not be 0: a refusal, `source_failed`, an internal failure (a panic inside one call is contained and answered `panic@<file>:<line>`).
 - R12: There is no `structuredContent`.
 - R13: Bounds: a request line over 1,048,576 bytes is answered `-32600` `request_too_large` and discarded as it is read;
 - R14: a `T` over 262,144 bytes (measured on the `text` bytes; the wire line is that text JSON-escaped and can be up to about twice as long) is replaced by the refusal `response_too_large` (with `bytes` and, for `ont_search` and `ont_log`, `retry_with_smaller_limit`: true);
-- R15: `tools/list` is constant and at most 6,000 bytes.
+- R15: `tools/list` is constant and at most 6,500 bytes.
 
 | Tool | Operation |
 | --- | --- |
@@ -32,6 +32,7 @@ Moved from crates/ont/README.md ("mcp") at cf328f3c07623d39f300cb3a84599bed30ca2
 | `ont_action_validate` | Preview criteria, basis revisions and edits without writing. |
 | `ont_action_apply` | Apply an action with a required `request_id` and optional `expected` revisions. |
 | `ont_log` | Read applied actions or recorded refusals, newest first (the request of `ont log`). |
+| `ont_fn` | Call a function a domain declares (the request of `ont fn` with its `name`; `specs/ont/fn.md`). |
 
 ### Changing something through an action
 

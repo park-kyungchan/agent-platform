@@ -1,5 +1,6 @@
 //! `ont mcp`: a Model Context Protocol server over stdio for `describe`,
-//! `get`, `search`, `index`, actions and the action log (`ont_log`).
+//! `get`, `search`, `index`, actions, the action log (`ont_log`) and the
+//! functions domains declare (`ont_fn`).
 //!
 //! Wire: newline-delimited JSON-RPC 2.0, one request per line on stdin, one
 //! JSON line per response on stdout (nothing else is ever written there).
@@ -35,6 +36,9 @@ pub struct Config {
     pub now: Option<u64>,
     /// `--client`.
     pub client: String,
+    /// `ONT_FN_READ_ONLY` was `1` when the server started: the tools that
+    /// write (`ont_action_apply`, `ont_index`) are refused `read_only_call`.
+    pub read_only: bool,
 }
 
 /// `^[a-z0-9][a-z0-9-]{0,31}$`.
@@ -226,6 +230,15 @@ fn tools() -> Vec<Tool> {
                         "limit":{"type":"integer","minimum":1,"maximum":1000},"continuation":s}}
             }),
         },
+        Tool {
+            op: ToolOp::Read(Op::Fn),
+            spec: json!({
+                "name":"ont_fn",
+                "description":"Call a function from ont_describe functions: name, parameters as declared there, domain when several domains declare it. Answers {function,domain,answer,elapsed_ms}; reads only.",
+                "inputSchema":{"type":"object","additionalProperties":false,"required":["name"],
+                    "properties":{"name":s,"domain":s,"parameters":{"type":"object"}}}
+            }),
+        },
     ]
 }
 
@@ -403,7 +416,13 @@ impl<'a> Server<'a> {
     /// contained here and answered as an internal failure of this call.
     fn call(&self, op: ToolOp, arguments: &Value) -> (String, bool) {
         let now = self.config.now.unwrap_or_else(now_seconds);
+        if self.config.read_only && matches!(op, ToolOp::Apply | ToolOp::Read(Op::Index)) {
+            // Before any store is opened and before any refusal is recorded.
+            let outcome = render(Err(crate::read_only_refusal().into()), now);
+            return (outcome.stdout.trim_end_matches('\n').to_string(), true);
+        }
         let mut ctx = Context::new(self.config.store.clone(), now);
+        ctx.read_only = self.config.read_only;
         ctx.client = if self.config.client.is_empty() {
             self.session
                 .client_info_name
