@@ -32,6 +32,7 @@ const PLAN_PART: &str = include_str!("fixtures/unit_review/plan-part.md");
 const REPAIR_LOOK: &str = include_str!("../src/unit/frames/repair-look.md");
 const PLAN_REVIEWER: &str = include_str!("../src/unit/frames/plan-reviewer.md");
 const STORE: &str = "/invented/scratch/store";
+const BWRAP: &str = "/usr/bin/bwrap";
 /// The epoch second of `2026-11-18T00:00:00Z`, the fake store's clock at 0.
 const EPOCH: u64 = 1_794_960_000;
 
@@ -146,6 +147,12 @@ struct F {
     git: Vec<Vec<String>>,
     /// The unit of a check of the base is read as active after its stop.
     checks_alive: bool,
+    /// The words of each launch between `systemd-run … --` and the CLI: `bwrap … --` under
+    /// `limits`, else none. They are dropped before the fake CLI runs.
+    wraps: Vec<Vec<String>>,
+    /// The answer of `/usr/bin/bwrap --version`, and how many times it was called.
+    bwrap: bool,
+    probes: usize,
 }
 impl F {
     fn new() -> Self {
@@ -155,7 +162,7 @@ impl F {
             NEXT.fetch_add(1, Ordering::SeqCst)
         ));
         let _ = std::fs::remove_dir_all(&t);
-        for d in ["bin", "a1", "a2", "origin"] {
+        for d in ["bin", "a1", "a2", "origin", "home/.ssh"] {
             std::fs::create_dir_all(t.join(d)).unwrap();
         }
         let fake = t.join("bin/claude");
@@ -204,6 +211,9 @@ impl F {
             other_key: false,
             git: vec![],
             checks_alive: false,
+            wraps: vec![],
+            bwrap: true,
+            probes: 0,
         };
         f.write_policy(json!({}));
         f.put("task", "invented-task", json!({"status": "open"}));
@@ -727,6 +737,16 @@ impl System for F {
                 let at = args.iter().position(|a| a == "--").unwrap();
                 Host.call(&args[at + 1], &args[at + 2..], input, ms)
             }
+            // The probe of `limits`: no `bwrap` of the host is called.
+            BWRAP => {
+                assert_eq!(args, ["--version"]);
+                self.probes += 1;
+                Ok(Reply {
+                    success: self.bwrap,
+                    bytes: vec![],
+                    stdout: b"bubblewrap 0.0.0\n".to_vec(),
+                })
+            }
             _ => Host.call(program, args, input, ms),
         }
     }
@@ -763,6 +783,15 @@ impl System for F {
             .find_map(|a| a.strip_prefix("--unit="))
             .unwrap()
             .to_owned();
+        // `bwrap … --` in front of the CLI is kept for the tests and dropped here.
+        let mut at = at;
+        let mut wrap = vec![];
+        if argv[at + 1] == BWRAP {
+            let end = at + 1 + argv[at + 1..].iter().position(|a| a == "--").unwrap();
+            wrap = argv[at + 1..=end].to_vec();
+            at = end;
+        }
+        self.wraps.push(wrap);
         let child = Command::new(self.t.join("bin").join(&argv[at + 1]))
             .args(&argv[at + 2..])
             .env_clear()
@@ -783,6 +812,9 @@ impl System for F {
     }
     fn units(&self) -> bool {
         true
+    }
+    fn home(&self) -> Option<PathBuf> {
+        Some(self.t.join("home"))
     }
     fn policy_file(&self) -> Option<PathBuf> {
         self.policy.clone()
@@ -2328,8 +2360,14 @@ fn r22_the_verb_writes_only_its_actions_and_removes_only_its_own() {
     assert!(
         names
             .iter()
-            .all(|n| n == "prompts" || n == "work" || n.starts_with("act-rq-")),
+            .all(|n| ["prompts", "work", "scratch"].contains(&n.as_str())
+                || n.starts_with("act-rq-")),
         "{names:?}"
+    );
+    // No scratch directory of a look is left either.
+    assert_eq!(
+        std::fs::read_dir(f.dir().join("scratch")).unwrap().count(),
+        0
     );
 }
 
@@ -2608,4 +2646,155 @@ fn r24_the_frames_name_the_kinds_of_a_blocking_finding() {
     }
     assert!(REPAIR_LOOK.contains("`earlier <kind>: closed`"));
     assert!(REPAIR_LOOK.contains("`earlier <kind>: open`"));
+}
+
+// ---- A look under `limits` (specs/ap/run-limits.md) -------------------------------------------
+
+/// The words of a launch under `limits` for a look whose working directory is `cwd`, on `account`
+/// with the scratch directory of `review`, up to the hidden paths.
+fn limited(f: &F, account: &str, review: &str) -> Vec<String> {
+    let (account, scratch) = (f.p(account), f.dir().join("scratch").join(review));
+    let scratch = scratch.to_str().unwrap();
+    [
+        BWRAP,
+        "--unshare-pid",
+        "--ro-bind",
+        "/",
+        "/",
+        "--dev",
+        "/dev",
+        "--proc",
+        "/proc",
+        "--ro-bind",
+        "/proc/sys",
+        "/proc/sys",
+        "--bind",
+        &account,
+        &account,
+        "--bind",
+        scratch,
+        scratch,
+    ]
+    .map(str::to_owned)
+    .to_vec()
+}
+/// Checks the launch `wrap` of the look of `review` in `cwd`: the binds, the hidden home, a
+/// working directory that is not bound (read-only), and the record's `limits`.
+fn under_limits(f: &F, wrap: &[String], review: &str, cwd: &Path, report: &str) {
+    let want = limited(f, "a1", review);
+    assert_eq!(wrap[..want.len()], want[..], "{wrap:?}");
+    let ssh = f.p("home/.ssh");
+    let hidden = ["--tmpfs", &ssh, "--remount-ro", &ssh].map(str::to_owned);
+    assert!(wrap.windows(4).any(|w| w == hidden), "{wrap:?}");
+    let cwd = cwd.to_str().unwrap().to_owned();
+    let tail = ["--cap-drop", "ALL", "--chdir", &cwd, "--"].map(str::to_owned);
+    assert_eq!(wrap[wrap.len() - 5..], tail[..], "{wrap:?}");
+    let bound = wrap.windows(2).any(|w| w[0] == "--bind" && w[1] == cwd);
+    assert!(
+        !bound,
+        "the working directory is read-only to the stage: {wrap:?}"
+    );
+    let limits = &record(report)["limits"];
+    let scratch = f.dir().join("scratch").join(review);
+    assert_eq!(limits["scratch"], json!(scratch), "{limits}");
+    assert!(
+        limits["hidden"].as_array().unwrap().contains(&json!(ssh)),
+        "{limits}"
+    );
+    // `ap run` made it and removed it after the stage.
+    assert!(!scratch.exists());
+}
+
+// spec: specs/ap/unit-review.md#R5
+// spec: specs/ap/unit-review.md#R13
+#[test]
+fn r13_a_look_on_claude_runs_under_limits_with_its_own_scratch_directory() {
+    let mut f = F::new();
+    // A page.
+    let first = first_look(&mut f, "repair");
+    let key = first["review"].as_str().unwrap().to_owned();
+    assert_eq!(mode(&f.dir().join("scratch")), 0o700);
+    let work = f.dir().join("work").join(&key);
+    let wrap = f.wraps.last().unwrap().clone();
+    under_limits(&f, &wrap, &key, &work, first["report"].as_str().unwrap());
+    assert_eq!(f.probes, 2, "the admission and the stage each probe once");
+    // A resumed look: its own key's scratch directory, the resumed record's working directory.
+    f.tick(5);
+    let (v, _) = f.ok(&resume(&f, &first["review"]));
+    let again = v["review"].as_str().unwrap().to_owned();
+    assert_ne!(again, key);
+    let wrap = f.wraps.last().unwrap().clone();
+    under_limits(&f, &wrap, &again, &work, v["report"].as_str().unwrap());
+    // A plan.
+    let (v, _) = f.ok(&f.req("intent", "widgets"));
+    let plan = v["review"].as_str().unwrap().to_owned();
+    let wrap = f.wraps.last().unwrap().clone();
+    let work = f.dir().join("work").join(&plan);
+    under_limits(&f, &wrap, &plan, &work, v["report"].as_str().unwrap());
+    assert_eq!(
+        std::fs::read_dir(f.dir().join("scratch")).unwrap().count(),
+        0
+    );
+}
+
+// spec: specs/ap/unit-review.md#R13
+#[test]
+fn r13_a_look_on_another_runtime_is_launched_without_limits() {
+    let mut f = F::new();
+    std::fs::create_dir(f.t.join("muse")).unwrap();
+    f.write_policy(json!({"runtime": "muse", "account": f.p("muse"),
+        "permission_mode": "bypassPermissions"}));
+    let path = f.t.join("policy.json");
+    let mut policy: Value = serde_json::from_slice(&std::fs::read(&path).unwrap()).unwrap();
+    policy["accounts"]["muse"] = json!([f.p("muse")]);
+    std::fs::write(&path, policy.to_string()).unwrap();
+    // The fake has no `muse`: the launch fails, after the words it was given are kept.
+    let (v, _) = f.ok(&f.req("unit", "u1"));
+    assert_eq!(v["verdict"], "abandoned", "{v}");
+    assert_eq!(f.wraps, [Vec::<String>::new()]);
+    assert_eq!(f.probes, 0);
+    let rec = record(
+        f.dir()
+            .join(format!("{}.md", v["review"].as_str().unwrap()))
+            .to_str()
+            .unwrap(),
+    );
+    assert!(rec.get("limits").is_none(), "{rec}");
+}
+
+// spec: specs/ap/unit-review.md#R18
+// spec: specs/ap/unit-review.md#R22
+#[test]
+fn r18_abandon_and_finish_remove_the_scratch_directory_a_killed_run_left() {
+    let mut f = F::new();
+    let scratch = |f: &F, k: &str| f.dir().join("scratch").join(k);
+    // Another review's directory, and a directory outside that a link points to: both stay.
+    std::fs::create_dir_all(scratch(&f, "other/tmp")).unwrap();
+    std::fs::create_dir_all(f.t.join("outside")).unwrap();
+    std::fs::write(f.t.join("outside/keep"), "k").unwrap();
+    // `abandon` of a cut look: the directory with everything in it, a link inside as a link.
+    let key = cut_after_start(&mut f);
+    std::fs::create_dir_all(scratch(&f, &key).join("tmp")).unwrap();
+    symlink(f.t.join("outside"), scratch(&f, &key).join("tmp/link")).unwrap();
+    f.ok(&ending(&f, "abandon", &key));
+    assert!(std::fs::symlink_metadata(scratch(&f, &key)).is_err());
+    // `finish` of a look cut after its stage; the path a link: removed as a link.
+    f.die_after = Some("close_run");
+    f.refusal(&f.req("unit", "u1"));
+    (f.dead, f.die_after) = (false, None);
+    let key = f
+        .reviews_of("unit", "u1")
+        .into_iter()
+        .find(|(_, r)| r["status"] == "running")
+        .unwrap()
+        .0;
+    symlink(f.t.join("outside"), scratch(&f, &key)).unwrap();
+    let (v, _) = f.ok(&ending(&f, "finish", &key));
+    assert_eq!(v["verdict"], "accept", "{v}");
+    assert!(std::fs::symlink_metadata(scratch(&f, &key)).is_err());
+    assert_eq!(
+        std::fs::read_to_string(f.t.join("outside/keep")).unwrap(),
+        "k"
+    );
+    assert!(scratch(&f, "other/tmp").is_dir());
 }
