@@ -1147,21 +1147,22 @@ refused `unit_not_draft` first (`page_not_reviewed` beside it when the digest ha
   unit without dependencies keeps its digest.
 
 ### The migration and the rehearsal
-`ontology/migrate` knows version 12; its step is empty (no data migration). `ap deliver` installs this file by
+`ontology/migrate` knew version 12 as its highest (section "Version 13" for the present one); its step is empty (no data migration). `ap deliver` installs this file by
 its existing schema step, and runs that step before it installs `ap`: between the two installs the old `ap`
 sends `ready_unit` without `page_digest`, and a `contract` or `effect` unit is refused `page_not_reviewed` (it
 fails safe). An `ap` rolled back below this change cannot make such a unit ready while the store is at version
 12; a plain unit is not affected.
 
-The second store of the rehearsal installs version 11 from Git by its commit and digest (above) instead of the
-repository's file, and runs the walk of version 11 on it. Then it adds, still under version 11, a unit of class
+The second store of the rehearsal installs version 11 from Git by its commit and digest (above), and runs the
+walk of version 11 on it (since version 13 it also installs version 12 from Git by its commit and digest,
+section "Version 13", instead of the repository's file). Then it adds, still under version 11, a unit of class
 `contract` with a dependency and a page review accepted after its last amendment, and installs the repository's
 file over the objects made under version 11: every object read under version 11 (tasks, decisions, requests,
 intents, criteria, units, reviews, runs, findings, holds) and ten views read the same; the schema differs from
 version 11 only in `ready_unit` and the version; `ont_describe` and `ont_action_list` stay within 262,144 bytes
 (the line `v12_mcp_bytes=`); `ontology/migrate` runs 11 12 (exit 0, the store unchanged), 9 12 (every row
-already done) and 12 13 (exit 2), and the pairs refused on the version 10 part are (9, 13), (10, 10) and
-(10, 9). The walk of version 12, each refusal before the action it guards: `ready_unit` without `page_digest`
+already done) and, at version 12, 12 13 (exit 2; since version 13 it is a known pair), and the pairs refused on the version 10
+part were (9, 13), (10, 10) and (10, 9) (since version 13: (9, 14), (10, 10) and (10, 9)). The walk of version 12, each refusal before the action it guards: `ready_unit` without `page_digest`
 on that unit, which has an accepted page review, refused `page_not_reviewed`; with a `page_digest` no accepted
 review of the unit has, refused `page_not_reviewed`; with a digest in capitals, `invalid_parameter`; then
 `amend_unit` changing only `depends_on`, `estimate_lines` and `implementer` (later than the review's start),
@@ -1169,3 +1170,99 @@ and `ready_unit` with the same `page_digest`, applied; again, `unit_not_draft`, 
 `unit_not_draft` and `page_not_reviewed`; `start_unit` of it. On a unit of class `effect` made under version
 12, a running page review and one closed `repair` of the digest given do not count, an accepting one does; a
 plain unit becomes ready without `page_digest`.
+
+## Version 13: principles
+Version 12 remains pinned at
+`60b52b1ccc99f50ac04fba7f3c472d5dc16261f9:ontology/work.schema.json`,
+sha256 `2310273cccfceae52d352ba112340ef695b5f959a48b89b6b2453173c7cf4ee1`.
+Version 13 only adds to version 12. Every value type, source, object type, link type, action type and view reads
+the same in canonical JSON, except that `intent` gains one optional property, `principles`; the one grant gains
+the type `principle` (in `read` and in `derive`, as the other types of the domain) and the four new actions.
+
+A `principle` is a want of the user that outlives one intent: a pillar, or a want under a pillar. It is
+Ontology-owned and written only by the actions below. It is keyed by the native key of the required reference
+parameter `principle` of `record_principle` (lower-case letters, digits and `-`, at most 60 bytes), as `intent` is
+keyed by the `intent` of `draft_intent`; it has no `title` and is shown by that key. A used key is refused by the
+engine (`revision_conflict`).
+
+| Property | Type | Meaning |
+| --- | --- | --- |
+| `order_key` | string, 1 to 40 bytes | the place in the hierarchy: two-digit segments joined by `.`, such as `01` for a pillar and `01.02` for a want under it |
+| `statement` | string, 1,000 | the want |
+| `parent` | `principle`, optional | the pillar or want it is under; none for a pillar |
+| `requests` | array of `request` | the requests that state it, at least one |
+| `status` | `current`, `retired` (value type `principle_status`) | |
+| `recorded_at`, `amended_at` | UTC time | `amended_at` is the time of `record_principle` or of the last `amend_principle` |
+| `retired_at`, `retired_reason` (600) | UTC time, string, optional | set by `retire_principle` |
+
+`intent.principles` (array of `principle`, optional) names the principles an intent obeys.
+
+### Links
+| Link | From | To | Cardinality | Reverse |
+| --- | --- | --- | --- | --- |
+| `principle_parent` | `principle.parent` | `principle` | `many_to_one` | `principle_children` |
+| `principle_requests` | `principle.requests` | `request` | `many_to_many` | `request_principles` |
+| `intent_principles` | `intent.principles` | `principle` | `many_to_many` | `principle_intents` |
+
+`ont around` walks them: from a principle by `principle_requests` to the requests that state it, from an intent by
+`intent_principles` to the principles set on it.
+
+### Actions
+| Action | Parameters | Effect | Refusals |
+| --- | --- | --- | --- |
+| `record_principle` | `principle`, `order_key`, `statement`, `requests`; optional `parent` | a `current` principle, `recorded_at` and `amended_at` the time of the action | `statement_empty`; `order_key_empty`; `parent_not_current` (a `parent` given that is absent or retired); `requests_empty`; a key used before: `revision_conflict` from the engine |
+| `amend_principle` | `principle`; optional `order_key`, `statement`, `requests`, `parent` | the members given replace their values; `amended_at` | `principle_not_current` (absent or retired); `statement_empty` and `requests_empty` (given and empty); `parent_not_current` |
+| `retire_principle` | `principle`, `reason` (600) | `status` `retired`, `retired_at`, `retired_reason` | `principle_not_current` |
+| `set_intent_principles` | `intent`, `principles` | the intent's `principles`, given whole; replaces the list | `intent_not_open` (absent, or `met` or `retired`) |
+
+`requests_empty` is a criterion `{"ne": ["$requests", []]}`, which the engine at the pin evaluates on an array
+parameter, so it has its rehearsal rows. `order_key_empty` of `amend_principle` is not a criterion: an `order_key`
+given and empty is not refused (see below).
+
+### The view
+`principles` (no arguments) lists the principles with `status` `current`, in `order_key` ascending order, at most
+1,000 rows, with the columns `Order` (`order_key`), `Key`, `Parent`, `Statement` and `Requests`. A pillar has no
+parent, so its `Parent` cell is the engine's text for an absent reference, `(missing)`. The engine renders flat
+tables: there is no tree and no recursion, and `order_key` gives the order, so a Lead reads the hierarchy off the
+keys.
+
+### The grant
+The grant of the domain reads `principle` and derives it as the other types are, and lists the four actions.
+
+### What the store does not check
+- That `order_key` has the form of two-digit segments joined by `.`: the engine orders it as a string and does not
+  check the form: `10` sorts before `9`, so a caller writes two digits. `amend_principle` has no criterion on an
+  `order_key` given as the empty string (it refuses an empty `statement` and an empty `requests` given;
+  `record_principle` refuses an empty `order_key`).
+- That a principle's `order_key` begins with its parent's, and that the parents do not form a cycle: an amendment
+  can name a principle under itself or under one of its descendants.
+- That a parent stays current: retiring a principle leaves its children current, under a retired parent.
+- That a request listed in `requests` is current, or that its words say what the statement says: only that the
+  listed objects are references.
+- A `parent` cannot be cleared by an amendment (an ordinary scalar or a reference has no clear by value).
+
+### The migration and the rehearsal
+`ontology/migrate` knows version 13; its step is empty (no data migration), so a store at version 12 carries on
+with `ontology/migrate` 12 13 changing nothing. The line `HIGHEST = 13` names it; `13 14` and `9 14` are pairs it
+does not know (exit 2).
+
+The second store of the rehearsal installs version 12 from Git by its commit and digest (above) instead of the
+repository's file, and runs the walk of version 12 on it. Then it installs the repository's file over the objects
+made under version 12: every object read under version 12 (tasks, decisions, requests, intents, criteria, units,
+reviews, runs, findings, holds) and ten views read the same; the schema differs from version 12 only by the new
+type, links, actions, view, value type and grant, and the property `intent.principles`; `ont_describe` and
+`ont_action_list` stay within 262,144 bytes (the line `v13_mcp_bytes=`); `ontology/migrate` runs 12 13 and 11 13
+(exit 0, the store unchanged), 9 13 (every row already done) and 13 14 (exit 2). The walk of version 13, each
+refusal before the action it guards: two requests are recorded; `record_principle` is refused `statement_empty`,
+`order_key_empty`, `requests_empty` and `parent_not_current` (an absent parent, and the principle's own key), a
+pillar and a want under it are recorded, and a used key is refused `revision_conflict`; the view `principles`
+renders the two rows in `order_key` order with the pillar's key in the child's `Parent` cell and `(missing)` in
+the pillar's; `ont around` from the child by `principle_requests` reaches its request, from the request by
+`request_principles`, from the child by `principle_parent` and from the pillar by `principle_children` reach their
+ends; `set_intent_principles` is refused `intent_not_open` for an absent intent and a met one, and applied on an
+open one, from which `ont around` by `intent_principles` reaches the principles set on it, and from a principle by
+`principle_intents` reaches the intent; `amend_principle` is refused `principle_not_current`, `statement_empty`,
+`requests_empty` and `parent_not_current`, and applied with all members and with one; `retire_principle` is
+applied, then refused `principle_not_current` as an amendment and a second retirement are, and a retired
+principle as a `parent` is refused `parent_not_current`; the view then holds the pillar only. The last line of
+standard output of the rehearsal is `v13 principles: ok`.
