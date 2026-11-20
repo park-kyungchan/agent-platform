@@ -96,6 +96,9 @@ const MOVED_WORK: &str = " This directory holds its work, committed or not. Read
 /// What the session of a Claude stage reads when it is asked again (R20): its answer's first line
 /// did not meet `expect.first_line`. One sentence, one newline; no prompt file follows.
 const ASK: &str = "Your last answer did not begin with the line your task asks it to begin with: give the whole answer again with that line as its first line and nothing before it, and post, push, send or change nothing a second time.\n";
+/// What the session reads when its answer's first line met `expect.first_line` and its second line
+/// missed `expect.second_line` (R20). One sentence, one newline.
+const ASK_SECOND: &str = "Your last answer did not have as its second line the line your task asks for: give the whole answer again with the same first line, that line as its second line and nothing before them, and post, push, send or change nothing a second time.\n";
 /// The exit of a run whose stage may have run but whose answer or record could not be written.
 const WRITE_FAILED: u8 = 5;
 /// The states `systemctl is-active` answers while something of a unit may live.
@@ -235,6 +238,8 @@ struct Request {
     timeout: u64,
     expect_file: Option<String>,
     expect_line: Option<String>,
+    /// `expect.second_line`: given only with `expect_line` (R2).
+    expect_second: Option<String>,
     /// The file of `answer_schema`: its path, text and digest as read.
     schema: Option<(String, String, String)>,
     mcp: Vec<String>,
@@ -730,11 +735,12 @@ fn request_at(s: &mut impl System, r: &Value, at_cwd: bool) -> Result<Request, F
             "verifier"
         }
     };
-    let (mut expect_file, mut expect_line) = (None, None);
+    let (mut expect_file, mut expect_line, mut expect_second) = (None, None, None);
     if let Some(e) = r.get("expect") {
+        let members = ["file", "first_line", "second_line"];
         let o = e
             .as_object()
-            .filter(|o| !o.is_empty() && o.keys().all(|k| k == "file" || k == "first_line"))
+            .filter(|o| !o.is_empty() && o.keys().all(|k| members.contains(&k.as_str())))
             .ok_or_else(|| error("invalid_input", "expect"))?;
         if o.contains_key("file") {
             expect_file = Some(path(e, "file").map_err(|_| error("invalid_input", "expect"))?);
@@ -743,6 +749,13 @@ fn request_at(s: &mut impl System, r: &Value, at_cwd: bool) -> Result<Request, F
             let line = text(e, "first_line").map_err(|_| error("invalid_input", "expect"))?;
             require!(line.len() <= 200 && !line.contains('\n') => "invalid_input", "expect");
             expect_line = Some(line.to_owned());
+        }
+        if o.contains_key("second_line") {
+            let field = "expect.second_line";
+            require!(expect_line.is_some() => "invalid_input", field);
+            let line = text(e, "second_line").map_err(|_| error("invalid_input", field))?;
+            require!(line.len() <= 200 && !line.contains('\n') => "invalid_input", field);
+            expect_second = Some(line.to_owned());
         }
     }
     let limits = match r.get("limits") {
@@ -949,6 +962,7 @@ fn request_at(s: &mut impl System, r: &Value, at_cwd: bool) -> Result<Request, F
         timeout,
         expect_file,
         expect_line,
+        expect_second,
         schema,
         mcp,
         spent: match (runtime, &earlier) {
@@ -1454,6 +1468,9 @@ fn judge(
         }) {
             record["unmet"] = json!("first_line");
             "no_result"
+        } else if !second_met(q, e["result"].as_str().unwrap_or("")) {
+            record["unmet"] = json!("second_line");
+            "no_result"
         } else {
             "ok"
         }
@@ -1505,6 +1522,7 @@ fn chosen<'a>(q: &Request, seen: &'a Seen) -> Option<&'a Value> {
                     && q.expect_line
                         .as_deref()
                         .is_none_or(|p| glob(p, answer.lines().next().unwrap_or("")))
+                    && second_met(q, answer)
             }
     };
     seen.results
@@ -1512,6 +1530,12 @@ fn chosen<'a>(q: &Request, seen: &'a Seen) -> Option<&'a Value> {
         .rev()
         .find(meets)
         .or(seen.results.last())
+}
+/// The answer's second line meets `expect.second_line`, or none is given (R16, R17).
+fn second_met(q: &Request, answer: &str) -> bool {
+    q.expect_second
+        .as_deref()
+        .is_none_or(|p| glob(p, answer.lines().nth(1).unwrap_or("")))
 }
 fn limit_text(text: &str) -> bool {
     let t = text.to_lowercase();
@@ -2234,14 +2258,20 @@ pub fn execute(s: &mut impl System, r: &Value) -> Result<(Value, u8), Failure> {
                 break;
             }
         }
-        // A Claude stage whose answer's first line missed `expect.first_line` is asked once more, in
-        // its own session on its own account, within what is left of the bound of the launch that
-        // answered; whatever the ask ends in ends the call (R20).
+        // A Claude stage whose answer's first line missed `expect.first_line`, or whose second line
+        // missed `expect.second_line`, is asked once more, in its own session on its own account,
+        // within what is left of the bound of the launch that answered; whatever the ask ends in
+        // ends the call (R20).
         let left = Duration::from_secs(q.timeout).saturating_sub(s.now().duration_since(began));
+        let lead = match last["unmet"].as_str() {
+            Some("first_line") => Some(ASK),
+            Some("second_line") => Some(ASK_SECOND),
+            _ => None,
+        };
         let asked = q.runtime == Runtime::Claude
             && clean
             && last["state"] == "no_result"
-            && last["unmet"] == "first_line"
+            && lead.is_some()
             && !left.is_zero();
         if let (true, Some(session), Some(account)) =
             (asked, last["session"].as_str(), last["account"].as_str())
@@ -2249,7 +2279,7 @@ pub fn execute(s: &mut impl System, r: &Value) -> Result<(Value, u8), Failure> {
             let earlier = last["attempts"].as_array().cloned().unwrap_or_default();
             let launch = Launch {
                 earlier: &earlier,
-                lead: Some(ASK),
+                lead,
                 resume: Some(session),
                 ask: true,
                 ready,

@@ -13,7 +13,6 @@ use std::{
     os::unix::fs::{DirBuilderExt, OpenOptionsExt, PermissionsExt},
     path::{Path, PathBuf},
     process::ExitCode,
-    time::{Duration, UNIX_EPOCH},
 };
 
 const PLAN_REVIEWER: &str = include_str!("frames/plan-reviewer.md");
@@ -423,7 +422,7 @@ fn look_at(
         }
     }
     let read = at(
-        store::head_now(s, look.store, look.member(), look.key),
+        store::head(s, look.store, look.member(), look.key),
         look.member(),
     );
     let unknown = if look.page {
@@ -431,7 +430,7 @@ fn look_at(
     } else {
         "unknown_intent"
     };
-    let (revision, subject, now) = read?.ok_or_else(|| error(unknown, look.member()))?;
+    let (revision, subject) = read?.ok_or_else(|| error(unknown, look.member()))?;
     let list = reviews_of(s, look, trace)?;
     let found = |k: &str| list.iter().find(|(key, _)| key == k).map(|(_, v)| v);
     let text_of = |v: &Value, k: &str| v[k].as_str().filter(|t| !t.is_empty()).map(str::to_owned);
@@ -617,7 +616,8 @@ fn look_at(
     req["role"] = json!("reviewer");
     (req["cwd"], req["prompt"], req["out"]) = (json!(cwd), json!(prompt), json!(out));
     req["timeout_seconds"] = json!(new.timeout);
-    req["expect"] = json!({"first_line": "Verdict: *"});
+    // The report's second line names the digest; the close of R14 judges it exactly (R13).
+    req["expect"] = json!({"first_line": "Verdict: *", "second_line": format!("*{head}*")});
     req[look.member()] = json!(look.key);
     if let Some(store) = look.store {
         req["store"] = json!(store);
@@ -629,12 +629,6 @@ fn look_at(
         true => fail(f.code, &format!("reviewer.{}", f.field), f.detail),
         false => f,
     })?;
-    // The store compares strictly: a start in the second of the amendment would not count (R11).
-    let amended = subject["amended_at"].as_str().unwrap_or_default();
-    let read_at = now.map(|n| crate::run::stamp(UNIX_EPOCH + Duration::from_secs(n)));
-    if look.page && read_at.is_none_or(|t| t.as_str() <= amended) {
-        s.pause(Duration::from_secs(1));
-    }
     trace.sent = true;
     let applied = match store::start_unit_review(s, look.store, &body) {
         Ok(a) => a,
@@ -847,11 +841,9 @@ fn answer(
         a["cause"] = json!(cause);
     }
     if look.page {
-        let started = list.iter().find(|(k, _)| k == review);
-        let started = started.and_then(|(_, v)| v["started_at"].as_str());
+        // The page read again after the stage has another digest than the one reviewed (R21).
         let unit = at(store::get(s, look.store, "unit", look.key), "unit")?;
-        let amended = unit.as_ref().and_then(|u| u["amended_at"].as_str());
-        let during = matches!((amended, started), (Some(a), Some(st)) if a >= st);
+        let during = unit.is_some_and(|u| render::page_digest(look.key, &u) != head);
         a["page_amended_during_review"] = json!(during);
     }
     Ok((a, if e.verdict == "abandoned" { 3 } else { 0 }))

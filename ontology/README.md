@@ -1105,11 +1105,67 @@ done when its record answered `already_applied` and its aside was refused `reque
 triaged with the old verb after its carry, so the reason of a second aside differs under the same request id.
 
 The second store of the rehearsal installs version 10 from Git by its commit and digest (above) and runs
-the walk of version 10 on it; then it installs the repository's file: every object read under version 10
-reads the same, `ontology/migrate` runs 10 11 (exit 0, the store unchanged), 9 11 (the carry of version 10:
-every row already done) and 11 12 (exit 2), and `confirm_intent`, `close_intent` and `route_request` act on
-objects made under version 10. Then the walk of version 11 applies every action of this section and asserts
+the walk of version 10 on it; then it installs version 11 (since version 12 from Git by its commit and
+digest, section "Version 12"): every object read under version 10 reads the same, `ontology/migrate` runs
+10 11 (exit 0, the store unchanged) and 9 11 (the carry of version 10: every row already done), and
+`confirm_intent`, `close_intent` and `route_request` act on objects made under version 10. Then the walk of version 11 applies every action of this section and asserts
 the refusals above, each before the action it guards, and shows that a review made by the new actions (and
 one made by `carry_review`) is found by the search delivery uses. `approve_unit` runs with the role `lead`;
 with an engine without the verb `log` in `ont --help` (which does not know the role), `approve_unit` and every
 later step on that unit are skipped, with one line on standard error that names them.
+
+## Version 12: the page digest
+Version 11 remains pinned at
+`eb4963d5fa0ff697a9f6743df38a03bbd20b233d:ontology/work.schema.json`,
+sha256 `62062852a76a173dc7a51625b1ccfdd806432d086a7350b9b3d2a12b6aeb1d34`.
+Version 12 changes one action. Every value type, source, object type, link type, view and every other action
+reads the same in canonical JSON as at version 11; `head_not_reviewed` of `accept_unit`, `merge_unit` and
+`close_unit`, and `review_older_than_amendment` of `carry_review` (reviews of kind `packet`), are unchanged.
+
+`ready_unit` takes one new optional parameter `page_digest` (value type `sha256_hex`: 64 lowercase hexadecimal
+characters, another string is `invalid_parameter`). Its criterion `page_not_reviewed` holds for a unit of class
+`contract` or `effect` only when a review of kind `page` linked by `unit_reviews` is `closed` with verdict
+`accept` and its `head` equals `$page_digest`, whenever that review started: the clause that compared the
+review's `started_at` with the unit's `amended_at` is removed from this criterion only. The `where` checks
+`{"present": "$page_digest"}` before the comparison, so such a unit without `page_digest` is refused
+`page_not_reviewed` (without the guard the engine answers `criterion_not_evaluable` for a unit that has an
+accepted review and no `page_digest`). A unit of class `plain` needs no `page_digest`.
+
+The digest is the one `ap unit page <key> --digest` prints (`specs/ap/unit.md` R34): the SHA-256 of the page
+part as built for the reviewer without its line `Depends on: ...`. Neither the dependencies, the tiers
+(`implementer`, `verifier`) nor `estimate_lines` enter it, so an amendment of only these after an accept keeps
+the accept; an amendment of any other page property makes another digest and needs a new look. `ap unit ready`
+gives `page_digest` for every unit, in any state and of any class, so that a unit that is not a draft is
+refused `unit_not_draft` first (`page_not_reviewed` beside it when the digest has no accepted review).
+
+### What the store does not check
+- That `page_digest` is the digest of the unit as stored: the engine does not render a page. `ap` computes it
+  from the same read it applies `expected` with; a caller that applies `ready_unit` by hand with another
+  digest is answered by what reviews exist of that digest.
+- A page review accepted before delivery for a unit with dependencies has the old digest (computed with the
+  `Depends on:` line) and no longer counts: such a page is looked at again after delivery. A page review of a
+  unit without dependencies keeps its digest.
+
+### The migration and the rehearsal
+`ontology/migrate` knows version 12; its step is empty (no data migration). `ap deliver` installs this file by
+its existing schema step, and runs that step before it installs `ap`: between the two installs the old `ap`
+sends `ready_unit` without `page_digest`, and a `contract` or `effect` unit is refused `page_not_reviewed` (it
+fails safe). An `ap` rolled back below this change cannot make such a unit ready while the store is at version
+12; a plain unit is not affected.
+
+The second store of the rehearsal installs version 11 from Git by its commit and digest (above) instead of the
+repository's file, and runs the walk of version 11 on it. Then it adds, still under version 11, a unit of class
+`contract` with a dependency and a page review accepted after its last amendment, and installs the repository's
+file over the objects made under version 11: every object read under version 11 (tasks, decisions, requests,
+intents, criteria, units, reviews, runs, findings, holds) and ten views read the same; the schema differs from
+version 11 only in `ready_unit` and the version; `ont_describe` and `ont_action_list` stay within 262,144 bytes
+(the line `v12_mcp_bytes=`); `ontology/migrate` runs 11 12 (exit 0, the store unchanged), 9 12 (every row
+already done) and 12 13 (exit 2), and the pairs refused on the version 10 part are (9, 13), (10, 10) and
+(10, 9). The walk of version 12, each refusal before the action it guards: `ready_unit` without `page_digest`
+on that unit, which has an accepted page review, refused `page_not_reviewed`; with a `page_digest` no accepted
+review of the unit has, refused `page_not_reviewed`; with a digest in capitals, `invalid_parameter`; then
+`amend_unit` changing only `depends_on`, `estimate_lines` and `implementer` (later than the review's start),
+and `ready_unit` with the same `page_digest`, applied; again, `unit_not_draft`, and with another digest
+`unit_not_draft` and `page_not_reviewed`; `start_unit` of it. On a unit of class `effect` made under version
+12, a running page review and one closed `repair` of the digest given do not count, an accepting one does; a
+plain unit becomes ready without `page_digest`.

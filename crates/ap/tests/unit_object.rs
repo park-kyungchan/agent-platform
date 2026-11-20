@@ -276,14 +276,14 @@ impl F {
         let unit = self.the(&p["unit"], "unit");
         let u = |m: &str| unit.map_or(Value::Null, |u| u[m].clone());
         let full = |v: Value| v.as_array().is_some_and(|a| !a.is_empty());
-        let reviewed = |kind: &str, on: &str, id: &Value, after: Option<&str>| {
+        let reviewed = |kind: &str, on: &str, id: &Value, head: Option<&Value>| {
             self.objects.iter().any(|((t, _), r)| {
                 t == "review"
                     && r["kind"] == kind
                     && &r[on] == id
                     && r["status"] == "closed"
                     && r["verdict"] == "accept"
-                    && after.is_none_or(|a| r["started_at"].as_str() > Some(a))
+                    && head.is_none_or(|h| &r["head"] == h)
             })
         };
         let itself = p["depends_on"]
@@ -336,9 +336,11 @@ impl F {
                 );
                 let plan = reviewed("plan", "intent", &u("intent"), None);
                 need(!objective || plan, "plan_not_reviewed");
+                // Version 12: an accepted page review whose head is `page_digest`, whenever it started.
                 let class = u("class");
-                let amended = u("amended_at");
-                let page = reviewed("page", "unit", &p["unit"], amended.as_str());
+                let page = p
+                    .get("page_digest")
+                    .is_some_and(|d| reviewed("page", "unit", &p["unit"], Some(d)));
                 need(
                     (class != "contract" && class != "effect") || page,
                     "page_not_reviewed",
@@ -460,7 +462,7 @@ impl F {
                     r["kind"].as_str().unwrap(),
                     r["head"].as_str().unwrap(),
                     r["status"].as_str().unwrap(),
-                    r["verdict"].as_str().unwrap()
+                    r["verdict"].as_str().unwrap_or("(missing)")
                 ));
             }
         }
@@ -1443,6 +1445,56 @@ fn r17_amend_takes_every_page_property_but_lane_intent_and_origin() {
     assert_eq!(v["page_review_outdated"], true);
 }
 
+// spec: specs/ap/unit.md#R17
+#[test]
+fn r17_page_review_outdated_is_whether_an_accept_names_the_digest_read_back() {
+    let mut f = F::new();
+    yes(&mut f, &["add"], added("u-dep"));
+    yes(
+        &mut f,
+        &["add"],
+        with(added("u-one"), json!({"class": "contract"})),
+    );
+    let amend = |f: &mut F, rid: &str, change: Value| -> Value {
+        let mut r = with(writer(rid), json!({"unit": "u-one"}));
+        r.as_object_mut()
+            .unwrap()
+            .extend(change.as_object().unwrap().clone());
+        yes(f, &["amend"], r)
+    };
+    let v = amend(&mut f, "m1", json!({"notes": "Read the list."}));
+    assert_eq!(v["page_review_outdated"], true, "no review at all");
+    let digest = page_digest("u-one", f.unit("u-one"));
+    f.page_review("rv-repair", "u-one", &digest, true, "repair");
+    f.page_review("rv-other", "u-one", &"a".repeat(64), true, "accept");
+    let v = amend(&mut f, "m2", json!({"estimate_lines": 80}));
+    assert_eq!(v["page_review_outdated"], true, "repair, or another digest");
+    // An accept of this digest, started before the amendment, is not outdated by the tiers, the
+    // estimate or the dependencies.
+    f.page_review("rv-this", "u-one", &digest, false, "accept");
+    for (rid, change) in [
+        ("m3", json!({"estimate_lines": 120})),
+        (
+            "m4",
+            json!({"implementer": {"runtime": "claude", "model": "m2", "effort": "xhigh"}}),
+        ),
+        (
+            "m5",
+            json!({"verifier": {"runtime": "claude", "model": "m2", "effort": "max"}}),
+        ),
+        ("m6", json!({"depends_on": ["u-dep"]})),
+    ] {
+        let v = amend(&mut f, rid, change.clone());
+        assert_eq!(v["page_review_outdated"], false, "{change}");
+    }
+    let v = amend(&mut f, "m7", json!({"notes": "Read the list twice."}));
+    assert_eq!(v["page_review_outdated"], true, "another page property");
+    let v = amend(&mut f, "m8", json!({"notes": "Read the list."}));
+    assert_eq!(v["page_review_outdated"], false, "the accepted page again");
+    let v = amend(&mut f, "m9", json!({"class": "plain"}));
+    assert_eq!(v["page_review_outdated"], false, "a plain unit");
+}
+
 // spec: specs/ap/unit.md#R18
 #[test]
 fn r18_drop_applies_drop_unit() {
@@ -1564,6 +1616,12 @@ fn r20_ready_reads_the_unit_once_and_a_unit_not_draft_runs_nothing() {
         oid("intent", "widgets"),
         "the unit's own intent"
     );
+    let digest = page_digest("u-one", f.unit("u-one"));
+    assert_eq!(
+        f.applies()[0]["parameters"]["page_digest"],
+        json!(digest),
+        "the digest goes with every unit, a plain one too"
+    );
     assert_eq!(
         f.names().iter().filter(|n| *n == "get unit").count(),
         2,
@@ -1585,6 +1643,28 @@ fn r20_ready_reads_the_unit_once_and_a_unit_not_draft_runs_nothing() {
     assert_eq!(
         (e.code.as_str(), e.field.as_str(), &e.after),
         ("unit_not_draft", "ready", &None)
+    );
+    // A contract unit that is not a draft: the store's first failed criterion, `page_not_reviewed`
+    // beside it when no accept names the digest; nothing runs before the apply.
+    f.modify("unit", "u-one", json!({"class": "contract"}));
+    f.calls.clear();
+    let e = no(
+        &mut f,
+        &["ready"],
+        with(writer("r-contract"), json!({"unit": "u-one"})),
+    );
+    assert_eq!(
+        (e.code.as_str(), e.field.as_str()),
+        ("unit_not_draft", "ready")
+    );
+    assert_eq!(
+        e.detail["failed"],
+        json!(["unit_not_draft", "page_not_reviewed"])
+    );
+    assert_eq!(f.names(), ["get unit", "apply ready_unit"]);
+    assert_eq!(
+        f.applies()[0]["parameters"]["page_digest"],
+        json!(page_digest("u-one", f.unit("u-one")))
     );
     // A unit of the lane small gets no intent.
     let small = with(
@@ -1628,13 +1708,40 @@ fn r21_a_contract_unit_needs_an_accepting_review_of_this_very_page() {
     };
     refused_with(&mut f);
     f.page_review("rv-other", "u-one", &"a".repeat(64), true, "accept");
-    f.page_review("rv-old", "u-one", &digest, false, "accept");
     f.page_review("rv-repair", "u-one", &digest, true, "repair");
+    f.put(
+        "review",
+        "rv-running",
+        json!({"kind": "page", "unit": oid("unit", "u-one"), "status": "running",
+            "started_at": "2026-11-18T00:00:00Z", "head": digest}),
+    );
+    f.put(
+        "review",
+        "rv-packet",
+        json!({"kind": "packet", "unit": oid("unit", "u-one"), "status": "closed", "verdict": "accept",
+            "started_at": "2026-11-18T00:00:00Z", "head": digest}),
+    );
     refused_with(&mut f);
     assert!(f.names().contains(&"render".to_owned()));
-    f.page_review("rv-this", "u-one", &digest, true, "accept");
+    // An accept of this digest counts whenever it started: here not later than the amendment.
+    f.page_review("rv-this", "u-one", &digest, false, "accept");
+    // The tiers, the estimate and the dependencies are amended after it: the accept still counts.
+    yes(&mut f, &["add"], added("u-dep"));
+    yes(
+        &mut f,
+        &["amend"],
+        with(
+            writer("m-tiers"),
+            json!({"unit": "u-one", "estimate_lines": 90, "depends_on": ["u-dep"],
+                "implementer": {"runtime": "claude", "model": "m2", "effort": "max"},
+                "verifier": {"runtime": "claude", "model": "m2", "effort": "max"}}),
+        ),
+    );
+    assert_eq!(page_digest("u-one", f.unit("u-one")), digest);
+    f.calls.clear();
     let v: Value = serde_json::from_str(&ready(&mut f, "u-one").unwrap()).unwrap();
     assert_eq!(v["state"], "ready");
+    assert_eq!(f.applies()[0]["parameters"]["page_digest"], json!(digest));
 }
 
 // spec: specs/ap/unit.md#R22
@@ -2402,7 +2509,10 @@ fn r34_the_digest_is_of_the_page_part_alone() {
     let line = text(&mut f, &["page", "page-fixture", "--digest"]);
     assert_eq!(f.names(), ["get unit"], "nothing but the unit is read");
     let part = page_part("page-fixture", f.unit("page-fixture"), true);
-    assert_eq!(line, format!("{:x}\n", Sha256::digest(part.as_bytes())));
+    // The part as built for the reviewer, without its line `Depends on: ...`.
+    let hashed = part.replacen("Depends on: base-unit\n", "", 1);
+    assert_ne!(hashed, part);
+    assert_eq!(line, format!("{:x}\n", Sha256::digest(hashed.as_bytes())));
     assert_eq!(line.len(), 65);
     // The reviewer's text begins with exactly the bytes hashed, a stored heading or not.
     let reviewer = text(&mut f, &["page", "page-fixture", "--for", "reviewer"]);
@@ -2433,6 +2543,51 @@ fn r34_the_digest_is_of_the_page_part_alone() {
         ),
     );
     assert_ne!(text(&mut f, &["page", "page-fixture", "--digest"]), amended);
+}
+
+// spec: specs/ap/unit.md#R34
+#[test]
+fn r34_the_dependencies_the_tiers_and_the_estimate_enter_no_digest() {
+    let (mut f, _r) = fixture();
+    yes(&mut f, &["add"], added("u-dep"));
+    let line = text(&mut f, &["page", "page-fixture", "--digest"]);
+    let reviewer = text(&mut f, &["page", "page-fixture", "--for", "reviewer"]);
+    assert!(reviewer.contains("\nDepends on: base-unit\n"));
+    for (rid, change) in [
+        ("d1", json!({"depends_on": ["u-dep"]})),
+        ("d2", json!({"estimate_lines": 321})),
+        (
+            "d3",
+            json!({"implementer": {"runtime": "codex", "model": "m3", "effort": "low"}}),
+        ),
+        (
+            "d4",
+            json!({"verifier": {"runtime": "codex", "model": "m3", "effort": "low"}}),
+        ),
+    ] {
+        let mut r = with(writer(rid), json!({"unit": "page-fixture"}));
+        r.as_object_mut()
+            .unwrap()
+            .extend(change.as_object().unwrap().clone());
+        yes(&mut f, &["amend"], r);
+        assert_eq!(
+            text(&mut f, &["page", "page-fixture", "--digest"]),
+            line,
+            "{change}"
+        );
+    }
+    // The text every role reads still shows the line; the digest is of that text without it.
+    let shown = text(&mut f, &["page", "page-fixture", "--for", "reviewer"]);
+    assert!(shown.contains("\nDepends on: u-dep\n"), "{shown}");
+    let part = page_part("page-fixture", f.unit("page-fixture"), true);
+    assert!(shown.starts_with(&part));
+    let without = part.replacen("Depends on: u-dep\n", "", 1);
+    assert_ne!(without, part);
+    assert_eq!(line, format!("{:x}\n", Sha256::digest(without.as_bytes())));
+    for role in ["implementer", "verifier"] {
+        let page = text(&mut f, &["page", "page-fixture", "--for", role]);
+        assert!(page.contains("\nDepends on: u-dep\n"), "{role}");
+    }
 }
 // spec: specs/ap/unit.md#R35
 #[test]
