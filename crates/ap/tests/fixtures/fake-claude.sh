@@ -56,6 +56,8 @@ case "$mode" in
   limit45) init; tool; rejected; result true 'You have hit your 5-hour limit · resets 6:30pm (UTC)' 45 ;;
   watch)   # the record as it is while the CLI runs
            init; cp "$(cat "$here/watch")" "$here/seen.json"; result false 'Verdict: accept' 2 ;;
+  owner)   # the mode of the record while the CLI runs, and a line on standard error
+           init; stat -c '%a' "$(cat "$here/watch")" > "$here/seen.mode"; echo noise >&2; result false 'Verdict: accept' 2 ;;
   answer)  # the bytes of the file `answer`, JSON-encoded
            init; python3 -I -c 'import json,sys; print(json.dumps({"type":"result","subtype":"success","is_error":False,"num_turns":2,"result":open(sys.argv[1],encoding="utf-8",newline="").read(),"session_id":sys.argv[2],"usage":{"input_tokens":7,"output_tokens":9},"permission_denials":[]}))' "$here/answer" "$sid" ;;
   script)  # runs `script-<account basename>.sh` in the cwd; its stdout is the answer (tests/unit.rs)
