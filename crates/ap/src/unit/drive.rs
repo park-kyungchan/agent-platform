@@ -331,8 +331,10 @@ impl Verdicts {
             .as_str()
             .is_some_and(|t| t > self.amended.as_str())
     }
+    /// A carried review is a verdict but not a round: the counts leave it out (R18, R37).
     fn rounds(&self) -> usize {
-        self.counted().count()
+        let judged = |(_, v): &&(String, Value)| v["carried_from"].is_null();
+        self.counted().filter(judged).count()
     }
     fn repairs(&self) -> usize {
         self.counted()
@@ -358,6 +360,8 @@ struct Done {
     own: Option<Own>,
     checks: u32,
     updates: u32,
+    /// The last accept this call carried to an updated head: `{review, from, file}` (R25, R37).
+    carried: Option<Value>,
 }
 /// The heads this call's own fixer and updates moved, one after the other, from the head `from`
 /// (R19).
@@ -1292,12 +1296,8 @@ impl Run {
         made.map_err(|_| Halt::Stop("io_error".into(), "the reviews directory".into()))?;
         crate::run::admit_stage(s, req).map_err(refused)?;
         // The store compares strictly: a review in the second of the amendment would not count.
-        let read = at(store::head_now(s, self.store(), "unit", &self.key), "unit")?;
-        let now = read.and_then(|(_, _, n)| n);
-        let read_at = now.map(|n| crate::run::stamp(UNIX_EPOCH + Duration::from_secs(n)));
-        if read_at.is_none_or(|t| t.as_str() <= self.u["amended_at"].as_str().unwrap_or_default()) {
-            s.pause(Duration::from_secs(1));
-        }
+        let amended = self.u["amended_at"].as_str().unwrap_or_default().to_owned();
+        self.past(s, &amended)?;
         let started = at(store::start_unit_review(s, self.store(), body), "start")?;
         self.applied = true;
         let key = started
@@ -1429,6 +1429,141 @@ impl Run {
         self.wait(s)
     }
 
+    /// The accept of the head the run's own updates moved from, carried to `head` without a verifier
+    /// (R37): the review `carry_review` made, or `None` when a condition fails or the store refuses the
+    /// carry, and the head goes to a verifier round (R19).
+    fn carry(&mut self, s: &mut impl System, head: &str, v: &Verdicts) -> Step<Option<String>> {
+        // (a) The newest verdict is `accept`, by a review that started after the amendment.
+        let Some((from, r)) = v.newest().filter(|(_, r)| r["verdict"] == "accept") else {
+            return Ok(None);
+        };
+        let (from, started) = (from.clone(), r["started_at"].as_str().unwrap_or_default());
+        let Some(judged) = r["head"].as_str().filter(|h| hex40(h) && *h != head) else {
+            return Ok(None);
+        };
+        let (judged, started) = (judged.to_owned(), started.to_owned());
+        // (b) Only the run's own merges from the accepted head to this one; (d) each without a conflict.
+        let Some(bases) = self.updates_since(s, head, &judged) else {
+            return Ok(None);
+        };
+        let (wt, base) = (self.wt.clone(), self.base.clone());
+        let before = review::git(s, &wt, &["merge-base", &judged, &base]).ok();
+        let Some(before) = before.map(|b| b.trim_end().to_owned()) else {
+            return Ok(None);
+        };
+        let same = self.patch(s, &before, &judged);
+        if same.is_none() || same != self.patch(s, &base, head) {
+            return Ok(None);
+        }
+        // (c) No path the other side changed meets the write set.
+        let first = review::git(s, &wt, &["merge-base", &judged, &bases[0]]).ok();
+        let Some(first) = first.map(|b| b.trim_end().to_owned()) else {
+            return Ok(None);
+        };
+        let mut words = vec!["diff"];
+        words.extend(
+            DIFF_OPTIONS
+                .into_iter()
+                .chain([first.as_str(), base.as_str()]),
+        );
+        let Ok(diff) = review::git(s, &wt, &words) else {
+            return Ok(None);
+        };
+        let theirs: Vec<&str> = diff.split_terminator('\0').collect();
+        let set = self.u["write_set"].as_array().into_iter().flatten();
+        let set: Vec<String> = set.filter_map(|p| p.as_str().map(str::to_owned)).collect();
+        if review::outside(&set, &theirs).len() != theirs.len() {
+            return Ok(None);
+        }
+        // The store compares by the second: the carried review starts after the one it carries.
+        self.past(s, &started)?;
+        let p = json!({"review": id("review", &from), "unit": self.unit_id(), "head": head});
+        let applied = match self.apply(s, "carry_review", p) {
+            Ok(a) => a,
+            Err(f) if f.code == store::REFUSED => return Ok(None),
+            Err(f) => return Err(f.into()),
+        };
+        let made = applied
+            .made("review")
+            .and_then(|i| i["native_key"].as_str());
+        let made = made.filter(|k| key_ok(k)).map(str::to_owned);
+        let review = made.ok_or_else(|| error("store_answer_unreadable", "carry_review"))?;
+        let mut text = format!(
+            "# The accept of {judged} carried to {head}\n\nUnit: {key}\nAccepted head: {judged}\nIts review: {from}\nHead now: {head}\nCarried review: {review}\n\nUpdates, the base each merged, oldest first:\n",
+            key = self.key
+        );
+        for b in &bases {
+            text.push_str(&format!("- {b}\n"));
+        }
+        text.push_str(&format!(
+            "\nPaths the other side changed (git diff --name-only {first} {base}):\n"
+        ));
+        for path in &theirs {
+            text.push_str(&format!("- {path}\n"));
+        }
+        text.push_str(&format!(
+            "\nNone of these paths meets the unit's write set.\nEvery update merged without a conflict.\nThe unit's patch is unchanged: git diff {before} {judged} and git diff {base} {head} are byte for byte the same.\nR16 on {head}: passed (the write set, the protected paths, the acceptance checks, the worktree clean).\nR17 on {head}: passed (the required check, no unresolved review thread).\n"
+        ));
+        let file = self.prompt(&format!("{}.update.md", self.next()), &text)?;
+        self.done.carried = Some(json!({"review": review, "from": from, "file": file}));
+        Ok(Some(review))
+    }
+    /// The bases the run's own merges took on the first-parent chain from `head` back to `judged`,
+    /// oldest first: each a merge with the message of R26, the previous head as its first parent and as
+    /// its second an ancestor of the present base (R26 to R28, R37). `None` when another commit is on it.
+    fn updates_since(&self, s: &mut impl System, head: &str, judged: &str) -> Option<Vec<String>> {
+        let mut bases = vec![];
+        let mut at = head.to_owned();
+        while at != judged {
+            let parents = review::git(s, &self.wt, &["rev-list", "--parents", "-n", "1", &at]);
+            let parents = parents.ok()?;
+            let [_, first, second] = parents.split_whitespace().collect::<Vec<_>>()[..] else {
+                return None;
+            };
+            let message = review::git(s, &self.wt, &["log", "-1", "--format=%B", &at]).ok()?;
+            let ancestor = ["merge-base", "--is-ancestor", second, &self.base];
+            if message.trim_end() != self.merge_message() || !self.git_ok(s, &self.wt, &ancestor) {
+                return None;
+            }
+            bases.push(second.to_owned());
+            at = first.to_owned();
+            if bases.len() > 100 {
+                return None;
+            }
+        }
+        bases.reverse();
+        (!bases.is_empty()).then_some(bases)
+    }
+    /// The bytes of `git diff <from> <to>`, every option that could vary it fixed (R37).
+    fn patch(&self, s: &mut impl System, from: &str, to: &str) -> Option<Vec<u8>> {
+        let words = [
+            "--no-replace-objects",
+            "-C",
+            &self.wt,
+            "diff",
+            "--no-ext-diff",
+            "--no-textconv",
+            "--no-color",
+            "--binary",
+            "--full-index",
+            from,
+            to,
+        ];
+        let out = s.call("git", &args(&words), &Value::Null, 120_000).ok()?;
+        out.success.then_some(out.stdout)
+    }
+    /// One second passes when the store's clock reads `floor` or earlier: the store writes and compares
+    /// times by the second (R19, R37).
+    fn past(&mut self, s: &mut impl System, floor: &str) -> Step {
+        let read = at(store::head_now(s, self.store(), "unit", &self.key), "unit")?;
+        let now = read.and_then(|(_, _, n)| n);
+        let read_at = now.map(|n| crate::run::stamp(UNIX_EPOCH + Duration::from_secs(n)));
+        if read_at.is_none_or(|t| t.as_str() <= floor) {
+            s.pause(Duration::from_secs(1));
+        }
+        Ok(())
+    }
+
     /// One base commit: `refs/remotes/origin/main` after a fetch (R8, R30).
     fn take_base(&mut self, s: &mut impl System) -> Step {
         self.fetch(s, "main")?;
@@ -1510,7 +1645,10 @@ impl Run {
                     r["verdict"].as_str().unwrap_or_default().to_owned(),
                     k.clone(),
                 ),
-                None => self.verify(s, number, &head, &v)?,
+                None => match self.carry(s, &head, &v)? {
+                    Some(review) => ("accept".to_owned(), review),
+                    None => self.verify(s, number, &head, &v)?,
+                },
             };
             if verdict == "accept" {
                 let p = json!({"unit": self.unit_id(), "head": head});
@@ -1845,6 +1983,9 @@ impl Run {
             "pull_request": u["pull_request"], "rounds": v.rounds(), "repairs": v.repairs(),
             "reviews": v.list.iter().map(one).collect::<Vec<_>>(), "updates": self.done.updates,
             "merged_commit": merged});
+        if let Some(c) = &self.done.carried {
+            a["carried"] = c.clone();
+        }
         if let Some(c) = &out.cleanup {
             a["cleanup"] = c.clone();
         }
