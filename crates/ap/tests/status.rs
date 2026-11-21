@@ -827,6 +827,7 @@ fn r4_the_time_and_the_schema_are_the_first_answers_of_the_store() {
     // The fake's clock moves with every answer: the first one is the verb's `at`.
     assert_eq!(v["at"], "2026-11-17T12:00:00Z");
     assert_eq!(v["schema"], 13);
+    let first_schema = v["schema"].clone();
     let members: Vec<&str> = v.as_object().unwrap().keys().map(String::as_str).collect();
     assert_eq!(
         members,
@@ -846,9 +847,15 @@ fn r4_the_time_and_the_schema_are_the_first_answers_of_the_store() {
     assert_eq!(f.calls[0].1["object_type"], "request");
     // The time is not a clock of the host: another envelope, another print.
     let mut f = fixture();
-    f.schema["version"] = json!(13);
+    // One above the repository's schema, read when the test runs, so it holds after every later version.
+    let other = serde_json::from_str::<Value>(SCHEMA).unwrap()["version"]
+        .as_u64()
+        .unwrap()
+        + 1;
+    f.schema["version"] = json!(other);
     let v = run(&mut f, &Call::Overview);
-    assert_eq!(v["schema"], 13);
+    assert_eq!(v["schema"], other);
+    assert_ne!(v["schema"], first_schema);
 }
 
 // spec: specs/ap/status.md#R5
