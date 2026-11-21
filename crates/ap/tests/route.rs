@@ -1400,10 +1400,14 @@ fn r22_the_timer_and_its_service() {
     .unwrap();
     assert!(options.prune && options.repositories.len() == 3 && options.store.is_none());
     let readme = include_str!("../../../deploy/README.md");
+    let (_, section) = readme.split_once("\n## Routes\n").unwrap();
+    let section = section
+        .split_once("\n## ")
+        .map_or(section, |(head, _)| head);
+    assert!(section.contains("ap-route.service") && section.contains("ap-route.timer"));
     assert!(
-        readme.contains("## Routes")
-            && readme.contains(
-                "install -m 0644 deploy/ap-route.service deploy/ap-route.timer /etc/systemd/system/"
-            )
+        !section
+            .lines()
+            .any(|l| l.starts_with("install -m 0644 deploy/"))
     );
 }

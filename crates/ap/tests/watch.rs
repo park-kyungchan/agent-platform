@@ -6,7 +6,9 @@ use ap::host::{Answer, Failure, Reply, System};
 use ap::watch::RUNTIMES;
 use ap::watch::checks::{GITHUB_APPLY, GITHUB_REPOSITORIES};
 use ap::watch::detect::{APT, BACKUP, DELIVERY, MEMORY_EVENTS};
-use ap::watch::drift::{INVENTORY_PATH, VPS_OPS_REPO};
+use ap::watch::drift::{
+    DELIVER_CLONE, ETC_CLONE, INSTALLED_AP, INVENTORY_PATH, UNIT_DIR, VPS_OPS_REPO,
+};
 use ap::watch::runtimes::flag_on_line;
 use ap::watch::{epoch, execute, family, key, utc};
 use serde_json::{Value, json};
@@ -87,6 +89,15 @@ fn shown(secs: u64) -> String {
     format!("Thu {} {} UTC", &t[..10], &t[11..19])
 }
 
+/// The commit the installed `ap` names (R28).
+fn installed() -> String {
+    "b".repeat(40)
+}
+/// The tip of delivery's last fetch of the operations repository (R29).
+fn ops_tip() -> String {
+    "c".repeat(40)
+}
+
 /// The fake host.
 struct F {
     dir: PathBuf,
@@ -145,6 +156,16 @@ struct F {
     git_show: Answer,
     /// `git -C VPS_OPS_REPO cat-file -t <commit>:<dest>` answers by `<commit>:<dest>`.
     git_cat_file: BTreeMap<String, Answer>,
+    /// `/usr/local/bin/ap --version` (R28).
+    ap_version: Answer,
+    /// `deploy/` at the commit the installed `ap` names, in delivery's clone: name, mode, type, bytes.
+    deploy: BTreeMap<String, (String, String, Vec<u8>)>,
+    /// `etc/` at the fetched tip of delivery's clone of the operations repository, by path; and the
+    /// answer of its `for-each-ref` (R29). The clone exists when `<clone>/.git/HEAD` is a file.
+    etc: BTreeMap<String, (String, String, Vec<u8>)>,
+    etc_ref: Answer,
+    /// The `git` calls that fail, as `<clone> <word>`.
+    git_fails: BTreeSet<String>,
     calls: RefCell<Vec<(String, Vec<String>, Value)>>,
     reads: RefCell<Vec<String>>,
 }
@@ -197,6 +218,11 @@ impl F {
             git_commit: ok(&format!("{}\n", "a".repeat(40))),
             git_show: ok("[]"),
             git_cat_file: BTreeMap::new(),
+            ap_version: ok(&format!("ap 0.1.0 {}\n", installed())),
+            deploy: BTreeMap::new(),
+            etc: BTreeMap::new(),
+            etc_ref: ok(&format!("{}\n", ops_tip())),
+            git_fails: BTreeSet::new(),
             calls: RefCell::default(),
             reads: RefCell::default(),
         };
@@ -292,6 +318,13 @@ impl F {
                 &[("LoadState", "loaded"), ("ActiveState", "inactive")],
             );
             f.trigger_age.insert(format!("{name}.timer"), 5);
+        }
+        // The unit files of the installed commit, each on the host with its bytes (R28).
+        for name in ["ap-watch.service", "ap-watch.timer"] {
+            let bytes = format!("[Unit]\nDescription={name}\n").into_bytes();
+            f.deploy
+                .insert(name.into(), ("100644".into(), "blob".into(), bytes.clone()));
+            f.files.insert(format!("{UNIT_DIR}/{name}"), bytes);
         }
         f.files
             .insert("/proc/uptime".into(), b"100000.00 190000.00\n".to_vec());
@@ -390,6 +423,69 @@ impl F {
         calls.iter().map(|c| (c.0.clone(), c.1.clone())).collect()
     }
 
+    /// `git -C <delivery's clone>`: `ls-tree` and `show` of the installed commit's `deploy/`, and of
+    /// the operations clone `for-each-ref`, `ls-tree -r -z` and `show` of `etc/` at its tip.
+    fn clone_git(&self, args: &[String]) -> Answer {
+        let (clone, word) = (args[1].as_str(), args[2].as_str());
+        if self.git_fails.contains(&format!("{clone} {word}")) {
+            return failed("fatal: bad object\n");
+        }
+        let a: Vec<&str> = args[2..].iter().map(String::as_str).collect();
+        let entry = |mode: &str, kind: &str, b: &[u8], path: &str| {
+            format!(
+                "{mode} {kind} {}\t{path}",
+                &sha(&String::from_utf8_lossy(b))[..40]
+            )
+        };
+        let bytes = |b: &[u8]| {
+            Ok(Reply {
+                success: true,
+                stdout: b.to_vec(),
+                bytes: b.to_vec(),
+            })
+        };
+        match (clone, a.as_slice()) {
+            (DELIVER_CLONE, ["ls-tree", k, "deploy/"]) => {
+                assert_eq!(*k, installed());
+                let lines: String = self
+                    .deploy
+                    .iter()
+                    .map(|(n, (m, t, b))| entry(m, t, b, &format!("deploy/{n}")) + "\n")
+                    .collect();
+                ok(&lines)
+            }
+            (DELIVER_CLONE, ["show", spec]) => {
+                let name = spec
+                    .strip_prefix(&format!("{}:deploy/", installed()))
+                    .unwrap_or_else(|| panic!("unexpected show {spec}"));
+                bytes(&self.deploy[name].2)
+            }
+            (
+                ETC_CLONE,
+                [
+                    "for-each-ref",
+                    "--format=%(objectname)",
+                    "refs/remotes/origin/main",
+                ],
+            ) => dup(&self.etc_ref),
+            (ETC_CLONE, ["ls-tree", "-r", "-z", tip, "etc/"]) => {
+                assert_eq!(*tip, ops_tip());
+                let all: String = self
+                    .etc
+                    .iter()
+                    .map(|(p, (m, t, b))| entry(m, t, b, p) + "\0")
+                    .collect();
+                ok(&all)
+            }
+            (ETC_CLONE, ["show", spec]) => {
+                let path = spec
+                    .strip_prefix(&format!("{}:", ops_tip()))
+                    .unwrap_or_else(|| panic!("unexpected show {spec}"));
+                bytes(&self.etc[path].2)
+            }
+            _ => panic!("unexpected git {args:?}"),
+        }
+    }
     fn systemctl(&self, args: &[String]) -> Answer {
         if args[0] == "--failed" {
             let lines: String = self.failed_units.iter().map(|l| format!("{l}\n")).collect();
@@ -657,6 +753,17 @@ impl System for F {
                     ]
                 );
                 dup(&self.apply_check)
+            }
+            "git"
+                if args
+                    .get(1)
+                    .is_some_and(|c| c == DELIVER_CLONE || c == ETC_CLONE) =>
+            {
+                self.clone_git(args)
+            }
+            INSTALLED_AP => {
+                assert_eq!(args, ["--version"]);
+                dup(&self.ap_version)
             }
             "git" => {
                 assert_eq!(args[0], "-C");
@@ -2037,9 +2144,16 @@ fn r18_the_unit_files() {
     }
     let readme = include_str!("../../../deploy/README.md");
     assert!(readme.contains("## The watch"));
-    assert!(readme.contains(
-        "install -m 0644 deploy/ap-watch.service deploy/ap-watch.timer /etc/systemd/system/"
-    ));
+    let (_, section) = readme.split_once("\n## The watch\n").unwrap();
+    let section = section
+        .split_once("\n## ")
+        .map_or(section, |(head, _)| head);
+    assert!(section.contains("ap-watch.service") && section.contains("ap-watch.timer"));
+    assert!(
+        !section
+            .lines()
+            .any(|l| l.starts_with("install -m 0644 deploy/"))
+    );
     assert!(readme.contains("/etc/systemd/system/ap-watch.service.d/path.conf"));
     for d in ap::watch::DETECTORS {
         assert!(readme.contains(&format!("- `{d}`:")), "{d}");
@@ -2051,7 +2165,13 @@ fn r18_the_unit_files() {
 fn r19_a_pass_only_reads_and_writes_only_its_directory() {
     let mut f = F::quiet();
     probe(&mut f, "watch-probe-3.service");
+    ops(&mut f);
     f.pass();
+    assert!(
+        f.programs()
+            .iter()
+            .any(|(p, a)| p == "git" && a[2] == "for-each-ref")
+    );
     for (program, a) in f.programs() {
         match program.as_str() {
             "systemctl" => assert!(a[0] == "show" || a[0] == "--failed", "{a:?}"),
@@ -2063,9 +2183,11 @@ fn r19_a_pass_only_reads_and_writes_only_its_directory() {
             "gh" => assert!((a[0] == "run" && a[1] == "list") || a[0] == "api", "{a:?}"),
             "python3" => assert!(a.contains(&"--check".to_owned()), "{a:?}"),
             "git" => assert!(
-                ["rev-parse", "show", "cat-file"].contains(&a[2].as_str()),
+                ["rev-parse", "show", "cat-file", "ls-tree", "for-each-ref"]
+                    .contains(&a[2].as_str()),
                 "{a:?}"
             ),
+            INSTALLED_AP => assert_eq!(a, ["--version"]),
             "claude" | "muse" | "agy" => assert!(
                 a == ["--version"] || a == ["--help"] || a == ["exec", "--help"],
                 "{a:?}"
@@ -3075,7 +3197,10 @@ fn r27_drift_inventory_validation_digests_absent_and_unreadable() {
         f.programs()
             .iter()
             .filter(|(p, _)| p == "git")
-            .all(|(_, a)| ["rev-parse", "show", "cat-file"].contains(&a[2].as_str()))
+            .all(
+                |(_, a)| ["rev-parse", "show", "cat-file", "ls-tree", "for-each-ref"]
+                    .contains(&a[2].as_str())
+            )
     );
     // Unreadable host file -> drift unreadable.
     f.git_show = ok(&json!([
@@ -3090,4 +3215,295 @@ fn r27_drift_inventory_validation_digests_absent_and_unreadable() {
     f.git_show = ok("{\"not\": \"an array\"}");
     f.at(10);
     assert_eq!(f.pass()["detectors"]["drift"]["state"], "unreadable");
+}
+
+/// Delivery's clone of the operations repository with its fetched tip, whose `etc/` holds the policy
+/// file, and the host's copy with the same bytes (R29).
+fn ops(f: &mut F) {
+    f.files.insert(
+        format!("{ETC_CLONE}/.git/HEAD"),
+        b"ref: refs/heads/main\n".to_vec(),
+    );
+    let policy = b"{\"version\": 1}\n".to_vec();
+    f.etc.insert(
+        "etc/agent-platform/policy.json".into(),
+        ("100644".into(), "blob".into(), policy.clone()),
+    );
+    f.files
+        .insert("/etc/agent-platform/policy.json".into(), policy);
+}
+fn opened(v: &Value) -> Vec<String> {
+    let mut o: Vec<String> = serde_json::from_value(v["opened"].clone()).unwrap();
+    o.sort();
+    o
+}
+fn drift_state(v: &Value) -> &str {
+    v["detectors"]["drift"]["state"].as_str().unwrap()
+}
+
+// spec: specs/ap/watch.md#R28
+#[test]
+fn r28_unit_files_of_the_installed_commit_are_compared() {
+    let mut f = F::quiet();
+    // The quiet host compares both unit files of the installed commit, read from delivery's clone.
+    f.pass();
+    let reads = f.reads.borrow().clone();
+    for name in ["ap-watch.service", "ap-watch.timer"] {
+        assert!(reads.contains(&format!("{UNIT_DIR}/{name}")), "{name}");
+    }
+    assert!(
+        f.programs()
+            .contains(&(INSTALLED_AP.into(), vec!["--version".into()]))
+    );
+    // A hand edit, an absent copy, and entries that are no unit file (a link, a README, a directory).
+    f.files.insert(
+        format!("{UNIT_DIR}/ap-watch.service"),
+        b"SECRET_UNIT_BYTES\n".to_vec(),
+    );
+    f.files.remove(&format!("{UNIT_DIR}/ap-watch.timer"));
+    for (name, mode, kind) in [
+        ("link.timer", "120000", "blob"),
+        ("README.md", "100644", "blob"),
+        ("sub.service", "040000", "tree"),
+        ("exec.service", "100755", "blob"),
+    ] {
+        f.deploy
+            .insert(name.into(), (mode.into(), kind.into(), b"x\n".to_vec()));
+    }
+    f.reset();
+    f.at(5);
+    let v = f.pass();
+    let changed = k("drift", "drift deploy/ap-watch.service");
+    let absent = k("drift", "drift deploy/ap-watch.timer absent");
+    let mut want = vec![changed.clone(), absent.clone()];
+    want.sort();
+    assert_eq!(opened(&v), want, "{v}");
+    let found = f.finding(&changed);
+    assert_eq!(
+        (&found["kind"], &found["severity"]),
+        (&json!("drift"), &json!("act"))
+    );
+    let ev = found["evidence"].as_str().unwrap();
+    let theirs = String::from_utf8(f.deploy["ap-watch.service"].2.clone()).unwrap();
+    assert_eq!(
+        ev,
+        format!(
+            "expected {}, actual {}, commit {}",
+            sha(&theirs),
+            sha("SECRET_UNIT_BYTES\n"),
+            installed()
+        )
+    );
+    assert!(!found["summary"].as_str().unwrap().contains("SECRET"));
+    let ev = f.finding(&absent)["evidence"].as_str().unwrap().to_owned();
+    assert!(ev.contains("absent") && ev.contains(&installed()), "{ev}");
+    // The entries that are no unit file are not read on the host.
+    let reads = f.reads.borrow().clone();
+    for name in ["link.timer", "README.md", "sub.service", "exec.service"] {
+        assert!(!reads.contains(&format!("{UNIT_DIR}/{name}")), "{name}");
+    }
+    // The next pass that sees the copies equal again closes both.
+    let bytes = f.deploy["ap-watch.service"].2.clone();
+    f.files
+        .insert(format!("{UNIT_DIR}/ap-watch.service"), bytes.clone());
+    f.files.insert(
+        format!("{UNIT_DIR}/ap-watch.timer"),
+        f.deploy["ap-watch.timer"].2.clone(),
+    );
+    f.at(10);
+    let v = f.pass();
+    let mut closed: Vec<String> = serde_json::from_value(v["closed"].clone()).unwrap();
+    closed.sort();
+    assert_eq!(closed, want);
+}
+
+// spec: specs/ap/watch.md#R28
+#[test]
+fn r28_each_cause_of_unreadable() {
+    type Setup = fn(&mut F);
+    let causes: [(&str, Setup); 6] = [
+        ("no commit", |f| f.ap_version = ok("ap 0.1.0 unknown\n")),
+        ("no version", |f| f.ap_version = failed("")),
+        ("two words", |f| {
+            f.ap_version = ok(&format!("ap {}\n", installed()))
+        }),
+        ("ls-tree", |f| {
+            f.git_fails.insert(format!("{DELIVER_CLONE} ls-tree"));
+        }),
+        ("show", |f| {
+            f.git_fails.insert(format!("{DELIVER_CLONE} show"));
+        }),
+        ("host file", |f| {
+            f.unreadable.insert(format!("{UNIT_DIR}/ap-watch.timer"));
+        }),
+    ];
+    for (what, setup) in causes {
+        let mut f = F::quiet();
+        setup(&mut f);
+        f.at(5);
+        let v = f.pass();
+        assert_eq!(drift_state(&v), "unreadable", "{what}: {v}");
+        assert_eq!(opened(&v), [k("drift", "unreadable")], "{what}");
+    }
+}
+
+// spec: specs/ap/watch.md#R29
+#[test]
+fn r29_files_of_etc_at_the_fetched_tip_are_compared() {
+    let mut f = F::quiet();
+    ops(&mut f);
+    f.at(5);
+    let v = f.pass();
+    assert_eq!(opened(&v), Vec::<String>::new(), "{v}");
+    assert!(
+        f.reads
+            .borrow()
+            .contains(&"/etc/agent-platform/policy.json".to_owned())
+    );
+    // A hand edit of the policy, a file of the tip absent on the host, and entries the watch does
+    // not compare: a link, a submodule, a path with a space or a `..`-like component.
+    f.files.insert(
+        "/etc/agent-platform/policy.json".into(),
+        b"{\"SECRET_POLICY\": 2}\n".to_vec(),
+    );
+    f.etc.insert(
+        "etc/agent-platform/extra.conf".into(),
+        ("100755".into(), "blob".into(), b"extra\n".to_vec()),
+    );
+    for (path, mode, kind) in [
+        ("etc/link.conf", "120000", "blob"),
+        ("etc/module", "160000", "commit"),
+        ("etc/a b.conf", "100644", "blob"),
+        ("etc/x/../y", "100644", "blob"),
+    ] {
+        f.etc
+            .insert(path.into(), (mode.into(), kind.into(), b"y\n".to_vec()));
+        f.files.insert(format!("/{path}"), b"never read\n".to_vec());
+    }
+    f.reset();
+    f.at(10);
+    let v = f.pass();
+    let changed = k("drift", "drift etc/agent-platform/policy.json");
+    let absent = k("drift", "drift etc/agent-platform/extra.conf absent");
+    let mut want = vec![changed.clone(), absent];
+    for path in ["etc/link.conf", "etc/module", "etc/a b.conf", "etc/x/../y"] {
+        want.push(k("drift", &format!("inventory {path}")));
+    }
+    want.sort();
+    assert_eq!(opened(&v), want, "{v}");
+    let found = f.finding(&changed);
+    assert_eq!(
+        (&found["kind"], &found["severity"]),
+        (&json!("drift"), &json!("act"))
+    );
+    let ev = found["evidence"].as_str().unwrap();
+    assert_eq!(
+        ev,
+        format!(
+            "expected {}, actual {}, commit {}",
+            sha("{\"version\": 1}\n"),
+            sha("{\"SECRET_POLICY\": 2}\n"),
+            ops_tip()
+        )
+    );
+    for finding in f.findings.values() {
+        let text = finding.to_string();
+        assert!(
+            !text.contains("SECRET_POLICY") && !text.contains("never read"),
+            "{text}"
+        );
+    }
+    let reads = f.reads.borrow().clone();
+    for path in ["etc/link.conf", "etc/module", "etc/a b.conf", "etc/x/../y"] {
+        assert!(!reads.contains(&format!("/{path}")), "{path}");
+    }
+}
+
+// spec: specs/ap/watch.md#R29
+#[test]
+fn r29_no_clone_or_no_fetched_tip_reads_nothing() {
+    // No clone: `.git/HEAD` is not found; no `git` call reaches the clone.
+    let mut f = F::quiet();
+    f.etc.insert(
+        "etc/agent-platform/policy.json".into(),
+        ("100644".into(), "blob".into(), b"{}\n".to_vec()),
+    );
+    f.at(5);
+    let v = f.pass();
+    assert_eq!(drift_state(&v), "ok");
+    assert!(f.reads.borrow().contains(&format!("{ETC_CLONE}/.git/HEAD")));
+    assert!(
+        f.programs()
+            .iter()
+            .all(|(_, a)| !a.contains(&ETC_CLONE.to_owned()))
+    );
+    // A clone that no fetch of delivery has reached: no ref of the tip, nothing listed.
+    let mut f = F::quiet();
+    ops(&mut f);
+    f.files.remove("/etc/agent-platform/policy.json");
+    f.etc_ref = ok("");
+    f.at(5);
+    let v = f.pass();
+    assert_eq!((drift_state(&v), opened(&v)), ("ok", vec![]), "{v}");
+    let words: Vec<String> = f
+        .programs()
+        .iter()
+        .filter(|(_, a)| a.contains(&ETC_CLONE.to_owned()))
+        .map(|(_, a)| a[2].clone())
+        .collect();
+    assert_eq!(words, ["for-each-ref"]);
+}
+
+// spec: specs/ap/watch.md#R29
+#[test]
+fn r29_each_cause_of_unreadable() {
+    type Setup = fn(&mut F);
+    let causes: [(&str, Setup); 7] = [
+        ("HEAD", |f| {
+            f.unreadable.insert(format!("{ETC_CLONE}/.git/HEAD"));
+        }),
+        ("for-each-ref", |f| {
+            f.git_fails.insert(format!("{ETC_CLONE} for-each-ref"));
+        }),
+        ("two refs", |f| {
+            f.etc_ref = ok(&format!("{}\n{}\n", ops_tip(), installed()));
+        }),
+        ("no commit", |f| f.etc_ref = ok("main\n")),
+        ("ls-tree", |f| {
+            f.git_fails.insert(format!("{ETC_CLONE} ls-tree"));
+        }),
+        ("show", |f| {
+            f.git_fails.insert(format!("{ETC_CLONE} show"));
+        }),
+        ("host file", |f| {
+            f.unreadable
+                .insert("/etc/agent-platform/policy.json".into());
+        }),
+    ];
+    for (what, setup) in causes {
+        let mut f = F::quiet();
+        ops(&mut f);
+        setup(&mut f);
+        f.at(5);
+        let v = f.pass();
+        assert_eq!(drift_state(&v), "unreadable", "{what}: {v}");
+        assert_eq!(opened(&v), [k("drift", "unreadable")], "{what}");
+    }
+}
+
+// spec: specs/ap/watch.md#R28
+// spec: specs/ap/watch.md#R29
+#[test]
+fn r28_r29_the_clones_are_those_of_the_host_s_request() {
+    let request: Value =
+        serde_json::from_str(include_str!("../../../deploy/deliver.json")).unwrap();
+    let state = request["state"].as_str().unwrap();
+    let clone = |repository: &Value| {
+        let name = repository.as_str().unwrap().split_once('/').unwrap().1;
+        format!("{state}/{name}")
+    };
+    assert_eq!(clone(&request["repository"]), DELIVER_CLONE);
+    assert_eq!(clone(&request["etc"]["repository"]), ETC_CLONE);
+    assert_eq!(INSTALLED_AP, "/usr/local/bin/ap");
+    assert_eq!(UNIT_DIR, "/etc/systemd/system");
 }

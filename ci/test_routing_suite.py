@@ -264,14 +264,17 @@ class FactRule(unittest.TestCase):
         self.assertTrue(m.passes(case, GOOD + " FACT-STAL E"), "a wrong fact holds only when found")
         self.assertTrue(m.passes({"must": [{"fact": ["a `b`  c"]}], "wrong": []}, "x a b c y"), "the fact is normalised too")
 
-    def test_repository_cases_are_the_instructions_cases(self):
+    def test_repository_cases_hold_their_form(self):
         root = RUN.parent.parent
-        old = json.loads((root / "instructions" / "cases.json").read_text())
         new = json.loads((root / "routing" / "cases.json").read_text())
-        self.assertEqual([c["id"] for c in new], [c["id"] for c in old])
-        for o, c in zip(old, new):
-            self.assertEqual(c["situation"], o["situation"])
-            self.assertEqual(c["must"], [{"fact": [t]} for t in o["tokens"]])
+        ids = [c["id"] for c in new]
+        self.assertEqual(len(ids), 16)
+        self.assertEqual(len(set(ids)), 16)
+        for c in new:
+            self.assertTrue(c["must"], c["id"])
+            for fact in c["must"]:
+                self.assertEqual(len(fact["fact"]), 1, c["id"])
+                self.assertIsInstance(fact["fact"][0], str)
             self.assertEqual(c["wrong"], [])
         first = (root / "routing" / "host-cases.sha256").read_text().splitlines()[0]
         self.assertEqual(first, "ce1ad2830739cb760f4f7346bcfe66f061a97314dc32b7878e828666cbe5701f  host-routing-24")

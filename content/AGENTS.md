@@ -40,7 +40,7 @@ When a request asks for the output of a later stage while the record of an earli
 
 ## 5. Effects
 
-- Never print a credential.
+- Never print a credential, nor write it into a file, a commit, a store or a message.
 - Never touch a session, pane, process, worktree or service identity that is not yours.
 - Do not change global configuration merely to orient yourself.
 - A CLI's private memory holds nothing another agent or a later session needs: that goes to the store, the owning repository or the task's directory.

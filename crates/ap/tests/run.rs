@@ -2,6 +2,8 @@
 //! only through the `System` trait: the `systemd-run … --` prefix is checked and dropped, the fake
 //! runs in its own process group, and `systemctl stop <unit>` kills that group. The real unit is
 //! exercised by ci/host-run-scope.sh.
+#[path = "fixtures/work/forks.rs"]
+mod forks;
 use ap::host::{Answer, Failure, Host, Reply, System};
 use ap::run::execute;
 use serde_json::{Value, json};
@@ -195,7 +197,11 @@ impl FakeOnt {
 }
 impl Fake {
     fn new() -> Self {
-        let t = std::env::temp_dir().join(format!(
+        forks::gap();
+        // The temporary directory resolved through links once, so that a `limits.scratch` below
+        // it holds no link (`specs/ap/run-limits.md` R2) where `TMPDIR` names a path through one.
+        let base = std::env::temp_dir().canonicalize().unwrap();
+        let t = base.join(format!(
             "ap-run-test-{}-{}",
             std::process::id(),
             NEXT.fetch_add(1, Ordering::SeqCst)
@@ -214,6 +220,9 @@ impl Fake {
             std::fs::write(&fake, text).unwrap();
             std::fs::set_permissions(&fake, std::fs::Permissions::from_mode(0o755)).unwrap();
         }
+        // The four fakes are written and closed: no fork of this binary still holds one open for
+        // writing when a launch executes it.
+        forks::settled();
         std::fs::write(t.join("prompt.md"), "review this\n").unwrap();
         let env = vec![
             ("PATH".into(), std::env::var("PATH").unwrap_or_default()),
@@ -308,10 +317,12 @@ impl Drop for Fake {
     }
 }
 fn kill_group(pgid: u32) {
-    let _ = Command::new("kill")
-        .args(["-KILL", "--", &format!("-{pgid}")])
-        .stderr(std::process::Stdio::null())
-        .status();
+    let _ = forks::forking(|| {
+        Command::new("kill")
+            .args(["-KILL", "--", &format!("-{pgid}")])
+            .stderr(std::process::Stdio::null())
+            .status()
+    });
 }
 impl System for Fake {
     fn call(&mut self, program: &str, args: &[String], input: &Value, ms: u64) -> Answer {
@@ -366,7 +377,7 @@ impl System for Fake {
             });
         }
         if program != "systemctl" {
-            return Host.call(program, args, input, ms);
+            return forks::forking(|| Host.call(program, args, input, ms));
         }
         let unit = args.last().unwrap();
         let (success, stdout) = match args[0].as_str() {
@@ -433,16 +444,20 @@ impl System for Fake {
             .find_map(|a| a.strip_prefix("--unit="))
             .unwrap()
             .to_owned();
-        let child = Command::new(self.t.join("bin").join(&argv[at + 1]))
-            .args(&argv[at + 2..])
-            .env_clear()
-            .envs(env.iter().map(|(k, v)| (k, v)))
-            .current_dir(cwd)
-            .stdin(files[0].try_clone()?)
-            .stdout(files[1].try_clone()?)
-            .stderr(files[2].try_clone()?)
-            .process_group(0)
-            .spawn()?;
+        // Every file a test wrote into `bin` is closed before this execution.
+        forks::settled();
+        let child = forks::forking(|| {
+            Command::new(self.t.join("bin").join(&argv[at + 1]))
+                .args(&argv[at + 2..])
+                .env_clear()
+                .envs(env.iter().map(|(k, v)| (k, v)))
+                .current_dir(cwd)
+                .stdin(files[0].try_clone()?)
+                .stdout(files[1].try_clone()?)
+                .stderr(files[2].try_clone()?)
+                .process_group(0)
+                .spawn()
+        })?;
         self.groups.insert(unit.clone(), child.id());
         self.alive.insert(unit);
         Ok(child)
@@ -1055,13 +1070,15 @@ fn a_fresh_implementer_refuses_a_dirty_worktree() {
     let mut f = Fake::new();
     let git = |args: &[&str]| {
         assert!(
-            Command::new("git")
-                .args(args)
-                .current_dir(f.p("cwd"))
-                .output()
-                .unwrap()
-                .status
-                .success()
+            forks::forking(|| {
+                Command::new("git")
+                    .args(args)
+                    .current_dir(f.p("cwd"))
+                    .output()
+            })
+            .unwrap()
+            .status
+            .success()
         );
     };
     git(&["init", "-q"]);
@@ -1833,10 +1850,7 @@ fn item08_the_worktree_check_fails_closed_in_a_clean_environment() {
     f.env.push(("GIT_DIR".into(), "/nonexistent".into()));
     let git = |dir: &str, args: &[&str]| {
         assert!(
-            Command::new("git")
-                .args(args)
-                .current_dir(dir)
-                .output()
+            forks::forking(|| { Command::new("git").args(args).current_dir(dir).output() })
                 .unwrap()
                 .status
                 .success()
@@ -2081,13 +2095,15 @@ fn the_requests_git_dir_does_not_skip_the_dirty_check() {
     let mut f = Fake::new();
     let git = |args: &[&str]| {
         assert!(
-            Command::new("git")
-                .args(args)
-                .current_dir(f.p("cwd"))
-                .output()
-                .unwrap()
-                .status
-                .success()
+            forks::forking(|| {
+                Command::new("git")
+                    .args(args)
+                    .current_dir(f.p("cwd"))
+                    .output()
+            })
+            .unwrap()
+            .status
+            .success()
         );
     };
     git(&["init", "-q"]);
@@ -2678,6 +2694,7 @@ fn x3_session_enters_the_record_at_the_thread_start() {
         "started() {",
     );
     std::fs::write(&fake, text).unwrap();
+    forks::settled();
     let (v, _) = f.run(&f.codex("n.md")).unwrap();
     assert_eq!(
         (v["state"].as_str(), v["session"].as_str()),
@@ -6634,16 +6651,18 @@ fn policy_the_built_binary_reads_the_file_the_variable_names() {
     let ask = |file: &Path, out: &str| {
         let mut r = f.request(out);
         r["account"] = json!(f.p("a1"));
-        let mut child = Command::new(env!("CARGO_BIN_EXE_ap"))
-            .arg("run")
-            .env_clear()
-            .env("PATH", f.t.join("empty"))
-            .env("AP_POLICY_FILE", file)
-            .stdin(std::process::Stdio::piped())
-            .stdout(std::process::Stdio::piped())
-            .stderr(std::process::Stdio::piped())
-            .spawn()
-            .unwrap();
+        let mut child = forks::forking(|| {
+            Command::new(env!("CARGO_BIN_EXE_ap"))
+                .arg("run")
+                .env_clear()
+                .env("PATH", f.t.join("empty"))
+                .env("AP_POLICY_FILE", file)
+                .stdin(std::process::Stdio::piped())
+                .stdout(std::process::Stdio::piped())
+                .stderr(std::process::Stdio::piped())
+                .spawn()
+        })
+        .unwrap();
         std::io::Write::write_all(&mut child.stdin.take().unwrap(), r.to_string().as_bytes())
             .unwrap();
         let out = child.wait_with_output().unwrap();
@@ -6769,10 +6788,12 @@ fn policy_refusals_come_after_the_refusals_that_ask_the_host() {
     f.units = true;
     // A dirty worktree, and a bind of the wrong shape after it: the order is the one without a policy.
     let git = |args: &[&str]| {
-        let status = Command::new("git")
-            .args(args)
-            .current_dir(f.p("cwd"))
-            .status();
+        let status = forks::forking(|| {
+            Command::new("git")
+                .args(args)
+                .current_dir(f.p("cwd"))
+                .status()
+        });
         assert!(status.unwrap().success());
     };
     git(&["init", "-q"]);
@@ -7494,6 +7515,7 @@ impl Fake {
     /// The fake of `fixtures/run_limits` in place of the CLI.
     fn limits_fake(&self) {
         std::fs::write(self.t.join("bin/claude"), FAKE_LIMITS).unwrap();
+        forks::settled();
     }
     /// What a launch on `account` runs between `systemd-run … --` and the CLI.
     fn bwrap(&self, account: &str) -> Vec<String> {
@@ -7692,6 +7714,96 @@ fn limits_r2_an_existing_scratch_or_a_parent_that_is_no_directory_refuses_before
     assert_eq!(f.events, ["probe"]);
     assert!(!Path::new(&s).exists());
     f.untouched("x.md");
+}
+
+// spec: specs/ap/run-limits.md#R2
+#[test]
+fn limits_r2_a_scratch_below_a_linked_ancestor_is_refused() {
+    use std::os::unix::fs::symlink;
+    let mut f = Fake::new();
+    // A policy that refuses the request's model: the refusal of the path comes first.
+    let barred = json!({"models": {"allowed": ["haiku"], "never": []},
+                        "accounts": {"claude": [f.p("a1")]}});
+    f.policy_is(&barred);
+    std::fs::create_dir(f.t.join("apart")).unwrap();
+    // A link to the request's cwd, to its account and to a directory apart from both.
+    for (n, target) in ["cwd", "a1", "apart"].into_iter().enumerate() {
+        std::fs::create_dir_all(f.t.join(target).join("sub/deeper")).unwrap();
+        let link = f.p(&format!("l{n}"));
+        symlink(f.p(target), &link).unwrap();
+        for below in ["sub/s", "sub/deeper/s"] {
+            let mut r = f.limited("x.md");
+            r["limits"]["scratch"] = json!(format!("{link}/{below}"));
+            assert_eq!(
+                code(f.run(&r)),
+                "scratch_parent_missing@limits",
+                "{target} {below}"
+            );
+            assert!(f.probes.is_empty(), "{target} {below}");
+            f.untouched("x.md");
+            assert!(!Path::new(&f.p(&format!("{target}/{below}"))).exists());
+        }
+    }
+    // A path without a link, written with a repeated `/` or a `.` component, is admitted.
+    std::fs::create_dir(f.t.join("plain")).unwrap();
+    f.policy = None;
+    let t = f.t.to_str().unwrap().to_owned();
+    let written = [
+        format!("{t}/plain//s"),
+        format!("{t}/plain/./s"),
+        format!("{t}/./plain/s"),
+        format!("{t}//plain/s"),
+    ];
+    for (n, scratch) in written.into_iter().enumerate() {
+        let mut r = f.limited(&format!("ok{n}.md"));
+        r["limits"]["scratch"] = json!(scratch);
+        let (v, status) = f.run(&r).unwrap();
+        assert_eq!((status, &v["state"]), (0, &json!("ok")), "{scratch}: {v}");
+        assert!(!Path::new(&f.p("plain/s")).exists());
+    }
+}
+
+// spec: specs/ap/run.md#R11
+#[test]
+fn r11_the_record_the_stream_and_the_error_file_are_owner_only() {
+    let mut f = Fake::new();
+    let bits =
+        |f: &Fake, rel: &str| std::fs::metadata(f.p(rel)).unwrap().permissions().mode() & 0o777;
+    // The record while the CLI runs (the fake notes its mode), the stream and the error file of
+    // a stage that wrote to standard error, and the record after the end.
+    std::fs::write(f.t.join("bin/watch"), f.p("w.md.run.json")).unwrap();
+    f.mode("a1", "owner");
+    let (v, status) = f.run(&f.request("w.md")).unwrap();
+    assert_eq!((status, &v["state"]), (0, &json!("ok")), "{v}");
+    assert_eq!(f.text("bin/seen.mode").trim(), "600", "while running");
+    assert_eq!(f.record("w.md")["state"], "ok");
+    for rel in ["w.md.run.json", "w.md.stream.jsonl", "w.md.err"] {
+        assert_eq!(bits(&f, rel), 0o600, "{rel}");
+    }
+    // The answer keeps the bits of a file made with default options.
+    let plain = f.p("plain.md");
+    std::fs::write(&plain, "x").unwrap();
+    assert_eq!(bits(&f, "w.md"), bits(&f, "plain.md"));
+    // A resumed run's record, and the record of the launch of a next account.
+    let r = f.resume(f.request("w2.md"), "w2.md", "w.md");
+    let (v, _) = f.run(&r).unwrap();
+    assert_eq!(v["state"], "ok", "{v}");
+    for rel in ["w2.md.run.json", "w2.md.stream.jsonl"] {
+        assert_eq!(bits(&f, rel), 0o600, "{rel}");
+    }
+    f.mode("a1", "limit1");
+    let mut r = f.request("w3.md");
+    r["next_accounts"] = json!([f.p("a2")]);
+    let (v, _) = f.run(&r).unwrap();
+    assert_eq!(v["attempts"].as_array().unwrap().len(), 2, "{v}");
+    for rel in ["w3.md.run.json", "w3.md.stream.jsonl"] {
+        assert_eq!(bits(&f, rel), 0o600, "{rel}");
+    }
+    // The fallback record of a call whose files cannot be opened.
+    f.precreate = Some(f.p("h.md.stream.jsonl"));
+    let (_, status) = f.run(&f.request("h.md")).unwrap();
+    assert_eq!(status, 5);
+    assert_eq!(bits(&f, "h.md.run.json"), 0o600);
 }
 
 // spec: specs/ap/run-limits.md#R3
@@ -8135,15 +8247,18 @@ fn run_object_r14_refusals_of_the_form_and_failures_of_the_store() {
     )
     .unwrap();
     std::fs::set_permissions(&ont, std::fs::Permissions::from_mode(0o755)).unwrap();
-    let mut child = Command::new(env!("CARGO_BIN_EXE_ap"))
-        .arg("run")
-        .env_clear()
-        .env("PATH", format!("{}:/usr/bin:/bin", bin.display()))
-        .stdin(std::process::Stdio::piped())
-        .stdout(std::process::Stdio::piped())
-        .stderr(std::process::Stdio::piped())
-        .spawn()
-        .unwrap();
+    forks::settled();
+    let mut child = forks::forking(|| {
+        Command::new(env!("CARGO_BIN_EXE_ap"))
+            .arg("run")
+            .env_clear()
+            .env("PATH", format!("{}:/usr/bin:/bin", bin.display()))
+            .stdin(std::process::Stdio::piped())
+            .stdout(std::process::Stdio::piped())
+            .stderr(std::process::Stdio::piped())
+            .spawn()
+    })
+    .unwrap();
     let r = json!({"close": "run-a", "store": f.p("no-store")});
     std::io::Write::write_all(&mut child.stdin.take().unwrap(), r.to_string().as_bytes()).unwrap();
     let out = child.wait_with_output().unwrap();
@@ -8163,15 +8278,17 @@ fn run_r1_the_form_of_the_call_is_refused_before_any_effect() {
     let f = Fake::new();
     std::fs::create_dir(f.t.join("empty")).unwrap();
     let ask = |args: &[&str], stdin: std::process::Stdio| {
-        let out = Command::new(env!("CARGO_BIN_EXE_ap"))
-            .arg("run")
-            .args(args)
-            .env_clear()
-            .env("PATH", f.t.join("empty"))
-            .env("AP_POLICY_FILE", f.t.join("no-policy.json"))
-            .stdin(stdin)
-            .output()
-            .unwrap();
+        let out = forks::forking(|| {
+            Command::new(env!("CARGO_BIN_EXE_ap"))
+                .arg("run")
+                .args(args)
+                .env_clear()
+                .env("PATH", f.t.join("empty"))
+                .env("AP_POLICY_FILE", f.t.join("no-policy.json"))
+                .stdin(stdin)
+                .output()
+        })
+        .unwrap();
         assert!(out.stdout.is_empty(), "{args:?}");
         let e: Value = serde_json::from_slice(&out.stderr).unwrap();
         (

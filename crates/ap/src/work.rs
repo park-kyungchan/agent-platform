@@ -575,7 +575,9 @@ impl Pass {
         )
     }
 
-    /// The first constraint of R10 to R13 that fails, as its `waits_on`; None when the unit may start.
+    /// The first constraint that fails, as its `waits_on`; None when the unit may start. A `ready` unit
+    /// meets R10 to R13; a merge candidate meets R10 only (R22): once the validate of `merge_unit`
+    /// passes it starts, with no count against `slots` and no reading of the load.
     /// `flying` is the count of the units in flight before this pass's starts.
     fn constraints(
         &mut self,
@@ -619,21 +621,21 @@ impl Pass {
             if !failed.is_empty() {
                 return Ok(Some(failed.join(", ")));
             }
+            // R22: nothing after the validate of `merge_unit` holds a merge candidate.
+            return Ok(None);
         }
-        if is_ready {
-            let mine = strings(&f["write_set"]);
-            let others = units.iter().filter(|o| {
-                let busy = o.in_flight
-                    || self.started.contains(&o.key)
-                    || o.f["state"] == "running"
-                    || o.f["state"] == "accepted";
-                o.key != key && busy && o.f["repository"] == repository
-            });
-            for o in others {
-                let theirs = strings(&o.f["write_set"]);
-                if mine.iter().any(|a| theirs.iter().any(|b| overlap(a, b))) {
-                    return Ok(Some(format!("write set overlaps {}", o.key)));
-                }
+        let mine = strings(&f["write_set"]);
+        let others = units.iter().filter(|o| {
+            let busy = o.in_flight
+                || self.started.contains(&o.key)
+                || o.f["state"] == "running"
+                || o.f["state"] == "accepted";
+            o.key != key && busy && o.f["repository"] == repository
+        });
+        for o in others {
+            let theirs = strings(&o.f["write_set"]);
+            if mine.iter().any(|a| theirs.iter().any(|b| overlap(a, b))) {
+                return Ok(Some(format!("write set overlaps {}", o.key)));
             }
         }
         let n = flying + self.started.len();
