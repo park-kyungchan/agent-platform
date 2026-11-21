@@ -93,5 +93,12 @@
   "slots": 2,
   "slice": "agents.slice",
   "prefix": "ap-unit"
+ },
+ "hosts": {
+  "pc": {
+   "ssh": "kcpalantir@kcpalantir-wsl",
+   "work": "/home/kcpalantir/work/ap-checks",
+   "busy_load": 1.0
+  }
  }
 }
