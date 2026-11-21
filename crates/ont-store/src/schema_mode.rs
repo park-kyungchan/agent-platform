@@ -1657,7 +1657,6 @@ pub(crate) fn append_schema_in(
 
 #[cfg(test)]
 mod provenance_tests {
-    #![allow(clippy::unwrap_used)]
     use super::*;
     use std::sync::atomic::{AtomicU64, Ordering};
 
@@ -1734,7 +1733,6 @@ mod provenance_tests {
 }
 
 #[cfg(test)]
-#[allow(clippy::unwrap_used)]
 mod observation_bound_tests {
     use super::*;
     #[test]

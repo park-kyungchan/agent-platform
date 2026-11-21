@@ -1,5 +1,4 @@
 //! Synthetic snapshot probes and real schema upgrades for count aggregation.
-#![allow(clippy::unwrap_used)]
 use super::*;
 use ont_core::{Id, Scope};
 use ont_store::schema_mode::{HeadAccess, SchemaHead, SchemaRead, StoreRefusal};

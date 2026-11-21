@@ -3890,7 +3890,6 @@ impl SchemaSet {
 }
 
 #[cfg(test)]
-#[allow(clippy::unwrap_used)]
 mod source_tests {
     use super::*;
     use serde_json::json;

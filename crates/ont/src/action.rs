@@ -3161,7 +3161,6 @@ fn apply_found(
 }
 
 #[cfg(test)]
-#[allow(clippy::unwrap_used)]
 mod tests {
     use super::*;
     use ont_core::schema::{ActionRule, Schema};

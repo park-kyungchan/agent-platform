@@ -1,5 +1,4 @@
 //! Ordering probes exercise the same snapshot evaluator as the public read.
-#![allow(clippy::unwrap_used)]
 use super::*;
 use ont_core::{Change, Coverage, Lineage, Namespace, Observation};
 use ont_store::{Append, Store};

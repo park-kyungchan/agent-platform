@@ -1,5 +1,4 @@
 //! Synthetic version/domain fences; no source adapters or external data.
-#![allow(clippy::unwrap_used, clippy::expect_used)]
 use super::*;
 use ont_core::{Coverage, Lineage};
 use std::path::PathBuf;
