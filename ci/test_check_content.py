@@ -94,7 +94,7 @@ class RetiredNames(Scratch, unittest.TestCase):
     """A file of content/ that names a removed skill or path fails, with its file and line."""
 
     def test_a_retired_skill_or_path_fails(self):
-        for name in ("lessons-loop", "hindsight-control", "memory/README.md", "publish-memory", "evaluate-memory", "explain-precisely"):
+        for name in ("lessons-loop", "hindsight-control", "memory/README.md", "publish-memory", "evaluate-memory", "explain-precisely", "herdr-hermes", "evals/instructions"):
             with self.subTest(name=name):
                 root = self.fixture()
                 line = self.append(root, f"See {name} for the rest.")

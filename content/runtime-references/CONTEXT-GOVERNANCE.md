@@ -42,11 +42,11 @@ A weak model routes as well as a strong one only where a route asks for no judgm
 - At most three steps lead from `AGENTS.md` to a line: a reference in a directory its section 8 names, a table of the reference, a `path:a-b`.
 - Paths are written in full, never shortened or elided; a table is keyed by the situation, in the words an assignment uses.
 - A stale copy is taken off the path, not warned about.
-- A change of a route is accepted on the instructions suite (`agent-platform` `evals/README.md`, section "The instructions suite"); its cases today cover how each CLI runs without a terminal UI, not the routes of this file or of `OFFICIAL-DOCS.md` section 4, so such a change also names the reads it was tried on.
+- A change of a route is accepted on the routing suite (`agent-platform` `evals/README.md`, section "The routing suite"); its cases in the repository, `evals/routing/cases.json`, cover how each CLI runs without a terminal UI, not the routes of this file or of `OFFICIAL-DOCS.md` section 4, so such a change also names the reads it was tried on.
 
 ## 5. A task kind no row covers
 
-Follow section 1 to its end. When you needed many reads (more than about fifteen) before your first effect, your report names the route you found, as `path:a-b`, with the situation in your assignment's words. The Lead adds the row (to a reference or the unit page form of the skill `lead`) and a case to the instructions suite: a mistake made twice becomes a row or a check, not one more sentence.
+Follow section 1 to its end. When you needed many reads (more than about fifteen) before your first effect, your report names the route you found, as `path:a-b`, with the situation in your assignment's words. The Lead adds the row (to a reference or the unit page form of the skill `lead`) and a case to the routing suite: a mistake made twice becomes a row or a check, not one more sentence.
 
 ## 6. Who writes each kind, and how it is read
 
