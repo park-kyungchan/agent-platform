@@ -6,7 +6,7 @@ use serde::Serialize;
 const HELP: &str = "Usage: ap <verb> [< request.json]\n";
 /// Every verb the dispatch below knows: the verb, its request form, the heading of the section of
 /// `crates/ap/README.md` that documents it. `ap --help` prints one line of this table per verb.
-const VERBS: [(&str, &str, &str); 17] = [
+const VERBS: [(&str, &str, &str); 18] = [
     ("version", "version | --version", "The older verbs"),
     ("run", "run < request.json", "One stage"),
     ("gate", "gate < request.json", "The gate"),
@@ -56,6 +56,11 @@ const VERBS: [(&str, &str, &str); 17] = [
         "watch [--record-login --totp-file <path> [--replace]]",
         "The watch",
     ),
+    (
+        "check",
+        "check <dir> [--timeout <seconds>] [-- <command> [<arg>...]]",
+        "One check",
+    ),
 ];
 fn verb_line(verb: &str, form: &str, heading: &str) -> String {
     format!("  {verb}: ap {form} (README \"{heading}\")\n")
@@ -73,6 +78,7 @@ const QUOTA_HELP: &str = "Usage: ap quota\nOne turn: sets the runtime CPU quota 
 const WORK_HELP: &str = "Usage: ap work [--store <path>]\nOne dispatch pass: starts each unit of the store that may start now as a run of ap unit run in a transient unit of the service manager, and notes on every ready unit that does not start what it waits on; one JSON answer.\n";
 const POLICY_HELP: &str = "Usage: ap policy check [<file>]\nRuns the policy file (the given one, else AP_POLICY_FILE, else /etc/agent-platform/policy.json) through every reader ap has of it and prints {\"status\":\"ok\",...} or the first refusal with its reader; it writes nothing.\n";
 const WATCH_HELP: &str = "Usage: ap watch [--record-login --totp-file <path> [--replace]]\nOne pass of the detectors delivery, login, services, host and records: opens, sees again, reopens and closes the findings of the store whose detector is watch:<name>, and prints one JSON answer. With --record-login it records the login reading the detector login compares with (login.json) and prints it.\n";
+const CHECK_HELP: &str = "Usage: ap check <dir> [--timeout <seconds>] [-- <command> [<arg>...]]\nRuns a repository's check (default ./check; a given command without a shell) for the worktree <dir>: on the local PC when the policy file names it in hosts.pc and it answers and is not busy, else in <dir> on this host. The output streams back, the exit status is the command's (124 at the timeout, 1 to 14400 seconds, default 2700), and one record line is appended to AP_CHECKS_LOG (default /var/lib/agent-platform/checks.jsonl).\n";
 const BUILD_REVISION: &str = match option_env!("AP_BUILD_REVISION") {
     Some(value) => value,
     None => "unknown",
@@ -234,6 +240,15 @@ fn main() -> ExitCode {
             };
         }
         return ap::watch::cli(&args[1..]);
+    }
+    if args.first().is_some_and(|arg| arg == "check") {
+        if args.len() == 2 && args[1] == "--help" {
+            return match io::stdout().lock().write_all(CHECK_HELP.as_bytes()) {
+                Ok(()) => ExitCode::SUCCESS,
+                Err(_) => fail("io_error", "stdout", 4),
+            };
+        }
+        return ap::check::cli(&args[1..]);
     }
     if args.first().is_some_and(|arg| arg == "deliver") {
         if args.len() == 2 && args[1] == "--help" {

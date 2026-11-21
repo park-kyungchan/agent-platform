@@ -68,7 +68,8 @@ fn host() -> Value {
             "park-kyungchan/agent-platform": {"clone": "/srv/agent-platform"},
             "park-kyungchan/other": {"clone": "/srv/other"}
         },
-        "work": {"slots": 3, "slice": "agents.slice", "prefix": "ap-unit"}
+        "work": {"slots": 3, "slice": "agents.slice", "prefix": "ap-unit"},
+        "hosts": {"pc": {"ssh": "u@pc", "work": "/home/u/work/ap-checks", "busy_load": 0.75}}
     })
 }
 
@@ -111,13 +112,13 @@ fn r12_the_host_shape_passes_every_reader_after_one_read() {
     assert_eq!(
         answer,
         json!({"status": "ok", "path": PATH, "sha256": digest,
-            "readers": ["models", "quota", "units", "reviews", "repositories", "work"]})
+            "readers": ["models", "quota", "units", "reviews", "repositories", "work", "check"]})
     );
     assert_eq!(fake.reads.get(), 1);
     assert!(fake.calls.is_empty());
     // A file without the optional members passes as well: only `models` and `accounts` are required.
     let mut p = host();
-    for m in ["quota", "units", "reviews", "repositories", "work"] {
+    for m in ["quota", "units", "reviews", "repositories", "work", "hosts"] {
         p.as_object_mut().unwrap().remove(m);
     }
     assert_eq!(check(&Fake::json(&p), None).unwrap()["status"], "ok");
@@ -179,13 +180,25 @@ fn r14_one_planted_fault_per_reader_is_refused_by_that_reader() {
         refused("work", json!({"slots": 0})),
         policy_invalid("work", "work.slots is not an integer from 1 to 16")
     );
+    assert_eq!(
+        refused(
+            "hosts",
+            json!({"pc": {"ssh": "nobody", "work": "/w", "busy_load": 0.5}})
+        ),
+        policy_invalid("check", "hosts.pc.ssh is not user@host")
+    );
 }
 
 // spec: specs/ap/policy.md#R12
 #[test]
 fn r12_the_first_refusal_in_the_order_of_the_readers_stops_the_check() {
     let mut p = host();
+    p["hosts"] = json!({"vps": {}});
+    let Refusal { reader, .. } = check(&Fake::json(&p), None).unwrap_err();
+    assert_eq!(reader, Some("check"));
     p["work"] = json!({"slots": 0});
+    let Refusal { reader, .. } = check(&Fake::json(&p), None).unwrap_err();
+    assert_eq!(reader, Some("work"));
     p["reviews"] = json!({"bogus": 1});
     p["units"] = json!({"nope": 1});
     let Refusal { reader, .. } = check(&Fake::json(&p), None).unwrap_err();

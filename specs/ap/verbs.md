@@ -27,6 +27,7 @@ Purpose: an agent of any CLI learns from `ap` itself which verbs it has, the req
 | `work` | `specs/ap/work.md` |
 | `policy` | `specs/ap/policy.md` R12 to R16 |
 | `watch` | `specs/ap/watch.md` |
+| `check` | `specs/ap/check.md` |
 | `gate`, `review`, `accept`, `backlog`, `state`, `row`, and `unit` with a page or a request on standard input | their sections of `crates/ap/README.md` (verbs to be removed; no specification) |
 
 Each verb's own refusals and exits are in its contract; this file holds only the argument lists above that reach no verb.

@@ -6,11 +6,11 @@ This repository holds the command `ap`, the shared instructions every coding CLI
 
 ## The check
 
-`./check` at the repository root, until it prints `check: ok`. The CI job `rust` runs the same file and is the required check of `main`. `./check content` runs only the steps without a Rust build, until it prints `check: ok (content)`; it is enough for a change of `content/` or of documents. The whole `./check` is for the rest. The script takes the build lock by itself (do not wrap it in `flock`) and builds into `target/` inside your worktree. Do not push before it passes.
+`./check` at the repository root, until it prints `check: ok`. The CI job `rust` runs the same file and is the required check of `main`. `./check content` runs only the steps without a Rust build, until it prints `check: ok (content)`; it is enough for a change of `content/` or of documents. The whole `./check` is for the rest. The script takes the build lock by itself (do not wrap it in `flock`) and builds into `target/` inside your worktree. `ap check <worktree>` runs it on the local PC when the host's policy names the PC and the PC is free, else here; `ap check <worktree> -- <command>` does the same for one cargo command (`specs/ap/check.md`). Do not push before it passes.
 
 ## The command `ap`
 
-`ap --help` lists the verbs: `version`, `run`, `gate`, `review`, `unit`, `accept`, `deliver`, `backlog`, `state`, `row`, `request`, `intent`, `status`, `quota` and `work`. Each verb is documented in `crates/ap/README.md`; the contracts are in `specs/ap/`. A kept verb's contract is its specification under `specs/ap/`, to which its README section routes. `ap` stays small: it keeps no registry of what Git, GitHub, Herdr or the file system already list, and it is not extended without a named user in a domain's work.
+`ap --help` lists the verbs: `version`, `run`, `gate`, `review`, `unit`, `accept`, `deliver`, `backlog`, `state`, `row`, `request`, `intent`, `status`, `quota`, `work`, `policy`, `watch` and `check`. Each verb is documented in `crates/ap/README.md`; the contracts are in `specs/ap/`. A kept verb's contract is its specification under `specs/ap/`, to which its README section routes. `ap` stays small: it keeps no registry of what Git, GitHub, Herdr or the file system already list, and it is not extended without a named user in a domain's work.
 
 ## Contracts you can break
 
