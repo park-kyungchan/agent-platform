@@ -7606,10 +7606,13 @@ fn limits_r1_only_a_claude_reviewer_with_one_scratch_apart_from_its_paths() {
     type Change<'a> = Box<dyn Fn(&mut Value) + 'a>;
     let cases: Vec<(&str, Change)> = vec![
         (
-            "implementer",
-            Box::new(|r| r["role"] = json!("implementer")),
+            "codex implementer",
+            Box::new(|r| {
+                r["role"] = json!("implementer");
+                r["runtime"] = json!("codex");
+                r["permission_mode"] = json!("bypassPermissions");
+            }),
         ),
-        ("fixer", Box::new(|r| r["role"] = json!("fixer"))),
         (
             "muse",
             Box::new(|r| {
@@ -8549,4 +8552,252 @@ fn limits_r1_a_path_equal_to_or_inside_a_hidden_path_is_refused() {
     r["limits"]["scratch"] = json!(f.p("work/other/edu-s"));
     let (v, _) = f.run(&r).unwrap();
     assert_eq!(v["state"], "ok", "{v}");
+}
+
+// ---- A stage with limits: the roles, the paths a request names, the view of a check ------------
+
+impl Fake {
+    /// The directories and the file the four members of `limits` name, made: `w1`, `w2`, the
+    /// pair `src` over `dst`, and `w1/keep` read-only.
+    fn named(&self) -> Value {
+        for d in ["w1", "w2", "src", "dst"] {
+            std::fs::create_dir_all(self.t.join(d)).unwrap();
+        }
+        std::fs::write(self.t.join("w1/keep"), "kept\n").unwrap();
+        json!({"write": [self.p("w1"), self.p("w2")], "over": [[self.p("src"), self.p("dst")]],
+            "read_only": [self.p("w1/keep")], "show": ["~/.config/gh"]})
+    }
+    /// A request of `role` on `out` whose `limits` hold the four members of `named()`.
+    fn named_request(&self, out: &str, role: &str) -> Value {
+        let mut r = self.limited(out);
+        r["role"] = json!(role);
+        for (k, v) in self.named().as_object().unwrap() {
+            r["limits"][k] = v.clone();
+        }
+        r
+    }
+}
+
+// spec: specs/ap/run-limits.md#R1
+#[test]
+fn limits_r1_an_implementer_and_a_fixer_with_the_four_members() {
+    let mut f = Fake::new();
+    for (n, role) in ["implementer", "fixer", "reviewer"].into_iter().enumerate() {
+        let out = format!("r{n}.md");
+        let (v, status) = f.run(&f.named_request(&out, role)).unwrap();
+        assert_eq!((status, &v["state"]), (0, &json!("ok")), "{role}: {v}");
+        assert_eq!(v["role"], role);
+        f.clear("a1");
+    }
+    // Each member and each path of another form, and the paths the stage writes kept apart from
+    // the hidden list, the out, the prompt and the scratch directory.
+    for d in ["o", "pr"] {
+        std::fs::create_dir_all(f.t.join(d)).unwrap();
+    }
+    std::fs::copy(f.p("prompt.md"), f.p("pr/prompt.md")).unwrap();
+    let root = f.t.clone();
+    let p = move |rel: &str| root.join(rel).to_str().unwrap().to_owned();
+    type Change<'a> = Box<dyn Fn(&mut Value) + 'a>;
+    let set = |r: &mut Value, k: &str, v: Value| r["limits"][k] = v;
+    let cases: Vec<(&str, Change)> = vec![
+        ("other member", Box::new(|r| set(r, "bind", json!([p("w1")])))),
+        ("write not a list", Box::new(|r| set(r, "write", json!(p("w1"))))),
+        ("write empty", Box::new(|r| set(r, "write", json!([])))),
+        ("write of nine", Box::new(|r| set(r, "write", json!(vec![p("w1"); 9])))),
+        ("write not text", Box::new(|r| set(r, "write", json!([7])))),
+        ("write relative", Box::new(|r| set(r, "write", json!(["w1"])))),
+        ("write is /", Box::new(|r| set(r, "write", json!(["/"])))),
+        ("write //", Box::new(|r| set(r, "write", json!(["//"])))),
+        ("write with ..", Box::new(|r| set(r, "write", json!([p("w1/../w2")])))),
+        ("over not pairs", Box::new(|r| set(r, "over", json!([p("src")])))),
+        ("over of three", Box::new(|r| set(r, "over", json!([[p("src"), p("dst"), p("w1")]])))),
+        ("over of five", Box::new(|r| set(r, "over", json!(vec![json!([p("src"), p("dst")]); 5])))),
+        ("over empty", Box::new(|r| set(r, "over", json!([])))),
+        ("over target /", Box::new(|r| set(r, "over", json!([[p("src"), "/"]])))),
+        ("over source with ..", Box::new(|r| set(r, "over", json!([[p("x/../src"), p("dst")]])))),
+        ("read_only of nine", Box::new(|r| set(r, "read_only", json!(vec![p("w1/keep"); 9])))),
+        ("read_only relative", Box::new(|r| set(r, "read_only", json!(["keep"])))),
+        ("read_only with ..", Box::new(|r| set(r, "read_only", json!([p("w1/../w1/keep")])))),
+        ("show another path", Box::new(|r| set(r, "show", json!(["~/.ssh"])))),
+        ("show a text", Box::new(|r| set(r, "show", json!("~/.config/gh")))),
+        ("show twice", Box::new(|r| set(r, "show", json!(["~/.config/gh", "~/.config/gh"])))),
+        ("write in ~/.ssh", Box::new(|r| set(r, "write", json!([p("home/.ssh/x")])))),
+        ("write an edu- name", Box::new(|r| set(r, "write", json!([p("work/edu-a")])))),
+        ("over source in /run/user", Box::new(|r| set(r, "over", json!([["/run/user/0", p("dst")]])))),
+        ("over target ~/.config/gh", Box::new(|r| set(r, "over", json!([[p("src"), p("home/.config/gh")]])))),
+        (
+            "write holds out",
+            Box::new(|r| {
+                r["out"] = json!(p("o/y.md"));
+                set(r, "write", json!([p("o")]));
+            }),
+        ),
+        (
+            "over source holds prompt",
+            Box::new(|r| {
+                r["prompt"] = json!(p("pr/prompt.md"));
+                set(r, "over", json!([[p("pr"), p("dst")]]));
+            }),
+        ),
+        (
+            "over target is out",
+            Box::new(|r| {
+                r["out"] = json!(p("o/y.md"));
+                set(r, "over", json!([[p("src"), p("o/y.md")]]));
+            }),
+        ),
+        ("scratch is a write path", Box::new(|r| set(r, "write", json!([p("scratch")])))),
+        ("scratch in a write path", Box::new(|r| set(r, "scratch", json!(p("w2/s"))))),
+        ("scratch in an over source", Box::new(|r| set(r, "scratch", json!(p("src/s"))))),
+        ("scratch in an over target", Box::new(|r| set(r, "scratch", json!(p("dst/s"))))),
+        (
+            "expect.file",
+            Box::new(|r| r["expect"] = json!({"file": r["cwd"].as_str().unwrap().to_owned() + "/a"})),
+        ),
+    ];
+    let probes = f.probes.len();
+    for (name, change) in cases {
+        let mut r = f.named_request("y.md", "implementer");
+        change(&mut r);
+        assert_eq!(code(f.run(&r)), "invalid_input@limits", "{name}");
+    }
+    // Every refusal came before the probe and made nothing.
+    assert_eq!((f.probes.len(), f.launches.len()), (probes, 3));
+    assert!(!Path::new(&f.p("y.md.run.json")).exists() && !Path::new(&f.p("scratch")).exists());
+}
+
+// spec: specs/ap/run-limits.md#R11
+#[test]
+fn limits_r11_the_paths_a_request_names_exist_without_a_link_before_the_probe_and_the_policy() {
+    use std::os::unix::fs::symlink;
+    let mut f = Fake::new();
+    // A policy that refuses the request's model: these refusals come first.
+    let barred = json!({"models": {"allowed": ["haiku"], "never": []},
+                        "accounts": {"claude": [f.p("a1")]}});
+    f.policy_is(&barred);
+    f.named();
+    std::fs::write(f.t.join("file"), "f").unwrap();
+    std::fs::create_dir_all(f.t.join("real/inner")).unwrap();
+    symlink(f.p("real"), f.p("link")).unwrap();
+    symlink(f.p("w2"), f.p("w2link")).unwrap();
+    let root = f.t.clone();
+    let p = move |rel: &str| root.join(rel).to_str().unwrap().to_owned();
+    let set = |r: &mut Value, k: &str, v: Value| r["limits"][k] = v;
+    type Change<'a> = Box<dyn Fn(&mut Value) + 'a>;
+    let cases: Vec<(&str, String, Change)> = vec![
+        ("write absent", p("absent"), Box::new(|r| set(r, "write", json!([p("w1"), p("absent")])))),
+        ("write a file", p("file"), Box::new(|r| set(r, "write", json!([p("file")])))),
+        ("write a link", p("w2link"), Box::new(|r| set(r, "write", json!([p("w2link")])))),
+        ("write below a link", p("link/inner"), Box::new(|r| set(r, "write", json!([p("link/inner")])))),
+        ("over source absent", p("absent"), Box::new(|r| set(r, "over", json!([[p("absent"), p("dst")]])))),
+        ("over target a file", p("file"), Box::new(|r| set(r, "over", json!([[p("src"), p("file")]])))),
+        ("over target a link", p("w2link"), Box::new(|r| set(r, "over", json!([[p("src"), p("w2link")]])))),
+        ("read_only absent", p("absent"), Box::new(|r| set(r, "read_only", json!([p("w1/keep"), p("absent")])))),
+        ("read_only below a link", p("link/inner"), Box::new(|r| set(r, "read_only", json!([p("link/inner")])))),
+        (
+            "write before over before read_only",
+            p("gone-w"),
+            Box::new(|r| {
+                set(r, "read_only", json!([p("gone-r")]));
+                set(r, "over", json!([[p("gone-o"), p("dst")]]));
+                set(r, "write", json!([p("gone-w")]));
+            }),
+        ),
+        (
+            "over before read_only",
+            p("gone-o"),
+            Box::new(|r| {
+                set(r, "read_only", json!([p("gone-r")]));
+                set(r, "over", json!([[p("src"), p("gone-o")]]));
+            }),
+        ),
+    ];
+    for (name, path, change) in cases {
+        let mut r = f.named_request("x.md", "fixer");
+        change(&mut r);
+        let e = f.run(&r).unwrap_err();
+        assert_eq!(
+            (e.code, e.field.as_str(), &e.detail),
+            ("invalid_input", "limits", &json!({ "path": path })),
+            "{name}"
+        );
+    }
+    assert!(f.probes.is_empty() && f.launches.is_empty());
+    f.untouched("x.md");
+    assert!(!Path::new(&f.p("scratch")).exists());
+    // The paths as they are: the request goes on to the policy, which refuses its model.
+    assert_eq!(
+        code(f.run(&f.named_request("x.md", "fixer"))),
+        "model_not_allowed@model"
+    );
+    // A directory read-only is a `read_only` path too.
+    f.policy_is(&json!({"models": {"allowed": ["sonnet", "opus"], "never": []},
+                        "accounts": {"claude": [f.p("a1")]}}));
+    let mut r = f.named_request("x.md", "fixer");
+    r["limits"]["read_only"] = json!([f.p("w2"), f.p("w1/keep")]);
+    let (v, _) = f.run(&r).unwrap();
+    assert_eq!(v["state"], "ok", "{v}");
+}
+
+// spec: specs/ap/run-limits.md#R5
+// spec: specs/ap/run-limits.md#R7
+// spec: specs/ap/run-limits.md#R10
+#[test]
+fn limits_r5_the_named_paths_follow_the_scratch_in_their_order_and_the_record_names_them() {
+    let mut f = Fake::new();
+    std::fs::create_dir_all(f.t.join("home/.config/gh")).unwrap();
+    let mut r = f.named_request("x.md", "implementer");
+    r["limits"]["write"] = json!([f.p("w2"), f.p("w1")]);
+    r["limits"]["over"] = json!([[f.p("src"), f.p("dst")], [f.p("w2"), f.p("src")]]);
+    r["limits"]["read_only"] = json!([f.p("w1/keep"), f.p("dst")]);
+    let (v, _) = f.run(&r).unwrap();
+    assert_eq!(v["state"], "ok", "{v}");
+    let after = f.after_unit(0);
+    let base = f.bwrap("a1");
+    let named: Vec<String> = [
+        "--bind", &f.p("w2"), &f.p("w2"), "--bind", &f.p("w1"), &f.p("w1"),
+        "--bind", &f.p("src"), &f.p("dst"), "--bind", &f.p("w2"), &f.p("src"),
+        "--ro-bind", &f.p("w1/keep"), &f.p("w1/keep"), "--ro-bind", &f.p("dst"), &f.p("dst"),
+    ]
+    .map(str::to_owned)
+    .to_vec();
+    // The base's words to the scratch directory, then the named paths, then the hidden ones but
+    // `~/.config/gh`, which `show` names.
+    let scratch_end = base.iter().position(|w| w == "--cap-drop").unwrap();
+    let hiding: Vec<String> = base[18..scratch_end].to_vec();
+    let mut want = base[..18].to_vec();
+    want.extend(named);
+    want.extend(hiding.clone());
+    want.extend(base[scratch_end..].to_vec());
+    assert_eq!(after[..want.len()], want[..], "{after:?}");
+    assert_eq!(after[want.len()], "claude");
+    let gh = f.p("home/.config/gh");
+    assert!(!after.contains(&gh), "{after:?}");
+    // The record: what the stage writes, the members as given, the hidden list but the one shown.
+    let hidden: Vec<String> = f.hidden().into_iter().map(|(p, _)| p).collect();
+    let s = f.p("scratch");
+    let want = json!({"scratch": s, "writable": [f.p("a1"), s, f.p("w2"), f.p("w1"), f.p("dst"), f.p("src")],
+        "bwrap": BWRAP, "hidden": hidden, "over": r["limits"]["over"], "read_only": r["limits"]["read_only"],
+        "show": ["~/.config/gh"]});
+    assert_eq!(v["limits"], want, "{v}");
+    assert_eq!(f.record("x.md"), v);
+    // Without `show` the path is hidden as any other; with `write` alone, only that member's words.
+    f.clear("a1");
+    let mut r = f.limited("y.md");
+    r["role"] = json!("fixer");
+    r["limits"]["write"] = json!([f.p("w1")]);
+    let (v, _) = f.run(&r).unwrap();
+    let after = f.after_unit(1);
+    let gh_words = ["--tmpfs", &gh, "--remount-ro", &gh].map(str::to_owned);
+    assert!(after.windows(4).any(|w| w == gh_words), "{after:?}");
+    assert_eq!(
+        after[18..21],
+        ["--bind", &f.p("w1"), &f.p("w1")].map(str::to_owned)
+    );
+    assert!(!after[21..].iter().any(|w| w == "--bind"), "{after:?}");
+    assert_eq!(v["limits"]["hidden"][0], json!(gh), "{v}");
+    assert_eq!(v["limits"]["writable"], json!([f.p("a1"), f.p("scratch"), f.p("w1")]));
+    for k in ["over", "read_only", "show", "write"] {
+        assert!(v["limits"].get(k).is_none(), "{k}: {v}");
+    }
 }

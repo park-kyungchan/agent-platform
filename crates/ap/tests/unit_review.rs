@@ -733,10 +733,16 @@ impl System for F {
                 self.git.push(args.to_vec());
                 Host.call(program, args, input, ms)
             }
-            // A check of `ap unit ready`: the command after `--`, run here (no unit is started).
+            // A check of `ap unit ready`: the command after `--`, run here (no unit is started),
+            // without the `bwrap … --` of its view, as `launch` drops the one of a stage.
             "systemd-run" => {
                 let at = args.iter().position(|a| a == "--").unwrap();
-                Host.call(&args[at + 1], &args[at + 2..], input, ms)
+                let mut command = args[at + 1..].to_vec();
+                if let Some(from) = command.iter().position(|a| a == BWRAP) {
+                    let to = from + command[from..].iter().position(|a| a == "--").unwrap();
+                    command.drain(from..=to);
+                }
+                Host.call(&command[0], &command[1..], input, ms)
             }
             // The probe of `limits`: no `bwrap` of the host is called.
             BWRAP => {

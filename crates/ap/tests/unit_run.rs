@@ -31,6 +31,14 @@ const FIXER: &str = include_str!("../src/unit/frames/fixer.md");
 const SECOND_LOOK: &str = include_str!("../src/unit/frames/second-look.md");
 const CONTINUE: &str = include_str!("../src/unit/frames/continue.md");
 const STORE: &str = "/invented/scratch/store";
+const BWRAP: &str = "/usr/bin/bwrap";
+/// The words of the driver's Git calls before the command word (R39).
+const SAFE: [&str; 4] = [
+    "-c",
+    "core.hooksPath=/dev/null",
+    "-c",
+    "core.fsmonitor=false",
+];
 const KEY: &str = "widgets-list";
 
 fn oid(kind: &str, key: &str) -> Value {
@@ -151,6 +159,14 @@ struct F {
     gh_says: &'static str,
     /// The state `lead-review` reads on the head, in place of the newest status posted on it.
     lead_review: Option<&'static str>,
+    /// The `bwrap … --` of each launch, dropped before the fake CLI starts (R38).
+    wraps: Vec<Vec<String>>,
+    /// The environment of each launch.
+    launch_envs: Vec<Vec<(String, String)>>,
+    /// The `bwrap … --` of each check's command, dropped before it runs (`run-limits.md` R12).
+    check_wraps: Vec<Vec<String>>,
+    /// From this launch on, the host has no units (a check runs by plain `sh`).
+    no_units_after: Option<usize>,
 }
 impl F {
     fn new() -> Self {
@@ -223,6 +239,10 @@ impl F {
             fetch_fails: vec![],
             gh_says: "{}",
             lead_review: None,
+            wraps: vec![],
+            launch_envs: vec![],
+            check_wraps: vec![],
+            no_units_after: None,
         };
         f.policy(json!({}));
         f.put("task", "invented-task", json!({"status": "open"}));
@@ -1214,10 +1234,27 @@ impl System for F {
                     stdout,
                 })
             }
-            // A check's unit: the command after `--`, run here (no unit is started).
+            // A check's unit: the command after `--`, run here (no unit is started), its view
+            // (`bwrap … --`) kept for the tests and dropped.
             "systemd-run" => {
                 let at = args.iter().position(|a| a == "--").unwrap();
-                forks::forking(|| Host.call(&args[at + 1], &args[at + 2..], input, ms))
+                let mut command = args[at + 1..].to_vec();
+                let mut wrap = vec![];
+                if let Some(from) = command.iter().position(|a| a == BWRAP) {
+                    let to = from + command[from..].iter().position(|a| a == "--").unwrap();
+                    wrap = command.drain(from..=to).collect();
+                }
+                self.check_wraps.push(wrap);
+                forks::forking(|| Host.call(&command[0], &command[1..], input, ms))
+            }
+            // The probe of `limits`: no `bwrap` of the host is called.
+            BWRAP => {
+                assert_eq!(args, ["--version"]);
+                Ok(Reply {
+                    success: true,
+                    bytes: vec![],
+                    stdout: b"bubblewrap 0.0.0\n".to_vec(),
+                })
             }
             _ => forks::forking(|| Host.call(program, args, input, ms)),
         }
@@ -1242,6 +1279,16 @@ impl System for F {
             .find_map(|a| a.strip_prefix("--unit="))
             .unwrap()
             .to_owned();
+        // `bwrap … --` in front of the CLI is kept for the tests and dropped here (R38).
+        let mut at = at;
+        let mut wrap = vec![];
+        if argv[at + 1] == BWRAP {
+            let end = at + 1 + argv[at + 1..].iter().position(|a| a == "--").unwrap();
+            wrap = argv[at + 1..=end].to_vec();
+            at = end;
+        }
+        self.wraps.push(wrap);
+        self.launch_envs.push(env.to_vec());
         let (stdin, stdout, stderr) = (
             files[0].try_clone()?,
             files[1].try_clone()?,
@@ -1252,6 +1299,8 @@ impl System for F {
                 .args(&argv[at + 2..])
                 .env_clear()
                 .envs(env.iter().map(|(k, v)| (k, v)))
+                // What the fake stage runs itself is told apart from what the run runs (R39).
+                .env("AP_FAKE_STAGE", "1")
                 .current_dir(cwd)
                 .stdin(stdin)
                 .stdout(stdout)
@@ -1278,7 +1327,7 @@ impl System for F {
         std::thread::sleep(duration.min(real));
     }
     fn units(&self) -> bool {
-        true
+        self.no_units_after.is_none_or(|n| self.launches < n)
     }
     fn policy_file(&self) -> Option<PathBuf> {
         Some(self.t.join("policy.json"))
@@ -2114,8 +2163,9 @@ fn r15_a_head_behind_main_is_updated_by_the_runs_own_merge() {
         .unwrap();
     assert!(recorded < push);
     let to = format!("HEAD:refs/heads/unit/{KEY}");
+    assert_eq!(f.calls[push].1[3..7], SAFE);
     assert_eq!(
-        f.calls[push].1[3..],
+        f.calls[push].1[7..],
         ["push", "--quiet", "origin", to.as_str()]
     );
     // The new head has no verdict: a round in a new session.
@@ -4045,4 +4095,542 @@ fn an_author_commit_and_an_update_go_to_the_verifier() {
     );
     assert!(f.bodies("carry_review").is_empty());
     assert_eq!(f.launches, 3);
+}
+
+// ---- Every stage under `limits`, the worktree's own Git directory, the driver's Git calls ------
+
+impl F {
+    /// The clone's Git directory and the worktree's administrative directory.
+    fn git_dirs(&self) -> (PathBuf, PathBuf) {
+        let g = self.t.join("clone/.git");
+        let admin = g.join("worktrees/wt");
+        (g, admin)
+    }
+    /// The words a stage of account `account` and scratch directory `<home>/scratch/<n>` gets in
+    /// front of the hidden paths: an author's with its worktree and its refs (R38).
+    fn stage_words(&self, account: &str, n: usize, author: bool) -> Vec<String> {
+        let text = |p: &Path| p.to_str().unwrap().to_owned();
+        let (g, admin) = self.git_dirs();
+        let (home, wt) = (self.home(), self.wt());
+        let (account, scratch) = (self.p(account), text(&home.join(format!("scratch/{n}"))));
+        let mut words: Vec<String> = [
+            BWRAP,
+            "--unshare-pid",
+            "--ro-bind",
+            "/",
+            "/",
+            "--dev",
+            "/dev",
+            "--proc",
+            "/proc",
+            "--ro-bind",
+            "/proc/sys",
+            "/proc/sys",
+            "--bind",
+            &account,
+            &account,
+            "--bind",
+            &scratch,
+            &scratch,
+        ]
+        .map(str::to_owned)
+        .to_vec();
+        if author {
+            let pairs = [
+                (wt.clone(), wt.clone()),
+                (g.join("objects"), g.join("objects")),
+                (admin.clone(), admin.clone()),
+                (g.join("refs/heads/unit"), g.join("refs/heads/unit")),
+                (g.join("logs/refs/heads/unit"), g.join("logs/refs/heads/unit")),
+                (home.join("remotes/refs"), g.join("refs/remotes/origin")),
+                (home.join("remotes/logs"), g.join("logs/refs/remotes/origin")),
+                (home.join("remotes/tags"), g.join("refs/tags")),
+            ];
+            for (from, to) in pairs {
+                words.extend(["--bind".to_owned(), text(&from), text(&to)]);
+            }
+            for p in [
+                wt.join(".git"),
+                admin.join("commondir"),
+                admin.join("gitdir"),
+                admin.join("config.worktree"),
+            ] {
+                words.extend(["--ro-bind".to_owned(), text(&p), text(&p)]);
+            }
+        }
+        words
+    }
+    /// The words of launch `i` (from 0) between those of `stage_words` and `--cap-drop`: the
+    /// hidden paths.
+    fn stage_hidden(&self, i: usize, words: usize) -> Vec<String> {
+        let wrap = &self.wraps[i];
+        wrap[words..wrap.len() - 5].to_vec()
+    }
+}
+/// The mode bits of a path.
+fn mode(p: &Path) -> u32 {
+    std::fs::metadata(p).unwrap().permissions().mode() & 0o777
+}
+
+// spec: specs/ap/unit-run.md#R38
+#[test]
+fn r38_every_stage_runs_under_limits_and_an_author_writes_its_worktree_and_its_own_refs() {
+    let mut f = F::new();
+    f.set_unit(json!({"class": "contract"}));
+    // The implementer replaces the name of its view's `origin/main` by a link to a file outside.
+    let outside = f.t.join("outside");
+    std::fs::write(&outside, "outside\n").unwrap();
+    let edit = format!(
+        "mkdir -p src; echo widget >> src/widgets.rs; rm -f ../remotes/refs/main; ln -s {} ../remotes/refs/main\n",
+        outside.display()
+    );
+    std::fs::write(f.t.join("bin/edit.sh"), edit).unwrap();
+    f.steps(&["edit", "repair", "fix", "accept"]);
+    let (a, status) = f.ok();
+    assert_eq!(
+        (a["state"].as_str(), a["waits_for"].as_str(), status),
+        (Some("accepted"), Some("approve"), 0),
+        "{a}"
+    );
+    let home = f.home();
+    let wt = f.wt();
+    let reviews: Vec<String> = f.packets().into_iter().map(|(k, _)| k).collect();
+    let stages = [
+        ("implementer", "a1", true),
+        ("verifier", "a2", false),
+        ("fixer", "a1", true),
+        ("verifier", "a2", false),
+    ];
+    assert_eq!(f.wraps.len(), 4);
+    for (i, (role, account, author)) in stages.into_iter().enumerate() {
+        let n = i + 1;
+        assert!(home.join(format!("{n}.{role}.prompt.md")).exists(), "{n}");
+        let want = f.stage_words(account, n, author);
+        let wrap = &f.wraps[i];
+        assert_eq!(wrap[..want.len()], want[..], "{role}: {wrap:?}");
+        let tail = ["--cap-drop", "ALL", "--chdir", wt.to_str().unwrap(), "--"];
+        assert_eq!(wrap[wrap.len() - 5..], tail.map(str::to_owned), "{role}");
+        // Only hidden paths after the named ones, and the state of `gh` not among them.
+        let hidden = f.stage_hidden(i, want.len());
+        assert!(!hidden.iter().any(|w| w == "--bind"), "{hidden:?}");
+        assert!(!wrap.iter().any(|w| w.ends_with("/.config/gh")), "{wrap:?}");
+        // A Cargo home in the stage's scratch directory, never root's.
+        let env = &f.launch_envs[i];
+        let cargo: Vec<&String> = env
+            .iter()
+            .filter(|(k, _)| k == "CARGO_HOME")
+            .map(|(_, v)| v)
+            .collect();
+        assert_eq!(
+            cargo,
+            [&format!("{}/scratch/{n}/cargo", home.display())],
+            "{role}"
+        );
+        // The record names the limits of the request.
+        let read = |p: PathBuf| -> Value { serde_json::from_slice(&std::fs::read(p).unwrap()).unwrap() };
+        let prompt = format!("/{n}.{role}.prompt.md");
+        let rec = match author {
+            true => read(home.join(format!("{n}.{role}.md.run.json"))),
+            false => (reviews.iter())
+                .map(|k| read(f.t.join(format!("reviews/{k}.md.run.json"))))
+                .find(|r| r["prompt"]["path"].as_str().unwrap().ends_with(&prompt))
+                .unwrap(),
+        };
+        let limits = &rec["limits"];
+        assert_eq!(limits["show"], json!(["~/.config/gh"]), "{role}: {rec}");
+        assert_eq!(
+            limits["scratch"],
+            json!(format!("{}/scratch/{n}", home.display()))
+        );
+        assert_eq!(limits.get("over").is_some(), author, "{role}: {limits}");
+        assert_eq!(limits.get("read_only").is_some(), author, "{role}: {limits}");
+        let writable = limits["writable"].as_array().unwrap();
+        assert_eq!(writable.len(), if author { 10 } else { 2 }, "{limits}");
+    }
+    // What the run made for the authors: the ref directories and the targets in the clone, its own
+    // remote-tracking directories (mode 0700) and an empty `config.worktree`.
+    let (g, admin) = f.git_dirs();
+    for d in [
+        "refs/heads/unit",
+        "logs/refs/heads/unit",
+        "refs/remotes/origin",
+        "logs/refs/remotes/origin",
+        "refs/tags",
+    ] {
+        assert!(g.join(d).is_dir(), "{d}");
+    }
+    for d in ["scratch", "remotes", "remotes/refs", "remotes/logs", "remotes/tags"] {
+        assert_eq!(mode(&home.join(d)), 0o700, "{d}");
+    }
+    let config = std::fs::symlink_metadata(admin.join("config.worktree")).unwrap();
+    assert!(config.is_file() && config.len() == 0);
+    // Each `ap run` removed its scratch directory.
+    assert_eq!(std::fs::read_dir(home.join("scratch")).unwrap().count(), 0);
+    // Before the fixer the link was replaced by the base, its target unchanged.
+    let main = home.join("remotes/refs/main");
+    assert!(std::fs::symlink_metadata(&main).unwrap().is_file());
+    let base = f.origin(&["rev-parse", "refs/heads/main"]);
+    assert_eq!(std::fs::read_to_string(&main).unwrap(), format!("{base}\n"));
+    assert_eq!(std::fs::read_to_string(&outside).unwrap(), "outside\n");
+    // A settling stage is an author's too.
+    let mut f = F::new();
+    f.steps(&["dirty", "settle", "accept"]);
+    let (a, _) = f.ok();
+    assert_eq!(a["state"], "merged", "{a}");
+    let want = f.stage_words("a1", 2, true);
+    assert_eq!(f.wraps[1][..want.len()], want[..], "{:?}", f.wraps[1]);
+    assert!(f.launch(2).1.ends_with(CONTINUE));
+}
+
+// spec: specs/ap/unit-run.md#R38
+#[test]
+fn r38_a_directory_at_the_name_of_the_views_main_is_removed_and_a_failure_starts_no_stage() {
+    let mut f = F::new();
+    f.steps(&["implement", "accept"]);
+    f.set_unit(json!({"class": "contract"}));
+    // A directory with a link in it where the run writes `main`: removed, the link not followed.
+    let home = f.home();
+    std::fs::create_dir_all(home.join("remotes/refs/main")).unwrap();
+    let outside = f.t.join("outside");
+    std::fs::create_dir(&outside).unwrap();
+    std::fs::write(outside.join("kept"), "kept\n").unwrap();
+    std::os::unix::fs::symlink(&outside, home.join("remotes/refs/main/link")).unwrap();
+    let (a, _) = f.ok();
+    assert_eq!(a["state"], "accepted", "{a}");
+    assert!(std::fs::symlink_metadata(home.join("remotes/refs/main")).unwrap().is_file());
+    assert_eq!(std::fs::read_to_string(outside.join("kept")).unwrap(), "kept\n");
+    // A name the run cannot write: the unit stops `worktree_failed` and no stage starts.
+    let mut f = F::new();
+    f.steps(&["implement", "accept"]);
+    std::fs::create_dir_all(f.home()).unwrap();
+    std::fs::write(f.home().join("remotes"), "a file").unwrap();
+    let a = f.stopped("worktree_failed");
+    assert_eq!(a["stop_detail"], "remotes");
+    assert_eq!(f.launches, 0);
+}
+
+// spec: specs/ap/unit-run.md#R8
+#[test]
+fn r8_the_worktree_names_its_own_git_directory() {
+    use std::os::unix::fs::symlink;
+    let mut f = F::new();
+    f.steps(&["implement", "repair", "nothing"]);
+    f.stopped("repair_refused");
+    let launches = f.launches;
+    let (g, admin) = f.git_dirs();
+    let dotgit = f.wt().join(".git");
+    let kept = std::fs::read_to_string(&dotgit).unwrap();
+    assert_eq!(kept, format!("gitdir: {}\n", admin.display()));
+    let refused = |f: &mut F| {
+        f.set_unit(json!({"state": "stopped"}));
+        assert_eq!(f.stopped("worktree_failed")["stop_detail"], "git directory");
+    };
+    // A `.git` that is a link, though to a file of the same text.
+    let copy = f.t.join("dotgit");
+    std::fs::write(&copy, &kept).unwrap();
+    std::fs::remove_file(&dotgit).unwrap();
+    symlink(&copy, &dotgit).unwrap();
+    refused(&mut f);
+    std::fs::remove_file(&dotgit).unwrap();
+    // A `.git` that names another directory: the clone's own, and a copy of the worktree's
+    // administrative directory under another repository.
+    std::fs::write(&dotgit, format!("gitdir: {}\n", g.display())).unwrap();
+    refused(&mut f);
+    let other = f.t.join("other.git/worktrees/wt");
+    std::fs::create_dir_all(&other).unwrap();
+    for name in ["gitdir", "commondir", "HEAD"] {
+        std::fs::copy(admin.join(name), other.join(name)).unwrap();
+    }
+    std::fs::write(&dotgit, format!("gitdir: {}\n", other.display())).unwrap();
+    refused(&mut f);
+    std::fs::write(&dotgit, &kept).unwrap();
+    // A `commondir` that names another directory.
+    std::fs::write(admin.join("commondir"), "../../..\n").unwrap();
+    refused(&mut f);
+    std::fs::write(admin.join("commondir"), "../..\n").unwrap();
+    assert_eq!(f.launches, launches, "no stage started");
+    // Restored, the worktree is used again.
+    f.set_unit(json!({"state": "stopped"}));
+    f.stopped("repair_refused");
+}
+
+// spec: specs/ap/unit-run.md#R39
+#[test]
+fn r39_every_git_call_of_the_driver_runs_no_hook_and_enters_no_submodule() {
+    // A run with an update that merges and pushes, and one whose update conflicts.
+    let mut f = F::new();
+    f.steps(&["implementmain", "accept"]);
+    let (a, _) = f.ok();
+    assert_eq!(a["state"], "merged", "{a}");
+    let mut g = F::new();
+    g.steps(&["implementclash"]);
+    g.stopped("merge_conflict");
+    let mut seen = BTreeSet::new();
+    for f in [&f, &g] {
+        for (program, args, _) in &f.calls {
+            let words: &[String] = match program.as_str() {
+                "git" => args,
+                // The update's merge and `ap run`'s reads of an implementer's worktree.
+                "env" => &args[args.iter().position(|a| a == "git").unwrap() + 1..],
+                _ => continue,
+            };
+            // `check-ref-format` reads no repository.
+            if words[0] == "check-ref-format" {
+                continue;
+            }
+            let at = words.iter().position(|w| w == "-C").unwrap() + 2;
+            let command = &words[at..];
+            // The page's reads of the clone (`ls-tree`, `cat-file`, its `rev-parse` of
+            // `origin/main`; `render.rs`) are not the driver's and run no hook.
+            let page = command == ["rev-parse", "--verify", "origin/main^{commit}"];
+            if page || ["ls-tree", "cat-file"].contains(&command[0].as_str()) {
+                continue;
+            }
+            assert!(command.len() > 4 && command[..4] == SAFE, "{words:?}");
+            let word = command[4].as_str();
+            let reads_worktree = word == "status"
+                || (word == "diff" && command.iter().any(|w| w == "--diff-filter=U"));
+            if reads_worktree {
+                assert!(
+                    command.contains(&"--ignore-submodules=all".to_owned()),
+                    "{words:?}"
+                );
+            }
+            seen.insert(word.to_owned());
+        }
+    }
+    for word in [
+        "fetch",
+        "status",
+        "rev-parse",
+        "worktree",
+        "merge",
+        "push",
+        "diff",
+        "merge-base",
+        "branch",
+    ] {
+        assert!(seen.contains(word), "{word}: {seen:?}");
+    }
+    // A diff between two commits keeps its options.
+    let between = f.calls.iter().find(|c| {
+        c.0 == "git" && c.1.iter().any(|w| w == "diff") && c.1.iter().any(|w| w == "-z")
+    });
+    let between = &between.unwrap().1;
+    assert!(between.contains(&"--ignore-submodules=none".to_owned()), "{between:?}");
+}
+
+/// A program at `<t>/bin/mark-<name>` that leaves the file `<t>/marks/<name>` when the run runs it,
+/// and nothing when a fake stage does (which in a real run would run in its own view).
+fn marker(f: &F, name: &str, body: &str) -> String {
+    let marks = f.t.join("marks");
+    std::fs::create_dir_all(&marks).unwrap();
+    let path = f.t.join(format!("bin/mark-{name}"));
+    let text = format!(
+        "#!/bin/sh\n[ -n \"$AP_FAKE_STAGE\" ] || : > '{}/{name}'\n{body}\n",
+        marks.display()
+    );
+    std::fs::write(&path, text).unwrap();
+    std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o755)).unwrap();
+    path.to_str().unwrap().to_owned()
+}
+/// The clone with hooks, the stage's edit with a committed submodule whose own configuration names
+/// a filter, a `core.fsmonitor` line in the worktree's `config.worktree`, and `main` moved by one
+/// commit that sets `moved` (R39).
+fn planted(f: &F, moved: &str) {
+    git(
+        &f.t.join("clone"),
+        &["config", "extensions.worktreeConfig", "true"],
+    );
+    let hooks = f.t.join("clone/.git/hooks");
+    std::fs::create_dir_all(&hooks).unwrap();
+    for hook in [
+        "post-merge",
+        "pre-push",
+        "post-checkout",
+        "reference-transaction",
+    ] {
+        let program = marker(f, hook, "cat > /dev/null 2>&1; exit 0");
+        std::fs::copy(&program, hooks.join(hook)).unwrap();
+    }
+    let filter = marker(f, "filter", "cat");
+    let fsmonitor = marker(f, "fsmonitor", "exit 1");
+    let edit = format!(
+        r#"set -e
+mkdir -p src; echo "widget" >> src/widgets.rs
+git init -q src/sub
+( cd src/sub && printf 'a\n' > f && printf 'f filter=mark\n' > .gitattributes \
+  && git config filter.mark.clean '{filter}' && git add -A \
+  && git -c user.name=Invented -c user.email=invented@example.invalid commit -qm sub && printf 'a\n' > f )
+printf '[core]\n\tfsmonitor = {fsmonitor}\n' >> "$(git rev-parse --git-path config.worktree)"
+git fetch -q origin main; base=$(git rev-parse FETCH_HEAD); idx=$(mktemp -u)
+GIT_INDEX_FILE=$idx git read-tree "$base"
+blob=$(printf 'main\n' | git hash-object -w --stdin)
+GIT_INDEX_FILE=$idx git update-index --add --cacheinfo "100644,$blob,{moved}"
+tree=$(GIT_INDEX_FILE=$idx git write-tree); rm -f "$idx"
+c=$(git -c user.name=Invented -c user.email=invented@example.invalid commit-tree "$tree" -p "$base" -m "main moved")
+git push -q origin "$c:refs/heads/main"
+"#
+    );
+    std::fs::write(f.t.join("bin/edit.sh"), edit).unwrap();
+}
+fn marks(f: &F) -> Vec<String> {
+    let entries = std::fs::read_dir(f.t.join("marks")).unwrap().flatten();
+    entries
+        .map(|e| e.file_name().to_string_lossy().into_owned())
+        .collect()
+}
+
+// spec: specs/ap/unit-run.md#R39
+// spec: specs/ap/unit-run.md#R32
+#[test]
+fn r39_with_the_real_git_no_hook_fsmonitor_or_filter_of_a_stage_runs_in_the_drivers_calls() {
+    // The update merges and pushes, the checks run, the unit is merged and cleaned up.
+    let mut f = F::new();
+    planted(&f, "docs/other.md");
+    f.steps(&["edit", "accept"]);
+    let (a, status) = f.ok();
+    assert_eq!((a["state"].as_str(), status), (Some("merged"), 0), "{a}");
+    assert_eq!(a["updates"], 1, "{a}");
+    assert!(f.merges().1 == 1 && f.checks_since(0) >= 1);
+    assert_eq!(marks(&f), Vec::<String>::new());
+    // What the stage left was there: a submodule merged into `main`, the fsmonitor line.
+    let sub = f.origin(&["ls-tree", "refs/heads/main", "src/sub"]);
+    assert!(sub.starts_with("160000 commit "), "{sub}");
+    assert!(std::fs::read_to_string(f.git_dirs().1.join("config.worktree"))
+        .unwrap()
+        .contains("fsmonitor"));
+    // Git refuses to remove a worktree with a committed submodule.
+    assert_eq!(a["cleanup"]["worktree"], "worktree_kept", "{a}");
+    // The update conflicts: the merge, the conflicting paths, the abort.
+    let mut f = F::new();
+    planted(&f, "src/widgets.rs");
+    f.steps(&["edit"]);
+    let a = f.stopped("merge_conflict");
+    assert!(
+        a["stop_detail"].as_str().unwrap().contains("src/widgets.rs"),
+        "{a}"
+    );
+    assert_eq!(marks(&f), Vec::<String>::new());
+}
+
+// spec: specs/ap/run-limits.md#R12
+// spec: specs/ap/unit-run.md#R16
+#[test]
+fn r12_a_check_on_the_head_runs_in_its_view_and_without_units_as_on_the_base() {
+    let mut f = F::new();
+    f.steps(&["implement", "accept"]);
+    let (a, _) = f.ok();
+    assert_eq!(a["state"], "merged", "{a}");
+    let wt = f.wt().to_str().unwrap().to_owned();
+    let dotgit = format!("{wt}/.git");
+    let run = f.calls.iter().find(|c| c.0 == "systemd-run").unwrap().1.clone();
+    let at = run.iter().position(|a| a == BWRAP).unwrap();
+    assert_eq!(run[..16][13..], ["--", "sh", "-c"].map(str::to_owned));
+    assert_eq!(run[19..23], ["env", "-i", "-C", wt.as_str()].map(str::to_owned));
+    assert!(run[at - 1].starts_with("AP_HEAD=") && run[at - 2].starts_with("AP_BASE="));
+    let head = [
+        BWRAP,
+        "--unshare-pid",
+        "--ro-bind",
+        "/",
+        "/",
+        "--dev",
+        "/dev",
+        "--proc",
+        "/proc",
+        "--ro-bind",
+        "/proc/sys",
+        "/proc/sys",
+        "--tmpfs",
+        "/tmp",
+        "--bind",
+        &wt,
+        &wt,
+        "--ro-bind",
+        &dotgit,
+        &dotgit,
+    ];
+    assert_eq!(run[at..at + head.len()], head.map(str::to_owned), "{run:?}");
+    let end = at + run[at..].iter().position(|a| a == "--").unwrap();
+    assert_eq!(
+        run[end - 4..=end],
+        ["--cap-drop", "ALL", "--chdir", &wt, "--"].map(str::to_owned)
+    );
+    assert_eq!(
+        run[end + 1..],
+        ["timeout", "-k", "10", "300", "bash", "-c", "test -f src/widgets.rs"].map(str::to_owned)
+    );
+    assert_eq!(f.check_wraps[0], run[at..=end]);
+    // The hidden paths are those a stage gets, the state of `gh` too, nothing shown.
+    let hidden = run[at + head.len()..end - 4].to_vec();
+    let stage = f.stage_hidden(0, f.stage_words("a1", 1, true).len());
+    let mut shown = hidden.clone();
+    if let Some(i) = shown.iter().position(|w| w.ends_with("/.config/gh")) {
+        match shown[i - 1] == "--tmpfs" {
+            true => shown.drain(i - 1..i + 3),
+            false => shown.drain(i - 2..=i),
+        };
+    }
+    assert_eq!(shown, stage);
+    assert!(!hidden.iter().any(|w| w == "--bind"), "{hidden:?}");
+    // Without units: the plain `sh` call of the base, no view.
+    let mut f = F::new();
+    f.no_units_after = Some(1);
+    f.steps(&["implement", "accept"]);
+    let a = f.stopped("stage_refused");
+    let wt = f.wt().to_str().unwrap().to_owned();
+    assert!(a["stop_detail"].as_str().unwrap().contains("systemd_absent"), "{a}");
+    let sh = &f.calls.iter().find(|c| c.0 == "sh").unwrap().1;
+    assert!(!sh.contains(&BWRAP.to_owned()), "{sh:?}");
+    assert_eq!(sh.len(), 19, "{sh:?}");
+    assert_eq!(sh[4..8], ["env", "-i", "-C", wt.as_str()].map(str::to_owned));
+    assert_eq!(
+        sh[12..18],
+        ["timeout", "-k", "10", "300", "bash", "-c"].map(str::to_owned)
+    );
+    assert!(f.check_wraps.is_empty());
+}
+
+// spec: specs/ap/unit-run.md#R7
+// spec: specs/ap/unit-run.md#R32
+#[test]
+fn r7_the_scratch_directories_go_after_the_leftovers_and_r32_the_scratch_and_remotes_go() {
+    use std::os::unix::fs::symlink;
+    let mut f = F::new();
+    f.set_unit(json!({"class": "contract"}));
+    f.steps(&["local", "settle", "accept"]);
+    f.die_at_launch = Some(1);
+    assert_eq!(f.refusal().status, 3);
+    let record = f.home().join("1.implementer.md.run.json");
+    f.cut(&record);
+    // What a killed `ap run` leaves: its scratch directory, with a link out of it; and a stray file.
+    let scratch = f.home().join("scratch");
+    let outside = f.t.join("outside");
+    std::fs::create_dir_all(scratch.join("1/tmp")).unwrap();
+    std::fs::create_dir(&outside).unwrap();
+    std::fs::write(outside.join("kept"), "kept\n").unwrap();
+    symlink(&outside, scratch.join("1/tmp/out")).unwrap();
+    std::fs::write(scratch.join("stray"), "s").unwrap();
+    let (a, _) = f.ok();
+    assert_eq!(a["state"], "accepted", "{a}");
+    assert!(!scratch.join("1").exists() && !scratch.join("stray").exists());
+    assert_eq!(std::fs::read_dir(&scratch).unwrap().count(), 0);
+    assert_eq!(std::fs::read_to_string(outside.join("kept")).unwrap(), "kept\n");
+    // The record of the killed stage still says `running`; its run is closed in the store.
+    assert_eq!(f.record("1.implementer.md.run.json")["state"], "running");
+    assert_eq!(f.objects[&k("run", "run-1")]["state"], "killed");
+    assert!(f.home().join("remotes/refs/main").is_file());
+    // The cleanup of a merged unit removes both directories.
+    f.set_unit(json!({"state": "merged"}));
+    let (a, _) = f.ok();
+    assert_eq!(a["cleanup"]["worktree"], "removed", "{a}");
+    assert!(!scratch.exists() && !f.home().join("remotes").exists());
+    assert!(f.home().join("1.implementer.md.run.json").exists());
+    // Links at both names are not followed, by the leftovers nor by the cleanup.
+    symlink(&outside, &scratch).unwrap();
+    symlink(&outside, f.home().join("remotes")).unwrap();
+    f.ok();
+    assert_eq!(std::fs::read_to_string(outside.join("kept")).unwrap(), "kept\n");
+    assert!(std::fs::symlink_metadata(&scratch).unwrap().is_symlink());
 }
