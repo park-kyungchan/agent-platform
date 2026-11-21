@@ -9,7 +9,6 @@ pub(crate) enum Command {
     Describe,
     Get,
     Backup,
-    Compact,
     Index,
     Search,
     Around,
@@ -89,16 +88,6 @@ const SPECS: &[Spec] = &[
         stdin: false,
         fields: "",
         example: "ont backup",
-    },
-    Spec {
-        command: Compact,
-        words: &["compact"],
-        files: &[0],
-        form: "compact",
-        options: &[],
-        stdin: false,
-        fields: "",
-        example: "ont compact",
     },
     Spec {
         command: Index,
@@ -310,8 +299,7 @@ mod tests {
     fn usage_and_dispatch_have_the_same_commands_and_options() {
         let help = help(&[]).unwrap_or(Value::Null);
         assert_eq!(help["commands"].as_array().map(Vec::len), Some(SPECS.len()));
-        // Help text budget in bytes, raised from 5000 when compact was added (2026-11-13)
-        // and from 5200 when fn was added (2026-11-20).
+        // Help text budget in bytes, raised from 5200 when fn was added (2026-11-20).
         assert!(help.to_string().len() < 5500);
         for spec in SPECS {
             for files in spec.files {

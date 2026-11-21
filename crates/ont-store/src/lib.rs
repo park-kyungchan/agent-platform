@@ -62,14 +62,12 @@ pub(crate) fn open_file_read_only(path: &Path) -> Result<Connection, Error> {
 /// A store's domain and version are selected explicitly, never inferred from rows.
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum StoreMode {
-    Education,
     Program,
     Schema,
 }
 impl StoreMode {
     fn version(self) -> i64 {
         match self {
-            Self::Education => 1,
             Self::Program => 2,
             Self::Schema => 4,
         }
@@ -77,9 +75,7 @@ impl StoreMode {
     fn accepts(self, scope: &Scope, namespace: &Namespace) -> bool {
         matches!(
             (self, scope),
-            (Self::Education, Scope::Education { .. })
-                | (Self::Program, Scope::Program { .. })
-                | (Self::Schema, Scope::Domain { .. })
+            (Self::Program, Scope::Program { .. }) | (Self::Schema, Scope::Domain { .. })
         ) && scope.validate().is_ok()
             && scope.namespace() == namespace
     }
@@ -109,13 +105,6 @@ pub struct Append {
     pub observation: Observation,
 }
 impl Store {
-    pub fn memory() -> Result<Self, Error> {
-        Self::configure(db(Connection::open_in_memory())?, StoreMode::Education)
-    }
-    /// Only task-owned synthetic files in S06. No live DB opening or migration.
-    pub fn open(path: &Path) -> Result<Self, Error> {
-        Self::open_mode(path, StoreMode::Education)
-    }
     /// Separate task-owned Program projection; schema v2, without action tables.
     /// Existing v1 or unknown databases refuse without conversion or row reads.
     pub fn open_program(path: &Path) -> Result<Self, Error> {

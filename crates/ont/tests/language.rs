@@ -3036,7 +3036,6 @@ fn installed_ambiguous_key_preserves_store_and_allows_repair() {
         (vec!["render"], json!({"view":"records"})),
         (vec!["action", "list"], json!({})),
         (vec!["backup"], json!({})),
-        (vec!["compact"], json!({})),
     ] {
         let answer = t.cli(&cmd, body, NOW);
         assert_eq!(answer["status"], "ok", "{cmd:?}: {answer}");

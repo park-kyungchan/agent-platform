@@ -419,17 +419,17 @@ fn the_library_and_the_mcp_tool_record() {
     assert_eq!(lines[1]["request_id"], "m1");
 }
 
-// A6: `ont backup` copies only the store, and neither it nor `ont compact`
-// reads or changes `refusals.jsonl`.
+// A6: `ont backup` copies only the store and neither reads nor changes
+// `refusals.jsonl`.
 #[test]
-fn backup_and_compact_leave_the_refusals_alone() {
+fn backup_leaves_the_refusals_alone() {
     // spec: specs/ont/action.md#R99
     let t = installed();
     apply(
         &t,
         json!({"action_type":"create_tag","parameters":{"label":5}}),
     );
-    // A damaged line: a reader would choke on it, these commands never read it.
+    // A damaged line: a reader would choke on it, backup never reads it.
     std::fs::OpenOptions::new()
         .append(true)
         .open(t.refusals())
@@ -444,8 +444,6 @@ fn backup_and_compact_leave_the_refusals_alone() {
         .map(|e| e.unwrap().file_name().to_string_lossy().into_owned())
         .collect();
     assert!(names.iter().all(|n| !n.contains("refusal")), "{names:?}");
-    let (code, answer) = run(&t, &["compact"], &json!({}));
-    assert_eq!(code, 0, "{answer}");
     assert_eq!(std::fs::read(t.refusals()).unwrap(), before);
 }
 

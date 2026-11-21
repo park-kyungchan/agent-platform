@@ -5,7 +5,6 @@ use crate::action::{
     validate_action,
 };
 use crate::backup::{BackupRequest, backup};
-use crate::compact::{CompactRequest, compact};
 use crate::describe::{DescribeRequest, describe};
 use crate::get::{GetRequest, get};
 use crate::index::{IndexRequest, index};
@@ -294,7 +293,7 @@ pub enum Op {
 fn writes(cli: &Cli) -> bool {
     use crate::usage::Command::*;
     match crate::usage::resolve(&cli.command) {
-        Ok(SchemaInstall | Backup | Compact | Index | ActionApply) => true,
+        Ok(SchemaInstall | Backup | Index | ActionApply) => true,
         Ok(Render) => cli.render_options.contains_key("--write"),
         _ => false,
     }
@@ -389,7 +388,6 @@ fn dispatch(cli: &Cli, stdin: impl Read, ctx: &Context) -> Result<Answer, Failur
         Describe => execute(Op::Describe, &read_request(stdin)?, ctx),
         Get => execute(Op::Get, &read_request(stdin)?, ctx),
         Backup => backup(ctx, &BackupRequest::default()),
-        Compact => compact(ctx, &CompactRequest::default()),
         Index => {
             let request = if cli.sources.is_empty() {
                 json!({"op":"index"})

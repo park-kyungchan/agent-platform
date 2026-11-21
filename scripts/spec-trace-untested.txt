@@ -41,10 +41,4 @@ specs/ont/store.md#R31
 specs/ont/store.md#R37
 specs/ont/store.md#R39
 specs/ont/store.md#R41
-specs/ont/store.md#R63
-specs/ont/store.md#R66
-specs/ont/store.md#R67
-specs/ont/store.md#R68
-specs/ont/store.md#R69
-specs/ont/store.md#R70
 specs/ont/store.md#R8

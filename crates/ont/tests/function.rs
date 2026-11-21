@@ -837,7 +837,6 @@ fn inside_a_program_writing_subcommands_are_refused_before_the_uid_check() {
             b"",
         ),
         (vec!["backup"], b""),
-        (vec!["compact"], b""),
         (vec!["index"], b""),
         (vec!["action", "apply"], apply),
         (
@@ -968,7 +967,6 @@ fn read_only_library_operations_refuse_before_writing_and_reads_work() {
         },
     ));
     refused_ro(ont::backup::backup(&ctx, &Default::default()));
-    refused_ro(ont::compact::compact(&ctx, &Default::default()));
     refused_ro(ont::index::index(&ctx, &Default::default()));
     refused_ro(ont::render::write_file(
         &ctx,
