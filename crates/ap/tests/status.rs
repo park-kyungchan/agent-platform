@@ -3962,3 +3962,27 @@ fn r44_the_brief_is_at_most_forty_lines_of_at_most_120_bytes_whatever_the_store_
     // Well under the 4800 bytes the lines allow.
     assert!(text.len() <= 40 * 120);
 }
+
+// spec: specs/ap/status.md#R37
+#[test]
+fn a_carried_review_is_not_a_round() {
+    // A review `carry_review` made (`carried_from`) is a verdict but not a round: the count leaves it out.
+    let mut f = indicator_store();
+    f.put(
+        "review",
+        "rv-8",
+        json!({"kind": "packet", "unit": oid("unit", "u-b"), "head": "h2", "status": "closed",
+        "verdict": "accept", "started_at": "2026-11-17T11:15:00Z", "closed_at": "2026-11-17T11:15:00Z",
+        "carried_from": oid("review", "rv-7")}),
+    );
+    let v = indicators_of(&mut f, Some("vps"));
+    let b = &v["units"][1];
+    assert_eq!(
+        (
+            b["unit"].clone(),
+            b["rounds"].clone(),
+            b["first_verdict"].clone()
+        ),
+        (json!("u-b"), json!(1), json!("accept"))
+    );
+}

@@ -938,6 +938,51 @@ impl F {
                 }
                 json!([{"change": "update", "id": oid("review", &key)}])
             }
+            "carry_review" => {
+                let from = p["review"]["native_key"].as_str().unwrap().to_owned();
+                let r = self.objects[&k("review", &from)].clone();
+                let accepting =
+                    r["status"] == "closed" && r["verdict"] == "accept" && r["kind"] == "packet";
+                if !accepting {
+                    failed.push("review_not_accepting");
+                }
+                let members = ["repository", "unit", "report", "report_sha256"];
+                if members.iter().any(|m| r[*m].is_null()) {
+                    failed.push("review_incomplete");
+                }
+                if r["started_at"].as_str() <= u["amended_at"].as_str() {
+                    failed.push("review_older_than_amendment");
+                }
+                if r["unit"] != p["unit"] {
+                    failed.push("unit_differs");
+                }
+                if r["head"] == p["head"] {
+                    failed.push("head_unchanged");
+                }
+                let key = Self::made_key(
+                    body["agent"].as_str().unwrap(),
+                    body["request_id"].as_str().unwrap(),
+                );
+                if failed.is_empty() {
+                    let mut c = json!({"kind": "packet", "head": p["head"], "status": "closed",
+                        "verdict": "accept", "started_at": now, "closed_at": now, "carried_from": p["review"]});
+                    for m in [
+                        "task",
+                        "model",
+                        "effort",
+                        "prompt",
+                        "prompt_sha256",
+                        "repository",
+                        "unit",
+                        "report",
+                        "report_sha256",
+                    ] {
+                        c[m] = r[m].clone();
+                    }
+                    self.put("review", &key, c);
+                }
+                json!([{"change": "initial", "id": oid("review", &key)}])
+            }
             "start_run" => {
                 assert_eq!(body["agent"], "ap-run");
                 let key = format!(
@@ -3717,4 +3762,256 @@ fn r8_a_fetch_that_raced_another_is_tried_once_more() {
     f.fetch_fails = vec!["fatal: unable to access the remote"];
     f.stopped("fetch_failed");
     assert_eq!(fetches(&f), 1);
+}
+
+impl F {
+    /// The files `<n>.update.md` under the unit's directory.
+    fn update_files(&self) -> Vec<String> {
+        let entries = std::fs::read_dir(self.home()).unwrap().flatten();
+        let names = entries.map(|e| e.file_name().to_string_lossy().into_owned());
+        let mut names: Vec<String> = names.filter(|n| n.ends_with(".update.md")).collect();
+        names.sort();
+        names
+    }
+}
+
+// spec: specs/ap/unit-run.md#R37
+// spec: specs/ap/unit-run.md#R18
+// spec: specs/ap/unit-run.md#R25
+#[test]
+fn an_update_outside_the_write_set_keeps_the_accept() {
+    // `main` moves outside the write set while the verifier looks: the update's head is checked and
+    // the accept carried to it, with no second verifier stage.
+    let mut f = F::new();
+    f.steps(&["implement", "acceptoutside"]);
+    let (a, status) = f.ok();
+    assert_eq!(
+        (
+            a["state"].as_str(),
+            a["updates"].as_u64(),
+            a["rounds"].as_u64(),
+            status
+        ),
+        (Some("merged"), Some(1), Some(1), 0),
+        "{a}"
+    );
+    assert_eq!(f.launches, 2, "no verifier stage after the update");
+    assert_eq!(f.bodies("start_unit_review").len(), 1);
+    let packets = f.packets();
+    assert_eq!(packets.len(), 2);
+    let (first, judged) = (packets[0].0.clone(), packets[0].1["head"].clone());
+    let head = a["head"].as_str().unwrap().to_owned();
+    assert_eq!(
+        json!(f.origin(&["rev-parse", &format!("{head}^1")])),
+        judged
+    );
+    // `carry_review` with the accepting review of the head moved from and the new head, then the accept.
+    let carried = f.bodies("carry_review");
+    assert_eq!(carried.len(), 1);
+    assert_eq!(carried[0]["parameters"]["review"]["native_key"], *first);
+    assert_eq!(carried[0]["parameters"]["head"], *head);
+    let actions = f.actions();
+    let at = actions.iter().position(|x| x == "carry_review").unwrap();
+    assert_eq!(actions[at + 1], "accept_unit");
+    let (made, r) = &packets[1];
+    assert_eq!(
+        (r["head"].as_str(), r["verdict"].as_str()),
+        (Some(head.as_str()), Some("accept"))
+    );
+    assert_eq!(r["carried_from"]["native_key"], *first);
+    assert!(r["round"].is_null(), "{r}");
+    // The answer names the carry; the review list holds both, the carried one without a round.
+    assert_eq!(a["carried"]["review"], *made, "{a}");
+    assert_eq!(a["carried"]["from"], *first, "{a}");
+    assert_eq!(a["reviews"].as_array().unwrap().len(), 2);
+    assert_eq!(f.update_files().len(), 1);
+    let file = a["carried"]["file"].as_str().unwrap();
+    assert_eq!(
+        Path::new(file),
+        f.home().join(&f.update_files()[0]).as_path()
+    );
+    let text = std::fs::read_to_string(file).unwrap();
+    for part in [
+        judged.as_str().unwrap(),
+        head.as_str(),
+        first.as_str(),
+        made.as_str(),
+        "- docs/other.md\n",
+        "None of these paths meets the unit's write set.",
+        "The unit's patch is unchanged",
+        &format!("R16 on {head}: passed"),
+        &format!("R17 on {head}: passed"),
+    ] {
+        assert!(text.contains(part), "{part}: {text}");
+    }
+    assert_eq!(f.merges(), (1, 1));
+
+    // A carry the store refuses stops nothing: the head goes to a verifier round instead.
+    let mut f = F::new();
+    f.refuse = Some(("carry_review", "head_unchanged"));
+    f.steps(&["implement", "acceptoutside", "accept"]);
+    let (a, _) = f.ok();
+    assert_eq!(
+        (a["state"].as_str(), a["rounds"].as_u64(), f.launches),
+        (Some("merged"), Some(2), 3),
+        "{a}"
+    );
+    assert!(a.get("carried").is_none(), "{a}");
+    assert!(f.update_files().is_empty());
+    let (line, prompt) = f.launch(3);
+    assert!(
+        line.contains(&format!("--resume {}", f.session_of(2))),
+        "{line}"
+    );
+    assert!(prompt.contains("What moved it: a merge of origin/main\n"));
+
+    // A carried accept is carried again on the next update; a later verifier counts no carried round
+    // and starts a new session, as a carried review names none.
+    let mut f = F::new();
+    f.set_unit(json!({"class": "contract"}));
+    f.steps(&["implement", "acceptoutside", "accept"]);
+    let (a, _) = f.ok();
+    assert_eq!(a["waits_for"], "approve", "{a}");
+    let (b, _) = f.ok();
+    assert_eq!(
+        (
+            b["state"].as_str(),
+            b["updates"].as_u64(),
+            b["rounds"].as_u64()
+        ),
+        (Some("accepted"), Some(1), Some(1)),
+        "{b}"
+    );
+    assert_eq!(b["carried"]["from"], a["reviews"][0]["key"], "{b}");
+    f.push_from_elsewhere("main", "notes-main.md");
+    let (c, _) = f.ok();
+    assert_eq!(
+        (
+            c["state"].as_str(),
+            c["updates"].as_u64(),
+            c["rounds"].as_u64()
+        ),
+        (Some("accepted"), Some(1), Some(1)),
+        "{c}"
+    );
+    assert_eq!(c["carried"]["from"], b["carried"]["review"], "{c}");
+    assert_eq!((f.launches, f.update_files().len()), (2, 2));
+    assert!(f.bodies("approve_unit").is_empty());
+    f.push_from_elsewhere(&format!("unit/{KEY}"), "src/widgets.rs");
+    let (d, _) = f.ok();
+    assert_eq!(
+        (d["state"].as_str(), d["rounds"].as_u64()),
+        (Some("accepted"), Some(2)),
+        "{d}"
+    );
+    assert!(f.launch(3).0.contains("--session-id"));
+    let starts = f.bodies("start_unit_review");
+    assert_eq!(starts.last().unwrap()["parameters"]["round"], 2);
+    assert_eq!(f.bodies("carry_review").len(), 2);
+}
+
+// spec: specs/ap/unit-run.md#R37
+// spec: specs/ap/unit-run.md#R19
+#[test]
+fn an_update_inside_the_write_set_goes_to_the_verifier() {
+    // `main` changed a path of the write set: the same verifier looks again, nothing is carried.
+    let mut f = F::new();
+    f.set_unit(json!({"class": "contract"}));
+    f.steps(&["implement", "acceptmain", "accept"]);
+    f.ok();
+    let (b, _) = f.ok();
+    assert_eq!(
+        (
+            b["state"].as_str(),
+            b["updates"].as_u64(),
+            b["rounds"].as_u64()
+        ),
+        (Some("accepted"), Some(1), Some(2)),
+        "{b}"
+    );
+    assert!(f.bodies("carry_review").is_empty());
+    assert!(b.get("carried").is_none() && f.update_files().is_empty());
+    let (line, prompt) = f.launch(3);
+    assert!(
+        line.contains(&format!("--resume {}", f.session_of(2))),
+        "{line}"
+    );
+    assert!(prompt.contains("What moved it: a merge of origin/main\n"));
+    // The path is matched against the unit's own write set, not a fixed tree.
+    let mut f = F::new();
+    f.set_unit(json!({"write_set": ["src/**", "docs/**"]}));
+    f.steps(&["implement", "acceptoutside", "accept"]);
+    let (a, _) = f.ok();
+    assert_eq!(
+        (a["state"].as_str(), a["rounds"].as_u64(), f.launches),
+        (Some("merged"), Some(2), 3),
+        "{a}"
+    );
+    assert!(f.bodies("carry_review").is_empty());
+}
+
+// spec: specs/ap/unit-run.md#R37
+// spec: specs/ap/unit-run.md#R12
+#[test]
+fn an_author_commit_and_an_update_go_to_the_verifier() {
+    // An author commit on the branch and `main` moved outside the write set: judged as at the base.
+    let mut f = F::new();
+    f.set_unit(json!({"class": "contract"}));
+    f.steps(&["implement", "accept", "accept"]);
+    f.ok();
+    let pushed = f.push_from_elsewhere(&format!("unit/{KEY}"), "src/widgets.rs");
+    f.push_from_elsewhere("main", "notes-main.md");
+    let (b, _) = f.ok();
+    assert_eq!(
+        (
+            b["state"].as_str(),
+            b["updates"].as_u64(),
+            b["rounds"].as_u64()
+        ),
+        (Some("accepted"), Some(1), Some(2)),
+        "{b}"
+    );
+    let head = b["head"].as_str().unwrap();
+    assert_eq!(f.origin(&["rev-parse", &format!("{head}^1")]), pushed);
+    assert!(f.bodies("carry_review").is_empty());
+    assert!(f.launch(3).0.contains("--session-id"));
+    // A merge with the update's message that also changes the patch: the patch differs, so judged anew.
+    let mut f = F::new();
+    f.set_unit(json!({"class": "contract"}));
+    f.steps(&["implement", "accept", "accept"]);
+    f.ok();
+    f.push_from_elsewhere("main", "notes-main.md");
+    let wt = f.wt();
+    git(&wt, &["fetch", "--quiet", "origin"]);
+    git(
+        &wt,
+        &[
+            "merge",
+            "--no-ff",
+            "--no-commit",
+            "--quiet",
+            "refs/remotes/origin/main",
+        ],
+    );
+    std::fs::write(wt.join("src/extra.rs"), "extra\n").unwrap();
+    git(&wt, &["add", "-A"]);
+    let message = format!("Merge origin/main into unit/{KEY} (ap unit run)");
+    git(&wt, &["commit", "--quiet", "-m", &message]);
+    git(
+        &wt,
+        &[
+            "push",
+            "--quiet",
+            "origin",
+            &format!("HEAD:refs/heads/unit/{KEY}"),
+        ],
+    );
+    let (c, _) = f.ok();
+    assert_eq!(
+        (c["state"].as_str(), c["rounds"].as_u64()),
+        (Some("accepted"), Some(2)),
+        "{c}"
+    );
+    assert!(f.bodies("carry_review").is_empty());
+    assert_eq!(f.launches, 3);
 }

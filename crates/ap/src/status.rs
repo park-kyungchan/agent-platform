@@ -885,6 +885,11 @@ fn indicator(
         r["kind"] == "packet" && r["status"] == "closed" && said
     });
     reviews.sort_by_key(|(k, r)| (text(&r["closed_at"]).to_owned(), k.clone()));
+    // A review `carry_review` made is a verdict but not a round: it is left out of the count alone.
+    let rounds = reviews
+        .iter()
+        .filter(|(_, r)| r["carried_from"].is_null())
+        .count();
     let runs = of_unit(s, store, ("runs_of_unit", "run"), key)?;
     let mut tokens = serde_json::Map::new();
     for role in runs
@@ -912,7 +917,7 @@ fn indicator(
         "implementer": match u["implementer"].is_object() {
             true => json!({"runtime": u["implementer"]["runtime"], "model": u["implementer"]["model"], "effort": u["implementer"]["effort"]}),
             false => Value::Null },
-        "started_at": started_at, "merged_at": merged_at, "minutes": minutes, "rounds": reviews.len(),
+        "started_at": started_at, "merged_at": merged_at, "minutes": minutes, "rounds": rounds,
         "repairs": runs.iter().filter(|r| r.1["role"] == "fixer").count(),
         "first_verdict": reviews.first().map(|r| r.1["verdict"].clone()), "stops": stops, "tokens": tokens});
     let cut = [began, merged, stopped].iter().any(|l| l.withheld > 0);
