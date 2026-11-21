@@ -1479,3 +1479,114 @@ fn r21_the_timer_and_its_service() {
         assert!(lines.contains(&line), "{line}");
     }
 }
+
+/// An `accepted` unit of `o/r` at head `h`, of class `class`, approved at `approved` when given.
+fn accepted(class: &str, head: &str, approved: Option<&str>) -> Value {
+    let mut f = json!({"state": "accepted", "class": class, "lane": "small", "repository": "o/r",
+        "head": head, "write_set": ["x/**"],
+        "implementer": {"runtime": "claude", "model": "opus", "effort": "high"},
+        "verifier": {"runtime": "claude", "model": "opus", "effort": "high"}});
+    if let Some(a) = approved {
+        f["approved_head"] = json!(a);
+    }
+    f
+}
+
+fn stat_reads(w: &W) -> usize {
+    w.reads
+        .borrow()
+        .iter()
+        .filter(|r| *r == "/proc/stat")
+        .count()
+}
+
+// spec: specs/ap/work.md#R22
+#[test]
+fn r22_a_merge_run_starts_whatever_the_slots_and_the_cpu_reading_say() {
+    let head = "a".repeat(40);
+    // (a) Every slot taken: both merge candidates start, the `ready` unit counts them.
+    let mut w = W::new();
+    w.policy_with(json!({"work": {"prefix": PREFIX, "slice": SLICE, "slots": 2}}));
+    w.put("m-approved", accepted("contract", &head, Some(&head)));
+    w.put("m-plain", accepted("plain", &head, None));
+    w.ready("r", &["r/**"], 1);
+    w.live(&[
+        "aptest-d1.service loaded active running d",
+        "aptest-d2.service loaded active running d",
+    ]);
+    let v = w.ok();
+    assert_eq!(keys(&v["started"]), ["m-approved", "m-plain"]);
+    assert_eq!(w.calls_of("systemd-run").len(), 2);
+    assert_eq!(waiting(&v), pairs(&[("r", "slots 4/2")]));
+    assert_eq!(w.notes(), pairs(&[("r", "slots 4/2")]));
+    // (b) A load over the busy limit, and a load that leaves the slice less than its floor.
+    for (quota, load, over) in [
+        (
+            json!({"slice": SLICE, "busy_limit": 50}),
+            (4, 60, 200),
+            "cpu over 50%",
+        ),
+        (json!({"slice": SLICE}), (2, 80, 10), "cpu outside"),
+    ] {
+        let mut w = W::new();
+        w.policy_with(json!({ "quota": quota }));
+        w.put("m", accepted("plain", &head, None));
+        w.load(load.0, load.1, load.2);
+        let v = w.ok();
+        assert_eq!(keys(&v["started"]), ["m"]);
+        assert_eq!(v["waiting"], json!([]));
+        assert_eq!(
+            (v["busy"].clone(), v["outside"].clone()),
+            (Value::Null, Value::Null)
+        );
+        assert_eq!(stat_reads(&w), 0);
+        let mut w = W::new();
+        w.policy_with(json!({ "quota": quota }));
+        w.put("m", accepted("plain", &head, None));
+        w.ready("r", &["r/**"], 1);
+        w.load(load.0, load.1, load.2);
+        let v = w.ok();
+        assert_eq!(keys(&v["started"]), ["m"]);
+        assert_eq!(waiting(&v), pairs(&[("r", over)]));
+        assert_eq!(stat_reads(&w), 2);
+        assert_ne!(v["busy"], Value::Null);
+    }
+    // (c) What still holds, with every slot taken by live run units.
+    let mut w = W::new();
+    w.policy_with(json!({"work": {"prefix": PREFIX, "slice": SLICE, "slots": 2}}));
+    w.put("m-bad", accepted("plain", &head, None));
+    w.refuse.insert("m-bad".into(), vec!["held".into()]);
+    w.put("m-again", accepted("plain", &head, None));
+    w.put("c-none", accepted("contract", &head, None));
+    w.put("c-old", accepted("effect", &head, Some(&"b".repeat(40))));
+    w.put("m-live", accepted("plain", &head, None));
+    std::fs::create_dir_all(w.root().join("m-again")).unwrap();
+    std::fs::write(
+        w.root().join("m-again").join("started"),
+        w.revision("m-again"),
+    )
+    .unwrap();
+    w.live(&[
+        "aptest-d1.service loaded active running d",
+        "aptest-d2.service loaded active running d",
+        "aptest-m-live.service loaded active running m",
+    ]);
+    let v = w.ok();
+    assert_eq!(v["started"], json!([]));
+    assert!(w.calls_of("systemd-run").is_empty());
+    assert_eq!(waiting(&v), pairs(&[("m-bad", "held")]));
+    assert!(w.notes().is_empty());
+    assert_eq!(keys(&v["not_restarted"]), ["m-again"]);
+    assert!(keys(&v["in_flight"]).contains(&"m-live".to_owned()));
+    let gets = w.gets();
+    assert!(!gets.contains(&"c-none".to_owned()) && !gets.contains(&"c-old".to_owned()));
+    assert!(!gets.contains(&"m-live".to_owned()));
+    // (d) The one slot free: the merge candidate takes it, the `ready` unit waits.
+    let mut w = W::new();
+    w.policy_with(json!({"work": {"prefix": PREFIX, "slice": SLICE, "slots": 1}}));
+    w.put("m", accepted("plain", &head, None));
+    w.ready("r", &["r/**"], 1);
+    let v = w.ok();
+    assert_eq!(keys(&v["started"]), ["m"]);
+    assert_eq!(waiting(&v), pairs(&[("r", "slots 1/1")]));
+}
