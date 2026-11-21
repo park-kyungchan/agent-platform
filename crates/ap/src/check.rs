@@ -13,7 +13,7 @@ use std::{
     io::{Read, Write},
     os::unix::{
         ffi::OsStrExt,
-        fs::DirBuilderExt,
+        fs::{DirBuilderExt, OpenOptionsExt},
         process::{CommandExt, ExitStatusExt},
     },
     path::{Path, PathBuf},
@@ -26,10 +26,13 @@ use std::{
 const PC_SCRIPT: &str = include_str!("check/pc.sh");
 /// The PC's CPUs, its one-minute load, the `MemAvailable` of its Linux in kB, Windows'
 /// `FreePhysicalMemory` in kB as PowerShell answers it (its whitespace made spaces; empty when the
-/// call fails), and the HEAD of the worktree's repository there, if any (R4): the file read as text,
-/// no git run on what a command might have left. One bounded PowerShell call, which only reads; its
-/// text holds no `"`, since interop rebuilds a Windows command line from the arguments.
-const PROBE: &str = r#"w=$(timeout 10 /mnt/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe -NoProfile -NonInteractive -Command '(Get-CimInstance Win32_OperatingSystem).FreePhysicalMemory' </dev/null 2>/dev/null) || w=; printf '%s %s %s %s\n' "$(nproc)" "$(cut -d ' ' -f 1 /proc/loadavg)" "$(sed -n 's/^MemAvailable: *\([0-9][0-9]*\) kB$/\1/p' /proc/meminfo 2>/dev/null)" "${w//[[:space:]]/ }"; [ -L "$1/HEAD" ] || head -c 80 -- "$1/HEAD" 2>/dev/null; exit 0"#;
+/// call fails); on the second line the first line of the account's `ont --version` (R19), run once
+/// in the login environment (the PC user's `~/.profile`, read in a subshell of its own as the PC's
+/// script reads it), outside any sandbox, bounded, its input empty and its errors discarded; and the
+/// HEAD of the worktree's repository there, if any (R4): the file read as text, no git run on what a
+/// command might have left. One bounded PowerShell call, which only reads; its text holds no `"`,
+/// since interop rebuilds a Windows command line from the arguments.
+const PROBE: &str = r#"w=$(timeout 10 /mnt/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe -NoProfile -NonInteractive -Command '(Get-CimInstance Win32_OperatingSystem).FreePhysicalMemory' </dev/null 2>/dev/null) || w=; e=$(if [ -r "$HOME/.profile" ]; then . "$HOME/.profile" >/dev/null 2>&1 </dev/null; fi; timeout 10 ont --version </dev/null 2>/dev/null) || e=; printf '%s %s %s %s\n%s\n' "$(nproc)" "$(cut -d ' ' -f 1 /proc/loadavg)" "$(sed -n 's/^MemAvailable: *\([0-9][0-9]*\) kB$/\1/p' /proc/meminfo 2>/dev/null)" "${w//[[:space:]]/ }" "${e%%$'\n'*}"; [ -L "$1/HEAD" ] || head -c 80 -- "$1/HEAD" 2>/dev/null; exit 0"#;
 /// The only variables of this process that a `tailscale` child gets (R7): not `LANG` or `LC_*`, which
 /// the ssh client's default `SendEnv` would send to the PC, nor an agent socket.
 const TAILSCALE_ENV: [&str; 4] = ["PATH", "HOME", "USER", "LOGNAME"];
@@ -215,6 +218,10 @@ fn line(bytes: Vec<u8>) -> Option<String> {
 fn is_hex(s: &str) -> bool {
     matches!(s.len(), 40 | 64) && s.bytes().all(|c| c.is_ascii_hexdigit())
 }
+/// A revision of the engine as `ap deliver` reads one: 40 lowercase hexadecimal digits.
+fn hex40(s: &str) -> bool {
+    s.len() == 40 && s.bytes().all(|c| matches!(c, b'0'..=b'9' | b'a'..=b'f'))
+}
 /// `owner/name` of a GitHub remote URL (`https://`, `ssh://` or `git@github.com:`), None otherwise.
 pub fn github(url: &str) -> Option<String> {
     let path =
@@ -362,6 +369,51 @@ pub fn probe_line(line: &str) -> Option<Probe> {
         windows_mb: windows_kb.map(|k| k / 1024),
     })
 }
+/// The revision the first line of `ont --version` names (R19): the third word of a line of exactly
+/// three words, the first `ont` and the third 40 hexadecimal digits; None for any other line.
+pub fn engine_line(line: &str) -> Option<String> {
+    let words: Vec<&str> = line.split_whitespace().collect();
+    (words.len() == 3 && words[0] == "ont" && hex40(words[2])).then(|| words[2].to_owned())
+}
+/// Whether the call runs here for its engine (R19): the worktree has a pinned engine and the PC's
+/// `ont` names no revision equal to it; a pin that is not 40 hexadecimal digits equals none.
+pub fn engine_differs(pin: Option<&str>, engine: Option<&str>) -> bool {
+    pin.is_some_and(|p| !(hex40(p) && engine == Some(p)))
+}
+/// The pinned engine of a worktree (R19): the text of `<dir>/ontology/ENGINE-PIN` without whitespace
+/// when that is a regular file of its working tree, read here; None without one. A file that cannot
+/// be read is an empty pin, which no engine names.
+pub fn engine_pin(dir: &str) -> Option<String> {
+    let ontology = Path::new(dir).join("ontology");
+    let file = ontology.join("ENGINE-PIN");
+    let regular = fs::symlink_metadata(&ontology).is_ok_and(|m| m.is_dir())
+        && fs::symlink_metadata(&file).is_ok_and(|m| m.is_file());
+    regular.then(|| {
+        let bytes = fs::read(&file).unwrap_or_default();
+        String::from_utf8_lossy(&bytes).split_whitespace().collect()
+    })
+}
+/// What the probe answered (R4, R19): its readings, the revision the account's `ont` names, and the
+/// HEAD of the worktree's repository on the PC.
+#[derive(Debug, PartialEq)]
+pub struct Answer {
+    pub probe: Probe,
+    pub engine: Option<String>,
+    pub head: Option<String>,
+}
+/// The probe's text: None where its first line cannot be read (no answer, R4); an engine line that
+/// names no revision is an answer without an engine.
+pub fn probe_answer(text: &str) -> Option<Answer> {
+    let mut lines = text.lines();
+    let probe = probe_line(lines.next().unwrap_or(""))?;
+    let engine = lines.next().and_then(engine_line);
+    let head = lines.next().map(str::to_owned).filter(|h| is_hex(h));
+    Some(Answer {
+        probe,
+        engine,
+        head,
+    })
+}
 /// Where the call runs (R4), with what the probe read where it answered.
 enum Place {
     Pc { probe: Probe, head: Option<String> },
@@ -398,7 +450,7 @@ fn answer(mut c: Command, limit: Duration) -> Option<Vec<u8>> {
     let bytes = rx.recv_timeout(Duration::from_secs(2)).ok()?;
     status.success().then_some(bytes)
 }
-fn place(pc: &Pc, key: &str) -> Place {
+fn place(pc: &Pc, key: &str, pin: Option<&str>) -> Place {
     let ping = [
         "ping",
         "--c",
@@ -419,17 +471,21 @@ fn place(pc: &Pc, key: &str) -> Place {
     ) else {
         return Place::Here("pc_unreachable", None);
     };
-    let text = String::from_utf8_lossy(&stdout);
-    let mut lines = text.lines();
-    let Some(probe) = probe_line(lines.next().unwrap_or("")) else {
+    let Some(Answer {
+        probe,
+        engine,
+        head,
+    }) = probe_answer(&String::from_utf8_lossy(&stdout))
+    else {
         return Place::Here("pc_unreachable", None);
     };
+    // The engine before the load and the memory (R19).
+    if engine_differs(pin, engine.as_deref()) {
+        return Place::Here("pc_engine_differs", Some(probe));
+    }
     match placement(pc, &probe) {
         Some(reason) => Place::Here(reason, Some(probe)),
-        None => Place::Pc {
-            probe,
-            head: lines.next().map(str::to_owned).filter(|h| is_hex(h)),
-        },
+        None => Place::Pc { probe, head },
     }
 }
 /// None when the PC takes the call: its load below `busy_load` times its CPUs and its available
@@ -804,9 +860,11 @@ fn record(
         "pc_min_wsl_available_mb": min_wsl_available_mb,
     });
     let path = variable("AP_CHECKS_LOG", DEFAULT_LOG);
+    // A file made here is the caller's alone; one that exists keeps its mode and owner.
     let written = OpenOptions::new()
         .append(true)
         .create(true)
+        .mode(0o600)
         .open(&path)
         .and_then(|mut f| f.write_all(format!("{line}\n").as_bytes()));
     if written.is_err() {
@@ -837,7 +895,7 @@ pub fn cli(argv: &[OsString]) -> ExitCode {
     };
     let (probe, low, (host, reason, exit)) = match &pc {
         None => (None, None, local("no_pc_in_policy")),
-        Some(pc) => match place(pc, &key) {
+        Some(pc) => match place(pc, &key, engine_pin(&tree.dir).as_deref()) {
             Place::Here(reason, probe) => (probe, None, local(reason)),
             Place::Pc { probe, head } => {
                 say(&format!(
@@ -1071,6 +1129,84 @@ mod tests {
             ..pc
         };
         assert_eq!(placement(&none, &probe("0.1", 0, Some(0))), None);
+    }
+
+    // spec: specs/ap/check.md#R19
+    #[test]
+    fn the_engine_is_the_third_word_of_ont_version_and_a_pin_it_does_not_name_differs() {
+        let rev = "0123456789abcdef0123456789abcdef01234567";
+        assert_eq!(engine_line(&format!("ont 0.1.0 {rev}")), Some(rev.into()));
+        assert_eq!(
+            engine_line(&format!(" ont  0.2.0\t{rev}\r")),
+            Some(rev.into())
+        );
+        for bad in [
+            String::new(),
+            format!("ont {rev}"),
+            format!("ont 0.1.0 {rev} extra"),
+            format!("ontx 0.1.0 {rev}"),
+            format!("ont 0.1.0 {}", rev.to_uppercase()),
+            format!("ont 0.1.0 {}", &rev[..39]),
+            format!("ont 0.1.0 {rev}0"),
+            "ont 0.1.0 not-a-revision".into(),
+        ] {
+            assert_eq!(engine_line(&bad), None, "{bad:?}");
+        }
+        // No pin: the engine does not matter. A pin: only the same revision is equal.
+        assert!(!engine_differs(None, None));
+        assert!(!engine_differs(None, Some(rev)));
+        assert!(!engine_differs(Some(rev), Some(rev)));
+        assert!(engine_differs(Some(rev), None));
+        let other = "1123456789abcdef0123456789abcdef01234567";
+        assert!(engine_differs(Some(rev), Some(other)));
+        // A pin that is not 40 hexadecimal digits equals none.
+        for pin in ["", "abc", "0123456789ABCDEF0123456789ABCDEF01234567"] {
+            assert!(engine_differs(Some(pin), Some(pin)), "{pin:?}");
+        }
+    }
+
+    // spec: specs/ap/check.md#R4
+    // spec: specs/ap/check.md#R19
+    #[test]
+    fn the_probe_answers_its_readings_the_engine_and_the_head() {
+        let rev = "0123456789abcdef0123456789abcdef01234567";
+        let head = "89abcdef0123456789abcdef0123456789abcdef";
+        let a = probe_answer(&format!("4 0.5 2097152 \nont 0.1.0 {rev}\n{head}\n")).unwrap();
+        assert_eq!(a.probe.cpus, 4);
+        assert_eq!(a.engine.as_deref(), Some(rev));
+        assert_eq!(a.head.as_deref(), Some(head));
+        // Without an engine, and without a HEAD at all (its file absent): still an answer.
+        let a = probe_answer(&format!("4 0.5 2097152 \n\n{head}")).unwrap();
+        assert_eq!((a.engine, a.head.as_deref()), (None, Some(head)));
+        let a = probe_answer("4 0.5 2097152 \nont: not found\n").unwrap();
+        assert_eq!((a.engine, a.head), (None, None));
+        assert_eq!(probe_answer("4 0.5 2097152").unwrap().engine, None);
+        // The readings unread: no answer, whatever the engine.
+        assert_eq!(probe_answer(&format!("4 0.5\nont 0.1.0 {rev}\n")), None);
+        assert_eq!(probe_answer(""), None);
+    }
+
+    // spec: specs/ap/check.md#R19
+    #[test]
+    fn the_pin_is_a_regular_file_of_the_working_tree_without_whitespace() {
+        let root = std::env::temp_dir().join(format!("ap-check-pin.{}", std::process::id()));
+        let _ = fs::remove_dir_all(&root);
+        let dir = root.to_str().unwrap().to_owned();
+        fs::create_dir_all(root.join("ontology")).unwrap();
+        assert_eq!(engine_pin(&dir), None);
+        fs::write(root.join("ontology/ENGINE-PIN"), " abc\n def \n").unwrap();
+        assert_eq!(engine_pin(&dir).as_deref(), Some("abcdef"));
+        fs::write(root.join("ontology/ENGINE-PIN"), "").unwrap();
+        assert_eq!(engine_pin(&dir).as_deref(), Some(""));
+        // A link or a directory is no pinned engine.
+        fs::remove_file(root.join("ontology/ENGINE-PIN")).unwrap();
+        fs::write(root.join("elsewhere"), "abc").unwrap();
+        std::os::unix::fs::symlink("../elsewhere", root.join("ontology/ENGINE-PIN")).unwrap();
+        assert_eq!(engine_pin(&dir), None);
+        fs::remove_file(root.join("ontology/ENGINE-PIN")).unwrap();
+        fs::create_dir(root.join("ontology/ENGINE-PIN")).unwrap();
+        assert_eq!(engine_pin(&dir), None);
+        fs::remove_dir_all(&root).unwrap();
     }
 
     #[test]
