@@ -8600,31 +8600,91 @@ fn limits_r1_an_implementer_and_a_fixer_with_the_four_members() {
     type Change<'a> = Box<dyn Fn(&mut Value) + 'a>;
     let set = |r: &mut Value, k: &str, v: Value| r["limits"][k] = v;
     let cases: Vec<(&str, Change)> = vec![
-        ("other member", Box::new(|r| set(r, "bind", json!([p("w1")])))),
-        ("write not a list", Box::new(|r| set(r, "write", json!(p("w1"))))),
+        (
+            "other member",
+            Box::new(|r| set(r, "bind", json!([p("w1")]))),
+        ),
+        (
+            "write not a list",
+            Box::new(|r| set(r, "write", json!(p("w1")))),
+        ),
         ("write empty", Box::new(|r| set(r, "write", json!([])))),
-        ("write of nine", Box::new(|r| set(r, "write", json!(vec![p("w1"); 9])))),
+        (
+            "write of nine",
+            Box::new(|r| set(r, "write", json!(vec![p("w1"); 9]))),
+        ),
         ("write not text", Box::new(|r| set(r, "write", json!([7])))),
-        ("write relative", Box::new(|r| set(r, "write", json!(["w1"])))),
+        (
+            "write relative",
+            Box::new(|r| set(r, "write", json!(["w1"]))),
+        ),
         ("write is /", Box::new(|r| set(r, "write", json!(["/"])))),
         ("write //", Box::new(|r| set(r, "write", json!(["//"])))),
-        ("write with ..", Box::new(|r| set(r, "write", json!([p("w1/../w2")])))),
-        ("over not pairs", Box::new(|r| set(r, "over", json!([p("src")])))),
-        ("over of three", Box::new(|r| set(r, "over", json!([[p("src"), p("dst"), p("w1")]])))),
-        ("over of five", Box::new(|r| set(r, "over", json!(vec![json!([p("src"), p("dst")]); 5])))),
+        (
+            "write with ..",
+            Box::new(|r| set(r, "write", json!([p("w1/../w2")]))),
+        ),
+        (
+            "over not pairs",
+            Box::new(|r| set(r, "over", json!([p("src")]))),
+        ),
+        (
+            "over of three",
+            Box::new(|r| set(r, "over", json!([[p("src"), p("dst"), p("w1")]]))),
+        ),
+        (
+            "over of five",
+            Box::new(|r| set(r, "over", json!(vec![json!([p("src"), p("dst")]); 5]))),
+        ),
         ("over empty", Box::new(|r| set(r, "over", json!([])))),
-        ("over target /", Box::new(|r| set(r, "over", json!([[p("src"), "/"]])))),
-        ("over source with ..", Box::new(|r| set(r, "over", json!([[p("x/../src"), p("dst")]])))),
-        ("read_only of nine", Box::new(|r| set(r, "read_only", json!(vec![p("w1/keep"); 9])))),
-        ("read_only relative", Box::new(|r| set(r, "read_only", json!(["keep"])))),
-        ("read_only with ..", Box::new(|r| set(r, "read_only", json!([p("w1/../w1/keep")])))),
-        ("show another path", Box::new(|r| set(r, "show", json!(["~/.ssh"])))),
-        ("show a text", Box::new(|r| set(r, "show", json!("~/.config/gh")))),
-        ("show twice", Box::new(|r| set(r, "show", json!(["~/.config/gh", "~/.config/gh"])))),
-        ("write in ~/.ssh", Box::new(|r| set(r, "write", json!([p("home/.ssh/x")])))),
-        ("write an edu- name", Box::new(|r| set(r, "write", json!([p("work/edu-a")])))),
-        ("over source in /run/user", Box::new(|r| set(r, "over", json!([["/run/user/0", p("dst")]])))),
-        ("over target ~/.config/gh", Box::new(|r| set(r, "over", json!([[p("src"), p("home/.config/gh")]])))),
+        (
+            "over target /",
+            Box::new(|r| set(r, "over", json!([[p("src"), "/"]]))),
+        ),
+        (
+            "over source with ..",
+            Box::new(|r| set(r, "over", json!([[p("x/../src"), p("dst")]]))),
+        ),
+        (
+            "read_only of nine",
+            Box::new(|r| set(r, "read_only", json!(vec![p("w1/keep"); 9]))),
+        ),
+        (
+            "read_only relative",
+            Box::new(|r| set(r, "read_only", json!(["keep"]))),
+        ),
+        (
+            "read_only with ..",
+            Box::new(|r| set(r, "read_only", json!([p("w1/../w1/keep")]))),
+        ),
+        (
+            "show another path",
+            Box::new(|r| set(r, "show", json!(["~/.ssh"]))),
+        ),
+        (
+            "show a text",
+            Box::new(|r| set(r, "show", json!("~/.config/gh"))),
+        ),
+        (
+            "show twice",
+            Box::new(|r| set(r, "show", json!(["~/.config/gh", "~/.config/gh"]))),
+        ),
+        (
+            "write in ~/.ssh",
+            Box::new(|r| set(r, "write", json!([p("home/.ssh/x")]))),
+        ),
+        (
+            "write an edu- name",
+            Box::new(|r| set(r, "write", json!([p("work/edu-a")]))),
+        ),
+        (
+            "over source in /run/user",
+            Box::new(|r| set(r, "over", json!([["/run/user/0", p("dst")]]))),
+        ),
+        (
+            "over target ~/.config/gh",
+            Box::new(|r| set(r, "over", json!([[p("src"), p("home/.config/gh")]]))),
+        ),
         (
             "write holds out",
             Box::new(|r| {
@@ -8646,13 +8706,27 @@ fn limits_r1_an_implementer_and_a_fixer_with_the_four_members() {
                 set(r, "over", json!([[p("src"), p("o/y.md")]]));
             }),
         ),
-        ("scratch is a write path", Box::new(|r| set(r, "write", json!([p("scratch")])))),
-        ("scratch in a write path", Box::new(|r| set(r, "scratch", json!(p("w2/s"))))),
-        ("scratch in an over source", Box::new(|r| set(r, "scratch", json!(p("src/s"))))),
-        ("scratch in an over target", Box::new(|r| set(r, "scratch", json!(p("dst/s"))))),
+        (
+            "scratch is a write path",
+            Box::new(|r| set(r, "write", json!([p("scratch")]))),
+        ),
+        (
+            "scratch in a write path",
+            Box::new(|r| set(r, "scratch", json!(p("w2/s")))),
+        ),
+        (
+            "scratch in an over source",
+            Box::new(|r| set(r, "scratch", json!(p("src/s")))),
+        ),
+        (
+            "scratch in an over target",
+            Box::new(|r| set(r, "scratch", json!(p("dst/s")))),
+        ),
         (
             "expect.file",
-            Box::new(|r| r["expect"] = json!({"file": r["cwd"].as_str().unwrap().to_owned() + "/a"})),
+            Box::new(|r| {
+                r["expect"] = json!({"file": r["cwd"].as_str().unwrap().to_owned() + "/a"})
+            }),
         ),
     ];
     let probes = f.probes.len();
@@ -8685,15 +8759,51 @@ fn limits_r11_the_paths_a_request_names_exist_without_a_link_before_the_probe_an
     let set = |r: &mut Value, k: &str, v: Value| r["limits"][k] = v;
     type Change<'a> = Box<dyn Fn(&mut Value) + 'a>;
     let cases: Vec<(&str, String, Change)> = vec![
-        ("write absent", p("absent"), Box::new(|r| set(r, "write", json!([p("w1"), p("absent")])))),
-        ("write a file", p("file"), Box::new(|r| set(r, "write", json!([p("file")])))),
-        ("write a link", p("w2link"), Box::new(|r| set(r, "write", json!([p("w2link")])))),
-        ("write below a link", p("link/inner"), Box::new(|r| set(r, "write", json!([p("link/inner")])))),
-        ("over source absent", p("absent"), Box::new(|r| set(r, "over", json!([[p("absent"), p("dst")]])))),
-        ("over target a file", p("file"), Box::new(|r| set(r, "over", json!([[p("src"), p("file")]])))),
-        ("over target a link", p("w2link"), Box::new(|r| set(r, "over", json!([[p("src"), p("w2link")]])))),
-        ("read_only absent", p("absent"), Box::new(|r| set(r, "read_only", json!([p("w1/keep"), p("absent")])))),
-        ("read_only below a link", p("link/inner"), Box::new(|r| set(r, "read_only", json!([p("link/inner")])))),
+        (
+            "write absent",
+            p("absent"),
+            Box::new(|r| set(r, "write", json!([p("w1"), p("absent")]))),
+        ),
+        (
+            "write a file",
+            p("file"),
+            Box::new(|r| set(r, "write", json!([p("file")]))),
+        ),
+        (
+            "write a link",
+            p("w2link"),
+            Box::new(|r| set(r, "write", json!([p("w2link")]))),
+        ),
+        (
+            "write below a link",
+            p("link/inner"),
+            Box::new(|r| set(r, "write", json!([p("link/inner")]))),
+        ),
+        (
+            "over source absent",
+            p("absent"),
+            Box::new(|r| set(r, "over", json!([[p("absent"), p("dst")]]))),
+        ),
+        (
+            "over target a file",
+            p("file"),
+            Box::new(|r| set(r, "over", json!([[p("src"), p("file")]]))),
+        ),
+        (
+            "over target a link",
+            p("w2link"),
+            Box::new(|r| set(r, "over", json!([[p("src"), p("w2link")]]))),
+        ),
+        (
+            "read_only absent",
+            p("absent"),
+            Box::new(|r| set(r, "read_only", json!([p("w1/keep"), p("absent")]))),
+        ),
+        (
+            "read_only below a link",
+            p("link/inner"),
+            Box::new(|r| set(r, "read_only", json!([p("link/inner")]))),
+        ),
         (
             "write before over before read_only",
             p("gone-w"),
@@ -8731,8 +8841,10 @@ fn limits_r11_the_paths_a_request_names_exist_without_a_link_before_the_probe_an
         "model_not_allowed@model"
     );
     // A directory read-only is a `read_only` path too.
-    f.policy_is(&json!({"models": {"allowed": ["sonnet", "opus"], "never": []},
-                        "accounts": {"claude": [f.p("a1")]}}));
+    f.policy_is(
+        &json!({"models": {"allowed": ["sonnet", "opus"], "never": []},
+                        "accounts": {"claude": [f.p("a1")]}}),
+    );
     let mut r = f.named_request("x.md", "fixer");
     r["limits"]["read_only"] = json!([f.p("w2"), f.p("w1/keep")]);
     let (v, _) = f.run(&r).unwrap();
@@ -8755,9 +8867,24 @@ fn limits_r5_the_named_paths_follow_the_scratch_in_their_order_and_the_record_na
     let after = f.after_unit(0);
     let base = f.bwrap("a1");
     let named: Vec<String> = [
-        "--bind", &f.p("w2"), &f.p("w2"), "--bind", &f.p("w1"), &f.p("w1"),
-        "--bind", &f.p("src"), &f.p("dst"), "--bind", &f.p("w2"), &f.p("src"),
-        "--ro-bind", &f.p("w1/keep"), &f.p("w1/keep"), "--ro-bind", &f.p("dst"), &f.p("dst"),
+        "--bind",
+        &f.p("w2"),
+        &f.p("w2"),
+        "--bind",
+        &f.p("w1"),
+        &f.p("w1"),
+        "--bind",
+        &f.p("src"),
+        &f.p("dst"),
+        "--bind",
+        &f.p("w2"),
+        &f.p("src"),
+        "--ro-bind",
+        &f.p("w1/keep"),
+        &f.p("w1/keep"),
+        "--ro-bind",
+        &f.p("dst"),
+        &f.p("dst"),
     ]
     .map(str::to_owned)
     .to_vec();
@@ -8796,7 +8923,10 @@ fn limits_r5_the_named_paths_follow_the_scratch_in_their_order_and_the_record_na
     );
     assert!(!after[21..].iter().any(|w| w == "--bind"), "{after:?}");
     assert_eq!(v["limits"]["hidden"][0], json!(gh), "{v}");
-    assert_eq!(v["limits"]["writable"], json!([f.p("a1"), f.p("scratch"), f.p("w1")]));
+    assert_eq!(
+        v["limits"]["writable"],
+        json!([f.p("a1"), f.p("scratch"), f.p("w1")])
+    );
     for k in ["over", "read_only", "show", "write"] {
         assert!(v["limits"].get(k).is_none(), "{k}: {v}");
     }

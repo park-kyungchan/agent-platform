@@ -1053,7 +1053,9 @@ impl Run {
         let g = self.git(s, &self.clone, &words)?;
         // The one line of a regular file that is not a link.
         let line = |p: &Path| -> Option<String> {
-            p.symlink_metadata().ok().filter(|m| m.file_type().is_file())?;
+            p.symlink_metadata()
+                .ok()
+                .filter(|m| m.file_type().is_file())?;
             let text = std::fs::read_to_string(p).ok()?;
             let text = text.strip_suffix('\n').unwrap_or(&text);
             (!text.contains('\n')).then(|| text.to_owned())

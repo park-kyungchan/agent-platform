@@ -1120,7 +1120,7 @@ fn request_at(s: &mut impl System, r: &Value, at_cwd: bool) -> Result<Request, F
                 &cwd,
                 &["status", "--porcelain", "--ignore-submodules=all"],
             )
-                .map_err(|_| error("worktree_unreadable", "cwd"))?;
+            .map_err(|_| error("worktree_unreadable", "cwd"))?;
             require!(status.success => "worktree_unreadable", "cwd");
             require!(status.stdout.is_empty() || continue_dirty => "worktree_dirty", "cwd");
         } else {

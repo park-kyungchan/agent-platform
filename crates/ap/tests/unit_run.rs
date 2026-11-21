@@ -4141,9 +4141,15 @@ impl F {
                 (g.join("objects"), g.join("objects")),
                 (admin.clone(), admin.clone()),
                 (g.join("refs/heads/unit"), g.join("refs/heads/unit")),
-                (g.join("logs/refs/heads/unit"), g.join("logs/refs/heads/unit")),
+                (
+                    g.join("logs/refs/heads/unit"),
+                    g.join("logs/refs/heads/unit"),
+                ),
                 (home.join("remotes/refs"), g.join("refs/remotes/origin")),
-                (home.join("remotes/logs"), g.join("logs/refs/remotes/origin")),
+                (
+                    home.join("remotes/logs"),
+                    g.join("logs/refs/remotes/origin"),
+                ),
                 (home.join("remotes/tags"), g.join("refs/tags")),
             ];
             for (from, to) in pairs {
@@ -4227,7 +4233,8 @@ fn r38_every_stage_runs_under_limits_and_an_author_writes_its_worktree_and_its_o
             "{role}"
         );
         // The record names the limits of the request.
-        let read = |p: PathBuf| -> Value { serde_json::from_slice(&std::fs::read(p).unwrap()).unwrap() };
+        let read =
+            |p: PathBuf| -> Value { serde_json::from_slice(&std::fs::read(p).unwrap()).unwrap() };
         let prompt = format!("/{n}.{role}.prompt.md");
         let rec = match author {
             true => read(home.join(format!("{n}.{role}.md.run.json"))),
@@ -4243,7 +4250,11 @@ fn r38_every_stage_runs_under_limits_and_an_author_writes_its_worktree_and_its_o
             json!(format!("{}/scratch/{n}", home.display()))
         );
         assert_eq!(limits.get("over").is_some(), author, "{role}: {limits}");
-        assert_eq!(limits.get("read_only").is_some(), author, "{role}: {limits}");
+        assert_eq!(
+            limits.get("read_only").is_some(),
+            author,
+            "{role}: {limits}"
+        );
         let writable = limits["writable"].as_array().unwrap();
         assert_eq!(writable.len(), if author { 10 } else { 2 }, "{limits}");
     }
@@ -4259,7 +4270,13 @@ fn r38_every_stage_runs_under_limits_and_an_author_writes_its_worktree_and_its_o
     ] {
         assert!(g.join(d).is_dir(), "{d}");
     }
-    for d in ["scratch", "remotes", "remotes/refs", "remotes/logs", "remotes/tags"] {
+    for d in [
+        "scratch",
+        "remotes",
+        "remotes/refs",
+        "remotes/logs",
+        "remotes/tags",
+    ] {
         assert_eq!(mode(&home.join(d)), 0o700, "{d}");
     }
     let config = std::fs::symlink_metadata(admin.join("config.worktree")).unwrap();
@@ -4297,8 +4314,15 @@ fn r38_a_directory_at_the_name_of_the_views_main_is_removed_and_a_failure_starts
     std::os::unix::fs::symlink(&outside, home.join("remotes/refs/main/link")).unwrap();
     let (a, _) = f.ok();
     assert_eq!(a["state"], "accepted", "{a}");
-    assert!(std::fs::symlink_metadata(home.join("remotes/refs/main")).unwrap().is_file());
-    assert_eq!(std::fs::read_to_string(outside.join("kept")).unwrap(), "kept\n");
+    assert!(
+        std::fs::symlink_metadata(home.join("remotes/refs/main"))
+            .unwrap()
+            .is_file()
+    );
+    assert_eq!(
+        std::fs::read_to_string(outside.join("kept")).unwrap(),
+        "kept\n"
+    );
     // A name the run cannot write: the unit stops `worktree_failed` and no stage starts.
     let mut f = F::new();
     f.steps(&["implement", "accept"]);
@@ -4413,11 +4437,15 @@ fn r39_every_git_call_of_the_driver_runs_no_hook_and_enters_no_submodule() {
         assert!(seen.contains(word), "{word}: {seen:?}");
     }
     // A diff between two commits keeps its options.
-    let between = f.calls.iter().find(|c| {
-        c.0 == "git" && c.1.iter().any(|w| w == "diff") && c.1.iter().any(|w| w == "-z")
-    });
+    let between = f
+        .calls
+        .iter()
+        .find(|c| c.0 == "git" && c.1.iter().any(|w| w == "diff") && c.1.iter().any(|w| w == "-z"));
     let between = &between.unwrap().1;
-    assert!(between.contains(&"--ignore-submodules=none".to_owned()), "{between:?}");
+    assert!(
+        between.contains(&"--ignore-submodules=none".to_owned()),
+        "{between:?}"
+    );
 }
 
 /// A program at `<t>/bin/mark-<name>` that leaves the file `<t>/marks/<name>` when the run runs it,
@@ -4497,9 +4525,11 @@ fn r39_with_the_real_git_no_hook_fsmonitor_or_filter_of_a_stage_runs_in_the_driv
     // What the stage left was there: a submodule merged into `main`, the fsmonitor line.
     let sub = f.origin(&["ls-tree", "refs/heads/main", "src/sub"]);
     assert!(sub.starts_with("160000 commit "), "{sub}");
-    assert!(std::fs::read_to_string(f.git_dirs().1.join("config.worktree"))
-        .unwrap()
-        .contains("fsmonitor"));
+    assert!(
+        std::fs::read_to_string(f.git_dirs().1.join("config.worktree"))
+            .unwrap()
+            .contains("fsmonitor")
+    );
     // Git refuses to remove a worktree with a committed submodule.
     assert_eq!(a["cleanup"]["worktree"], "worktree_kept", "{a}");
     // The update conflicts: the merge, the conflicting paths, the abort.
@@ -4508,7 +4538,10 @@ fn r39_with_the_real_git_no_hook_fsmonitor_or_filter_of_a_stage_runs_in_the_driv
     f.steps(&["edit"]);
     let a = f.stopped("merge_conflict");
     assert!(
-        a["stop_detail"].as_str().unwrap().contains("src/widgets.rs"),
+        a["stop_detail"]
+            .as_str()
+            .unwrap()
+            .contains("src/widgets.rs"),
         "{a}"
     );
     assert_eq!(marks(&f), Vec::<String>::new());
@@ -4524,10 +4557,19 @@ fn r12_a_check_on_the_head_runs_in_its_view_and_without_units_as_on_the_base() {
     assert_eq!(a["state"], "merged", "{a}");
     let wt = f.wt().to_str().unwrap().to_owned();
     let dotgit = format!("{wt}/.git");
-    let run = f.calls.iter().find(|c| c.0 == "systemd-run").unwrap().1.clone();
+    let run = f
+        .calls
+        .iter()
+        .find(|c| c.0 == "systemd-run")
+        .unwrap()
+        .1
+        .clone();
     let at = run.iter().position(|a| a == BWRAP).unwrap();
     assert_eq!(run[..16][13..], ["--", "sh", "-c"].map(str::to_owned));
-    assert_eq!(run[19..23], ["env", "-i", "-C", wt.as_str()].map(str::to_owned));
+    assert_eq!(
+        run[19..23],
+        ["env", "-i", "-C", wt.as_str()].map(str::to_owned)
+    );
     assert!(run[at - 1].starts_with("AP_HEAD=") && run[at - 2].starts_with("AP_BASE="));
     let head = [
         BWRAP,
@@ -4559,7 +4601,16 @@ fn r12_a_check_on_the_head_runs_in_its_view_and_without_units_as_on_the_base() {
     );
     assert_eq!(
         run[end + 1..],
-        ["timeout", "-k", "10", "300", "bash", "-c", "test -f src/widgets.rs"].map(str::to_owned)
+        [
+            "timeout",
+            "-k",
+            "10",
+            "300",
+            "bash",
+            "-c",
+            "test -f src/widgets.rs"
+        ]
+        .map(str::to_owned)
     );
     assert_eq!(f.check_wraps[0], run[at..=end]);
     // The hidden paths are those a stage gets, the state of `gh` too, nothing shown.
@@ -4580,11 +4631,20 @@ fn r12_a_check_on_the_head_runs_in_its_view_and_without_units_as_on_the_base() {
     f.steps(&["implement", "accept"]);
     let a = f.stopped("stage_refused");
     let wt = f.wt().to_str().unwrap().to_owned();
-    assert!(a["stop_detail"].as_str().unwrap().contains("systemd_absent"), "{a}");
+    assert!(
+        a["stop_detail"]
+            .as_str()
+            .unwrap()
+            .contains("systemd_absent"),
+        "{a}"
+    );
     let sh = &f.calls.iter().find(|c| c.0 == "sh").unwrap().1;
     assert!(!sh.contains(&BWRAP.to_owned()), "{sh:?}");
     assert_eq!(sh.len(), 19, "{sh:?}");
-    assert_eq!(sh[4..8], ["env", "-i", "-C", wt.as_str()].map(str::to_owned));
+    assert_eq!(
+        sh[4..8],
+        ["env", "-i", "-C", wt.as_str()].map(str::to_owned)
+    );
     assert_eq!(
         sh[12..18],
         ["timeout", "-k", "10", "300", "bash", "-c"].map(str::to_owned)
@@ -4616,7 +4676,10 @@ fn r7_the_scratch_directories_go_after_the_leftovers_and_r32_the_scratch_and_rem
     assert_eq!(a["state"], "accepted", "{a}");
     assert!(!scratch.join("1").exists() && !scratch.join("stray").exists());
     assert_eq!(std::fs::read_dir(&scratch).unwrap().count(), 0);
-    assert_eq!(std::fs::read_to_string(outside.join("kept")).unwrap(), "kept\n");
+    assert_eq!(
+        std::fs::read_to_string(outside.join("kept")).unwrap(),
+        "kept\n"
+    );
     // The record of the killed stage still says `running`; its run is closed in the store.
     assert_eq!(f.record("1.implementer.md.run.json")["state"], "running");
     assert_eq!(f.objects[&k("run", "run-1")]["state"], "killed");
@@ -4631,6 +4694,9 @@ fn r7_the_scratch_directories_go_after_the_leftovers_and_r32_the_scratch_and_rem
     symlink(&outside, &scratch).unwrap();
     symlink(&outside, f.home().join("remotes")).unwrap();
     f.ok();
-    assert_eq!(std::fs::read_to_string(outside.join("kept")).unwrap(), "kept\n");
+    assert_eq!(
+        std::fs::read_to_string(outside.join("kept")).unwrap(),
+        "kept\n"
+    );
     assert!(std::fs::symlink_metadata(&scratch).unwrap().is_symlink());
 }
