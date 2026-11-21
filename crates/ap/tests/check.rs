@@ -286,7 +286,8 @@ fn r1_a_malformed_call_is_refused_before_any_effect() {
     // Neither the record nor the PC is touched.
     assert!(!w.p("checks.jsonl").exists());
     assert!(!w.p("pc/calls").exists());
-    // The bounds themselves are taken.
+    // The bounds themselves are taken (here: one second does not cover the fake PC's setup on a busy host).
+    w.no_policy();
     for t in ["1", "14400"] {
         assert_eq!(
             w.ap(&[&d, "--timeout", t, "--", "true"]).status.code(),
