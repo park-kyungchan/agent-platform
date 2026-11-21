@@ -317,8 +317,9 @@ fn entries(
             .filter(|e| (1..=bytes).contains(&e.len()) && !e.chars().any(char::is_control));
         let checked = within.filter(|e| ok(e));
         let mut refused = bad(&format!("{k}.{i}"));
-        if within.is_some() && k == "write_set" {
-            // A text of neither form names both forms (R11).
+        if k == "write_set" && text_rule(Some(e), bytes) == FORM {
+            // An entry refused by the rule `form` names both forms (R11): a text of neither form, one
+            // with a control character, and a value that is no string.
             refused.detail = json!({"forms": WRITE_SET_FORMS});
         }
         b.text(checked.ok_or(refused), Some(e), bytes);

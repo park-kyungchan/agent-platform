@@ -1222,6 +1222,40 @@ fn r11_the_write_set() {
             );
         }
     }
+    // Every entry refused by the rule `form` names both forms: a control character, a value that is no string.
+    for (entry, shown) in [
+        (json!("a\tb"), "a\tb"),
+        (json!("a\nb/**"), "a\nb/**"),
+        (json!(5), "5"),
+        (json!(null), "null"),
+        (json!(["a"]), "[a]"),
+        (json!({"a": 1}), "{a}"),
+    ] {
+        for op in ["add", "amend"] {
+            let mut r = with(added("u-new"), json!({"write_set": ["ok/a", entry]}));
+            if op == "amend" {
+                r = with(
+                    writer("m"),
+                    json!({"unit": "u-amend", "write_set": ["ok/a", entry]}),
+                );
+            }
+            let e = no(&mut f, &[op], r);
+            assert_eq!(
+                (e.code.as_str(), e.field.as_str(), &e.detail),
+                (
+                    "invalid_input",
+                    "write_set.1",
+                    &json!({"forms": ["<path>", "<dir>/**"]})
+                ),
+                "{op} {shown}"
+            );
+            assert_eq!(
+                e.fields.unwrap(),
+                json!([{"field": "write_set.1", "rule": "form", "bytes": null, "limit": null}]),
+                "{op} {shown}"
+            );
+        }
+    }
     // The rules `required`, `max_bytes` and `max_entries` keep their entries and their detail.
     let e = no(
         &mut f,
