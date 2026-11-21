@@ -30,7 +30,7 @@ The file is one JSON object. `models` and `accounts` are required; every other t
 
 The member `work` (the dispatch pass's slots, slice and prefix) is read only by `ap work`: `specs/ap/work.md`.
 
-The member `hosts` (the local PC that `ap check` sends a check to: `hosts.pc` with exactly `ssh`, `work` and `busy_load`) is read only by `ap check`: `specs/ap/check.md` R16. A file without it is read by every verb as before.
+The member `hosts` (the local PC that `ap check` sends a check to: `hosts.pc` with exactly `ssh`, `work` and `busy_load`, and optionally `min_available_mb`, the PC's available memory in MB a call needs, 2,048 when absent) is read only by `ap check`: `specs/ap/check.md` R16. A file without it is read by every verb as before.
 
 Refusals, all exit 2 before any effect, `{"error":{"code","field","detail"}}` on stderr:
 

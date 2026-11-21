@@ -24,9 +24,12 @@ use std::{
 
 /// The PC's side, run as `bash -c` (R6 to R12).
 const PC_SCRIPT: &str = include_str!("check/pc.sh");
-/// The PC's CPUs, its one-minute load and the HEAD of the worktree's repository there, if any (R4):
-/// the file read as text, no git run on what a command might have left.
-const PROBE: &str = r#"printf '%s %s\n' "$(nproc)" "$(cut -d ' ' -f 1 /proc/loadavg)"; [ -L "$1/HEAD" ] || head -c 80 -- "$1/HEAD" 2>/dev/null; exit 0"#;
+/// The PC's CPUs, its one-minute load, the `MemAvailable` of its Linux in kB, Windows'
+/// `FreePhysicalMemory` in kB as PowerShell answers it (its whitespace made spaces; empty when the
+/// call fails), and the HEAD of the worktree's repository there, if any (R4): the file read as text,
+/// no git run on what a command might have left. One bounded PowerShell call, which only reads; its
+/// text holds no `"`, since interop rebuilds a Windows command line from the arguments.
+const PROBE: &str = r#"w=$(timeout 10 /mnt/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe -NoProfile -NonInteractive -Command '(Get-CimInstance Win32_OperatingSystem).FreePhysicalMemory' </dev/null 2>/dev/null) || w=; printf '%s %s %s %s\n' "$(nproc)" "$(cut -d ' ' -f 1 /proc/loadavg)" "$(sed -n 's/^MemAvailable: *\([0-9][0-9]*\) kB$/\1/p' /proc/meminfo 2>/dev/null)" "${w//[[:space:]]/ }"; [ -L "$1/HEAD" ] || head -c 80 -- "$1/HEAD" 2>/dev/null; exit 0"#;
 /// The only variables of this process that a `tailscale` child gets (R7): not `LANG` or `LC_*`, which
 /// the ssh client's default `SendEnv` would send to the PC, nor an agent socket.
 const TAILSCALE_ENV: [&str; 4] = ["PATH", "HOME", "USER", "LOGNAME"];
@@ -36,6 +39,9 @@ const MAX_TIMEOUT: u64 = 14_400;
 const GRACE: Duration = Duration::from_secs(30);
 const DEFAULT_LOCK: &str = "/var/lib/agent-platform/build.lock";
 const DEFAULT_LOG: &str = "/var/lib/agent-platform/checks.jsonl";
+/// `hosts.pc.min_available_mb` when the policy does not give it (R16).
+const DEFAULT_MIN_AVAILABLE_MB: u64 = 2_048;
+const MAX_MIN_AVAILABLE_MB: u64 = 1_048_576;
 
 /// The policy's member `hosts.pc` (R16).
 #[derive(Debug, Clone, PartialEq)]
@@ -43,6 +49,7 @@ pub struct Pc {
     pub ssh: String,
     pub work: String,
     pub busy_load: f64,
+    pub min_available_mb: u64,
 }
 impl Pc {
     fn host(&self) -> &str {
@@ -89,15 +96,17 @@ pub fn hosts(policy: &Value) -> Result<Option<Pc>, Failure> {
     let m = pc
         .as_object()
         .filter(|m| {
-            m.len() == 3
-                && ["ssh", "work", "busy_load"]
-                    .iter()
-                    .all(|k| m.contains_key(*k))
+            ["ssh", "work", "busy_load"]
+                .iter()
+                .all(|k| m.contains_key(*k))
+                && m.keys().all(|k| {
+                    ["ssh", "work", "busy_load", "min_available_mb"].contains(&k.as_str())
+                })
         })
         .ok_or_else(|| {
             invalid(
                 "hosts.pc",
-                "is not an object with exactly ssh, work and busy_load",
+                "is not an object with exactly ssh, work and busy_load, and at most min_available_mb besides",
             )
         })?;
     let ssh = (m["ssh"].as_str())
@@ -112,10 +121,23 @@ pub fn hosts(policy: &Value) -> Result<Option<Pc>, Failure> {
     let busy_load = (m["busy_load"].as_f64())
         .filter(|b| (0.1..=1.0).contains(b))
         .ok_or_else(|| invalid("hosts.pc.busy_load", "is not a number from 0.1 to 1.0"))?;
+    let min_available_mb = match m.get("min_available_mb") {
+        None => DEFAULT_MIN_AVAILABLE_MB,
+        Some(v) => v
+            .as_u64()
+            .filter(|n| *n <= MAX_MIN_AVAILABLE_MB)
+            .ok_or_else(|| {
+                invalid(
+                    "hosts.pc.min_available_mb",
+                    "is not a whole number from 0 to 1048576",
+                )
+            })?,
+    };
     Ok(Some(Pc {
         ssh: ssh.to_owned(),
         work: work.to_owned(),
         busy_load,
+        min_available_mb,
     }))
 }
 
@@ -296,14 +318,54 @@ fn wait_until(child: &mut Child, deadline: Instant) -> Option<ExitStatus> {
     }
 }
 
-/// Where the call runs (R4).
+/// What the probe of R4 read on the PC: its CPUs, its one-minute load (as the PC wrote it), the
+/// `MemAvailable` of its Linux and Windows' free physical memory, both in MB rounded down.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Probe {
+    pub cpus: u64,
+    pub load: String,
+    pub wsl_mb: u64,
+    pub windows_mb: Option<u64>,
+}
+impl Probe {
+    /// The PC's available memory: the smaller of the two, or the Linux reading alone.
+    pub fn available_mb(&self) -> u64 {
+        self.windows_mb.map_or(self.wsl_mb, |w| w.min(self.wsl_mb))
+    }
+    fn load_value(&self) -> f64 {
+        self.load.parse().unwrap_or(f64::MAX)
+    }
+}
+/// The probe's first line, `<cpus> <load> <MemAvailable kB> <Windows' answer>`: None when the CPUs,
+/// the load or the Linux memory cannot be parsed; Windows' answer, trimmed of whitespace, is None
+/// unless it is then a whole number of kB.
+pub fn probe_line(line: &str) -> Option<Probe> {
+    let mut f = line.splitn(4, ' ');
+    let cpus = f.next()?.parse::<u64>().ok().filter(|c| *c >= 1)?;
+    let load = f
+        .next()
+        .filter(|l| l.parse::<f64>().is_ok_and(f64::is_finite))?;
+    let wsl_kb = f
+        .next()
+        .filter(|k| !k.is_empty() && k.bytes().all(|c| c.is_ascii_digit()))?
+        .parse::<u64>()
+        .ok()?;
+    let windows_kb = f.next().map(str::trim).and_then(|w| {
+        (!w.is_empty() && w.bytes().all(|c| c.is_ascii_digit()))
+            .then(|| w.parse::<u64>().ok())
+            .flatten()
+    });
+    Some(Probe {
+        cpus,
+        load: load.to_owned(),
+        wsl_mb: wsl_kb / 1024,
+        windows_mb: windows_kb.map(|k| k / 1024),
+    })
+}
+/// Where the call runs (R4), with what the probe read where it answered.
 enum Place {
-    Pc {
-        cpus: u64,
-        load: String,
-        head: Option<String>,
-    },
-    Here(&'static str),
+    Pc { probe: Probe, head: Option<String> },
+    Here(&'static str, Option<Probe>),
 }
 /// `tailscale` with `words`, in an environment of `TAILSCALE_ENV` alone.
 fn tailscale(words: &[&str]) -> Command {
@@ -347,7 +409,7 @@ fn place(pc: &Pc, key: &str) -> Place {
         pc.host(),
     ];
     if answer(tailscale(&ping), Duration::from_secs(12)).is_none() {
-        return Place::Here("pc_unreachable");
+        return Place::Here("pc_unreachable", None);
     }
     let repo = format!("{}/repos/{key}", pc.work);
     let probe = format!("bash -c {} ap-check-probe {}", quote(PROBE), quote(&repo));
@@ -355,30 +417,30 @@ fn place(pc: &Pc, key: &str) -> Place {
         tailscale(&["ssh", &pc.ssh, &probe]),
         Duration::from_secs(30),
     ) else {
-        return Place::Here("pc_unreachable");
+        return Place::Here("pc_unreachable", None);
     };
     let text = String::from_utf8_lossy(&stdout);
     let mut lines = text.lines();
-    let first: Vec<&str> = lines.next().unwrap_or("").split(' ').collect();
-    let (Some(cpus), Some(load)) = (
-        first
-            .first()
-            .and_then(|c| c.parse::<u64>().ok())
-            .filter(|c| *c >= 1),
-        first
-            .get(1)
-            .filter(|l| l.parse::<f64>().is_ok_and(f64::is_finite)),
-    ) else {
-        return Place::Here("pc_unreachable");
+    let Some(probe) = probe_line(lines.next().unwrap_or("")) else {
+        return Place::Here("pc_unreachable", None);
     };
-    let value: f64 = load.parse().unwrap_or(f64::MAX);
-    if value >= pc.busy_load * cpus as f64 {
-        return Place::Here("pc_busy");
+    match placement(pc, &probe) {
+        Some(reason) => Place::Here(reason, Some(probe)),
+        None => Place::Pc {
+            probe,
+            head: lines.next().map(str::to_owned).filter(|h| is_hex(h)),
+        },
     }
-    Place::Pc {
-        cpus,
-        load: (*load).to_owned(),
-        head: lines.next().map(str::to_owned).filter(|h| is_hex(h)),
+}
+/// None when the PC takes the call: its load below `busy_load` times its CPUs and its available
+/// memory at least `min_available_mb`; else the reason it runs here (R4).
+pub fn placement(pc: &Pc, probe: &Probe) -> Option<&'static str> {
+    if probe.load_value() >= pc.busy_load * probe.cpus as f64 {
+        Some("pc_busy")
+    } else if probe.available_mb() < pc.min_available_mb {
+        Some("pc_memory_low")
+    } else {
+        None
     }
 }
 
@@ -557,12 +619,15 @@ fn payload(tree: &Tree, pc_head: Option<&str>, stage: &Path) -> Result<PathBuf, 
     Ok(out)
 }
 
-/// The PC's standard error as it comes, less the line that carries the command's status (R11, R13).
+/// The PC's standard error as it comes, less the line that carries the command's status and the
+/// lowest `MemAvailable` of the PC's Linux while it ran (R11, R13): `<status> <MB>`, or `<status> -`
+/// where no command ran.
 pub struct Filter {
     marker: Vec<u8>,
     pending: Vec<u8>,
     done: bool,
     pub status: Option<i32>,
+    pub min_wsl_available_mb: Option<u64>,
 }
 impl Filter {
     pub fn new(nonce: &str) -> Self {
@@ -571,6 +636,7 @@ impl Filter {
             pending: vec![],
             done: false,
             status: None,
+            min_wsl_available_mb: None,
         }
     }
     /// The bytes to pass on now; a tail that may begin the status line is held back.
@@ -584,10 +650,25 @@ impl Filter {
             let emit = self.pending[..i].to_vec();
             let tail = &self.pending[i + m..];
             if let Some(nl) = tail.iter().position(|b| *b == b'\n') {
-                self.status = std::str::from_utf8(&tail[..nl])
+                let fields = std::str::from_utf8(&tail[..nl])
                     .ok()
-                    .and_then(|s| s.parse().ok())
-                    .filter(|s| (0..=255).contains(s));
+                    .and_then(|s| s.split_once(' '))
+                    .and_then(|(status, low)| {
+                        let status = status
+                            .parse::<i32>()
+                            .ok()
+                            .filter(|s| (0..=255).contains(s))?;
+                        let low = match low {
+                            "-" => None,
+                            mb if !mb.is_empty() && mb.bytes().all(|c| c.is_ascii_digit()) => {
+                                Some(mb.parse::<u64>().ok()?)
+                            }
+                            _ => return None,
+                        };
+                        Some((status, low))
+                    });
+                self.status = fields.map(|f| f.0);
+                self.min_wsl_available_mb = fields.and_then(|f| f.1);
                 self.done = true;
                 self.pending.clear();
             } else {
@@ -608,7 +689,7 @@ impl Filter {
         std::mem::take(&mut self.pending)
     }
 }
-fn relay(mut pipe: impl Read, nonce: &str) -> Option<i32> {
+fn relay(mut pipe: impl Read, nonce: &str) -> Option<(i32, Option<u64>)> {
     let mut filter = Filter::new(nonce);
     let mut buf = [0u8; 8192];
     let mut err = std::io::stderr();
@@ -622,10 +703,11 @@ fn relay(mut pipe: impl Read, nonce: &str) -> Option<i32> {
         let _ = err.write_all(&filter.feed(&buf[..n]));
     }
     let _ = err.write_all(&filter.finish());
-    filter.status
+    filter.status.map(|s| (s, filter.min_wsl_available_mb))
 }
 
-/// The command on the PC (R6 to R11): Ok with its exit status, Err when that status never came back.
+/// The command on the PC (R6 to R11): Ok with its exit status and the lowest `MemAvailable` of the
+/// PC's Linux while it ran (None where no command ran), Err when that status never came back.
 fn on_pc(
     pc: &Pc,
     call: &Call,
@@ -633,7 +715,7 @@ fn on_pc(
     key: &str,
     pc_head: Option<&str>,
     deadline: Instant,
-) -> Result<i32, ()> {
+) -> Result<(i32, Option<u64>), ()> {
     let nonce = new_session_id(&Host).map_err(|_| say("check: pc: no nonce"))?;
     let stage = std::env::temp_dir().join(format!("ap-check.{nonce}"));
     fs::DirBuilder::new()
@@ -679,12 +761,13 @@ fn on_pc(
     match (status, ended) {
         (Some(s), _) => Ok(s),
         // Cut at the deadline's grace: the PC's own bound ends what is left there.
-        (None, None) => Ok(124),
+        (None, None) => Ok((124, None)),
         (None, Some(_)) => Err(()),
     }
 }
 
 /// The record line (R15); a write that fails is said on standard error and changes no exit status.
+#[allow(clippy::too_many_arguments)]
 fn record(
     start: SystemTime,
     seconds: f64,
@@ -693,6 +776,8 @@ fn record(
     tree: &Tree,
     call: &Call,
     exit: i32,
+    probe: Option<&Probe>,
+    min_wsl_available_mb: Option<u64>,
 ) {
     let line = json!({
         "start": stamp(start),
@@ -705,6 +790,12 @@ fn record(
         "head": tree.head,
         "command": call.command,
         "exit": exit,
+        "pc_cpus": probe.map(|p| p.cpus),
+        "pc_load": probe.map(Probe::load_value),
+        "pc_wsl_available_mb": probe.map(|p| p.wsl_mb),
+        "pc_windows_available_mb": probe.and_then(|p| p.windows_mb),
+        "pc_available_mb": probe.map(Probe::available_mb),
+        "pc_min_wsl_available_mb": min_wsl_available_mb,
     });
     let path = variable("AP_CHECKS_LOG", DEFAULT_LOG);
     let written = OpenOptions::new()
@@ -738,21 +829,36 @@ pub fn cli(argv: &[OsString]) -> ExitCode {
         say(&format!("check: on this host ({reason})"));
         ("local", Some(reason), here(&call, &tree, deadline))
     };
-    let (host, reason, exit) = match &pc {
-        None => local("no_pc_in_policy"),
+    let (probe, low, (host, reason, exit)) = match &pc {
+        None => (None, None, local("no_pc_in_policy")),
         Some(pc) => match place(pc, &key) {
-            Place::Here(reason) => local(reason),
-            Place::Pc { cpus, load, head } => {
-                say(&format!("check: on pc ({cpus} CPUs, load {load})"));
+            Place::Here(reason, probe) => (probe, None, local(reason)),
+            Place::Pc { probe, head } => {
+                say(&format!(
+                    "check: on pc ({} CPUs, load {}, {} MB available)",
+                    probe.cpus,
+                    probe.load,
+                    probe.available_mb()
+                ));
                 match on_pc(pc, &call, &tree, &key, head.as_deref(), deadline) {
-                    Ok(exit) => ("pc", None, exit),
-                    Err(()) => local("pc_lost"),
+                    Ok((exit, low)) => (Some(probe), low, ("pc", None, exit)),
+                    Err(()) => (Some(probe), None, local("pc_lost")),
                 }
             }
         },
     };
     let seconds = (started.elapsed().as_millis() as f64) / 1000.0;
-    record(start, seconds, host, reason, &tree, &call, exit);
+    record(
+        start,
+        seconds,
+        host,
+        reason,
+        &tree,
+        &call,
+        exit,
+        probe.as_ref(),
+        low,
+    );
     ExitCode::from(u8::try_from(exit).unwrap_or(1))
 }
 
@@ -765,15 +871,25 @@ mod tests {
     #[test]
     fn the_status_line_is_taken_out_wherever_the_stream_splits_it() {
         let nonce = "0f0e0d0c-0b0a-4908-8706-050403020100";
-        let text = format!("one\ntwo\0ap-check {nonce} 255\n");
-        let bytes = text.as_bytes();
-        for cut in 0..bytes.len() {
+        for (low, want) in [("1234", Some(1234)), ("-", None)] {
+            let text = format!("one\ntwo\0ap-check {nonce} 255 {low}\n");
+            let bytes = text.as_bytes();
+            for cut in 0..bytes.len() {
+                let mut f = Filter::new(nonce);
+                let mut out = f.feed(&bytes[..cut]);
+                out.extend(f.feed(&bytes[cut..]));
+                out.extend(f.finish());
+                assert_eq!(out, b"one\ntwo", "cut at {cut}");
+                assert_eq!(f.status, Some(255), "cut at {cut}");
+                assert_eq!(f.min_wsl_available_mb, want, "cut at {cut}");
+            }
+        }
+        // A status line without both fields, or with another second field, carries no status.
+        for bad in ["0", "0 ", "0 x", "0 -1", "0 1 2", "256 1"] {
             let mut f = Filter::new(nonce);
-            let mut out = f.feed(&bytes[..cut]);
-            out.extend(f.feed(&bytes[cut..]));
-            out.extend(f.finish());
-            assert_eq!(out, b"one\ntwo", "cut at {cut}");
-            assert_eq!(f.status, Some(255), "cut at {cut}");
+            let out = f.feed(format!("\0ap-check {nonce} {bad}\n").as_bytes());
+            assert!(out.is_empty(), "{bad}");
+            assert_eq!(f.status, None, "{bad}");
         }
         // Without the line the status is unknown and every byte is passed on.
         let mut f = Filter::new(nonce);
@@ -783,7 +899,7 @@ mod tests {
         assert_eq!(f.status, None);
         // Another nonce is the command's own text.
         let mut f = Filter::new(nonce);
-        let other = b"x\0ap-check 00000000-0000-4000-8000-000000000000 0\n";
+        let other = b"x\0ap-check 00000000-0000-4000-8000-000000000000 0 1\n";
         let mut out = f.feed(other);
         out.extend(f.finish());
         assert_eq!(out, other);
@@ -819,7 +935,8 @@ mod tests {
             Some(Pc {
                 ssh: "u@pc-1".into(),
                 work: "/home/u/work/ap-checks".into(),
-                busy_load: 0.75
+                busy_load: 0.75,
+                min_available_mb: 2048,
             })
         );
         let refused = |v: Value| hosts(&json!({"hosts": v})).unwrap_err().detail;
@@ -854,6 +971,100 @@ mod tests {
                 .busy_load,
             1.0
         );
+        for bad in [
+            json!(-1),
+            json!(1_048_577),
+            json!(2048.5),
+            json!(8192.0),
+            json!("2048"),
+            json!(null),
+        ] {
+            starts(with("min_available_mb", bad), "hosts.pc.min_available_mb");
+        }
+        for good in [0, 4096, 1_048_576] {
+            let read = hosts(&json!({"hosts": with("min_available_mb", json!(good))}));
+            assert_eq!(read.unwrap().unwrap().min_available_mb, good);
+        }
+        // Any other new member is refused as before.
+        starts(with("max_jobs", json!(4)), "hosts.pc");
+    }
+
+    // spec: specs/ap/check.md#R4
+    #[test]
+    fn the_probe_reads_cpus_load_and_both_memories_in_mb_rounded_down() {
+        let p = probe_line("22 1.50 15022080 3761152\r ").unwrap();
+        assert_eq!(
+            p,
+            Probe {
+                cpus: 22,
+                load: "1.50".into(),
+                wsl_mb: 14670,
+                windows_mb: Some(3673)
+            }
+        );
+        assert_eq!(p.available_mb(), 3673);
+        // 2,047 MB and 1,023 kB is 2,047 MB.
+        assert_eq!(probe_line("4 0.1 2097151 ").unwrap().wsl_mb, 2047);
+        // Windows answers nothing, a failure or no number: the Linux reading alone.
+        for windows in ["", " ", "x", "12 34", "-5", "1.5"] {
+            let p = probe_line(&format!("4 0.1 2097152 {windows}")).unwrap();
+            assert_eq!(
+                (p.windows_mb, p.available_mb()),
+                (None, 2048),
+                "{windows:?}"
+            );
+        }
+        assert_eq!(
+            probe_line("4 0.1 409600").unwrap().windows_mb,
+            None,
+            "no fourth field"
+        );
+        // The CPUs, the load or the Linux memory unread: no answer.
+        for bad in [
+            "",
+            "4 0.1  100",
+            "4 0.1 x 100",
+            "0 0.1 100 100",
+            "4 x 100 100",
+            "4 0.1",
+        ] {
+            assert_eq!(probe_line(bad), None, "{bad:?}");
+        }
+    }
+
+    // spec: specs/ap/check.md#R4
+    #[test]
+    fn the_pc_takes_the_call_when_not_busy_and_with_enough_memory() {
+        let pc = Pc {
+            ssh: "u@h".into(),
+            work: "/w".into(),
+            busy_load: 0.75,
+            min_available_mb: 2048,
+        };
+        let probe = |load: &str, wsl: u64, windows: Option<u64>| Probe {
+            cpus: 4,
+            load: load.into(),
+            wsl_mb: wsl,
+            windows_mb: windows,
+        };
+        assert_eq!(placement(&pc, &probe("2.99", 2048, None)), None);
+        assert_eq!(placement(&pc, &probe("2.99", 9000, Some(2048))), None);
+        assert_eq!(placement(&pc, &probe("3.00", 9000, None)), Some("pc_busy"));
+        // Busy and short of memory: busy.
+        assert_eq!(placement(&pc, &probe("3.00", 10, None)), Some("pc_busy"));
+        assert_eq!(
+            placement(&pc, &probe("0.1", 2047, Some(9000))),
+            Some("pc_memory_low")
+        );
+        assert_eq!(
+            placement(&pc, &probe("0.1", 9000, Some(2047))),
+            Some("pc_memory_low")
+        );
+        let none = Pc {
+            min_available_mb: 0,
+            ..pc
+        };
+        assert_eq!(placement(&none, &probe("0.1", 0, Some(0))), None);
     }
 
     #[test]

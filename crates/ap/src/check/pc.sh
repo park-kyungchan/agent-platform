@@ -1,7 +1,8 @@
 # The PC's side of `ap check` (specs/ap/check.md R6 to R12), run as `bash -c` through `tailscale ssh`
 # with the payload of the worktree's state on standard input. Arguments: <work> <key> <nonce>
 # <seconds> <command>... Once the command's exit status is known it is the last thing written: one line
-# NUL `ap-check <nonce> <status>` on standard error. Without that line the caller counts the call lost.
+# NUL `ap-check <nonce> <status> <MB>` on standard error, <MB> the lowest MemAvailable of this Linux
+# while the command ran, `-` where no command ran. Without that line the caller counts the call lost.
 work=$1 key=$2 nonce=$3 limit=$4
 shift 4
 start=$(date +%s)
@@ -18,7 +19,18 @@ tree=$work/trees/$key repo=$work/repos/$key target=$work/targets/$key home=$work
 in=$work/tmp/$nonce.in tmp=$work/tmp/$nonce
 # Removes paths; a link is removed, never followed (find does not follow one, even as an argument).
 clean() { find "$@" -type d ! -perm -u=rwx -exec chmod u+rwx {} + 2>/dev/null; rm -rf -- "$@"; }
-trap 'clean "$in" "$tmp"' EXIT
+# The sampler of the memory (R11), its own process group and session once its setsid ran: ended
+# with its group and its PID, since before that setsid the group does not exist yet (R10); the
+# group once more for a child it may have started meanwhile.
+sampler=
+unsample() {
+  [ -n "$sampler" ] || return 0
+  kill -KILL -- "-$sampler" "$sampler" 2>/dev/null
+  kill -KILL -- "-$sampler" 2>/dev/null
+  wait "$sampler" 2>/dev/null
+  sampler=
+}
+trap 'unsample; clean "$in" "$tmp"' EXIT
 mkdir -p -- "$work/trees" "$work/repos" "$work/targets" "$home" "$work/locks" "$work/used" "$in" "$tmp" || { say "work directory"; exit 3; }
 tar -x -C "$in" -f - || { say "payload"; exit 3; }
 cat >/dev/null
@@ -31,7 +43,7 @@ wait=$((start + limit - $(date +%s)))
 if ! flock -w "$wait" 9; then
   [ $(($(date +%s) - start)) -ge "$limit" ] || { say "lock"; exit 3; }
   clean "$in" "$tmp"; trap - EXIT
-  printf '\0ap-check %s %s\n' "$nonce" 124 >&2
+  printf '\0ap-check %s %s -\n' "$nonce" 124 >&2
   exit 0
 fi
 touch -- "$work/used/$key"
@@ -75,12 +87,29 @@ g update-index -z --index-info < "$in/index-info" || { say "index"; exit 3; }
 g update-index -q --refresh >/dev/null 2>&1
 mkdir -p -- "$target" || { say "target"; exit 3; }
 
-# The command: uid 0 of a user namespace, the root read-only but the tree (not its .git), the target directory, the
-# cargo home and the temporary directory, the network kept, under nice and the time left (R8, R10).
+# The memory while the command runs (R11): MemAvailable of this Linux in kB, read here, outside the
+# command's namespaces: once by this script itself before the command starts, so a command however
+# short has its reading, then every 2 seconds by a sampler that keeps the lowest in a file under $in,
+# which the command cannot write (never under $tmp, its /tmp). No Windows process runs meanwhile.
+# The sampler writes nothing to the session's streams; it is killed before the status line and at
+# this script's exit, and ends by itself at the call's deadline or once this script is gone (R10).
+mem() { sed -n 's/^MemAvailable: *\([0-9][0-9]*\) kB$/\1/p' /proc/meminfo 2>/dev/null; }
+low=$in/low first=
 left=$((start + limit - $(date +%s)))
 if [ "$left" -lt 1 ]; then
   rc=124
 else
+  first=$(mem)
+  case $first in *[!0-9]*) first= ;; esac
+  if [ -n "$first" ]; then
+    setsid bash -c 'low=$3; while sleep 2 && [ "$(date +%s)" -lt "$4" ] && kill -0 "$2" 2>/dev/null; do
+        m=$(sed -n "s/^MemAvailable: *\([0-9][0-9]*\) kB\$/\1/p" /proc/meminfo 2>/dev/null)
+        case $m in "" | *[!0-9]*) continue ;; esac
+        [ "$m" -lt "$low" ] || continue
+        low=$m; printf "%s\n" "$low" > "$1.new" && mv -f -- "$1.new" "$1"
+      done' ap-check-sampler "$low" "$$" "$first" "$((start + limit))" </dev/null >/dev/null 2>&1 &
+    sampler=$!
+  fi
   timeout -k 10 "$left" nice -n 10 bwrap --unshare-user --uid 0 --gid 0 --unshare-pid --die-with-parent --new-session \
     --ro-bind / / --dev /dev --proc /proc --bind "$tmp" /tmp \
     --bind "$tree" "$tree" --ro-bind "$repo" "$tree/.git" --bind "$target" "$target" --bind "$home" "$home" \
@@ -89,7 +118,17 @@ else
   rc=$?
   case $rc in 124 | 137) [ $(($(date +%s) - start)) -lt "$limit" ] || rc=124 ;; esac
 fi
+unsample
+# The lowest reading in MB: the sampler's file where it holds a lower number, else the first
+# reading; `-` where no command ran or that first reading failed.
+lowest=-
+if [ -n "$first" ]; then
+  lowest=$first
+  sampled=$(cat -- "$low" 2>/dev/null)
+  case $sampled in "" | *[!0-9]*) ;; *) [ "$sampled" -ge "$lowest" ] || lowest=$sampled ;; esac
+  lowest=$((lowest / 1024))
+fi
 touch -- "$work/used/$key"
 clean "$in" "$tmp"
 trap - EXIT
-printf '\0ap-check %s %s\n' "$nonce" "$rc" >&2
+printf '\0ap-check %s %s %s\n' "$nonce" "$rc" "$lowest" >&2
