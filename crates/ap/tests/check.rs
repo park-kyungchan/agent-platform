@@ -841,6 +841,32 @@ fn bwrap_works() -> bool {
         .is_ok_and(|s| s.success())
 }
 
+/// The first of `candidates` that a world can be made in where `work` is not covered by the
+/// sandbox's own mount at `/tmp` (`specs/ap/check.md` R8): a directory that exists, resolved through
+/// links is neither `/tmp` nor below it, and in which a directory can be made. Where none is usable
+/// the test fails and names every candidate.
+fn outside_tmp(candidates: &[&str]) -> PathBuf {
+    for c in candidates {
+        let Ok(dir) = fs::canonicalize(c) else {
+            continue;
+        };
+        if !dir.is_dir() || dir.starts_with("/tmp") {
+            continue;
+        }
+        let made = Command::new("mktemp")
+            .args(["-d", "-p"])
+            .arg(&dir)
+            .output()
+            .unwrap();
+        if !made.status.success() {
+            continue;
+        }
+        let _ = fs::remove_dir(String::from_utf8(made.stdout).unwrap().trim());
+        return dir;
+    }
+    panic!("no directory outside /tmp to make the world of r8 in: tried {candidates:?}");
+}
+
 // spec: specs/ap/check.md#R8
 #[test]
 fn r8_on_the_pc_the_command_is_uid_0_with_a_read_only_root_but_its_directories() {
@@ -848,7 +874,8 @@ fn r8_on_the_pc_the_command_is_uid_0_with_a_read_only_root_but_its_directories()
         eprintln!("skipped: bwrap cannot make a user namespace on this host");
         return;
     }
-    let w = World::within(Some(Path::new(env!("CARGO_TARGET_TMPDIR"))), false);
+    let parent = outside_tmp(&[env!("CARGO_TARGET_TMPDIR"), "/var/tmp"]);
+    let w = World::within(Some(&parent), false);
     let script = "id -u; for p in \"$PWD/x\" \"$CARGO_TARGET_DIR/x\" \"$CARGO_HOME/x\" /tmp/x \"$HOME/x\" /etc/ap-check-x \"$CARGO_TARGET_DIR/../x\" \"$PWD/.git/x\"; do \
                   if touch \"$p\" 2>/dev/null; then echo \"rw $p\"; else echo \"ro $p\"; fi; done; echo \"tmp $TMPDIR\"";
     let out = w.ap(&[&w.dir(), "--", "sh", "-c", script]);
@@ -1035,15 +1062,19 @@ fn r10_at_the_timeout_the_status_is_124_and_no_process_is_left() {
         assert!(!running(&sampler(&w)), "{place}: the sampler is left");
         let r = w.records().pop().unwrap();
         assert_eq!(r["exit"], 124);
-        // On the PC a command that started has its lowest value; where the PC's setup left no
-        // second of the two, no command ran and the status line carried `-`.
+        // On the PC a command that started has its lowest value. Without the marker either no
+        // command ran and the status line carried `-` (R11), or the script took its first
+        // reading and its bound ended the sandbox before the command made the marker.
         if place.starts_with("pc") {
-            let want = if started.exists() {
-                Value::from(16384)
+            let low = &r["pc_min_wsl_available_mb"];
+            if started.exists() {
+                assert_eq!(low, &Value::from(16384), "{place}: {out:?}");
             } else {
-                Value::Null
-            };
-            assert_eq!(r["pc_min_wsl_available_mb"], want, "{place}: {out:?}");
+                assert!(
+                    low.is_null() || low == &Value::from(16384),
+                    "{place}: no marker, and the lowest memory is {low}: {out:?}"
+                );
+            }
         }
     }
     // The connection cut while the command runs: the script is killed, and its sampler ends by itself.
