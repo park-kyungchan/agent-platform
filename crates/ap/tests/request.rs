@@ -1,14 +1,20 @@
 //! `ap request` (README "One request", `specs/ap/request.md`) against a fake of `ont` that answers as
-//! the engine does, and a session record of invented lines (`fixtures/request/session.jsonl`).
+//! the engine does, and a session record of invented lines (`fixtures/request/session.jsonl`) under the
+//! fake's own home.
 use ap::{
     host::{Answer, Failure, Reply, System},
-    request::{Refusal, execute, text},
+    request::{Refusal, execute, hook, is_hook, text},
 };
 use serde_json::{Value, json};
 use std::collections::BTreeMap;
 
 const RECORD: &[u8] = include_bytes!("fixtures/request/session.jsonl");
-const PATH: &str = "/rec/session.jsonl";
+/// The fake's home and its directory of session records (R25).
+const HOME: &str = "/home/hearer";
+const DIR: &str = "/home/hearer/.claude/projects/-w-work-walk/";
+const PATH: &str = "/home/hearer/.claude/projects/-w-work-walk/session.jsonl";
+/// The fake's work root.
+const WORK: &str = "/w/work/";
 /// The fake store's clock.
 const NOW: &str = "2026-11-17T12:00:00Z";
 const ACTIONS: [&str; 6] = [
@@ -45,6 +51,11 @@ struct F {
     heavy: bool,
     /// How many times each object was written (its observations).
     written: BTreeMap<String, usize>,
+    /// The port's home and work root: never the real ones, so no result depends on who runs the tests.
+    home: Option<std::path::PathBuf>,
+    work: std::path::PathBuf,
+    /// How many files were read.
+    reads: std::cell::Cell<usize>,
 }
 /// The bound of `Host::call`: an answer over 1 MiB is `process_failed`.
 const LIMIT: usize = 1_048_576;
@@ -80,6 +91,9 @@ impl F {
             unqualified: false,
             heavy: false,
             written: BTreeMap::new(),
+            home: Some(HOME.into()),
+            work: WORK.into(),
+            reads: std::cell::Cell::new(0),
         };
         f.files.insert(PATH.into(), RECORD.to_vec());
         for (key, status) in [("open", "draft"), ("met", "met"), ("gone", "retired")] {
@@ -336,6 +350,7 @@ impl System for F {
         })
     }
     fn read(&self, path: &str) -> std::io::Result<Vec<u8>> {
+        self.reads.set(self.reads.get() + 1);
         self.files
             .get(path)
             .cloned()
@@ -343,6 +358,12 @@ impl System for F {
     }
     fn pause(&mut self, _: std::time::Duration) {
         self.pauses += 1;
+    }
+    fn home(&self) -> Option<std::path::PathBuf> {
+        self.home.clone()
+    }
+    fn work_root(&self) -> std::path::PathBuf {
+        self.work.clone()
     }
 }
 fn rec() -> Value {
@@ -376,6 +397,12 @@ fn applied_params(f: &F, action: &str) -> Value {
     found.unwrap().1["parameters"].clone()
 }
 fn ap(args: &[&str], stdin: &[u8]) -> (Option<i32>, Vec<u8>, Value) {
+    let (status, out, err) = ap_raw(args, stdin);
+    let err = serde_json::from_slice(&err).unwrap_or(Value::Null);
+    (status, out, err)
+}
+/// The built binary's status, standard output and standard error as bytes.
+fn ap_raw(args: &[&str], stdin: &[u8]) -> (Option<i32>, Vec<u8>, Vec<u8>) {
     use std::io::Write;
     let mut child = std::process::Command::new(env!("CARGO_BIN_EXE_ap"))
         .arg("request")
@@ -388,8 +415,7 @@ fn ap(args: &[&str], stdin: &[u8]) -> (Option<i32>, Vec<u8>, Value) {
         .unwrap();
     let _ = child.stdin.take().unwrap().write_all(stdin);
     let out = child.wait_with_output().unwrap();
-    let err = serde_json::from_slice(&out.stderr).unwrap_or(Value::Null);
-    (out.status.code(), out.stdout, err)
+    (out.status.code(), out.stdout, out.stderr)
 }
 
 // spec: specs/ap/request.md#R1
@@ -709,7 +735,7 @@ fn r7_words_from_take_the_one_string_of_the_users_lines_of_the_second() {
     }
     for path in [
         "rec/session.jsonl",
-        "/rec/missing.jsonl",
+        &format!("{DIR}missing.jsonl"),
         &format!("/{}", "r".repeat(400)),
     ] {
         let mut q = from("2026-11-16T03:04:05");
@@ -930,10 +956,11 @@ fn r11_words_over_the_bound_are_their_first_4000_bytes_and_truncated() {
                 with(rec(), "words", json!(said))
             } else {
                 let line = json!({"type": "user", "timestamp": "2026-11-16T04:00:00.5Z", "message": {"content": said}});
+                let long = format!("{DIR}long.jsonl");
                 f.files
-                    .insert("/rec/long.jsonl".into(), format!("{line}\n").into_bytes());
+                    .insert(long.clone(), format!("{line}\n").into_bytes());
                 let mut q = from("2026-11-16T04:00:00");
-                q["words_from"]["record"] = json!("/rec/long.jsonl");
+                q["words_from"]["record"] = json!(long);
                 q
             };
             let v = run(&mut f, &q);
@@ -1675,4 +1702,742 @@ fn r20_list_names_the_unit_or_finding_a_request_is_routed_to() {
         (json!("finding"), Value::Null, Value::Null, json!("f1"))
     );
     assert!(text(&v).contains(" -> unit u1\n") && text(&v).contains(" -> finding f1\n"));
+}
+
+/// A line of a session record: a prompt the user typed at `t` (`origin.kind` `human`).
+fn typed(t: &str, words: &str) -> Value {
+    json!({"type": "user", "timestamp": t, "sessionId": "sess-1", "origin": {"kind": "human"},
+        "message": {"role": "user", "content": words}})
+}
+/// A line of an answer at `t`.
+fn answer(t: &str) -> Value {
+    json!({"type": "assistant", "timestamp": t, "message": {"role": "assistant", "content": "an answer"}})
+}
+fn lines(v: &[Value]) -> Vec<u8> {
+    v.iter()
+        .map(|l| format!("{l}\n"))
+        .collect::<String>()
+        .into_bytes()
+}
+/// The record the hook's input names, under the fake's home.
+fn hooked() -> String {
+    format!("{DIR}hooked.jsonl")
+}
+/// A fake whose record `hooked()` holds `record`.
+fn holding(record: &[Value]) -> F {
+    let mut f = F::new();
+    f.files.insert(hooked(), lines(record));
+    f
+}
+/// The input of `UserPromptSubmit` for `prompt`, with members of the CLI the verb does not read.
+fn submitted(prompt: &str) -> Value {
+    json!({"hook_event_name": "UserPromptSubmit", "session_id": "sess-1", "transcript_path": hooked(),
+        "cwd": "/w/work/walk-topic/wt/agent-platform", "permission_mode": "default", "prompt": prompt})
+}
+fn stopped(session: &str) -> Value {
+    json!({"hook_event_name": "Stop", "session_id": session, "transcript_path": hooked(),
+        "cwd": "/w/work/walk-topic", "stop_hook_active": false})
+}
+/// The line of 3f for `recorded`.
+fn recorded(key: &str, at: &str) -> String {
+    format!(
+        "ap request: recorded {key} (verified, unrouted) by the hook. Do not record this message again: route it \
+         (op route, request {key}), or supersede it with your kind and reading and \
+         \"words_from\":{{\"record\":\"{}\",\"at\":\"{at}\"}}.",
+        hooked()
+    )
+}
+/// The line of 3f for `not recorded`; the record named when it is admitted.
+fn not_recorded(code: &str, record: Option<&str>) -> String {
+    let tail = record.map_or(String::new(), |r| format!("; its session record is {r}"));
+    format!(
+        "ap request: not recorded by the hook ({code}). If this message is the user's, record it with ap request{tail}."
+    )
+}
+const T: &str = "2026-11-16T05:00:00.250Z";
+const AT: &str = "2026-11-16T05:00:00";
+// spec: specs/ap/request.md#R25
+#[test]
+fn r25_only_a_record_under_the_users_claude_projects_gives_verified_words() {
+    // Refused whether or not the file exists and whatever it holds, before any call to the store.
+    let refused = |f: &mut F, record: &str| {
+        let mut q = from("2026-11-16T03:04:05");
+        q["words_from"]["record"] = json!(record);
+        let e = refusal(f, &q);
+        assert_eq!(
+            (e.code.as_str(), e.field.as_str(), e.after),
+            ("invalid_input", "words_from.record", None),
+            "{record}"
+        );
+        assert!(f.calls.is_empty(), "{record}");
+    };
+    for record in [
+        "/tmp/session.jsonl".to_owned(),
+        "/home/other/.claude/projects/-w-work-walk/session.jsonl".to_owned(),
+        format!("{HOME}/.claude/projects/../projects/-w-work-walk/session.jsonl"),
+        format!("{DIR}../-w-work-walk/session.jsonl"),
+        format!("{DIR}./session.jsonl"),
+        format!("{HOME}/.claude/projects//session.jsonl"),
+        format!("{HOME}/.claude/projects/"),
+        format!("{HOME}/.claude/projects"),
+        format!("{DIR}session.jsonl/"),
+        format!("{DIR}sess\u{7f}ion.jsonl"),
+        format!("{DIR}sess\nion.jsonl"),
+        format!("{HOME}/.claude/session.jsonl"),
+        format!("{HOME}x/.claude/projects/-w-work-walk/session.jsonl"),
+    ] {
+        let mut f = F::new();
+        f.files.insert(record.clone(), RECORD.to_vec());
+        refused(&mut f, &record);
+    }
+    // At most 400 bytes.
+    let long = format!("{DIR}{}", "s".repeat(400 - DIR.len()));
+    let longer = format!("{long}s");
+    let mut f = F::new();
+    f.files.insert(long.clone(), RECORD.to_vec());
+    f.files.insert(longer.clone(), RECORD.to_vec());
+    refused(&mut f, &longer);
+    let mut q = from("2026-11-16T03:04:05");
+    q["words_from"]["record"] = json!(long);
+    assert_eq!(run(&mut f, &q)["words_verified"], true);
+    // No home: nothing is admitted.
+    let mut f = F::new();
+    f.home = None;
+    refused(&mut f, PATH);
+    // The home of the port, with or without a final `/`, not another.
+    let mut f = F::new();
+    f.home = Some("/home/other".into());
+    refused(&mut f, PATH);
+    let mut f = F::new();
+    f.home = Some(format!("{HOME}/").into());
+    assert_eq!(
+        run(&mut f, &from("2026-11-16T03:04:05"))["words_verified"],
+        true
+    );
+    // The admitted path, taken by `record` and by `supersede`.
+    let mut f = F::new();
+    let first = run(&mut f, &from("2026-11-16T03:04:05"));
+    assert_eq!(applied_params(&f, "record_request")["record"], PATH);
+    let mut sup = supersede(&first["request"], from("2026-11-16T03:04:07"));
+    let v = run(&mut f, &sup);
+    assert_eq!(
+        (
+            &v["words_verified"],
+            &applied_params(&f, "supersede_request")["record"]
+        ),
+        (&json!(true), &json!(PATH))
+    );
+    f.files.insert("/tmp/session.jsonl".into(), RECORD.to_vec());
+    sup["words_from"]["record"] = json!("/tmp/session.jsonl");
+    sup["request_id"] = json!("m3");
+    let writes = f.writes();
+    let e = refusal(&mut f, &sup);
+    assert_eq!(
+        (e.code.as_str(), e.field.as_str(), e.after),
+        ("invalid_input", "words_from.record", None)
+    );
+    assert_eq!(f.writes(), writes);
+    // The same file as typed words is stored, not verified.
+    let mut f = F::new();
+    f.files.insert("/tmp/words.txt".into(), b"typed".to_vec());
+    run(
+        &mut f,
+        &with(
+            without(rec(), "words"),
+            "words_file",
+            json!("/tmp/words.txt"),
+        ),
+    );
+    assert_eq!(
+        applied_params(&f, "record_request")["words_verified"],
+        false
+    );
+    let listed = run(&mut f, &json!({"op": "list", "topic": "walk/one"}));
+    assert!(
+        text(&listed)
+            .starts_with("2026-11-16T03:04:05Z order walk/one [not verified] -> unrouted\n")
+    );
+}
+// spec: specs/ap/request.md#R26
+#[test]
+fn r26_a_hooks_input_is_its_own_form_and_unknown_events_do_nothing() {
+    // An unknown event: nothing printed, no file read, no call.
+    for event in ["SessionStart", "PreToolUse", "", "Stop "] {
+        let mut f = holding(&[typed(T, "hello")]);
+        let q = with(submitted("hello"), "hook_event_name", json!(event));
+        assert!(is_hook(&q));
+        assert_eq!(hook(&mut f, None, &q), None, "{event}");
+        assert_eq!((f.calls.len(), f.reads.get()), (0, 0), "{event}");
+    }
+    // Members the verb does not read are ignored, whatever they hold.
+    let mut f = holding(&[typed(T, "hello")]);
+    let mut q = submitted("hello");
+    q["permission_mode"] = json!({"nested": [1, 2]});
+    q["a_member_of_a_later_version"] = json!(null);
+    q["op_like"] = json!("record");
+    assert_eq!(hook(&mut f, None, &q), Some(recorded("rq3", AT)));
+    // `--store` is forwarded.
+    let mut f = holding(&[typed(T, "hello")]);
+    hook(&mut f, Some("/s/store"), &submitted("hello")).unwrap();
+    assert!(!f.stores.is_empty());
+    assert!(f.stores.iter().all(|s| s.as_deref() == Some("/s/store")));
+    // An object with `op` and `hook_event_name` is no hook's input: its `op` refuses the member.
+    for q in [
+        json!({"op": "list", "hook_event_name": "Stop"}),
+        with(rec(), "hook_event_name", json!("UserPromptSubmit")),
+    ] {
+        assert!(!is_hook(&q));
+        let mut f = F::new();
+        let e = refusal(&mut f, &q);
+        assert_eq!(
+            (e.code.as_str(), e.field.as_str(), e.after),
+            ("invalid_input", "hook_event_name", None)
+        );
+        assert!(f.calls.is_empty());
+    }
+    // A `hook_event_name` that is no string is no hook's input either.
+    let q = json!({"hook_event_name": 1});
+    assert!(!is_hook(&q));
+    assert_eq!(refusal(&mut F::new(), &q).field, "op");
+}
+// spec: specs/ap/request.md#R27
+#[test]
+fn r27_a_typed_prompt_is_recorded_verified_and_unrouted() {
+    let mut f = holding(&[
+        typed("2026-11-16T04:00:00.0Z", "an earlier prompt"),
+        answer("2026-11-16T04:00:01.0Z"),
+        typed(T, "do \"this\"\n가나다"),
+        // An answer of a sub-agent is no answer of the turn.
+        json!({"type": "assistant", "timestamp": "2026-11-16T05:00:01.0Z", "isSidechain": true, "message": {"content": "x"}}),
+    ]);
+    let line = hook(&mut f, None, &submitted("do \"this\"\n가나다"));
+    assert_eq!(line, Some(recorded("rq3", AT)));
+    assert_eq!(f.names(), ["apply record_request", "search request"]);
+    let action = &f.calls[0].1;
+    assert_eq!(
+        (&action["request_id"], &action["agent"], &action["session"]),
+        (
+            &json!("hook-7602eec8756b29f8660e7dc1097437c9ea9c33f5-record"),
+            &json!("hook"),
+            &json!("sess-1")
+        )
+    );
+    assert_eq!(
+        action["parameters"],
+        json!({"words": "do \"this\"\n가나다", "words_verified": true, "truncated": false,
+            "reading": "Recorded by the hook of the CLI; kind and reading are not yet an agent's.",
+            "kind": "order", "topic": "walk-topic", "said_at": "2026-11-16T05:00:00Z", "session": "sess-1",
+            "record": hooked(), "runtime": "claude"})
+    );
+    let stored = f.request("rq3");
+    assert_eq!(
+        (&stored["route"], &stored["status"]),
+        (&json!("unrouted"), &json!("current"))
+    );
+    // The agent's supersede with the given `words_from` reads the same words.
+    let q = json!({"op": "supersede", "request": "rq3", "request_id": "m9", "agent": "lead", "session": "sess-1",
+        "topic": "walk-topic", "kind": "decision", "reading": "an agent's reading",
+        "words_from": {"record": hooked(), "at": AT}, "route": {"aside": "an example"}});
+    let v = run(&mut f, &q);
+    assert_eq!(
+        (v["words_verified"].clone(), v["route"].clone()),
+        (json!(true), json!("applied"))
+    );
+}
+// spec: specs/ap/request.md#R27
+#[test]
+fn r27_the_topic_is_the_task_directory_else_the_last_component() {
+    for (cwd, topic) in [
+        (json!("/w/work/walk-topic/wt/agent-platform"), "walk-topic"),
+        (json!("/w/work/walk-topic"), "walk-topic"),
+        (json!("/w/work"), "work"),
+        (json!("/w/workshop/a/b"), "b"),
+        (json!("/srv/some dir/가나"), "------"),
+        (json!("/w/work/a:b.c_d-e/x"), "a:b.c_d-e"),
+        (json!(format!("/w/work/{}", "t".repeat(130))), "t"),
+        (json!("/"), "hook"),
+        (json!(5), "hook"),
+        (Value::Null, "hook"),
+    ] {
+        let mut f = holding(&[typed(T, "hello")]);
+        let q = match cwd.clone() {
+            Value::Null => without(submitted("hello"), "cwd"),
+            c => with(submitted("hello"), "cwd", c),
+        };
+        assert_eq!(hook(&mut f, None, &q), Some(recorded("rq3", AT)), "{cwd}");
+        let got = applied_params(&f, "record_request")["topic"].clone();
+        let want = if topic == "t" {
+            "t".repeat(120)
+        } else {
+            topic.to_owned()
+        };
+        assert_eq!(got, json!(want), "{cwd}");
+    }
+}
+// spec: specs/ap/request.md#R27
+#[test]
+fn r27_an_input_out_of_form_is_not_recorded_as_invalid_input() {
+    let path = hooked();
+    for (q, record) in [
+        (
+            with(submitted("hello"), "session_id", json!("a b")),
+            Some(path.as_str()),
+        ),
+        (
+            with(submitted("hello"), "session_id", json!("s".repeat(65))),
+            Some(path.as_str()),
+        ),
+        (
+            without(submitted("hello"), "session_id"),
+            Some(path.as_str()),
+        ),
+        (
+            with(submitted("hello"), "prompt", json!("")),
+            Some(path.as_str()),
+        ),
+        (
+            with(submitted("hello"), "prompt", json!(["hello"])),
+            Some(path.as_str()),
+        ),
+        (without(submitted("hello"), "prompt"), Some(path.as_str())),
+        (
+            with(
+                submitted("hello"),
+                "transcript_path",
+                json!("/tmp/hooked.jsonl"),
+            ),
+            None,
+        ),
+        (
+            with(
+                submitted("hello"),
+                "transcript_path",
+                json!(format!("{DIR}../hooked.jsonl")),
+            ),
+            None,
+        ),
+        (without(submitted("hello"), "transcript_path"), None),
+    ] {
+        let mut f = holding(&[typed(T, "hello")]);
+        f.files
+            .insert("/tmp/hooked.jsonl".into(), lines(&[typed(T, "hello")]));
+        assert_eq!(
+            hook(&mut f, None, &q),
+            Some(not_recorded("invalid_input", record)),
+            "{q}"
+        );
+        assert!(f.calls.is_empty(), "{q}");
+    }
+}
+// spec: specs/ap/request.md#R27
+#[test]
+fn r27_a_prompt_the_record_does_not_hold_as_a_human_line_now_is_not_recorded() {
+    let human_meta = with(typed(T, "hello"), "isMeta", json!(true));
+    let sidechain = with(typed(T, "hello"), "isSidechain", json!(true));
+    let no_origin = without(typed(T, "hello"), "origin");
+    let other_origin = with(
+        typed(T, "hello"),
+        "origin",
+        json!({"kind": "task-notification"}),
+    );
+    let queued = json!({"type": "queue-operation", "timestamp": T, "operation": "enqueue", "content": "hello"});
+    let blocks = with(
+        typed(T, "x"),
+        "message",
+        json!({"role": "user", "content": [{"type": "text", "text": "hello"}]}),
+    );
+    let bad_time = with(
+        typed(T, "hello"),
+        "timestamp",
+        json!("2026-11-16 05:00:00Z"),
+    );
+    let cases: Vec<(&str, Option<Vec<Value>>)> = vec![
+        // The first prompt of a session: the record does not exist yet.
+        ("absent", None),
+        ("empty", Some(vec![])),
+        ("other text", Some(vec![typed(T, "hello!")])),
+        ("no origin", Some(vec![no_origin])),
+        ("another origin", Some(vec![other_origin])),
+        ("isMeta", Some(vec![human_meta])),
+        ("sidechain", Some(vec![sidechain])),
+        ("queued", Some(vec![queued])),
+        ("blocks", Some(vec![blocks])),
+        ("bad time", Some(vec![bad_time])),
+        // An earlier line with the same text, no request of the hook names it, and an answer follows.
+        (
+            "answered",
+            Some(vec![typed(T, "hello"), answer("2026-11-16T05:00:02.0Z")]),
+        ),
+        (
+            "answered then other",
+            Some(vec![
+                typed(T, "hello"),
+                answer("2026-11-16T05:00:02.0Z"),
+                typed("2026-11-16T05:01:00.0Z", "next"),
+            ]),
+        ),
+    ];
+    for (name, record) in cases {
+        let mut f = F::new();
+        if let Some(record) = record {
+            f.files.insert(hooked(), lines(&record));
+        }
+        assert_eq!(
+            hook(&mut f, None, &submitted("hello")),
+            Some(not_recorded("words_not_found", Some(&hooked()))),
+            "{name}"
+        );
+        assert!(f.calls.is_empty(), "{name}");
+        assert!(f.requests().is_empty(), "{name}");
+    }
+    // The last such line counts: an answered earlier one, then the same text again unanswered.
+    let mut f = holding(&[
+        typed("2026-11-16T04:00:00.0Z", "hello"),
+        answer("2026-11-16T04:00:01.0Z"),
+        typed(T, "hello"),
+    ]);
+    assert_eq!(
+        hook(&mut f, None, &submitted("hello")),
+        Some(recorded("rq3", AT))
+    );
+}
+// spec: specs/ap/request.md#R27
+#[test]
+fn r27_two_strings_in_the_lines_second_are_ambiguous() {
+    for other in [
+        json!({"type": "user", "timestamp": "2026-11-16T05:00:00.900Z", "message": {"content": "another"}}),
+        json!({"type": "queue-operation", "timestamp": "2026-11-16T05:00:00.100Z", "operation": "enqueue", "content": "another"}),
+    ] {
+        let mut f = holding(&[other.clone(), typed(T, "hello")]);
+        assert_eq!(
+            hook(&mut f, None, &submitted("hello")),
+            Some(not_recorded("words_ambiguous", Some(&hooked()))),
+            "{other}"
+        );
+        assert!(f.calls.is_empty());
+    }
+    // The same string twice in the second (a line and its queued copy) is one.
+    let queued = json!({"type": "queue-operation", "timestamp": T, "operation": "enqueue", "content": "hello"});
+    let mut f = holding(&[queued, typed(T, "hello")]);
+    assert_eq!(
+        hook(&mut f, None, &submitted("hello")),
+        Some(recorded("rq3", AT))
+    );
+}
+// spec: specs/ap/request.md#R27
+#[test]
+fn r27_a_line_that_has_its_request_is_not_recorded_again() {
+    // The same input twice: the second call sends the same action, which creates nothing.
+    let mut f = holding(&[typed(T, "hello")]);
+    let q = submitted("hello");
+    assert_eq!(hook(&mut f, None, &q), Some(recorded("rq3", AT)));
+    let first = f.calls[0].1.clone();
+    f.calls.clear();
+    assert_eq!(
+        hook(&mut f, None, &q),
+        Some(not_recorded("words_not_found", Some(&hooked())))
+    );
+    assert_eq!(f.names(), ["apply record_request"]);
+    assert_eq!(f.calls[0].1, first);
+    assert_eq!(f.requests().len(), 1);
+    // An earlier line with the same text whose request is current and unrouted, then routed: a new
+    // message with that text the record does not hold yet is not recorded, with one call each.
+    for route in [
+        None,
+        Some(json!({"aside": "done"})),
+        Some(json!({"intent": "open"})),
+    ] {
+        let mut f = holding(&[typed(T, "hello")]);
+        hook(&mut f, None, &submitted("hello")).unwrap();
+        if let Some(route) = route.clone() {
+            let mut q = json!({"op": "route", "request_id": "r1", "agent": "lead", "session": "sess-1", "request": "rq3"});
+            q.as_object_mut()
+                .unwrap()
+                .extend(route.as_object().unwrap().clone());
+            run(&mut f, &q);
+        }
+        f.calls.clear();
+        assert_eq!(
+            hook(&mut f, None, &submitted("hello")),
+            Some(not_recorded("words_not_found", Some(&hooked()))),
+            "{route:?}"
+        );
+        assert_eq!(f.calls.len(), 1, "{route:?}");
+        assert_eq!(f.requests().len(), 1, "{route:?}");
+    }
+}
+// spec: specs/ap/request.md#R27
+#[test]
+fn r27_a_prompt_over_the_bound_is_stored_cut_and_truncated() {
+    let said = format!("{}가", "x".repeat(3_999)) + &"y".repeat(30_000);
+    let mut f = holding(&[typed(T, &said)]);
+    assert_eq!(
+        hook(&mut f, None, &submitted(&said)),
+        Some(recorded("rq3", AT))
+    );
+    let p = applied_params(&f, "record_request");
+    assert_eq!(
+        (&p["words"], &p["truncated"], &p["words_verified"]),
+        (&json!("x".repeat(3_999)), &json!(true), &json!(true))
+    );
+}
+/// A change of the fake before a call.
+type Setup = Box<dyn Fn(&mut F)>;
+// spec: specs/ap/request.md#R27
+#[test]
+fn r27_a_refusal_or_a_failure_of_the_store_is_not_recorded_with_its_code() {
+    let engine = json!({"status": "refused", "code": "invalid_parameter", "parameter": "kind"});
+    let criteria = json!({"status": "refused", "code": "submission_criteria", "failed": ["said_in_the_future"]});
+    let cases: Vec<(&str, Setup)> = vec![
+        (
+            "invalid_parameter",
+            Box::new(move |f: &mut F| f.refuse = Some(("record_request", engine.clone()))),
+        ),
+        (
+            "said_in_the_future",
+            Box::new(move |f: &mut F| f.refuse = Some(("record_request", criteria.clone()))),
+        ),
+        ("store_busy", Box::new(|f: &mut F| f.busy = 6)),
+        (
+            "process_failed",
+            Box::new(|f: &mut F| f.cut = Some("record_request")),
+        ),
+        (
+            "readback_differs",
+            Box::new(|f: &mut F| f.alter_words = true),
+        ),
+        (
+            "store_answer_unqualified",
+            Box::new(|f: &mut F| f.unqualified = true),
+        ),
+    ];
+    for (code, set) in cases {
+        let mut f = holding(&[typed(T, "hello")]);
+        set(&mut f);
+        assert_eq!(
+            hook(&mut f, None, &submitted("hello")),
+            Some(not_recorded(code, Some(&hooked()))),
+            "{code}"
+        );
+        assert!(
+            f.calls
+                .iter()
+                .all(|c| c.1["action_type"] != "route_request")
+        );
+    }
+}
+/// A request of session `session` said at `at`, recorded by an agent.
+fn said(f: &mut F, id: &str, session: &str, at: &str) -> String {
+    let q = json!({"op": "record", "request_id": id, "agent": "lead", "session": session, "topic": "walk-topic",
+        "kind": "order", "reading": "r", "words": format!("w {id}"), "said_at": at});
+    run(f, &q)["request"].as_str().unwrap().to_owned()
+}
+fn reason(n: usize, keys: &[&str]) -> String {
+    json!({"decision": "block", "reason": format!(
+        "ap request: {n} unrouted request(s) of this session: {}. Route each (op route) or set it aside, then end the turn.",
+        keys.join(", "))}).to_string()
+}
+// spec: specs/ap/request.md#R28
+#[test]
+fn r28_stop_says_once_that_requests_of_the_session_are_unrouted() {
+    // Already continued by this hook: nothing, and no call.
+    let mut f = F::new();
+    said(&mut f, "a", "sess-1", "2026-11-16T01:00:00Z");
+    f.calls.clear();
+    assert_eq!(
+        hook(
+            &mut f,
+            None,
+            &with(stopped("sess-1"), "stop_hook_active", json!(true))
+        ),
+        None
+    );
+    assert!(f.calls.is_empty());
+    // No row.
+    let mut f = F::new();
+    assert_eq!(hook(&mut f, None, &stopped("sess-1")), None);
+    assert_eq!(f.names(), ["search request"]);
+    assert_eq!(
+        f.calls[0].1["where"]["all"],
+        json!([{"eq": ["route", "unrouted"]}, {"eq": ["status", "current"]}])
+    );
+    // Rows of this and of another session, one routed: this session's unrouted ones, oldest first.
+    let mut f = F::new();
+    let late = said(&mut f, "a", "sess-1", "2026-11-16T03:00:00Z");
+    said(&mut f, "b", "sess-2", "2026-11-16T01:00:00Z");
+    let early = said(&mut f, "c", "sess-1", "2026-11-16T02:00:00Z");
+    let routed = said(&mut f, "d", "sess-1", "2026-11-16T00:00:00Z");
+    run(
+        &mut f,
+        &json!({"op": "route", "request_id": "r", "agent": "lead", "session": "sess-1", "request": routed, "aside": "done"}),
+    );
+    f.calls.clear();
+    let line = hook(&mut f, None, &stopped("sess-1")).unwrap();
+    assert_eq!(line, reason(2, &[&early, &late]));
+    let v: Value = serde_json::from_str(&line).unwrap();
+    assert_eq!(v.as_object().unwrap().len(), 2);
+    assert_eq!(f.writes(), 0);
+    assert_eq!(f.reads.get(), 0);
+    assert_eq!(hook(&mut f, None, &stopped("sess-3")), None);
+    // More than five: the count, and the first five keys.
+    let mut f = F::new();
+    let keys: Vec<String> = (0..7)
+        .map(|i| {
+            said(
+                &mut f,
+                &format!("k{i}"),
+                "sess-1",
+                &format!("2026-11-16T0{}:00:00Z", 7 - i),
+            )
+        })
+        .collect();
+    let mut oldest: Vec<&str> = keys.iter().rev().map(String::as_str).collect();
+    oldest.truncate(5);
+    assert_eq!(
+        hook(&mut f, None, &stopped("sess-1")),
+        Some(reason(7, &oldest))
+    );
+    // Every page is read.
+    let mut f = F::new();
+    many(&mut f, 20, "walk-topic");
+    let line = hook(&mut f, None, &stopped("s1")).unwrap();
+    assert!(line.contains("ap request: 20 unrouted request(s)"));
+    // An unqualified answer, a refusal and a failed call: nothing.
+    for set in [
+        Box::new(|f: &mut F| f.unqualified = true) as Setup,
+        Box::new(|f: &mut F| f.busy = 6),
+    ] {
+        let mut f = F::new();
+        said(&mut f, "a", "sess-1", "2026-11-16T01:00:00Z");
+        set(&mut f);
+        assert_eq!(hook(&mut f, None, &stopped("sess-1")), None);
+    }
+    let mut f = F::new();
+    said(&mut f, "a", "sess-1", "2026-11-16T01:00:00Z");
+    struct Cut;
+    impl System for Cut {
+        fn call(&mut self, _: &str, _: &[String], _: &Value, _: u64) -> Answer {
+            Err(Failure {
+                code: "process_failed",
+                field: "ont".into(),
+                detail: Value::Null,
+            })
+        }
+    }
+    assert_eq!(hook(&mut Cut, None, &stopped("sess-1")), None);
+}
+// spec: specs/ap/request.md#R29
+#[test]
+fn r29_the_hook_form_never_refuses_and_prints_at_most_one_line() {
+    let mut inputs = vec![
+        submitted("hello"),
+        submitted("other"),
+        with(submitted("hello"), "transcript_path", json!("/tmp/x.jsonl")),
+        with(submitted("hello"), "session_id", json!(1)),
+        stopped("sess-1"),
+        with(stopped("sess-1"), "stop_hook_active", json!(true)),
+        json!({"hook_event_name": "Notification"}),
+        json!({"hook_event_name": "UserPromptSubmit"}),
+        json!({"hook_event_name": "Stop"}),
+    ];
+    inputs.push(with(
+        submitted("hello"),
+        "prompt",
+        json!("x".repeat(30_000)),
+    ));
+    for q in &inputs {
+        for busy in [0, 6] {
+            let mut f = holding(&[typed(T, "hello")]);
+            said(&mut f, "a", "sess-1", "2026-11-16T01:00:00Z");
+            f.busy = busy;
+            assert!(is_hook(q));
+            if let Some(line) = hook(&mut f, None, q) {
+                assert!(
+                    !line.contains('\n') && !line.starts_with("{\"error\""),
+                    "{line}"
+                );
+                assert!(
+                    line.starts_with("ap request: ") || line.starts_with("{\"decision\":\"block\""),
+                    "{line}"
+                );
+            }
+        }
+    }
+    // The built binary: status 0, nothing on standard error, for the cases that reach no store.
+    let stdin = |v: Value| v.to_string().into_bytes();
+    for (args, q, out) in [
+        (
+            vec![],
+            json!({"hook_event_name": "SessionStart", "session_id": "s"}),
+            String::new(),
+        ),
+        (
+            vec!["--store", "/s/store"],
+            json!({"hook_event_name": "Notification"}),
+            String::new(),
+        ),
+        (
+            vec![],
+            with(stopped("sess-1"), "stop_hook_active", json!(true)),
+            String::new(),
+        ),
+        (
+            vec![],
+            with(
+                submitted("hello"),
+                "transcript_path",
+                json!("/tmp/hooked.jsonl"),
+            ),
+            format!("{}\n", not_recorded("invalid_input", None)),
+        ),
+        (
+            vec!["--store", "/s/store"],
+            with(
+                with(submitted("hello"), "session_id", json!("a b")),
+                "transcript_path",
+                json!("/tmp/hooked.jsonl"),
+            ),
+            format!("{}\n", not_recorded("invalid_input", None)),
+        ),
+    ] {
+        let (status, stdout, stderr) = ap_raw(&args, &stdin(q.clone()));
+        assert_eq!(
+            (status, String::from_utf8(stdout).unwrap(), stderr),
+            (Some(0), out, vec![]),
+            "{q}"
+        );
+    }
+    // An object with `op` and `hook_event_name` is refused; `--text` with a hook's input is `usage`.
+    let (status, out, e) = ap(&[], br#"{"op":"list","hook_event_name":"Stop"}"#);
+    assert_eq!(
+        (
+            status,
+            out.is_empty(),
+            &e["error"]["code"],
+            &e["error"]["field"]
+        ),
+        (
+            Some(2),
+            true,
+            &json!("invalid_input"),
+            &json!("hook_event_name")
+        )
+    );
+    for args in [
+        vec!["--text"],
+        vec!["--store", "/s/store", "--text"],
+        vec!["--bogus"],
+    ] {
+        let (status, out, e) = ap(&args, &stdin(json!({"hook_event_name": "Notification"})));
+        assert_eq!(
+            (
+                status,
+                out.is_empty(),
+                &e["error"]["code"],
+                &e["error"]["field"]
+            ),
+            (Some(2), true, &json!("usage"), &json!("args")),
+            "{args:?}"
+        );
+    }
 }

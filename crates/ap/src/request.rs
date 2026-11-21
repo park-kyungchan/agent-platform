@@ -1,6 +1,6 @@
 //! `ap request`: one message of the user recorded as a `request` of the store with its words, routed,
 //! and the current requests of a topic listed (README "One request", `specs/ap/request.md`).
-use crate::host::{Failure, Host, LIMIT, System, error, fail, id};
+use crate::host::{Failure, Host, LIMIT, System, digest, error, fail, id};
 use crate::store::{self, Actor, Applied, Found, at, bad, only, shaped, sized};
 use serde_json::{Value, json};
 use std::{ffi::OsString, io::Write, process::ExitCode};
@@ -122,9 +122,7 @@ fn words(s: &impl System, r: &Value) -> Result<Words, Failure> {
             let w = &r[way];
             only(w, "record at", "words_from.")?;
             require_none(r, "said_at")?;
-            let record = w["record"]
-                .as_str()
-                .filter(|p| p.starts_with('/') && p.len() <= 400);
+            let record = w["record"].as_str().filter(|p| admitted(s, p));
             let record = record.ok_or_else(|| bad("words_from.record"))?;
             let at = w["at"]
                 .as_str()
@@ -150,6 +148,25 @@ fn words(s: &impl System, r: &Value) -> Result<Words, Failure> {
         record,
         said_at,
     })
+}
+/// A session record whose words count as verified (R25): `<home>/.claude/projects/` and one or more
+/// components, none empty, `.` or `..`, no control character, at most 400 bytes. `<home>` is the port's
+/// (the passwd entry of the effective user), not `HOME` or `CLAUDE_CONFIG_DIR`; the string is compared,
+/// no link is resolved; without a home nothing is admitted.
+fn admitted(s: &impl System, path: &str) -> bool {
+    let Some(home) = s.home() else {
+        return false;
+    };
+    let Some(home) = home.to_str() else {
+        return false;
+    };
+    let dir = format!("{}/.claude/projects/", home.trim_end_matches('/'));
+    path.len() <= 400
+        && !path.chars().any(char::is_control)
+        && path.strip_prefix(&dir).is_some_and(|rest| {
+            rest.split('/')
+                .all(|c| !c.is_empty() && c != "." && c != "..")
+        })
 }
 fn require_none(r: &Value, k: &str) -> Result<(), Failure> {
     r.get(k).map_or(Ok(()), |_| Err(bad(k)))
@@ -287,6 +304,23 @@ fn read_back(
         .ok_or_else(|| error("store_answer_unreadable", "request"))?
         .1)
 }
+/// The parameters of `record_request` and `supersede_request` but `request`.
+fn params(
+    w: &Words,
+    (reading, kind, topic): (&str, &str, &str),
+    session: &str,
+    runtime: Option<&str>,
+) -> Value {
+    let mut p = json!({"words": w.text, "words_verified": w.verified, "truncated": w.truncated, "reading": reading,
+        "kind": kind, "topic": topic, "said_at": w.said_at, "session": session});
+    if let Some(record) = &w.record {
+        p["record"] = json!(record);
+    }
+    if let Some(runtime) = runtime {
+        p["runtime"] = json!(runtime);
+    }
+    p
+}
 /// `record`, and `supersede` of the current request `request`.
 fn record(
     s: &mut impl System,
@@ -323,14 +357,7 @@ fn record(
     if let Some(route) = &route {
         check(s, store, route, "route.intent")?;
     }
-    let mut p = json!({"words": w.text, "words_verified": w.verified, "truncated": w.truncated, "reading": reading,
-        "kind": kind, "topic": topic, "said_at": w.said_at, "session": actor.session});
-    if let Some(record) = &w.record {
-        p["record"] = json!(record);
-    }
-    if let Some(runtime) = runtime {
-        p["runtime"] = json!(runtime);
-    }
+    let mut p = params(&w, (reading, kind, topic), actor.session, runtime);
     let applied = match old {
         Some(old) => {
             p["request"] = id("request", old);
@@ -437,6 +464,183 @@ pub fn text(v: &Value) -> String {
     }
     out
 }
+/// The reading the hook stores: no agent has read the message yet.
+const HOOK_READING: &str =
+    "Recorded by the hook of the CLI; kind and reading are not yet an agent's.";
+/// A hook's input (R26): one object with a string `hook_event_name` and no `op`.
+pub fn is_hook(r: &Value) -> bool {
+    r.get("op").is_none() && r.get("hook_event_name").is_some_and(Value::is_string)
+}
+/// The hook form (R26 to R29): the one line it prints, or none. It never ends as a refusal.
+pub fn hook(s: &mut impl System, store: Option<&str>, r: &Value) -> Option<String> {
+    match r["hook_event_name"].as_str() {
+        Some("UserPromptSubmit") => Some(prompt_hook(s, store, r)),
+        Some("Stop") => stop_hook(s, store, r),
+        _ => None,
+    }
+}
+/// `UserPromptSubmit` (R27): the prompt recorded from the session record, or why it is not.
+fn prompt_hook(s: &mut impl System, store: Option<&str>, r: &Value) -> String {
+    let path = r["transcript_path"].as_str().filter(|p| admitted(s, p));
+    match prompt_recorded(s, store, r, path) {
+        Ok((key, at)) => {
+            let path = serde_json::to_string(path.unwrap_or_default()).unwrap_or_default();
+            format!(
+                "ap request: recorded {key} (verified, unrouted) by the hook. Do not record this message again: \
+                 route it (op route, request {key}), or supersede it with your kind and reading and \
+                 \"words_from\":{{\"record\":{path},\"at\":\"{at}\"}}."
+            )
+        }
+        Err(code) => {
+            let record = path.map_or(String::new(), |p| format!("; its session record is {p}"));
+            format!(
+                "ap request: not recorded by the hook ({code}). If this message is the user's, record it \
+                 with ap request{record}."
+            )
+        }
+    }
+}
+/// The request's key and the second of its line, or the code of the end `not recorded`.
+fn prompt_recorded(
+    s: &mut impl System,
+    store: Option<&str>,
+    r: &Value,
+    path: Option<&str>,
+) -> Result<(String, String), String> {
+    let invalid = || "invalid_input".to_owned();
+    let session = shaped(r, "session_id", 64, "._:-").map_err(|_| invalid())?;
+    let path = path.ok_or_else(invalid)?;
+    let prompt = r["prompt"]
+        .as_str()
+        .filter(|p| !p.is_empty())
+        .ok_or_else(invalid)?;
+    let not_found = || "words_not_found".to_owned();
+    let bytes = s.read(path).map_err(|_| not_found())?;
+    let at = prompt_line(&bytes, prompt).ok_or_else(not_found)?;
+    match from_record(&bytes, &at) {
+        Ok(w) if w == prompt => {}
+        Ok(_) => return Err(not_found()),
+        Err(f) => return Err(f.code.to_owned()),
+    }
+    let (text, truncated) = bound(prompt.to_owned());
+    let w = Words {
+        text,
+        verified: true,
+        truncated,
+        record: Some(path.to_owned()),
+        said_at: format!("{at}Z"),
+    };
+    let topic = hook_topic(s, r);
+    let p = params(&w, (HOOK_READING, "order", &topic), session, Some("claude"));
+    let rid = format!(
+        "hook-{}",
+        &digest(format!("{session}\n{at}").as_bytes())[..40]
+    );
+    let actor = Actor {
+        agent: "hook",
+        session,
+    };
+    let failed = |f: Failure| store::code(&f);
+    let applied =
+        store::record_request(s, store, &actor, format!("{rid}-record"), p).map_err(failed)?;
+    if applied.outcome != "applied" {
+        // A line that already has its request is an earlier message's with the same text.
+        return Err(not_found());
+    }
+    let key = applied.created().and_then(|i| i["native_key"].as_str());
+    let key = key
+        .ok_or_else(|| "store_answer_unreadable".to_owned())?
+        .to_owned();
+    let back = read_back(s, store, (&topic, &w.said_at), &key).map_err(failed)?;
+    if back["words"].as_str() != Some(w.text.as_str()) {
+        return Err("readback_differs".to_owned());
+    }
+    Ok((key, at))
+}
+/// The second (`YYYY-MM-DDTHH:MM:SS`) of the prompt's line: the last line of a typed prompt (`origin.kind`
+/// `human`) whose string is `prompt`, when no answer of the main thread follows it.
+fn prompt_line(bytes: &[u8], prompt: &str) -> Option<String> {
+    let mut found = None;
+    let mut answered = false;
+    for line in bytes.split(|b| *b == b'\n') {
+        let Ok(v) = serde_json::from_slice::<Value>(line) else {
+            continue;
+        };
+        let flagged = |k: &str| v[k] == true;
+        match v["type"].as_str() {
+            Some("assistant") if !flagged("isSidechain") => answered = true,
+            Some("user")
+                if !["isMeta", "isCompactSummary", "isSidechain"]
+                    .into_iter()
+                    .any(flagged)
+                    && v["origin"]["kind"] == "human"
+                    && v["message"]["content"].as_str() == Some(prompt) =>
+            {
+                found = Some(v["timestamp"].clone());
+                answered = false;
+            }
+            _ => {}
+        }
+    }
+    let time = found.filter(|_| !answered)?;
+    let at = time.as_str()?.as_bytes().get(..19)?;
+    let at = std::str::from_utf8(at).ok().filter(|a| utc(a, false))?;
+    Some(at.to_owned())
+}
+/// The topic of a hook's request: the first component of `cwd` below the work root, else its last
+/// component, each byte outside the topic set as `-`, at most 120 bytes; `hook` when that is empty.
+fn hook_topic(s: &impl System, r: &Value) -> String {
+    let Some(cwd) = r["cwd"].as_str().map(std::path::Path::new) else {
+        return "hook".to_owned();
+    };
+    let root = s.work_root();
+    let below = cwd
+        .strip_prefix(&root)
+        .ok()
+        .and_then(|rest| match rest.components().next()? {
+            std::path::Component::Normal(c) => Some(c),
+            _ => None,
+        });
+    let name = below.or_else(|| cwd.file_name()).unwrap_or_default();
+    let keep = |c: u8| c.is_ascii_alphanumeric() || b"._:/-".contains(&c);
+    let mut topic: String = (name.as_encoded_bytes().iter())
+        .map(|c| if keep(*c) { *c as char } else { '-' })
+        .collect();
+    topic.truncate(120);
+    if topic.is_empty() {
+        "hook".to_owned()
+    } else {
+        topic
+    }
+}
+/// `Stop` (R28): the current unrouted requests of the session, said once; nothing on any failure.
+fn stop_hook(s: &mut impl System, store: Option<&str>, r: &Value) -> Option<String> {
+    if r["stop_hook_active"] == true {
+        return None;
+    }
+    let session = r["session_id"].as_str()?;
+    let eq = |k: &str, v: &str| json!({"eq": [k, v]});
+    let all = vec![eq("route", "unrouted"), eq("status", "current")];
+    let mut found: Vec<Found> = store::search(s, store, "request", all).ok()?;
+    found.retain(|(_, f)| f["session"] == session);
+    if found.is_empty() {
+        return None;
+    }
+    found.sort_by_key(|o| {
+        (
+            o.1["said_at"].as_str().unwrap_or_default().to_owned(),
+            o.0.clone(),
+        )
+    });
+    let keys: Vec<&str> = found.iter().take(5).map(|o| o.0.as_str()).collect();
+    let reason = format!(
+        "ap request: {} unrouted request(s) of this session: {}. Route each (op route) or set it aside, \
+         then end the turn.",
+        found.len(),
+        keys.join(", ")
+    );
+    Some(json!({"decision": "block", "reason": reason}).to_string())
+}
 fn run(
     s: &mut impl System,
     store: Option<&str>,
@@ -474,6 +678,14 @@ pub fn execute(s: &mut impl System, store: Option<&str>, r: &Value) -> Result<Va
 }
 pub fn cli(argv: &[OsString]) -> ExitCode {
     let called = store::input(argv, "list").map_err(|f| refusal(f, None));
+    // The hook form (R29): status 0, nothing on standard error, at most one line.
+    if let Ok((store, _, r)) = &called
+        && is_hook(r)
+    {
+        let line = hook(&mut Host, store.as_deref(), r);
+        let written = line.map_or(Ok(()), |l| writeln!(std::io::stdout(), "{l}"));
+        return ExitCode::from(if written.is_ok() { 0 } else { 4 });
+    }
     let result = called.and_then(|(store, text, r)| {
         let v = execute(&mut Host, store.as_deref(), &r)?;
         Ok(if text {
