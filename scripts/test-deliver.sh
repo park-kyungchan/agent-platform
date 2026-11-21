@@ -15,8 +15,10 @@
 # installed on the scratch store. The engine file and the store lie under ONT_INSTALL_BIN_DIR and
 # ONT_INSTALL_STATE_DIR of that directory. The origin carries deploy/walk.service and deploy/walk.timer, which
 # pass a writes under AP_UNIT_DIR and pass k changes, edits by hand, rolls back and leaves after a tip
-# without an accepting review.
-# One line `walk pass=<a..k> k=<k> pair=<commit or neither> outcome=<outcome>` per case, then
+# without an accepting review. Pass l gives the request the members `engine` and `etc`: a scratch operations
+# origin whose `scripts/install-etc.sh` is a fake with the real script's verbs and exits, which writes the
+# policy file, its record and its kept copies under the scratch root AP_ETC_ROOT of that directory.
+# One line `walk pass=<a..l> k=<k> pair=<commit or neither> outcome=<outcome>` per case, then
 # `deliver-walk: ok`. Under CI=true it is skipped: the engine there has no object for the target's key.
 # Under AP_CHECK_HOST=pc it is skipped too (`deliver-walk: skipped (pc)`): the walk needs this host's engine
 # store and the installed `ap`, which the local PC lacks. AP_CHECK_HOST is `ap check`'s marker of a command
@@ -164,10 +166,11 @@ PY
 request() {
   python3 -I -c 'import json, sys; w = sys.argv[1]; r = dict(repository="walk/origin", url=w + "/origin", state=w + "/state", build_lock=w + "/build.lock", by="walk", reason="the walk")
 if sys.argv[2] == "rollback": r["rollback"] = True
-if sys.argv[2] == "engine": r["engine"] = dict(repository="walk/engine", url=w + "/engine-origin")
+if sys.argv[2] in ("engine", "etc"): r["engine"] = dict(repository="walk/engine", url=w + "/engine-origin")
+if sys.argv[2] == "etc": r["etc"] = dict(repository="walk/ops", url=w + "/ops-origin")
 print(json.dumps(r))' "$W" "$1" > "$W/$1.json"
 }
-request lead; request rollback; request engine
+request lead; request rollback; request engine; request etc
 CLONE=$W/state/origin
 
 # One call of the built ap in a process group of its own; RC its exit, $W/out.json its record.
@@ -480,6 +483,94 @@ HEAD=$(git -C "$CLONE" rev-parse HEAD)
   [ "$(git -C "$CLONE" rev-parse refs/remotes/origin/main)" = "$M" ] && [ ! -s "$W/systemctl.log" ] ||
   fail "pass k: a tip without an accepting review moved the clone (exit $RC)"
 line k 2 "$(pair)" not_accepted
+
+# spec: specs/ap/deliver.md#R54
+# spec: specs/ap/deliver.md#R55
+# spec: specs/ap/deliver.md#R56
+# spec: specs/ap/deliver.md#R57
+# (l) The configuration files. Pass k left the origin's tip without an accepting review, and only a call
+# that ends `current` or `installed` reaches the step: an accepting review of that merge's second parent
+# first, so that the next call installs the pair. A scratch operations origin X0 and one accepted merge
+# X1 of its policy file: that call installs X1 (the clone is new: X1 alone is judged), the next answers
+# `same`, a hand edit of the host's file `differs`, and a merge without an accepting review is
+# `not_accepted` with the file and the clone's HEAD unchanged.
+X=$W/ops-origin
+mkdir -p "$X/scripts" "$X/etc/agent-platform"
+cat > "$X/scripts/install-etc.sh" <<'EOF'
+#!/bin/bash
+# The walk's installer of the configuration files: the real script's verbs and exits (0 done or same,
+# 1 differs, 2 refused before any write), its record, its kept copies and its refusals `not_forward` and
+# `target_changed`, all under AP_ETC_ROOT. It reads the commit's file from the clone it runs from.
+set -euo pipefail
+REPO=$(cd -- "$(dirname -- "$0")/.." && pwd -P)
+ROOT=${AP_ETC_ROOT:?}
+TARGET=$ROOT/etc/agent-platform/policy.json RECORD=$ROOT/var/lib/agent-platform/etc/installed
+KEEP=$ROOT/var/backups/agent-platform-etc
+want() { git -C "$REPO" show "$1:etc/agent-platform/policy.json"; }
+[ "$#" = 2 ] || { echo "usage: install-etc.sh install <commit> | check <commit>" >&2; exit 2; }
+case $1 in
+  check)
+    if want "$2" | cmp -s - "$TARGET"; then exit 0; fi
+    echo "differs $TARGET" >&2; exit 1 ;;
+  install)
+    rec=none; sha=none
+    [ ! -e "$RECORD" ] || read -r rec sha < "$RECORD"
+    [ "$rec" != "$2" ] || { echo "not_forward $2 is the record" >&2; exit 2; }
+    if [ -e "$TARGET" ] && [ "$(sha256sum < "$TARGET" | cut -d' ' -f1)" != "$sha" ]; then
+      echo "target_changed $TARGET" >&2; exit 2
+    fi
+    mkdir -p "$KEEP" "$(dirname "$TARGET")" "$(dirname "$RECORD")"
+    [ ! -e "$TARGET" ] || cp -p "$TARGET" "$KEEP/policy.json.before-$(date -u +%Y%m%dT%H%M%SZ)-$$"
+    want "$2" > "$TARGET.new"; mv "$TARGET.new" "$TARGET"
+    printf '%s %s\n' "$2" "$(sha256sum < "$TARGET" | cut -d' ' -f1)" > "$RECORD" ;;
+  *) echo "usage: install-etc.sh install <commit> | check <commit>" >&2; exit 2 ;;
+esac
+EOF
+printf '{"version": 0}\n' > "$X/etc/agent-platform/policy.json"
+git -C "$X" init -q -b main
+git -C "$X" add -A && git -C "$X" commit -q -m "ops 0"
+# A merge of the policy at version $1, with an accepting review of its head unless $2 is `no`.
+ops_merge() {
+  git -C "$X" checkout -q -b "p$1" main
+  printf '{"version": %s}\n' "$1" > "$X/etc/agent-platform/policy.json"
+  git -C "$X" add -A && git -C "$X" commit -q -m "policy $1"
+  local head; head=$(git -C "$X" rev-parse HEAD)
+  git -C "$X" checkout -q main
+  git -C "$X" merge -q --no-ff -m "merge policy $1" "p$1"
+  [ "${2:-}" = no ] || accept "$head" walk/ops
+  git -C "$X" rev-parse HEAD
+}
+export AP_ETC_ROOT=$W/etc-root
+POLICY=$AP_ETC_ROOT/etc/agent-platform/policy.json
+XC=$W/state/ops
+etc_rows() { member '[(i["name"], i["exit"], i["code"]) for i in r["installers"] if i["name"].startswith("etc")]'; }
+accept "$(git -C "$O" rev-parse "$M^2")" walk/origin
+X1=$(ops_merge 1)
+call etc
+[ "$RC" = 0 ] && [ "$(member 'r["end"]')" = installed ] && [ "$(pair)" = "$M" ] &&
+  [ "$(member '(r["etc"]["result"], r["etc"]["from"], r["etc"]["tip"], r["etc"]["code"])')" = "('installed', None, '$X1', None)" ] ||
+  fail "pass l: the install (exit $RC)"
+git -C "$X" show "$X1:etc/agent-platform/policy.json" | cmp -s - "$POLICY" || fail "pass l: the policy file"
+[ "$(git -C "$XC" rev-parse HEAD)" = "$X1" ] && [ "$(git -C "$XC" remote get-url origin)" = "$X" ] || fail "pass l: the clone"
+[ "$(etc_rows)" = "[('etc-check', 1, None), ('etc', 0, None), ('etc-check', 0, None)]" ] || fail "pass l: the rows of the install"
+line l 0 "$(pair)" "$(member 'r["etc"]["result"]')"
+call etc
+[ "$RC" = 0 ] && [ "$(member 'r["end"]')" = current ] && [ "$(member 'r["etc"]["result"]')" = same ] &&
+  [ "$(etc_rows)" = "[('etc-check', 0, None)]" ] || fail "pass l: the call after the install (exit $RC)"
+line l 1 "$(pair)" "$(member 'r["etc"]["result"]')"
+printf '# by hand\n' >> "$POLICY"
+HAND=$(sha256sum < "$POLICY")
+call etc
+[ "$RC" = 0 ] && [ "$(member '(r["etc"]["result"], r["etc"]["code"])')" = "('differs', 'not_forward')" ] &&
+  [ "$(sha256sum < "$POLICY")" = "$HAND" ] || fail "pass l: a hand edit (exit $RC)"
+line l 2 "$(pair)" "$(member 'r["etc"]["result"]')"
+X2=$(ops_merge 2 no)
+call etc
+[ "$RC" = 0 ] && [ "$(member 'r["end"]')" = current ] &&
+  [ "$(member '(r["etc"]["result"], r["etc"]["tip"], r["etc"]["detail"]["why"])')" = "('not_accepted', '$X2', 'no_accepting_review')" ] &&
+  [ "$(etc_rows)" = "[]" ] && [ "$(sha256sum < "$POLICY")" = "$HAND" ] && [ "$(git -C "$XC" rev-parse HEAD)" = "$X1" ] ||
+  fail "pass l: a tip without an accepting review (exit $RC)"
+line l 3 "$(pair)" "$(member 'r["etc"]["result"]')"
 
 [ "$(host_count)" = "$host_before" ] || fail "the host store's install objects changed"
 echo "deliver-walk: ok"

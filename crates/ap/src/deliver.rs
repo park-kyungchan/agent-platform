@@ -2,7 +2,9 @@
 //! of `main` and leaves its record in the store (README "Delivery"). Every program it starts goes
 //! through `System`; the lock is the only file it holds, `<state>` the only directory it writes,
 //! except that a request with `checkouts` may fast-forward those checkouts and an install writes the
-//! unit files of `deploy/` under `AP_UNIT_DIR` (`specs/ap/deliver.md` R48 to R51).
+//! unit files of `deploy/` under `AP_UNIT_DIR` (`specs/ap/deliver.md` R48 to R51). With the member `etc`
+//! it also runs the installer of the operations repository's clone at its accepted tip (R53 to R57),
+//! which alone writes the host's configuration files.
 use crate::host::{Host, LIMIT, System, args, complete_id, digest, id, ont, refused};
 use crate::review::{accepting, field, objects};
 use crate::run::{stamp, write};
@@ -19,8 +21,7 @@ use std::{
     time::SystemTime,
 };
 
-const MEMBERS: &str =
-    "repository url state build_lock build_wait_seconds by reason past rollback engine checkouts";
+const MEMBERS: &str = "repository url state build_lock build_wait_seconds by reason past rollback engine etc checkouts";
 const TARGET: &str = "/usr/local/bin/ap";
 const ENGINE: &str = "/usr/local/bin/ont";
 const MARKER: &str = "migrate.pending";
@@ -58,6 +59,8 @@ struct Call<'a> {
     /// With `engine`: its clone, and the engine installer's two directories (README "The engine
     /// and the schema").
     engine: Option<(String, String, String)>,
+    /// With `etc`: the clone of the operations repository, `<state>/<etc name>` (R53).
+    etc: Option<String>,
 }
 /// What one installer did: its exit (128 plus the signal for a signal), its code, and for the
 /// content installer the tarball it printed.
@@ -121,6 +124,16 @@ fn check(r: &Value) -> Result<(), String> {
         let name = named_by(&e["repository"], part).map(|(_, n)| n);
         members && url_of(&e["url"]) && name.is_some_and(|n| n != own && n != MARKER)
     });
+    // The operations repository's clone lies beside the other two (R53).
+    let engine_name = r
+        .get("engine")
+        .and_then(|e| named_by(&e["repository"], part));
+    let etc = r.get("etc").is_none_or(|e| {
+        let members = e.as_object().is_some_and(|o| o.len() == 2);
+        let name = named_by(&e["repository"], part).map(|(_, n)| n);
+        let free = |n: &str| n != own && n != MARKER && engine_name.is_none_or(|(_, x)| x != n);
+        members && url_of(&e["url"]) && name.is_some_and(free)
+    });
     // Three forms: a Lead's install, a Lead's rollback (no `past`), the timer's (none of the four).
     let lead = ["by", "reason", "past", "rollback"]
         .iter()
@@ -149,6 +162,7 @@ fn check(r: &Value) -> Result<(), String> {
         ),
         ("repository", r.get("engine").is_none() || own != MARKER),
         ("engine", engine),
+        ("etc", etc),
         ("checkouts", r.get("checkouts").is_none_or(checkouts)),
     ];
     match checks.iter().find(|(_, ok)| !ok) {
@@ -682,6 +696,11 @@ fn installer(s: &mut impl System, c: &mut Call, name: &str, words: &[&str]) -> R
             let argv = vec![format!("{}/ontology/migrate", c.clone)];
             (argv, c.clone.clone(), c.env.clone())
         }
+        "etc" => {
+            let clone = c.etc.clone().unwrap_or_default();
+            let script = format!("{clone}/scripts/install-etc.sh");
+            (args(&["bash", &script]), clone, c.env.clone())
+        }
         _ => {
             let script = if kind == "ap" {
                 "install-ap.sh"
@@ -694,7 +713,7 @@ fn installer(s: &mut impl System, c: &mut Call, name: &str, words: &[&str]) -> R
         }
     };
     argv.extend(args(words));
-    if !matches!(kind, "ont" | "migrate") {
+    if !matches!(kind, "ont" | "migrate" | "etc") {
         env.push(("CARGO_TARGET_DIR".into(), format!("{}/target", c.state)));
     }
     let scratch = || {
@@ -744,8 +763,19 @@ fn installer(s: &mut impl System, c: &mut Call, name: &str, words: &[&str]) -> R
             (word_ok && rest.starts_with("install-ap.sh:")).then(|| json!(word))
         })
     };
+    // The configuration installer's code: the first word of the last line it wrote on stderr (R56).
+    let etc_code = |n: i32| {
+        let last = err.lines().rev().find(|l| !l.trim().is_empty());
+        let word = last.and_then(|l| l.split_whitespace().next()).filter(|w| {
+            w.bytes()
+                .all(|b| matches!(b, b'a'..=b'z' | b'0'..=b'9' | b'_'))
+        });
+        json!(word.map_or(format!("etc_exit_{n}"), str::to_owned))
+    };
     let code = match (kind, exit) {
         (_, Some(0) | None) => Value::Null,
+        ("etc", Some(1)) if name == "etc-check" => Value::Null,
+        ("etc", Some(n)) => etc_code(n),
         ("ap", _) => ap_code().unwrap_or(Value::Null),
         ("ont", Some(2)) => json!("engine_refused"),
         ("ont", Some(n)) => json!(format!("engine_exit_{n}")),
@@ -1531,6 +1561,113 @@ fn forward(s: &mut impl System, path: &str) -> Value {
     let result = steps(s, path, &mut from, &mut to);
     json!({"path": path, "from": from, "to": to, "result": result})
 }
+/// The configuration files (`specs/ap/deliver.md` R53 to R57): the clone of the operations repository
+/// at its fetched tip E, the merges after its `HEAD` F judged by the rule of step 6, the checkout of E,
+/// then its installer `scripts/install-etc.sh`: `check`, and unless that answered the host at an E
+/// already checked out, `install` and `check` again. The record's member `etc`; it changes nothing
+/// else of the record, the pair or the store.
+fn configuration(s: &mut impl System, c: &mut Call) -> Value {
+    let e = &c.r["etc"];
+    let repository = e["repository"].as_str().unwrap_or_default().to_owned();
+    let url = e["url"].as_str().unwrap_or_default().to_owned();
+    let clone = c.etc.clone().unwrap_or_default();
+    let mut out = json!({"repository": repository, "from": null, "tip": null,
+        "result": "fetch_failed", "code": null, "detail": null});
+    let commit = |o: Option<String>| o.map(|t| t.trim().to_owned()).filter(|t| hex40(t));
+    if run(s, "git", args(&["init", "--quiet", &clone]), 30_000).is_none() {
+        return out;
+    }
+    let from = commit(git_at(
+        s,
+        &clone,
+        &["rev-parse", "--verify", "HEAD^{commit}"],
+    ));
+    out["from"] = json!(from);
+    let fetched = git_at(s, &clone, &["config", "remote.origin.url", &url]).is_some()
+        && git_at(s, &clone, &["config", "remote.origin.fetch", MAIN]).is_some()
+        && git_at(
+            s,
+            &clone,
+            &["fetch", "--quiet", "--no-tags", "origin", MAIN],
+        )
+        .is_some();
+    let read = || ["rev-parse", "--verify", "refs/remotes/origin/main^{commit}"];
+    let tip = if fetched {
+        commit(git_at(s, &clone, &read()))
+    } else {
+        None
+    };
+    let Some(tip) = tip else {
+        return out;
+    };
+    out["tip"] = json!(tip);
+    // The merges after F up to E, or E alone from its first parent for a new clone.
+    if from.as_deref() != Some(tip.as_str()) {
+        let base = match &from {
+            Some(f) => Ok(f.clone()),
+            None => {
+                let line = git_at(s, &clone, &["rev-list", "--parents", "-n", "1", &tip]);
+                let Some(line) = line else {
+                    return out;
+                };
+                let words: Vec<&str> = line.split_whitespace().collect();
+                match words.get(1) {
+                    Some(parent) => Ok((*parent).to_owned()),
+                    None => Err(No(
+                        "not_accepted",
+                        json!({"commit": tip, "why": "not_a_merge"}),
+                    )),
+                }
+            }
+        };
+        let chain = Chain {
+            clone: &clone,
+            repository: &repository,
+            past: vec![],
+            code: "not_accepted",
+        };
+        match base.and_then(|b| accepted(s, c, &chain, &b, &tip)) {
+            Ok(_) => {}
+            Err(No("store_unreadable", _)) => {
+                (out["result"], out["code"]) = (json!("failed"), json!("store_unreadable"));
+                return out;
+            }
+            Err(No(_, detail)) => {
+                (out["result"], out["detail"]) = (json!("not_accepted"), detail);
+                return out;
+            }
+        }
+    }
+    // No program of the clone runs before its tree is at E (R47).
+    if !checkout(s, &clone, &tip) {
+        return out;
+    }
+    let first = installer(s, c, "etc-check", &["check", &tip]);
+    let new = from.as_deref() != Some(tip.as_str());
+    let mut ran = vec![];
+    let mut installed = false;
+    let goes_on = match first.exit {
+        Some(0) => new,
+        Some(1) => true,
+        _ => false,
+    };
+    ran.push(first);
+    if goes_on {
+        let install = installer(s, c, "etc", &["install", &tip]);
+        installed = install.exit == Some(0);
+        ran.push(install);
+        ran.push(installer(s, c, "etc-check", &["check", &tip]));
+    }
+    // The last `check` decides, never the exit of `install`.
+    let result = match ran.last().and_then(|r| r.exit) {
+        Some(0) if installed => "installed",
+        Some(0) => "same",
+        Some(1) => "differs",
+        _ => "failed",
+    };
+    (out["result"], out["code"]) = (json!(result), first_code(&ran));
+    out
+}
 /// A host entry under `AP_UNIT_DIR`: none, a regular file and its bytes, or anything else (a link, a
 /// directory, a file that cannot be read).
 enum Entry {
@@ -1562,7 +1699,11 @@ fn unit_name(n: &str) -> bool {
 /// The unit files of commit `k` (R48): the blobs of mode 100644 directly in `deploy/` that have a
 /// unit file's name, from the clone's objects; None when the clone cannot answer.
 fn unit_files(s: &mut impl System, c: &Call, k: &str) -> Option<Vec<String>> {
-    let out = git(s, c, &["ls-tree", k, "deploy/"])?;
+    Some(unit_entries(&git(s, c, &["ls-tree", k, "deploy/"])?))
+}
+/// The unit files an answer of `git ls-tree <K> deploy/` lists (R48), sorted: the one test of a unit
+/// file's name and mode, which the watch's detector `drift` also calls (`specs/ap/watch.md` R28).
+pub(crate) fn unit_entries(out: &str) -> Vec<String> {
     let mut names: Vec<String> = out
         .lines()
         .filter_map(|l| {
@@ -1575,7 +1716,7 @@ fn unit_files(s: &mut impl System, c: &Call, k: &str) -> Option<Vec<String>> {
         .collect();
     names.sort();
     names.dedup();
-    Some(names)
+    names
 }
 /// Whether `bytes` are those `deploy/<name>` has at `base` or had at a commit of the first-parent
 /// chain of `base` (R49), from the clone's objects; None when the clone cannot answer.
@@ -1818,6 +1959,7 @@ pub fn execute(s: &mut impl System, r: &Value) -> (Value, u8) {
         lock: None,
         sums: RefCell::default(),
         engine: None,
+        etc: None,
         env,
     };
     if let Some(e) = r.get("engine") {
@@ -1833,6 +1975,11 @@ pub fn execute(s: &mut impl System, r: &Value) -> (Value, u8) {
             ),
         ));
         c.rec["schema"] = Value::Null;
+    }
+    if let Some(e) = r.get("etc") {
+        let name = e["repository"].as_str().and_then(|v| v.split_once('/'));
+        c.etc = Some(format!("{}/{}", c.state, name.map_or("", |(_, n)| n)));
+        c.rec["etc"] = Value::Null;
     }
     if r.get("checkouts").is_some() {
         c.rec["checkouts"] = Value::Null;
@@ -1864,9 +2011,13 @@ pub fn execute(s: &mut impl System, r: &Value) -> (Value, u8) {
         (Some("not_started" | "failed_restored"), _) => 3,
         _ => 5,
     };
-    // The fast-forward of the listed checkouts: only after an end `current` or `installed` of a call
-    // that is no rollback, and it changes neither `end`, `code` nor the exit.
+    // The configuration files, then the fast-forward of the listed checkouts: only after an end
+    // `current` or `installed` of a call that is no rollback, and neither changes `end`, `code` nor the
+    // exit (R54, R2).
     let ended = matches!(c.rec["end"].as_str(), Some("installed" | "current"));
+    if ended && r.get("rollback").is_none() && c.etc.is_some() {
+        c.rec["etc"] = configuration(s, &mut c);
+    }
     if let (true, None, Some(list)) = (ended, r.get("rollback"), r["checkouts"].as_array()) {
         let rows: Vec<Value> = list
             .iter()

@@ -6,11 +6,11 @@ The files of this directory make `ap deliver` run with no session in the path. T
 | --- | --- | --- |
 | `ap-deliver.service` | One run of `/usr/local/bin/ap deliver` with the host's request on stdin (`Type=oneshot`, in `agents.slice`, which holds the host's CPU and memory limits; `Nice=10`; at most an hour). `SuccessExitStatus=2`: a refusal (exit 2, nothing installed) is no failure of the unit; the exits 3, 4 and 5 fail it | `/etc/systemd/system/ap-deliver.service` |
 | `ap-deliver.timer` | Starts the service ten minutes after boot and ten minutes after each run ended | `/etc/systemd/system/ap-deliver.timer` |
-| `deliver.json` | The timer's request of this host: `repository`, `url`, `state` (`/var/lib/agent-platform/deliver`), `build_lock` (the build lock `scripts/install-ap.sh` names), `build_wait_seconds: 480` (wait up to eight minutes for that lock), and `engine` (the engine's repository `park-kyungchan/ontology-platform` and its URL: delivery also installs the engine at `ontology/ENGINE-PIN` and a higher version of `ontology/work.schema.json`). It has no `by` and no `reason`: that is the timer's form | `/etc/agent-platform/deliver.json` |
+| `deliver.json` | The timer's request of this host: `repository`, `url`, `state` (`/var/lib/agent-platform/deliver`), `build_lock` (the build lock `scripts/install-ap.sh` names), `build_wait_seconds: 480` (wait up to eight minutes for that lock), `engine` (the engine's repository `park-kyungchan/ontology-platform` and its URL: delivery also installs the engine at `ontology/ENGINE-PIN` and a higher version of `ontology/work.schema.json`), and `etc` (the operations repository `park-kyungchan/agent-vps-operations` and its URL: delivery also runs that repository's installer of the host's configuration files at its accepted tip, section "The configuration files"). It has no `by` and no `reason`: that is the timer's form | `/etc/agent-platform/deliver.json` |
 
 The build lock is one file for every repository of the host, `/var/lib/agent-platform/build.lock`: the `check` of each repository and the installers that build (`scripts/install-ap.sh` here, `scripts/install-ont.sh` of `ontology-platform`) take it. The `check` of `education-platform` also makes its fixture directory beside the lock, so a directory `edu-check.*` under `/var/lib/agent-platform` belongs to a running check of that repository and is removed when it ends.
 
-`ap deliver` installs `ap` and `content/`, with the member `engine` the engine `ont` and the work schema, and the unit files of this directory (section "The unit files"); `deliver.json` and the drop-ins stay by hand. The service relies on systemd's default search path for `cargo`, `git`, `flock` and `ont` (on the host these files are written for, `/usr/bin/cargo`, the rustup proxy, answers in a system service with only `HOME=/root`); on a host where `cargo` lies elsewhere, add the drop-in `/etc/systemd/system/ap-deliver.service.d/path.conf` with the lines `[Service]` and `Environment=PATH=<the directory of cargo>:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin`.
+`ap deliver` installs `ap` and `content/`, with the member `engine` the engine `ont` and the work schema, with the member `etc` the host's configuration files through the operations repository's own installer (section "The configuration files"), and the unit files of this directory (section "The unit files"); `deliver.json` and the drop-ins stay by hand. The service relies on systemd's default search path for `cargo`, `git`, `flock` and `ont` (on the host these files are written for, `/usr/bin/cargo`, the rustup proxy, answers in a system service with only `HOME=/root`); on a host where `cargo` lies elsewhere, add the drop-in `/etc/systemd/system/ap-deliver.service.d/path.conf` with the lines `[Service]` and `Environment=PATH=<the directory of cargo>:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin`.
 
 ## Enable
 
@@ -77,6 +77,58 @@ ont --version                                                      # the engine'
 `schema_install_failed` and `migrate_failed` end a run with exit 4 and keep the service failed. A marker that cannot clear: stop the timer, run the corrected `ontology/migrate` by hand with the store's path and the marker's two versions, read the result, remove the marker, start the timer.
 
 Undo: remove the member `engine` from `/etc/agent-platform/deliver.json`; delivery then stops on a difference of the engine or the schema as before (`engine_differs`, `schema_differs`) and reads no marker. An installed engine goes back with the engine's own rollback, with the timer stopped: `bash /var/lib/agent-platform/deliver/ontology-platform/scripts/install-ont.sh rollback`. A schema is repaired by a higher version, installed forward; delivery never restores the store from a backup.
+
+## The configuration files
+
+With the member `etc` (`specs/ap/deliver.md` R53 to R57) the host's configuration files follow the accepted tip of `main` of the operations repository `park-kyungchan/agent-vps-operations`; today that is `/etc/agent-platform/policy.json`, the policy of models and accounts that `ap run` enforces. A change of the policy is a merged unit of that repository, and the next run of the timer installs it. In each call that ends `current` or `installed` and is no rollback, after every other step and before the checkouts, delivery:
+
+1. makes or reuses its clone `/var/lib/agent-platform/deliver/agent-vps-operations` with the remote `origin` at `etc.url`, and fetches `main` (every call that reaches the step fetches the operations repository);
+2. judges the merges from the clone's `HEAD` (F) up to the fetched tip (E) by the rule of the pair's chain: each a merge whose tree is its second parent's, with an accepting packet review of that head for the repository `park-kyungchan/agent-vps-operations`, and the report of the tip's review on disk with its digest; a new clone judges E alone; E equal to F judges nothing;
+3. checks the clone out at E, and only then runs that repository's installer from it: `bash scripts/install-etc.sh check <E>`, and unless that answered `same` for an E already checked out, `install <E>` and `check <E>` again. The installer checks the accepted merges itself, runs `ap policy check` on the new bytes before it writes, keeps the replaced file under `/var/backups/agent-platform-etc/` and writes only its own target.
+
+Delivery writes no configuration file itself, adds nothing to the installer's environment, passes no `--past` and never calls its `rollback`. The step changes no end, code or exit of the call.
+
+Add the member to the host's request once, after delivery installed an `ap` that knows it (`ap deliver check` refuses `etc` with `invalid_input` before). This is not the command of "Enable": that one replaces `/etc/agent-platform/deliver.json` whole, and the host's request holds members `deploy/deliver.json` does not (`checkouts`, which delivery and the watch's family `checkout` need). From a clean checkout of the merged commit, as root, the block below changes only the member `etc`, keeps the present file as `deliver.json.before-etc`, checks the new one, installs it with mode 0644 and prints the member names of the installed file:
+
+```sh
+python3 -I -c 'import json, sys; r = json.load(open(sys.argv[1])); r["etc"] = json.load(open(sys.argv[2]))["etc"]; open(sys.argv[3], "w").write(json.dumps(r, indent=2) + "\n")' \
+  /etc/agent-platform/deliver.json deploy/deliver.json /etc/agent-platform/deliver.json.new
+ap deliver check < /etc/agent-platform/deliver.json.new &&
+  cp -p /etc/agent-platform/deliver.json /etc/agent-platform/deliver.json.before-etc &&
+  install -m 0644 /etc/agent-platform/deliver.json.new /etc/agent-platform/deliver.json &&
+  rm /etc/agent-platform/deliver.json.new
+python3 -I -c 'import json; print(sorted(json.load(open("/etc/agent-platform/deliver.json"))))'
+```
+
+Where a Lead reads the result: the member `etc` of the record, one line of `journalctl -u ap-deliver.service -o cat` (`last.json` until the next call), `{"repository","from","tip","result","code","detail"}`, and its rows `etc-check` and `etc` of `installers` (exit and code of each run). The installer's kept copies lie under `/var/backups/agent-platform-etc/`; a Lead puts one back by hand, with the timer stopped, through the installer's `rollback <kept file>`.
+
+```sh
+journalctl -u ap-deliver.service -o cat | grep '"etc":{' | tail -n 1        # the record of the last call that ran the step
+```
+
+What follows each result, read with its `code`:
+
+- `installed`: the tip is on the host and read back by the installer's own `check`.
+- `same`: the host already was at the tip. With the code `not_forward` it is the normal answer of the first call of a clone new to delivery when the installer's own record already names the tip.
+- `differs`: the host's file is not at the tip; only `code` tells the states apart. `not_forward`: a hand edit of the host's file while the tip has not moved; `target_changed`: a hand edit when the tip has moved; in both the installer refuses to overwrite the file: compare the edit with the tip's file, then make the change a unit of the operations repository or put the kept copy back. `verify_failed`: `ap policy check` refuses the tip's bytes, on every call until a merge repairs them. `not_accepted` as a code: the installer's own accepted check, which walks from its own record and also wants the review's pull request number to be the merge's.
+- `not_accepted` as the result: delivery's own judgement, with no program run and the clone's `HEAD` where it was; review the commit `detail` names. For a commit on the chain that cannot be reviewed, the hand path, with the timer stopped: run the installer by hand from a clean checkout of the operations repository at the tip, `bash scripts/install-etc.sh install <tip> --past <commit>:<reason>`, then remove delivery's clone of the operations repository (`rm -rf /var/lib/agent-platform/deliver/agent-vps-operations`), so that the next call judges the tip alone; then start the timer.
+- `fetch_failed`: the clone could not be made, fetched, read or checked out; the next call tries again.
+- `failed`: the first `check` refused or did not start (its code, `busy` for the installer's lock), the last `check` did not answer, or the store could not be read (`store_unreadable`); the next call tries again.
+
+What the step leaves and what holds it back. `install` keeps one more copy under `/var/backups/agent-platform-etc/` for every tip new to the clone, also when no byte under `etc/` changed, and nothing prunes them. The step runs only after an end `current` or `installed`: a refusal of agent-platform's own delivery (`not_accepted`, `suppressed`, `held_by_rollback`, `pair_differs`, `build_busy`) holds the configuration back too; nothing is fetched then, so no `drift` finding of the configuration files opens, and the finding `end ...` of the detector `delivery` is the signal. A hand edit of the host's file is a `drift` finding of the watch within one pass (section "The watch").
+
+Undo: remove only the member `etc` from the host's request, a copy kept and `ap deliver check` first; then the clone may be removed. The configuration files stay as the installer last wrote them.
+
+```sh
+python3 -I -c 'import json, sys; r = json.load(open(sys.argv[1])); r.pop("etc", None); open(sys.argv[2], "w").write(json.dumps(r, indent=2) + "\n")' \
+  /etc/agent-platform/deliver.json /etc/agent-platform/deliver.json.new
+ap deliver check < /etc/agent-platform/deliver.json.new &&
+  cp -p /etc/agent-platform/deliver.json /etc/agent-platform/deliver.json.with-etc &&
+  install -m 0644 /etc/agent-platform/deliver.json.new /etc/agent-platform/deliver.json &&
+  rm /etc/agent-platform/deliver.json.new
+python3 -I -c 'import json; print(sorted(json.load(open("/etc/agent-platform/deliver.json"))))'
+rm -rf /var/lib/agent-platform/deliver/agent-vps-operations
+```
 
 ## A Lead's call
 
@@ -291,7 +343,7 @@ systemctl is-active ap-route.service                  # until it answers inactiv
 - `accounts`: checks Claude account `.credentials.json` expiry (only the expiry timestamp is kept) and recent `run` usage limits (`>= 0.9`).
 - `checks`: checks GitHub `main` workflow conclusions, open Dependabot alerts and `github/apply --check` settings drift for policy repositories.
 - `runtimes`: checks `--version` and `--help` flags of `claude`, `muse` and `agy` against the flags `ap run` invokes.
-- `drift`: compares host files listed in `deployments/host-artifacts.json` at `origin/main` of `agent-vps-operations` by SHA-256 without fetching.
+- `drift`: compares by SHA-256, without fetching, three sources with the host's files: the files listed in `deployments/host-artifacts.json` at `origin/main` of `agent-vps-operations`; the unit files of `deploy/` at the commit the installed `ap` names, read from delivery's clone `/var/lib/agent-platform/deliver/agent-platform`, with `/etc/systemd/system/<name>`; and the files of `etc/` at the tip delivery's last fetch of the operations repository read (its clone `/var/lib/agent-platform/deliver/agent-vps-operations`), each with the host's file of the same path under `/`.
 
 `ap-watch.service` (`Type=oneshot`, run of `/usr/local/bin/ap watch`, `Nice=10`, `TZ=UTC` so that `systemctl` prints the times the pass reads in UTC, a `PATH` with `/usr/sbin` for `sshd`, no `Restart=`) is one pass; `ap-watch.timer` starts one at every fifth minute (`OnCalendar=*:0/5`) and makes up no pass missed while the host was down. Each pass is a new process of the installed `ap`: a delivery of `ap` reaches the next pass with no restart. The answer of each pass is one line in the journal.
 

@@ -7,5 +7,9 @@
   "engine": {
     "repository": "park-kyungchan/ontology-platform",
     "url": "https://github.com/park-kyungchan/ontology-platform.git"
+  },
+  "etc": {
+    "repository": "park-kyungchan/agent-vps-operations",
+    "url": "https://github.com/park-kyungchan/agent-vps-operations.git"
   }
 }
