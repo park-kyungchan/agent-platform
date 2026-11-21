@@ -1,5 +1,4 @@
 //! Synthetic format-3 (Schema mode) tests; temporary files only.
-#![allow(clippy::unwrap_used, clippy::expect_used)]
 use super::schema_mode::{ActionLogEntry, InstallArgs, StoreRefusal, append_schema_in};
 use super::*;
 use ont_core::{Coverage, Knowledge, Lineage, Namespace};

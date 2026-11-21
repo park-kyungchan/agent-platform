@@ -6,7 +6,6 @@
 //! reuse their property's/parameter's/rule's class. Structural parser errors
 //! are generic JSON-field classes, sampled at root, property and parameter.
 //! Runtime value/field emitters are included separately from declarations.
-#![allow(clippy::unwrap_used)]
 use super::schema_input_refusal;
 use ont_core::Knowledge;
 use ont_core::schema::{Schema, SchemaSet};

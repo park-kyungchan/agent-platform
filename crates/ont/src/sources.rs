@@ -780,7 +780,6 @@ fn field_of(line: &str) -> Option<(&str, &str)> {
 }
 
 #[cfg(test)]
-#[allow(clippy::unwrap_used)]
 mod tests {
     use super::*;
 

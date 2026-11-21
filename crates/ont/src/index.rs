@@ -684,7 +684,6 @@ fn reference_value(schema: &Schema, target: &str, value: &Value) -> Option<Value
 }
 
 #[cfg(test)]
-#[allow(clippy::unwrap_used)]
 mod tests {
     use super::*;
 

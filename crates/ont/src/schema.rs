@@ -499,7 +499,6 @@ mod diagnostics_tests;
 
 #[cfg(test)]
 mod tests {
-    #![allow(clippy::unwrap_used)]
     use super::*;
     #[test]
     fn existing_default_aliases_refuse_without_rows_or_backups() {

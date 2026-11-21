@@ -1,5 +1,4 @@
 //! Observe the history count/load boundary in the production get evaluator.
-#![allow(clippy::unwrap_used)]
 use super::*;
 use ont_core::{Change, Coverage, Lineage, Namespace, Observation, Scope};
 use ont_store::{Append, Store};

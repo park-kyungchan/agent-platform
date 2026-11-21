@@ -123,14 +123,10 @@ thread_local! {
 /// The calling thread's previous bounds are restored even during unwinding.
 #[doc(hidden)]
 pub fn __with_snapshot_bounds<T>(page: usize, max: usize, f: impl FnOnce() -> T) -> T {
-    struct Restore(Option<(usize, usize)>);
-    impl Drop for Restore {
-        fn drop(&mut self) {
-            TEST_SNAPSHOT_BOUNDS.with(|b| b.set(self.0));
-        }
-    }
-    let _restore =
-        Restore(TEST_SNAPSHOT_BOUNDS.with(|b| b.replace(Some((page.max(1), max.max(1))))));
+    let _restore = std::mem::DropGuard::new(
+        TEST_SNAPSHOT_BOUNDS.with(|b| b.replace(Some((page.max(1), max.max(1))))),
+        |previous| TEST_SNAPSHOT_BOUNDS.with(|b| b.set(previous)),
+    );
     f()
 }
 impl Context {
@@ -191,4 +187,34 @@ pub(crate) fn sha256_hex(bytes: &[u8]) -> String {
 }
 pub(crate) fn pin_json(p: &SchemaPin) -> Value {
     json!({"domain":p.domain,"version":p.version,"sha256":p.sha256})
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn bounds() -> (usize, usize) {
+        let ctx = Context::new(PathBuf::new(), 0);
+        (ctx.snapshot_page_size, ctx.snapshot_max_heads)
+    }
+
+    #[test]
+    fn previous_bounds_return_after_a_value_and_after_a_panic() {
+        assert_eq!(bounds(), (500, 100_000));
+        __with_snapshot_bounds(2, 3, || {
+            assert_eq!(bounds(), (2, 3));
+            let caught = std::panic::catch_unwind(|| {
+                __with_snapshot_bounds(5, 7, || {
+                    assert_eq!(bounds(), (5, 7));
+                    panic!("seam");
+                })
+            });
+            assert!(caught.is_err());
+            assert_eq!(bounds(), (2, 3));
+            assert_eq!(__with_snapshot_bounds(5, 7, bounds), (5, 7));
+            assert_eq!(bounds(), (2, 3));
+        });
+        assert_eq!(__with_snapshot_bounds(0, 0, bounds), (1, 1));
+        assert_eq!(bounds(), (500, 100_000));
+    }
 }

@@ -84,20 +84,6 @@ thread_local! {
     static IN_CALL: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
 }
 
-/// Marks the thread as inside a tool call until dropped.
-struct InCall;
-impl InCall {
-    fn enter() -> Self {
-        IN_CALL.with(|c| c.set(true));
-        Self
-    }
-}
-impl Drop for InCall {
-    fn drop(&mut self) {
-        IN_CALL.with(|c| c.set(false));
-    }
-}
-
 /// The part of a panic location's file from `crates/` on (the file is
 /// repository-relative, or absolute with a `/crates/` component); any other
 /// location (a dependency, the standard library) is `external`.
@@ -469,7 +455,9 @@ impl<'a> Server<'a> {
         };
         let arguments = &arguments;
         let request = arguments.to_string();
-        let guard = InCall::enter();
+        // The thread is inside a tool call until the guard is dropped.
+        IN_CALL.with(|c| c.set(true));
+        let guard = std::mem::DropGuard::new((), |()| IN_CALL.with(|c| c.set(false)));
         let ran = catch_unwind(AssertUnwindSafe(|| {
             let result = match op {
                 ToolOp::Read(op) => (self.exec)(op, request.as_bytes(), &ctx),
@@ -617,7 +605,6 @@ pub fn serve_with(
 }
 
 #[cfg(test)]
-#[allow(clippy::unwrap_used)]
 mod tests {
     use super::*;
     use std::io::Cursor;
@@ -636,6 +623,43 @@ mod tests {
             panic_location("/root/.cargo/registry/src/a-1/src/lib.rs", 9),
             "external:9"
         );
+    }
+
+    #[test]
+    fn in_call_mark_is_clear_after_a_returned_and_a_panicked_call() {
+        // spec: specs/ont/mcp.md#R11
+        let seen = std::cell::RefCell::new(Vec::new());
+        let exec = |_: Op, request: &[u8], _: &Context| {
+            // No assertion here: a panic of the seam is caught by the call.
+            seen.borrow_mut().push(IN_CALL.with(std::cell::Cell::get));
+            if request == b"{\"panic\":true}" {
+                panic!("seam");
+            }
+            Err(Failure::from(Refusal::new("seam_refusal")))
+        };
+        let config = Config {
+            store: PathBuf::from("unused.sqlite"),
+            now: Some(0),
+            client: "unit".to_string(),
+            read_only: false,
+        };
+        let mut server = Server::new(config, &exec);
+        let call = |server: &mut Server, id: u64, arguments: Value| {
+            let line = json!({"jsonrpc":"2.0","id":id,"method":"tools/call",
+                "params":{"name":"ont_describe","arguments":arguments}});
+            let response = server.handle_line(line.to_string().as_bytes()).unwrap();
+            response["result"]["isError"].as_bool().unwrap()
+        };
+        assert!(!IN_CALL.with(std::cell::Cell::get));
+        assert!(call(&mut server, 1, json!({})));
+        assert!(!IN_CALL.with(std::cell::Cell::get));
+        assert!(call(&mut server, 2, json!({"panic":true})));
+        assert!(!IN_CALL.with(std::cell::Cell::get));
+        assert_eq!(*seen.borrow(), [true, true]);
+        // The server answers the call after the panicked one.
+        assert!(call(&mut server, 3, json!({})));
+        assert_eq!(*seen.borrow(), [true, true, true]);
+        assert!(!IN_CALL.with(std::cell::Cell::get));
     }
 
     #[test]
