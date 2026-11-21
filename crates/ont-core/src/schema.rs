@@ -72,6 +72,8 @@ pub mod codes {
         "reference_array_from_source_unsupported";
     pub const RECORDS_SOURCE_OWNER: &str = "records_source_owner";
     pub const INVALID_FUNCTION: &str = "invalid_function";
+    pub const INVALID_RULE_TARGET: &str = "invalid_rule_target";
+    pub const AMBIGUOUS_RULE_TARGET: &str = "ambiguous_rule_target";
     pub const ALL: &[&str] = &[
         INVALID_FORMAT,
         INVALID_VERSION,
@@ -133,7 +135,15 @@ pub mod codes {
         REFERENCE_ARRAY_FROM_SOURCE_UNSUPPORTED,
         RECORDS_SOURCE_OWNER,
         INVALID_FUNCTION,
+        INVALID_RULE_TARGET,
+        AMBIGUOUS_RULE_TARGET,
     ];
+}
+/// The violations a schema installed before the rule that raises them may
+/// keep: the store still opens it, and the affected action refuses at
+/// execution (`specs/ont/action.md` R40 to R43, R110).
+fn installed_exempt(code: &str) -> bool {
+    code == codes::AMBIGUOUS_CREATE_KEY || code == codes::AMBIGUOUS_RULE_TARGET
 }
 const SOURCE_KINDS: &[&str] = &["markdown_fields", "file_digest", "records"];
 
@@ -1013,8 +1023,34 @@ pub struct ActionRule {
     pub clear_reference: Option<ReferenceRule>,
     #[serde(default)]
     pub set: BTreeMap<String, Value>,
+    /// `$<parameter>`: the reference parameter whose object the rule edits
+    /// (`specs/ont/action.md` R108).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub target: Option<String>,
 }
 impl ActionRule {
+    /// The object type a rule of `specs/ont/action.md` R108 edits through one
+    /// parameter: `modify_object`, `delete_object`, `set_reference`,
+    /// `clear_reference`, and `create_or_modify_object` of a type whose key
+    /// is not a pointer (`$action_id`). `None` for every other rule.
+    pub fn targeted_type<'a>(&'a self, schema: &Schema) -> Option<&'a str> {
+        if let Some(t) = &self.create_or_modify_object {
+            let pointer_key = schema
+                .object_types
+                .get(t)
+                .and_then(|ty| ty.primary_key.from.as_deref())
+                .is_some_and(|p| p.starts_with('/'));
+            return (!pointer_key).then_some(t.as_str());
+        }
+        self.modify_object
+            .as_deref()
+            .or(self.delete_object.as_deref())
+            .or(self.set_reference.as_ref().map(|r| r.object_type.as_str()))
+            .or(self
+                .clear_reference
+                .as_ref()
+                .map(|r| r.object_type.as_str()))
+    }
     fn object_target(&self) -> Option<(&'static str, &str)> {
         [
             ("create_object", &self.create_object),
@@ -1054,6 +1090,36 @@ pub struct ActionType {
 }
 
 impl ActionType {
+    /// The declared reference parameters to `object_type`, in name order
+    /// (an array of references is none).
+    pub fn reference_parameters<'a>(&'a self, object_type: &str) -> Vec<&'a str> {
+        self.parameters
+            .iter()
+            .filter(|(_, p)| matches!(&p.ty, PropertyType::Ref(r) if r.target == object_type))
+            .map(|(name, _)| name.as_str())
+            .collect()
+    }
+    /// The parameter whose object a rule of `specs/ont/action.md` R108 edits:
+    /// the one `target` names, or else the only declared reference parameter
+    /// to `object_type`. `Err(())` when the rule names no target and the
+    /// action declares more than one such parameter (`ambiguous_rule_target`);
+    /// `Ok(None)` when it declares none. Neither a name nor the order of names
+    /// chooses.
+    #[allow(clippy::result_unit_err)]
+    pub fn rule_target_parameter<'a>(
+        &'a self,
+        rule: &'a ActionRule,
+        object_type: &str,
+    ) -> Result<Option<&'a str>, ()> {
+        if let Some(t) = &rule.target {
+            return Ok(Some(t.strip_prefix('$').unwrap_or(t)));
+        }
+        match self.reference_parameters(object_type).as_slice() {
+            [] => Ok(None),
+            [one] => Ok(Some(one)),
+            _ => Err(()),
+        }
+    }
     /// A pointer key comes from exactly one required reference to its created
     /// type, and one create/upsert rule for that type. Never use value/name order.
     pub fn create_key_parameter(&self, object_type: &str, pointer: &str) -> Option<&str> {
@@ -1549,7 +1615,8 @@ impl Schema {
         Self::check_bytes_inner(bytes, other_domains_types, false)
     }
 
-    /// Reload previously installed bytes, exempting only the create-key rule.
+    /// Reload previously installed bytes, exempting only the create-key rule
+    /// and the rule-target rule (`specs/ont/action.md` R40, R110).
     /// Never use for admission of a new install; execution must resolve its key.
     pub fn check_installed_bytes(
         bytes: &[u8],
@@ -1598,7 +1665,7 @@ impl Schema {
         })?;
         let mut violations = check(&schema, other_domains_types);
         if installed {
-            violations.retain(|v| v.code != codes::AMBIGUOUS_CREATE_KEY);
+            violations.retain(|v| !installed_exempt(v.code));
         }
         if violations.is_empty() {
             Ok(CheckedSchema {
@@ -2344,6 +2411,29 @@ pub fn check(schema: &Schema, other_domains_types: &BTreeSet<String>) -> Vec<Vio
             if rule.kind_count() != 1 {
                 v(codes::INVALID_RULE, rp.clone(), &mut out);
                 continue;
+            }
+            // The object a rule edits through one parameter (R108, R109).
+            match rule.targeted_type(schema) {
+                None => {
+                    if rule.target.is_some() {
+                        v(codes::INVALID_RULE_TARGET, format!("{rp}/target"), &mut out);
+                    }
+                }
+                Some(t) => match &rule.target {
+                    Some(target) => {
+                        let named = target
+                            .strip_prefix('$')
+                            .is_some_and(|name| at.reference_parameters(t).contains(&name));
+                        if !named {
+                            v(codes::INVALID_RULE_TARGET, format!("{rp}/target"), &mut out);
+                        }
+                    }
+                    None => {
+                        if at.reference_parameters(t).len() > 1 {
+                            v(codes::AMBIGUOUS_RULE_TARGET, rp.clone(), &mut out);
+                        }
+                    }
+                },
             }
             if let Some((field, target)) = rule.object_target() {
                 let tp = format!("{rp}/{field}");
@@ -3155,11 +3245,31 @@ fn compare_values(a: &Value, b: &Value) -> Option<std::cmp::Ordering> {
                 x.as_f64()?.partial_cmp(&y.as_f64()?)
             }
         }
-        (Value::String(x), Value::String(y)) => match (parse_decimal(x), parse_decimal(y)) {
-            (Some(dx), Some(dy)) => Some(cmp_decimal(&dx, &dy)),
-            _ => Some(x.cmp(y)),
-        },
+        (Value::String(x), Value::String(y)) => {
+            Some(compare_decimal(x, y).unwrap_or_else(|| x.cmp(y)))
+        }
         _ => None,
+    }
+}
+
+/// The order of two decimals in the decimal spelling (`-?digits[.digits]`),
+/// of any length: `"0999"` is greater than `"100"`, `"1.0"` equals `"1"`,
+/// `"-0"` equals `"0"`. `None` when either is not such a decimal. The one
+/// decimal order of the engine: value-type bounds and action criteria.
+pub fn compare_decimal(a: &str, b: &str) -> Option<std::cmp::Ordering> {
+    Some(cmp_decimal(&parse_decimal(a)?, &parse_decimal(b)?))
+}
+
+/// Whether a declared type is `decimal`: the scalar, or a value type of
+/// `schema` whose base is `decimal`.
+pub fn is_decimal_type(schema: &Schema, ty: &PropertyType) -> bool {
+    match ty {
+        PropertyType::Scalar(ScalarType::Decimal) => true,
+        PropertyType::ValueType(vt) => schema
+            .value_types
+            .get(&vt.value_type)
+            .is_some_and(|d| d.base == ScalarType::Decimal),
+        _ => false,
     }
 }
 
@@ -3303,7 +3413,7 @@ impl SchemaSet {
             violations.extend(
                 check(&schema, &others)
                     .into_iter()
-                    .filter(|v| v.code != codes::AMBIGUOUS_CREATE_KEY),
+                    .filter(|v| !installed_exempt(v.code)),
             );
             if let Some(p) = pin {
                 pins.insert(schema.domain.clone(), p);

@@ -39,3 +39,6 @@ This is a Rust source API change requiring consumers to recompile; legacy Educat
 - R25: Attribution in the action log is self-reported; it is not authentication.
 - R26: The store file has one owner process family: every process opens the file itself, SQLite's write lock admits one writer at a time, and no second process family may write the SQLite file, `edits.jsonl`, or the schema installs directly.
 
+## Names across domains
+
+- R27: Among the domains installed in one store, object type names and view names are unique (`duplicate_type_name` at check and at install). Action type names, link type names with their forward and reverse names, and function names are unique inside one schema and may repeat across domains; a name that may repeat is always resolved in one domain (action.md R105 and R107, read.md R104, fn.md R5). `ont render` and the other reads take no `domain`.

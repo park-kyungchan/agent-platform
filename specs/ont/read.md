@@ -113,6 +113,7 @@ Repair explicitly with `ont --store STORE schema install FILE`, using the exact 
 - R77: Each admitted source's entire reference array is charged before iteration or target lookups, also in reverse scans; hidden source heads consume no entries.
 - R78: Exceeding `MAX_REFERENCE_ENTRIES` refuses `result_too_large` with `max_reference_entries: 10000`.
 - R79: Loaded heads are shared without copying their reference arrays before this check.
+- R104: Each path entry is resolved among the link types that have the type reached so far as an end, and those are links of that type's own domain (a link's ends are types of its own schema, and object type names are unique across the installed domains, schema-language.md R27). A link of the same forward or reverse name in another installed domain is not followed and is not listed in `available`.
 
 ## Count aggregation
 
