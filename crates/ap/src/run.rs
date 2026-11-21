@@ -917,10 +917,14 @@ fn request_at(s: &mut impl System, r: &Value, at_cwd: bool) -> Result<Request, F
     require!(names.iter().all(|n| std::fs::symlink_metadata(n).is_err()) => "out_exists", "out");
     if let Some(Limits { scratch, .. }) = &limits {
         // The host's state for `limits`, before the policy step: nothing at the path, a parent
-        // that is a directory and not a link, and a `bwrap` that answers (R2, R3).
+        // that is a directory with no link in its path, and a `bwrap` that answers (R2, R3).
         require!(std::fs::symlink_metadata(scratch).is_err() => "scratch_exists", "limits");
-        let parent = Path::new(scratch).parent().map(std::fs::symlink_metadata);
-        let parent = parent.is_some_and(|m| m.is_ok_and(|m| m.is_dir()));
+        let parent = Path::new(scratch).parent().is_some_and(|p| {
+            // Resolved through every link, the parent is the path as written, component by
+            // component: a repeated `/` or a `.` is no difference, a link anywhere is.
+            let resolved = std::fs::canonicalize(p);
+            resolved.is_ok_and(|r| r.is_dir() && r.components().eq(p.components()))
+        });
         require!(parent => "scratch_parent_missing", "limits");
         let probe = s.call(BWRAP, &args(&["--version"]), &Value::Null, 10_000);
         require!(probe.is_ok_and(|r| r.success) => "limits_unavailable", "limits");
@@ -1180,16 +1184,22 @@ fn glob(pattern: &str, line: &str) -> bool {
 /// The temporary name is unique per write and created exclusively, so it is never a file of
 /// another run (whose `out` may be any name).
 pub(crate) fn write(path: &str, bytes: &[u8]) -> Result<(), Failure> {
+    write_with(path, bytes, None)
+}
+/// `write` with the mode every temporary name is created with (the default options' when none).
+fn write_with(path: &str, bytes: &[u8], mode: Option<u32>) -> Result<(), Failure> {
+    use std::os::unix::fs::OpenOptionsExt;
     let nanos = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .map_or(0, |d| d.as_nanos());
     for n in 0..8 {
         let tmp = format!("{path}.{}-{nanos}-{n}.ap-tmp", std::process::id());
-        let created = std::fs::OpenOptions::new()
-            .write(true)
-            .create_new(true)
-            .open(&tmp);
-        match created {
+        let mut options = std::fs::OpenOptions::new();
+        options.write(true).create_new(true);
+        if let Some(mode) = mode {
+            options.mode(mode);
+        }
+        match options.open(&tmp) {
             Ok(mut f) => {
                 let done = f.write_all(bytes).and_then(|()| f.sync_all());
                 let done = done.and_then(|()| std::fs::rename(&tmp, path));
@@ -1204,18 +1214,28 @@ pub(crate) fn write(path: &str, bytes: &[u8]) -> Result<(), Failure> {
     }
     Err(error("io_error", "out"))
 }
+/// The mode of the record, the stream and the error file: readable by their owner alone, asked
+/// for at the creation (`specs/ap/run.md` R11).
+const OWNER_ONLY: u32 = 0o600;
 fn write_record(out: &str, record: &Value) -> Result<(), Failure> {
     let mut bytes = serde_json::to_vec_pretty(record).map_err(|_| error("io_error", "record"))?;
     bytes.push(b'\n');
-    write(&record_path(out), &bytes)
+    write_with(&record_path(out), &bytes, Some(OWNER_ONLY))
 }
 /// After an effect: the record through the rename, else written in place. False when neither
 /// write succeeded.
 fn persist(out: &str, record: &Value) -> bool {
+    use std::os::unix::fs::OpenOptionsExt;
     write_record(out, record).is_ok() || {
         let mut bytes = serde_json::to_vec_pretty(record).unwrap_or_default();
         bytes.push(b'\n');
-        File::create(record_path(out)).is_ok_and(|mut f| f.write_all(&bytes).is_ok())
+        let place = std::fs::OpenOptions::new()
+            .write(true)
+            .create(true)
+            .truncate(true)
+            .mode(OWNER_ONLY)
+            .open(record_path(out));
+        place.is_ok_and(|mut f| f.write_all(&bytes).is_ok())
     }
 }
 /// What the stream of one run showed.
@@ -2280,10 +2300,12 @@ pub fn execute(s: &mut impl System, r: &Value) -> Result<(Value, u8), Failure> {
     // The claim: the record is created exclusively, so of two requests on one `out` started at
     // the same instant only one passes. Every effect comes after it.
     let create = |p: &str| {
+        use std::os::unix::fs::OpenOptionsExt;
         std::fs::OpenOptions::new()
             .write(true)
             .read(true)
             .create_new(true)
+            .mode(OWNER_ONLY)
             .open(p)
     };
     create(&record_path(&q.out)).map_err(|e| match e.kind() {

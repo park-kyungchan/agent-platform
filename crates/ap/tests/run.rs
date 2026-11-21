@@ -195,7 +195,10 @@ impl FakeOnt {
 }
 impl Fake {
     fn new() -> Self {
-        let t = std::env::temp_dir().join(format!(
+        // The temporary directory resolved through links once, so that a `limits.scratch` below
+        // it holds no link (`specs/ap/run-limits.md` R2) where `TMPDIR` names a path through one.
+        let base = std::env::temp_dir().canonicalize().unwrap();
+        let t = base.join(format!(
             "ap-run-test-{}-{}",
             std::process::id(),
             NEXT.fetch_add(1, Ordering::SeqCst)
@@ -7692,6 +7695,96 @@ fn limits_r2_an_existing_scratch_or_a_parent_that_is_no_directory_refuses_before
     assert_eq!(f.events, ["probe"]);
     assert!(!Path::new(&s).exists());
     f.untouched("x.md");
+}
+
+// spec: specs/ap/run-limits.md#R2
+#[test]
+fn limits_r2_a_scratch_below_a_linked_ancestor_is_refused() {
+    use std::os::unix::fs::symlink;
+    let mut f = Fake::new();
+    // A policy that refuses the request's model: the refusal of the path comes first.
+    let barred = json!({"models": {"allowed": ["haiku"], "never": []},
+                        "accounts": {"claude": [f.p("a1")]}});
+    f.policy_is(&barred);
+    std::fs::create_dir(f.t.join("apart")).unwrap();
+    // A link to the request's cwd, to its account and to a directory apart from both.
+    for (n, target) in ["cwd", "a1", "apart"].into_iter().enumerate() {
+        std::fs::create_dir_all(f.t.join(target).join("sub/deeper")).unwrap();
+        let link = f.p(&format!("l{n}"));
+        symlink(f.p(target), &link).unwrap();
+        for below in ["sub/s", "sub/deeper/s"] {
+            let mut r = f.limited("x.md");
+            r["limits"]["scratch"] = json!(format!("{link}/{below}"));
+            assert_eq!(
+                code(f.run(&r)),
+                "scratch_parent_missing@limits",
+                "{target} {below}"
+            );
+            assert!(f.probes.is_empty(), "{target} {below}");
+            f.untouched("x.md");
+            assert!(!Path::new(&f.p(&format!("{target}/{below}"))).exists());
+        }
+    }
+    // A path without a link, written with a repeated `/` or a `.` component, is admitted.
+    std::fs::create_dir(f.t.join("plain")).unwrap();
+    f.policy = None;
+    let t = f.t.to_str().unwrap().to_owned();
+    let written = [
+        format!("{t}/plain//s"),
+        format!("{t}/plain/./s"),
+        format!("{t}/./plain/s"),
+        format!("{t}//plain/s"),
+    ];
+    for (n, scratch) in written.into_iter().enumerate() {
+        let mut r = f.limited(&format!("ok{n}.md"));
+        r["limits"]["scratch"] = json!(scratch);
+        let (v, status) = f.run(&r).unwrap();
+        assert_eq!((status, &v["state"]), (0, &json!("ok")), "{scratch}: {v}");
+        assert!(!Path::new(&f.p("plain/s")).exists());
+    }
+}
+
+// spec: specs/ap/run.md#R11
+#[test]
+fn r11_the_record_the_stream_and_the_error_file_are_owner_only() {
+    let mut f = Fake::new();
+    let bits =
+        |f: &Fake, rel: &str| std::fs::metadata(f.p(rel)).unwrap().permissions().mode() & 0o777;
+    // The record while the CLI runs (the fake notes its mode), the stream and the error file of
+    // a stage that wrote to standard error, and the record after the end.
+    std::fs::write(f.t.join("bin/watch"), f.p("w.md.run.json")).unwrap();
+    f.mode("a1", "owner");
+    let (v, status) = f.run(&f.request("w.md")).unwrap();
+    assert_eq!((status, &v["state"]), (0, &json!("ok")), "{v}");
+    assert_eq!(f.text("bin/seen.mode").trim(), "600", "while running");
+    assert_eq!(f.record("w.md")["state"], "ok");
+    for rel in ["w.md.run.json", "w.md.stream.jsonl", "w.md.err"] {
+        assert_eq!(bits(&f, rel), 0o600, "{rel}");
+    }
+    // The answer keeps the bits of a file made with default options.
+    let plain = f.p("plain.md");
+    std::fs::write(&plain, "x").unwrap();
+    assert_eq!(bits(&f, "w.md"), bits(&f, "plain.md"));
+    // A resumed run's record, and the record of the launch of a next account.
+    let r = f.resume(f.request("w2.md"), "w2.md", "w.md");
+    let (v, _) = f.run(&r).unwrap();
+    assert_eq!(v["state"], "ok", "{v}");
+    for rel in ["w2.md.run.json", "w2.md.stream.jsonl"] {
+        assert_eq!(bits(&f, rel), 0o600, "{rel}");
+    }
+    f.mode("a1", "limit1");
+    let mut r = f.request("w3.md");
+    r["next_accounts"] = json!([f.p("a2")]);
+    let (v, _) = f.run(&r).unwrap();
+    assert_eq!(v["attempts"].as_array().unwrap().len(), 2, "{v}");
+    for rel in ["w3.md.run.json", "w3.md.stream.jsonl"] {
+        assert_eq!(bits(&f, rel), 0o600, "{rel}");
+    }
+    // The fallback record of a call whose files cannot be opened.
+    f.precreate = Some(f.p("h.md.stream.jsonl"));
+    let (_, status) = f.run(&f.request("h.md")).unwrap();
+    assert_eq!(status, 5);
+    assert_eq!(bits(&f, "h.md.run.json"), 0o600);
 }
 
 // spec: specs/ap/run-limits.md#R3

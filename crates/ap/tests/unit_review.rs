@@ -156,7 +156,8 @@ struct F {
 }
 impl F {
     fn new() -> Self {
-        let t = std::env::temp_dir().join(format!(
+        // Resolved through links once: a scratch path below it holds no link (R2 of run-limits).
+        let t = std::env::temp_dir().canonicalize().unwrap().join(format!(
             "ap-unit-review-{}-{}",
             std::process::id(),
             NEXT.fetch_add(1, Ordering::SeqCst)
