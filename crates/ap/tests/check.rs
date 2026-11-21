@@ -962,7 +962,20 @@ fn r10_at_the_timeout_the_status_is_124_and_no_process_is_left() {
             pc_policy();
         }
         let t = Instant::now();
-        let out = w.ap(&[&d, "--timeout", "2", "--", "sh", "-c", "sleep 60; :", token]);
+        let started = w.p(&format!("started-{round}-{}", &place[..2]));
+        let started_s = started.to_str().unwrap();
+        let script = "touch \"$1\"; sleep 60; :";
+        let out = w.ap(&[
+            &d,
+            "--timeout",
+            "2",
+            "--",
+            "sh",
+            "-c",
+            script,
+            token,
+            started_s,
+        ]);
         assert_eq!(out.status.code(), Some(124), "{place}: {out:?}");
         assert!(
             t.elapsed() < Duration::from_secs(15),
@@ -974,8 +987,15 @@ fn r10_at_the_timeout_the_status_is_124_and_no_process_is_left() {
         assert!(!running(&sampler(&w)), "{place}: the sampler is left");
         let r = w.records().pop().unwrap();
         assert_eq!(r["exit"], 124);
+        // On the PC a command that started has its lowest value; where the PC's setup left no
+        // second of the two, no command ran and the status line carried `-`.
         if place.starts_with("pc") {
-            assert_eq!(r["pc_min_wsl_available_mb"], 16384, "{place}");
+            let want = if started.exists() {
+                Value::from(16384)
+            } else {
+                Value::Null
+            };
+            assert_eq!(r["pc_min_wsl_available_mb"], want, "{place}: {out:?}");
         }
     }
     // The connection cut while the command runs: the script is killed, and its sampler ends by itself.
