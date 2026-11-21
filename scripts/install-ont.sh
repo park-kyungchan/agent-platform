@@ -39,8 +39,8 @@ refuse() {
 # Test overrides are accepted only together, under the test flag, and
 # never pointing at the real directories.
 if [ "${ONT_INSTALL_TEST:-}" != "1" ]; then
-  if [ -n "${ONT_INSTALL_BIN_DIR:-}" ] || [ -n "${ONT_INSTALL_STATE_DIR:-}" ] || [ -n "${ONT_INSTALL_PREBUILT:-}" ]; then
-    refuse "ONT_INSTALL_BIN_DIR, ONT_INSTALL_STATE_DIR and ONT_INSTALL_PREBUILT require ONT_INSTALL_TEST=1"
+  if [ -n "${ONT_INSTALL_BIN_DIR:-}" ] || [ -n "${ONT_INSTALL_STATE_DIR:-}" ] || [ -n "${ONT_INSTALL_PREBUILT:-}" ] || [ -n "${ONT_INSTALL_TEST_TRUST:-}" ]; then
+    refuse "ONT_INSTALL_BIN_DIR, ONT_INSTALL_STATE_DIR, ONT_INSTALL_PREBUILT and ONT_INSTALL_TEST_TRUST require ONT_INSTALL_TEST=1"
   fi
 else
   if [ "$(realpath -m -- "$BIN_DIR")" = "$(realpath -m -- "$REAL_BIN_DIR")" ] || [ "$(realpath -m -- "$STATE_DIR")" = "$(realpath -m -- "$REAL_STATE_DIR")" ]; then
@@ -55,6 +55,10 @@ BIN_PATH=$BIN_DIR/ont
 STORE_DIR=$STATE_DIR/ont
 INSTALL_DIR=$STATE_DIR/install
 INSTALLED_JSON=$INSTALL_DIR/installed.json
+# The build base: only root (or the running test account) can write any
+# component of its path, so no other account can give Cargo a configuration.
+BUILD_BASE=$STATE_DIR/build
+BUILD_TMP=""
 
 CLEANUP_BUILD=""
 CLEANUP_BIN=""
@@ -113,6 +117,96 @@ state_write_failed() {
   exit 1
 }
 
+normalize_path() {
+  # Collapses repeated slashes and strips trailing ones.
+  local p=$1
+  while [[ $p == *//* ]]; do p=${p//\/\//\/}; done
+  while [[ $p == */ && $p != / ]]; do p=${p%/}; done
+  printf '%s' "$p"
+}
+
+component_unsafe() {
+  # $1 = an existing path that is not a symbolic link. Succeeds when it is
+  # not a directory, is owned by another uid than 0 and the running one, or
+  # is writable by group or other (a sticky directory counts as writable).
+  local uid mode
+  [ -d "$1" ] || return 0
+  read -r uid mode < <(stat -c '%u %a' -- "$1") || return 0
+  [[ $uid =~ ^[0-9]+$ && $mode =~ ^[0-7]+$ ]] || return 0
+  [ "$uid" = 0 ] || [ "$uid" = "$EUID" ] || return 0
+  (( (8#$mode & 8#1022) != 0 ))
+}
+
+deepest_unsafe_component() {
+  # $1 = absolute normalized path, $2 = trusted test root or empty. Prints the
+  # failing existing component nearest $1, or nothing. Each component is read
+  # as it stands (never through a link); the trusted root and its ancestors
+  # are not read; the walk stops at the first link and at the first
+  # component that does not exist.
+  local path=$1 trust=$2 rest p=/ part bad=""
+  rest=${path#/}
+  while :; do
+    if [ -n "$trust" ] && { [ "$p" = / ] || [ "$p" = "$trust" ] || [[ $trust == "$p"/* ]]; }; then
+      :
+    elif [ -L "$p" ]; then
+      # A path below a link resolves through it: read nothing further.
+      bad=$p
+      break
+    elif [ ! -e "$p" ]; then
+      break
+    elif component_unsafe "$p"; then
+      bad=$p
+    fi
+    [ -n "$rest" ] || break
+    part=${rest%%/*}
+    if [[ $rest == */* ]]; then rest=${rest#*/}; else rest=""; fi
+    p=${p%/}/$part
+  done
+  printf '%s' "$bad"
+}
+
+make_build_dir() {
+  # $1 = 1 for an install that builds. Sets BUILD_TMP to a new 0700 directory
+  # under the build base, holding <base>/.lock until the script ends.
+  local building=$1 base trust="" bad lock_status=0
+  base=$(normalize_path "$BUILD_BASE")
+  if [ "$building" = 1 ]; then
+    [[ $base == /* ]] || refuse "build_dir_unsafe: $base"
+    if [ -n "${ONT_INSTALL_TEST_TRUST:-}" ]; then
+      trust=$(normalize_path "$ONT_INSTALL_TEST_TRUST")
+      if ! [[ $trust == /* ]] || { [ "$trust" != / ] && ! [[ $base == "$trust"/* ]]; }; then
+        refuse "ONT_INSTALL_TEST_TRUST must be a directory above the build base $base"
+      fi
+    fi
+    bad=$(deepest_unsafe_component "$base" "$trust")
+    [ -z "$bad" ] || refuse "build_dir_unsafe: $bad"
+  fi
+  if [ ! -d "$base" ]; then
+    (umask 077 && mkdir -p -- "$base") || refuse "build_dir_unusable: $base"
+  fi
+  if [ "$building" = 1 ]; then
+    bad=$(deepest_unsafe_component "$base" "$trust")
+    [ -z "$bad" ] || refuse "build_dir_unsafe: $bad"
+    [ -d "$base" ] && [ ! -L "$base" ] || refuse "build_dir_unusable: $base"
+  fi
+  # One install at a time owns the base; the lock is held to the end.
+  [ ! -L "$base/.lock" ] || rm -f -- "$base/.lock"
+  exec 9>>"$base/.lock" || refuse "build_dir_unusable: $base"
+  flock -n 9 || lock_status=$?
+  case $lock_status in
+    0) ;;
+    1) refuse "install_busy" ;;
+    *) refuse "install_lock_failed: flock exited $lock_status" ;;
+  esac
+  # Leftovers of an install killed before its cleanup; a link is removed as
+  # a link, nothing outside the base is touched.
+  find "$base" -mindepth 1 -maxdepth 1 ! -name .lock -exec rm -rf -- {} + \
+    || refuse "build_dir_unusable: $base"
+  BUILD_TMP=$(mktemp -d "$base/install.XXXXXXXXXX") || refuse "build_dir_unusable: $base"
+  CLEANUP_BUILD=$BUILD_TMP
+  chmod 0700 "$BUILD_TMP"
+}
+
 do_install() {
   local commit=${1:-}
   [[ $commit =~ ^[0-9a-f]{40}$ ]] || refuse "commit must be 40 lowercase hex"
@@ -134,11 +228,13 @@ do_install() {
     *) refuse "git_unavailable: ancestor check failed (status $ancestor_status)" ;;
   esac
   if [ "$DRY_RUN" = "1" ]; then
-    printf 'dry-run: git -C %s archive %s | tar -x into a new temporary directory\n' "$REPO_ROOT" "$commit"
     if [ -n "${ONT_INSTALL_PREBUILT:-}" ]; then
+      printf 'dry-run: create %s with mode 0700 when absent, take %s with flock -n, remove its other entries and make a new 0700 directory in it\n' "$BUILD_BASE" "$BUILD_BASE/.lock"
       printf 'dry-run: use prebuilt binary %s (build skipped)\n' "$ONT_INSTALL_PREBUILT"
     else
-      printf 'dry-run: flock %s cargo build --release -p ont --locked (CARGO_TARGET_DIR under the temporary directory, CARGO_BUILD_JOBS=2)\n' "$CARGO_LOCK"
+      printf 'dry-run: check build base %s (each existing component a directory, not a link, owned by uid 0 or the running uid, not writable by group or other), create it with mode 0700 when absent, take %s with flock -n, remove its other entries\n' "$BUILD_BASE" "$BUILD_BASE/.lock"
+      printf 'dry-run: git -C %s archive %s | tar -x into a new 0700 directory under %s\n' "$REPO_ROOT" "$commit" "$BUILD_BASE"
+      printf 'dry-run: flock %s cargo build --release -p ont --locked (CARGO_TARGET_DIR under the new build directory, CARGO_BUILD_JOBS=2)\n' "$CARGO_LOCK"
     fi
     printf 'dry-run: check the built binary prints ont <version> %s\n' "$commit"
     printf 'dry-run: create %s and %s with mode 0700\n' "$STORE_DIR" "$INSTALL_DIR"
@@ -149,8 +245,12 @@ do_install() {
   fi
 
   local tmp built tmp_bin=""
-  tmp=$(mktemp -d)
-  CLEANUP_BUILD=$tmp
+  if [ -n "${ONT_INSTALL_PREBUILT:-}" ]; then
+    make_build_dir 0
+  else
+    make_build_dir 1
+  fi
+  tmp=$BUILD_TMP
   if [ -n "${ONT_INSTALL_PREBUILT:-}" ]; then
     [ -f "$ONT_INSTALL_PREBUILT" ] || refuse "prebuilt binary not found: $ONT_INSTALL_PREBUILT"
     built=$ONT_INSTALL_PREBUILT
