@@ -975,6 +975,7 @@ mod tests {
             json!(-1),
             json!(1_048_577),
             json!(2048.5),
+            json!(8192.0),
             json!("2048"),
             json!(null),
         ] {

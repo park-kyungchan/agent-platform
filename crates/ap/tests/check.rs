@@ -18,9 +18,9 @@ use std::{
 const TAILSCALE: &str = r#"#!/bin/sh
 # The fake PC, its state in the directory @PC@. ping: answers unless down exists. ssh: as ssh's
 # default SendEnv, LANG and LC_* of the caller go along; the probe reads loadavg, meminfo, the fake
-# PowerShell and 4 CPUs; the run reads meminfo, keeps its command line and payload, and with lose ends
+# PowerShell and 4 CPUs; the run reads meminfo (meminfo-run where it exists), keeps its command line and payload, and with lose ends
 # as a lost connection before the command, with lose-after after it (its status line dropped), with
-# cut kills the script (its process group) once the sampler's file is there.
+# cut kills the script (its process group) once its sampler runs.
 pc=@PC@
 run() {
   set --
@@ -42,13 +42,14 @@ ssh)
     run < /dev/null; exit ;;
   esac
   printf '%s' "$cmd" > "$pc/remote"
-  cmd=$(printf '%s' "$cmd" | sed "s#/proc/meminfo#$pc/meminfo#g")
+  m=$pc/meminfo; [ ! -e "$pc/meminfo-run" ] || m=$pc/meminfo-run
+  cmd=$(printf '%s' "$cmd" | sed "s#/proc/meminfo#$m#g")
   cat > "$pc/payload.tar"
   [ ! -e "$pc/lose" ] || exit 255
   if [ -e "$pc/cut" ]; then
     setsid env -i HOME="$pc/home" PATH="$pc/bin:/usr/bin:/bin" sh -c "$cmd" < "$pc/payload.tar" > /dev/null 2>&1 &
     p=$! i=0
-    while [ -z "$(find "$pc/work/tmp" -name low 2>/dev/null)" ] && [ $i -lt 300 ]; do sleep 0.1; i=$((i + 1)); done
+    while ! pgrep -f "ap-check-sampler $pc/work/tmp/" > /dev/null && [ $i -lt 300 ]; do sleep 0.1; i=$((i + 1)); done
     sleep 1
     kill -KILL -- "-$p"
     exit 255
@@ -387,6 +388,10 @@ fn r3_an_invalid_policy_is_refused_and_an_absent_one_runs_here() {
         ),
         (
             r#"{"hosts": {"pc": {"ssh": "u@h", "work": "/w", "busy_load": 0.5, "min_available_mb": 2048.5}}}"#,
+            "hosts.pc.min_available_mb ",
+        ),
+        (
+            r#"{"hosts": {"pc": {"ssh": "u@h", "work": "/w", "busy_load": 0.5, "min_available_mb": 8192.0}}}"#,
             "hosts.pc.min_available_mb ",
         ),
         (
@@ -937,12 +942,24 @@ fn running(token: &str) -> bool {
 fn r10_at_the_timeout_the_status_is_124_and_no_process_is_left() {
     let w = World::new();
     let d = w.dir();
-    for (place, token) in [
-        ("pc", "ap-check-timeout-pc-a1"),
-        ("here", "ap-check-timeout-here-b2"),
-    ] {
-        if place == "here" {
+    let pc_policy = || {
+        w.policy(&format!(
+            r#"{{"hosts": {{"pc": {{"ssh": "tester@fake-pc", "work": "{}", "busy_load": 0.75}}}}}}"#,
+            w.s("pc/work")
+        ))
+    };
+    // Twenty rounds in a row: no race of the sampler's end with the command's.
+    for (round, (place, token)) in (0..20).flat_map(|r| {
+        [
+            (r, ("pc", "ap-check-timeout-pc-a1")),
+            (r, ("here", "ap-check-timeout-here-b2")),
+        ]
+    }) {
+        let place = format!("{place} round {round}");
+        if place.starts_with("here") {
             w.no_policy();
+        } else {
+            pc_policy();
         }
         let t = Instant::now();
         let out = w.ap(&[&d, "--timeout", "2", "--", "sh", "-c", "sleep 60; :", token]);
@@ -957,15 +974,12 @@ fn r10_at_the_timeout_the_status_is_124_and_no_process_is_left() {
         assert!(!running(&sampler(&w)), "{place}: the sampler is left");
         let r = w.records().pop().unwrap();
         assert_eq!(r["exit"], 124);
-        if place == "pc" {
-            assert_eq!(r["pc_min_wsl_available_mb"], 16384);
+        if place.starts_with("pc") {
+            assert_eq!(r["pc_min_wsl_available_mb"], 16384, "{place}");
         }
     }
     // The connection cut while the command runs: the script is killed, and its sampler ends by itself.
-    w.policy(&format!(
-        r#"{{"hosts": {{"pc": {{"ssh": "tester@fake-pc", "work": "{}", "busy_load": 0.75}}}}}}"#,
-        w.s("pc/work")
-    ));
+    pc_policy();
     write(&w.p("pc/cut"), "", 0o644);
     let out = w.ap(&[
         &d,
@@ -987,6 +1001,64 @@ fn r10_at_the_timeout_the_status_is_124_and_no_process_is_left() {
         std::thread::sleep(Duration::from_millis(200));
     }
     assert!(!running(&sampler(&w)), "the sampler is left after the cut");
+}
+
+// spec: specs/ap/check.md#R10
+// spec: specs/ap/check.md#R11
+#[test]
+fn r11_a_command_that_cannot_start_on_the_pc_ends_at_once_with_its_own_status() {
+    let w = World::new();
+    let d = w.dir();
+    for i in 0..50 {
+        let t = Instant::now();
+        let out = w.ap(&[&d, "--", "./no-such-program"]);
+        assert!(
+            t.elapsed() < Duration::from_secs(10),
+            "call {i}: {:?}",
+            t.elapsed()
+        );
+        // The stand-in bwrap's exec fails as the shell's 127, on the PC.
+        assert_eq!(out.status.code(), Some(127), "call {i}: {out:?}");
+        let r = w.records().pop().unwrap();
+        assert_eq!(
+            (
+                r["host"].as_str(),
+                &r["reason"],
+                &r["pc_min_wsl_available_mb"]
+            ),
+            (Some("pc"), &Value::Null, &Value::from(16384)),
+            "call {i}"
+        );
+    }
+    assert!(!running(&sampler(&w)), "a sampler is left");
+}
+
+// spec: specs/ap/check.md#R11
+#[test]
+fn r11_the_lowest_memory_falls_back_to_the_first_reading_and_a_failed_one_is_a_dash() {
+    let w = World::new();
+    let d = w.dir();
+    // The sampler's file made unparsable (the stand-in bwrap lets the command reach it): the first
+    // reading stands.
+    let spoil = "sleep 3; for f in \"$1\"/tmp/*.in; do printf 'x\\n' > \"$f/low\"; done";
+    let out = w.ap(&[&d, "--", "sh", "-c", spoil, "x", &w.s("pc/work")]);
+    assert_eq!(out.status.code(), Some(0), "{out:?}");
+    let r = w.records().pop().unwrap();
+    assert_eq!(r["pc_min_wsl_available_mb"], 16384, "{r}");
+    // The first reading failing on the run path: `-`, the record's null, and the call not lost.
+    write(&w.p("pc/meminfo-run"), "MemTotal: 32000000 kB\n", 0o644);
+    let out = w.ap(&[&d, "--", "sh", "-c", "exit 4"]);
+    assert_eq!(out.status.code(), Some(4), "{out:?}");
+    let r = w.records().pop().unwrap();
+    assert_eq!(
+        (
+            r["host"].as_str(),
+            &r["reason"],
+            &r["pc_wsl_available_mb"],
+            &r["pc_min_wsl_available_mb"]
+        ),
+        (Some("pc"), &Value::Null, &Value::from(16384), &Value::Null)
+    );
 }
 
 /// The command line of a sampler of this world's calls.
