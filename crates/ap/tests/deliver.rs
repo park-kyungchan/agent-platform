@@ -191,6 +191,18 @@ struct W {
     not_enabled: Vec<String>,
     /// The length of `calls` at each `rollback-check`.
     checks_at: Vec<usize>,
+    /// The configuration files (`specs/ap/deliver.md` R53 to R57): whether the request carries `etc`,
+    /// the operations repository's chain and heads, the clone's `HEAD`, its fetch, its checkout, a
+    /// search of its reviews that fails, and what each run of `install-etc.sh` exits and prints on
+    /// stderr, in order.
+    etc: bool,
+    xchain: Vec<Commit>,
+    xheads: BTreeMap<String, String>,
+    xhead: Option<String>,
+    xfetch_fails: bool,
+    xcheckout_fails: bool,
+    xsearch_fails: bool,
+    xruns: Vec<(i32, String)>,
 }
 
 impl W {
@@ -288,6 +300,14 @@ impl W {
             systemctl_fails: vec![],
             not_enabled: vec![],
             checks_at: vec![],
+            etc: false,
+            xchain: vec![],
+            xheads: BTreeMap::new(),
+            xhead: None,
+            xfetch_fails: false,
+            xcheckout_fails: false,
+            xsearch_fails: false,
+            xruns: vec![],
         };
         w.lock = w.p("deliver.lock");
         for n in 1..=k {
@@ -404,6 +424,9 @@ impl W {
         if self.engine {
             r["engine"] = json!({"repository": "o/engine", "url": EURL});
         }
+        if self.etc {
+            r["etc"] = json!({"repository": "o/ops", "url": XURL});
+        }
         r
     }
     fn run(&mut self) -> (Value, u8) {
@@ -462,10 +485,14 @@ impl W {
                     "ap"
                 } else if a[0].ends_with("install-ont.sh") {
                     "ont"
+                } else if a[0].ends_with("install-etc.sh") {
+                    "etc"
                 } else {
                     "content"
                 };
-                if a[1] == "rollback" {
+                if script == "etc" && a[1] == "check" {
+                    "etc-check".into()
+                } else if a[1] == "rollback" {
                     format!("{script}-rollback")
                 } else {
                     script.into()
@@ -530,9 +557,14 @@ impl W {
         }
         let clone = self.p("state/r");
         let eclone = self.p("state/engine");
-        if a[0] == "init" && a[2] == eclone {
-            assert_eq!(a, args(&["init", "--quiet", &eclone]));
+        let xclone = self.p("state/ops");
+        if a[0] == "init" && (a[2] == eclone || a[2] == xclone) {
+            assert_eq!(a.len(), 3);
+            assert_eq!(a[1], "--quiet");
             return Self::text(real_git(a), "");
+        }
+        if a[..2] == ["-C", xclone.as_str()] {
+            return self.xgit(a);
         }
         if a[0] == "init" {
             assert_eq!(a, args(&["init", "--quiet", &clone]));
@@ -673,6 +705,15 @@ impl W {
             }
             "search" => {
                 let kind = body["object_type"].as_str().unwrap();
+                let head = &body["where"]["all"][1]["eq"][1];
+                let xhead = head.as_str().is_some_and(|h| self.xheads.contains_key(h));
+                if self.xsearch_fails && kind == "review" && xhead {
+                    return Err(Failure {
+                        code: "process_failed",
+                        field: "ont".into(),
+                        detail: Value::Null,
+                    });
+                }
                 let (rows, allowed): (&Vec<Value>, &[&str]) = match kind {
                     "review" => (&self.reviews, &["kind", "head", "status"]),
                     "install" => (&self.installs, &["target", "status", "commit", "kind"]),
@@ -892,6 +933,9 @@ impl System for W {
         ));
         if argv[0].ends_with("/ontology/migrate") || argv[1].ends_with("/scripts/install-ont.sh") {
             return self.launch_engine(argv, files);
+        }
+        if argv[1].ends_with("/scripts/install-etc.sh") {
+            return self.launch_etc(argv, files);
         }
         assert_eq!(argv[0], "bash");
         let script = if argv[1].ends_with("/scripts/install-ap.sh") {
@@ -5563,4 +5607,684 @@ fn u6_every_service_of_deploy_is_confined() {
         );
     }
     assert!(seen >= 7);
+}
+
+// ---- X the configuration files (specs/ap/deliver.md R53 to R57) ----------------------------------
+
+const XURL: &str = "https://example.invalid/o/ops.git";
+/// A commit of the operations repository's chain: `xc(0)` is the clone's `HEAD`, `xc(2)` its tip.
+fn xc(n: u32) -> String {
+    format!("{:040}", 700 + n)
+}
+fn xh(n: u32) -> String {
+    format!("{:040}", 800 + n)
+}
+
+impl W {
+    /// A request with `etc`: the clone at xc(0), two accepted merges up to the tip xc(2); the first
+    /// `check` answers that the host differs, `install` and the second `check` succeed.
+    fn ops() -> Self {
+        let mut w = W::new();
+        w.etc = true;
+        w.xchain = vec![Commit {
+            id: xc(0),
+            parents: vec![],
+            tree: tree(70),
+        }];
+        for n in 1..=2 {
+            w.xchain.push(Commit {
+                id: xc(n),
+                parents: vec![xc(n - 1), xh(n)],
+                tree: tree(70 + n),
+            });
+            w.xheads.insert(xh(n), tree(70 + n));
+            w.xreview(n);
+        }
+        w.xhead = Some(xc(0));
+        w.xruns = vec![(1, String::new()), (0, String::new()), (0, String::new())];
+        w
+    }
+    fn xtip(&self) -> String {
+        self.xchain.last().unwrap().id.clone()
+    }
+    fn xclone(&self) -> String {
+        self.p("state/ops")
+    }
+    fn xreview(&mut self, n: u32) -> Value {
+        let key = format!("rv-{}", self.reviews.len() + 1);
+        let report = self.p(&format!("reports/{key}.md"));
+        let bytes = format!("Verdict: accept\n{}\n", xh(n));
+        std::fs::write(&report, &bytes).unwrap();
+        let row = json!({"id": oid("review", &key), "kind": "packet", "head": xh(n), "status": "closed",
+            "verdict": "accept", "repository": "o/ops", "report": report,
+            "report_sha256": sha(bytes.as_bytes()), "closed_at": "2026-11-13T00:02:00Z"});
+        self.reviews.push(row.clone());
+        row["id"].clone()
+    }
+    /// The calls that reach the operations clone, each as its words after `-C <clone>` (an `init` as
+    /// its own words), and the programs of the clone as `etc-check <E>` or `etc <E>`.
+    fn xcalls(&self) -> Vec<String> {
+        let xclone = self.xclone();
+        self.calls
+            .iter()
+            .filter_map(|(p, a, _)| {
+                if p == "git" && a.first().is_some_and(|x| x == "init") && a[2] == xclone {
+                    return Some("init".to_owned());
+                }
+                if p == "git" && a.len() > 2 && a[1] == xclone {
+                    return Some(a[2..].join(" "));
+                }
+                if p == "bash" && a[0] == format!("{xclone}/scripts/install-etc.sh") {
+                    let name = if a[1] == "check" { "etc-check" } else { "etc" };
+                    return Some(format!("{name} {}", a[2..].join(" ")));
+                }
+                None
+            })
+            .collect()
+    }
+    fn xgit(&mut self, a: &[String]) -> Answer {
+        let rest: Vec<&str> = a[2..].iter().map(String::as_str).collect();
+        match rest.as_slice() {
+            ["rev-parse", "--verify", "HEAD^{commit}"] => match &self.xhead {
+                Some(h) => Self::text(true, &format!("{h}\n")),
+                None => Self::text(false, ""),
+            },
+            ["config", _, _] => Self::text(real_git(a), ""),
+            ["fetch", "--quiet", "--no-tags", "origin", refspec] => {
+                assert_eq!(*refspec, MAIN);
+                let url = git_config(&a[1], "remote.origin.url");
+                Self::text(!self.xfetch_fails && url.as_deref() == Some(XURL), "")
+            }
+            ["rev-parse", "--verify", "refs/remotes/origin/main^{commit}"] => {
+                Self::text(true, &format!("{}\n", self.xtip()))
+            }
+            ["rev-list", "--parents", "-n", "1", tip] => {
+                assert_eq!(*tip, self.xtip());
+                let c = self.xchain.iter().find(|c| c.id == *tip).unwrap();
+                let mut words = vec![c.id.clone()];
+                words.extend(c.parents.iter().cloned());
+                Self::text(true, &format!("{}\n", words.join(" ")))
+            }
+            ["rev-list", "--first-parent", "--parents", range] => {
+                let (from, to) = range.split_once("..").unwrap();
+                assert_eq!(to, self.xtip());
+                let mut lines = vec![];
+                for commit in self.xchain.iter().rev() {
+                    if commit.id == from {
+                        break;
+                    }
+                    let mut words = vec![commit.id.clone()];
+                    words.extend(commit.parents.iter().cloned());
+                    lines.push(words.join(" "));
+                }
+                Self::text(true, &format!("{}\n", lines.join("\n")))
+            }
+            ["rev-parse", own, _] => {
+                let commit = own.strip_suffix("^{tree}").unwrap();
+                let c = self.xchain.iter().find(|c| c.id == commit).unwrap();
+                match c.parents.get(1).and_then(|p| self.xheads.get(p)) {
+                    Some(t) => Self::text(true, &format!("{}\n{t}\n", c.tree)),
+                    None => Self::text(false, ""),
+                }
+            }
+            ["checkout", "--quiet", "--force", "--detach", k] => {
+                if self.xcheckout_fails {
+                    return Self::text(false, "");
+                }
+                self.xhead = Some((*k).to_owned());
+                Self::text(true, "")
+            }
+            _ => panic!("unexpected operations git call {a:?}"),
+        }
+    }
+    /// `install-etc.sh`: the next of `xruns`, run from the clone's tree, which must be at the commit
+    /// it is given.
+    fn launch_etc(&mut self, argv: &[String], files: [std::fs::File; 3]) -> std::io::Result<Child> {
+        assert_eq!(argv[0], "bash");
+        assert_eq!(argv.len(), 4, "{argv:?}");
+        assert!(["check", "install"].contains(&argv[2].as_str()), "{argv:?}");
+        assert_eq!(
+            self.xhead.as_deref(),
+            Some(argv[3].as_str()),
+            "a program ran off E"
+        );
+        let (exit, err) = self.xruns.remove(0);
+        let [stdin, stdout, stderr] = files;
+        Command::new("sh")
+            .args(["-c", "printf '%s' \"$1\" >&2; exit \"$2\"", "sh"])
+            .args([&err, &exit.to_string()])
+            .env_clear()
+            .stdin(stdin)
+            .stdout(stdout)
+            .stderr(stderr)
+            .spawn()
+    }
+}
+fn etc_rows(v: &Value) -> Vec<(String, Value, Value)> {
+    rows(v)
+        .into_iter()
+        .filter(|(n, _, _)| n.starts_with("etc"))
+        .collect()
+}
+fn xrecord(
+    from: Option<&str>,
+    tip: Option<&str>,
+    result: &str,
+    code: Value,
+    detail: Value,
+) -> Value {
+    json!({"repository": "o/ops", "from": from, "tip": tip, "result": result, "code": code, "detail": detail})
+}
+
+// spec: specs/ap/deliver.md#R53
+// spec: specs/ap/deliver.md#R57
+#[test]
+fn x_without_etc_the_record_and_the_calls_are_as_before() {
+    for setup in [
+        |_: &mut W| {},
+        |w: &mut W| {
+            (w.file, w.tree, w.bytes) = (Some(c(2)), Some(c(2)), binary(&c(2)));
+        },
+    ] {
+        let mut w = W::new();
+        setup(&mut w);
+        let (v, exit) = w.run();
+        assert_eq!(exit, 0, "{v}");
+        assert_eq!(members(&v), sorted());
+        assert!(w.xcalls().is_empty());
+        assert!(w.calls.iter().all(|(p, a, _)| {
+            !p.contains("install-etc.sh")
+                && !a
+                    .iter()
+                    .any(|x| x.contains("install-etc.sh") || x.contains("/state/ops"))
+        }));
+        assert!(etc_rows(&v).is_empty());
+    }
+    // With `etc` the record has the one member more, on stdout and in `last.json`.
+    let mut w = W::ops();
+    let (v, _) = w.run();
+    let mut want = sorted();
+    want.push("etc".into());
+    want.sort();
+    assert_eq!(members(&v), want);
+    assert_eq!(w.last(), Some(v));
+}
+
+// spec: specs/ap/deliver.md#R53
+#[test]
+fn x_etc_is_checked() {
+    let bad = [
+        json!("o/ops"),
+        json!({"repository": "o/ops"}),
+        json!({"url": XURL}),
+        json!({"repository": "o/ops", "url": XURL, "x": 1}),
+        json!({"repository": "ops", "url": XURL}),
+        json!({"repository": "o/o ps", "url": XURL}),
+        json!({"repository": "o/ops", "url": "-uhttps://x"}),
+        json!({"repository": "o/ops", "url": ""}),
+        json!({"repository": "o/ops", "url": 1}),
+        json!({"repository": "o/r", "url": XURL}),
+        json!({"repository": "x/engine", "url": XURL}),
+        json!({"repository": "o/migrate.pending", "url": XURL}),
+        json!({"repository": "o/.", "url": XURL}),
+        json!({"repository": "o/..", "url": XURL}),
+        json!({"repository": "o/target", "url": XURL}),
+        json!({"repository": "o/last.json", "url": XURL}),
+        json!(null),
+    ];
+    for etc in bad {
+        let mut w = W::new();
+        w.engine = true;
+        let mut r = w.request();
+        r["etc"] = etc.clone();
+        let (v, exit) = w.run_with(&r);
+        assert_eq!(
+            (v["code"].as_str(), exit, v["detail"].clone()),
+            (Some("invalid_input"), 2, json!({"field": "etc"})),
+            "{etc}"
+        );
+        assert!(v.get("etc").is_none(), "{etc}");
+        assert!(w.calls.is_empty() && !w.t.join("state").exists(), "{etc}");
+        assert_eq!(check_request(&r), (v, 2), "{etc}");
+    }
+    // The engine's name is free for `etc` without `engine`; each form takes the member.
+    let w = W::ops();
+    let mut r = w.request();
+    r["etc"] = json!({"repository": "x/engine", "url": XURL});
+    assert_eq!(check_request(&r), (json!({"status": "ok"}), 0));
+    for r in [w.request(), w.timer(), w.rollback()] {
+        assert_eq!(check_request(&r), (json!({"status": "ok"}), 0), "{r}");
+    }
+}
+
+// spec: specs/ap/deliver.md#R54
+#[test]
+fn x_the_step_runs_only_after_current_or_installed_and_never_in_a_rollback() {
+    type Setup = fn(&mut W);
+    let ends: [(&str, Setup); 7] = [
+        ("refused", |w| w.build_busy = true),
+        ("refused", |w| w.reviews.retain(|r| r["head"] != h(2))),
+        ("refused", |w| w.fetch_fails = true),
+        ("failed_restored", |w| {
+            w.inst.get_mut("content").unwrap().exit = 1;
+            w.inst.get_mut("content").unwrap().tree = None;
+        }),
+        ("not_started", |w| {
+            w.inst.insert(
+                "ap",
+                installer(None, None, 2, "", "install_busy@install-ap.sh:40\n"),
+            );
+        }),
+        ("failed", |w| {
+            let content = w.inst.get_mut("content").unwrap();
+            (content.tree, content.exit, content.out) = (Some(None), 1, String::new());
+        }),
+        ("unrecorded", |w| w.close_fails = true),
+    ];
+    for (want, setup) in ends {
+        let mut w = W::ops();
+        setup(&mut w);
+        let (v, _) = w.run();
+        assert_eq!(v["end"], want, "{v}");
+        assert_eq!(v["etc"], Value::Null, "{want}");
+        assert!(w.xcalls().is_empty(), "{want}: {:?}", w.xcalls());
+        assert_eq!(w.xhead, Some(xc(0)));
+    }
+    // A Lead's rollback that ends `installed` runs no step either.
+    let mut w = W::ops();
+    installed_by_a(&mut w);
+    let r = w.rollback();
+    let (v, exit) = w.run_with(&r);
+    assert_eq!((end(&v), exit), (("installed", ""), 0), "{v}");
+    assert_eq!(v["etc"], Value::Null);
+    assert!(w.xcalls().is_empty());
+}
+
+// spec: specs/ap/deliver.md#R54
+// spec: specs/ap/deliver.md#R55
+// spec: specs/ap/deliver.md#R56
+// spec: specs/ap/deliver.md#R57
+#[test]
+fn x_a_moved_tip_that_is_accepted_is_installed() {
+    let mut w = W::ops();
+    let (v, exit) = w.run();
+    assert_eq!((end(&v), exit), (("installed", ""), 0), "{v}");
+    assert_eq!(
+        v["etc"],
+        xrecord(
+            Some(&xc(0)),
+            Some(&xc(2)),
+            "installed",
+            Value::Null,
+            Value::Null
+        )
+    );
+    let tip = xc(2);
+    assert_eq!(
+        w.xcalls(),
+        [
+            "init".to_owned(),
+            "rev-parse --verify HEAD^{commit}".into(),
+            format!("config remote.origin.url {XURL}"),
+            format!("config remote.origin.fetch {MAIN}"),
+            format!("fetch --quiet --no-tags origin {MAIN}"),
+            "rev-parse --verify refs/remotes/origin/main^{commit}".into(),
+            format!("rev-list --first-parent --parents {}..{tip}", xc(0)),
+            format!("rev-parse {}^{{tree}} {}^2^{{tree}}", xc(1), xc(1)),
+            format!("rev-parse {tip}^{{tree}} {tip}^2^{{tree}}"),
+            format!("checkout --quiet --force --detach {tip}"),
+            format!("etc-check {tip}"),
+            format!("etc {tip}"),
+            format!("etc-check {tip}"),
+        ]
+    );
+    // The remote is the request's, the clone's `HEAD` the tip; the step comes after every step of the
+    // pair, and its rows follow the pair's; the record of the pair is unchanged.
+    assert_eq!(
+        git_config(&w.xclone(), "remote.origin.url").as_deref(),
+        Some(XURL)
+    );
+    assert_eq!(
+        git_config(&w.xclone(), "remote.origin.fetch").as_deref(),
+        Some(MAIN)
+    );
+    assert_eq!(w.xhead, Some(tip.clone()));
+    let names: Vec<String> = rows(&v).into_iter().map(|r| r.0).collect();
+    assert_eq!(names, ["ap", "content", "etc-check", "etc", "etc-check"]);
+    let close = w.at("close_install").unwrap();
+    let first = w
+        .calls
+        .iter()
+        .position(|(_, a, _)| a.contains(&w.xclone()))
+        .unwrap();
+    assert!(close < first);
+    assert_eq!(
+        (v["outcome"].clone(), v["code"].clone()),
+        (json!("installed"), Value::Null)
+    );
+    assert_eq!(w.applies("start_install").len(), 1);
+    assert_eq!(w.applies("close_install").len(), 1);
+    assert_eq!(w.last(), Some(v));
+}
+
+// spec: specs/ap/deliver.md#R55
+// spec: specs/ap/deliver.md#R57
+#[test]
+fn x_a_new_clone_judges_the_tip_alone() {
+    let mut w = W::ops();
+    w.xhead = None;
+    // The merge before the tip has no accepting review: only the tip is judged.
+    w.reviews.retain(|r| r["head"] != xh(1));
+    (w.file, w.tree, w.bytes) = (Some(c(2)), Some(c(2)), binary(&c(2)));
+    let (v, exit) = w.run();
+    assert_eq!((end(&v), exit), (("current", ""), 0), "{v}");
+    assert_eq!(
+        v["etc"],
+        xrecord(None, Some(&xc(2)), "installed", Value::Null, Value::Null)
+    );
+    let tip = xc(2);
+    let judged: Vec<String> = w
+        .xcalls()
+        .into_iter()
+        .filter(|c| c.starts_with("rev-"))
+        .collect();
+    assert_eq!(
+        judged,
+        [
+            "rev-parse --verify HEAD^{commit}".to_owned(),
+            "rev-parse --verify refs/remotes/origin/main^{commit}".into(),
+            format!("rev-list --parents -n 1 {tip}"),
+            format!("rev-list --first-parent --parents {}..{tip}", xc(1)),
+            format!("rev-parse {tip}^{{tree}} {tip}^2^{{tree}}"),
+        ]
+    );
+    // A tip that is no merge is refused without a program.
+    let mut w = W::ops();
+    w.xhead = None;
+    w.xchain.truncate(1);
+    let (v, _) = w.run();
+    let no = json!({"commit": xc(0), "why": "not_a_merge"});
+    assert_eq!(
+        v["etc"],
+        xrecord(None, Some(&xc(0)), "not_accepted", Value::Null, no)
+    );
+    assert!(etc_rows(&v).is_empty());
+}
+
+// spec: specs/ap/deliver.md#R55
+// spec: specs/ap/deliver.md#R56
+// spec: specs/ap/deliver.md#R57
+#[test]
+fn x_a_tip_equal_to_head_runs_one_check() {
+    let mut w = W::ops();
+    w.xhead = Some(xc(2));
+    w.xruns = vec![(0, String::new())];
+    let (v, _) = w.run();
+    assert_eq!(
+        v["etc"],
+        xrecord(Some(&xc(2)), Some(&xc(2)), "same", Value::Null, Value::Null)
+    );
+    assert_eq!(etc_rows(&v), [row("etc-check", 0, None)]);
+    let calls = w.xcalls();
+    assert!(
+        calls.iter().all(|c| !c.starts_with("rev-list")),
+        "{calls:?}"
+    );
+    assert!(calls.contains(&format!("checkout --quiet --force --detach {}", xc(2))));
+    // A new tip whose bytes the host already has is installed anyway: the installer's record follows.
+    let mut w = W::ops();
+    w.xruns = vec![(0, String::new()), (0, String::new()), (0, String::new())];
+    let (v, _) = w.run();
+    assert_eq!(v["etc"]["result"], "installed");
+    assert_eq!(
+        etc_rows(&v),
+        [
+            row("etc-check", 0, None),
+            row("etc", 0, None),
+            row("etc-check", 0, None)
+        ]
+    );
+    // The first call of a clone new to delivery when the installer's record names the tip already.
+    let mut w = W::ops();
+    w.xhead = None;
+    w.xruns = vec![
+        (0, String::new()),
+        (2, "not_forward a3f 88d\n".into()),
+        (0, String::new()),
+    ];
+    let (v, _) = w.run();
+    assert_eq!(
+        v["etc"],
+        xrecord(
+            None,
+            Some(&xc(2)),
+            "same",
+            json!("not_forward"),
+            Value::Null
+        )
+    );
+}
+
+// spec: specs/ap/deliver.md#R55
+// spec: specs/ap/deliver.md#R57
+#[test]
+fn x_a_tip_that_is_not_accepted_runs_no_program_and_keeps_head() {
+    let mut w = W::ops();
+    w.reviews.retain(|r| r["head"] != xh(2));
+    let (v, exit) = w.run();
+    assert_eq!((end(&v), exit), (("installed", ""), 0), "{v}");
+    let no = json!({"commit": xc(2), "why": "no_accepting_review"});
+    assert_eq!(
+        v["etc"],
+        xrecord(Some(&xc(0)), Some(&xc(2)), "not_accepted", Value::Null, no)
+    );
+    assert!(etc_rows(&v).is_empty());
+    assert!(
+        w.xcalls()
+            .iter()
+            .all(|c| !c.starts_with("checkout") && !c.starts_with("etc"))
+    );
+    assert_eq!(w.xhead, Some(xc(0)));
+    // A `HEAD` that is not on the tip's first-parent chain.
+    let mut w = W::ops();
+    w.xhead = Some(other());
+    let (v, _) = w.run();
+    let no = json!({"commit": other(), "why": "not_on_chain"});
+    assert_eq!(
+        v["etc"],
+        xrecord(
+            Some(&other()),
+            Some(&xc(2)),
+            "not_accepted",
+            Value::Null,
+            no
+        )
+    );
+    assert_eq!(w.xhead, Some(other()));
+    // A store that cannot be read.
+    let mut w = W::ops();
+    w.xsearch_fails = true;
+    let (v, _) = w.run();
+    let want = xrecord(
+        Some(&xc(0)),
+        Some(&xc(2)),
+        "failed",
+        json!("store_unreadable"),
+        Value::Null,
+    );
+    assert_eq!(v["etc"], want);
+    assert!(etc_rows(&v).is_empty());
+    assert_eq!(w.xhead, Some(xc(0)));
+}
+
+// spec: specs/ap/deliver.md#R55
+#[test]
+fn x_a_fetch_or_checkout_that_fails_is_fetch_failed() {
+    let mut w = W::ops();
+    w.xfetch_fails = true;
+    let (v, exit) = w.run();
+    assert_eq!((end(&v), exit), (("installed", ""), 0), "{v}");
+    assert_eq!(
+        v["etc"],
+        xrecord(Some(&xc(0)), None, "fetch_failed", Value::Null, Value::Null)
+    );
+    assert!(etc_rows(&v).is_empty());
+    assert_eq!(w.xhead, Some(xc(0)));
+    let mut w = W::ops();
+    w.xcheckout_fails = true;
+    let (v, _) = w.run();
+    assert_eq!(
+        v["etc"],
+        xrecord(
+            Some(&xc(0)),
+            Some(&xc(2)),
+            "fetch_failed",
+            Value::Null,
+            Value::Null
+        )
+    );
+    assert!(etc_rows(&v).is_empty());
+}
+
+// spec: specs/ap/deliver.md#R56
+// spec: specs/ap/deliver.md#R57
+#[test]
+fn x_a_hand_edit_differs() {
+    // The tip has not moved: the installer refuses to overwrite the edit.
+    let mut w = W::ops();
+    w.xhead = Some(xc(2));
+    w.xruns = vec![
+        (1, String::new()),
+        (
+            2,
+            "reading the record\nnot_forward 0000700 is the record\n".into(),
+        ),
+        (1, String::new()),
+    ];
+    let (v, exit) = w.run();
+    assert_eq!((end(&v), exit), (("installed", ""), 0), "{v}");
+    assert_eq!(
+        v["etc"],
+        xrecord(
+            Some(&xc(2)),
+            Some(&xc(2)),
+            "differs",
+            json!("not_forward"),
+            Value::Null
+        )
+    );
+    assert_eq!(
+        etc_rows(&v),
+        [
+            row("etc-check", 1, None),
+            row("etc", 2, Some("not_forward")),
+            row("etc-check", 1, None)
+        ]
+    );
+    // The tip moved: `target_changed`; the record holds the code and nothing else of the output.
+    let mut w = W::ops();
+    w.xruns = vec![
+        (1, String::new()),
+        (
+            2,
+            "target_changed /etc/agent-platform/policy.json SECRET\n".into(),
+        ),
+        (1, "differs SECRET\n".into()),
+    ];
+    let (v, _) = w.run();
+    assert_eq!(v["etc"]["result"], "differs");
+    assert_eq!(v["etc"]["code"], "target_changed");
+    assert!(!v.to_string().contains("SECRET"));
+}
+
+// spec: specs/ap/deliver.md#R56
+// spec: specs/ap/deliver.md#R57
+#[test]
+fn x_the_last_check_decides_never_the_install() {
+    let mut w = W::ops();
+    w.xruns = vec![
+        (1, String::new()),
+        (1, "verify_failed x\n".into()),
+        (0, String::new()),
+    ];
+    let (v, _) = w.run();
+    assert_eq!(v["etc"]["result"], "same");
+    assert_eq!(v["etc"]["code"], "verify_failed");
+    // A first check that refuses ends the programs; an unreadable last word is `etc_exit_<n>`.
+    let mut w = W::ops();
+    w.xruns = vec![(2, "busy /var/lib/agent-platform/etc/lock\n".into())];
+    let (v, _) = w.run();
+    assert_eq!(v["etc"]["result"], "failed");
+    assert_eq!(etc_rows(&v), [row("etc-check", 2, Some("busy"))]);
+    let mut w = W::ops();
+    w.xruns = vec![
+        (1, String::new()),
+        (0, String::new()),
+        (3, "usage: check\n".into()),
+    ];
+    let (v, _) = w.run();
+    assert_eq!(v["etc"]["result"], "failed");
+    assert_eq!(v["etc"]["code"], "etc_exit_3");
+    // An install that exited 0 while the last check differs is `differs`.
+    let mut w = W::ops();
+    w.xruns = vec![(1, String::new()), (0, String::new()), (1, String::new())];
+    let (v, _) = w.run();
+    assert_eq!(
+        (v["etc"]["result"].clone(), v["etc"]["code"].clone()),
+        (json!("differs"), Value::Null)
+    );
+}
+
+// spec: specs/ap/deliver.md#R56
+#[test]
+fn x_each_program_inherits_the_lock_with_the_environment_unchanged() {
+    let mut w = W::ops();
+    let (v, _) = w.run();
+    assert_eq!(
+        w.launched(),
+        ["ap", "content", "etc-check", "etc", "etc-check"],
+        "{v}"
+    );
+    assert_eq!(w.lock_inherited, [true; 5]);
+    let env: serde_json::Map<String, Value> = w
+        .environment()
+        .into_iter()
+        .map(|(k, v)| (k, json!(v)))
+        .collect();
+    let script = format!("{}/scripts/install-etc.sh", w.xclone());
+    let launches: Vec<&Value> = w
+        .calls
+        .iter()
+        .filter(|(p, a, _)| p == "bash" && a[0] == script)
+        .map(|(_, _, b)| b)
+        .collect();
+    assert_eq!(launches.len(), 3);
+    for b in launches {
+        assert_eq!(b["cwd"], json!(w.xclone()));
+        assert_eq!(b["env"], json!(env));
+    }
+}
+
+// spec: specs/ap/deliver.md#R54
+#[test]
+fn x_the_step_runs_after_current_and_before_the_checkouts() {
+    let mut w = W::ops();
+    (w.file, w.tree, w.bytes) = (Some(c(2)), Some(c(2)), binary(&c(2)));
+    let co = Co::new(w.co_path("a"));
+    let mut r = w.with_checkouts(vec![co]);
+    r["etc"] = json!({"repository": "o/ops", "url": XURL});
+    let (v, exit) = w.run_with(&r);
+    assert_eq!((end(&v), exit), (("current", ""), 0), "{v}");
+    assert_eq!(v["etc"]["result"], "installed");
+    let last_etc = w
+        .calls
+        .iter()
+        .rposition(|(p, a, _)| p == "bash" && a[0].ends_with("install-etc.sh"))
+        .unwrap();
+    let first_co = w
+        .calls
+        .iter()
+        .position(|(_, a, _)| a.first().is_some_and(|x| x == "--no-optional-locks"));
+    assert!(first_co.is_some_and(|n| n > last_etc));
+    assert!(w.applies("start_install").is_empty() && w.applies("close_install").is_empty());
 }
