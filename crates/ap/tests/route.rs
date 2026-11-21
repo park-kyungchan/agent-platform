@@ -210,12 +210,8 @@ fn ap(args: &[&str], env: &[(&str, &str)], stdin: &str) -> std::process::Output 
         .stderr(std::process::Stdio::piped());
     let mut child = c.spawn().unwrap();
     use std::io::Write;
-    child
-        .stdin
-        .take()
-        .unwrap()
-        .write_all(stdin.as_bytes())
-        .unwrap();
+    // A refusal before `ap` reads its input closes the pipe first: a failed write is no failure here.
+    let _ = child.stdin.take().unwrap().write_all(stdin.as_bytes());
     child.wait_with_output().unwrap()
 }
 fn error_of(o: &std::process::Output) -> Value {
