@@ -1104,6 +1104,12 @@ fn steps(
 
 /// One `ap unit` request. A refusal (exit 2) comes before any effect and writes no file.
 pub fn execute(s: &mut impl System, r: &Value) -> Result<(Value, u8), Failure> {
+    // A request of the unit object sent to the older form: its op is the first argument (R1 of
+    // `specs/ap/unit.md`), before any other check, a case call's included.
+    if r.get("op").is_some() {
+        let said = "ap unit <op> < request.json: the op is the first argument";
+        return Err(fail("usage", "op", json!(said)));
+    }
     if r.get("case").is_some() {
         return case::execute(s, r);
     }

@@ -2,7 +2,7 @@
 //! its acceptance checks ended on the base as their kinds require (`specs/ap/unit.md`).
 use super::render::{self, Role};
 use crate::host::{Failure, Host, LIMIT, System, error, fail, id, new_session_id};
-use crate::store::{self, Actor, at, bad, only, shaped, sized};
+use crate::store::{self, Actor, at, bad, shaped, sized};
 use serde_json::{Map, Value, json};
 use std::{
     ffi::OsString,
@@ -50,7 +50,8 @@ const ALIVE: [&str; 5] = [
     "refreshing",
 ];
 
-/// A refusal: `after` the op's suffix once its action applied, `unit` the key the request names.
+/// A refusal: `after` the op's suffix once its action applied, `unit` the key the request names,
+/// `fields` every member that breaks a rule of R2 to R16 when the refusal is one of these (R37).
 #[derive(Debug)]
 pub struct Refusal {
     pub code: String,
@@ -58,6 +59,7 @@ pub struct Refusal {
     pub detail: Value,
     pub after: Option<String>,
     pub unit: Option<String>,
+    pub fields: Option<Value>,
 }
 /// One call by its arguments: the op, `--store`, and for `page` the key, `--for` and `--digest`.
 #[derive(Debug)]
@@ -108,7 +110,7 @@ pub fn arguments(argv: &[OsString]) -> Result<Call, Failure> {
 /// The call: what it prints on standard output, or the refusal with how far it went.
 pub fn execute(s: &mut impl System, call: &Call, r: &Value) -> Result<String, Box<Refusal>> {
     let store = call.store.as_deref();
-    let mut after = None;
+    let (mut after, mut fields) = (None, None);
     let (out, unit) = match call.op {
         "page" => {
             let key = call.key.as_deref().unwrap_or_default();
@@ -116,7 +118,7 @@ pub fn execute(s: &mut impl System, call: &Call, r: &Value) -> Result<String, Bo
             (page, call.key.clone())
         }
         op => {
-            let answer = write(s, store, op, r, &mut after).map(|v| format!("{v}\n"));
+            let answer = write(s, store, op, r, &mut after, &mut fields).map(|v| format!("{v}\n"));
             (answer, r["unit"].as_str().map(str::to_owned))
         }
     };
@@ -127,6 +129,7 @@ pub fn execute(s: &mut impl System, call: &Call, r: &Value) -> Result<String, Bo
             detail: f.detail,
             after,
             unit,
+            fields,
         })
     })
 }
@@ -138,6 +141,7 @@ pub fn cli(argv: &[OsString]) -> ExitCode {
             detail: f.detail,
             after: None,
             unit: None,
+            fields: None,
         })
     };
     let result = arguments(argv).map_err(refused).and_then(|call| {
@@ -150,8 +154,11 @@ pub fn cli(argv: &[OsString]) -> ExitCode {
     let (written, status) = match result {
         Ok(out) => (std::io::stdout().write_all(out.as_bytes()), 0),
         Err(e) => {
-            let v = json!({"error": {"code": e.code, "field": e.field, "detail": e.detail,
+            let mut v = json!({"error": {"code": e.code, "field": e.field, "detail": e.detail,
                 "after": e.after, "unit": e.unit}});
+            if let Some(fields) = e.fields {
+                v["error"]["fields"] = fields;
+            }
             (writeln!(std::io::stderr(), "{v}"), 2)
         }
     };
@@ -199,26 +206,120 @@ fn one_of(r: &Value, k: &str, values: &[&str]) -> Result<Value, Failure> {
     let v = r[k].as_str().filter(|v| values.contains(v));
     v.map(|v| json!(v)).ok_or_else(|| bad(k))
 }
+/// The rule a refused member breaks, with its bytes and its bound where the rule has them (R37).
+type Rule = (&'static str, Option<usize>, Option<usize>);
+const FORM: Rule = ("form", None, None);
+const REQUIRED: Rule = ("required", None, None);
+/// The most bytes of a branch (R10); R7's bound of 200 is the schema's.
+const BRANCH_BYTES: usize = 100;
+/// The rule of a refused text of at most `max` bytes: absent or empty `required`, a string over `max`
+/// bytes `max_bytes`, else `form`.
+fn text_rule(v: Option<&Value>, max: usize) -> Rule {
+    match v {
+        None => REQUIRED,
+        Some(Value::String(t)) if t.is_empty() => REQUIRED,
+        Some(Value::String(t)) if t.len() > max => ("max_bytes", Some(t.len()), Some(max)),
+        _ => FORM,
+    }
+}
+/// The rule of a refused choice among strings: absent or empty `required`, another string `one_of`,
+/// else `form`.
+fn choice_rule(v: Option<&Value>) -> Rule {
+    match v {
+        None => REQUIRED,
+        Some(Value::String(t)) if t.is_empty() => REQUIRED,
+        Some(Value::String(_)) => ("one_of", None, None),
+        _ => FORM,
+    }
+}
+/// Every member of a request that breaks a rule of R2 to R16, in the order the checks of the base
+/// refuse them: the first one's failure as the base gives it, and one entry per member (R37).
+#[derive(Default)]
+struct Breaks {
+    first: Option<Failure>,
+    fields: Vec<Value>,
+}
+impl Breaks {
+    /// The value of a check that passed; none for one refused, its member noted with `rule` unless
+    /// it is already named.
+    fn take<T>(&mut self, checked: Result<T, Failure>, rule: Rule) -> Option<T> {
+        let f = match checked {
+            Ok(v) => return Some(v),
+            Err(f) => f,
+        };
+        if !self.fields.iter().any(|e| e["field"] == f.field) {
+            let (rule, bytes, limit) = rule;
+            self.fields
+                .push(json!({"field": f.field, "rule": rule, "bytes": bytes, "limit": limit}));
+            self.first.get_or_insert(f);
+        }
+        None
+    }
+    /// A check of the text `v` of at most `max` bytes, refused by the rule of `text_rule`.
+    fn text<T>(&mut self, checked: Result<T, Failure>, v: Option<&Value>, max: usize) -> Option<T> {
+        let rule = match checked {
+            Ok(_) => FORM,
+            Err(_) => text_rule(v, max),
+        };
+        self.take(checked, rule)
+    }
+    fn refuse(&mut self, field: &str, rule: Rule) {
+        self.take::<()>(Err(bad(field)), rule);
+    }
+    /// A check of the choice `k` of `r` among `values` (R7, R14).
+    fn choice(&mut self, r: &Value, k: &str, field: &str, values: &[&str]) -> Option<Value> {
+        let checked = one_of(r, k, values).map_err(|_| bad(field));
+        self.take(checked, choice_rule(r.get(k)))
+    }
+    /// The members of the object `v` among `allowed`, each other one `unknown_member` with its name
+    /// after `at` (where the base's `only` names the first); false, with one entry `form`, for a `v`
+    /// that is not an object.
+    fn members(&mut self, v: &Value, allowed: &str, at: &str) -> bool {
+        let obj = v.as_object().ok_or_else(|| bad(at.trim_end_matches('.')));
+        let Some(obj) = self.take(obj, FORM) else {
+            return false;
+        };
+        for k in obj.keys().filter(|k| !allowed.split(' ').any(|a| a == *k)) {
+            self.refuse(&format!("{at}{k}"), ("unknown_member", None, None));
+        }
+        true
+    }
+    /// An array `k` of `r` of at most `max` entries, which are not looked into when `k` is not an
+    /// array.
+    fn list<'a>(&mut self, r: &'a Value, k: &str, max: usize) -> Option<&'a Vec<Value>> {
+        let list = self.take(r[k].as_array().ok_or_else(|| bad(k)), FORM)?;
+        if list.len() > max {
+            self.refuse(k, ("max_entries", None, Some(max)));
+        }
+        Some(list)
+    }
+    /// The refusal of the first member, with every entry; none when no member breaks a rule.
+    fn refusal(self) -> Option<(Failure, Value)> {
+        self.first.map(|f| (f, json!(self.fields)))
+    }
+}
 /// An array of at most `max` strings of 1 to `bytes` bytes without a control character, each
 /// admitted by `ok`.
 fn entries(
+    b: &mut Breaks,
     r: &Value,
     k: &str,
     max: usize,
     bytes: usize,
     ok: fn(&str) -> bool,
-) -> Result<Value, Failure> {
-    let list = r[k]
-        .as_array()
-        .filter(|l| l.len() <= max)
-        .ok_or_else(|| bad(k))?;
+) -> Option<Value> {
+    let list = b.list(r, k, max)?;
     for (i, e) in list.iter().enumerate() {
-        let e = e.as_str().filter(|e| {
+        let checked = e.as_str().filter(|e| {
             (1..=bytes).contains(&e.len()) && !e.chars().any(char::is_control) && ok(e)
         });
-        e.ok_or_else(|| bad(&format!("{k}.{i}")))?;
+        b.text(
+            checked.ok_or_else(|| bad(&format!("{k}.{i}"))),
+            Some(e),
+            bytes,
+        );
     }
-    Ok(json!(list))
+    Some(json!(list))
 }
 /// `<owner>/<name>` (R9).
 fn repository_ok(t: &str) -> bool {
@@ -276,67 +377,80 @@ fn spec_ok(e: &str) -> bool {
 /// A list property: its name, its most entries, the most bytes of one, and the form of one.
 type List = (&'static str, usize, usize, fn(&str) -> bool);
 /// The acceptance checks (R14).
-fn acceptance(r: &Value) -> Result<Value, Failure> {
-    let list = r["acceptance"].as_array().filter(|l| l.len() <= 20);
-    let list = list.ok_or_else(|| bad("acceptance"))?;
+fn acceptance(b: &mut Breaks, r: &Value) -> Option<Value> {
+    let list = b.list(r, "acceptance", 20)?;
     for (i, c) in list.iter().enumerate() {
         let at = format!("acceptance.{i}.");
-        only(c, "check kind", &at)?;
-        let check = sized(&c["check"], &format!("{at}check"), 600)?;
-        if check.contains(['\n', '\r']) {
-            return Err(bad(&format!("{at}check")));
+        if !b.members(c, "check kind", &at) {
+            continue;
         }
-        one_of(c, "kind", &["fails_on_base", "invariant"])
-            .map_err(|_| bad(&format!("{at}kind")))?;
+        let field = format!("{at}check");
+        let check = b.text(sized(&c["check"], &field, 600), c.get("check"), 600);
+        if check.is_some_and(|t| t.contains(['\n', '\r'])) {
+            b.refuse(&field, ("one_line", None, None));
+        }
+        let kinds = ["fails_on_base", "invariant"];
+        b.choice(c, "kind", &format!("{at}kind"), &kinds);
     }
-    Ok(json!(list))
+    Some(json!(list))
 }
 /// A tier: exactly `runtime`, `model` and `effort`, three strings of 1 to 80 bytes.
-fn tier(r: &Value, k: &str) -> Result<Value, Failure> {
+fn tier(b: &mut Breaks, r: &Value, k: &str) -> Option<Value> {
     let t = &r[k];
     let at = format!("{k}.");
-    only(t, "runtime model effort", &at)?;
-    for m in ["runtime", "model", "effort"] {
-        let ok = t[m].as_str().is_some_and(|v| (1..=80).contains(&v.len()));
-        if !ok {
-            return Err(bad(&format!("{at}{m}")));
-        }
+    if !b.members(t, "runtime model effort", &at) {
+        return None;
     }
-    Ok(t.clone())
+    for m in ["runtime", "model", "effort"] {
+        let checked = t[m].as_str().filter(|v| (1..=80).contains(&v.len()));
+        b.text(
+            checked.ok_or_else(|| bad(&format!("{at}{m}"))),
+            t.get(m),
+            80,
+        );
+    }
+    Some(t.clone())
 }
 /// The parameters of `add_unit` or `amend_unit` from the request, every rule but the dependencies'
-/// existence checked; the keys of `depends_on`.
-fn page_parameters(r: &Value, op: &str, key: &str) -> Result<(Value, Vec<String>), Failure> {
+/// existence checked, each member that breaks one noted in `b`; the keys of `depends_on`.
+fn page_parameters(b: &mut Breaks, r: &Value, op: &str, key: &str) -> (Value, Vec<String>) {
     let mut p = Map::from_iter([("unit".to_owned(), id("unit", key))]);
     let add = op == "add";
     if add {
-        p.insert("lane".into(), one_of(r, "lane", &["small", "objective"])?);
+        if let Some(lane) = b.choice(r, "lane", "lane", &["small", "objective"]) {
+            p.insert("lane".into(), lane);
+        }
         for (k, kind) in [("intent", "intent"), ("origin", "request")] {
-            if r.get(k).is_some() {
-                p.insert(k.into(), id(kind, sized(&r[k], k, 512)?));
+            if r.get(k).is_some()
+                && let Some(t) = b.text(sized(&r[k], k, 512), r.get(k), 512)
+            {
+                p.insert(k.into(), id(kind, t));
             }
         }
     }
-    if add || r.get("class").is_some() {
-        p.insert(
-            "class".into(),
-            one_of(r, "class", &["plain", "contract", "effect"])?,
-        );
+    if (add || r.get("class").is_some())
+        && let Some(class) = b.choice(r, "class", "class", &["plain", "contract", "effect"])
+    {
+        p.insert("class".into(), class);
     }
     for (k, max) in TEXTS {
-        if let Some(t) = bounded(r, k, max, add && k == "objective")? {
+        let bound = if k == "branch" { BRANCH_BYTES } else { max };
+        let checked = bounded(r, k, max, add && k == "objective");
+        if let Some(t) = b.text(checked, r.get(k), bound).flatten() {
             p.insert(k.into(), json!(t));
         }
     }
-    if p.get("repository")
-        .is_some_and(|v| !repository_ok(v.as_str().unwrap_or_default()))
-    {
-        return Err(bad("repository"));
-    }
-    if p.get("branch")
-        .is_some_and(|v| !branch_ok(v.as_str().unwrap_or_default()))
-    {
-        return Err(bad("branch"));
+    let form = |k: &str, ok: fn(&str) -> bool| {
+        let t = p.get(k).map(|v| v.as_str().unwrap_or_default());
+        t.is_some_and(|t| !ok(t)).then(|| bad(k))
+    };
+    for (k, ok, bound) in [
+        ("repository", repository_ok as fn(&str) -> bool, 200),
+        ("branch", branch_ok, BRANCH_BYTES),
+    ] {
+        if let Some(f) = form(k, ok) {
+            b.text::<()>(Err(f), r.get(k), bound);
+        }
     }
     let lists: [List; 3] = [
         ("write_set", 60, 200, pattern_ok),
@@ -344,35 +458,44 @@ fn page_parameters(r: &Value, op: &str, key: &str) -> Result<(Value, Vec<String>
         ("specs", 20, 300, spec_ok),
     ];
     for (k, max, bytes, ok) in lists {
-        if r.get(k).is_some() {
-            p.insert(k.into(), entries(r, k, max, bytes, ok)?);
+        if r.get(k).is_some()
+            && let Some(list) = entries(b, r, k, max, bytes, ok)
+        {
+            p.insert(k.into(), list);
         }
     }
-    if r.get("acceptance").is_some() {
-        p.insert("acceptance".into(), acceptance(r)?);
+    if r.get("acceptance").is_some()
+        && let Some(list) = acceptance(b, r)
+    {
+        p.insert("acceptance".into(), list);
     }
     for k in ["implementer", "verifier"] {
-        if r.get(k).is_some() {
-            p.insert(k.into(), tier(r, k)?);
+        if r.get(k).is_some()
+            && let Some(t) = tier(b, r, k)
+        {
+            p.insert(k.into(), t);
         }
     }
     if let Some(n) = r.get("estimate_lines") {
         let n = n.as_u64().filter(|n| *n <= i64::MAX as u64);
-        p.insert(
-            "estimate_lines".into(),
-            json!(n.ok_or_else(|| bad("estimate_lines"))?),
-        );
+        if let Some(n) = b.take(n.ok_or_else(|| bad("estimate_lines")), FORM) {
+            p.insert("estimate_lines".into(), json!(n));
+        }
     }
     let mut depends = vec![];
-    if r.get("depends_on").is_some() {
-        let list = r["depends_on"].as_array().filter(|l| l.len() <= 20);
-        for (i, d) in list.ok_or_else(|| bad("depends_on"))?.iter().enumerate() {
-            depends.push(sized(d, &format!("depends_on.{i}"), 512)?.to_owned());
+    if r.get("depends_on").is_some()
+        && let Some(list) = b.list(r, "depends_on", 20)
+    {
+        for (i, d) in list.iter().enumerate() {
+            let field = format!("depends_on.{i}");
+            if let Some(d) = b.text(sized(d, &field, 512), Some(d), 512) {
+                depends.push(d.to_owned());
+            }
         }
         let ids: Vec<Value> = depends.iter().map(|d| id("unit", d)).collect();
         p.insert("depends_on".into(), json!(ids));
     }
-    Ok((p.into(), depends))
+    (p.into(), depends)
 }
 /// The engine gives the role of `ONT_ROLE` to a request that carries none (R4).
 pub(crate) fn lead_in_environment(s: &impl System) -> bool {
@@ -389,43 +512,54 @@ fn members(op: &str) -> String {
         _ => "unit reason".into(),
     }
 }
-/// A writing op (R2 to R28).
+/// A writing op (R2 to R28); `fields` every member that breaks a rule of R2 to R16 (R37).
 fn write(
     s: &mut impl System,
     store: Option<&str>,
     op: &str,
     r: &Value,
     after: &mut Option<String>,
+    fields: &mut Option<Value>,
 ) -> Result<Value, Failure> {
     if !r.is_object() {
         return Err(bad("stdin"));
     }
-    if op == "amend"
-        && let Some(k) = ["lane", "intent", "origin"]
-            .into_iter()
-            .find(|k| r.get(*k).is_some())
-    {
-        return Err(bad(k));
+    let mut b = Breaks::default();
+    if op == "amend" {
+        for k in ["lane", "intent", "origin"] {
+            if r.get(k).is_some() {
+                b.refuse(k, ("not_admitted", None, None));
+            }
+        }
     }
-    only(r, &format!("request_id agent session {}", members(op)), "")?;
-    let rid = shaped(r, "request_id", 44, "._-")?;
-    let actor = Actor {
-        agent: shaped(r, "agent", 64, "._:-")?,
-        session: shaped(r, "session", 64, "._:-")?,
-    };
+    b.members(r, &format!("request_id agent session {}", members(op)), "");
+    let rid = b.text(shaped(r, "request_id", 44, "._-"), r.get("request_id"), 44);
+    let agent = b.text(shaped(r, "agent", 64, "._:-"), r.get("agent"), 64);
+    let session = b.text(shaped(r, "session", 64, "._:-"), r.get("session"), 64);
     let key = match op {
-        "add" => new_key(r)?,
-        _ => sized(&r["unit"], "unit", 512)?,
+        "add" => b.text(new_key(r), r.get("unit"), 59),
+        _ => b.text(sized(&r["unit"], "unit", 512), r.get("unit"), 512),
     };
-    let rid = format!("{rid}-{op}");
+    let key = key.unwrap_or_default();
     let (p, depends) = match op {
-        "add" | "amend" => page_parameters(r, op, key)?,
+        "add" | "amend" => page_parameters(&mut b, r, op, key),
         "drop" => {
-            let reason = bounded(r, "reason", 600, true)?.unwrap_or_default();
+            let reason = bounded(r, "reason", 600, true);
+            let reason = b.text(reason, r.get("reason"), 600).flatten();
+            let reason = reason.unwrap_or_default();
             (json!({"unit": id("unit", key), "reason": reason}), vec![])
         }
         _ => (json!({"unit": id("unit", key)}), vec![]),
     };
+    if let Some((first, all)) = b.refusal() {
+        *fields = Some(all);
+        return Err(first);
+    }
+    let actor = Actor {
+        agent: agent.unwrap_or_default(),
+        session: session.unwrap_or_default(),
+    };
+    let rid = format!("{}-{op}", rid.unwrap_or_default());
     let action = format!("{}_unit", if op == "add" { "add" } else { op });
     let size = serde_json::to_vec(&store::body(&actor, &action, rid.clone(), p.clone()));
     let size = size.map_or(usize::MAX, |b| b.len());

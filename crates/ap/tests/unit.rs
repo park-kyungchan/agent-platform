@@ -1026,6 +1026,54 @@ fn i1_the_binary_refuses_with_exit_2_and_the_error_form_of_ap_run() {
     assert!(e["error"].as_object().unwrap().contains_key("detail"));
 }
 
+// spec: specs/ap/unit.md#R1
+#[test]
+fn i1_a_request_with_the_member_op_names_the_op_as_the_first_argument() {
+    const SAID: &str = "ap unit <op> < request.json: the op is the first argument";
+    let mut u = U::new();
+    // Before any other check: a request of the unit object, a unit call's and a case call's.
+    let object = json!({"op": "amend", "request_id": "m", "agent": "lead", "session": "s",
+        "unit": "u-one"});
+    let mut call = u.request();
+    call["op"] = json!("add");
+    let mut case = json!({"case": u.p("cases/tc-1.json"), "op": "add"});
+    case["agent"] = json!("lead");
+    for r in [object.clone(), call, case] {
+        let e = u.run(&r).expect_err("refused");
+        assert_eq!(
+            (e.code, e.field.as_str(), &e.detail),
+            ("usage", "op", &json!(SAID)),
+            "{r}"
+        );
+    }
+    assert_eq!((u.launches, u.calls.len()), (0, 0));
+    let mut child = Command::new(env!("CARGO_BIN_EXE_ap"))
+        .arg("unit")
+        .stdin(std::process::Stdio::piped())
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped())
+        .spawn()
+        .unwrap();
+    use std::io::Write;
+    child
+        .stdin
+        .take()
+        .unwrap()
+        .write_all(object.to_string().as_bytes())
+        .unwrap();
+    let out = child.wait_with_output().unwrap();
+    assert_eq!(out.status.code(), Some(2));
+    let e: Value = serde_json::from_slice(&out.stderr).unwrap();
+    assert_eq!(
+        (
+            &e["error"]["code"],
+            &e["error"]["field"],
+            &e["error"]["detail"]
+        ),
+        (&json!("usage"), &json!("op"), &json!(SAID))
+    );
+}
+
 // ---- I2 one pass -------------------------------------------------------------------------------
 
 #[test]
