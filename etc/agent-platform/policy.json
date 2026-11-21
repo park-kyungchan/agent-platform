@@ -97,8 +97,8 @@
  },
  "hosts": {
   "pc": {
-   "ssh": "kcpalantir@kcpalantir-wsl",
-   "work": "/home/kcpalantir/work/ap-checks",
+   "ssh": "apcheck@ap-checks",
+   "work": "/home/apcheck/work/ap-checks",
    "busy_load": 1.0
   }
  }
