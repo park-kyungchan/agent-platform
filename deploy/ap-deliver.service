@@ -15,3 +15,15 @@ TimeoutStartSec=3600
 SuccessExitStatus=2
 # cargo is the rustup proxy, which reads its toolchains under HOME; a system service without User= has none.
 Environment=HOME=/root
+# Confinement (specs/ap/deliver.md R52). No ProtectSystem=: delivery writes /usr/local/bin (ap) and
+# the unit files of deploy/ under AP_UNIT_DIR (/etc/systemd/system).
+NoNewPrivileges=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectKernelTunables=yes
+ProtectControlGroups=yes
+ProtectHostname=yes
+LockPersonality=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+SystemCallArchitectures=native
