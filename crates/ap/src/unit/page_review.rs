@@ -524,6 +524,7 @@ fn look_at(
     // The checks `ap unit ready` runs on the base, at the commit the text names (R23).
     if look.page {
         object::complete(&subject)?;
+        object::write_set_judged(&subject)?;
         let at = copy
             .as_ref()
             .map(|(clone, commit)| (clone.as_str(), commit.as_str()));

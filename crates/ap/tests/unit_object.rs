@@ -1177,6 +1177,80 @@ fn r11_the_write_set() {
             ("invalid_input", field)
         );
     }
+    // Two forms only: an exact path, or a directory and `/**`. Each other text is refused with both forms.
+    yes(&mut f, &["add"], added("u-amend"));
+    for text in [
+        "crates/ap/src/*",
+        "**",
+        "a/**/b.rs",
+        "a/**/",
+        "a/",
+        "./a",
+        "a/*.rs",
+        "a/b?.rs",
+        "a/[b]/**",
+        "/a",
+        "/**",
+        "a//b",
+        "a/./b",
+        "a/**/**",
+        "a/../b/**",
+        "x/*",
+    ] {
+        for op in ["add", "amend"] {
+            let mut r = with(added("u-new"), json!({"write_set": ["ok/a", text]}));
+            if op == "amend" {
+                r = with(
+                    writer("m"),
+                    json!({"unit": "u-amend", "write_set": ["ok/a", text]}),
+                );
+            }
+            let e = no(&mut f, &[op], r);
+            assert_eq!(
+                (e.code.as_str(), e.field.as_str(), &e.detail),
+                (
+                    "invalid_input",
+                    "write_set.1",
+                    &json!({"forms": ["<path>", "<dir>/**"]})
+                ),
+                "{op} {text}"
+            );
+            assert_eq!(
+                e.fields.unwrap(),
+                json!([{"field": "write_set.1", "rule": "form", "bytes": null, "limit": null}]),
+                "{op} {text}"
+            );
+        }
+    }
+    // The rules `required`, `max_bytes` and `max_entries` keep their entries and their detail.
+    let e = no(
+        &mut f,
+        &["add"],
+        with(added("u-one"), json!({"write_set": ["", "w".repeat(201)]})),
+    );
+    assert_eq!(
+        e.fields.unwrap(),
+        json!([{"field": "write_set.0", "rule": "required", "bytes": null, "limit": null},
+            {"field": "write_set.1", "rule": "max_bytes", "bytes": 201, "limit": 200}])
+    );
+    let e = no(
+        &mut f,
+        &["add"],
+        with(added("u-one"), json!({"write_set": vec!["a"; 61]})),
+    );
+    assert_eq!(
+        e.fields.unwrap(),
+        json!([{"field": "write_set", "rule": "max_entries", "bytes": null, "limit": 60}])
+    );
+    let e = no(
+        &mut f,
+        &["add"],
+        with(added("u-one"), json!({"write_set": ["w".repeat(201)]})),
+    );
+    assert_eq!(
+        e.fields.unwrap(),
+        json!([{"field": "write_set.0", "rule": "max_bytes", "bytes": 201, "limit": 200}])
+    );
     let good = json!(["crates/ap/src/unit/**", "a..b/c", "w".repeat(200)]);
     yes(
         &mut f,
@@ -3014,4 +3088,347 @@ fn r37_one_refusal_names_every_member_that_breaks_a_rule() {
     assert_eq!(e["error"]["field"], "acceptance.0.check");
     assert_eq!(e["error"]["fields"].as_array().map(Vec::len), Some(2));
     assert_eq!(e["error"]["fields"][1]["rule"], "one_line");
+}
+
+/// Stores the unit `key` of class `class` with these patterns, as a client of the store other than `ap` could.
+fn stored(f: &mut F, key: &str, class: &str, set: Value) {
+    plain_unit(f, key, check("exit 1", "fails_on_base"));
+    f.modify("unit", key, json!({"class": class, "write_set": set}));
+}
+
+// spec: specs/ap/unit.md#R38
+#[test]
+fn r38_a_stored_pattern_outside_the_grammar_refuses_ready() {
+    let r = Repo::new(&[("AGENTS.md", "# Widgets\n")]);
+    let mut f = F::new();
+    repo_unit(&mut f, &r, "u-one", check("exit 1", "fails_on_base"));
+    let forms = json!(["<path>", "<dir>/**"]);
+    for (set, shown) in [
+        (json!(["crates/ap/src/*"]), json!(["crates/ap/src/*"])),
+        (json!(["a/[b]/**"]), json!(["a/[b]/**"])),
+        (
+            json!(["ok/a", "x/*", 5, "a/**/b", "ok/b/**", "q?"]),
+            json!(["x/*", "a/**/b", "q?"]),
+        ),
+        (
+            json!(["w".repeat(201), "a\tb"]),
+            json!(["w".repeat(201), "a\tb"]),
+        ),
+    ] {
+        f.modify("unit", "u-one", json!({"write_set": set}));
+        f.calls.clear();
+        let e = ready(&mut f, "u-one").unwrap_err();
+        assert_eq!(
+            (e.code.as_str(), e.field.as_str(), &e.after, &e.fields),
+            ("write_set_form", "write_set", &None, &None)
+        );
+        assert_eq!(
+            e.detail,
+            json!({"patterns": shown, "count": shown.as_array().unwrap().len(), "forms": forms})
+        );
+        // One read of the unit: no review, no fetch, no check, nothing applied.
+        assert_eq!(f.names(), ["get unit"]);
+        assert_eq!(f.unit("u-one")["state"], "draft");
+    }
+    // At most ten shown, all counted.
+    let many: Vec<String> = (0..12).map(|i| format!("m{i}/*")).collect();
+    f.modify("unit", "u-one", json!({"write_set": many}));
+    let e = ready(&mut f, "u-one").unwrap_err();
+    assert_eq!(e.detail["patterns"], json!(many[..10]));
+    assert_eq!(e.detail["count"], 12);
+    // A contract unit is judged the same, before the page review it lacks.
+    f.modify("unit", "u-one", json!({"class": "contract"}));
+    f.calls.clear();
+    let e = ready(&mut f, "u-one").unwrap_err();
+    assert_eq!(e.code, "write_set_form");
+    assert_eq!(f.names(), ["get unit"]);
+    // A unit that is not draft is not judged: the apply's answer is passed on.
+    f.modify(
+        "unit",
+        "u-one",
+        json!({"state": "stopped", "class": "plain"}),
+    );
+    f.calls.clear();
+    let e = ready(&mut f, "u-one").unwrap_err();
+    assert_eq!(e.code, "unit_not_draft");
+    assert_eq!(f.names(), ["get unit", "apply ready_unit"]);
+    // A page of the grammar, an entry that is no string aside, goes on to its checks.
+    f.modify(
+        "unit",
+        "u-one",
+        json!({"state": "draft", "write_set": [1, "src/a.rs", "d/**"]}),
+    );
+    let v: Value = serde_json::from_str(&ready(&mut f, "u-one").unwrap()).unwrap();
+    assert_eq!(v["state"], "ready");
+}
+
+// spec: specs/ap/unit.md#R39
+#[test]
+fn r39_a_plain_unit_whose_pattern_can_only_match_protected_paths_is_refused() {
+    let mut f = F::new();
+    let needs = "class contract, lane objective";
+    let refused = [
+        "specs/ap/unit.md",
+        "check",
+        "REVIEW.md",
+        "crates/ap/Cargo.toml",
+        "sub/build.rs",
+        "x/.cargo/config.toml",
+        "ci/**",
+        "Specs/ap/**",
+        ".github/workflows/**",
+        "ontology/migrate",
+        "content/**",
+    ];
+    for (i, pattern) in refused.iter().enumerate() {
+        f.calls.clear();
+        let r = with(
+            added(&format!("u-r{i}")),
+            json!({"write_set": ["src/a.rs", pattern]}),
+        );
+        let e = no(&mut f, &["add"], r);
+        assert_eq!(
+            (e.code.as_str(), e.field.as_str(), &e.after, &e.fields),
+            ("plain_writes_protected", "write_set", &None, &None),
+            "{pattern}"
+        );
+        assert_eq!(
+            e.detail,
+            json!({"patterns": [pattern], "count": 1, "needs": needs})
+        );
+        assert!(f.calls.is_empty(), "no call to the store: {pattern}");
+    }
+    // Every such pattern in its order, at most ten of them shown.
+    let all: Vec<String> = (0..12).map(|i| format!("ci/d{i}/**")).collect();
+    let e = no(
+        &mut f,
+        &["add"],
+        with(added("u-many"), json!({"write_set": all})),
+    );
+    assert_eq!(e.detail["patterns"], json!(all[..10]));
+    assert_eq!(e.detail["count"], 12);
+    // These can match others too, or no protected path at all.
+    for (i, pattern) in [
+        "src/a.rs",
+        "crates/**",
+        "crates/ap/**",
+        "crates/x/.cargo/**",
+        "check/**",
+        "docs/specs/x",
+        "crates/ap/Cargo.toml/**",
+    ]
+    .iter()
+    .enumerate()
+    {
+        let r = with(added(&format!("u-a{i}")), json!({"write_set": [pattern]}));
+        yes(&mut f, &["add"], r);
+    }
+    // A unit of class contract or effect is never refused.
+    for (i, class) in ["contract", "effect"].iter().enumerate() {
+        let set: Vec<&str> = refused.to_vec();
+        let r = with(
+            added(&format!("u-c{i}")),
+            json!({"class": class, "write_set": set}),
+        );
+        yes(&mut f, &["add"], r);
+    }
+    // `amend`: the request's class and write set where it gives them, else the unit's, read once.
+    stored(&mut f, "u-am", "contract", json!(["specs/ap/unit.md"]));
+    for (change, rid) in [
+        (json!({"class": "plain"}), "m1"),
+        (json!({"write_set": ["ci/**"], "class": "plain"}), "m2"),
+    ] {
+        f.calls.clear();
+        let mut r = with(writer(rid), json!({"unit": "u-am"}));
+        r.as_object_mut()
+            .unwrap()
+            .extend(change.as_object().unwrap().clone());
+        let e = no(&mut f, &["amend"], r);
+        assert_eq!(
+            (e.code.as_str(), e.field.as_str(), &e.after, &e.fields),
+            ("plain_writes_protected", "write_set", &None, &None)
+        );
+        assert_eq!(f.names(), ["get unit"], "one read, nothing applied");
+    }
+    f.modify(
+        "unit",
+        "u-am",
+        json!({"class": "plain", "write_set": ["src/a.rs"]}),
+    );
+    f.calls.clear();
+    let e = no(
+        &mut f,
+        &["amend"],
+        with(
+            writer("m3"),
+            json!({"unit": "u-am", "write_set": ["specs/x.md"]}),
+        ),
+    );
+    assert_eq!(e.code, "plain_writes_protected");
+    assert_eq!(e.detail["patterns"], json!(["specs/x.md"]));
+    assert_eq!(f.names(), ["get unit"]);
+    // Neither member: not judged, whatever the stored page holds.
+    f.modify("unit", "u-am", json!({"write_set": ["ci/**"]}));
+    yes(
+        &mut f,
+        &["amend"],
+        with(
+            writer("m4"),
+            json!({"unit": "u-am", "notes": "Other notes."}),
+        ),
+    );
+    // A stored text of neither form is not judged by `amend` (R38 refuses it at `ready`).
+    f.modify("unit", "u-am", json!({"write_set": ["a/*", "ci/**"]}));
+    let e = no(
+        &mut f,
+        &["amend"],
+        with(writer("m5"), json!({"unit": "u-am", "class": "plain"})),
+    );
+    assert_eq!(e.detail["patterns"], json!(["ci/**"]));
+    f.modify("unit", "u-am", json!({"write_set": ["a/*"]}));
+    yes(
+        &mut f,
+        &["amend"],
+        with(writer("m6"), json!({"unit": "u-am", "class": "plain"})),
+    );
+    // A request that moves the unit to contract passes with the same patterns.
+    f.modify("unit", "u-am", json!({"write_set": ["ci/**"]}));
+    yes(
+        &mut f,
+        &["amend"],
+        with(writer("m7"), json!({"unit": "u-am", "class": "contract"})),
+    );
+    // `ready`: after R38's check, before the page review.
+    for (set, class, code) in [
+        (
+            json!(["specs/ap/unit.md", "src/a.rs"]),
+            "plain",
+            "plain_writes_protected",
+        ),
+        (
+            json!(["specs/ap/unit.md", "src/*"]),
+            "plain",
+            "write_set_form",
+        ),
+        (json!(["specs/ap/unit.md"]), "contract", "page_not_reviewed"),
+    ] {
+        let key = format!("u-rd-{}", code.len());
+        stored(&mut f, &key, class, set);
+        f.calls.clear();
+        let e = ready(&mut f, &key).unwrap_err();
+        assert_eq!(e.code, code);
+        if code != "page_not_reviewed" {
+            assert_eq!(f.names(), ["get unit"]);
+            assert_eq!(e.detail["count"], 1);
+        }
+    }
+}
+
+/// The section of R40 as it prints.
+const SECTION: &str = "\n## Protected paths\n\nThis unit is of class plain: its run stops protected_path_changed when it changes one of these paths, compared without case, whatever its write set names. A page that needs one is class contract, lane objective.\n- exactly: check, review.md\n- the last component, in any directory: clippy.toml, .clippy.toml, rustfmt.toml, .rustfmt.toml, rust-toolchain, rust-toolchain.toml, build.rs, cargo.toml, cargo.lock\n- the last two components, in any directory: .cargo/config.toml, .cargo/config\n- the first component, the path itself or anything under it: ci, .github, specs, scripts, .cargo, deploy, etc, content, github, ontology\n";
+
+// spec: specs/ap/unit.md#R40
+#[test]
+fn r40_the_page_of_a_plain_unit_lists_the_protected_paths() {
+    let (mut f, r) = fixture();
+    // The class contract: no section, in any text.
+    for role in [
+        None,
+        Some("implementer"),
+        Some("verifier"),
+        Some("reviewer"),
+    ] {
+        let mut words = vec!["page", "page-fixture"];
+        words.extend(role.iter().flat_map(|r| ["--for", r]));
+        assert!(
+            !text(&mut f, &words).contains("## Protected paths"),
+            "{role:?}"
+        );
+    }
+    let contract = text(&mut f, &["page", "page-fixture"]);
+    yes(
+        &mut f,
+        &["amend"],
+        with(
+            writer("m"),
+            json!({"unit": "page-fixture", "class": "plain"}),
+        ),
+    );
+    let part = page_part("page-fixture", f.unit("page-fixture"), true);
+    assert!(!part.contains("## Protected paths"));
+    let none = text(&mut f, &["page", "page-fixture"]);
+    // After the last line of the repository part, whatever it is, and nowhere else.
+    assert!(none.ends_with(SECTION), "{none}");
+    assert_eq!(none.matches("## Protected paths").count(), 1);
+    let before = &none[..none.len() - SECTION.len()];
+    assert!(before.contains("\n## The repository at ") && before.ends_with('\n'));
+    assert!(contract.contains("\n## The repository at ") && !contract.contains("Protected"));
+    // Each role: the same text, then the frame after the section.
+    for role in ["implementer", "verifier", "reviewer"] {
+        let got = text(&mut f, &["page", "page-fixture", "--for", role]);
+        let (head, frame) = got.split_once(SECTION).expect(role);
+        assert!(head.contains("\n## The repository at "), "{role}");
+        assert!(
+            frame.starts_with('\n') && !frame.contains("## The repository at "),
+            "{role}"
+        );
+        assert_eq!(got.matches("## Protected paths").count(), 1, "{role}");
+    }
+    // Also when the map is missing or the last line is another one.
+    f.policy = Some(r.policy.clone());
+    std::fs::remove_file(r.origin.join("map.json")).unwrap();
+    r.commit(&[]);
+    r.fetch();
+    let bare = text(&mut f, &["page", "page-fixture"]);
+    assert!(
+        bare.ends_with(&format!("No map of this repository yet.\n{SECTION}")),
+        "{bare}"
+    );
+    // A plain unit without a repository has none, nor does its reviewer's text.
+    plain_unit(&mut f, "u-norepo", check("true", "invariant"));
+    assert!(!text(&mut f, &["page", "u-norepo", "--for", "reviewer"]).contains("Protected"));
+    // The digest is of the page part alone, for a plain unit with a repository and for one without.
+    for key in ["page-fixture", "u-norepo"] {
+        let line = text(&mut f, &["page", key, "--digest"]);
+        let part = page_part(key, f.unit(key), true);
+        let hashed = part.replacen("Depends on: base-unit\n", "", 1);
+        assert_eq!(
+            line,
+            format!("{:x}\n", Sha256::digest(hashed.as_bytes())),
+            "{key}"
+        );
+        let reviewer = text(&mut f, &["page", key, "--for", "reviewer"]);
+        assert!(reviewer.starts_with(&format!("{part}\n## For\n")), "{key}");
+        assert!(!part.contains("## Protected paths"));
+    }
+}
+
+// spec: specs/ap/unit.md#R32
+#[test]
+fn r32_a_map_entry_meets_a_pattern_of_the_grammar() {
+    let (mut f, _r) = fixture();
+    let part = |f: &mut F| text(f, &["page", "page-fixture"]);
+    let lines = |t: &str| {
+        let at = t.find("## The repository at ").unwrap();
+        t[at..].lines().filter(|l| l.contains(" — ")).count()
+    };
+    assert_eq!(lines(&part(&mut f)), 2, "src/list and docs/list.md");
+    // A stored text of neither form meets no entry; the directory of a pattern meets its own.
+    for (set, found) in [
+        (json!(["src/*"]), 0),
+        (json!(["src/[l]ist/**", "docs/*.md"]), 0),
+        (json!(["src/other/**"]), 1),
+        (json!(["src/other/x.rs", "src/list/mod.rs"]), 2),
+        (json!(["docs"]), 1),
+    ] {
+        f.modify("unit", "page-fixture", json!({"write_set": set}));
+        let got = part(&mut f);
+        assert_eq!(lines(&got), found, "{set}\n{got}");
+        if found == 0 {
+            assert!(
+                got.contains("No entry of the map meets the write set.\n"),
+                "{set}"
+            );
+        }
+    }
 }
