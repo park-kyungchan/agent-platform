@@ -243,20 +243,20 @@ fn escape_pointer(name: &str) -> String {
     name.replace('~', "~0").replace('/', "~1")
 }
 
-/// The names the module defines in one place, with the pointer of the schema
-/// name each came from; the second name of one Rust name is refused.
+/// The Rust names the module defines in one place; the second schema name
+/// that gives one of them is refused at its pointer.
 #[derive(Default)]
-struct Scope(BTreeMap<String, String>);
+struct Scope(BTreeSet<String>);
 impl Scope {
     fn add(&mut self, rust: String, pointer: String, faults: &mut Vec<Violation>) {
-        if self.0.contains_key(&rust) {
+        if !self.0.insert(rust.clone()) {
             faults.push(Violation {
                 code: NAME_COLLISION,
                 pointer,
-                message: Some(format!("gives the Rust name {rust} a name before it gives")),
+                message: Some(format!(
+                    "another schema name before it gives the Rust name {rust}"
+                )),
             });
-        } else {
-            self.0.insert(rust, pointer);
         }
     }
 }
@@ -509,7 +509,7 @@ impl Out {
     }
     fn comment(&mut self, description: Option<&str>) {
         if let Some(d) = description {
-            self.line(&format!("// {}", comment_text(d)).trim_end().to_string());
+            self.line(format!("// {}", comment_text(d)).trim_end());
         }
     }
 }

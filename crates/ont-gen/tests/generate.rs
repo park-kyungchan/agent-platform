@@ -253,12 +253,11 @@ fn schema_text_never_becomes_code() {
             &root[..root.len().min(40)]
         );
     }
-    for line in text
+    let unwraps: Vec<&str> = text
         .lines()
         .filter(|l| l.contains("unwrap") || l.contains("expect("))
-    {
-        panic!("{line}");
-    }
+        .collect();
+    assert!(unwraps.is_empty(), "{unwraps:?}");
 }
 
 // spec: specs/ont/gen.md#R4
