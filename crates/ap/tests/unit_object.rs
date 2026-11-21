@@ -2636,3 +2636,382 @@ fn r35_only_the_four_actions_through_the_store_module_and_store_busy_asked_again
     }));
     assert_eq!(r.shown(), before);
 }
+
+/// One entry of `fields`.
+fn entry(field: &str, rule: &str, bytes: Option<usize>, limit: Option<usize>) -> Value {
+    json!({"field": field, "rule": rule, "bytes": bytes, "limit": limit})
+}
+
+// spec: specs/ap/unit.md#R37
+#[test]
+fn r37_one_refusal_names_every_member_that_breaks_a_rule() {
+    let mut f = F::new();
+    yes(&mut f, &["add"], added("u-one"));
+    f.calls.clear();
+    // Two bad checks in one amend: refused once, the first as the base refuses it, both with their rules.
+    let checks = json!([{"check": "c".repeat(892), "kind": "invariant"},
+        {"check": "true\ntrue", "kind": "fails_on_base"}]);
+    let e = no(
+        &mut f,
+        &["amend"],
+        with(
+            writer("m"),
+            json!({"unit": "u-one", "acceptance": checks.clone()}),
+        ),
+    );
+    assert_eq!(
+        (e.code.as_str(), e.field.as_str(), &e.detail),
+        (
+            "invalid_input",
+            "acceptance.0.check",
+            &json!({"bytes": 892, "limit": 600})
+        )
+    );
+    assert_eq!(
+        e.fields,
+        Some(json!([
+            entry("acceptance.0.check", "max_bytes", Some(892), Some(600)),
+            entry("acceptance.1.check", "one_line", None, None)
+        ]))
+    );
+    // One bad member: the base's code, field and detail, and `fields` of one entry with its rule.
+    let cases = [
+        (
+            with(added("u-two"), json!({"other": 1})),
+            "other",
+            "unknown_member",
+            None,
+            None,
+        ),
+        (
+            without(added("u-two"), "request_id"),
+            "request_id",
+            "required",
+            None,
+            None,
+        ),
+        (
+            with(added("u-two"), json!({"request_id": "x".repeat(45)})),
+            "request_id",
+            "max_bytes",
+            Some(45),
+            Some(44),
+        ),
+        (
+            with(added("u-two"), json!({"request_id": "a b"})),
+            "request_id",
+            "form",
+            None,
+            None,
+        ),
+        (
+            with(added("u-two"), json!({"agent": ""})),
+            "agent",
+            "required",
+            None,
+            None,
+        ),
+        (
+            with(added("u-two"), json!({"session": "s".repeat(65)})),
+            "session",
+            "max_bytes",
+            Some(65),
+            Some(64),
+        ),
+        (
+            with(added("u-two"), json!({"unit": "u".repeat(60)})),
+            "unit",
+            "max_bytes",
+            Some(60),
+            Some(59),
+        ),
+        (
+            with(added("u-two"), json!({"unit": "U"})),
+            "unit",
+            "form",
+            None,
+            None,
+        ),
+        (
+            without(added("u-two"), "lane"),
+            "lane",
+            "required",
+            None,
+            None,
+        ),
+        (
+            with(added("u-two"), json!({"lane": "big"})),
+            "lane",
+            "one_of",
+            None,
+            None,
+        ),
+        (
+            with(added("u-two"), json!({"class": 3})),
+            "class",
+            "form",
+            None,
+            None,
+        ),
+        (
+            without(added("u-two"), "objective"),
+            "objective",
+            "required",
+            None,
+            None,
+        ),
+        (
+            with(added("u-two"), json!({"objective": "o".repeat(2001)})),
+            "objective",
+            "max_bytes",
+            Some(2001),
+            Some(2000),
+        ),
+        (
+            with(added("u-two"), json!({"intent": ""})),
+            "intent",
+            "required",
+            None,
+            None,
+        ),
+        (
+            with(added("u-two"), json!({"repository": "a"})),
+            "repository",
+            "form",
+            None,
+            None,
+        ),
+        (
+            with(added("u-two"), json!({"branch": "b".repeat(150)})),
+            "branch",
+            "max_bytes",
+            Some(150),
+            Some(100),
+        ),
+        (
+            with(added("u-two"), json!({"branch": "main"})),
+            "branch",
+            "form",
+            None,
+            None,
+        ),
+        (
+            with(added("u-two"), json!({"write_set": vec!["a"; 61]})),
+            "write_set",
+            "max_entries",
+            None,
+            Some(60),
+        ),
+        (
+            with(added("u-two"), json!({"write_set": "a"})),
+            "write_set",
+            "form",
+            None,
+            None,
+        ),
+        (
+            with(added("u-two"), json!({"write_set": ["w".repeat(201)]})),
+            "write_set.0",
+            "max_bytes",
+            Some(201),
+            Some(200),
+        ),
+        (
+            with(added("u-two"), json!({"read_first": ["a.rs:9-3"]})),
+            "read_first.0",
+            "form",
+            None,
+            None,
+        ),
+        (
+            with(added("u-two"), json!({"specs": [""]})),
+            "specs.0",
+            "required",
+            None,
+            None,
+        ),
+        (
+            with(
+                added("u-two"),
+                json!({"acceptance": [{"check": "a\nb", "kind": "invariant"}]}),
+            ),
+            "acceptance.0.check",
+            "one_line",
+            None,
+            None,
+        ),
+        (
+            with(
+                added("u-two"),
+                json!({"acceptance": [{"check": "a", "kind": "fails"}]}),
+            ),
+            "acceptance.0.kind",
+            "one_of",
+            None,
+            None,
+        ),
+        (
+            with(added("u-two"), json!({"acceptance": ["true"]})),
+            "acceptance.0",
+            "form",
+            None,
+            None,
+        ),
+        (
+            with(
+                added("u-two"),
+                json!({"verifier": {"runtime": "c", "model": "m".repeat(81), "effort": "e"}}),
+            ),
+            "verifier.model",
+            "max_bytes",
+            Some(81),
+            Some(80),
+        ),
+        (
+            with(added("u-two"), json!({"estimate_lines": -1})),
+            "estimate_lines",
+            "form",
+            None,
+            None,
+        ),
+        (
+            with(added("u-two"), json!({"depends_on": vec!["d"; 21]})),
+            "depends_on",
+            "max_entries",
+            None,
+            Some(20),
+        ),
+        (
+            with(added("u-two"), json!({"depends_on": ["d".repeat(513)]})),
+            "depends_on.0",
+            "max_bytes",
+            Some(513),
+            Some(512),
+        ),
+    ];
+    for (r, field, rule, bytes, limit) in cases {
+        let e = no(&mut f, &["add"], r);
+        assert_eq!(
+            (e.code.as_str(), e.field.as_str()),
+            ("invalid_input", field),
+            "{rule}"
+        );
+        assert_eq!(
+            e.fields,
+            Some(json!([entry(field, rule, bytes, limit)])),
+            "{field}"
+        );
+    }
+    let e = no(
+        &mut f,
+        &["drop"],
+        with(
+            writer("d"),
+            json!({"unit": "u-one", "reason": "r".repeat(601)}),
+        ),
+    );
+    assert_eq!(e.detail, json!({"bytes": 601, "limit": 600}));
+    assert_eq!(
+        e.fields,
+        Some(json!([entry("reason", "max_bytes", Some(601), Some(600))]))
+    );
+    // A request id over its bound keeps the base's detail, null; its entry says the size.
+    let e = no(
+        &mut f,
+        &["ready"],
+        with(writer(&"x".repeat(45)), json!({"unit": "u-one"})),
+    );
+    assert_eq!((e.field.as_str(), &e.detail), ("request_id", &Value::Null));
+    // In `amend`, `lane`, `intent` and `origin` are `not_admitted` only, never `unknown_member` too.
+    let e = no(
+        &mut f,
+        &["amend"],
+        with(
+            writer("m"),
+            json!({"unit": "u-one", "lane": "small", "origin": "q", "notes": "n".repeat(3001)}),
+        ),
+    );
+    assert_eq!(e.field, "lane");
+    assert_eq!(
+        e.fields,
+        Some(json!([
+            entry("lane", "not_admitted", None, None),
+            entry("origin", "not_admitted", None, None),
+            entry("notes", "max_bytes", Some(3001), Some(3000))
+        ]))
+    );
+    // Many at once, in the order of the base's checks; one entry per member, a member whose own form
+    // is wrong not looked into.
+    let r = with(
+        writer("a b"),
+        json!({"unit": "U", "lane": "big", "class": 3, "objective": "o".repeat(2001),
+            "branch": "main", "write_set": ["", "/x"], "read_first": 7,
+            "acceptance": ["x", {"check": "a\nb", "kind": "", "why": 1}],
+            "implementer": {"runtime": "c"}, "estimate_lines": "1",
+            "depends_on": vec!["d"; 21], "other": 1}),
+    );
+    let e = no(&mut f, &["add"], r);
+    assert_eq!((e.field.as_str(), &e.detail), ("other", &Value::Null));
+    assert_eq!(
+        e.fields,
+        Some(json!([
+            entry("other", "unknown_member", None, None),
+            entry("request_id", "form", None, None),
+            entry("unit", "form", None, None),
+            entry("lane", "one_of", None, None),
+            entry("class", "form", None, None),
+            entry("objective", "max_bytes", Some(2001), Some(2000)),
+            entry("branch", "form", None, None),
+            entry("write_set.0", "required", None, None),
+            entry("write_set.1", "form", None, None),
+            entry("read_first", "form", None, None),
+            entry("acceptance.0", "form", None, None),
+            entry("acceptance.1.why", "unknown_member", None, None),
+            entry("acceptance.1.check", "one_line", None, None),
+            entry("acceptance.1.kind", "required", None, None),
+            entry("implementer.model", "required", None, None),
+            entry("implementer.effort", "required", None, None),
+            entry("estimate_lines", "form", None, None),
+            entry("depends_on", "max_entries", None, Some(20)),
+        ]))
+    );
+    assert!(f.calls.is_empty(), "{:?}", f.names());
+    // What the base admits is admitted: an empty objective is the store's, with no `fields`.
+    let e = no(
+        &mut f,
+        &["add"],
+        with(added("u-two"), json!({"objective": ""})),
+    );
+    assert_eq!((e.code.as_str(), &e.fields), ("objective_empty", &None));
+    // The refusals after these checks carry no `fields`.
+    let e = no(
+        &mut f,
+        &["add"],
+        with(added("u-two"), json!({"depends_on": ["none"]})),
+    );
+    assert_eq!((e.code.as_str(), &e.fields), ("unknown_dependency", &None));
+    let e = no(&mut f, &["add"], json!([1]));
+    assert_eq!((e.field.as_str(), &e.fields), ("stdin", &None));
+    // The line on the binary: refused once, before any call to the store, with `fields`.
+    let mut child = Command::new(env!("CARGO_BIN_EXE_ap"))
+        .args(["unit", "amend", "--store", "/nonexistent/store.sqlite"])
+        .stdin(std::process::Stdio::piped())
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped())
+        .spawn()
+        .unwrap();
+    use std::io::Write;
+    let request = with(writer("m"), json!({"unit": "u-one", "acceptance": checks}));
+    child
+        .stdin
+        .take()
+        .unwrap()
+        .write_all(request.to_string().as_bytes())
+        .unwrap();
+    let out = child.wait_with_output().unwrap();
+    assert_eq!(out.status.code(), Some(2));
+    let e: Value = serde_json::from_slice(&out.stderr).unwrap();
+    assert_eq!(e["error"]["field"], "acceptance.0.check");
+    assert_eq!(e["error"]["fields"].as_array().map(Vec::len), Some(2));
+    assert_eq!(e["error"]["fields"][1]["rule"], "one_line");
+}
