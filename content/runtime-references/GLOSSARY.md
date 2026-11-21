@@ -92,4 +92,4 @@ Only the Lead needs this section. The user speaks Korean, shortens names, and so
 | 보드 | The board of the current task | — |
 | 정리, 손봐, 개선 | A request whose target and extent are open | State what you will change and what you will leave before starting |
 
-A new expression is written in the task's STATE under "Words the user used" with what it resolved to. When the same expression appears in a second task, add a row here through a pull request; most expressions never need a row, because the three-step resolution above already finds them.
+What a new expression resolved to is the reading of the request that holds it (`ap request`). When the same expression appears in a second task, add a row here through a pull request; most expressions never need a row, because the three-step resolution above already finds them.

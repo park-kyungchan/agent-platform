@@ -4,7 +4,7 @@ Read this when you hand work to another agent, receive work, or share a reposito
 
 ## 1. Ownership before anyone writes
 
-- The task's STATE names, for each writer: the checkout, branch and base revision, the files it may write, and the shared targets it must not touch.
+- The unit's page (`ap unit page <key>`) names, for each writer: the checkout, branch and base revision, the files it may write, and the shared targets it must not touch; for work outside a unit, the packet of section 2 names them.
 - Keep three kinds of work apart: read-only review, implementation in its own worktree, and integration.
 - Two agents may read the same checkout. Two agents that write need separate Git worktrees or file sets that do not overlap.
 - A worktree separates files only. It does not separate global settings, databases, ports, service accounts or a shared build directory.
@@ -27,14 +27,14 @@ The verification in item 4 is fixed by the one who hands over: the worker may no
 Also name the files to read first, and require the worker's first output to list the files it read. Name the Strategy line and the KPI or guardrail the task moves when the task has one. Start source work in its assigned worktree.
 
 Fresh context or the same session:
-- Default to a fresh worker. Continue an existing session only when the follow-up stays in the same scope and files, needs the context already loaded and has room left; record that reason in STATE.
+- Default to a fresh worker. Continue an existing session only when the follow-up stays in the same scope and files, needs the context already loaded and has room left; record that reason in the unit's notes (`ap unit amend`).
 - A review always runs in a fresh context that never saw the implementer's reasoning. Give the reviewer the request, the contracts, the frozen candidate revision and raw evidence, not a suggested verdict.
 - Separate context is not separate files, builds, services or authority. Check each of those separately.
 
 Memory for workers:
 - A stage of `ap run` loads no hook, and loads auto-memory only when its request sets `memory`.
 - A pane worker keeps its native Hindsight hooks and MCP server. When a task needs memory isolation (an evaluation, an independent review), run it in a directory covered by a `paths.<prefix>` override in the Hindsight integration settings, for example `/home/palantirkc/work/eval-isolated` with `{"disabled": true}`, and verify the override took effect. Adding an override changes host configuration and needs task authority.
-- If memory injected into a worker was irrelevant or misleading, record that in STATE and correct the page or the path override.
+- If memory injected into a worker was irrelevant or misleading, record that as a finding (the action `open_finding`) and correct the page or the path override.
 
 ## 3. When you receive work
 
