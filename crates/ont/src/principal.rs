@@ -262,7 +262,7 @@ pub fn role_checked(schema: &Schema) -> bool {
 
 /// What the roles file says of a principal and a claimed role.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum RoleAdmission {
+pub(crate) enum RoleAdmission {
     Admitted,
     /// No file there.
     RolesFileAbsent,
@@ -273,7 +273,7 @@ pub enum RoleAdmission {
 }
 impl RoleAdmission {
     /// The `detail` of `role_not_admitted`; `None` when admitted.
-    pub fn detail(self) -> Option<&'static str> {
+    pub(crate) fn detail(self) -> Option<&'static str> {
         match self {
             Self::Admitted => None,
             Self::RolesFileAbsent => Some("roles_file_absent"),
@@ -328,7 +328,7 @@ fn principal_form(s: &str) -> bool {
 /// (uid 0 or the engine's real uid) and its mode (no write bit for group or
 /// others) are read from the opened descriptor, and at most
 /// `ROLES_FILE_MAX_BYTES` + 1 bytes are read. Nothing is created or written.
-pub fn roles_file_admits(store: &Path, principal: &str, role: &str) -> RoleAdmission {
+pub(crate) fn roles_file_admits(store: &Path, principal: &str, role: &str) -> RoleAdmission {
     use rustix::fs::{FileType, Mode, OFlags};
     let unusable = RoleAdmission::RolesFileUnusable;
     let fd = match rustix::fs::open(
@@ -376,7 +376,7 @@ pub fn roles_file_admits(store: &Path, principal: &str, role: &str) -> RoleAdmis
 
 /// The refusal of a claimed role the roles file does not admit; the claimed
 /// value is not in it.
-pub fn role_not_admitted(detail: &'static str) -> Refusal {
+pub(crate) fn role_not_admitted(detail: &'static str) -> Refusal {
     Refusal::new("role_not_admitted")
         .with("field", json!("/role"))
         .with("detail", json!(detail))
@@ -384,7 +384,7 @@ pub fn role_not_admitted(detail: &'static str) -> Refusal {
 
 /// The refusal of an action or a function outside the grants that apply in
 /// a role-checked domain.
-pub fn not_granted() -> Refusal {
+pub(crate) fn not_granted() -> Refusal {
     Refusal::new("not_granted")
 }
 
@@ -393,7 +393,7 @@ pub fn not_granted() -> Refusal {
 /// domain found is role-checked. The file is read at most once per call
 /// (the first resolution in a role-checked domain); nothing is kept between
 /// calls.
-pub struct RoleResolver<'a> {
+pub(crate) struct RoleResolver<'a> {
     store: &'a Path,
     principal: &'a str,
     claimed: Option<&'a str>,
@@ -402,7 +402,7 @@ pub struct RoleResolver<'a> {
 impl<'a> RoleResolver<'a> {
     /// `principal` is the one `engine_identity` read for this call;
     /// `claimed` the call's claimed role, already within its bound.
-    pub fn new(store: &'a Path, principal: &'a str, claimed: Option<&'a str>) -> Self {
+    pub(crate) fn new(store: &'a Path, principal: &'a str, claimed: Option<&'a str>) -> Self {
         Self {
             store,
             principal,
@@ -413,7 +413,7 @@ impl<'a> RoleResolver<'a> {
     /// The resolved role of a call found in the domain of `schema`: `None`
     /// when the domain is not role-checked or no role is claimed, the
     /// claimed role when the file admits it, else `role_not_admitted`.
-    pub fn resolve(&self, schema: &Schema) -> Result<Option<&'a str>, Refusal> {
+    pub(crate) fn resolve(&self, schema: &Schema) -> Result<Option<&'a str>, Refusal> {
         if !role_checked(schema) {
             return Ok(None);
         }
