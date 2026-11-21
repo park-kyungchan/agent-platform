@@ -15,6 +15,7 @@ The contract of each kept verb is its specification under `specs/ap/`; its secti
 | `work` | `ap work [--store <path>]` | `specs/ap/work.md` |
 | `policy` | `ap policy check [<file>]` | `specs/ap/policy.md` R12 to R16 |
 | `watch` | `ap watch [--record-login --totp-file <path> [--replace]]` | `specs/ap/watch.md` |
+| `check` | `ap check <dir> [--timeout <seconds>] [-- <command> [<arg>...]]` | `specs/ap/check.md` |
 | `gate` | `ap gate < request.json` | section "The gate" |
 | `review` | `ap review <start\|close\|revoke> < request.json` | section "One review" |
 | `unit` (a page or a request) | `ap unit < request.json`, `ap unit [--compose-only] <page>` | sections "One unit", "The page's block", "One case" |
@@ -344,3 +345,7 @@ What it does not print: the installed revisions (`deploy/README.md`, "Read the s
 ## The policy check
 
 `ap policy check [<file>]`: `specs/ap/policy.md` R12 to R16.
+
+## One check
+
+`ap check <dir> [--timeout <seconds>] [-- <command> [<arg>...]]`: `specs/ap/check.md`. It runs `./check`, or the given command without a shell, for the worktree `<dir>`: on the local PC when the policy file names it in `hosts.pc` and the PC answers and is not busy, else in `<dir>` here (a command other than `./check` under the host's build lock). The output streams back, the exit status is the command's (124 at the timeout), and one record line goes to `AP_CHECKS_LOG` (default `/var/lib/agent-platform/checks.jsonl`).

@@ -35,3 +35,5 @@ pub mod work;
 pub mod policy;
 
 pub mod watch;
+
+pub mod check;
