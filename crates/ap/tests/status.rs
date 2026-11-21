@@ -846,9 +846,14 @@ fn r4_the_time_and_the_schema_are_the_first_answers_of_the_store() {
     assert_eq!(f.calls[0].1["object_type"], "request");
     // The time is not a clock of the host: another envelope, another print.
     let mut f = fixture();
-    f.schema["version"] = json!(13);
+    // One above the repository's schema, read when the test runs, so it holds after every later version.
+    let other = serde_json::from_str::<Value>(SCHEMA).unwrap()["version"]
+        .as_u64()
+        .unwrap()
+        + 1;
+    f.schema["version"] = json!(other);
     let v = run(&mut f, &Call::Overview);
-    assert_eq!(v["schema"], 13);
+    assert_eq!(v["schema"], other);
 }
 
 // spec: specs/ap/status.md#R5
