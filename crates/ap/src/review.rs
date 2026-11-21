@@ -268,12 +268,21 @@ pub const DIFF_OPTIONS: [&str; 5] = [
     "--name-only",
     "-z",
 ];
+/// The words before the command word of every Git call of the driver: no hook and no fsmonitor
+/// program of the repository runs (`specs/ap/unit-run.md` R39).
+pub const GIT_SAFE: [&str; 4] = [
+    "-c",
+    "core.hooksPath=/dev/null",
+    "-c",
+    "core.fsmonitor=false",
+];
 pub(crate) fn git(
     s: &mut impl System,
     worktree: &str,
     command: &[&str],
 ) -> Result<String, Failure> {
     let mut argv = args(&["--no-replace-objects", "-C", worktree]);
+    argv.extend(args(&GIT_SAFE));
     argv.extend(args(command));
     let reply = s.call("git", &argv, &Value::Null, 30_000)?;
     require!(reply.success => "process_failed", "git");

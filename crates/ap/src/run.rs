@@ -75,7 +75,7 @@ const SCHEMA_MAX: u64 = 65_536;
 const ARGUMENT_MAX: usize = 131_071;
 /// The program that holds a stage with `limits` to its home and its scratch directory
 /// (`specs/ap/run-limits.md`).
-const BWRAP: &str = "/usr/bin/bwrap";
+pub(crate) const BWRAP: &str = "/usr/bin/bwrap";
 /// The levels an `agy` slug ends with: the `effort` of its stage.
 const LEVELS: [&str; 4] = ["low", "medium", "high", "xhigh"];
 /// The unit's own bound runs this long past the request's: `ap run` stops the unit first, and the
@@ -280,11 +280,65 @@ struct Request {
     /// (`specs/ap/run-limits.md`).
     limits: Option<Limits>,
 }
-/// What a request with `limits` holds: its scratch directory, and the home of the passwd entry of
+/// What a request with `limits` holds: its scratch directory, the paths it writes, binds over or
+/// reads only (R1, R5), whether `~/.config/gh` is shown (R10), and the home of the passwd entry of
 /// the user `ap run` runs as, where the hidden list's `~` points (R10).
 struct Limits {
     scratch: String,
     home: String,
+    write: Vec<String>,
+    over: Vec<(String, String)>,
+    read_only: Vec<String>,
+    show: bool,
+    /// `over`, `read_only` and `show` as the request gave them, for the record (R7).
+    given: serde_json::Map<String, Value>,
+}
+/// The one path `show` may name (R1, R10).
+const SHOWN: &str = "~/.config/gh";
+impl Limits {
+    /// The paths of the hidden list that exist now, but the one `show` names (R10).
+    fn hidden(&self, work_root: &Path) -> Vec<(String, bool)> {
+        let shown = Path::new(&self.home).join(&SHOWN[2..]);
+        let mut hidden = hidden_now(&self.home, work_root);
+        hidden.retain(|(p, _)| !self.show || Path::new(p) != shown);
+        hidden
+    }
+    /// The `bwrap` words of the paths the request names, after the scratch directory: `write`,
+    /// then `over`, then `read_only`, each in its order (R5).
+    fn named(&self) -> Vec<String> {
+        let mut words = vec![];
+        for p in &self.write {
+            words.extend(args(&["--bind", p, p]));
+        }
+        for (source, target) in &self.over {
+            words.extend(args(&["--bind", source, target]));
+        }
+        for p in &self.read_only {
+            words.extend(args(&["--ro-bind", p, p]));
+        }
+        words
+    }
+    /// What the stage can write beside its home: the scratch directory, the `write` paths and the
+    /// `over` targets (R7).
+    fn writable(&self) -> Vec<&str> {
+        let targets = self.over.iter().map(|(_, t)| t.as_str());
+        let write = self.write.iter().map(String::as_str);
+        [self.scratch.as_str()]
+            .into_iter()
+            .chain(write)
+            .chain(targets)
+            .collect()
+    }
+    /// The paths R11 reads, in its order, each with whether a regular file may stand there.
+    fn named_paths(&self) -> impl Iterator<Item = (&str, bool)> {
+        let write = self.write.iter().map(|p| (p.as_str(), false));
+        let over = self
+            .over
+            .iter()
+            .flat_map(|(a, b)| [(a.as_str(), false), (b.as_str(), false)]);
+        let read_only = self.read_only.iter().map(|p| (p.as_str(), true));
+        write.chain(over).chain(read_only)
+    }
 }
 /// The hidden list's paths under the home, in the list's order (R10).
 const HIDDEN_HOME: [&str; 4] = [".config/gh", ".git-credentials", ".netrc", ".ssh"];
@@ -341,6 +395,13 @@ fn hidden_now(home: &str, work_root: &Path) -> Vec<(String, bool)> {
             Some((p, dir))
         })
         .collect()
+}
+/// The `bwrap` words that hide the paths of the hidden list that exist now, all of them (nothing
+/// shown): the view of an acceptance check (`specs/ap/run-limits.md` R12). None without a passwd
+/// entry for this user (R10).
+pub(crate) fn hidden_words(s: &impl System) -> Option<Vec<String>> {
+    let home = s.home()?.to_string_lossy().into_owned();
+    Some(hiding(&hidden_now(&home, &s.work_root())))
 }
 /// The `bwrap` arguments that hide these paths: a directory becomes an empty one the stage cannot
 /// write, any other path `/dev/null` (R10).
@@ -442,9 +503,26 @@ fn target(r: &Value) -> Result<Option<(&'static str, String)>, Failure> {
         (a, b) => Ok(a.or(b)),
     }
 }
-/// The `scratch` of `limits`: a reviewer on the Claude CLI only, one member, an absolute path
-/// without `..`, apart from the accounts, the cwd, the out and the prompt by its components as
-/// written, and never with `expect.file` (`specs/ap/run-limits.md` R1).
+/// A path of the lists of `limits`: absolute, not `/` and without a `..` component (R1).
+fn listed(p: &Value) -> Option<String> {
+    let p = p.as_str().filter(|p| !p.contains('\0'))?;
+    let at = Path::new(p);
+    let root = at.components().all(|c| c == Component::RootDir);
+    let up = at.components().any(|c| c == Component::ParentDir);
+    (at.is_absolute() && !root && !up).then(|| p.to_owned())
+}
+/// A list of `limits` of 1 to `max` paths; empty when the member is absent (R1).
+fn listed_paths(o: &serde_json::Map<String, Value>, key: &str, max: usize) -> Option<Vec<String>> {
+    let Some(v) = o.get(key) else {
+        return Some(vec![]);
+    };
+    let list = v.as_array().filter(|a| (1..=max).contains(&a.len()))?;
+    list.iter().map(listed).collect()
+}
+/// The `limits` of a request: a reviewer, an implementer or a fixer on the Claude CLI only; a
+/// `scratch`, an absolute path without `..`, apart from the accounts, the cwd, the out, the prompt
+/// and the paths it writes by its components as written; the optional `write`, `over`, `read_only`
+/// and `show`; never with `expect.file` (`specs/ap/run-limits.md` R1).
 fn scratch(
     s: &impl System,
     v: &Value,
@@ -452,27 +530,76 @@ fn scratch(
     accounts: &[String],
     [cwd, out, prompt]: [&str; 3],
 ) -> Result<Limits, Failure> {
-    let one = v.as_object().is_some_and(|o| o.len() == 1);
-    let p = path(v, "scratch").map_err(|_| error("invalid_input", "limits"))?;
+    let bad = || error("invalid_input", "limits");
+    let o = v.as_object().ok_or_else(bad)?;
+    let known = ["scratch", "write", "over", "read_only", "show"];
+    require!(o.keys().all(|k| known.contains(&k.as_str())) => "invalid_input", "limits");
+    let p = path(v, "scratch").map_err(|_| bad())?;
+    let write = listed_paths(o, "write", 8).ok_or_else(bad)?;
+    let read_only = listed_paths(o, "read_only", 8).ok_or_else(bad)?;
+    let over = match o.get("over") {
+        None => vec![],
+        Some(v) => {
+            let list = v.as_array().filter(|a| (1..=4).contains(&a.len()));
+            let pair = |p: &Value| {
+                let p = p.as_array().filter(|p| p.len() == 2)?;
+                Some((listed(&p[0])?, listed(&p[1])?))
+            };
+            let pairs = list.and_then(|l| l.iter().map(pair).collect::<Option<Vec<_>>>());
+            pairs.ok_or_else(bad)?
+        }
+    };
+    let show = match o.get("show") {
+        None => false,
+        Some(v) => {
+            require!(*v == json!([SHOWN]) => "invalid_input", "limits");
+            true
+        }
+    };
     let at = Path::new(&p);
     let up = at.components().any(|c| c == Component::ParentDir);
+    // What the stage writes beside its home and scratch directory: the `write` paths, the `over`
+    // sources and targets.
+    let writes: Vec<&str> = (write.iter().map(String::as_str))
+        .chain(over.iter().flat_map(|(a, b)| [a.as_str(), b.as_str()]))
+        .collect();
     let inside = (accounts.iter().map(String::as_str))
         .chain([cwd])
+        .chain(writes.iter().copied())
         .any(|a| at.starts_with(a));
     let holds = [cwd, out, prompt]
         .iter()
         .any(|h| Path::new(h).starts_with(at));
-    let stage = role == "reviewer" && runtime == Runtime::Claude && !expect_file;
-    require!(one && stage && !up && !inside && !holds => "invalid_input", "limits");
+    let held = [out, prompt]
+        .iter()
+        .any(|h| writes.iter().any(|w| Path::new(h).starts_with(w)));
+    let roles = ["reviewer", "implementer", "fixer"];
+    let stage = roles.contains(&role) && runtime == Runtime::Claude && !expect_file;
+    require!(stage && !up && !inside && !holds && !held => "invalid_input", "limits");
     // The hidden list's `~`: without a passwd entry for this user there is no list to hide (R10).
     let home = s.home().map(|h| h.to_string_lossy().into_owned());
     let home = home.ok_or_else(|| error("limits_unavailable", "limits"))?;
     let root = s.work_root();
     let hidden = (accounts.iter().map(String::as_str))
         .chain([cwd, p.as_str()])
+        .chain(writes.iter().copied())
         .any(|a| in_hidden(a, &home, &root));
     require!(!hidden => "invalid_input", "limits");
-    Ok(Limits { scratch: p, home })
+    let mut given = serde_json::Map::new();
+    for k in ["over", "read_only", "show"] {
+        if let Some(v) = o.get(k) {
+            given.insert(k.to_owned(), v.clone());
+        }
+    }
+    Ok(Limits {
+        scratch: p,
+        home,
+        write,
+        over,
+        read_only,
+        show,
+        given,
+    })
 }
 /// One `mkdir` of the scratch directory that fails when the path exists (mode 0700), then its
 /// `tmp` and `target`: whether this call made it, and whether all three were made (R4).
@@ -710,6 +837,8 @@ fn git(
             .map(|(k, v)| format!("{k}={v}")),
     );
     a.extend(args(&["LC_ALL=C", "git", "-C", cwd]));
+    // No hook or fsmonitor program of the worktree runs (`specs/ap/unit-run.md` R39).
+    a.extend(args(&crate::review::GIT_SAFE));
     a.extend(args(command));
     s.call("env", &a, &Value::Null, 10_000)
 }
@@ -917,7 +1046,8 @@ fn request_at(s: &mut impl System, r: &Value, at_cwd: bool) -> Result<Request, F
     require!(names.iter().all(|n| std::fs::symlink_metadata(n).is_err()) => "out_exists", "out");
     if let Some(Limits { scratch, .. }) = &limits {
         // The host's state for `limits`, before the policy step: nothing at the path, a parent
-        // that is a directory with no link in its path, and a `bwrap` that answers (R2, R3).
+        // that is a directory with no link in its path (R2), the named paths (R11), and a `bwrap`
+        // that answers (R3).
         require!(std::fs::symlink_metadata(scratch).is_err() => "scratch_exists", "limits");
         let parent = Path::new(scratch).parent().is_some_and(|p| {
             // Resolved through every link, the parent is the path as written, component by
@@ -926,6 +1056,19 @@ fn request_at(s: &mut impl System, r: &Value, at_cwd: bool) -> Result<Request, F
             resolved.is_ok_and(|r| r.is_dir() && r.components().eq(p.components()))
         });
         require!(parent => "scratch_parent_missing", "limits");
+    }
+    if let Some(l) = &limits {
+        // The paths the request names exist: a directory (a `read_only` path may be a regular
+        // file), with no link in its path (R11).
+        let real = |p: &str, file: bool| {
+            let at = Path::new(p);
+            let kind = std::fs::metadata(at).is_ok_and(|m| m.is_dir() || (file && m.is_file()));
+            let resolved = std::fs::canonicalize(at);
+            kind && resolved.is_ok_and(|r| r.components().eq(at.components()))
+        };
+        if let Some((p, _)) = l.named_paths().find(|(p, file)| !real(p, *file)) {
+            return Err(fail("invalid_input", "limits", json!({ "path": p })));
+        }
         let probe = s.call(BWRAP, &args(&["--version"]), &Value::Null, 10_000);
         require!(probe.is_ok_and(|r| r.success) => "limits_unavailable", "limits");
     }
@@ -971,7 +1114,12 @@ fn request_at(s: &mut impl System, r: &Value, at_cwd: bool) -> Result<Request, F
         let inside = git(s, &clean, &cwd, &["rev-parse", "--is-inside-work-tree"])
             .map_err(|_| error("worktree_unreadable", "cwd"))?;
         if inside.success && inside.stdout == b"true\n" {
-            let status = git(s, &clean, &cwd, &["status", "--porcelain"])
+            let status = git(
+                s,
+                &clean,
+                &cwd,
+                &["status", "--porcelain", "--ignore-submodules=all"],
+            )
                 .map_err(|_| error("worktree_unreadable", "cwd"))?;
             require!(status.success => "worktree_unreadable", "cwd");
             require!(status.stdout.is_empty() || continue_dirty => "worktree_dirty", "cwd");
@@ -1890,16 +2038,23 @@ fn attempt(
     if let Some((path, _, sha256)) = &q.schema {
         record["answer_schema"] = json!({"path": path, "sha256": sha256});
     }
-    // The hidden paths of this launch, as they exist when it is prepared (R7, R10).
+    // The hidden paths of this launch, as they exist when it is prepared, but the one shown (R7,
+    // R10).
     let hidden = q
         .limits
         .as_ref()
-        .map(|l| hidden_now(&l.home, &s.work_root()))
+        .map(|l| l.hidden(&s.work_root()))
         .unwrap_or_default();
-    if let Some(Limits { scratch, .. }) = &q.limits {
+    if let Some(l) = &q.limits {
         let paths: Vec<&String> = hidden.iter().map(|(p, _)| p).collect();
-        record["limits"] = json!({"scratch": scratch, "writable": [account, scratch],
+        let mut writable = vec![account];
+        writable.extend(l.writable());
+        let mut limits = json!({"scratch": l.scratch, "writable": writable,
             "bwrap": BWRAP, "hidden": paths});
+        for (k, v) in &l.given {
+            limits[k] = v.clone();
+        }
+        record["limits"] = limits;
     }
     let not_launched = |mut record: Value, unmet: &str| {
         record["state"] = json!("failed");
@@ -2016,11 +2171,11 @@ fn attempt(
             env.push(("AGY_CLI_DISABLE_AUTO_UPDATE".into(), "1".into()));
         }
     }
-    if let Some(Limits { scratch, .. }) = &q.limits {
+    if let Some(limits @ Limits { scratch, .. }) = &q.limits {
         // After `systemd-run … --`, in front of the CLI: its own pid namespace (no other stage
-        // in its `/proc`), everything read-only but the launch's account and the scratch
-        // directory, no capability (R5); temporary files and builds go to the scratch directory
-        // (R6).
+        // in its `/proc`), everything read-only but the launch's account, the scratch directory
+        // and the paths the request names, no capability (R5); temporary files and builds go to
+        // the scratch directory (R6).
         let bwrap = [
             BWRAP,
             "--unshare-pid",
@@ -2037,6 +2192,7 @@ fn attempt(
         bwrap.extend(args(&[
             "--bind", account, account, "--bind", scratch, scratch,
         ]));
+        bwrap.extend(limits.named());
         // After the binds: the host's credentials and sockets, hidden (R10).
         bwrap.extend(hiding(&hidden));
         bwrap.extend(args(&["--cap-drop", "ALL", "--chdir", &q.cwd, "--"]));
