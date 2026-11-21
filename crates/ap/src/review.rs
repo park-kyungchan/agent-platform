@@ -331,19 +331,56 @@ pub(crate) fn lead_review(s: &mut impl System, repository: &str, head: &str) -> 
     let lead = all.find(|st| st["context"] == "lead-review")?;
     lead["state"].as_str().map(str::to_owned)
 }
-/// The paths no pattern covers: a pattern matches its exact path; a trailing `/**` matches
-/// descendants, not the directory itself or another name with the same prefix.
+/// The two forms of a write-set pattern, as the refusals of `specs/ap/unit.md` R11, R38 and R39 name them.
+pub(crate) const WRITE_SET_FORMS: [&str; 2] = ["<path>", "<dir>/**"];
+/// How the matcher reads a write-set pattern: the one path equal to the text, or the descendants of the
+/// literal text before a final `/**`.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub(crate) enum Reading<'a> {
+    Exact(&'a str),
+    Below(&'a str),
+}
+/// A write-set pattern: whether its text is of the grammar of `specs/ap/unit.md` R11 and how the matcher
+/// reads it, which is the same reading for every text, of the grammar or not.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub(crate) struct WritePattern<'a> {
+    pub grammar: bool,
+    pub reading: Reading<'a>,
+}
+/// An exact path: components joined by single `/`, none empty, `.` or `..`, none holding `*`, `?` or `[`.
+fn exact_path(t: &str) -> bool {
+    !t.is_empty()
+        && t.split('/')
+            .all(|c| !c.is_empty() && c != "." && c != ".." && !c.contains(['*', '?', '[']))
+}
+/// The one reading of a write-set pattern's text (`specs/ap/unit.md` R11, `specs/ap/unit-run.md` R16).
+pub(crate) fn write_set_pattern(text: &str) -> WritePattern<'_> {
+    let reading = match text.strip_suffix("/**") {
+        Some(dir) => Reading::Below(dir),
+        None => Reading::Exact(text),
+    };
+    let path = match reading {
+        Reading::Exact(p) | Reading::Below(p) => p,
+    };
+    let grammar =
+        (1..=200).contains(&text.len()) && !text.chars().any(char::is_control) && exact_path(path);
+    WritePattern { grammar, reading }
+}
+/// The paths no pattern covers: a pattern of the grammar matches its exact path or the descendants of its
+/// directory, not the directory itself or another name with the same prefix; a text of neither form is read
+/// as before (`write_set_pattern`).
 pub(crate) fn outside<'a>(patterns: &[String], paths: &[&'a str]) -> Vec<&'a str> {
     paths
         .iter()
         .filter(|path| {
-            !patterns.iter().any(|pattern| {
-                pattern == **path
-                    || pattern.strip_suffix("/**").is_some_and(|dir| {
-                        path.strip_prefix(dir)
-                            .is_some_and(|tail| tail.starts_with('/') && tail.len() > 1)
-                    })
-            })
+            !patterns
+                .iter()
+                .any(|pattern| match write_set_pattern(pattern).reading {
+                    Reading::Exact(exact) => exact == **path,
+                    Reading::Below(dir) => path
+                        .strip_prefix(dir)
+                        .is_some_and(|tail| tail.starts_with('/') && tail.len() > 1),
+                })
         })
         .copied()
         .collect()
