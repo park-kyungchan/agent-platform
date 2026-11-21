@@ -1,6 +1,6 @@
 # One stage: `ap run`
 
-Purpose: one stage of work (an implementer, a reviewer or a fixer) runs as ONE headless session of a coding CLI (Claude Code; the Codex CLI with `runtime: "codex"`; the Muse Code CLI with `runtime: "muse"`; for a reviewer, the Antigravity CLI with `runtime: "agy"`) in a transient systemd scope `ap-run-<uuid>.scope` under `agents.slice`, and `ap run` returns when nothing of it is alive, with one record `<out>.run.json` that says how it ended, so that a caller judges a stage by its record and never by a session it watched. This file holds the request, the refusals, the run, the states, the record, the typed answer and the four runtimes. Three specifications hold the rest and are not repeated here: `specs/ap/run-limits.md` (a reviewer with `limits`), `specs/ap/run-object.md` (a stage of a unit or an intent, the role and the author, and the close of an orphan `run` object) and `specs/ap/policy.md` (the host's policy file, the last check of admission).
+Purpose: one stage of work (an implementer, a reviewer or a fixer) runs as ONE headless session of a coding CLI (Claude Code; the Codex CLI with `runtime: "codex"`; the Muse Code CLI with `runtime: "muse"`; for a reviewer, the Antigravity CLI with `runtime: "agy"`) in a transient systemd scope `ap-run-<uuid>.scope` under `agents.slice`, and `ap run` returns when nothing of it is alive, with one record `<out>.run.json` that says how it ended, so that a caller judges a stage by its record and never by a session it watched. This file holds the request, the refusals, the run, the states, the record, the typed answer and the four runtimes. Three specifications hold the rest and are not repeated here: `specs/ap/run-limits.md` (a stage with `limits`), `specs/ap/run-object.md` (a stage of a unit or an intent, the role and the author, and the close of an orphan `run` object) and `specs/ap/policy.md` (the host's policy file, the last check of admission).
 
 ## Requirements
 
@@ -86,7 +86,7 @@ Every refusal code `ap run` emits, exit 2 before any effect, with the requiremen
 | Code | Requirement |
 | --- | --- |
 | `usage`, `input_too_large`, `io_error` | R1 |
-| `invalid_input` | R1, R2, R4, R5, R6, R30, R34, R38, R47, R48, R50; `specs/ap/run-object.md` R1, R14; `specs/ap/run-limits.md` R1 |
+| `invalid_input` | R1, R2, R4, R5, R6, R30, R34, R38, R47, R48, R50; `specs/ap/run-object.md` R1, R14; `specs/ap/run-limits.md` R1, R11 |
 | `env_forbidden` | R3, R34, R39, R47; `specs/ap/run-object.md` R2 |
 | `account_missing` | R7, R38, R47 |
 | `cwd_missing`, `prompt_unreadable`, `out_unwritable`, `out_named_in_prompt`, `out_exists` | R8 (`out_exists` also R11) |

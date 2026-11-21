@@ -37,9 +37,9 @@ For `install`, `origin/main` means the local ref, so run `git fetch` first; the 
 
 `ap run < request.json`: `specs/ap/run.md` (the request R1 to R6, the refusals before any effect R7 to R10, the run and its record R11 to R29), with `specs/ap/run-limits.md`, `specs/ap/run-object.md` and `specs/ap/policy.md`. The record, the stream and the error file are mode 0600 (R11).
 
-### A reviewer stage with limits
+### A stage with limits
 
-`specs/ap/run-limits.md` R1 to R10: `limits` holds a Claude reviewer to its account and one scratch directory under `bwrap`, and hides the host's credential and socket paths from it (R10; the record's `limits.hidden` names those hidden at each launch). A scratch path below a link is refused (R2). `ap unit review` gives every look on Claude its limits (`specs/ap/unit-review.md` R13).
+`specs/ap/run-limits.md` R1 to R12: `limits` holds a Claude stage (a reviewer, an implementer or a fixer) under `bwrap` to its account, one scratch directory and the paths its request names (`write`, `over`, `read_only`, R1, R5, R11), and hides the host's credential and socket paths from it but the one `show` names (R10; the record's `limits.hidden`). A scratch path below a link is refused (R2). `ap unit review` gives every look on Claude its limits (`specs/ap/unit-review.md` R13), `ap unit run` every stage (`specs/ap/unit-run.md` R38), and an acceptance check of a unit runs in the view of R12.
 
 ### A stage of a unit or an intent
 

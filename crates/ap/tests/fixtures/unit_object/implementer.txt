@@ -84,7 +84,7 @@ You are the implementer of this unit, in a fresh headless session. English only.
 - Install nothing, change no service, write no file outside the worktree and directories you make with `mktemp -d`, and never run the change against this host's store or records: tests use scratch stores and the tests' own fakes.
 - Before the push: `git fetch origin`; when `origin/main` is not an ancestor of your head, `git merge origin/main` (no rebase) and the repository's check again.
 - On your committed head with a clean worktree: the repository's check until it passes; then each acceptance check of the page, run in the worktree as `AP_BASE=$(git merge-base origin/main HEAD) AP_HEAD=$(git rev-parse HEAD) bash -c '<the check>'`, ends as the page says.
-- Then `git push -u origin HEAD` and ONE pull request against `main` (not a draft), whose description holds your plan as it ended and each place where the page left you a choice. If the push or the creation fails, do not try another form: say so in the first line of your report and end.
+- Then `git push origin HEAD` and ONE pull request against `main` (not a draft), whose description holds your plan as it ended and each place where the page left you a choice. If the push or the creation fails, do not try another form: say so in the first line of your report and end.
 - When you are done: `git status --porcelain` prints nothing and the pushed head equals `git rev-parse HEAD`.
 - No memory tool, no login, no merge. Never print a credential. The repository may be public: no account name, session id, host path outside the repository, task-internal word, real name or private text in a commit, the pull request or a comment.
 
