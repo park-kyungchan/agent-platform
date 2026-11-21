@@ -150,9 +150,9 @@ The unit files, `/etc/agent-platform/deliver.json` and the state directory `/var
 
 ## The store's backup
 
-`scripts/backup-store.sh` backs up the Ontology store with `ont backup` (a verified copy under the store's `backup/` directory; the engine keeps the newest three) and copies each new backup to an `rclone` remote. `ont-backup.timer` starts `ont-backup.service` every hour (`Persistent=true`: a run missed while the host was off happens at the next boot). The service is a `Type=oneshot` in `agents.slice` that runs the installed script; `SuccessExitStatus` is not set, so a failed remote copy shows as a failed unit.
+`scripts/backup-store.sh` backs up the Ontology store with `ont backup` (a verified copy under the store's `backup/` directory; the engine keeps the newest three) and copies each new backup to an `rclone` remote, encrypted: the copy that goes to the remote is the backup encrypted with `gpg` to the public key of `recipient`, and the plain backup never leaves the host. `ont-backup.timer` starts `ont-backup.service` every hour (`Persistent=true`: a run missed while the host was off happens at the next boot). The service is a `Type=oneshot` in `agents.slice` that runs the installed script; `SuccessExitStatus` is not set, so a failed remote copy shows as a failed unit.
 
-`ap deliver` installs `ont-backup.service` and `ont-backup.timer` and enables the timer (section "The unit files"). The script stays by hand: install it, from a clean checkout of the merged commit, as root, before the timer's first run and again after a merge changes it:
+`ap deliver` installs `ont-backup.service` and `ont-backup.timer` and enables the timer (section "The unit files"). The script stays by hand. Before the install, one more hand step, the key: make the key pair off the host (on the PC) and bring only the exported public key to the host, to the path `recipient` names (for example `/etc/agent-platform/backup-recipient.pub`); the private key is never on the host. Read it back there: `gpg --show-keys <file>` lists one key that can encrypt (a `pub` line and an `[E]` subkey, or a primary key whose usage includes `E`). Add `recipient` to `/etc/agent-platform/backup.json` before the new script is installed, else every run ends `recipient_missing` (exit 3; the local backup is still made). Then install the script, from a clean checkout of the merged commit, as root, before the timer's first run and again after a merge changes it:
 
 ```sh
 install -d -m 0755 /usr/local/lib/agent-platform
@@ -167,8 +167,9 @@ The settings are the JSON file `/etc/agent-platform/backup.json` (another path: 
 | `state` | a directory (absolute) for the lock and `last.json` | `/var/lib/agent-platform/backup` |
 | `remote` | an `rclone` path `name:dir/sub` (letters, digits, `_`, `.`, `-`, `/`; no `..`); absent or `""` means no remote. The `rclone` configuration of root names `name` | none |
 | `keep` | how many files stay on the remote, 1 to 60 | 14 |
+| `recipient` | an absolute path (no control character) of a file that holds exactly one OpenPGP public key, binary or armored, as `gpg --recipient-file` takes it; needed for a remote, and a value that is not such a path is refused (exit 2) | none |
 
-Each run writes `<state>/last.json` (`at`, `store`, `backup`, `sha256`, `bytes`, `retention_failure`, `remote`, `remote_name`, `deleted`, `code`) by a rename and prints one line `backup: <code or ok> <backup path or ->`. The exit is 0 (backup made, remote `copied`, `unchanged` or `none`; also `backup: busy` when a run holds the lock), 3 (backup made, a remote step failed: `code` is `remote_copy_failed`, `remote_list_failed` or `remote_prune_failed`; the local backup stays) or 4 (`backup_failed`: nothing is copied or deleted). A backup whose digest equals the one the previous run copied is not copied again (`remote: unchanged`). The script deletes from the remote only names it wrote (`<YYYYMMDDTHHMMSSZ>-<12 hex of the digest>.sqlite`), oldest first, beyond `keep`; `rclone`'s own output is discarded, so a journal line never holds credentials. Read the state:
+Each run writes `<state>/last.json` (`at`, `store`, `backup`, `sha256`, `bytes`, `retention_failure`, `remote`, `remote_name`, `recipient_sha256`, `deleted`, `code`) by a rename and prints one line `backup: <code or ok> <backup path or ->`. `sha256` and `bytes` are those of the plain local backup; `recipient_sha256` is the SHA-256 of the recipient file, null when the run did not read it. The exit is 0 (backup made, remote `copied`, `unchanged` or `none`; also `backup: busy` when a run holds the lock), 3 (backup made, a remote step failed: `code` is `recipient_missing` (a remote and no `recipient`), `encrypt_failed` (the recipient file is absent, empty or not a regular file, `gpg` is not on the path or fails, or its output is absent, empty or an SQLite file), `remote_copy_failed`, `remote_list_failed` or `remote_prune_failed`; the local backup stays) or 4 (`backup_failed`: nothing is copied or deleted). A run with a remote makes one `gpg` public-key encryption in a GnuPG home of its own under the state directory, so the GnuPG home of root is neither read nor written; no passphrase and no private key is involved. A backup is not copied again (`remote: unchanged`) only when the previous record is `copied` or `unchanged` with the same `sha256` and the same `recipient_sha256`: a record of the earlier script has no `recipient_sha256`, so the first run after the install, and the first run after a change of the key, copy even an unchanged store. The file on the remote is named `<YYYYMMDDTHHMMSSZ>-<12 hex of the digest of the plain backup>.sqlite.gpg`. The script deletes from the remote only names of that form and of the earlier plain form (`.sqlite`), oldest first, beyond `keep` of both together, so the plain copies the earlier script wrote leave once `keep` encrypted copies are newer; any other name stays. The output of `gpg`, like that of `rclone`, is discarded, so a journal line never holds credentials. The working files (the encrypted file and the `gpg` home, names that begin with `.`) are removed at the end of each run, and a run removes those a killed run left. Read the state:
 
 ```sh
 systemctl list-timers ont-backup.timer
@@ -176,7 +177,7 @@ systemctl is-failed ont-backup.service       # failed: the last run exited 3 or 
 python3 -m json.tool /var/lib/agent-platform/backup/last.json
 ```
 
-There is no restore command: a copy of a remote file is read with `ont --store <copy> describe` (the engine admits one uid, so run it as root on a scratch copy).
+There is no restore command. A remote file is first decrypted off the host (on the PC, with the private key): `gpg --output <copy> --decrypt <file>`; the SHA-256 of the copy begins with the 12 hex digits of the file's name; then `ont --store <copy> describe` reads it (the engine admits one uid, so run it as root on a scratch copy). What is not offered: the encryption keeps what the remote holds from being read, but the credential that writes the remote can also delete its files, so a root process of the host can delete the copies; a remote with a credential that writes without delete, or a retention rule of its own, is a choice the user makes separately.
 
 Undo: disable the timer and wait until a run that is going on has ended; the unit files stay in place.
 
@@ -185,7 +186,7 @@ systemctl disable --now ont-backup.timer
 systemctl is-active ont-backup.service       # until it answers inactive or failed, not activating
 ```
 
-The script, `/etc/agent-platform/backup.json`, the state directory and the files already on the remote stay; remove the last three by hand when no run will happen again.
+The script, `/etc/agent-platform/backup.json`, the public key file, the state directory and the files already on the remote stay; remove the last three by hand when no run will happen again.
 
 ## The CPU quota
 
