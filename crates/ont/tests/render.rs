@@ -1491,3 +1491,772 @@ fn describe_discovers_readable_views_and_arguments_on_cli_and_mcp() {
             .contains("lists views and args")
     );
 }
+
+// Documents: one generated block over several document blocks.
+fn note_id(key: &str) -> Id {
+    Id {
+        object_type: "note".into(),
+        namespace: ns(),
+        native_key: key.into(),
+    }
+}
+fn observation(fields: BTreeMap<String, Knowledge>, fresh_until: u64) -> Observation {
+    Observation {
+        revision: "r1".into(),
+        source_revision: "s1".into(),
+        observed_at: 10,
+        fresh_until,
+        change: Change::Initial,
+        supersedes: None,
+        coverage: Coverage::Complete,
+        fields,
+        lineage: Lineage {
+            artifact_sha256: "a".repeat(64),
+            pointer: "/0".into(),
+        },
+    }
+}
+fn append_all(t: &Temp, entries: Vec<(Id, Observation)>) {
+    let mut store = ont_store::Store::open_schema(&t.0.join("store.sqlite")).unwrap();
+    let entries: Vec<_> = entries
+        .into_iter()
+        .map(|(id, observation)| ont_store::Append {
+            id,
+            scope: Scope::domain(ns(), "board", BTreeMap::new()).unwrap(),
+            observation,
+        })
+        .collect();
+    store.append_schema(&entries, 15).unwrap();
+}
+fn note(t: &Temp, key: &str, text: Knowledge, fresh_until: u64) {
+    append_all(
+        t,
+        vec![(
+            note_id(key),
+            observation(BTreeMap::from([("text".into(), text)]), fresh_until),
+        )],
+    );
+}
+fn text(s: &str) -> Knowledge {
+    Knowledge::Value(json!(s))
+}
+/// The fixture plus a second object type `note`, readable by the principal,
+/// and the document `overview` of specs/ont/render.md R53.
+fn document_schema() -> Value {
+    let mut s = schema();
+    s["object_types"]["note"] = json!({"owner":"ontology","primary_key":{"from":"$action_id"},
+        "properties":{"text":{"type":"string"},"short":{"type":"string","max_bytes":4},
+            "item":{"type":{"ref":"item"}}}});
+    s["grants"][0]["read"] = json!(["item", "note"]);
+    s["views"]["overview"] = json!({"args":["title"],"blocks":[
+        {"heading":"Items","table":{"object_type":"item","filter":{"eq":["title","$title"]},
+            "order":[{"property":"rank","direction":"asc"}],
+            "columns":[{"header":"Key","property":"$key"},{"header":"Rank","property":"rank"}]}},
+        {"heading":"Notes","list":{"object_type":"note",
+            "order":[{"property":"text","direction":"asc"}],"properties":["$key","text"]}}]});
+    s
+}
+const OVERVIEW: &str = "<!-- ont:render overview title=equal schema=board@1 -->\n## Items\n| Key | Rank |\n| --- | --- |\n| a | 2 |\n| b | 2 |\n\n## Notes\n- n1: first\n- n2: second\n<!-- /ont:render -->";
+fn overview_store() -> Temp {
+    let t = Temp::new();
+    t.install(document_schema());
+    append(&t, "z", fields("last", 10), Change::Initial, 2000);
+    append(&t, "b", fields("equal", 2), Change::Initial, 2000);
+    append(&t, "a", fields("equal", 2), Change::Initial, 2000);
+    note(&t, "n2", text("second"), 2000);
+    note(&t, "n1", text("first"), 2000);
+    t
+}
+/// Every line between the markers is empty or opens with `## `, `| ` or `- `.
+fn lines_are_inert(markdown: &str) {
+    let lines: Vec<_> = markdown.split('\n').collect();
+    assert!(lines[0].starts_with("<!-- ont:render "));
+    assert_eq!(lines[lines.len() - 1], "<!-- /ont:render -->");
+    for line in &lines[1..lines.len() - 1] {
+        assert!(
+            line.is_empty() || ["## ", "| ", "- "].iter().any(|p| line.starts_with(p)),
+            "{line}"
+        );
+    }
+}
+
+#[test]
+fn document_over_two_types_renders_the_same_bytes_twice() {
+    // spec: specs/ont/render.md#R1
+    // spec: specs/ont/render.md#R51
+    // spec: specs/ont/render.md#R53
+    let t = overview_store();
+    let (code, answer) = t.render("overview", json!({"title":"equal"}));
+    assert_eq!(code, 0, "{answer}");
+    assert_eq!(
+        answer,
+        json!({"status":"ok","view":"overview","schema":"board@1","rows":4,
+            "truncated":false,"markdown":OVERVIEW})
+    );
+    lines_are_inert(OVERVIEW);
+    assert_eq!(t.render("overview", json!({"title":"equal"})), (0, answer));
+    // The table views of the same schema keep the bytes of a schema without documents.
+    assert_eq!(
+        t.render("items", json!({})).1["markdown"],
+        "<!-- ont:render items schema=board@1 -->\n| Key | Title | Rank |\n| --- | --- | --- |\n| a | equal | 2 |\n| b | equal | 2 |\n| z | last | 10 |\n<!-- /ont:render -->"
+    );
+    assert_eq!(
+        t.render("named_items", json!({"title":"last"})).1,
+        json!({"status":"ok","view":"named_items","schema":"board@1","rows":1,"truncated":false,
+            "markdown":"<!-- ont:render named_items title=last schema=board@1 -->\n| Key | Title | Rank |\n| --- | --- | --- |\n| z | last | 10 |\n<!-- /ont:render -->"})
+    );
+    // describe lists the table views and not the document.
+    let (code, answer) = t.run(&["describe"], json!({}));
+    assert_eq!(code, 0, "{answer}");
+    assert_eq!(
+        answer["result"]["views"],
+        json!([
+            {"domain":"board","name":"items","args":[],"object_type":"item"},
+            {"domain":"board","name":"named_items","args":["title"],"object_type":"item"}
+        ])
+    );
+    // A document name is unique among the views of every installed domain.
+    let mut other = document_schema();
+    other["domain"] = json!("other");
+    other["object_types"] = json!({"other_note":other["object_types"]["note"].clone()});
+    other["object_types"]["other_note"]["properties"]
+        .as_object_mut()
+        .unwrap()
+        .remove("item");
+    other["action_types"] = json!({});
+    other["grants"] = json!([]);
+    other["views"] = json!({"overview":{"blocks":[{"heading":"Notes","list":{"object_type":"other_note",
+        "order":[{"property":"text","direction":"asc"}],"properties":["text"]}}]}});
+    let file = t.file("other.json", &serde_json::to_vec(&other).unwrap());
+    let (code, answer) = t.run(&["schema", "install", &file], json!({}));
+    assert_eq!(
+        (code, answer["code"].as_str()),
+        (2, Some("schema_violation"))
+    );
+    let (code, answer) = t.run(&["schema", "check", &file], json!({}));
+    assert_eq!(code, 2, "{answer}");
+    assert!(
+        answer["violations"]
+            .as_array()
+            .unwrap()
+            .contains(&json!({"code":"duplicate_type_name","pointer":"/views/overview"})),
+        "{answer}"
+    );
+}
+
+fn document_refusal(s: &Value, code: &str, pointer: &str) {
+    let t = Temp::new();
+    let file = t.file("invalid.json", &serde_json::to_vec(s).unwrap());
+    let (exit, answer) = t.run(&["schema", "check", &file], json!({}));
+    assert_eq!(
+        (exit, answer["code"].as_str()),
+        (2, Some("schema_violation")),
+        "{pointer}: {answer}"
+    );
+    assert!(
+        answer["violations"]
+            .as_array()
+            .unwrap()
+            .contains(&json!({"code":code,"pointer":pointer})),
+        "{code}@{pointer}: {answer}"
+    );
+}
+
+#[test]
+fn document_schema_refusals_name_code_and_pointer() {
+    // spec: specs/ont/render.md#R52
+    let base = document_schema();
+    let t = Temp::new();
+    let file = t.file("valid.json", &serde_json::to_vec(&base).unwrap());
+    assert_eq!(t.run(&["schema", "check", &file], json!({})).0, 0);
+    let doc = "/views/overview";
+    let table = "/views/overview/blocks/0/table";
+    let list = "/views/overview/blocks/1/list";
+    let block = base["views"]["overview"]["blocks"][1].clone();
+    let cases: Vec<(&str, Value, &str, String)> = vec![
+        // (a) 1 to 20 document blocks.
+        (
+            "/blocks",
+            json!([]),
+            "invalid_document",
+            format!("{doc}/blocks"),
+        ),
+        (
+            "/blocks",
+            Value::Array(vec![block; 21]),
+            "invalid_document",
+            format!("{doc}/blocks"),
+        ),
+        // (b) headings.
+        (
+            "/blocks/0/heading",
+            json!(""),
+            "invalid_document",
+            format!("{doc}/blocks/0/heading"),
+        ),
+        (
+            "/blocks/0/heading",
+            json!("h".repeat(201)),
+            "invalid_document",
+            format!("{doc}/blocks/0/heading"),
+        ),
+        (
+            "/blocks/0/heading",
+            json!("a\nb"),
+            "invalid_document",
+            format!("{doc}/blocks/0/heading"),
+        ),
+        (
+            "/blocks/0/heading",
+            json!("a\rb"),
+            "invalid_document",
+            format!("{doc}/blocks/0/heading"),
+        ),
+        (
+            "/blocks/0/heading",
+            json!("a\tb"),
+            "invalid_document",
+            format!("{doc}/blocks/0/heading"),
+        ),
+        // (c) list properties.
+        (
+            "/blocks/1/list/properties",
+            json!([]),
+            "invalid_document",
+            format!("{list}/properties"),
+        ),
+        (
+            "/blocks/1/list/properties",
+            json!(["text", "text", "text", "text", "text"]),
+            "invalid_document",
+            format!("{list}/properties"),
+        ),
+        (
+            "/blocks/1/list/properties",
+            json!(["absent"]),
+            "unknown_property",
+            format!("{list}/properties"),
+        ),
+        // (d) the document's arguments.
+        (
+            "/args",
+            json!(["Bad"]),
+            "invalid_schema",
+            format!("{doc}/args"),
+        ),
+        (
+            "/args",
+            json!(["title", "title"]),
+            "invalid_schema",
+            format!("{doc}/args"),
+        ),
+        // (e) the checks of a table view, under the document block's pointer.
+        (
+            "/blocks/0/table/object_type",
+            json!("absent"),
+            "unknown_type",
+            format!("{table}/object_type"),
+        ),
+        (
+            "/blocks/1/list/object_type",
+            json!("absent"),
+            "unknown_type",
+            format!("{list}/object_type"),
+        ),
+        (
+            "/blocks/0/table/limit",
+            json!(0),
+            "invalid_schema",
+            format!("{table}/limit"),
+        ),
+        (
+            "/blocks/1/list/limit",
+            json!(1001),
+            "invalid_schema",
+            format!("{list}/limit"),
+        ),
+        (
+            "/blocks/0/table/order",
+            json!([]),
+            "invalid_schema",
+            format!("{table}/order"),
+        ),
+        (
+            "/blocks/1/list/order",
+            json!([]),
+            "invalid_schema",
+            format!("{list}/order"),
+        ),
+        (
+            "/blocks/0/table/columns",
+            json!([]),
+            "invalid_schema",
+            format!("{table}/columns"),
+        ),
+        (
+            "/blocks/0/table/columns",
+            json!([{"header":"a|b","property":"rank"}]),
+            "invalid_schema",
+            format!("{table}/columns"),
+        ),
+        (
+            "/blocks/0/table/columns",
+            json!([{"header":"A","property":"absent"}]),
+            "unknown_property",
+            format!("{table}/columns"),
+        ),
+        (
+            "/blocks/0/table/order",
+            json!([{"property":"absent","direction":"asc"}]),
+            "unknown_property",
+            format!("{table}/order"),
+        ),
+        (
+            "/blocks/1/list/order",
+            json!([{"property":"absent","direction":"asc"}]),
+            "unknown_property",
+            format!("{list}/order"),
+        ),
+        (
+            "/blocks/0/table/filter",
+            json!({"eq":["title","$undeclared"]}),
+            "invalid_schema",
+            format!("{table}/filter"),
+        ),
+        (
+            "/blocks/1/list/filter",
+            json!({"eq":["text","$undeclared"]}),
+            "invalid_schema",
+            format!("{list}/filter"),
+        ),
+        (
+            "/blocks/1/list/filter",
+            json!({"eq":["absent","x"]}),
+            "invalid_schema",
+            format!("{list}/filter"),
+        ),
+        (
+            "/blocks/1/list/filter",
+            json!({"eq":["text",1]}),
+            "invalid_schema",
+            format!("{list}/filter"),
+        ),
+    ];
+    for (at, value, code, pointer) in cases {
+        let mut s = base.clone();
+        let (parent, key) = format!("{doc}{at}")
+            .rsplit_once('/')
+            .map(|(p, k)| (p.to_string(), k.to_string()))
+            .unwrap();
+        s.pointer_mut(&parent)
+            .unwrap()
+            .as_object_mut()
+            .unwrap()
+            .insert(key, value);
+        document_refusal(&s, code, &pointer);
+    }
+    // (f) shapes no form names: exit 2 and schema_violation from check and install.
+    let mut shapes = Vec::new();
+    for (member, value) in [
+        ("object_type", json!("item")),
+        ("filter", json!({"eq":["title","x"]})),
+        ("order", json!([{"property":"rank","direction":"asc"}])),
+        ("columns", json!([{"header":"Key","property":"$key"}])),
+        ("limit", json!(5)),
+        ("extra", json!(true)),
+    ] {
+        let mut s = base.clone();
+        s["views"]["overview"][member] = value;
+        shapes.push(s);
+    }
+    let mut both = base.clone();
+    both["views"]["overview"]["blocks"][1]["table"] =
+        base["views"]["overview"]["blocks"][0]["table"].clone();
+    shapes.push(both);
+    let mut neither = base.clone();
+    neither["views"]["overview"]["blocks"][1]
+        .as_object_mut()
+        .unwrap()
+        .remove("list");
+    shapes.push(neither);
+    for (path, member, value) in [
+        ("/views/overview/blocks/0", "args", json!(["title"])),
+        ("/views/overview/blocks/0", "description", json!("block")),
+        (
+            "/views/overview/blocks/0/table",
+            "properties",
+            json!(["title"]),
+        ),
+        ("/views/overview/blocks/0/table", "args", json!(["title"])),
+        (
+            "/views/overview/blocks/1/list",
+            "columns",
+            json!([{"header":"K","property":"$key"}]),
+        ),
+        (
+            "/views/overview/blocks/1/list",
+            "description",
+            json!("list"),
+        ),
+    ] {
+        let mut s = base.clone();
+        s.pointer_mut(path)
+            .unwrap()
+            .as_object_mut()
+            .unwrap()
+            .insert(member.into(), value);
+        shapes.push(s);
+    }
+    let mut no_heading = base.clone();
+    no_heading["views"]["overview"]["blocks"][0]
+        .as_object_mut()
+        .unwrap()
+        .remove("heading");
+    shapes.push(no_heading);
+    for s in shapes {
+        let t = Temp::new();
+        let file = t.file("invalid.json", &serde_json::to_vec(&s).unwrap());
+        for command in ["check", "install"] {
+            let (code, answer) = t.run(&["schema", command, &file], json!({}));
+            assert_eq!(
+                (code, answer["code"].as_str()),
+                (2, Some("schema_violation")),
+                "{command} {}: {answer}",
+                s["views"]["overview"]
+            );
+        }
+    }
+}
+
+#[test]
+fn document_list_prints_none_truncation_and_escapes() {
+    // spec: specs/ont/render.md#R54
+    let t = Temp::new();
+    let mut s = document_schema();
+    s["views"]["lists"] = json!({"blocks":[
+        {"heading":"Empty","list":{"object_type":"note","filter":{"eq":["text","nothing"]},
+            "order":[{"property":"text","direction":"asc"}],"properties":["text"]}},
+        {"heading":"Cut | <!-- x -->","list":{"object_type":"item",
+            "order":[{"property":"rank","direction":"asc"}],"properties":["$key","title","rank"],"limit":1}},
+        {"heading":"Escaped","list":{"object_type":"note",
+            "order":[{"property":"$key","direction":"asc"}],"properties":["$key","text"]}}]});
+    t.install(s);
+    append(&t, "a", fields("first", 1), Change::Initial, 2000);
+    append(&t, "b", fields("second", 2), Change::Initial, 2000);
+    note(&t, "e1", text("line\nbreak|pipe\\back<!--c-->"), 2000);
+    note(&t, "e2", text("old"), 20);
+    note(&t, "e3", Knowledge::Null, 2000);
+    let (code, answer) = t.render("lists", json!({}));
+    assert_eq!(code, 0, "{answer}");
+    let expected = "<!-- ont:render lists schema=board@1 -->\n\
+        ## Empty\n- (none)\n\n\
+        ## Cut \\| <\\!-- x --\\>\n- a: first: 1\n- (+1 more; limit 1)\n\n\
+        ## Escaped\n- e1: line break\\|pipe\\\\back<\\!--c--\\>\n- e2: old (stale)\n- e3: (null)\n\
+        <!-- /ont:render -->";
+    assert_eq!(
+        answer,
+        json!({"status":"ok","view":"lists","schema":"board@1","rows":4,"truncated":true,
+            "markdown":expected})
+    );
+    lines_are_inert(expected);
+}
+
+#[test]
+fn document_arguments_and_admission_cover_every_block() {
+    // spec: specs/ont/render.md#R55
+    let t = Temp::new();
+    let mut s = document_schema();
+    s["views"]["checked"] = json!({"args":["title"],"blocks":[
+        {"heading":"Items","table":{"object_type":"item","filter":{"eq":["title","$title"]},
+            "order":[{"property":"rank","direction":"asc"}],"columns":[{"header":"Key","property":"$key"}]}},
+        {"heading":"Short","list":{"object_type":"note","filter":{"eq":["short","$title"]},
+            "order":[{"property":"$key","direction":"asc"}],"properties":["$key"]}}]});
+    s["views"]["mixed"] = json!({"args":["key"],"blocks":[
+        {"heading":"Notes of","table":{"object_type":"note","filter":{"eq":["item","$key"]},
+            "order":[{"property":"$key","direction":"asc"}],"columns":[{"header":"Note","property":"$key"}]}},
+        {"heading":"Titled","list":{"object_type":"item","filter":{"eq":["title","$key"]},
+            "order":[{"property":"$key","direction":"asc"}],"properties":["$key","rank"]}}]});
+    t.install(s.clone());
+    append(&t, "a", fields("a", 1), Change::Initial, 2000);
+    append(&t, "b", fields("b", 2), Change::Initial, 2000);
+    append_all(
+        &t,
+        vec![
+            (
+                note_id("on-a"),
+                observation(
+                    BTreeMap::from([("item".into(), Knowledge::Value(json!(id("a"))))]),
+                    2000,
+                ),
+            ),
+            (
+                note_id("on-b"),
+                observation(
+                    BTreeMap::from([("item".into(), Knowledge::Value(json!(id("b"))))]),
+                    2000,
+                ),
+            ),
+        ],
+    );
+    // Missing and undeclared arguments.
+    let (code, answer) = t.render("checked", json!({}));
+    assert_eq!(
+        (code, answer["code"].as_str()),
+        (2, Some("invalid_argument"))
+    );
+    assert_eq!(answer["field"], "/args/title");
+    let (code, answer) = t.render("checked", json!({"title":"a","other":"x"}));
+    assert_eq!(
+        (code, answer["code"].as_str()),
+        (2, Some("invalid_argument"))
+    );
+    assert_eq!(answer["field"], "/args/other");
+    // Only the second document block's property refuses the value, without naming it.
+    let (code, answer) = t.render("checked", json!({"title":"toolong"}));
+    argument_refusal(code, &answer, "title", "short");
+    assert!(!answer.to_string().contains("toolong"), "{answer}");
+    let (code, answer) = t.render("checked", json!({"title":"a"}));
+    assert_eq!(code, 0, "{answer}");
+    assert_eq!(
+        answer["markdown"],
+        "<!-- ont:render checked title=a schema=board@1 -->\n## Items\n| Key |\n| --- |\n| a |\n\n## Short\n- (none)\n<!-- /ont:render -->"
+    );
+    // A reference in one document block and a string in another.
+    let (code, answer) = t.render("mixed", json!({"key":"a"}));
+    assert_eq!(code, 0, "{answer}");
+    assert_eq!(
+        answer["markdown"],
+        "<!-- ont:render mixed key=a schema=board@1 -->\n## Notes of\n| Note |\n| --- |\n| on-a |\n\n## Titled\n- a: 1\n<!-- /ont:render -->"
+    );
+    assert_eq!(answer["rows"], 2);
+    for key in ["bad key", "bad=key", ""] {
+        let (code, answer) = t.render("mixed", json!({"key":key}));
+        assert_eq!(
+            (code, answer["code"].as_str()),
+            (2, Some("reference_argument_unrepresentable")),
+            "{answer}"
+        );
+        assert_eq!(answer["field"], "/args/key");
+    }
+    // A principal who may not read the second document block's type learns nothing.
+    let hidden = Temp::new();
+    s["grants"][0]["read"] = json!(["item"]);
+    hidden.install(s);
+    append(&hidden, "a", fields("a", 1), Change::Initial, 2000);
+    let absent = hidden.render("absent", json!({}));
+    assert_eq!(absent.1["code"], "unavailable");
+    for args in [json!({"title":"a"}), json!({}), json!({"title":"toolong"})] {
+        assert_eq!(hidden.render("checked", args), absent);
+    }
+}
+
+#[test]
+fn document_blocks_share_one_snapshot() {
+    // spec: specs/ont/render.md#R56
+    let t = Temp::new();
+    let mut s = document_schema();
+    s["views"]["snap"] = json!({"blocks":[
+        {"heading":"Items","table":{"object_type":"item","limit":2,
+            "order":[{"property":"rank","direction":"asc"}],
+            "columns":[{"header":"Key","property":"$key"},{"header":"Rank","property":"rank"}]}},
+        {"heading":"Notes","list":{"object_type":"note",
+            "order":[{"property":"$key","direction":"asc"}],"properties":["$key","text"]}}]});
+    t.install(s);
+    append_all(
+        &t,
+        (0..1002)
+            .map(|i| {
+                (
+                    id(&format!("k{i:04}")),
+                    observation(fields("page", 1002 - i), 2000),
+                )
+            })
+            .collect(),
+    );
+    let store_path = t.0.join("store.sqlite");
+    let writer = std::sync::Arc::new(std::sync::Mutex::new(None));
+    let pending = writer.clone();
+    ont::render::__set_between_pages_hook(move || {
+        let (ready, receiver) = std::sync::mpsc::channel();
+        *pending.lock().unwrap() = Some(std::thread::spawn(move || {
+            let mut store = ont_store::Store::open_schema_existing_writable(&store_path).unwrap();
+            store
+                .write(1000, |tx| {
+                    tx.append(&ont_store::Append {
+                        id: note_id("late"),
+                        scope: Scope::domain(ns(), "board", BTreeMap::new()).unwrap(),
+                        observation: observation(
+                            BTreeMap::from([("text".into(), text("concurrent"))]),
+                            2000,
+                        ),
+                    })?;
+                    ready.send(()).unwrap();
+                    Ok(())
+                })
+                .unwrap();
+        }));
+        receiver
+            .recv_timeout(std::time::Duration::from_secs(2))
+            .unwrap();
+    });
+    let (code, answer) = t.render("snap", json!({}));
+    assert_eq!(code, 0, "{answer}");
+    writer.lock().unwrap().take().unwrap().join().unwrap();
+    assert_eq!(
+        answer["markdown"],
+        "<!-- ont:render snap schema=board@1 -->\n## Items\n| Key | Rank |\n| --- | --- |\n| k1001 | 1 |\n| k1000 | 2 |\n| (+1000 more; limit 2) |  |\n\n## Notes\n- (none)\n<!-- /ont:render -->"
+    );
+    assert_eq!(
+        (answer["rows"].clone(), answer["truncated"].clone()),
+        (json!(2), json!(true))
+    );
+    let (code, next) = t.render("snap", json!({}));
+    assert_eq!(code, 0, "{next}");
+    assert!(
+        next["markdown"]
+            .as_str()
+            .unwrap()
+            .ends_with("## Notes\n- late: concurrent\n<!-- /ont:render -->"),
+        "{next}"
+    );
+}
+
+#[test]
+fn document_blocks_share_the_candidate_bound() {
+    // spec: specs/ont/render.md#R57
+    let t = Temp::new();
+    let mut s = document_schema();
+    s["views"]["notes"] = json!({"object_type":"note","order":[{"property":"$key","direction":"asc"}],
+        "columns":[{"header":"Key","property":"$key"}]});
+    s["views"]["both"] = json!({"blocks":[
+        {"heading":"Items","table":{"object_type":"item","order":[{"property":"$key","direction":"asc"}],
+            "columns":[{"header":"Key","property":"$key"}]}},
+        {"heading":"Notes","list":{"object_type":"note","order":[{"property":"$key","direction":"asc"}],
+            "properties":["$key"]}}]});
+    s["views"]["items_only"] = json!({"blocks":[
+        {"heading":"Items","table":{"object_type":"item","order":[{"property":"$key","direction":"asc"}],
+            "columns":[{"header":"Key","property":"$key"}]}}]});
+    t.install(s);
+    let mut entries: Vec<_> = (0..5001)
+        .map(|i| {
+            (
+                id(&format!("i{i:05}")),
+                observation(fields("bulk", i), 2000),
+            )
+        })
+        .collect();
+    entries.extend((0..5001).map(|i| {
+        (
+            note_id(&format!("n{i:05}")),
+            observation(BTreeMap::from([("text".into(), text("bulk"))]), 2000),
+        )
+    }));
+    append_all(&t, entries);
+    for view in ["items", "notes", "items_only"] {
+        let (code, answer) = t.render(view, json!({}));
+        assert_eq!(code, 0, "{view}: {answer}");
+        assert_eq!(answer["rows"], 200);
+        assert_eq!(answer["truncated"], true);
+    }
+    let (code, answer) = t.render("both", json!({}));
+    assert_eq!(
+        (code, answer["code"].as_str()),
+        (2, Some("result_too_large"))
+    );
+    assert!(answer.get("markdown").is_none(), "{answer}");
+}
+
+#[test]
+fn document_is_one_generated_block_for_write_and_check() {
+    // spec: specs/ont/render.md#R58
+    let t = overview_store();
+    let (code, answer) = t.render("overview", json!({"title":"equal"}));
+    assert_eq!(code, 0, "{answer}");
+    let mut members: Vec<_> = answer.as_object().unwrap().keys().cloned().collect();
+    members.sort();
+    assert_eq!(
+        members,
+        ["markdown", "rows", "schema", "status", "truncated", "view"]
+    );
+    let original = "before\n<!-- ont:render overview title=equal schema=board@0 -->\nold\n<!-- /ont:render -->\nafter\n";
+    let file = t.file("doc.md", original.as_bytes());
+    let write = || {
+        t.run(
+            &[
+                "render",
+                "--write",
+                &file,
+                "--section",
+                "overview",
+                "--arg",
+                "title=equal",
+                "--preimage-dir",
+                t.0.to_str().unwrap(),
+            ],
+            json!({}),
+        )
+    };
+    let (code, written) = write();
+    assert_eq!(code, 0, "{written}");
+    assert_eq!(
+        (
+            &written["view"],
+            &written["changed"],
+            &written["rows"],
+            &written["status"]
+        ),
+        (&json!("overview"), &json!(true), &json!(4), &json!("ok"))
+    );
+    assert_eq!(
+        std::fs::read_to_string(&file).unwrap(),
+        format!("before\n{OVERVIEW}\nafter\n")
+    );
+    assert_eq!(
+        t.run(
+            &["render", "--check", &file, "--expect-blocks", "1"],
+            json!({})
+        ),
+        (0, json!({"status":"ok","blocks":1,"drift":[]}))
+    );
+    let (code, again) = write();
+    assert_eq!(code, 0, "{again}");
+    assert_eq!(
+        (&again["changed"], &again["preimage"]),
+        (&json!(false), &Value::Null)
+    );
+    // A change in the second document block is drift of the one generated block.
+    let mut store =
+        ont_store::Store::open_schema_existing_writable(&t.0.join("store.sqlite")).unwrap();
+    store
+        .write(1000, |tx| {
+            let access = tx.head_access(&note_id("n2"))?.unwrap();
+            let head = tx.head_after_access(&access)?.unwrap();
+            let mut observation = head.head.observation;
+            observation.supersedes = Some(observation.revision.clone());
+            observation.revision = "r2".into();
+            observation.change = Change::Update;
+            observation.fields = BTreeMap::from([("text".into(), text("changed"))]);
+            tx.append(&ont_store::Append {
+                id: head.id,
+                scope: head.scope,
+                observation,
+            })
+        })
+        .unwrap();
+    drop(store);
+    let (code, answer) = t.run(
+        &["render", "--check", &file, "--expect-blocks", "1"],
+        json!({}),
+    );
+    assert_eq!(
+        (code, answer["code"].as_str()),
+        (2, Some("render_drift")),
+        "{answer}"
+    );
+    assert_eq!(
+        answer["drift"],
+        json!([{"view":"overview","args":{"title":"equal"},"line":2}])
+    );
+    let text = std::fs::read_to_string(&file).unwrap();
+    assert!(text.starts_with("before\n") && text.ends_with("\nafter\n"));
+}

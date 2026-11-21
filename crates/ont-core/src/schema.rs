@@ -74,6 +74,7 @@ pub mod codes {
     pub const INVALID_FUNCTION: &str = "invalid_function";
     pub const INVALID_RULE_TARGET: &str = "invalid_rule_target";
     pub const AMBIGUOUS_RULE_TARGET: &str = "ambiguous_rule_target";
+    pub const INVALID_DOCUMENT: &str = "invalid_document";
     pub const ALL: &[&str] = &[
         INVALID_FORMAT,
         INVALID_VERSION,
@@ -137,6 +138,7 @@ pub mod codes {
         INVALID_FUNCTION,
         INVALID_RULE_TARGET,
         AMBIGUOUS_RULE_TARGET,
+        INVALID_DOCUMENT,
     ];
 }
 /// The violations a schema installed before the rule that raises them may
@@ -1386,10 +1388,270 @@ pub struct ViewColumn {
     pub property: String,
 }
 
+/// One entry of a schema's `views` map: a table view over one object type,
+/// or a document of ordered document blocks (`specs/ont/render.md` R1, R51).
+#[derive(Debug, Clone, PartialEq)]
+pub enum View {
+    Table(ViewDef),
+    Document(DocumentDef),
+}
+impl View {
+    /// The arguments the view's filters may use.
+    pub fn args(&self) -> &[String] {
+        match self {
+            View::Table(v) => &v.args,
+            View::Document(d) => &d.args,
+        }
+    }
+}
+
+/// A document: 1 to 20 document blocks, each a heading and a table or a
+/// list over one object type; the arguments are declared once for all.
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct DocumentDef {
+    pub blocks: Vec<DocumentBlock>,
+    pub args: Vec<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+}
+
+/// One part of a document: `{"heading", "table"}` or `{"heading", "list"}`.
+#[derive(Debug, Clone, PartialEq)]
+pub struct DocumentBlock {
+    pub heading: String,
+    pub body: BlockBody,
+}
+#[derive(Debug, Clone, PartialEq)]
+pub enum BlockBody {
+    Table(BlockTable),
+    List(BlockList),
+}
+impl BlockBody {
+    pub fn object_type(&self) -> &str {
+        match self {
+            BlockBody::Table(t) => &t.object_type,
+            BlockBody::List(l) => &l.object_type,
+        }
+    }
+    pub fn filter(&self) -> Option<&Value> {
+        match self {
+            BlockBody::Table(t) => t.filter.as_ref(),
+            BlockBody::List(l) => l.filter.as_ref(),
+        }
+    }
+}
+
+/// A table of a document block; members as in a table view, without
+/// `args` and `description`.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct BlockTable {
+    pub object_type: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub filter: Option<Value>,
+    pub order: Vec<ViewOrder>,
+    pub columns: Vec<ViewColumn>,
+    #[serde(default = "view_limit")]
+    pub limit: u64,
+}
+
+/// A list of a document block: one line per object, the cell texts of
+/// `properties` joined by `: ` (`specs/ont/render.md` R54).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct BlockList {
+    pub object_type: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub filter: Option<Value>,
+    pub order: Vec<ViewOrder>,
+    pub properties: Vec<String>,
+    #[serde(default = "view_limit")]
+    pub limit: u64,
+}
+
+/// A present member never takes `null` for "absent": the error stays the
+/// one the member's own type gives.
+fn present<'de, D: serde::Deserializer<'de>, T: Deserialize<'de>>(
+    d: D,
+) -> Result<Option<T>, D::Error> {
+    T::deserialize(d).map(Some)
+}
+
+/// Every member either form of a view may hold; `blocks` chooses the form.
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct ViewMembers {
+    #[serde(default, deserialize_with = "present")]
+    object_type: Option<String>,
+    #[serde(default)]
+    filter: Option<Value>,
+    #[serde(default, deserialize_with = "present")]
+    args: Option<Vec<String>>,
+    #[serde(default, deserialize_with = "present")]
+    order: Option<Vec<ViewOrder>>,
+    #[serde(default, deserialize_with = "present")]
+    columns: Option<Vec<ViewColumn>>,
+    #[serde(default, deserialize_with = "present")]
+    limit: Option<u64>,
+    #[serde(default)]
+    description: Option<String>,
+    #[serde(default, deserialize_with = "present")]
+    blocks: Option<Vec<DocumentBlock>>,
+}
+const DOCUMENT_MEMBERS: &[&str] = &["blocks", "args", "description"];
+
+impl<'de> Deserialize<'de> for View {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        use serde::de::Error as _;
+        let m = ViewMembers::deserialize(deserializer)?;
+        let Some(blocks) = m.blocks else {
+            // A table view: the members and the order of missing-member
+            // errors of the derived form.
+            return Ok(View::Table(ViewDef {
+                object_type: m
+                    .object_type
+                    .ok_or_else(|| D::Error::missing_field("object_type"))?,
+                filter: m.filter,
+                args: m.args.unwrap_or_default(),
+                order: m.order.ok_or_else(|| D::Error::missing_field("order"))?,
+                columns: m
+                    .columns
+                    .ok_or_else(|| D::Error::missing_field("columns"))?,
+                limit: m.limit.unwrap_or_else(view_limit),
+                description: m.description,
+            }));
+        };
+        for (member, present) in [
+            ("object_type", m.object_type.is_some()),
+            ("filter", m.filter.is_some()),
+            ("order", m.order.is_some()),
+            ("columns", m.columns.is_some()),
+            ("limit", m.limit.is_some()),
+        ] {
+            if present {
+                return Err(D::Error::unknown_field(member, DOCUMENT_MEMBERS));
+            }
+        }
+        Ok(View::Document(DocumentDef {
+            blocks,
+            args: m.args.unwrap_or_default(),
+            description: m.description,
+        }))
+    }
+}
+impl Serialize for View {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        match self {
+            View::Table(v) => v.serialize(serializer),
+            View::Document(d) => d.serialize(serializer),
+        }
+    }
+}
+
+#[derive(Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+struct BlockMembers {
+    heading: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    table: Option<BlockTable>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    list: Option<BlockList>,
+}
+impl<'de> Deserialize<'de> for DocumentBlock {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        use serde::de::Error as _;
+        let m = BlockMembers::deserialize(deserializer)?;
+        let body = match (m.table, m.list) {
+            (Some(t), None) => BlockBody::Table(t),
+            (None, Some(l)) => BlockBody::List(l),
+            (Some(_), Some(_)) => {
+                return Err(D::Error::unknown_field("list", &["heading", "table"]));
+            }
+            (None, None) => return Err(D::Error::missing_field("table")),
+        };
+        Ok(DocumentBlock {
+            heading: m.heading,
+            body,
+        })
+    }
+}
+impl Serialize for DocumentBlock {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        let (table, list) = match &self.body {
+            BlockBody::Table(t) => (Some(t.clone()), None),
+            BlockBody::List(l) => (None, Some(l.clone())),
+        };
+        BlockMembers {
+            heading: self.heading.clone(),
+            table,
+            list,
+        }
+        .serialize(serializer)
+    }
+}
+
+/// A schema's `views` map. Iterating `&Views` yields the table views only,
+/// each with its one object type; a document has none, so readers that list
+/// views by type (`describe`) do not see it. `get`, `keys` and `all` reach
+/// every entry.
+#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
+#[serde(transparent)]
+pub struct Views(BTreeMap<String, View>);
+type TableEntry<'a> = (&'a String, &'a ViewDef);
+fn table_entry<'a>((name, view): (&'a String, &'a View)) -> Option<TableEntry<'a>> {
+    match view {
+        View::Table(v) => Some((name, v)),
+        View::Document(_) => None,
+    }
+}
+impl Views {
+    pub fn get(&self, name: &str) -> Option<&View> {
+        self.0.get(name)
+    }
+    pub fn contains_key(&self, name: &str) -> bool {
+        self.0.contains_key(name)
+    }
+    /// The names of every entry, table views and documents.
+    pub fn keys(&self) -> impl Iterator<Item = &String> {
+        self.0.keys()
+    }
+    /// Every entry, table views and documents, by name.
+    pub fn all(&self) -> std::collections::btree_map::Iter<'_, String, View> {
+        self.0.iter()
+    }
+    /// The table views, by name.
+    pub fn tables(&self) -> <&Self as IntoIterator>::IntoIter {
+        self.into_iter()
+    }
+    pub fn is_empty(&self) -> bool {
+        self.0.is_empty()
+    }
+    pub fn len(&self) -> usize {
+        self.0.len()
+    }
+}
+impl From<BTreeMap<String, View>> for Views {
+    fn from(map: BTreeMap<String, View>) -> Self {
+        Self(map)
+    }
+}
+impl<'a> IntoIterator for &'a Views {
+    type Item = TableEntry<'a>;
+    type IntoIter = std::iter::FilterMap<
+        std::collections::btree_map::Iter<'a, String, View>,
+        fn((&'a String, &'a View)) -> Option<TableEntry<'a>>,
+    >;
+    fn into_iter(self) -> Self::IntoIter {
+        self.0
+            .iter()
+            .filter_map(table_entry as fn((&'a String, &'a View)) -> Option<TableEntry<'a>>)
+    }
+}
+
 /// Validate the search filter grammar without depending on the CLI crate.
 fn check_view_filter(
     f: &Value,
-    view: &ViewDef,
+    args: &[String],
     schema: &Schema,
     props: &BTreeMap<String, PropertyDef>,
     depth: usize,
@@ -1407,7 +1669,7 @@ fn check_view_filter(
     if matches!(op.as_str(), "all" | "any" | "none") {
         return arg.as_array().is_some_and(|a| {
             a.iter()
-                .all(|f| check_view_filter(f, view, schema, props, depth + 1, leaves))
+                .all(|f| check_view_filter(f, args, schema, props, depth + 1, leaves))
         });
     }
     *leaves += 1;
@@ -1460,7 +1722,7 @@ fn check_view_filter(
     if op == "in" && a[1].as_array().is_none_or(|a| a.len() > 100) {
         return false;
     }
-    if !declared(&a[1], &view.args) {
+    if !declared(&a[1], args) {
         return false;
     }
     fn has_arg(v: &Value) -> bool {
@@ -1486,53 +1748,152 @@ fn check_view_filter(
         valid(&a[1])
     }
 }
+/// The members a table view and a document block share: the selection of
+/// one object type, its order and limit, and what is printed of each object.
+struct Selection<'a> {
+    object_type: &'a str,
+    filter: Option<&'a Value>,
+    order: &'a [ViewOrder],
+    limit: u64,
+    printed: Printed<'a>,
+}
+enum Printed<'a> {
+    Columns(&'a [ViewColumn]),
+    Properties(&'a [String]),
+}
+/// The checks of a table view (R1 to R5) over one selection, with pointers
+/// under `p`; `args` are the arguments its filter may use.
+fn check_selection(
+    schema: &Schema,
+    sel: &Selection<'_>,
+    args: &[String],
+    p: &str,
+    out: &mut Vec<Violation>,
+) {
+    let mut bad = |code, field: &str| out.push(Violation::new(code, format!("{p}{field}")));
+    if !(1..=1000).contains(&sel.limit) {
+        bad(codes::INVALID_SCHEMA, "/limit");
+    }
+    if sel.order.is_empty() {
+        bad(codes::INVALID_SCHEMA, "/order");
+    }
+    match sel.printed {
+        Printed::Columns([]) => bad(codes::INVALID_SCHEMA, "/columns"),
+        Printed::Properties(properties) if !(1..=4).contains(&properties.len()) => {
+            bad(codes::INVALID_DOCUMENT, "/properties")
+        }
+        _ => {}
+    }
+    let Some(ty) = schema.object_types.get(sel.object_type) else {
+        bad(codes::UNKNOWN_TYPE, "/object_type");
+        return;
+    };
+    let printable = |property: &str| {
+        property == "$key" || property == "$observed_at" || ty.properties.contains_key(property)
+    };
+    match sel.printed {
+        Printed::Columns(columns) => {
+            for col in columns {
+                if col.header.contains(['|', '\n', '\r']) {
+                    bad(codes::INVALID_SCHEMA, "/columns");
+                }
+                if !printable(&col.property) {
+                    bad(codes::UNKNOWN_PROPERTY, "/columns");
+                }
+            }
+        }
+        Printed::Properties(properties) => {
+            if properties.iter().any(|p| !printable(p)) {
+                bad(codes::UNKNOWN_PROPERTY, "/properties");
+            }
+        }
+    }
+    for order in sel.order {
+        if order.property != "$key" && !ty.properties.contains_key(&order.property) {
+            bad(codes::UNKNOWN_PROPERTY, "/order");
+        }
+    }
+    if sel
+        .filter
+        .is_some_and(|f| !check_view_filter(f, args, schema, &ty.properties, 0, &mut 0))
+    {
+        bad(codes::INVALID_SCHEMA, "/filter");
+    }
+}
+/// At most this many document blocks in one document (R52).
+pub const DOCUMENT_BLOCKS_MAX: usize = 20;
+/// At most this many bytes in a document block's heading (R52).
+pub const HEADING_BYTES_MAX: usize = 200;
 fn check_views(schema: &Schema) -> Vec<Violation> {
     let mut out = Vec::new();
-    for (name, view) in &schema.views {
+    for (name, view) in schema.views.all() {
         let p = format!("/views/{}", esc(name));
-        let mut bad = |code, field: &str| out.push(Violation::new(code, format!("{p}{field}")));
         if !valid_name(name) {
-            bad(codes::INVALID_NAME, "");
+            out.push(Violation::new(codes::INVALID_NAME, p.clone()));
         }
         let mut args = BTreeSet::new();
-        if view.args.iter().any(|a| !valid_name(a) || !args.insert(a)) {
-            bad(codes::INVALID_SCHEMA, "/args");
-        }
-        if !(1..=1000).contains(&view.limit) {
-            bad(codes::INVALID_SCHEMA, "/limit");
-        }
-        if view.order.is_empty() {
-            bad(codes::INVALID_SCHEMA, "/order");
-        }
-        if view.columns.is_empty() {
-            bad(codes::INVALID_SCHEMA, "/columns");
-        }
-        let Some(ty) = schema.object_types.get(&view.object_type) else {
-            bad(codes::UNKNOWN_TYPE, "/object_type");
-            continue;
-        };
-        for col in &view.columns {
-            if col.header.contains(['|', '\n', '\r']) {
-                bad(codes::INVALID_SCHEMA, "/columns");
-            }
-            if col.property != "$key"
-                && col.property != "$observed_at"
-                && !ty.properties.contains_key(&col.property)
-            {
-                bad(codes::UNKNOWN_PROPERTY, "/columns");
-            }
-        }
-        for order in &view.order {
-            if order.property != "$key" && !ty.properties.contains_key(&order.property) {
-                bad(codes::UNKNOWN_PROPERTY, "/order");
-            }
-        }
         if view
-            .filter
-            .as_ref()
-            .is_some_and(|f| !check_view_filter(f, view, schema, &ty.properties, 0, &mut 0))
+            .args()
+            .iter()
+            .any(|a| !valid_name(a) || !args.insert(a))
         {
-            bad(codes::INVALID_SCHEMA, "/filter");
+            out.push(Violation::new(codes::INVALID_SCHEMA, format!("{p}/args")));
+        }
+        match view {
+            View::Table(v) => {
+                let sel = Selection {
+                    object_type: &v.object_type,
+                    filter: v.filter.as_ref(),
+                    order: &v.order,
+                    limit: v.limit,
+                    printed: Printed::Columns(&v.columns),
+                };
+                check_selection(schema, &sel, &v.args, &p, &mut out);
+            }
+            View::Document(d) => {
+                if !(1..=DOCUMENT_BLOCKS_MAX).contains(&d.blocks.len()) {
+                    out.push(Violation::new(
+                        codes::INVALID_DOCUMENT,
+                        format!("{p}/blocks"),
+                    ));
+                }
+                for (i, block) in d.blocks.iter().enumerate() {
+                    let bp = format!("{p}/blocks/{i}");
+                    let h = &block.heading;
+                    if h.is_empty()
+                        || h.len() > HEADING_BYTES_MAX
+                        || h.chars().any(char::is_control)
+                    {
+                        out.push(Violation::new(
+                            codes::INVALID_DOCUMENT,
+                            format!("{bp}/heading"),
+                        ));
+                    }
+                    let (sel, at) = match &block.body {
+                        BlockBody::Table(t) => (
+                            Selection {
+                                object_type: &t.object_type,
+                                filter: t.filter.as_ref(),
+                                order: &t.order,
+                                limit: t.limit,
+                                printed: Printed::Columns(&t.columns),
+                            },
+                            "table",
+                        ),
+                        BlockBody::List(l) => (
+                            Selection {
+                                object_type: &l.object_type,
+                                filter: l.filter.as_ref(),
+                                order: &l.order,
+                                limit: l.limit,
+                                printed: Printed::Properties(&l.properties),
+                            },
+                            "list",
+                        ),
+                    };
+                    check_selection(schema, &sel, &d.args, &format!("{bp}/{at}"), &mut out);
+                }
+            }
         }
     }
     out
@@ -1541,8 +1902,8 @@ fn check_views(schema: &Schema) -> Vec<Violation> {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Schema {
-    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
-    pub views: BTreeMap<String, ViewDef>,
+    #[serde(default, skip_serializing_if = "Views::is_empty")]
+    pub views: Views,
     pub format: String,
     pub domain: String,
     pub version: u64,

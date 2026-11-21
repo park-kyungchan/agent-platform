@@ -3,7 +3,9 @@ use crate::refusal::{open_store, st};
 use crate::search::{self, Filter, SearchRequest};
 use crate::{Answer, Context, Failure, Refusal};
 use ont_core::Knowledge;
-use ont_core::schema::{PropertyType, Schema, SchemaSet, ViewDef, ViewDirection};
+use ont_core::schema::{
+    BlockBody, PropertyType, Schema, SchemaSet, View, ViewColumn, ViewDirection, ViewOrder,
+};
 use serde::Deserialize;
 use serde_json::{Value, json};
 use std::cmp::Ordering;
@@ -59,7 +61,7 @@ fn opening(req: &RenderRequest, schema: &str) -> String {
 // A reference argument is a native key; only eq admits this shorthand.
 // Materialize the same full Id that search already compares, without a copy
 // of the key in the referenced object's properties.
-fn reference_args(filter: &Value, schema: &Schema, view: &ViewDef, out: &mut Vec<String>) {
+fn reference_args(filter: &Value, schema: &Schema, object_type: &str, out: &mut Vec<String>) {
     if let Some(m) = filter.as_object() {
         for (op, value) in m {
             if op == "eq" {
@@ -72,7 +74,7 @@ fn reference_args(filter: &Value, schema: &Schema, view: &ViewDef, out: &mut Vec
                     )
                     && schema
                         .object_types
-                        .get(&view.object_type)
+                        .get(object_type)
                         .and_then(|t| t.properties.get(property))
                         .is_some_and(|p| matches!(p.ty, PropertyType::Ref(_)))
                 {
@@ -80,7 +82,7 @@ fn reference_args(filter: &Value, schema: &Schema, view: &ViewDef, out: &mut Vec
                 }
             } else if let Some(conditions) = value.as_array() {
                 for condition in conditions {
-                    reference_args(condition, schema, view, out);
+                    reference_args(condition, schema, object_type, out);
                 }
             }
         }
@@ -91,7 +93,7 @@ fn validate_argument(
     name: &str,
     value: &str,
     set: &SchemaSet,
-    view: &ViewDef,
+    object_type: &str,
 ) -> Result<(), Refusal> {
     let Some((op, operand)) = filter.as_object().and_then(|m| m.iter().next()) else {
         return Ok(());
@@ -99,7 +101,7 @@ fn validate_argument(
     if matches!(op.as_str(), "all" | "any" | "none") {
         if let Some(conditions) = operand.as_array() {
             for condition in conditions {
-                validate_argument(condition, name, value, set, view)?;
+                validate_argument(condition, name, value, set, object_type)?;
             }
         }
         return Ok(());
@@ -118,8 +120,7 @@ fn validate_argument(
     {
         return Ok(());
     }
-    let Some((property, properties)) = pair[0].as_str().zip(set.properties(&view.object_type))
-    else {
+    let Some((property, properties)) = pair[0].as_str().zip(set.properties(object_type)) else {
         return Ok(());
     };
     // Schema admission limits placeholders to strings and eq references.
@@ -136,7 +137,7 @@ fn validate_argument(
         .map(|p| (p.clone(), Knowledge::Missing))
         .collect::<BTreeMap<_, _>>();
     fields.insert(property.into(), Knowledge::Value(json!(value)));
-    if set.validate_fields(&view.object_type, &fields).is_err() {
+    if set.validate_fields(object_type, &fields).is_err() {
         return Err(invalid(
             name,
             "argument must satisfy the compared property's value constraints",
@@ -149,7 +150,7 @@ fn substitute_filter(
     filter: &mut Value,
     args: &BTreeMap<String, String>,
     schema: &Schema,
-    view: &ViewDef,
+    object_type: &str,
 ) {
     let Some(map) = filter.as_object_mut() else {
         return;
@@ -158,19 +159,13 @@ fn substitute_filter(
         if matches!(op.as_str(), "all" | "any" | "none") {
             if let Some(conditions) = value.as_array_mut() {
                 for condition in conditions {
-                    substitute_filter(condition, args, schema, view);
+                    substitute_filter(condition, args, schema, object_type);
                 }
             }
         } else if let Some(pair) = value.as_array_mut().filter(|a| a.len() == 2) {
             let reference = pair[0]
                 .as_str()
-                .and_then(|p| {
-                    schema
-                        .object_types
-                        .get(&view.object_type)?
-                        .properties
-                        .get(p)
-                })
+                .and_then(|p| schema.object_types.get(object_type)?.properties.get(p))
                 .and_then(|p| match &p.ty {
                     PropertyType::Ref(r) => Some(r),
                     _ => None,
@@ -231,7 +226,7 @@ fn value_text(v: &Value, ty: Option<&PropertyType>) -> String {
         _ => v.to_string(),
     }
 }
-fn cell(object: &Value, property: &str, schema: &Schema, view: &ViewDef) -> String {
+fn cell(object: &Value, property: &str, schema: &Schema, object_type: &str) -> String {
     if property == "$key" {
         return escape(object["id"]["native_key"].as_str().unwrap_or_default());
     }
@@ -246,7 +241,7 @@ fn cell(object: &Value, property: &str, schema: &Schema, view: &ViewDef) -> Stri
     let raw = if k["kind"] == "value" {
         let ty = schema
             .object_types
-            .get(&view.object_type)
+            .get(object_type)
             .and_then(|t| t.properties.get(property))
             .map(|p| &p.ty);
         let mut text = value_text(&k["value"], ty);
@@ -307,88 +302,77 @@ pub fn render(ctx: &Context, req: &RenderRequest) -> Result<Answer, Failure> {
     let mut store = open_store(&ctx.store, false)?;
     st!(store.read_schema(|tx| read_render(ctx, req, tx)))
 }
-fn read_render(
-    ctx: &Context,
-    req: &RenderRequest,
-    tx: &ont_store::schema_mode::SchemaRead<'_>,
-) -> Result<Answer, Failure> {
-    let set = tx.schema_set();
-    let (schema, view) = set
-        .pins()
-        .keys()
-        .filter_map(|d| set.schema(d))
-        .find_map(|s| s.views.get(&req.view).map(|v| (s, v)))
-        .ok_or_else(|| Refusal::new("unavailable"))?;
-    // Type admission precedes argument checks without scanning extra heads.
-    let principal = crate::principal::Principal::bind(set)?;
-    if !principal
-        .view()
-        .read_types(&schema.domain)
-        .contains(&view.object_type)
-    {
-        return Err(Refusal::new("unavailable").into());
-    }
-    for name in &view.args {
-        if !req.args.contains_key(name) {
-            return Err(invalid(name, "required argument declared by the view").into());
-        }
-    }
-    let mut ref_args = Vec::new();
-    if let Some(filter) = &view.filter {
-        reference_args(filter, schema, view, &mut ref_args);
-    }
-    for (name, value) in &req.args {
-        if ref_args.contains(name) && !safe_value(value) {
-            return Err(Refusal::input(
-                "reference_argument_unrepresentable",
-                &crate::input::pointer("/args", name),
-                "nonempty ASCII letters, digits, or . _ : / -",
-            )
-            .with("argument", json!(name))
-            .into());
-        }
-        if !view.args.contains(name) || !safe_value(value) {
-            return Err(invalid(
-                name,
-                "declared view argument; nonempty ASCII letters, digits, or . _ : / -",
-            )
-            .into());
-        }
-    }
-    if let Some(filter) = &view.filter {
-        for (name, value) in &req.args {
-            validate_argument(filter, name, value, set, view)?;
-        }
-    }
-    let filter = view
-        .filter
-        .clone()
-        .map(|mut f| {
-            substitute_filter(&mut f, &req.args, schema, view);
-            serde_json::from_value::<Filter>(f).map_err(|_| {
-                Refusal::input(
-                    "invalid_request",
-                    "/args",
-                    "substituted view filter must have the search filter form",
-                )
+/// One selection of a view: a table view is one part without a heading; a
+/// document has one part per document block, in the declared order.
+struct Part<'a> {
+    heading: Option<&'a str>,
+    object_type: &'a str,
+    filter: Option<&'a Value>,
+    order: &'a [ViewOrder],
+    limit: u64,
+    body: Body<'a>,
+}
+enum Body<'a> {
+    Table(&'a [ViewColumn]),
+    List(&'a [String]),
+}
+fn parts(view: &View) -> Vec<Part<'_>> {
+    match view {
+        View::Table(v) => vec![Part {
+            heading: None,
+            object_type: &v.object_type,
+            filter: v.filter.as_ref(),
+            order: &v.order,
+            limit: v.limit,
+            body: Body::Table(&v.columns),
+        }],
+        View::Document(d) => d
+            .blocks
+            .iter()
+            .map(|b| match &b.body {
+                BlockBody::Table(t) => Part {
+                    heading: Some(&b.heading),
+                    object_type: &t.object_type,
+                    filter: t.filter.as_ref(),
+                    order: &t.order,
+                    limit: t.limit,
+                    body: Body::Table(&t.columns),
+                },
+                BlockBody::List(l) => Part {
+                    heading: Some(&b.heading),
+                    object_type: &l.object_type,
+                    filter: l.filter.as_ref(),
+                    order: &l.order,
+                    limit: l.limit,
+                    body: Body::List(&l.properties),
+                },
             })
-        })
-        .transpose()?;
+            .collect(),
+    }
+}
+/// The visible objects of one part, read in the caller's snapshot from the
+/// allowance the earlier parts left (`scanned` is shared by the whole render).
+fn read_part(
+    ctx: &Context,
+    object_type: &str,
+    filter: Option<Filter>,
+    scanned: &mut u64,
+    tx: &ont_store::schema_mode::SchemaRead<'_>,
+) -> Result<Vec<Value>, Failure> {
     let mut request = SearchRequest {
         op: None,
-        object_type: view.object_type.clone(),
+        object_type: object_type.to_string(),
         filter,
         limit: Some(1000),
         continuation: None,
     };
     let mut objects = Vec::new();
-    let mut scanned = 0;
     loop {
         let Answer::Enveloped { result, .. } = search::read_search(
             ctx,
             &request,
             1000,
-            crate::search::SCAN_LIMIT - scanned as usize,
+            crate::search::SCAN_LIMIT - *scanned as usize,
             tx,
         )?
         else {
@@ -400,8 +384,8 @@ fn read_render(
         {
             return Err(Refusal::new(ont_core::Error::ObservationTooLarge.code()).into());
         }
-        scanned += result["basis"]["scanned"].as_u64().unwrap_or(0);
-        if scanned > crate::search::SCAN_LIMIT as u64 {
+        *scanned += result["basis"]["scanned"].as_u64().unwrap_or(0);
+        if *scanned > crate::search::SCAN_LIMIT as u64 {
             return Err(Refusal::new("result_too_large").into());
         }
         if let Some(rows) = result["objects"].as_array() {
@@ -416,44 +400,164 @@ fn read_render(
             hook();
         }
     }
-    objects.sort_by(|a, b| {
-        for order in &view.order {
-            let c = compare(
-                order_value(a, &order.property),
-                order_value(b, &order.property),
-            );
-            let c = if order.direction == ViewDirection::Desc {
-                c.reverse()
-            } else {
-                c
-            };
-            if c != Ordering::Equal {
-                return c;
+    Ok(objects)
+}
+fn read_render(
+    ctx: &Context,
+    req: &RenderRequest,
+    tx: &ont_store::schema_mode::SchemaRead<'_>,
+) -> Result<Answer, Failure> {
+    let set = tx.schema_set();
+    let (schema, view) = set
+        .pins()
+        .keys()
+        .filter_map(|d| set.schema(d))
+        .find_map(|s| s.views.get(&req.view).map(|v| (s, v)))
+        .ok_or_else(|| Refusal::new("unavailable"))?;
+    let parts = parts(view);
+    let declared = view.args();
+    // Type admission precedes argument checks without scanning extra heads;
+    // one unreadable part refuses the whole view.
+    let principal = crate::principal::Principal::bind(set)?;
+    let readable = principal.view().read_types(&schema.domain);
+    if parts.iter().any(|p| !readable.contains(p.object_type)) {
+        return Err(Refusal::new("unavailable").into());
+    }
+    for name in declared {
+        if !req.args.contains_key(name) {
+            return Err(invalid(name, "required argument declared by the view").into());
+        }
+    }
+    let mut ref_args = Vec::new();
+    for part in &parts {
+        if let Some(filter) = part.filter {
+            reference_args(filter, schema, part.object_type, &mut ref_args);
+        }
+    }
+    for (name, value) in &req.args {
+        if ref_args.contains(name) && !safe_value(value) {
+            return Err(Refusal::input(
+                "reference_argument_unrepresentable",
+                &crate::input::pointer("/args", name),
+                "nonempty ASCII letters, digits, or . _ : / -",
+            )
+            .with("argument", json!(name))
+            .into());
+        }
+        if !declared.contains(name) || !safe_value(value) {
+            return Err(invalid(
+                name,
+                "declared view argument; nonempty ASCII letters, digits, or . _ : / -",
+            )
+            .into());
+        }
+    }
+    // Ascending argument name, then part order, then the filter's written order.
+    for (name, value) in &req.args {
+        for part in &parts {
+            if let Some(filter) = part.filter {
+                validate_argument(filter, name, value, set, part.object_type)?;
             }
         }
-        compare(&a["id"]["native_key"], &b["id"]["native_key"])
-    });
+    }
+    let mut filters = Vec::with_capacity(parts.len());
+    for part in &parts {
+        filters.push(
+            part.filter
+                .cloned()
+                .map(|mut f| {
+                    substitute_filter(&mut f, &req.args, schema, part.object_type);
+                    serde_json::from_value::<Filter>(f).map_err(|_| {
+                        Refusal::input(
+                            "invalid_request",
+                            "/args",
+                            "substituted view filter must have the search filter form",
+                        )
+                    })
+                })
+                .transpose()?,
+        );
+    }
+    // Every part is read before anything is printed: a refusal of any part
+    // refuses the whole view, and all parts share one allowance.
+    let mut scanned = 0;
+    let mut selected = Vec::with_capacity(parts.len());
+    for (part, filter) in parts.iter().zip(filters) {
+        let mut objects = read_part(ctx, part.object_type, filter, &mut scanned, tx)?;
+        objects.sort_by(|a, b| {
+            for order in part.order {
+                let c = compare(
+                    order_value(a, &order.property),
+                    order_value(b, &order.property),
+                );
+                let c = if order.direction == ViewDirection::Desc {
+                    c.reverse()
+                } else {
+                    c
+                };
+                if c != Ordering::Equal {
+                    return c;
+                }
+            }
+            compare(&a["id"]["native_key"], &b["id"]["native_key"])
+        });
+        selected.push(objects);
+    }
     let schema_id = format!("{}@{}", schema.domain, schema.version);
     let mut markdown = opening(req, &schema_id) + "\n";
-    markdown.push_str(&table_row(view.columns.iter().map(|c| escape(&c.header))));
-    markdown.push_str(&table_row(view.columns.iter().map(|_| "---".into())));
-    let rows = objects.len().min(view.limit as usize);
-    for object in objects.iter().take(rows) {
-        markdown.push_str(&table_row(
-            view.columns
-                .iter()
-                .map(|c| cell(object, &c.property, schema, view)),
-        ));
-    }
-    let truncated = objects.len() > rows;
-    if truncated {
-        markdown.push_str(&table_row((0..view.columns.len()).map(|i| {
-            if i == 0 {
-                format!("(+{} more; limit {})", objects.len() - rows, view.limit)
-            } else {
-                String::new()
+    let mut rows = 0;
+    let mut truncated = false;
+    for (i, (part, objects)) in parts.iter().zip(&selected).enumerate() {
+        if let Some(heading) = part.heading {
+            if i > 0 {
+                markdown.push('\n');
             }
-        })));
+            markdown.push_str("## ");
+            markdown.push_str(&escape(heading));
+            markdown.push('\n');
+        }
+        let shown = objects.len().min(part.limit as usize);
+        let more = (objects.len() > shown)
+            .then(|| format!("(+{} more; limit {})", objects.len() - shown, part.limit));
+        rows += shown;
+        truncated |= more.is_some();
+        let cells = |object: &Value, properties: &mut dyn Iterator<Item = &String>| {
+            properties
+                .map(|p| cell(object, p, schema, part.object_type))
+                .collect::<Vec<_>>()
+        };
+        match part.body {
+            Body::Table(columns) => {
+                markdown.push_str(&table_row(columns.iter().map(|c| escape(&c.header))));
+                markdown.push_str(&table_row(columns.iter().map(|_| "---".into())));
+                for object in objects.iter().take(shown) {
+                    markdown.push_str(&table_row(cells(
+                        object,
+                        &mut columns.iter().map(|c| &c.property),
+                    )));
+                }
+                if let Some(more) = more {
+                    let mut last = vec![String::new(); columns.len()];
+                    if let Some(first) = last.first_mut() {
+                        *first = more;
+                    }
+                    markdown.push_str(&table_row(last));
+                }
+            }
+            Body::List(properties) => {
+                if objects.is_empty() {
+                    markdown.push_str("- (none)\n");
+                }
+                for object in objects.iter().take(shown) {
+                    markdown.push_str("- ");
+                    markdown.push_str(&cells(object, &mut properties.iter()).join(": "));
+                    markdown.push('\n');
+                }
+                if let Some(more) = more {
+                    markdown.push_str(&format!("- {more}\n"));
+                }
+            }
+        }
     }
     markdown.push_str("<!-- /ont:render -->");
     Ok(Answer::Plain(
