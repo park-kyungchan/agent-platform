@@ -75,6 +75,7 @@ pub mod codes {
     pub const INVALID_RULE_TARGET: &str = "invalid_rule_target";
     pub const AMBIGUOUS_RULE_TARGET: &str = "ambiguous_rule_target";
     pub const INVALID_DOCUMENT: &str = "invalid_document";
+    pub const UNKNOWN_FUNCTION: &str = "unknown_function";
     pub const ALL: &[&str] = &[
         INVALID_FORMAT,
         INVALID_VERSION,
@@ -139,6 +140,7 @@ pub mod codes {
         INVALID_RULE_TARGET,
         AMBIGUOUS_RULE_TARGET,
         INVALID_DOCUMENT,
+        UNKNOWN_FUNCTION,
     ];
 }
 /// The violations a schema installed before the rule that raises them may
@@ -1348,6 +1350,13 @@ pub struct SchemaGrant {
     pub derive: Vec<String>,
     #[serde(default)]
     pub actions: Vec<String>,
+    /// The role whose calls the grant is of; without it, a grant of every
+    /// call (`specs/ont/schema-language.md` R28, R29).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub role: Option<String>,
+    /// The functions of the schema the grant lets a call run.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub functions: Vec<String>,
 }
 
 /// A deterministic generated table over one type in this domain.
@@ -2969,6 +2978,18 @@ pub fn check(schema: &Schema, other_domains_types: &BTreeSet<String>) -> Vec<Vio
         for (i, a) in g.actions.iter().enumerate() {
             if !schema.action_types.contains_key(a) {
                 v(codes::UNKNOWN_ACTION, format!("{gp}/actions/{i}"), &mut out);
+            }
+        }
+        if g.role.as_deref().is_some_and(|r| !valid_name(r)) {
+            v(codes::INVALID_NAME, format!("{gp}/role"), &mut out);
+        }
+        for (i, f) in g.functions.iter().enumerate() {
+            if !schema.functions.contains_key(f) {
+                v(
+                    codes::UNKNOWN_FUNCTION,
+                    format!("{gp}/functions/{i}"),
+                    &mut out,
+                );
             }
         }
     }

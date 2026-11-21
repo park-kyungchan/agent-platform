@@ -36,10 +36,16 @@ A function is a question an agent asks instead of reading files. Its body here i
 - R19: `ont mcp` offers the tool `ont_fn`, whose arguments are `{"name", "domain"?, "parameters"?}` (no other member), and which runs the same operation as `ont fn`: its `text` is the subcommand's line for the same request. An answer whose `text` is over the bound of R14 of `specs/ont/mcp.md` comes back as `response_too_large`, as every tool's does.
 - R20: `ont help` and `ont fn --help` list the form `fn NAME` with its standard-input fields.
 
+## Grants
+
+- R21: After the function is found (R5) in a role-checked domain (schema-language.md R30) and before its parameters are checked, `client`, `agent` and `role` (and `session`, when a library caller sets it) are within the bound of action.md R14, else `invalid_request` with the `field` of R14; then the role is resolved (action.md R112) and the call is refused `not_granted` (exit 2) unless a grant that applies (action.md R114) lists the function in `functions`. `role_not_admitted` and `not_granted` carry `function` and `domain` (R13) and start no program. In a domain that is not role-checked every function of a listed domain is callable, as before this requirement, and no roles file is read.
+- R22: Each `role_not_admitted` and `not_granted` of `fn` and `ont_fn` appends one line to `refusals.jsonl` with the append of action.md R95 to R98: the canonical object `{"actor","code","domain","function","outcome":"refused","schema_version","submitted_at"}`, its actor built as `action apply` builds one (the engine's `principal` and `host`, the claimed members), and no `parameters`. No line is appended while the call is read only (`Context::read_only`, R16); the answer never depends on the append; no other refusal of `fn` is recorded.
+
 ## Not included
 
 - The read-plan body of a function (several starting sets, link hops, filters, run by the engine): a later change. A program serves the first functions meanwhile.
-- Grants per function: every function of a listed domain is listed and callable. One MCP tool per function.
+- One MCP tool per function, and a list of functions per role in `describe` (R18 lists every function of a listed domain).
+- `ont log` returning the lines of R22: its reader counts a line without `action_type` in `skipped` (log.md R4).
 - A sandbox against a program that means harm: the program is installed by its domain under a path only its owner writes, and the read-only rule binds `ont` only. A program that calls `ont fn` starts the inner program in a process group of its own, which a kill of the outer group does not reach; the inner call keeps its own time limit while its `ont` lives.
 - Forward only: a store whose latest schema of a domain declares a function cannot be opened by an `ont` older than this change (each open checks the latest schema, and the older one refuses the new members of an entry). Install the new `ont` before such a schema.
 - No function of any domain ships with the engine.

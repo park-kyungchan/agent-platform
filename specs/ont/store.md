@@ -78,3 +78,10 @@ Use only an explicitly task-owned new path for Program projections.
 - R71: `ont backup` follows the normal rotation (newest three kept).
 - R54: `log_action` refuses an entry whose `domain` differs from its schema domain (`action_domain_mismatch`) or whose schema version is not the current pin of that domain in the transaction's set (`action_schema_mismatch`);
 - R55: a duplicate `action_id` is recognised by the unique-constraint extended result code.
+
+## Who can reach a store
+
+- R72: The store file that `ont schema install` creates (schema-language.md R22) and the files the two appends create, `edits.jsonl` (action.md R18) and `refusals.jsonl` (action.md R95), have mode 0600; a store file a consumer creates another way has the mode its creator gave it. A process of an account that is neither their owner nor root cannot open a file of mode 0600, whatever program it runs: the operating system is the boundary against such a process (a stage that runs under an account of its own is one), and the engine's own refusal `principal_not_trusted` is not that boundary.
+- R73: Among callers of one OS account the role is a claim and the grant a guard against error, not a boundary: a caller may claim any role the roles file (action.md R113) admits its principal to, and its account can open the store file without `ont`.
+
+The boundary between hosts is the peer identity that `ont serve` will take from the tailnet; nothing of it exists here.

@@ -11,7 +11,7 @@
 //! `poll` loop in the calling thread. A program over its time or its answer
 //! bound has its process group killed before it is reaped.
 use crate::action::{DeclaredParameter, check_parameter_values};
-use crate::principal::Principal;
+use crate::principal::{Principal, RoleResolver, engine_identity, not_granted, role_checked};
 use crate::refusal::{open_store, st};
 use crate::{Answer, Context, Failure, READ_ONLY_ENV, Refusal, internal};
 use ont_core::schema::FunctionDef;
@@ -126,6 +126,9 @@ fn resolve(ctx: &Context, req: &FnRequest) -> Result<(String, FunctionDef, Value
     let Some(def) = schema.functions.get(&req.name).cloned() else {
         return Err(unknown_function());
     };
+    if role_checked(schema) {
+        admit_function(ctx, &set, schema, &req.name)?;
+    }
     let declared: Vec<DeclaredParameter<'_>> = def
         .parameters
         .iter()
@@ -139,6 +142,46 @@ fn resolve(ctx: &Context, req: &FnRequest) -> Result<(String, FunctionDef, Value
     let supplied = req.parameters.clone().unwrap_or_else(|| json!({}));
     let checked = check_parameter_values(schema, &declared, &supplied, "describe")?;
     Ok((domain, def, json!(checked)))
+}
+
+/// The role and the grant of a function found in a role-checked domain
+/// (`specs/ont/fn.md` R21, R22): the claimed members within their bound,
+/// the role resolved against the roles file for the engine's principal, and
+/// the function listed by a grant that applies. `role_not_admitted` and
+/// `not_granted` carry `function` and `domain` and append one line to
+/// `refusals.jsonl` (not while the call is read only); no program starts.
+fn admit_function(
+    ctx: &Context,
+    set: &ont_core::schema::SchemaSet,
+    schema: &ont_core::schema::Schema,
+    name: &str,
+) -> Result<(), Failure> {
+    crate::action::check_actor_bounds(ctx, &None, &None)?;
+    let identity = engine_identity()?;
+    let roles = RoleResolver::new(&ctx.store, &identity.principal, ctx.role.as_deref());
+    let refusal = match roles.resolve(schema) {
+        Err(refusal) => refusal,
+        Ok(role) => {
+            let principal = Principal::bind_role(set, role)?;
+            if principal.view().functions(&schema.domain).contains(name) {
+                return Ok(());
+            }
+            not_granted()
+        }
+    };
+    if !ctx.read_only {
+        let line = json!({
+            "actor":crate::action::actor_json(ctx, &identity, &None, &None),
+            "code":refusal.code,"domain":schema.domain,"function":name,"outcome":"refused",
+            "schema_version":set.pin(&schema.domain).map(|p| p.version).unwrap_or(0),
+            "submitted_at":ctx.now
+        });
+        crate::log::append_refusal(&ctx.store, &crate::action::canonical_string(&line));
+    }
+    Err(refusal
+        .with("function", json!(name))
+        .with("domain", json!(schema.domain))
+        .into())
 }
 
 fn unknown_function() -> Failure {
