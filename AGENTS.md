@@ -10,7 +10,7 @@ This repository holds the command `ap`, the shared instructions every coding CLI
 
 ## The command `ap`
 
-`ap --help` lists the verbs: `version`, `run`, `gate`, `review`, `unit`, `accept`, `deliver`, `backlog`, `state`, `row`, `request`, `intent`, `status`, `quota`, `work`, `policy`, `watch` and `check`. Each verb is documented in `crates/ap/README.md`; the contracts are in `specs/ap/`. A kept verb's contract is its specification under `specs/ap/`, to which its README section routes. `ap` stays small: it keeps no registry of what Git, GitHub, Herdr or the file system already list, and it is not extended without a named user in a domain's work.
+`ap --help` lists the verbs: `version`, `run`, `gate`, `review`, `unit`, `accept`, `deliver`, `backlog`, `state`, `row`, `request`, `intent`, `status`, `quota`, `work`, `policy`, `watch`, `check` and `route`. Each verb is documented in `crates/ap/README.md`; the contracts are in `specs/ap/`. A kept verb's contract is its specification under `specs/ap/`, to which its README section routes. `ap` stays small: it keeps no registry of what Git, GitHub, Herdr or the file system already list, and it is not extended without a named user in a domain's work.
 
 ## Contracts you can break
 

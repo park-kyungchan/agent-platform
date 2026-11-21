@@ -11,6 +11,7 @@
   {"name": "ontology", "purpose": "The work schema, its rehearsal and the pinned engine revision.", "paths": ["ontology/"], "entry": ["ontology/work.schema.json:1-20", "ontology/rehearsal.sh:1-20", "ontology/README.md:889-900", "ontology/README.md:704-712"], "spec": ["ontology/README.md"], "tests": ["ontology/rehearsal.sh"]},
   {"name": "scripts", "purpose": "The install and backup steps that ap deliver calls, and their tests.", "paths": ["scripts/"], "entry": ["scripts/install-ap.sh:1-20"], "spec": ["specs/ap/deliver.md"], "tests": ["scripts/test-install-ap.sh"]},
   {"name": "specs", "purpose": "The specifications of the ap contracts.", "paths": ["specs/"], "entry": ["specs/ap/unit.md:1-15"], "spec": [], "tests": []},
+  {"name": "route", "purpose": "ap route index, the function route over sections and components, its timer and its evaluation.", "paths": ["crates/ap/src/route.rs", "crates/ap/src/route/", "specs/ap/route.md", "deploy/ap-route.service", "deploy/ap-route.timer", "evals/route/run", "crates/ap/tests/route.rs", "crates/ap/tests/route_engine.rs"], "entry": ["crates/ap/src/route.rs:1-10", "specs/ap/route.md:1-10"], "spec": ["specs/ap/route.md", "ontology/README.md"], "tests": ["crates/ap/tests/route.rs", "crates/ap/tests/route_engine.rs", "ontology/rehearsal.sh"]},
   {"name": "github-config", "purpose": "The continuous-integration workflow and ownership files.", "paths": [".github/"], "entry": [".github/workflows/rust.yml:1-15"], "spec": [], "tests": []}
  ]
 }

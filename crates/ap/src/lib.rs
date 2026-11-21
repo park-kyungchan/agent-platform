@@ -37,3 +37,5 @@ pub mod policy;
 pub mod watch;
 
 pub mod check;
+
+pub mod route;

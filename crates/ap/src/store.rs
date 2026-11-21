@@ -570,6 +570,66 @@ pub fn search_seen(
         }
     }
 }
+/// Every head of `kind` the store answers, page by page (`page` objects a page), and whether every page was
+/// qualified: unlike `search`, a page that is not (a head past its freshness) is read and counted
+/// (`specs/ap/route.md` R17). Each page is one attempt of 1.5 seconds and a `store_busy` answer one more.
+pub fn search_every(
+    s: &mut impl System,
+    store: Option<&str>,
+    kind: &str,
+    page: u64,
+) -> Result<(Vec<Found>, bool), Failure> {
+    let mut q = json!({"object_type": kind, "limit": page});
+    let mut found = vec![];
+    let mut qualified = true;
+    loop {
+        let v = call_in(s, store, &["search"], &q, (1, 1_500))?;
+        let r = &v["result"];
+        qualified &= r["basis"]["qualified"] == true;
+        for o in r["objects"]
+            .as_array()
+            .ok_or_else(|| error("store_answer_unreadable", kind))?
+        {
+            let key = o["id"]["native_key"].as_str();
+            let fields = o["head"]["fields"].as_object();
+            let (Some(key), Some(fields)) = (key, fields) else {
+                return Err(error("store_answer_unreadable", kind));
+            };
+            found.push((key.to_owned(), values(fields)));
+        }
+        match &r["continuation"] {
+            Value::Null => return Ok((found, qualified)),
+            c if c == &q["continuation"] => return Err(error("store_answer_unreadable", kind)),
+            c => q["continuation"] = c.clone(),
+        }
+    }
+}
+/// `ont index` of the named sources (`specs/ap/route.md` R13), bound to `ms`: the engine's answer whether every
+/// source held (`status` `ok`) or one failed (`source_failed`, each source's own `status`, `code` and `cause`);
+/// any other refusal is `store_refused`.
+pub fn index(
+    s: &mut impl System,
+    store: Option<&str>,
+    sources: &[&str],
+    ms: u64,
+) -> Result<Value, Failure> {
+    let mut command = vec!["index"];
+    for source in sources {
+        command.extend(["--source", source]);
+    }
+    let reply = ont_within(s, &json!({ "store": store }), &command, &Value::Null, ms)?;
+    let v: Value = serde_json::from_slice(&reply.bytes)
+        .map_err(|_| error("store_answer_unreadable", "index"))?;
+    let answered = (v["status"] == "ok" || v["status"] == "source_failed")
+        && v["result"]["sources"].is_array();
+    if answered {
+        return Ok(v);
+    }
+    if v["status"] == "refused" && v["code"].is_string() {
+        return Err(fail(REFUSED, "index", v));
+    }
+    Err(error("store_answer_unreadable", "index"))
+}
 /// The keys of the criteria added to the intent `key`, oldest first, as the engine's log of the action
 /// `add_criterion` gives them (newest first; `added_at` is only to the second, so it cannot order the
 /// criteria of one call). Every page is read; a criterion the log does not hold (a scan the engine

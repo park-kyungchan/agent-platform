@@ -16,6 +16,7 @@ The contract of each kept verb is its specification under `specs/ap/`; its secti
 | `policy` | `ap policy check [<file>]` | `specs/ap/policy.md` R12 to R16 |
 | `watch` | `ap watch [--record-login --totp-file <path> [--replace]]` | `specs/ap/watch.md` |
 | `check` | `ap check <dir> [--timeout <seconds>] [-- <command> [<arg>...]]` | `specs/ap/check.md` |
+| `route` | `ap route index [--directory <dir>] [--store <path>] [--prune] [--repository <owner/name>]... [--instructions <dir>]`; `ap` with no argument as the function `route` | `specs/ap/route.md` |
 | `gate` | `ap gate < request.json` | section "The gate" |
 | `review` | `ap review <start\|close\|revoke> < request.json` | section "One review" |
 | `unit` (a page or a request) | `ap unit < request.json`, `ap unit [--compose-only] <page>` | sections "One unit", "The page's block", "One case" |
@@ -343,6 +344,10 @@ What it does not print: the installed revisions (`deploy/README.md`, "Read the s
 ### The engine and the schema
 
 `specs/ap/deliver.md` R37 to R46; the contract of `ontology/migrate` is in its Interface, and what a Lead does with `engine` is in its part "What a Lead does after each end".
+
+## Routes
+
+`ap route index [--directory <dir>] [--store <path>] [--prune] [--repository <owner/name>]... [--instructions <dir>]`, and `ap` with no argument and `ONT_FN_NAME=route`, the program of the store's function `route` (`ont fn route`): `specs/ap/route.md`. The objects `section` and `component` and the function are those of schema version 14 (`ontology/README.md`, "Version 14: routes"); the timer, its install and the undo are in `deploy/README.md`, "Routes"; the evaluation of the answers is `evals/route/run` (`evals/README.md`, "The route suite").
 
 ## The policy check
 

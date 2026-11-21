@@ -839,8 +839,9 @@ python3 -I -B "$repo/ontology/memory-index-walk.py" "$ont_binary" "$rehearsal_ro
 # Version 10 on a second store: the user's rows of version 9 carried by ontology/migrate, then the walk of the
 # requests, intents and criteria, on version 10 pinned in Git. Then version 11, pinned in Git, over the objects
 # made under version 10, and the walk of the units, runs and findings. Then version 12, pinned in Git, over the
-# objects made under version 11, and the walk of the page digest. Then version 13, the repository's file, over the
-# objects made under version 12, and the walk of the principles.
+# objects made under version 11, and the walk of the page digest. Then version 13, pinned in Git, over the objects
+# made under version 12, and the walk of the principles. Then version 14, the repository's file, over the objects made
+# under version 13, and the walk of the two record sources of the routes.
 mkdir -- "$rehearsal_root/v10"
 python3 - "$ont_binary" "$repo" "$rehearsal_root/v10/store.sqlite" "$work_root/" "$rehearsal_root/copies" "$rehearsal_root/lib" <<'PY'
 import datetime, hashlib, json, os, pathlib, subprocess, sys
@@ -941,7 +942,7 @@ apply('triage_decision', 'v9-after-carry', dict(decision=third, triage='none', r
 unchanged = fingerprint()
 assert migrate(9, 10) == dict(carried=0, already=3)
 assert fingerprint() == unchanged and fields(third_request)['route_reason'] == 'carried from version 9'
-for before, after in [(9, 14), (10, 10), (10, 9)]:
+for before, after in [(9, 15), (10, 10), (10, 9)]:
     assert migrate(before, after, 2) == dict(status='unknown_pair')
 assert fingerprint() == unchanged
 assert migrate(9, 10) == dict(carried=0, already=3)
@@ -1520,8 +1521,9 @@ refused = call(['log'], dict(outcome='refused', action_type='ready_unit', parame
 assert any(r.get('failed') == ['page_not_reviewed'] and r['parameters']['unit'] == digested and r['parameters'].get('page_digest') == digest('another page') for r in refused), refused
 print('v12_gate_rows_complete')
 
-# Version 13: the repository's file over the objects made under version 12. Every object type, link type, action,
-# view, value type and source of version 12 reads the same, but the optional property principles of intent.
+# Version 13, pinned in Git by the commit of main that holds it, over the objects made under version 12. Every object
+# type, link type, action, view, value type and source of version 12 reads the same, but the optional property
+# principles of intent.
 v12_objects = [o['id'] for t in ('task', 'decision', 'request', 'intent', 'criterion', 'unit', 'review', 'run', 'finding', 'hold')
                for o in call(['search'], dict(object_type=t, limit=1000))['objects']]
 v12_before = [obj(i) for i in v12_objects]
@@ -1529,7 +1531,8 @@ v12_views = [(view, args, call(['render'], dict(view=view, args=args))) for view
     ('intents_open', {}), ('criteria_of_intent', dict(intent='gadget-board')), ('requests_unrouted', {}), ('units_of_intent', dict(intent='gadget-board')),
     ('units_live', {}), ('reviews_of_unit', dict(unit='fixture-digest')), ('reviews_of_unit', dict(unit='fixture-effect-12')),
     ('runs_of_unit', dict(unit='fixture-stopped')), ('findings_open', {}), ('holds_on_work', {})]]
-schema = json.loads(pathlib.Path(repo, 'ontology/work.schema.json').read_text())
+V13_PIN = ('4338bf4b9369c55dd0180f91ca39f430fac178d6', 'fdbb0f838035b28c41b81cc08ddacd6ea2e69480156dbe58fafa9409792b825c')
+schema = json.loads(subprocess.check_output(['git', '-C', repo, 'show', V13_PIN[0] + ':ontology/work.schema.json'], timeout=10))
 assert schema['version'] == 13
 head = json.loads(json.dumps(schema))
 assert head['object_types']['intent']['properties'].pop('principles') == {'type': {'array': {'ref': 'principle'}}, 'required': False, 'description': 'The principles the intent obeys; set whole by set_intent_principles.'}
@@ -1540,7 +1543,7 @@ assert sorted(set(schema['link_types']) - set(v12_schema['link_types'])) == ['in
 assert sorted(set(schema['action_types']) - set(v12_schema['action_types'])) == ['amend_principle', 'record_principle', 'retire_principle', 'set_intent_principles']
 assert sorted(set(schema['views']) - set(v12_schema['views'])) == ['principles'] and sorted(set(schema['value_types']) - set(v12_schema['value_types'])) == ['principle_status']
 print('gate_row=v13-only-principles-added expected=admitted actions=' + str(len(schema['action_types'])))
-call(['schema', 'install', str(redirected(pathlib.Path(repo, 'ontology/work.schema.json'), 'repository.json'))])
+assert install(*V13_PIN) == schema
 redirect.trace(work, copies)
 assert [obj(i) for i in v12_objects] == v12_before
 for view, args, before in v12_views:
@@ -1557,7 +1560,6 @@ unchanged = fingerprint()
 assert migrate(12, 13) == dict(carried=0, already=0)
 assert migrate(11, 13) == dict(carried=0, already=0)
 assert migrate(9, 13) == dict(carried=0, already=3)
-assert migrate(13, 14, 2) == dict(status='unknown_pair')
 assert fingerprint() == unchanged and [obj(i) for i in v12_objects] == v12_before
 print('v13_migration_rows_complete')
 phase = 'v13'
@@ -1631,4 +1633,116 @@ apply('amend_principle', 'retired-parent', dict(principle=pillar, parent=want), 
 view = call(['render'], dict(view='principles', args={})); assert view['rows'] == 1 and 'fixture-want' not in view['markdown'] and 'fixture-pillar' in view['markdown'], view
 print('v13_gate_rows_complete')
 print('v13 principles: ok')
+
+# Version 14: the repository's file over the objects made under version 13. Every value type, link type, action, view
+# and source of version 13 reads the same; the two object types and sources of the routes, the function route and
+# two types in the grant's read are added.
+v13_schema = schema
+v13_objects = [o['id'] for t in ('task', 'decision', 'request', 'intent', 'criterion', 'unit', 'review', 'run', 'finding', 'hold', 'principle')
+               for o in call(['search'], dict(object_type=t, limit=1000))['objects']]
+v13_before = [obj(i) for i in v13_objects]
+v13_views = [(view, args, call(['render'], dict(view=view, args=args))) for view, args in [
+    ('intents_open', {}), ('criteria_of_intent', dict(intent='gadget-board')), ('requests_unrouted', {}), ('units_of_intent', dict(intent='gadget-board')),
+    ('units_live', {}), ('reviews_of_unit', dict(unit='fixture-digest')), ('runs_of_unit', dict(unit='fixture-stopped')), ('findings_open', {}),
+    ('holds_on_work', {}), ('principles', {})]]
+schema = json.loads(pathlib.Path(repo, 'ontology/work.schema.json').read_text())
+assert schema['version'] == 14
+for kind in ('object_types', 'link_types', 'action_types', 'views', 'value_types', 'sources'):
+    assert all(schema[kind].get(name) == body for name, body in v13_schema[kind].items()), kind
+assert sorted(set(schema['object_types']) - set(v13_schema['object_types'])) == ['component', 'section']
+assert sorted(set(schema['sources']) - set(v13_schema['sources'])) == ['components', 'sections']
+for kind in ('link_types', 'action_types', 'views', 'value_types'):
+    assert sorted(schema[kind]) == sorted(v13_schema[kind]), kind
+assert v13_schema['functions'] == {} and sorted(schema['functions']) == ['route']
+route_fn = schema['functions']['route']
+assert route_fn['program'] == '/usr/local/bin/ap' and route_fn['timeout_ms'] == 2000 and route_fn['answer_bytes'] == 65536
+assert {n: (p['type'], p['required']) for n, p in route_fn['parameters'].items()} == dict(words=('string', True), limit=('integer', False))
+for name in ('sections', 'components'):
+    source = schema['sources'][name]
+    assert source['kind'] == 'records' and source['complete_listing'] is True and source['fresh_for_s'] == 3600 and source['time_member'] == 'observed_at'
+    assert source['glob'] == '/var/lib/agent-platform/route/*.' + name + '.jsonl'
+[grant], [grant13] = schema['grants'], v13_schema['grants']
+assert grant['read'] == grant13['read'] + ['section', 'component'] and {k: v for k, v in grant.items() if k != 'read'} == {k: v for k, v in grant13.items() if k != 'read'}
+assert {k: v for k, v in schema.items() if k not in ('version', 'object_types', 'sources', 'functions', 'grants')} == {k: v for k, v in v13_schema.items() if k not in ('version', 'object_types', 'sources', 'functions', 'grants')}
+print('gate_row=v14-only-routes-added expected=admitted sources=' + str(len(schema['sources'])))
+# The record sources read a directory of the rehearsal's own root instead of the host's route directory.
+route_dir = pathlib.Path(store).parent / 'route'
+HOST_ROUTE = '/var/lib/agent-platform/route/'
+copy_path, copy = redirect.make(pathlib.Path(repo, 'ontology/work.schema.json'), work, copies, 'repository.json')
+for name in ('sections', 'components'):
+    assert copy['sources'][name]['glob'].startswith(HOST_ROUTE)
+    copy['sources'][name]['glob'] = str(route_dir) + '/' + copy['sources'][name]['glob'][len(HOST_ROUTE):]
+assert HOST_ROUTE not in json.dumps(copy['sources'])
+routed = pathlib.Path(store).with_name('repository-route.json'); routed.write_text(json.dumps(copy))
+call(['schema', 'install', str(routed)])
+redirect.trace(work, copies)
+assert [obj(i) for i in v13_objects] == v13_before
+for view, args, before in v13_views:
+    answer = call(['render'], dict(view=view, args=args))
+    assert answer['rows'] == before['rows'] and answer['markdown'] == before['markdown'].replace('schema=work@13', 'schema=work@14'), view
+print('gate_row=v14-v13-objects-and-views-unchanged expected=admitted objects=' + str(len(v13_objects)) + ' views=' + str(len(v13_views)))
+sizes = []
+for name in ('ont_describe', 'ont_action_list'):
+    wire = subprocess.run([binary, '--store', store, 'mcp'], input=json.dumps(dict(jsonrpc='2.0', id=1, method='tools/call', params=dict(name=name, arguments={}))) + '\n', text=True, capture_output=True, timeout=60)
+    answer = json.loads(wire.stdout.splitlines()[0])['result']; assert wire.returncode == 0 and not answer['isError'], answer
+    sizes.append(len(answer['content'][0]['text'].encode())); assert sizes[-1] <= 262144, (name, sizes[-1])
+print('v14_mcp_bytes=' + ','.join(map(str, sizes)), file=sys.stderr)
+described = call(['describe'], {})
+[listed] = [f for f in described['functions'] if f['name'] == 'route']
+assert listed['domain'] == 'work' and 'program' not in listed and sorted(p['name'] for p in listed['parameters']) == ['limit', 'words']
+unchanged = fingerprint()
+assert migrate(13, 14) == dict(carried=0, already=0)
+assert migrate(12, 14) == dict(carried=0, already=0)
+assert migrate(9, 14) == dict(carried=0, already=3)
+assert migrate(14, 15, 2) == dict(status='unknown_pair')
+assert fingerprint() == unchanged and [obj(i) for i in v13_objects] == v13_before
+print('v14_migration_rows_complete')
+# The walk of the two record sources. A source that fails appends nothing.
+def index(code=0):
+    p = subprocess.run([binary, '--store', store, '--now', str(now), 'index', '--source', 'sections', '--source', 'components'], text=True, capture_output=True, timeout=60)
+    assert p.returncode == code, (p.returncode, p.stdout, p.stderr)
+    return {s['source']: s for s in json.loads(p.stdout)['result']['sources']}
+def heads(kind): return {o['id']['native_key']: {k: v.get('value') for k, v in o['head']['fields'].items()} for o in call(['search'], dict(object_type=kind, limit=1000))['objects']}
+def lines(name, records): (route_dir / name).write_text(''.join(json.dumps(r) + '\n' for r in records))
+def digest(text): return hashlib.sha256(text.encode()).hexdigest()
+assert not route_dir.exists()
+answer = index(2)
+assert {n: (s['status'], s['code']) for n, s in answer.items()} == dict(sections=('source_failed', 'glob_root_missing'), components=('source_failed', 'glob_root_missing')), answer
+route_dir.mkdir()
+tick(); seen = now - 1
+section_a = dict(type='section', key=digest('a'), observed_at=seen, repository='fixture/repo', path='README.md', heading='Fixture > Use', first_line=3, last_line=9, commit='1' * 40, digest=digest('readme'), text='Use the invented widget.')
+section_b = dict(type='section', key=digest('b'), observed_at=seen, path=str(route_dir / 'AGENTS.md'), heading='AGENTS.md', first_line=1, last_line=2, digest=digest('agents'), text='')
+component = dict(type='component', key=digest('c'), observed_at=seen, repository='fixture/repo', name='widget', purpose='The invented widget.', paths=['src/'], entry=['src/main.rs:1-10'], spec=[], tests=['tests/widget.rs'], commit='2' * 40)
+lines('fixture--repo.sections.jsonl', [section_a]); lines('instructions.sections.jsonl', [section_b]); lines('fixture--repo.components.jsonl', [component])
+answer = index()
+assert (answer['sections']['appended']['initial'], answer['components']['appended']['initial']) == (2, 1), answer
+found = heads('section')
+assert found[digest('a')] == {k: v for k, v in section_a.items() if k not in ('type', 'key', 'observed_at')}, found
+assert found[digest('b')] == dict({k: v for k, v in section_b.items() if k not in ('type', 'key', 'observed_at')}, repository=None, commit=None), found
+assert heads('component') == {digest('c'): {k: v for k, v in component.items() if k not in ('type', 'key', 'observed_at')}}
+print('gate_row=v14-records-indexed expected=admitted sections=2 components=1')
+answer = index()
+assert sum(answer['sections']['appended'].values()) == 0 and answer['sections']['unchanged'] == 2, answer
+tick(); lines('fixture--repo.sections.jsonl', [dict(section_a, observed_at=now - 1, text='Use the invented gadget.')])
+answer = index()
+assert answer['sections']['appended']['update'] == 1 and heads('section')[digest('a')]['text'] == 'Use the invented gadget.', answer
+# A line of the other type, and a text over 4,000 bytes, fail the source; the heads stay as they were.
+before = heads('section')
+lines('wrong.sections.jsonl', [dict(component, key=digest('w'))])
+assert index(2)['sections']['code'] == 'record_type_mismatch'
+lines('wrong.sections.jsonl', [dict(section_a, key=digest('w'), text='x' * 4001)])
+assert index(2)['sections']['code'] == 'schema_violation:value_constraint_violation'
+(route_dir / 'wrong.sections.jsonl').unlink()
+assert heads('section') == before
+print('gate_row=v14-records-refused expected=record_type_mismatch,value_constraint_violation')
+# The complete listing: a file removed retracts its sections; an empty directory retracts every one.
+(route_dir / 'instructions.sections.jsonl').unlink()
+answer = index()
+assert answer['sections']['appended']['retraction'] == 1 and sorted(heads('section')) == [digest('a')], answer
+for f in route_dir.iterdir(): f.unlink()
+answer = index()
+assert (answer['sections']['appended']['retraction'], answer['components']['appended']['retraction']) == (1, 1) and heads('section') == {} and heads('component') == {}, answer
+print('gate_row=v14-records-retracted expected=admitted')
+print('v14_gate_rows_complete')
+print('v14 routes: ok')
 PY

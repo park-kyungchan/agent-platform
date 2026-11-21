@@ -75,6 +75,17 @@ if [ "${CI:-}" = true ] && [ "$(id -u)" != 0 ]; then
 else
   bash ontology/rehearsal.sh "$ont_bin" > /dev/null
 fi
+# The tests of `ap route` that run the real engine (crates/ap/tests/route_engine.rs, ignored by the cargo test
+# above): the test binary is built once and run with --ignored and the engine of $ont_bin; in CI through sudo
+# (the engine admits only uid 0; a bare `sudo cargo test` can lose rustup's toolchain). Each test copies the
+# built ap to a file of mode 0755 of its own temporary directory, owned by the user it runs as.
+route_tests=$(cargo test --locked -p ap --test route_engine --no-run --message-format=json \
+  | python3 -I -B -c 'import json, sys; print(next(m["executable"] for m in map(json.loads, sys.stdin) if m.get("reason") == "compiler-artifact" and m.get("executable") and m["target"]["name"] == "route_engine"))')
+if [ "${CI:-}" = true ] && [ "$(id -u)" != 0 ]; then
+  sudo env "PATH=$PATH" "ONT_BIN=$ont_bin" "$route_tests" --ignored --test-threads=1 --quiet
+else
+  ONT_BIN="$ont_bin" "$route_tests" --ignored --test-threads=1 --quiet
+fi
 # The tests of evals/lesson/replay and of evals/intake/run build their stores with that engine (which also admits only uid 0).
 if [ "${CI:-}" = true ] && [ "$(id -u)" != 0 ]; then
   sudo env "ONT_BIN=$ont_bin" python3 -I -B -m unittest discover -s ci -p 'test_lesson_replay.py'
