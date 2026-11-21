@@ -259,6 +259,39 @@ rm -f /etc/systemd/system/ap-work.service /etc/systemd/system/ap-work.timer
 systemctl daemon-reload
 ```
 
+## Routes
+
+`ap route index` (`specs/ap/route.md`) writes one record per heading of each `*.md` file at `origin/main` of agent-platform, ontology-platform and agent-vps-operations (after `git fetch origin main` in each clone the policy's `repositories` names; no checkout is read or changed) and of the installed shared instructions under `/root/.agents`, and one per component of each repository's `map.json`, into `/var/lib/agent-platform/route`, which the store's sources `sections` and `components` read (schema version 14), and indexes the two sources. `ont fn route` answers from them. `ap-route.service` (`Type=oneshot`, run of `/usr/local/bin/ap route index --prune` with the three repositories and `--instructions /root/.agents`, in `agents.slice`, `Nice=10`) is one run; `ap-route.timer` starts it every ten minutes (`OnCalendar=*:0/10`, `Persistent=true`). With `--prune`, the files of a repository the service no longer names are removed and their sections retracted. A fetch that fails (also on Git's ref lock while `ap deliver` or `ap unit ready` fetches the same clone) keeps that repository's previous file until the next run; the other way round, their fetch can fail on this run's lock for the seconds it holds it, and they recover on their next run. The education repositories are never named: the command refuses an `education-` name.
+
+Install, from a clean checkout of the merged commit, as root, once the engine and the schema of version 14 are installed (`ap deliver`):
+
+```sh
+install -m 0644 deploy/ap-route.service deploy/ap-route.timer /etc/systemd/system/
+systemctl daemon-reload
+systemd-analyze verify /etc/systemd/system/ap-route.service /etc/systemd/system/ap-route.timer
+systemctl enable --now ap-route.timer
+systemctl start ap-route.service                      # the first run now, not at the next tenth minute
+```
+
+Read the state:
+
+```sh
+systemctl list-timers ap-route.timer
+journalctl -u ap-route.service -n 1 -o cat            # one line per run: records, appended, renewed, retracted, kept, removed
+printf '{"parameters":{"words":"how a schema version is installed"}}' | ont fn route
+```
+
+A run that exits 3 (an index that did not hold, a file it could not write) fails the service; the files and the store's objects stay as the last run that held left them, and the function answers `"stale": true` once they are older than an hour.
+
+Undo: disable the timer, wait until a run that is going on has ended, remove the two files. The sections stay in the store, stale after an hour; to retract them, remove the files of `/var/lib/agent-platform/route` and run `ont index --source sections --source components` once.
+
+```sh
+systemctl disable --now ap-route.timer
+systemctl is-active ap-route.service                  # until it answers inactive or failed, not activating
+rm -f /etc/systemd/system/ap-route.service /etc/systemd/system/ap-route.timer
+systemctl daemon-reload
+```
+
 ## The watch
 
 `ap watch` (`specs/ap/watch.md`) is one pass: under the lock `pass.lock` of `/var/lib/agent-platform/watch/` the nine detectors read the host, and the pass opens, sees again, reopens and closes findings of the store whose detector is `watch:<name>`; it writes nothing else but its `state.json`, and it stops, starts, restarts and kills nothing:

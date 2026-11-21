@@ -1272,4 +1272,83 @@ open one, from which `ont around` by `intent_principles` reaches the principles 
 `requests_empty` and `parent_not_current`, and applied with all members and with one; `retire_principle` is
 applied, then refused `principle_not_current` as an amendment and a second retirement are, and a retired
 principle as a `parent` is refused `parent_not_current`; the view then holds the pillar only. The last line of
-standard output of the rehearsal is `v13 principles: ok`.
+standard output of the rehearsal's walk of version 13 is `v13 principles: ok`.
+
+Version 13 stays pinned as stated at the head of section "Version 14: routes"; the migration and the rehearsal as they stand now are described in section "Version 14: routes", "The migration and the rehearsal".
+
+## Version 14: routes
+Version 13 remains pinned at
+`4338bf4b9369c55dd0180f91ca39f430fac178d6:ontology/work.schema.json`,
+sha256 `fdbb0f838035b28c41b81cc08ddacd6ea2e69480156dbe58fafa9409792b825c`.
+Version 14 only adds to version 13. Every value type, link type, action type, view and source of version 13 reads
+the same in canonical JSON; two object types and their two sources, the function `route` and the two types in the
+grant's `read` are added.
+
+The routes answer where a fact lives, so a reader asks once instead of reading files. `ap route index`
+(`specs/ap/route.md`) writes the records, on the timer `ap-route.timer` every ten minutes (`deploy/README.md`,
+"Routes"); `ont fn route` answers from the current objects.
+
+### `section`: one heading of a Markdown file
+One object per heading of each `*.md` file at `origin/main` of agent-platform, ontology-platform and
+agent-vps-operations, and of the installed shared instructions under `/root/.agents`, with the text above a file's
+first heading (or a whole file without a heading) as one more. The Academy's repositories are not indexed. Keyed by
+the hex SHA-256 of the repository (or `instructions`), the path, the heading path and the ordinal among equal heading
+paths of the file, so a key stays when lines move; titled by `heading`.
+
+| Property | Type | Meaning |
+| --- | --- | --- |
+| `repository` | string, optional | `owner/name`; none for the instructions |
+| `path` | string | the path in the repository, or the absolute path of an installed instruction file |
+| `heading` | string | the heading path, parent headings joined by ` > `; the file's name for the text above the first heading |
+| `first_line`, `last_line` | integer | the heading line, and the line before the next heading of the same or a higher level |
+| `commit` | string, optional | the last commit at `origin/main` that changed the file; none for the instructions |
+| `digest` | string | SHA-256 of the file's bytes when it was indexed |
+| `text` | string, 4,000 | the words of the section's lines, each run of white space one space |
+
+### `component`: one component of a repository's map
+One object per component of each repository's `map.json` at `origin/main`, keyed by the hex SHA-256 of the
+repository, `map.json` and the name; titled by `name`. Properties `repository`, `name`, `purpose`, `paths`, `entry`,
+`spec`, `tests` (each an array of strings) and `commit`, the last commit that changed `map.json`.
+
+### Sources, the grant and the function
+The sources `sections` and `components` are of kind `records` (`specs/ont/index.md` R14 to R29 of the engine):
+every line of `/var/lib/agent-platform/route/*.sections.jsonl` and `*.components.jsonl` is one record, its time the
+member `observed_at` (the producer's run time), its type the member `type`; `complete_listing` is set, so a section
+whose file or heading is gone is retracted, and `fresh_for_s` is 3600. Each source is owned by its one type. The
+grant of the domain reads `section` and `component`; they are source-owned, so it derives neither.
+
+The function `route` (`specs/ont/fn.md` R1 of the engine) has the parameters `words` (string, required) and `limit`
+(integer, optional), the program `/usr/local/bin/ap`, `timeout_ms` 2000 and `answer_bytes` 65536. Its answer is
+`specs/ap/route.md` R15 to R21.
+
+### What the store does not check
+- That a record's lines and text are those of the file at the commit it names: the engine reads the records as the
+  producer wrote them. A repository whose fetch fails keeps its earlier records, which turn stale after an hour.
+- That `limit` is from 1 to 20: the parameter is an integer; the program refuses another value (`function_failed`
+  to the caller).
+- That `repository` and `commit` are absent exactly for the instructions, and that a component's arrays hold paths.
+- That the program at `/usr/local/bin/ap` answers the function: an `ap` older than this change refuses an empty
+  argument list, and the call is `function_failed`.
+
+### The migration and the rehearsal
+`ontology/migrate` knows version 14; its step is empty (no data migration), so a store at version 13 carries on with
+`ontology/migrate` 13 14 changing nothing. The line `HIGHEST = 14` names it; `14 15` and `9 15` are pairs it does not
+know (exit 2). The pairs refused on the version 10 part of the rehearsal are (9, 15), (10, 10) and (10, 9). The
+engine at `ontology/ENGINE-PIN` must know functions and the kind `records` before this schema is installed: an older
+engine refuses it.
+
+The second store of the rehearsal installs version 13 from Git by its commit and digest (above) instead of the
+repository's file, and runs the walk of version 13 on it. Then it installs the repository's file over the objects
+made under version 13, with the globs of the two sources rewritten to a directory of the rehearsal's own root:
+every object read under version 13 (tasks, decisions, requests, intents, criteria, units, reviews, runs, findings,
+holds, principles) and ten views read the same; the schema differs from version 13 only by the two types, the two
+sources, the function and the grant's `read`; `ont describe` lists the function `route` with its two parameters and
+without its program; `ont_describe` and `ont_action_list` stay within 262,144 bytes (the line `v14_mcp_bytes=`);
+`ontology/migrate` runs 13 14, 12 14 (exit 0, the store unchanged), 9 14 (every row already done) and 14 15 (exit 2).
+The walk of version 14: an index of the two sources while their directory is absent fails both with
+`glob_root_missing`; two sections (one of a repository, one of the instructions without `repository` and `commit`)
+and a component are written and indexed (`initial`), read back by `ont search` with every property, indexed again
+unchanged, and a changed text is an `update`; a line of the other type fails the source `record_type_mismatch`, a
+text over 4,000 bytes `value_constraint_violation`, and neither changes a head; a file removed retracts its section,
+and an empty directory retracts every section and component. The last line of standard output of the rehearsal is
+`v14 routes: ok`.

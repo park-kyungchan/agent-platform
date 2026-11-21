@@ -1,7 +1,7 @@
 {
   "format": "ontology-schema/v1",
   "domain": "work",
-  "version": 13,
+  "version": 14,
   "namespace": {
     "instance": "vps://palantirkc",
     "account": "root"
@@ -291,7 +291,9 @@
       ],
       "complete_listing": true,
       "fresh_for_s": 86400
-    }
+    },
+    "sections": {"kind": "records", "glob": "/var/lib/agent-platform/route/*.sections.jsonl", "time_member": "observed_at", "type_member": "type", "complete_listing": true, "fresh_for_s": 3600},
+    "components": {"kind": "records", "glob": "/var/lib/agent-platform/route/*.components.jsonl", "time_member": "observed_at", "type_member": "type", "complete_listing": true, "fresh_for_s": 3600}
   },
   "object_types": {
     "task": {
@@ -1289,6 +1291,38 @@
         "intent": {"type": {"ref": "intent"}, "required": false, "description": "The intent it was planned into."},
         "reason": {"type": "string", "required": false, "max_bytes": 600, "description": "Why it was dismissed or closed."},
         "ended_at": {"type": {"value_type": "utc_time"}, "required": false, "description": "When it was dismissed or closed."}
+      }
+    },
+    "section": {
+      "description": "One heading of a Markdown file the host works from, written by ap route index (specs/ap/route.md): a file at origin/main of a repository, or an installed file of the shared instructions. Key: the hex SHA-256 of repository (or instructions), path, heading path and ordinal.",
+      "owner": {"source": "sections"},
+      "primary_key": {"from": "/key"},
+      "title": "heading",
+      "properties": {
+        "repository": {"type": "string", "required": false, "from": "/repository", "description": "owner/name of the repository; no value for the shared instructions."},
+        "path": {"type": "string", "required": true, "from": "/path", "description": "The file's path in the repository, or its absolute path for the shared instructions."},
+        "heading": {"type": "string", "required": true, "from": "/heading", "description": "The heading path, parent headings joined by ' > '; the file's name for the text above its first heading."},
+        "first_line": {"type": "integer", "required": true, "from": "/first_line", "description": "The first line of the section (its heading line), counted from 1."},
+        "last_line": {"type": "integer", "required": true, "from": "/last_line", "description": "The last line before the next heading of the same or a higher level, or the file's last line."},
+        "commit": {"type": "string", "required": false, "from": "/commit", "description": "The last commit at origin/main that changed the file; no value for the shared instructions."},
+        "digest": {"type": "string", "required": true, "from": "/digest", "description": "SHA-256 of the file's bytes when it was indexed."},
+        "text": {"type": "string", "required": true, "from": "/text", "max_bytes": 4000, "description": "The words of the section's lines, each run of white space one space, at most 4,000 bytes cut at a character boundary."}
+      }
+    },
+    "component": {
+      "description": "One component of a repository's map.json at origin/main, written by ap route index (specs/ap/route.md). Key: the hex SHA-256 of repository, map.json and the component's name.",
+      "owner": {"source": "components"},
+      "primary_key": {"from": "/key"},
+      "title": "name",
+      "properties": {
+        "repository": {"type": "string", "required": true, "from": "/repository", "description": "owner/name of the repository."},
+        "name": {"type": "string", "required": true, "from": "/name", "description": "The component's name in map.json."},
+        "purpose": {"type": "string", "required": true, "from": "/purpose", "description": "The component's purpose in map.json."},
+        "paths": {"type": {"array": "string"}, "required": true, "from": "/paths", "description": "The paths the component covers."},
+        "entry": {"type": {"array": "string"}, "required": true, "from": "/entry", "description": "Where a reader starts: path:first-last."},
+        "spec": {"type": {"array": "string"}, "required": true, "from": "/spec", "description": "Its specifications."},
+        "tests": {"type": {"array": "string"}, "required": true, "from": "/tests", "description": "Its tests."},
+        "commit": {"type": "string", "required": true, "from": "/commit", "description": "The last commit at origin/main that changed map.json."}
       }
     }
   },
@@ -4118,7 +4152,18 @@
       ]
     }
   },
-  "functions": {},
+  "functions": {
+    "route": {
+      "description": "Where a fact lives: the sections of the host's Markdown and the components of the repositories' maps that best match the words (specs/ap/route.md).",
+      "parameters": {
+        "words": {"type": "string", "required": true, "description": "The words to look for, such as the situation a reader is in."},
+        "limit": {"type": "integer", "required": false, "description": "How many answers, 1 to 20; default 8."}
+      },
+      "program": "/usr/local/bin/ap",
+      "answer_bytes": 65536,
+      "timeout_ms": 2000
+    }
+  },
   "grants": [
     {
       "principal": "agent",
@@ -4148,7 +4193,9 @@
         "unit",
         "run",
         "finding",
-        "principle"
+        "principle",
+        "section",
+        "component"
       ],
       "derive": [
         "hold",

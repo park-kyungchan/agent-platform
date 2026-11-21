@@ -1,0 +1,205 @@
+#!/usr/bin/env -S python3 -I -B
+"""The route suite: does the function `route` of the store, given a case's situation, answer a section or a
+component whose lines hold each fact the case needs? No reader runs and no model judges.
+
+  run --cases FILE [--cases FILE ...] [--case ID ...] [--limit N] [--store PATH]
+
+For each case it calls `ont [--store PATH] fn route` with {"words": <situation>} (and "limit" when given), and for
+each `must` fact prints one JSON line: whether every string of the fact is in the lines of one of the answers, read
+at the commit the answer names in the repository's clone of the policy file (or on disk for the shared
+instructions; for a component, in its object's purpose, paths, entry, spec and tests read from the same store);
+then one line of totals. Case files are those of the routing suite: a file of this repository's evals/ directory,
+or a host file admitted by its SHA-256 in evals/routing/host-cases.sha256. Nothing of a case is written anywhere.
+Every refusal is one line {"status":"<code>"} with exit 2. Method and limits: evals/README.md, "The route suite".
+"""
+import argparse
+import hashlib
+import json
+import os
+import subprocess
+import sys
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+EVALS = os.path.dirname(HERE)
+HOST_DIGESTS = os.path.join(EVALS, "routing", "host-cases.sha256")
+ONT = os.environ.get("ONT_BIN", "ont")
+POLICY = os.environ.get("AP_POLICY_FILE") or "/etc/agent-platform/policy.json"
+TIMEOUT = 60  # seconds per call of ont or git
+
+
+class Refuse(Exception):
+    pass
+
+
+def refuse(code):
+    raise Refuse(code)
+
+
+class Parser(argparse.ArgumentParser):
+    def error(self, message):
+        refuse("usage")
+
+
+def norm(s):
+    """Backticks removed, each run of whitespace made one space (as the routing suite compares)."""
+    return " ".join(s.replace("`", "").split())
+
+
+def sha_file(path):
+    with open(path, "rb") as f:
+        return hashlib.sha256(f.read()).hexdigest()
+
+
+def admitted():
+    names = {}
+    with open(HOST_DIGESTS, encoding="utf-8") as f:
+        for line in f:
+            parts = line.split()
+            if len(parts) == 2:
+                names[parts[0]] = parts[1]
+    return names
+
+
+def load_cases(paths, only):
+    """The cases of the given files, in their order: a file of evals/ as it is, any other by its digest."""
+    known = admitted()
+    cases, seen = [], set()
+    for path in paths:
+        if not os.path.isabs(path) or not os.path.isfile(path):
+            refuse("cases_unreadable")
+        inside = os.path.realpath(path).startswith(os.path.realpath(EVALS) + os.sep)
+        if not inside and sha_file(path) not in known:
+            refuse("cases_digest_unknown")
+        try:
+            with open(path, encoding="utf-8") as f:
+                data = json.load(f)
+        except (OSError, ValueError):
+            refuse("cases_invalid")
+        if not isinstance(data, list):
+            refuse("cases_invalid")
+        for c in data:
+            ok = (isinstance(c, dict) and isinstance(c.get("id"), str) and c["id"] and isinstance(c.get("situation"), str)
+                  and isinstance(c.get("must"), list) and c["must"]
+                  and all(isinstance(f, dict) and isinstance(f.get("fact"), list) and f["fact"]
+                          and all(isinstance(x, str) and norm(x) for x in f["fact"]) for f in c["must"]))
+            if not ok:
+                refuse("cases_invalid")
+            if c["id"] in seen:
+                refuse("case_id_twice")
+            seen.add(c["id"])
+            if not only or c["id"] in only:
+                cases.append(c)
+    if only and set(only) - {c["id"] for c in cases}:
+        refuse("case_unknown")
+    return cases
+
+
+def ont(store, args, request):
+    command = [ONT] + (["--store", store] if store else []) + args
+    try:
+        done = subprocess.run(command, input=json.dumps(request), text=True, capture_output=True, timeout=TIMEOUT)
+        answer = json.loads(done.stdout)
+    except (OSError, ValueError, subprocess.TimeoutExpired):
+        return None
+    return answer if done.returncode == 0 and isinstance(answer, dict) else None
+
+
+def clones():
+    try:
+        with open(POLICY, encoding="utf-8") as f:
+            repositories = json.load(f).get("repositories") or {}
+    except (OSError, ValueError, AttributeError):
+        return {}
+    return {name: entry.get("clone") for name, entry in repositories.items() if isinstance(entry, dict)}
+
+
+class Reader:
+    """The text of an answer: its lines at the commit it names, or the strings of a component's object."""
+
+    def __init__(self, store):
+        self.store, self.clones, self.files = store, clones(), {}
+
+    def file(self, repository, commit, path):
+        key = (repository, commit, path)
+        if key not in self.files:
+            text = None
+            if repository is None:
+                try:
+                    with open(path, encoding="utf-8", errors="replace") as f:
+                        text = f.read()
+                except OSError:
+                    pass
+            elif self.clones.get(repository) and isinstance(commit, str):
+                try:
+                    done = subprocess.run(["git", "-C", self.clones[repository], "show", "%s:%s" % (commit, path)],
+                                          capture_output=True, timeout=TIMEOUT)
+                    if done.returncode == 0:
+                        text = done.stdout.decode("utf-8", "replace")
+                except (OSError, subprocess.TimeoutExpired):
+                    pass
+            self.files[key] = None if text is None else text.split("\n")
+        return self.files[key]
+
+    def component(self, repository, name):
+        where = {"all": [{"eq": ["repository", repository]}, {"eq": ["name", name]}]}
+        answer = ont(self.store, ["search"], {"object_type": "component", "where": where, "limit": 1})
+        objects = (answer or {}).get("result", {}).get("objects") or []
+        if not objects:
+            return None
+        fields = {k: v.get("value") for k, v in objects[0]["head"]["fields"].items()}
+        parts = [fields.get("purpose") or ""]
+        for member in ("paths", "entry", "spec", "tests"):
+            parts.extend(fields.get(member) or [])
+        return "\n".join(p for p in parts if isinstance(p, str))
+
+    def text(self, a):
+        if a.get("kind") == "component":
+            return self.component(a.get("repository"), a.get("heading"))
+        lines = self.file(a.get("repository"), a.get("commit"), a.get("path"))
+        first, last = a.get("first_line"), a.get("last_line")
+        if lines is None or not isinstance(first, int) or not isinstance(last, int):
+            return None
+        return "\n".join(lines[first - 1:last])
+
+
+def main(argv):
+    p = Parser(prog="run", description="The route suite (evals/README.md, \"The route suite\").")
+    p.add_argument("--cases", action="append", required=True)
+    p.add_argument("--case", action="append", default=[])
+    p.add_argument("--limit", type=int)
+    p.add_argument("--store")
+    a = p.parse_args(argv)
+    if a.limit is not None and not 1 <= a.limit <= 20:
+        refuse("usage")
+    cases = load_cases(a.cases, a.case)
+    reader = Reader(a.store)
+    facts = held = unanswered = stale = 0
+    for c in cases:
+        parameters = {"words": c["situation"]}
+        if a.limit is not None:
+            parameters["limit"] = a.limit
+        answer = ont(a.store, ["fn", "route"], {"parameters": parameters})
+        answers = ((answer or {}).get("answer") or {}).get("answers")
+        if not isinstance(answers, list):
+            unanswered += 1
+            answers = []
+        stale += bool(((answer or {}).get("answer") or {}).get("stale"))
+        texts = [reader.text(x) for x in answers]
+        for i, fact in enumerate(c["must"]):
+            found = next((k for k, t in enumerate(texts) if t is not None and all(norm(x) in norm(t) for x in fact["fact"])), None)
+            facts += 1
+            held += found is not None
+            where = None if found is None else {k: answers[found].get(k) for k in ("rank", "kind", "repository", "path", "first_line", "last_line")}
+            if where is not None:
+                where["rank"] = found + 1
+            print(json.dumps({"case": c["id"], "fact": i, "strings": fact["fact"], "holds": found is not None, "answer": where}))
+    print(json.dumps({"cases": len(cases), "facts": facts, "held": held, "unanswered": unanswered, "stale": stale}))
+    return 0
+
+
+if __name__ == "__main__":
+    try:
+        sys.exit(main(sys.argv[1:]))
+    except Refuse as r:
+        print(json.dumps({"status": str(r)}))
+        sys.exit(2)

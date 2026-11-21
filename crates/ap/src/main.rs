@@ -6,7 +6,7 @@ use serde::Serialize;
 const HELP: &str = "Usage: ap <verb> [< request.json]\n";
 /// Every verb the dispatch below knows: the verb, its request form, the heading of the section of
 /// `crates/ap/README.md` that documents it. `ap --help` prints one line of this table per verb.
-const VERBS: [(&str, &str, &str); 18] = [
+const VERBS: [(&str, &str, &str); 19] = [
     ("version", "version | --version", "The older verbs"),
     ("run", "run < request.json", "One stage"),
     ("gate", "gate < request.json", "The gate"),
@@ -61,6 +61,11 @@ const VERBS: [(&str, &str, &str); 18] = [
         "check <dir> [--timeout <seconds>] [-- <command> [<arg>...]]",
         "One check",
     ),
+    (
+        "route",
+        "route index [--directory <dir>] [--store <path>] [--prune] [--repository <owner/name>]... [--instructions <dir>]",
+        "Routes",
+    ),
 ];
 fn verb_line(verb: &str, form: &str, heading: &str) -> String {
     format!("  {verb}: ap {form} (README \"{heading}\")\n")
@@ -79,6 +84,7 @@ const WORK_HELP: &str = "Usage: ap work [--store <path>]\nOne dispatch pass: sta
 const POLICY_HELP: &str = "Usage: ap policy check [<file>]\nRuns the policy file (the given one, else AP_POLICY_FILE, else /etc/agent-platform/policy.json) through every reader ap has of it and prints {\"status\":\"ok\",...} or the first refusal with its reader; it writes nothing.\n";
 const WATCH_HELP: &str = "Usage: ap watch [--record-login --totp-file <path> [--replace]]\nOne pass of the detectors delivery, login, services, host and records: opens, sees again, reopens and closes the findings of the store whose detector is watch:<name>, and prints one JSON answer. With --record-login it records the login reading the detector login compares with (login.json) and prints it.\n";
 const CHECK_HELP: &str = "Usage: ap check <dir> [--timeout <seconds>] [-- <command> [<arg>...]]\nRuns a repository's check (default ./check; a given command without a shell) for the worktree <dir>: on the local PC when the policy file names it in hosts.pc and it answers, is not busy and has at least hosts.pc.min_available_mb (default 2048) MB available (the smaller of its Linux's MemAvailable and Windows' free memory), else in <dir> on this host. The output streams back, the exit status is the command's (124 at the timeout, 1 to 14400 seconds, default 2700), and one record line is appended to AP_CHECKS_LOG (default /var/lib/agent-platform/checks.jsonl), with what the probe read of the PC and the lowest MemAvailable of its Linux while the command ran there.\n";
+const ROUTE_HELP: &str = "Usage: ap route index [--directory <dir>] [--store <path>] [--prune] [--repository <owner/name>]... [--instructions <dir>]\nWrites one record per heading of each *.md file at origin/main of each repository named (after git fetch origin main) and of the instructions directory on disk, and one per component of each repository's map.json, into the directory the store's sources sections and components read (default /var/lib/agent-platform/route; another one only with --store, a scratch store), removes with --prune the files of repositories no longer named, runs ont index of the two sources and prints one JSON line. ap with no argument and ONT_FN_NAME=route in its environment answers the function route of the store (specs/ap/route.md).\n";
 const BUILD_REVISION: &str = match option_env!("AP_BUILD_REVISION") {
     Some(value) => value,
     None => "unknown",
@@ -276,6 +282,20 @@ fn main() -> ExitCode {
             };
         }
         return ap::state::cli(&args[1..]);
+    }
+    if args.first().is_some_and(|arg| arg == "route") {
+        if args.len() == 2 && args[1] == "--help" {
+            return match io::stdout().lock().write_all(ROUTE_HELP.as_bytes()) {
+                Ok(()) => ExitCode::SUCCESS,
+                Err(_) => fail("io_error", "stdout", 4),
+            };
+        }
+        return ap::route::cli(&args[1..]);
+    }
+    // No argument: the function the store's engine names in the environment (`specs/ont/fn.md` R8), when `ap`
+    // answers it; else the usage refusal below.
+    if args.is_empty() && std::env::var_os("ONT_FN_NAME").is_some_and(|name| name == "route") {
+        return ap::route::function();
     }
     if args.len() == 1 && (args[0] == "--help" || args[0] == "-h") {
         let mut text = format!("{HELP}Verbs; the section is of crates/ap/README.md:\n");
