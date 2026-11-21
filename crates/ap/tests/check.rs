@@ -16,10 +16,16 @@ use std::{
 };
 
 const TAILSCALE: &str = r#"#!/bin/sh
-# The fake PC. ping: answers unless $FAKE_PC/down exists. ssh: the probe reads $FAKE_PC/loadavg and
-# 4 CPUs; the run keeps its command line and payload, and with $FAKE_PC/lose ends as a lost
-# connection before the command, with $FAKE_PC/lose-after after it (its status line dropped).
-pc=$FAKE_PC
+# The fake PC, its state in the directory @PC@. ping: answers unless down exists. ssh: as ssh's
+# default SendEnv, LANG and LC_* of the caller go along; the probe reads loadavg and 4 CPUs; the run
+# keeps its command line and payload, and with lose ends as a lost connection before the command,
+# with lose-after after it (its status line dropped).
+pc=@PC@
+run() {
+  set --
+  for v in $(env | sed -n 's/^\(LANG\|LC_[A-Za-z0-9_]*\)=.*/\1/p'); do eval "set -- \"\$@\" \"$v=\${$v}\""; done
+  env -i HOME="$pc/home" PATH="$pc/bin:/usr/bin:/bin" "$@" sh -c "$cmd"
+}
 case $1 in
 ping)
   echo ping >> "$pc/calls"
@@ -32,28 +38,30 @@ ssh)
   *ap-check-probe*)
     [ ! -e "$pc/probe-fails" ] || exit 255
     cmd=$(printf '%s' "$cmd" | sed "s#/proc/loadavg#$pc/loadavg#; s#(nproc)#(echo 4)#")
-    exec env -i HOME="$pc/home" PATH="$pc/bin:/usr/bin:/bin" sh -c "$cmd" < /dev/null ;;
+    run < /dev/null; exit ;;
   esac
   printf '%s' "$cmd" > "$pc/remote"
   cat > "$pc/payload.tar"
   [ ! -e "$pc/lose" ] || exit 255
   if [ -e "$pc/lose-after" ]; then
-    { env -i HOME="$pc/home" PATH="$pc/bin:/usr/bin:/bin" sh -c "$cmd" < "$pc/payload.tar" 2>&1 1>&3 | grep -av 'ap-check' >&2; } 3>&1
+    { run < "$pc/payload.tar" 2>&1 1>&3 | grep -av 'ap-check' >&2; } 3>&1
     exit 255
   fi
-  exec env -i HOME="$pc/home" PATH="$pc/bin:/usr/bin:/bin" sh -c "$cmd" < "$pc/payload.tar" ;;
+  run < "$pc/payload.tar"; exit ;;
 esac
 exit 2
 "#;
 
 const BWRAP: &str = r#"#!/bin/sh
-# A stand-in for bwrap: changes directory and sets the variables it is given, then runs the command.
+# A stand-in for bwrap: changes directory and sets the variables it is given, puts a link where a
+# read-only bind of a directory other than the root goes, then runs the command.
 while [ $# -gt 0 ]; do
   case $1 in
   --) shift; break ;;
   --chdir) cd "$2" || exit 1; shift 2 ;;
   --setenv) export "$2=$3"; shift 3 ;;
-  --bind | --ro-bind) shift 3 ;;
+  --bind) shift 3 ;;
+  --ro-bind) [ "$3" = / ] || { rm -rf "$3"; ln -s "$2" "$3"; }; shift 3 ;;
   --dev | --proc | --uid | --gid) shift 2 ;;
   *) shift ;;
   esac
@@ -136,7 +144,11 @@ impl World {
             repo: root.join("repo"),
             root,
         };
-        write(&w.p("bin/tailscale"), TAILSCALE, 0o755);
+        write(
+            &w.p("bin/tailscale"),
+            &TAILSCALE.replace("@PC@", &w.s("pc")),
+            0o755,
+        );
         if fake_bwrap {
             write(&w.p("pc/bin/bwrap"), BWRAP, 0o755);
         }
@@ -187,7 +199,6 @@ impl World {
         c.arg("check")
             .args(args)
             .env("PATH", path)
-            .env("FAKE_PC", self.p("pc"))
             .env("AP_POLICY_FILE", self.p("policy.json"))
             .env("AP_CHECKS_LOG", self.p("checks.jsonl"))
             .env("HOST_CARGO_LOCK", self.p("build.lock"))
@@ -522,13 +533,28 @@ fn r7_only_the_payload_and_the_script_reach_the_pc() {
         .output()
         .unwrap();
     assert_eq!(lines(&out.stdout), ["absent"]);
+    // Not even the variables ssh sends by default (LANG, LC_*): tailscale gets none of them.
+    let out = w
+        .command(&[
+            &d,
+            "--",
+            "sh",
+            "-c",
+            "echo ${LANG:-absent} ${LC_APVERIFY:-absent} ${LC_ALL:-absent}",
+        ])
+        .env("LANG", "C.UTF-8")
+        .env("LC_APVERIFY", "lc-value")
+        .env("LC_ALL", "C")
+        .output()
+        .unwrap();
+    assert_eq!(lines(&out.stdout), ["absent absent absent"], "{out:?}");
+    // The payload of that second call: the commit is on the PC already, so no bundle goes.
     assert_eq!(
         w.payload_members(),
         [
             "exclude",
             "global-excludes",
             "head",
-            "head.bundle",
             "index-info",
             "tree.tar"
         ]
@@ -570,7 +596,9 @@ fn r7_only_the_payload_and_the_script_reach_the_pc() {
             .any(|x| x == secret.as_bytes())
     );
     assert!(
-        remote.ends_with(" 'sh' '-c' 'echo ${SECRET_PROBE:-absent}'"),
+        remote.ends_with(
+            " 'sh' '-c' 'echo ${LANG:-absent} ${LC_APVERIFY:-absent} ${LC_ALL:-absent}'"
+        ),
         "{remote}"
     );
 }
@@ -613,7 +641,7 @@ fn r8_on_the_pc_the_command_is_uid_0_with_a_read_only_root_but_its_directories()
         return;
     }
     let w = World::within(Some(Path::new(env!("CARGO_TARGET_TMPDIR"))), false);
-    let script = "id -u; for p in \"$PWD/x\" \"$CARGO_TARGET_DIR/x\" \"$CARGO_HOME/x\" /tmp/x \"$HOME/x\" /etc/ap-check-x \"$CARGO_TARGET_DIR/../x\"; do \
+    let script = "id -u; for p in \"$PWD/x\" \"$CARGO_TARGET_DIR/x\" \"$CARGO_HOME/x\" /tmp/x \"$HOME/x\" /etc/ap-check-x \"$CARGO_TARGET_DIR/../x\" \"$PWD/.git/x\"; do \
                   if touch \"$p\" 2>/dev/null; then echo \"rw $p\"; else echo \"ro $p\"; fi; done; echo \"tmp $TMPDIR\"";
     let out = w.ap(&[&w.dir(), "--", "sh", "-c", script]);
     assert_eq!(out.status.code(), Some(0), "{out:?}");
@@ -630,11 +658,67 @@ fn r8_on_the_pc_the_command_is_uid_0_with_a_read_only_root_but_its_directories()
             format!("ro {}/x", w.s("pc/home")),
             "ro /etc/ap-check-x".into(),
             format!("ro {work}/targets/{key}/../x"),
+            format!("ro {work}/trees/{key}/.git/x"),
             "tmp /tmp".into(),
         ]
     );
     // The temporary directory goes with the call.
     assert_eq!(fs::read_dir(w.p("pc/work/tmp")).unwrap().count(), 0);
+}
+
+// spec: specs/ap/check.md#R6
+// spec: specs/ap/check.md#R8
+#[test]
+fn r8_what_a_command_leaves_in_git_never_runs_outside_its_sandbox() {
+    // The stand-in bwrap lets the command write the repository at .git: as if the read-only bind
+    // were broken, nothing it writes there may run, and no repository it points to is touched.
+    let w = World::new();
+    let d = w.dir();
+    sh(
+        &w.root,
+        "git init -q -b main other && git -C other -c user.name=t -c user.email=t@e commit -q --allow-empty -m o",
+    );
+    let other = |w: &World| {
+        sh(
+            &w.root,
+            "git -C other rev-parse HEAD; cat other/.git/config; ls -a other/.git other/.git/hooks",
+        )
+    };
+    let before = other(&w);
+    let mark = w.s("mark");
+    let plant = format!(
+        "for h in reference-transaction post-checkout post-index-change pre-auto-gc; do \
+           mkdir -p .git/hooks; printf '#!/bin/sh\\ntouch {mark}\\n' > .git/hooks/$h; chmod +x .git/hooks/$h; done; \
+         git config core.fsmonitor 'touch {mark}.fsmonitor'; git config core.hooksPath \"$PWD/.git/hooks\"; \
+         printf '* filter=x\\n' > .git/info/attributes; git config filter.x.clean 'touch {mark}.filter; cat'"
+    );
+    let out = w.ap(&[&d, "--", "sh", "-c", &plant]);
+    assert_eq!(out.status.code(), Some(0), "{out:?}");
+    sh(
+        &w.repo,
+        "echo changed >> a.txt && git -c user.name=t -c user.email=t@e commit -q -am two",
+    );
+    let out = w.ap(&[&d, "--", "git", "rev-parse", "HEAD"]);
+    assert_eq!(out.status.code(), Some(0), "{out:?}");
+    assert_eq!(
+        String::from_utf8(out.stdout).unwrap(),
+        sh(&w.repo, "git rev-parse HEAD")
+    );
+    for m in ["", ".fsmonitor", ".filter"] {
+        assert!(
+            !Path::new(&format!("{mark}{m}")).exists(),
+            "a planted {m} ran"
+        );
+    }
+    // A .git replaced by a link to another repository.
+    let link = format!("rm -rf .git; ln -s {}/.git .git", w.s("other"));
+    w.ap(&[&d, "--", "sh", "-c", &link]);
+    let out = w.ap(&[&d, "--", "git", "rev-parse", "HEAD"]);
+    assert_eq!(
+        String::from_utf8(out.stdout).unwrap(),
+        sh(&w.repo, "git rev-parse HEAD")
+    );
+    assert_eq!(other(&w), before);
 }
 
 // spec: specs/ap/check.md#R9
@@ -787,6 +871,7 @@ fn r12_a_tree_unused_for_seven_days_is_removed_under_its_lock() {
     );
     old(&format!("trees/{a}"));
     old(&format!("targets/{a}"));
+    old(&format!("repos/{a}"));
     write(&work.join(format!("used/{a}")), "", 0o644);
     sh(&w.root, &format!("touch -d '8 days ago' pc/work/used/{a}"));
     fresh(&format!("trees/{b}"));
@@ -804,6 +889,7 @@ fn r12_a_tree_unused_for_seven_days_is_removed_under_its_lock() {
     for (rel, kept) in [
         (format!("trees/{a}"), false),
         (format!("targets/{a}"), false),
+        (format!("repos/{a}"), false),
         (format!("used/{a}"), false),
         (format!("trees/{b}"), true),
         (format!("trees/{c}"), false),

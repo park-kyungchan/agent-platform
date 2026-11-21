@@ -14,11 +14,12 @@ case $key in *[!0-9a-f]*) say "bad key"; exit 3 ;; esac
 case $nonce in '' | *[!0-9a-f-]*) say "bad nonce"; exit 3 ;; esac
 case $limit in '' | *[!0-9]*) say "bad limit"; exit 3 ;; esac
 case $work in /*) ;; *) say "bad work"; exit 3 ;; esac
-tree=$work/trees/$key target=$work/targets/$key home=$work/cargo-home
+tree=$work/trees/$key repo=$work/repos/$key target=$work/targets/$key home=$work/cargo-home
 in=$work/tmp/$nonce.in tmp=$work/tmp/$nonce
-clean() { chmod -R u+rwX -- "$@" 2>/dev/null; rm -rf -- "$@"; }
+# Removes paths; a link is removed, never followed (find does not follow one, even as an argument).
+clean() { find "$@" -type d ! -perm -u=rwx -exec chmod u+rwx {} + 2>/dev/null; rm -rf -- "$@"; }
 trap 'clean "$in" "$tmp"' EXIT
-mkdir -p -- "$work/trees" "$work/targets" "$home" "$work/locks" "$work/used" "$in" "$tmp" || { say "work directory"; exit 3; }
+mkdir -p -- "$work/trees" "$work/repos" "$work/targets" "$home" "$work/locks" "$work/used" "$in" "$tmp" || { say "work directory"; exit 3; }
 tar -x -C "$in" -f - || { say "payload"; exit 3; }
 cat >/dev/null
 
@@ -37,36 +38,44 @@ touch -- "$work/used/$key"
 
 # A tree or target directory no call has used for seven days goes, under its key's lock (R12).
 stale() {
-  if [ -e "$work/used/$1" ]; then set -- "$work/used/$1"; else set -- "$work/trees/$1" "$work/targets/$1"; fi
+  if [ -e "$work/used/$1" ]; then set -- "$work/used/$1"; else set -- "$work/trees/$1" "$work/repos/$1" "$work/targets/$1"; fi
   for p; do [ ! -e "$p" ] || [ -n "$(find "$p" -maxdepth 0 -mtime +6)" ] || return 1; done
 }
-for d in "$work"/trees/* "$work"/targets/*; do
+for d in "$work"/trees/* "$work"/repos/* "$work"/targets/*; do
   k=${d##*/}
   case $k in "$key" | *[!0-9a-f]*) continue ;; ????????????????) ;; *) continue ;; esac
   [ -e "$d" ] || continue
-  ( flock -n 8 || exit 0; stale "$k" || exit 0; clean "$work/trees/$k" "$work/targets/$k" "$work/used/$k" ) 8>"$work/locks/$k"
+  ( flock -n 8 || exit 0; stale "$k" || exit 0; clean "$work/trees/$k" "$work/repos/$k" "$work/targets/$k" "$work/used/$k" ) 8>"$work/locks/$k"
 done
 # A temporary directory of a call that ended without its own cleanup, a day later (calls last at most 4 hours).
-find "$work/tmp" -mindepth 1 -maxdepth 1 -mmin +1440 -exec sh -c 'chmod -R u+rwX -- "$@" 2>/dev/null; rm -rf -- "$@"' sh {} +
+find "$work/tmp" -mindepth 1 -maxdepth 1 -mmin +1440 -print0 | while IFS= read -r -d '' old; do clean "$old"; done
 
-# The tree: the worktree's commit, its files as listed, its index entries and its exclude rules (R6).
-g() { git -C "$tree" -c gc.auto=0 -c maintenance.auto=false "$@"; }
-if [ ! -d "$tree/.git" ]; then clean "$tree"; git -c init.defaultBranch=main init -q -- "$tree" || { say "git init"; exit 3; }; fi
+# The repository: kept outside the tree under repos/<key>, which no command can write (the tree's
+# .git is a read-only bind of it), and still reset before each use: no hook, a config of this
+# script's own, no alternates, attributes or link to another repository (R6, R8). The tree: the
+# worktree's files as listed, nothing else (R6).
+g() { git --git-dir="$repo" --work-tree="$tree" -c core.hooksPath=/dev/null -c gc.auto=0 -c maintenance.auto=false "$@"; }
+if [ -L "$repo" ] || [ ! -d "$repo" ] || [ ! -f "$repo/HEAD" ] || [ -L "$repo/HEAD" ]; then
+  clean "$repo"
+  git -c init.defaultBranch=main -c core.hooksPath=/dev/null init -q --bare -- "$repo" || { say "git init"; exit 3; }
+fi
+clean "$repo/hooks" "$repo/info" "$repo/commondir" "$repo/gitdir" "$repo/objects/info/alternates" "$repo/objects/info/http-alternates" "$repo/index"
+mkdir -p -- "$repo/info" && cp -- "$in/exclude" "$repo/info/exclude" && cp -- "$in/global-excludes" "$repo/ap-check-excludes" &&
+  printf '[core]\n\trepositoryformatversion = 0\n\tfilemode = true\n\tbare = false\n\texcludesFile = %s\n' "$repo/ap-check-excludes" > "$repo/config" ||
+  { say "repository"; exit 3; }
 head=$(cat -- "$in/head")
 if [ -f "$in/head.bundle" ]; then
   g fetch -q --no-tags "$in/head.bundle" "+HEAD:refs/ap-check/head" || { say "bundle"; exit 3; }
 fi
 g update-ref --no-deref HEAD "$head" && [ "$(g rev-parse -q --verify HEAD)" = "$head" ] || { say "head"; exit 3; }
-gd=$tree/.git
-mkdir -p -- "$gd/info" && cp -- "$in/exclude" "$gd/info/exclude" && cp -- "$in/global-excludes" "$gd/ap-check-excludes" &&
-  g config core.excludesFile "$gd/ap-check-excludes" || { say "excludes"; exit 3; }
-find "$tree" -mindepth 1 -maxdepth 1 ! -name .git -exec sh -c 'chmod -R u+rwX -- "$@" 2>/dev/null; rm -rf -- "$@"' sh {} +
+mkdir -p -- "$tree" && find "$tree" -mindepth 1 -maxdepth 1 -print0 | while IFS= read -r -d '' old; do clean "$old"; done
 tar -x -p -C "$tree" -f "$in/tree.tar" || { say "files"; exit 3; }
-rm -f -- "$gd/index" && g update-index -z --index-info < "$in/index-info" || { say "index"; exit 3; }
+[ ! -e "$tree/.git" ] && [ ! -L "$tree/.git" ] && mkdir -- "$tree/.git" || { say "files"; exit 3; }
+g update-index -z --index-info < "$in/index-info" || { say "index"; exit 3; }
 g update-index -q --refresh >/dev/null 2>&1
 mkdir -p -- "$target" || { say "target"; exit 3; }
 
-# The command: uid 0 of a user namespace, the root read-only but the tree, the target directory, the
+# The command: uid 0 of a user namespace, the root read-only but the tree (not its .git), the target directory, the
 # cargo home and the temporary directory, the network kept, under nice and the time left (R8, R10).
 left=$((start + limit - $(date +%s)))
 if [ "$left" -lt 1 ]; then
@@ -74,7 +83,7 @@ if [ "$left" -lt 1 ]; then
 else
   timeout -k 10 "$left" nice -n 10 bwrap --unshare-user --uid 0 --gid 0 --unshare-pid --die-with-parent --new-session \
     --ro-bind / / --dev /dev --proc /proc --bind "$tmp" /tmp \
-    --bind "$tree" "$tree" --bind "$target" "$target" --bind "$home" "$home" \
+    --bind "$tree" "$tree" --ro-bind "$repo" "$tree/.git" --bind "$target" "$target" --bind "$home" "$home" \
     --setenv CARGO_TARGET_DIR "$target" --setenv CARGO_HOME "$home" --setenv TMPDIR /tmp \
     --chdir "$tree" -- "$@" </dev/null
   rc=$?

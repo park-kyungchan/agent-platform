@@ -2,7 +2,7 @@
 //! and the PC answers and is not busy, else on this host (`specs/ap/check.md`). The PC's side is the
 //! fixed script `check/pc.sh`; what reaches the PC is that script, its arguments and one payload of
 //! the worktree's state.
-use crate::host::{Failure, Host, System, args, digest, fail, new_session_id};
+use crate::host::{Failure, Host, System, digest, fail, new_session_id};
 use crate::run::stamp;
 use crate::work;
 use serde_json::{Value, json};
@@ -24,8 +24,12 @@ use std::{
 
 /// The PC's side, run as `bash -c` (R6 to R12).
 const PC_SCRIPT: &str = include_str!("check/pc.sh");
-/// The PC's CPUs, its one-minute load and the HEAD of the worktree's tree there, if any (R4).
-const PROBE: &str = r#"printf '%s %s\n' "$(nproc)" "$(cut -d ' ' -f 1 /proc/loadavg)"; git -C "$1" rev-parse -q --verify HEAD 2>/dev/null; exit 0"#;
+/// The PC's CPUs, its one-minute load and the HEAD of the worktree's repository there, if any (R4):
+/// the file read as text, no git run on what a command might have left.
+const PROBE: &str = r#"printf '%s %s\n' "$(nproc)" "$(cut -d ' ' -f 1 /proc/loadavg)"; [ -L "$1/HEAD" ] || head -c 80 -- "$1/HEAD" 2>/dev/null; exit 0"#;
+/// The only variables of this process that a `tailscale` child gets (R7): not `LANG` or `LC_*`, which
+/// the ssh client's default `SendEnv` would send to the PC, nor an agent socket.
+const TAILSCALE_ENV: [&str; 4] = ["PATH", "HOME", "USER", "LOGNAME"];
 const DEFAULT_TIMEOUT: u64 = 2_700;
 const MAX_TIMEOUT: u64 = 14_400;
 /// How long after the deadline this host waits for the PC's own end before it cuts the connection.
@@ -301,8 +305,39 @@ enum Place {
     },
     Here(&'static str),
 }
+/// `tailscale` with `words`, in an environment of `TAILSCALE_ENV` alone.
+fn tailscale(words: &[&str]) -> Command {
+    let mut c = Command::new("tailscale");
+    c.args(words).env_clear();
+    for k in TAILSCALE_ENV {
+        if let Some(v) = std::env::var_os(k) {
+            c.env(k, v);
+        }
+    }
+    c
+}
+/// The standard output of a short call that succeeded within `limit`; None otherwise.
+fn answer(mut c: Command, limit: Duration) -> Option<Vec<u8>> {
+    let mut child = c
+        .stdin(Stdio::null())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::null())
+        .process_group(0)
+        .spawn()
+        .ok()?;
+    let out = child.stdout.take()?;
+    let (tx, rx) = mpsc::channel();
+    std::thread::spawn(move || {
+        let mut bytes = vec![];
+        let _ = out.take(1 << 20).read_to_end(&mut bytes);
+        let _ = tx.send(bytes);
+    });
+    let status = wait_until(&mut child, Instant::now() + limit)?;
+    let bytes = rx.recv_timeout(Duration::from_secs(2)).ok()?;
+    status.success().then_some(bytes)
+}
 fn place(pc: &Pc, key: &str) -> Place {
-    let ping = args(&[
+    let ping = [
         "ping",
         "--c",
         "1",
@@ -310,25 +345,19 @@ fn place(pc: &Pc, key: &str) -> Place {
         "10s",
         "--until-direct=false",
         pc.host(),
-    ]);
-    if !Host
-        .call("tailscale", &ping, &Value::Null, 12_000)
-        .is_ok_and(|r| r.success)
-    {
+    ];
+    if answer(tailscale(&ping), Duration::from_secs(12)).is_none() {
         return Place::Here("pc_unreachable");
     }
-    let tree = format!("{}/trees/{key}", pc.work);
-    let probe = format!("bash -c {} ap-check-probe {}", quote(PROBE), quote(&tree));
-    let reply = match Host.call(
-        "tailscale",
-        &args(&["ssh", &pc.ssh, &probe]),
-        &Value::Null,
-        30_000,
-    ) {
-        Ok(r) if r.success => r,
-        _ => return Place::Here("pc_unreachable"),
+    let repo = format!("{}/repos/{key}", pc.work);
+    let probe = format!("bash -c {} ap-check-probe {}", quote(PROBE), quote(&repo));
+    let Some(stdout) = answer(
+        tailscale(&["ssh", &pc.ssh, &probe]),
+        Duration::from_secs(30),
+    ) else {
+        return Place::Here("pc_unreachable");
     };
-    let text = String::from_utf8_lossy(&reply.stdout);
+    let text = String::from_utf8_lossy(&stdout);
     let mut lines = text.lines();
     let first: Vec<&str> = lines.next().unwrap_or("").split(' ').collect();
     let (Some(cpus), Some(load)) = (
@@ -628,8 +657,7 @@ fn on_pc(
         remote.push_str(&quote(w));
     }
     let input = File::open(&payload).map_err(|_| say("check: pc: no payload"))?;
-    let child = Command::new("tailscale")
-        .args(["ssh", &pc.ssh, &remote])
+    let child = tailscale(&["ssh", &pc.ssh, &remote])
         .stdin(input)
         .stdout(Stdio::inherit())
         .stderr(Stdio::piped())
