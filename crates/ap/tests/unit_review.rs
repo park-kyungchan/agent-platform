@@ -2582,6 +2582,93 @@ fn r23_a_check_that_does_not_hold_on_the_base_refuses_the_look_before_anything_s
 }
 
 // spec: specs/ap/unit-review.md#R23
+// spec: specs/ap/unit.md#R36
+#[test]
+fn r23_a_look_refuses_a_pattern_outside_the_grammar_and_a_plain_page_of_protected_paths() {
+    let mut f = F::new();
+    let never = json!([{"check": "exit 99", "kind": "invariant"}]);
+    let forms = json!(["<path>", "<dir>/**"]);
+    let refused = |f: &mut F, key: &str, set: Value, class: &str| {
+        f.modify("unit", key, json!({"write_set": set, "class": class}));
+        f.git.clear();
+        let calls = f.calls.len();
+        let e = refused_look(f, key, never.clone());
+        // The one fetch of the page, and nothing after it: no copy, no check, no unit of a check.
+        let fetches = f.git.iter().filter(|a| a.iter().any(|w| w == "fetch"));
+        assert_eq!(fetches.count(), 1, "{:?}", f.git);
+        assert!(
+            f.git.iter().all(|a| !a.iter().any(|w| w == "clone")),
+            "{:?}",
+            f.git
+        );
+        assert!(
+            f.calls[calls..].iter().all(|c| c.0 != "systemctl"),
+            "no check ran"
+        );
+        e
+    };
+    // Any state, any class: a stored text of neither form.
+    for (key, class, state) in [
+        ("u1", "contract", "draft"),
+        ("u4", "plain", "ready"),
+        ("u5", "effect", "stopped"),
+    ] {
+        f.unit(key, class, true);
+        f.modify("unit", key, json!({"state": state}));
+        let e = refused(
+            &mut f,
+            key,
+            json!(["src/a.rs", "crates/ap/src/*", "a/[b]/**"]),
+            class,
+        );
+        assert_eq!(
+            code(&e),
+            ("write_set_form".into(), "write_set".into()),
+            "{key}"
+        );
+        assert_eq!(
+            e.detail,
+            json!({"patterns": ["crates/ap/src/*", "a/[b]/**"], "count": 2, "forms": forms}),
+            "{key}"
+        );
+    }
+    // A plain page whose pattern can only match protected paths; the class contract and effect are not refused.
+    f.unit("u6", "plain", true);
+    let e = refused(
+        &mut f,
+        "u6",
+        json!(["src/a.rs", "specs/ap/unit.md", "ci/**"]),
+        "plain",
+    );
+    assert_eq!(
+        code(&e),
+        ("plain_writes_protected".into(), "write_set".into())
+    );
+    assert_eq!(
+        e.detail,
+        json!({"patterns": ["specs/ap/unit.md", "ci/**"], "count": 2,
+            "needs": "class contract, lane objective"})
+    );
+    // The form comes first when a page has both faults.
+    let e = refused(&mut f, "u6", json!(["specs/ap/unit.md", "a/*"]), "plain");
+    assert_eq!(code(&e).0, "write_set_form");
+    // A page of the grammar that is not protected is looked at; so is a contract page naming protected paths.
+    for (class, set) in [
+        ("plain", json!(["crates/**"])),
+        ("contract", json!(["ci/**"])),
+    ] {
+        f.modify("unit", "u6", json!({"write_set": set, "class": class}));
+        f.modify(
+            "unit",
+            "u6",
+            json!({"acceptance": [{"check": "true", "kind": "invariant"}]}),
+        );
+        let (v, _) = f.ok(&f.req("unit", "u6"));
+        assert_eq!(v["verdict"], "accept", "{class}");
+    }
+}
+
+// spec: specs/ap/unit-review.md#R23
 // spec: specs/ap/unit-review.md#R8
 #[test]
 fn r23_a_look_that_resumes_runs_the_same_checks_first() {
