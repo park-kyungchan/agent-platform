@@ -508,7 +508,7 @@ fn crash_between_commit_and_append_is_repaired_by_next_write() {
     );
     // Attribution reaches the log.
     assert_eq!(log[0].1.actor["agent"], "tester");
-    assert_eq!(log[0].1.actor["principal"], "agent");
+    assert_eq!(log[0].1.actor["principal"], format!("uid:{}", kernel_uid()));
     assert_eq!(log[0].1.actor["client"], "cli");
 }
 
@@ -1666,4 +1666,276 @@ fn g2a_complete_tail_with_unterminated_fragment_is_truncated() {
         expected,
         "fragment must be removed before appending"
     );
+}
+
+// ---- sec-actor: the engine's identity, the claim, the default store's clock ----
+
+/// The node name, read by the test from the kernel (not through the engine).
+fn kernel_node() -> String {
+    let text = std::fs::read_to_string("/proc/sys/kernel/hostname").unwrap();
+    text.strip_suffix('\n').unwrap_or(&text).to_string()
+}
+/// The real uid, read by the test from the kernel (not through the engine).
+fn kernel_uid() -> String {
+    let text = std::fs::read_to_string("/proc/self/status").unwrap();
+    let line = text.lines().find(|l| l.starts_with("Uid:")).unwrap();
+    line.split_whitespace().nth(1).unwrap().to_string()
+}
+/// The whole actor the engine builds for a caller with the given claims.
+fn expected_actor(
+    client: &str,
+    agent: Option<&str>,
+    session: Option<&str>,
+    role: Option<&str>,
+) -> Value {
+    let mut a = json!({
+        "actor_trust":"self_reported","client":client,
+        "host":kernel_node(),"principal":format!("uid:{}", kernel_uid())
+    });
+    let mut claimed = vec!["client"];
+    for (name, value) in [("agent", agent), ("role", role), ("session", session)] {
+        if let Some(v) = value {
+            a[name] = json!(v);
+            claimed.push(name);
+        }
+    }
+    claimed.sort_unstable();
+    a["claimed"] = json!(claimed);
+    a
+}
+fn refusal_lines(t: &Temp) -> Vec<Value> {
+    std::fs::read_to_string(t.0.join("refusals.jsonl"))
+        .unwrap_or_default()
+        .lines()
+        .map(|l| serde_json::from_str(l).unwrap())
+        .collect()
+}
+
+#[test]
+fn engine_writes_principal_and_host_into_the_actor() {
+    // spec: specs/ont/action.md#R101
+    // spec: specs/ont/action.md#R102
+    let t = setup();
+    // Through `ont::run` with the uid arguments 0, 0.
+    for (rid, agent, session, role) in [
+        ("r1", None, None, None),
+        ("r2", Some("ag"), None, None),
+        ("r3", Some("ag"), Some("s1"), Some("lead")),
+        ("r4", None, Some("s1"), None),
+    ] {
+        let mut body = json!({"action_type":"create_tag","parameters":{"label":rid},"request_id":rid});
+        for (name, v) in [("agent", agent), ("session", session), ("role", role)] {
+            if let Some(v) = v {
+                body[name] = json!(v);
+            }
+        }
+        let (code, ans) = apply(&t, body);
+        assert_eq!(code, 0, "{ans}");
+        assert_eq!(ans["result"]["actor_trust"], "self_reported");
+        assert!(ans["result"].get("host").is_none() && ans["result"].get("claimed").is_none());
+    }
+    // Through the library with a Context the test builds.
+    let mut ctx = Context::new(t.store_path(), NOW);
+    ctx.client = "lib".into();
+    ctx.agent = Some("lag".into());
+    ctx.role = Some("reviewer".into());
+    let req: ont::action::ApplyActionRequest = serde_json::from_value(
+        json!({"action_type":"create_tag","parameters":{"label":"l1"},"request_id":"l1","session":"ls"}),
+    )
+    .unwrap();
+    ont::action::apply_action(&ctx, &req).unwrap();
+    let ctx = Context::new(t.store_path(), NOW);
+    let req: ont::action::ApplyActionRequest = serde_json::from_value(
+        json!({"action_type":"create_tag","parameters":{"label":"l2"},"request_id":"l2"}),
+    )
+    .unwrap();
+    ont::action::apply_action(&ctx, &req).unwrap();
+
+    let mut store = Store::open_schema(&t.store_path()).unwrap();
+    let log = store.action_log().unwrap();
+    let expected = [
+        expected_actor("cli", None, None, None),
+        expected_actor("cli", Some("ag"), None, None),
+        expected_actor("cli", Some("ag"), Some("s1"), Some("lead")),
+        expected_actor("cli", None, Some("s1"), None),
+        expected_actor("lib", Some("lag"), Some("ls"), Some("reviewer")),
+        expected_actor("cli", None, None, None),
+    ];
+    assert_eq!(log.len(), expected.len());
+    for ((_, entry), want) in log.iter().zip(expected.iter()) {
+        assert_eq!(&entry.actor, want);
+    }
+    let text = std::fs::read_to_string(t.edits()).unwrap();
+    let want: Vec<String> = log.iter().map(|(s, e)| log_line(*s, e)).collect();
+    assert_eq!(text.lines().collect::<Vec<_>>(), want);
+    drop(store);
+
+    // A refused apply records the same host, principal and claimed.
+    let (code, _) = apply(
+        &t,
+        json!({"action_type":"create_tag","parameters":{"label":5},"agent":"ag","role":"lead"}),
+    );
+    assert_eq!(code, 2);
+    let ctx = Context::new(t.store_path(), NOW);
+    let bad: ont::action::ApplyActionRequest =
+        serde_json::from_value(json!({"action_type":"create_tag","parameters":{"label":5}}))
+            .unwrap();
+    assert!(ont::action::apply_action(&ctx, &bad).is_err());
+    let lines = refusal_lines(&t);
+    assert_eq!(lines.len(), 2);
+    assert_eq!(
+        lines[0]["actor"],
+        expected_actor("cli", Some("ag"), None, Some("lead"))
+    );
+    assert_eq!(lines[1]["actor"], expected_actor("cli", None, None, None));
+}
+
+#[test]
+fn forged_host_and_account_are_recorded_as_the_true_ones() {
+    // spec: specs/ont/action.md#R101
+    // Set the environment only in a child, never in the threaded test process.
+    if std::env::var_os("ONT_FORGE_TEST").is_none() {
+        let output = std::process::Command::new(std::env::current_exe().unwrap())
+            .args([
+                "--exact",
+                "forged_host_and_account_are_recorded_as_the_true_ones",
+                "--nocapture",
+            ])
+            .env("HOSTNAME", "forged-host")
+            .env("USER", "forged-user")
+            .env("LOGNAME", "forged-user")
+            .env("ONT_HOST", "forged-host")
+            .env("ONT_PRINCIPAL", "uid:4242")
+            .env("ONT_FORGE_TEST", "1")
+            .output()
+            .unwrap();
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        assert!(
+            output.status.success() && stdout.contains("test result: ok. 1 passed;"),
+            "{stdout}\n{}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        return;
+    }
+    assert_eq!(std::env::var("HOSTNAME").unwrap(), "forged-host");
+    let t = setup();
+    let (code, ans) = apply(
+        &t,
+        json!({"action_type":"create_tag","parameters":{"label":"f"},"request_id":"f1"}),
+    );
+    assert_eq!(code, 0, "{ans}");
+    let mut store = Store::open_schema(&t.store_path()).unwrap();
+    let log = store.action_log().unwrap();
+    assert_eq!(log[0].1.actor["host"], json!(kernel_node()));
+    assert_eq!(
+        log[0].1.actor["principal"],
+        json!(format!("uid:{}", kernel_uid()))
+    );
+    assert_ne!(log[0].1.actor["host"], "forged-host");
+    drop(store);
+    let before = counts(&t);
+    for member in ["host", "principal"] {
+        let mut body = json!({"action_type":"create_tag","parameters":{"label":"g"}});
+        body[member] = json!("forged");
+        let (code, ans) = apply(&t, body);
+        assert_eq!((code, ans["code"].as_str()), (2, Some("invalid_request")), "{ans}");
+    }
+    assert_eq!(counts(&t), before);
+}
+
+#[test]
+fn criteria_read_the_engine_written_host() {
+    // spec: specs/ont/action.md#R103
+    let t = Temp::new();
+    let mut schema: Value = serde_json::from_slice(FIXTURE).unwrap();
+    let node = kernel_node();
+    for (name, operand) in [
+        ("this_node_tag", json!({"host":node})),
+        ("other_node_tag", json!({"host":"no-such-node-0"})),
+        ("this_account_tag", json!({"principal":format!("uid:{}", kernel_uid())})),
+        ("named_agent_tag", json!("claimed-agent")),
+        ("word_agent_tag", json!("agent")),
+    ] {
+        schema["action_types"][name] = json!({
+            "description":"Create a tag when the actor matches.",
+            "parameters":{"label":{"type":"string","required":true}},
+            "submission_criteria":[{"code":"actor_matches","message":"The actor does not match.","all":[{"actor":operand}]}],
+            "rules":[{"create_object":"tag","set":{"label":"$label"}}]
+        });
+        schema["grants"][0]["actions"].as_array_mut().unwrap().push(json!(name));
+    }
+    install_bytes(&t, &serde_json::to_vec(&schema).unwrap());
+    let go = |action: &str, label: &str, agent: Option<&str>| {
+        let mut body = json!({"action_type":action,"parameters":{"label":label}});
+        if let Some(a) = agent {
+            body["agent"] = json!(a);
+        }
+        apply(&t, body)
+    };
+    let (code, ans) = go("this_node_tag", "a", None);
+    assert_eq!(code, 0, "{ans}");
+    let (code, ans) = go("this_account_tag", "b", None);
+    assert_eq!(code, 0, "{ans}");
+    let (code, ans) = go("other_node_tag", "c", None);
+    assert_eq!((code, ans["code"].as_str()), (2, Some("submission_criteria")), "{ans}");
+    // The string form holds for the claimed agent equal to its operand.
+    let (code, ans) = go("named_agent_tag", "d", Some("claimed-agent"));
+    assert_eq!(code, 0, "{ans}");
+    let (code, ans) = go("named_agent_tag", "e", None);
+    assert_eq!((code, ans["code"].as_str()), (2, Some("submission_criteria")), "{ans}");
+    // The word `agent` is no longer the principal.
+    let (code, ans) = go("word_agent_tag", "f", None);
+    assert_eq!((code, ans["code"].as_str()), (2, Some("submission_criteria")), "{ans}");
+    assert_eq!(ans["failed"], json!(["actor_matches"]));
+    let (code, ans) = go("word_agent_tag", "g", Some("agent"));
+    assert_eq!(code, 0, "{ans}");
+}
+
+#[test]
+fn now_is_refused_at_the_default_store() {
+    // spec: specs/ont/action.md#R104
+    let default = ont::DEFAULT_STORE;
+    let (dir, file) = default.rsplit_once('/').unwrap();
+    let mut spellings = vec![
+        default.to_string(),
+        format!("{dir}//{file}"),
+        format!("{dir}/./{file}"),
+    ];
+    let t = Temp::new();
+    if std::path::Path::new(dir).is_dir() {
+        let link = t.0.join("link");
+        std::os::unix::fs::symlink(dir, &link).unwrap();
+        spellings.push(format!("{}/{file}", link.display()));
+    }
+    for spelling in &spellings {
+        for command in ["describe", "mcp"] {
+            let args: Vec<String> = ["--store", spelling, "--now", "1", command]
+                .iter()
+                .map(|s| s.to_string())
+                .collect();
+            // Uid arguments 1000, 1000: on any revision the call ends before
+            // a store file is opened.
+            let out = ont::run(&args, &b"{}"[..], 1000, 1000);
+            assert_eq!(out.code, 2, "{spelling} {command}: {}", out.stdout);
+            let v: Value = serde_json::from_str(out.stdout.trim()).unwrap();
+            assert_eq!(v["code"], "now_at_default_store", "{spelling} {command}");
+            assert_eq!(v["field"], "--now");
+        }
+    }
+    // `--now` without `--store` is still `now_requires_store`.
+    let args: Vec<String> = ["--now", "1", "describe"].iter().map(|s| s.to_string()).collect();
+    let out = ont::run(&args, &b"{}"[..], 1000, 1000);
+    let v: Value = serde_json::from_str(out.stdout.trim()).unwrap();
+    assert_eq!((out.code, v["code"].as_str()), (2, Some("now_requires_store")));
+    // Another store with `--now` is not refused by this rule.
+    install(&t);
+    let (code, ans) = run_store(&t, &["describe"], &json!({}));
+    assert_eq!(code, 0, "{ans}");
+    let args: Vec<String> = ["--store", &t.store(), "--now", "1", "describe"]
+        .iter()
+        .map(|s| s.to_string())
+        .collect();
+    let out = ont::run(&args, &b"{}"[..], 1000, 1000);
+    let v: Value = serde_json::from_str(out.stdout.trim()).unwrap();
+    assert_eq!(v["code"], "principal_not_trusted");
 }

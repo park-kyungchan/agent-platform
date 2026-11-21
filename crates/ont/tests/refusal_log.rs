@@ -118,6 +118,31 @@ fn probe(t: &Temp) -> Value {
 fn canonical(v: &Value) -> String {
     serde_json::to_string(&ont::action::canonical(v)).unwrap()
 }
+/// The node name, read by the test from the kernel (not through the engine).
+fn node() -> String {
+    let text = std::fs::read_to_string("/proc/sys/kernel/hostname").unwrap();
+    text.strip_suffix('\n').unwrap_or(&text).to_string()
+}
+/// The real uid, read by the test from the kernel (not through the engine).
+fn uid() -> String {
+    let text = std::fs::read_to_string("/proc/self/status").unwrap();
+    let line = text.lines().find(|l| l.starts_with("Uid:")).unwrap();
+    line.split_whitespace().nth(1).unwrap().to_string()
+}
+/// The whole actor the engine builds for a caller that claims the given members.
+fn actor(agent: Option<&str>, session: Option<&str>, role: Option<&str>) -> Value {
+    let mut a = json!({"actor_trust":"self_reported","client":"cli","host":node(),"principal":format!("uid:{}", uid())});
+    let mut claimed = vec!["client"];
+    for (name, value) in [("agent", agent), ("role", role), ("session", session)] {
+        if let Some(v) = value {
+            a[name] = json!(v);
+            claimed.push(name);
+        }
+    }
+    claimed.sort_unstable();
+    a["claimed"] = json!(claimed);
+    a
+}
 
 // A1, A2: each refusal after the action type was found appends one
 // canonical line with the members of the page, in mode 0600.
@@ -161,12 +186,16 @@ fn refused_applies_append_one_canonical_line_each() {
     assert_eq!(lines.len(), 5, "{lines:?}");
     assert_eq!(
         lines[0],
-        r#"{"action_type":"create_tag","actor":{"actor_trust":"self_reported","agent":"a1","client":"cli","principal":"agent"},"code":"invalid_parameter","domain":"work","outcome":"refused","parameters":{"label":5},"schema_version":1,"submitted_at":1000}"#
+        format!(
+            r#"{{"action_type":"create_tag","actor":{},"code":"invalid_parameter","domain":"work","outcome":"refused","parameters":{{"label":5}},"schema_version":1,"submitted_at":1000}}"#,
+            canonical(&actor(Some("a1"), None, None))
+        )
     );
     assert_eq!(
         lines[1],
         format!(
-            r#"{{"action_type":"check_probe_kind","actor":{{"actor_trust":"self_reported","client":"cli","principal":"agent","role":"lead","session":"s1"}},"code":"submission_criteria","domain":"work","failed":["kind_is_note"],"outcome":"refused","parameters":{{"probe":{}}},"request_id":"k1","schema_version":1,"submitted_at":1000}}"#,
+            r#"{{"action_type":"check_probe_kind","actor":{},"code":"submission_criteria","domain":"work","failed":["kind_is_note"],"outcome":"refused","parameters":{{"probe":{}}},"request_id":"k1","schema_version":1,"submitted_at":1000}}"#,
+            canonical(&actor(None, Some("s1"), Some("lead"))),
             canonical(&id)
         )
     );
@@ -478,7 +507,7 @@ fn log_reads_applied_rows_newest_first_from_the_table() {
     assert_eq!(
         rows[0],
         json!({"action_type":"create_tag","domain":"work",
-            "actor":{"actor_trust":"self_reported","agent":"ag","client":"cli","principal":"agent"},
+            "actor":actor(Some("ag"), None, None),
             "submitted_at":"1970-01-01T00:50:00Z","outcome":"applied",
             "action_id":applied[2]["action_id"],"edits":applied[2]["edits"]})
     );
@@ -651,14 +680,14 @@ fn log_reads_refusals_and_skips_bad_lines() {
     assert_eq!(
         rows[0],
         json!({"action_type":"check_probe_kind","domain":"work",
-            "actor":{"actor_trust":"self_reported","client":"cli","principal":"agent","role":"lead"},
+            "actor":actor(None, None, Some("lead")),
             "submitted_at":"1970-01-01T00:33:20Z","outcome":"refused","code":"submission_criteria",
             "failed":["kind_is_note"],"request_id":"k1"})
     );
     assert_eq!(
         rows[1],
         json!({"action_type":"create_tag","domain":"work",
-            "actor":{"actor_trust":"self_reported","agent":"a1","client":"cli","principal":"agent"},
+            "actor":actor(Some("a1"), None, None),
             "submitted_at":"1970-01-01T00:16:40Z","outcome":"refused","code":"invalid_parameter"})
     );
     let with = log(&t, json!({"outcome":"refused","parameters":true}));
@@ -1079,7 +1108,7 @@ fn without_a_role_ids_and_lines_are_as_before() {
     let (seq, entry) = db.action_log().unwrap().remove(0);
     assert_eq!(
         entry.actor,
-        json!({"actor_trust":"self_reported","agent":"ag","client":"cli","principal":"agent"})
+        actor(Some("ag"), None, None)
     );
     assert_eq!(
         std::fs::read_to_string(without.0.join("edits.jsonl")).unwrap(),
@@ -1090,4 +1119,54 @@ fn without_a_role_ids_and_lines_are_as_before() {
     let entry = db.action_log().unwrap().remove(0).1;
     assert_eq!(entry.actor["role"], "lead");
     assert_eq!(entry.actor["actor_trust"], "self_reported");
+}
+
+// log.md R13: rows carry the engine's host; the actor filter selects by it.
+#[test]
+fn log_rows_carry_the_host_and_filter_by_it() {
+    // spec: specs/ont/log.md#R13
+    // spec: specs/ont/log.md#R1
+    let t = installed();
+    let (code, answer) = apply(
+        &t,
+        json!({"action_type":"create_tag","parameters":{"label":"a"},"request_id":"h1","agent":"ag"}),
+    );
+    assert_eq!(code, 0, "{answer}");
+    let (code, _) = apply(
+        &t,
+        json!({"action_type":"create_tag","parameters":{"label":5},"request_id":"h2"}),
+    );
+    assert_eq!(code, 2);
+    // A line of the old form, written by the test.
+    let old = r#"{"action_type":"create_tag","actor":{"actor_trust":"self_reported","client":"cli","principal":"agent"},"code":"invalid_parameter","domain":"work","outcome":"refused","parameters":{"label":5},"request_id":"old1","schema_version":1,"submitted_at":900}"#;
+    let mut file = std::fs::OpenOptions::new()
+        .append(true)
+        .open(t.refusals())
+        .unwrap();
+    std::io::Write::write_all(&mut file, format!("{old}\n").as_bytes()).unwrap();
+    drop(file);
+
+    let here = json!({"host":node()});
+    let applied = log(&t, json!({"actor":here}));
+    assert_eq!(applied["rows"].as_array().unwrap().len(), 1, "{applied}");
+    assert_eq!(applied["rows"][0]["actor"], actor(Some("ag"), None, None));
+    let refused = log(&t, json!({"outcome":"refused","actor":here}));
+    let rows = refused["rows"].as_array().unwrap();
+    assert_eq!(rows.len(), 1, "{refused}");
+    assert_eq!(rows[0]["request_id"], "h2");
+    assert_eq!(rows[0]["actor"], actor(None, None, None));
+    for outcome in ["applied", "refused"] {
+        let none = log(&t, json!({"outcome":outcome,"actor":{"host":"no-such-node-0"}}));
+        assert_eq!(none["rows"], json!([]), "{none}");
+    }
+    // The old line is returned as written, with no `host` and no `claimed`.
+    let all = log(&t, json!({"outcome":"refused"}));
+    let rows = all["rows"].as_array().unwrap();
+    assert_eq!(rows.len(), 2, "{all}");
+    let old_row = rows.iter().find(|r| r["request_id"] == "old1").unwrap();
+    assert_eq!(
+        old_row["actor"],
+        json!({"actor_trust":"self_reported","client":"cli","principal":"agent"})
+    );
+    assert!(old_row["actor"].get("host").is_none() && old_row["actor"].get("claimed").is_none());
 }

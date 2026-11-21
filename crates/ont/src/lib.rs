@@ -87,11 +87,14 @@ pub fn check_uid(real: u32, effective: u32) -> Result<(), &'static str> {
 }
 
 /// What an operation needs besides its request: the store path, `now` and
-/// the self-reported attribution of the caller. `client` is the command's
-/// `--client` value (default `cli`); `agent` comes from the request field
-/// or `ONT_AGENT`; `session` is given per request; `role` comes from the
-/// request field `role` of an action or `ONT_ROLE`. All four are
-/// self-reported, as DESIGN section 7 states.
+/// the attribution the caller claims. `client` is the command's `--client`
+/// value (default `cli`); `agent` comes from the request field or
+/// `ONT_AGENT`; `session` is given per request; `role` comes from the
+/// request field `role` of an action or `ONT_ROLE`. These four members are
+/// the caller's claim (DESIGN section 7); the actor's `claimed` names them.
+/// The actor's `principal` and `host` are not members of `Context`: the
+/// engine reads them from the kernel itself (`principal::engine_identity`),
+/// and nothing a caller supplies sets either.
 #[derive(Debug, Clone)]
 #[non_exhaustive]
 pub struct Context {

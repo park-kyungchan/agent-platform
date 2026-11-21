@@ -571,6 +571,19 @@ pub fn run(args: &[String], stdin: impl Read, real_uid: u32, effective_uid: u32)
             0,
         );
     }
+    // The host's default store keeps the real clock: `--now` is for a store
+    // of a test or a rehearsal, so it is refused there by any spelling.
+    if cli.now.is_some() && cli.store_given && crate::schema::install_requires_commit(&cli.store) {
+        return render(
+            Err(Refusal::input(
+                "now_at_default_store",
+                "--now",
+                "not allowed when --store names the default store",
+            )
+            .into()),
+            0,
+        );
+    }
     if let Err(code) = check_uid(real_uid, effective_uid) {
         return render(Err(Refusal::new(code).into()), 0);
     }

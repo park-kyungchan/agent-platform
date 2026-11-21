@@ -18,6 +18,7 @@ Moved from crates/ont/README.md ("Reading the action log", "History") at cf328f3
 - R10: Answer: the envelope of the other reads (`schema` holds every installed domain).
 - R11: `result` is `{"rows":[...],"continuation":C,"withheld":N,"skipped":N,"scan_limited":B}` with the rows newest first. A row holds `action_type`, `domain`, `actor`, `submitted_at` as a UTC string, and `outcome`; an applied row also `action_id` and `edits` as logged; a refused row also `code` and, when recorded, `failed` and `request_id`; `parameters` only when the request asked for them.
 - R12: Paging is that of `search`: `continuation` is null when no older row is left, otherwise a string to pass with the same request for the next older rows.
+- R13: A row's `actor` is the logged one, never rewritten: a row logged since `specs/ont/action.md` R101 holds the engine's `principal` and `host` and names its claimed members in `claimed`; an older row or line has `principal` `agent`, no `host` and no `claimed`. The `actor` filter of R1 matches `principal` and `host` like any string member, for example `{"host":"<node>"}`, so it selects the rows one node applied; an older row matches no `host`.
 
 ## History
 

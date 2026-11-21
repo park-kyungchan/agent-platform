@@ -8,6 +8,40 @@ use std::collections::{BTreeMap, BTreeSet};
 
 pub const PRINCIPAL: &str = "agent";
 
+/// The kernel file that holds the node name of the reader's UTS namespace
+/// (what `uname -n` prints).
+const NODE_NAME_FILE: &str = "/proc/sys/kernel/hostname";
+
+/// Who the engine is for one call: the OS account and the node it runs on,
+/// as the kernel reports them. Nothing the caller supplies reaches it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct EngineIdentity {
+    /// `uid:<n>`, n the real uid of this process.
+    pub principal: String,
+    /// The node name of this process, without a line end.
+    pub host: String,
+}
+
+/// Read the engine's identity from the kernel, now. Fails (internal,
+/// `actor_identity_unreadable`) when the node name cannot be read, is empty
+/// or is not UTF-8. This is the one place that reads it; it takes no
+/// argument, so no request, option, environment variable or `Context` member
+/// can set either value.
+pub fn engine_identity() -> Result<EngineIdentity, Failure> {
+    let unreadable = || Failure::Internal(internal!("actor_identity_unreadable"));
+    let uid = rustix::process::getuid().as_raw();
+    let bytes = std::fs::read(NODE_NAME_FILE).map_err(|_| unreadable())?;
+    let text = String::from_utf8(bytes).map_err(|_| unreadable())?;
+    let host = text.strip_suffix('\n').unwrap_or(&text);
+    if host.is_empty() {
+        return Err(unreadable());
+    }
+    Ok(EngineIdentity {
+        principal: format!("uid:{uid}"),
+        host: host.to_string(),
+    })
+}
+
 /// What one grant of the principal allows, with its scope built.
 #[derive(Debug, Clone)]
 pub struct GrantEntry {

@@ -2,7 +2,7 @@
 //! Ontology-owned types: grant check, parameter typing, expected-head
 //! check, criteria, observations and the `action_log` row in ONE
 //! IMMEDIATE transaction, then the `edits.jsonl` append after commit.
-use crate::principal::Principal;
+use crate::principal::{EngineIdentity, Principal, engine_identity};
 use crate::refusal::{open_store, st, store_err};
 use crate::{Answer, Context, Failure, Refusal, internal, sha256_hex};
 use ont_core::schema::{
@@ -300,12 +300,31 @@ fn check_parameters_size(params: &Value) -> Result<(), Failure> {
     }
     Ok(())
 }
-fn actor_json(ctx: &Context, agent: &Option<String>, session: &Option<String>) -> Value {
+fn actor_json(
+    ctx: &Context,
+    identity: &EngineIdentity,
+    agent: &Option<String>,
+    session: &Option<String>,
+) -> Value {
     let agent = agent.clone().or_else(|| ctx.agent.clone());
     let session = session.clone().or_else(|| ctx.session.clone());
     let client = effective_client(ctx);
+    // The caller's claim: `client` always, the others when held. Sorted.
+    let mut claimed = vec!["client"];
+    if agent.is_some() {
+        claimed.push("agent");
+    }
+    if ctx.role.is_some() {
+        claimed.push("role");
+    }
+    if session.is_some() {
+        claimed.push("session");
+    }
+    claimed.sort_unstable();
     let mut m = Map::new();
-    m.insert("principal".into(), json!("agent"));
+    m.insert("principal".into(), json!(identity.principal));
+    m.insert("host".into(), json!(identity.host));
+    m.insert("claimed".into(), json!(claimed));
     m.insert("client".into(), json!(client));
     m.insert("actor_trust".into(), json!("self_reported"));
     if let Some(a) = agent {
@@ -2588,6 +2607,8 @@ fn check_create_keys(schema: &Schema, at: &ActionType, name: &str) -> Result<(),
 }
 
 pub fn validate_action(ctx: &Context, req: &ValidateActionRequest) -> Result<Answer, Failure> {
+    // Read once, before any refusal: the one identity this call uses.
+    let identity = engine_identity()?;
     let mut store = open_store(&ctx.store, false)?;
     let set = st!(store.schema_set()).clone();
     let principal = Principal::bind(&set)?;
@@ -2623,7 +2644,7 @@ pub fn validate_action(ctx: &Context, req: &ValidateActionRequest) -> Result<Ans
     let params_canon = canonical(&Value::Object(
         params.iter().map(|(k, v)| (k.clone(), v.clone())).collect(),
     ));
-    let actor = actor_json(ctx, &req.agent, &req.session);
+    let actor = actor_json(ctx, &identity, &req.agent, &req.session);
     let snap = load_snapshot(
         ctx,
         &set,
@@ -2765,14 +2786,17 @@ fn records_refusal(code: &str) -> bool {
 /// appends one line to `refusals.jsonl` (`specs/ont/action.md` "Refusal records"); the
 /// answer is the same whether or not the append succeeds.
 pub fn apply_action(ctx: &Context, req: &ApplyActionRequest) -> Result<Answer, Failure> {
+    // Read once, before any refusal: the one identity this call uses, in the
+    // criteria, the log row, the `edits.jsonl` line and the refusal line.
+    let identity = engine_identity()?;
     crate::refuse_read_only(ctx)?;
     let mut found: Option<(String, u64)> = None;
-    let result = apply_found(ctx, req, &mut found);
+    let result = apply_found(ctx, &identity, req, &mut found);
     if let (Err(Failure::Refused(refusal)), Some((domain, version))) = (&result, found)
         && records_refusal(refusal.code)
     {
         let mut line = json!({
-            "action_type":req.action_type,"actor":actor_json(ctx, &req.agent, &req.session),
+            "action_type":req.action_type,"actor":actor_json(ctx, &identity, &req.agent, &req.session),
             "code":refusal.code,"domain":domain,"outcome":"refused",
             "parameters":canonical(&req.parameters),"schema_version":version,"submitted_at":ctx.now
         });
@@ -2791,6 +2815,7 @@ pub fn apply_action(ctx: &Context, req: &ApplyActionRequest) -> Result<Answer, F
 
 fn apply_found(
     ctx: &Context,
+    identity: &EngineIdentity,
     req: &ApplyActionRequest,
     found: &mut Option<(String, u64)>,
 ) -> Result<Answer, Failure> {
@@ -2834,7 +2859,7 @@ fn apply_found(
     let params_canon = canonical(&Value::Object(
         params.iter().map(|(k, v)| (k.clone(), v.clone())).collect(),
     ));
-    let actor = actor_json(ctx, &req.agent, &req.session);
+    let actor = actor_json(ctx, identity, &req.agent, &req.session);
     let mut captured: Option<Failure> = None;
     let mut outcome: Option<ApplyOutcome> = None;
     let write_result = store.write(ctx.now, |tx| {
