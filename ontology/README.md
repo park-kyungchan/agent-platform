@@ -1147,22 +1147,21 @@ refused `unit_not_draft` first (`page_not_reviewed` beside it when the digest ha
   unit without dependencies keeps its digest.
 
 ### The migration and the rehearsal
-`ontology/migrate` knew version 12 as its highest (section "Version 13" for the present one); its step is empty (no data migration). `ap deliver` installs this file by
+`ontology/migrate` knows version 12; its step is empty (no data migration). `ap deliver` installs this file by
 its existing schema step, and runs that step before it installs `ap`: between the two installs the old `ap`
 sends `ready_unit` without `page_digest`, and a `contract` or `effect` unit is refused `page_not_reviewed` (it
 fails safe). An `ap` rolled back below this change cannot make such a unit ready while the store is at version
 12; a plain unit is not affected.
 
-The second store of the rehearsal installs version 11 from Git by its commit and digest (above), and runs the
-walk of version 11 on it (since version 13 it also installs version 12 from Git by its commit and digest,
-section "Version 13", instead of the repository's file). Then it adds, still under version 11, a unit of class
+The second store of the rehearsal installs version 11 from Git by its commit and digest (above) instead of the
+repository's file, and runs the walk of version 11 on it. Then it adds, still under version 11, a unit of class
 `contract` with a dependency and a page review accepted after its last amendment, and installs the repository's
 file over the objects made under version 11: every object read under version 11 (tasks, decisions, requests,
 intents, criteria, units, reviews, runs, findings, holds) and ten views read the same; the schema differs from
 version 11 only in `ready_unit` and the version; `ont_describe` and `ont_action_list` stay within 262,144 bytes
 (the line `v12_mcp_bytes=`); `ontology/migrate` runs 11 12 (exit 0, the store unchanged), 9 12 (every row
-already done) and, at version 12, 12 13 (exit 2; since version 13 it is a known pair), and the pairs refused on the version 10
-part were (9, 13), (10, 10) and (10, 9) (since version 13: (9, 14), (10, 10) and (10, 9)). The walk of version 12, each refusal before the action it guards: `ready_unit` without `page_digest`
+already done) and 12 13 (exit 2), and the pairs refused on the version 10 part are (9, 13), (10, 10) and
+(10, 9). The walk of version 12, each refusal before the action it guards: `ready_unit` without `page_digest`
 on that unit, which has an accepted page review, refused `page_not_reviewed`; with a `page_digest` no accepted
 review of the unit has, refused `page_not_reviewed`; with a digest in capitals, `invalid_parameter`; then
 `amend_unit` changing only `depends_on`, `estimate_lines` and `implementer` (later than the review's start),
@@ -1170,6 +1169,8 @@ and `ready_unit` with the same `page_digest`, applied; again, `unit_not_draft`, 
 `unit_not_draft` and `page_not_reviewed`; `start_unit` of it. On a unit of class `effect` made under version
 12, a running page review and one closed `repair` of the digest given do not count, an accepting one does; a
 plain unit becomes ready without `page_digest`.
+
+Version 12 stays pinned as stated at the head of section "Version 13"; the migration and the rehearsal as they stand now are described in section "Version 13", "The migration and the rehearsal".
 
 ## Version 13: principles
 Version 12 remains pinned at
@@ -1240,11 +1241,17 @@ The grant of the domain reads `principle` and derives it as the other types are,
 - That a request listed in `requests` is current, or that its words say what the statement says: only that the
   listed objects are references.
 - A `parent` cannot be cleared by an amendment (an ordinary scalar or a reference has no clear by value).
+- That a principle named by `set_intent_principles` exists, is current, or is listed once: it stores a principle
+  that does not exist, a retired principle and an empty list, as given (its only refusal is `intent_not_open`).
+- That an intent drops a principle when it is retired: the intent keeps it in `principles`, `ont around` still
+  reaches it by `intent_principles`, and the view `principles` no longer shows its row.
 
 ### The migration and the rehearsal
 `ontology/migrate` knows version 13; its step is empty (no data migration), so a store at version 12 carries on
 with `ontology/migrate` 12 13 changing nothing. The line `HIGHEST = 13` names it; `13 14` and `9 14` are pairs it
-does not know (exit 2).
+does not know (exit 2). `12 13`, which `ontology/migrate` refused (exit 2) while its highest version was 12, is
+now a known pair; the pairs refused on the version 10 part of the rehearsal are (9, 14), (10, 10) and (10, 9)
+(they were (9, 13), (10, 10) and (10, 9) at version 12).
 
 The second store of the rehearsal installs version 12 from Git by its commit and digest (above) instead of the
 repository's file, and runs the walk of version 12 on it. Then it installs the repository's file over the objects
