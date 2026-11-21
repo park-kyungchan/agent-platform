@@ -193,7 +193,7 @@ fn tools() -> Vec<Tool> {
                 "name":"ont_action_validate",
                 "description":"Preview without writing. Use the body that will be applied, with the same request_id. action_type/parameters: ont_action_list; reference values: objects[].id from ont_search. If result.valid, apply the same arguments with result.basis as expected; otherwise fix failed criteria. agent/session are optional.",
                 "inputSchema":{"type":"object","additionalProperties":false,"required":["action_type","parameters"],
-                    "properties":{"action_type":s,"parameters":{"type":"object"},"request_id":request_id,"agent":actor,"session":actor,"role":actor,"expected":expected}}
+                    "properties":{"action_type":s,"domain":s,"parameters":{"type":"object"},"request_id":request_id,"agent":actor,"session":actor,"role":actor,"expected":expected}}
             }),
         },
         Tool {
@@ -202,7 +202,7 @@ fn tools() -> Vec<Tool> {
                 "name":"ont_action_apply",
                 "description":"Apply action_type/parameters from ont_action_list; reference values: objects[].id from ont_search; expected: validate result.basis. Every edits_log value means the change was made. On applied or already_applied continue; on refusal fix its code.",
                 "inputSchema":{"type":"object","additionalProperties":false,"required":["action_type","parameters","request_id"],
-                    "properties":{"action_type":s,"parameters":{"type":"object"},"request_id":request_id,"agent":actor,"session":actor,"role":actor,"expected":expected}}
+                    "properties":{"action_type":s,"domain":s,"parameters":{"type":"object"},"request_id":request_id,"agent":actor,"session":actor,"role":actor,"expected":expected}}
             }),
         },
         Tool {

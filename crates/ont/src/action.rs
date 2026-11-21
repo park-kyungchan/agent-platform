@@ -2,7 +2,9 @@
 //! Ontology-owned types: grant check, parameter typing, expected-head
 //! check, criteria, observations and the `action_log` row in ONE
 //! IMMEDIATE transaction, then the `edits.jsonl` append after commit.
-use crate::principal::{EngineIdentity, Principal, engine_identity};
+use crate::principal::{
+    EngineIdentity, Principal, RoleResolver, engine_identity, not_granted, role_checked,
+};
 use crate::refusal::{open_store, st, store_err};
 use crate::{Answer, Context, Failure, Refusal, internal, sha256_hex};
 use ont_core::schema::{
@@ -193,7 +195,7 @@ pub fn canonical(v: &Value) -> Value {
         other => other.clone(),
     }
 }
-fn canonical_string(v: &Value) -> String {
+pub(crate) fn canonical_string(v: &Value) -> String {
     serde_json::to_string(&canonical(v)).unwrap_or_default()
 }
 fn parameter_field(name: &str) -> String {
@@ -295,7 +297,7 @@ fn resolve_action_type<'a>(
         .into()),
     }
 }
-fn valid_actor_field(s: &str) -> bool {
+pub(crate) fn valid_actor_field(s: &str) -> bool {
     !s.is_empty()
         && s.len() <= 64
         && s.bytes()
@@ -308,7 +310,7 @@ fn effective_client(ctx: &Context) -> String {
         ctx.client.clone()
     }
 }
-fn check_actor_bounds(
+pub(crate) fn check_actor_bounds(
     ctx: &Context,
     agent: &Option<String>,
     session: &Option<String>,
@@ -347,7 +349,7 @@ fn check_parameters_size(params: &Value) -> Result<(), Failure> {
     }
     Ok(())
 }
-fn actor_json(
+pub(crate) fn actor_json(
     ctx: &Context,
     identity: &EngineIdentity,
     agent: &Option<String>,
@@ -2790,22 +2792,46 @@ fn ambiguous_rule_target(name: &str, rule: usize) -> Failure {
         .into()
 }
 
+/// The grant check of an action found in the domain of `schema`
+/// (`specs/ont/action.md` R112 to R114): the role is resolved, the
+/// principal bound with the grants that apply to it, and the action must be
+/// listed by one of them in that domain; else `not_granted` in a
+/// role-checked domain and `action_forbidden` in any other.
+fn admit_action(
+    set: &SchemaSet,
+    schema: &Schema,
+    name: &str,
+    roles: &RoleResolver<'_>,
+) -> Result<Principal, Failure> {
+    let role = roles.resolve(schema)?;
+    let principal = Principal::bind_role(set, role)?;
+    if !principal.view().action_types(&schema.domain).contains(name) {
+        if role_checked(schema) {
+            return Err(not_granted().into());
+        }
+        return Err(Refusal::new("action_forbidden").into());
+    }
+    Ok(principal)
+}
+
 pub fn validate_action(ctx: &Context, req: &ValidateActionRequest) -> Result<Answer, Failure> {
     // Read once, before any refusal: the one identity this call uses.
     let identity = engine_identity()?;
     let mut store = open_store(&ctx.store, false)?;
     let set = st!(store.schema_set()).clone();
-    let principal = Principal::bind(&set)?;
     let (schema, at) = resolve_action_type(&set, &req.action_type, req.domain.as_deref())?;
     let (schema, at) = (schema.clone(), at.clone());
-    if !principal
-        .view()
-        .action_types(&schema.domain)
-        .contains(&req.action_type)
-    {
-        return Err(Refusal::new("action_forbidden").into());
+    // In a role-checked domain the claimed members are bounded before the
+    // role is resolved; elsewhere the order of the base stays.
+    let checked = role_checked(&schema);
+    if checked {
+        check_actor_bounds(ctx, &req.agent, &req.session)?;
     }
-    check_actor_bounds(ctx, &req.agent, &req.session)?;
+    let roles = RoleResolver::new(&ctx.store, &identity.principal, ctx.role.as_deref());
+    let principal = admit_action(&set, &schema, &req.action_type, &roles)?;
+    if !checked {
+        check_actor_bounds(ctx, &req.agent, &req.session)?;
+    }
     check_parameters_size(&req.parameters)?;
     if let Some(r) = &req.request_id
         && !valid_request_id(r)
@@ -3018,21 +3044,17 @@ fn apply_found(
     check_parameters_size(&req.parameters)?;
     let mut store = open_store(&ctx.store, true)?;
     let set = st!(store.schema_set()).clone();
-    let principal = Principal::bind(&set)?;
-    let revision = principal.revision()?;
     let (schema, at) = resolve_action_type(&set, &req.action_type, req.domain.as_deref())?;
     let (schema, at) = (schema.clone(), at.clone());
     *found = Some((
         schema.domain.clone(),
         set.pin(&schema.domain).map(|p| p.version).unwrap_or(0),
     ));
-    if !principal
-        .view()
-        .action_types(&schema.domain)
-        .contains(&req.action_type)
-    {
-        return Err(Refusal::new("action_forbidden").into());
-    }
+    // The roles file is read at most once in this call, here or in the
+    // transaction's repetition of the check.
+    let roles = RoleResolver::new(&ctx.store, &identity.principal, ctx.role.as_deref());
+    let principal = admit_action(&set, &schema, &req.action_type, &roles)?;
+    let revision = principal.revision()?;
     check_create_keys(&schema, &at, &req.action_type)?;
     check_rule_targets(&schema, &at, &req.action_type)?;
     let params = validate_parameters(&schema, &at, &req.parameters)?;
@@ -3047,10 +3069,7 @@ fn apply_found(
         let run = |tx: &mut ont_store::schema_mode::SchemaWrite<'_>| -> Result<ApplyOutcome, Failure> {
             let (tschema, tat) = resolve_action_type(&tx_set, &req.action_type, req.domain.as_deref())?;
             let (tschema, tat) = (tschema.clone(), tat.clone());
-            let tprincipal = Principal::bind(&tx_set)?;
-            if !tprincipal.view().action_types(&tschema.domain).contains(&req.action_type) {
-                return Err(Refusal::new("action_forbidden").into());
-            }
+            let tprincipal = admit_action(&tx_set, &tschema, &req.action_type, &roles)?;
             check_create_keys(&tschema, &tat, &req.action_type)?;
             check_rule_targets(&tschema, &tat, &req.action_type)?;
             let tparams = validate_parameters(&tschema, &tat, &req.parameters)?;

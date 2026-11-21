@@ -817,3 +817,50 @@ fn valid_document_nested_100_deep_in_source_options_checks() {
         vec![("invalid_source_option", "/sources/src/nested")]
     );
 }
+
+#[test]
+fn grant_role_and_functions_are_checked() {
+    // spec: specs/ont/schema-language.md#R28
+    let program =
+        json!({"parameters":{},"program":"/usr/bin/true","answer_bytes":16,"timeout_ms":100});
+    let mut m = base_value();
+    m["functions"] = json!({"count_things":program});
+    m["grants"][0]["role"] = json!("Writer");
+    m["grants"][0]["functions"] = json!(["count_things", "missing_fn"]);
+    let found = check_of(m);
+    assert_eq!(
+        pairs(&found),
+        vec![
+            ("invalid_name", "/grants/0/role"),
+            ("unknown_function", "/grants/0/functions/1"),
+        ]
+    );
+    assert!(ont_core::schema::codes::ALL.contains(&"unknown_function"));
+    // A valid role and declared functions check clean and keep their values.
+    let mut m = base_value();
+    m["functions"] = json!({"count_things":program});
+    m["grants"][0]["role"] = json!("writer_2");
+    m["grants"][0]["functions"] = json!(["count_things"]);
+    assert!(check_of(m.clone()).is_empty());
+    let schema: Schema = serde_json::from_value(m).unwrap();
+    assert_eq!(schema.grants[0].role.as_deref(), Some("writer_2"));
+    assert_eq!(schema.grants[0].functions, vec!["count_things".to_string()]);
+    // A role that is not a string is a parse fault of the member.
+    let mut m = base_value();
+    m["grants"][0]["role"] = json!(7);
+    let bytes = serde_json::to_vec(&m).unwrap();
+    assert!(Schema::check_bytes(&bytes, &BTreeSet::new()).is_err());
+    // A schema without the two members is unchanged: it checks clean, its
+    // grant has no role and no function, and it serializes without them.
+    let schema: Schema = serde_json::from_value(base_value()).unwrap();
+    assert!(schema.check(&BTreeSet::new()).is_empty());
+    assert_eq!(schema.grants[0].role, None);
+    assert!(schema.grants[0].functions.is_empty());
+    let back = serde_json::to_value(&schema.grants[0]).unwrap();
+    assert!(
+        back.get("role").is_none() && back.get("functions").is_none(),
+        "{back}"
+    );
+    let checked = Schema::check_bytes(EXAMPLE, &BTreeSet::new()).unwrap();
+    assert_eq!(checked.pin().sha256, EXAMPLE_SHA256);
+}

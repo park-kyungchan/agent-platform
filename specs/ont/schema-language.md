@@ -42,3 +42,11 @@ This is a Rust source API change requiring consumers to recompile; legacy Educat
 ## Names across domains
 
 - R27: Among the domains installed in one store, object type names and view names are unique (`duplicate_type_name` at check and at install). Action type names, link type names with their forward and reverse names, and function names are unique inside one schema and may repeat across domains; a name that may repeat is always resolved in one domain (action.md R105 and R107, read.md R104, fn.md R5). `ont render` and the other reads take no `domain`.
+
+## Grants
+
+- R28: An entry of `grants` may hold, beside `principal`, `scope`, `read`, `derive` and `actions`, two optional members: `role`, a string under the schema's name rule (1 to 64 characters, a lowercase letter first, then lowercase letters, digits or underscore), and `functions`, an array of names of functions the schema declares. `ont schema check` and `ont schema install` refuse a `role` against the name rule with `invalid_name` at `/grants/<i>/role`, and a name in `functions` the schema does not declare with `unknown_function` at `/grants/<i>/functions/<j>`, as they refuse `unknown_action` at `/grants/<i>/actions/<j>`. `principal` stays required and as it is: the engine applies the grants whose principal is the word `agent`. The public type `SchemaGrant` of `ont-core` carries `role` and `functions` as public members.
+- R29: A grant without `role` is a grant of every call; a grant with `role` is a grant of the calls whose resolved role (action.md R112) is that role. A grant gives nothing outside its schema's domain (action.md R106).
+- R30: A domain is role-checked when a grant of its schema names a role or lists a function. A schema none of whose grants does is of the form before this requirement, and its domain answers every call as before it: the role stays the logged claim of action.md R12 to R17 and no roles file is read. A schema without the two members checks, installs and loads as before.
+
+Forward only: an `ont` older than this change refuses a schema whose grant holds `role` or `functions` (`unknown_field`), so the new `ont` is installed before such a schema.

@@ -1474,3 +1474,59 @@ fn oversized_committed_apply_retains_action_identity_and_outcome() {
         1
     );
 }
+
+#[test]
+fn action_tools_offer_domain() {
+    // spec: specs/ont/action.md#R105
+    let list = ont::mcp::tools_list();
+    for name in ["ont_action_validate", "ont_action_apply"] {
+        let tool = list["tools"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|t| t["name"] == name)
+            .unwrap();
+        assert_eq!(
+            tool["inputSchema"]["properties"]["domain"],
+            json!({"type":"string"}),
+            "{name}"
+        );
+    }
+    // Two domains that share an action name: `domain` reaches the named one.
+    let t = Temp::new();
+    let store = t.store("two.sqlite");
+    for domain in ["north", "south"] {
+        let note = format!("{domain}_note");
+        let schema = json!({
+            "format":"ontology-schema/v1","domain":domain,"version":1,
+            "namespace":{"instance":"test","account":"root"},
+            "object_types":{note.clone():{"owner":"ontology","primary_key":{"from":"$action_id"},
+                "properties":{"label":{"type":"string","required":true}}}},
+            "action_types":{"add_note":{"parameters":{"label":{"type":"string","required":true}},
+                "rules":[{"create_object":note,"set":{"label":"$label"}}]}},
+            "grants":[{"principal":"agent","read":[note],"actions":["add_note"]}]
+        });
+        let file = t.0.join(format!("{domain}.json"));
+        std::fs::write(&file, schema.to_string()).unwrap();
+        let (code, out, _) = sub(&store, &["schema", "install", file.to_str().unwrap()], b"");
+        assert_eq!(code, 0, "{out}");
+    }
+    let mut server = ont::mcp::Server::new(action_config(&store, "test"), &ont::cli::execute);
+    let body = json!({"action_type":"add_note","parameters":{"label":"x"},"request_id":"d-1"});
+    let answer = action_call(&mut server, "ont_action_validate", body.clone());
+    assert_eq!(answer["code"], "action_ambiguous", "{answer}");
+    for domain in ["south", "north"] {
+        let mut body = body.clone();
+        body["domain"] = json!(domain);
+        body["request_id"] = json!(format!("d-{domain}"));
+        let answer = action_call(&mut server, "ont_action_validate", body.clone());
+        assert_eq!(answer["result"]["valid"], true, "{answer}");
+        let answer = action_call(&mut server, "ont_action_apply", body);
+        assert_eq!(answer["result"]["outcome"], "applied", "{answer}");
+        assert_eq!(
+            answer["result"]["edits"][0]["id"]["object_type"],
+            format!("{domain}_note"),
+            "{answer}"
+        );
+    }
+}
