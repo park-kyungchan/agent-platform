@@ -1478,13 +1478,15 @@ fn present<'de, D: serde::Deserializer<'de>, T: Deserialize<'de>>(
 }
 
 /// Every member either form of a view may hold; `blocks` chooses the form.
+/// `filter` keeps a written `null` apart from an absent member: a table view
+/// reads `null` as no filter, a document refuses the member in any form.
 #[derive(Deserialize)]
-#[serde(deny_unknown_fields)]
+#[serde(deny_unknown_fields, rename = "ViewDef")]
 struct ViewMembers {
     #[serde(default, deserialize_with = "present")]
     object_type: Option<String>,
-    #[serde(default)]
-    filter: Option<Value>,
+    #[serde(default, deserialize_with = "present")]
+    filter: Option<Option<Value>>,
     #[serde(default, deserialize_with = "present")]
     args: Option<Vec<String>>,
     #[serde(default, deserialize_with = "present")]
@@ -1500,43 +1502,71 @@ struct ViewMembers {
 }
 const DOCUMENT_MEMBERS: &[&str] = &["blocks", "args", "description"];
 
+const VIEW_MEMBERS: &[&str] = &[
+    "object_type",
+    "filter",
+    "args",
+    "order",
+    "columns",
+    "limit",
+    "description",
+    "blocks",
+];
+fn view_from_members<E: serde::de::Error>(m: ViewMembers) -> Result<View, E> {
+    let Some(blocks) = m.blocks else {
+        // A table view: the members and the order of missing-member errors
+        // of the derived form.
+        return Ok(View::Table(ViewDef {
+            object_type: m
+                .object_type
+                .ok_or_else(|| E::missing_field("object_type"))?,
+            filter: m.filter.flatten(),
+            args: m.args.unwrap_or_default(),
+            order: m.order.ok_or_else(|| E::missing_field("order"))?,
+            columns: m.columns.ok_or_else(|| E::missing_field("columns"))?,
+            limit: m.limit.unwrap_or_else(view_limit),
+            description: m.description,
+        }));
+    };
+    for (member, written) in [
+        ("object_type", m.object_type.is_some()),
+        ("filter", m.filter.is_some()),
+        ("order", m.order.is_some()),
+        ("columns", m.columns.is_some()),
+        ("limit", m.limit.is_some()),
+    ] {
+        if written {
+            return Err(E::unknown_field(member, DOCUMENT_MEMBERS));
+        }
+    }
+    Ok(View::Document(DocumentDef {
+        blocks,
+        args: m.args.unwrap_or_default(),
+        description: m.description,
+    }))
+}
+/// A map is a table view or a document; any other input is judged by the
+/// derived `ViewDef`, so its answers (a sequence form among them) stay those
+/// of a table view.
 impl<'de> Deserialize<'de> for View {
     fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        use serde::de::Error as _;
-        let m = ViewMembers::deserialize(deserializer)?;
-        let Some(blocks) = m.blocks else {
-            // A table view: the members and the order of missing-member
-            // errors of the derived form.
-            return Ok(View::Table(ViewDef {
-                object_type: m
-                    .object_type
-                    .ok_or_else(|| D::Error::missing_field("object_type"))?,
-                filter: m.filter,
-                args: m.args.unwrap_or_default(),
-                order: m.order.ok_or_else(|| D::Error::missing_field("order"))?,
-                columns: m
-                    .columns
-                    .ok_or_else(|| D::Error::missing_field("columns"))?,
-                limit: m.limit.unwrap_or_else(view_limit),
-                description: m.description,
-            }));
-        };
-        for (member, present) in [
-            ("object_type", m.object_type.is_some()),
-            ("filter", m.filter.is_some()),
-            ("order", m.order.is_some()),
-            ("columns", m.columns.is_some()),
-            ("limit", m.limit.is_some()),
-        ] {
-            if present {
-                return Err(D::Error::unknown_field(member, DOCUMENT_MEMBERS));
+        struct ViewVisitor;
+        impl<'de> serde::de::Visitor<'de> for ViewVisitor {
+            type Value = View;
+            fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                f.write_str("struct ViewDef")
+            }
+            fn visit_seq<A: serde::de::SeqAccess<'de>>(self, seq: A) -> Result<View, A::Error> {
+                ViewDef::deserialize(serde::de::value::SeqAccessDeserializer::new(seq))
+                    .map(View::Table)
+            }
+            fn visit_map<A: serde::de::MapAccess<'de>>(self, map: A) -> Result<View, A::Error> {
+                view_from_members(ViewMembers::deserialize(
+                    serde::de::value::MapAccessDeserializer::new(map),
+                )?)
             }
         }
-        Ok(View::Document(DocumentDef {
-            blocks,
-            args: m.args.unwrap_or_default(),
-            description: m.description,
-        }))
+        deserializer.deserialize_struct("ViewDef", VIEW_MEMBERS, ViewVisitor)
     }
 }
 impl Serialize for View {

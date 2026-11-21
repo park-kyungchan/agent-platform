@@ -1860,6 +1860,7 @@ fn document_schema_refusals_name_code_and_pointer() {
     for (member, value) in [
         ("object_type", json!("item")),
         ("filter", json!({"eq":["title","x"]})),
+        ("filter", Value::Null),
         ("order", json!([{"property":"rank","direction":"asc"}])),
         ("columns", json!([{"header":"Key","property":"$key"}])),
         ("limit", json!(5)),
@@ -2259,4 +2260,70 @@ fn document_is_one_generated_block_for_write_and_check() {
     );
     let text = std::fs::read_to_string(&file).unwrap();
     assert!(text.starts_with("before\n") && text.ends_with("\nafter\n"));
+}
+
+#[test]
+fn table_view_shape_errors_keep_the_base_answers() {
+    // spec: specs/ont/render.md#R1
+    let t = Temp::new();
+    for (value, field, rule, code) in [
+        (
+            json!(5),
+            "/views/items",
+            "expected struct ViewDef",
+            "invalid_schema",
+        ),
+        (
+            json!("x"),
+            "/views/items",
+            "expected struct ViewDef",
+            "invalid_schema",
+        ),
+        (
+            json!(null),
+            "/views/items",
+            "expected struct ViewDef",
+            "invalid_schema",
+        ),
+        (
+            json!([]),
+            "/views/items",
+            "expected struct ViewDef with 7 elements",
+            "invalid_schema",
+        ),
+    ] {
+        let mut s = schema();
+        s["views"]["items"] = value.clone();
+        let file = t.file("shape.json", &serde_json::to_vec(&s).unwrap());
+        let (exit, answer) = t.run(&["schema", "check", &file], json!({}));
+        assert_eq!(exit, 2, "{value}: {answer}");
+        assert_eq!(
+            (
+                answer["code"].as_str(),
+                answer["field"].as_str(),
+                answer["rule"].as_str()
+            ),
+            (Some("schema_violation"), Some(field), Some(rule)),
+            "{value}: {answer}"
+        );
+        assert_eq!(
+            answer["violations"],
+            json!([{"code":code,"pointer":"/views/items"}]),
+            "{value}: {answer}"
+        );
+    }
+    // The derived sequence form of a table view stays accepted, as on the base.
+    let mut s = schema();
+    s["views"]["items"] = json!([
+        "item",
+        null,
+        [],
+        [{"property":"rank","direction":"asc"}],
+        [{"header":"Key","property":"$key"}],
+        200,
+        null
+    ]);
+    let file = t.file("sequence.json", &serde_json::to_vec(&s).unwrap());
+    let (exit, answer) = t.run(&["schema", "check", &file], json!({}));
+    assert_eq!(exit, 0, "{answer}");
 }
