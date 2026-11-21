@@ -1,7 +1,7 @@
 //! `ap check` (`specs/ap/check.md`) as a command, against a fake PC: a fake `tailscale` on the
 //! PATH whose `ping` answers unless the file `down` exists and whose `ssh` runs the PC's command
 //! here, as the PC's user would, with only a PC's own environment (`HOME` and `PATH` of the fake
-//! PC); a stand-in `bwrap` on the fake PC's PATH that only changes directory and sets the variables
+//! PC), its `/proc/meminfo` and Windows' PowerShell mapped to files of the fake PC; a stand-in `bwrap` on the fake PC's PATH that only changes directory and sets the variables
 //! (one test runs the real `bwrap` instead). Every path is under a scratch directory: the policy
 //! file, the record file, the build lock and the PC's work directory.
 use serde_json::Value;
@@ -17,9 +17,10 @@ use std::{
 
 const TAILSCALE: &str = r#"#!/bin/sh
 # The fake PC, its state in the directory @PC@. ping: answers unless down exists. ssh: as ssh's
-# default SendEnv, LANG and LC_* of the caller go along; the probe reads loadavg and 4 CPUs; the run
-# keeps its command line and payload, and with lose ends as a lost connection before the command,
-# with lose-after after it (its status line dropped).
+# default SendEnv, LANG and LC_* of the caller go along; the probe reads loadavg, meminfo, the fake
+# PowerShell and 4 CPUs; the run reads meminfo, keeps its command line and payload, and with lose ends
+# as a lost connection before the command, with lose-after after it (its status line dropped), with
+# cut kills the script (its process group) once the sampler's file is there.
 pc=@PC@
 run() {
   set --
@@ -37,12 +38,21 @@ ssh)
   case $cmd in
   *ap-check-probe*)
     [ ! -e "$pc/probe-fails" ] || exit 255
-    cmd=$(printf '%s' "$cmd" | sed "s#/proc/loadavg#$pc/loadavg#; s#(nproc)#(echo 4)#")
+    cmd=$(printf '%s' "$cmd" | sed "s#/proc/loadavg#$pc/loadavg#; s#/proc/meminfo#$pc/meminfo#; s#/mnt/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe#$pc/powershell.exe#; s#(nproc)#(echo 4)#")
     run < /dev/null; exit ;;
   esac
   printf '%s' "$cmd" > "$pc/remote"
+  cmd=$(printf '%s' "$cmd" | sed "s#/proc/meminfo#$pc/meminfo#g")
   cat > "$pc/payload.tar"
   [ ! -e "$pc/lose" ] || exit 255
+  if [ -e "$pc/cut" ]; then
+    setsid env -i HOME="$pc/home" PATH="$pc/bin:/usr/bin:/bin" sh -c "$cmd" < "$pc/payload.tar" > /dev/null 2>&1 &
+    p=$! i=0
+    while [ -z "$(find "$pc/work/tmp" -name low 2>/dev/null)" ] && [ $i -lt 300 ]; do sleep 0.1; i=$((i + 1)); done
+    sleep 1
+    kill -KILL -- "-$p"
+    exit 255
+  fi
   if [ -e "$pc/lose-after" ]; then
     { run < "$pc/payload.tar" 2>&1 1>&3 | grep -av 'ap-check' >&2; } 3>&1
     exit 255
@@ -51,6 +61,26 @@ ssh)
 esac
 exit 2
 "#;
+
+const POWERSHELL: &str = r#"#!/bin/sh
+# Windows' PowerShell as interop runs it: its arguments kept, `during` noted while a command marks
+# itself running; fails with windows-fails; answers the file windows-free with CRLF.
+echo "$*" >> @PC@/powershell-calls
+[ ! -e @PC@/running ] || echo during >> @PC@/powershell-calls
+[ ! -e @PC@/windows-fails ] || exit 1
+printf '%s\r\n' "$(cat @PC@/windows-free)"
+"#;
+
+/// The fake PC's `/proc/meminfo` with `kb` available.
+fn meminfo(w: &World, kb: u64) {
+    write(
+        &w.p("pc/meminfo"),
+        &format!(
+            "MemTotal:       32000000 kB\nMemFree:          100000 kB\nMemAvailable:   {kb} kB\n"
+        ),
+        0o644,
+    );
+}
 
 const BWRAP: &str = r#"#!/bin/sh
 # A stand-in for bwrap: changes directory and sets the variables it is given, puts a link where a
@@ -154,6 +184,14 @@ impl World {
         }
         fs::create_dir_all(w.p("pc/bin")).unwrap();
         write(&w.p("pc/loadavg"), "0.10 0.10 0.10 1/100 1\n", 0o644);
+        // Linux 16,384 MB available, Windows 8,192 MB free: the PC has 8,192 MB.
+        meminfo(&w, 16_777_216);
+        write(
+            &w.p("pc/powershell.exe"),
+            &POWERSHELL.replace("@PC@", &w.s("pc")),
+            0o755,
+        );
+        write(&w.p("pc/windows-free"), "8388608", 0o644);
         // The PC user's own global excludes hide every .txt: they must not apply to the tree.
         write(&w.p("pc/home/ignore"), "*.txt\n", 0o644);
         let pc_gitconfig = format!("[core]\n\texcludesFile = {}\n", w.s("pc/home/ignore"));
@@ -339,6 +377,22 @@ fn r3_an_invalid_policy_is_refused_and_an_absent_one_runs_here() {
             r#"{"hosts": {"pc": {"ssh": "u@h", "work": "/w", "busy_load": 2}}}"#,
             "hosts.pc.busy_load ",
         ),
+        (
+            r#"{"hosts": {"pc": {"ssh": "u@h", "work": "/w", "busy_load": 0.5, "min_available_mb": -1}}}"#,
+            "hosts.pc.min_available_mb ",
+        ),
+        (
+            r#"{"hosts": {"pc": {"ssh": "u@h", "work": "/w", "busy_load": 0.5, "min_available_mb": 1048577}}}"#,
+            "hosts.pc.min_available_mb ",
+        ),
+        (
+            r#"{"hosts": {"pc": {"ssh": "u@h", "work": "/w", "busy_load": 0.5, "min_available_mb": 2048.5}}}"#,
+            "hosts.pc.min_available_mb ",
+        ),
+        (
+            r#"{"hosts": {"pc": {"ssh": "u@h", "work": "/w", "busy_load": 0.5, "max_jobs": 4}}}"#,
+            "hosts.pc ",
+        ),
         (r#"{"hosts": {"vps": {}}}"#, "hosts "),
     ] {
         w.policy(text);
@@ -384,7 +438,7 @@ fn r4_the_pc_runs_the_call_when_it_answers_and_is_not_busy() {
     // 3.00 is 0.75 of 4 CPUs: busy; just below it is not.
     write(&w.p("pc/loadavg"), "2.99 0.10 0.10 1/100 1\n", 0o644);
     assert_eq!(
-        run("check: on pc (4 CPUs, load 2.99)", tree),
+        run("check: on pc (4 CPUs, load 2.99, 8192 MB available)", tree),
         ("pc".into(), Value::Null)
     );
     write(&w.p("pc/loadavg"), "3.00 0.10 0.10 1/100 1\n", 0o644);
@@ -402,16 +456,119 @@ fn r4_the_pc_runs_the_call_when_it_answers_and_is_not_busy() {
         run("check: on this host (pc_unreachable)", &d),
         ("local".into(), "pc_unreachable".into())
     );
-    // The default command is ./check; its exit status is the call's.
     let _ = fs::remove_file(w.p("pc/down"));
     let _ = fs::remove_file(w.p("pc/probe-fails"));
     write(&w.p("pc/loadavg"), "0.20 0.10 0.10 1/100 1\n", 0o644);
+    // The memory: the smaller of Linux's MemAvailable and Windows' free memory, in MB rounded down,
+    // against min_available_mb, 2,048 when the policy does not give it.
+    let pc_ = |s: &str| format!("check: on pc (4 CPUs, load 0.20, {s} MB available)");
+    let memory = |r: &Value| {
+        Value::Array(
+            [
+                "pc_cpus",
+                "pc_load",
+                "pc_wsl_available_mb",
+                "pc_windows_available_mb",
+                "pc_available_mb",
+            ]
+            .iter()
+            .map(|k| r[*k].clone())
+            .collect(),
+        )
+    };
+    let calls_before = fs::read_to_string(w.p("pc/powershell-calls")).unwrap();
+    write(&w.p("pc/windows-free"), "2097152", 0o644);
+    assert_eq!(run(&pc_("2048"), tree), ("pc".into(), Value::Null));
+    write(&w.p("pc/windows-free"), "2097151", 0o644);
+    assert_eq!(
+        run("check: on this host (pc_memory_low)", &d),
+        ("local".into(), "pc_memory_low".into())
+    );
+    let r = w.records().pop().unwrap();
+    assert_eq!(memory(&r), serde_json::json!([4, 0.2, 16384, 2047, 2047]));
+    assert_eq!(r["pc_min_wsl_available_mb"], Value::Null);
+    // Linux short while Windows is not.
+    write(&w.p("pc/windows-free"), "8388608", 0o644);
+    meminfo(&w, 2_097_151);
+    assert_eq!(
+        run("check: on this host (pc_memory_low)", &d),
+        ("local".into(), "pc_memory_low".into())
+    );
+    assert_eq!(
+        memory(&w.records().pop().unwrap()),
+        serde_json::json!([4, 0.2, 2047, 8192, 2047])
+    );
+    // Busy and short of memory: busy, with what the probe read.
+    write(&w.p("pc/loadavg"), "3.00 0.10 0.10 1/100 1\n", 0o644);
+    assert_eq!(
+        run("check: on this host (pc_busy)", &d),
+        ("local".into(), "pc_busy".into())
+    );
+    assert_eq!(
+        memory(&w.records().pop().unwrap()),
+        serde_json::json!([4, 3.0, 2047, 8192, 2047])
+    );
+    write(&w.p("pc/loadavg"), "0.20 0.10 0.10 1/100 1\n", 0o644);
+    // Windows without an answer, failing, or answering no number: Linux's reading alone.
+    meminfo(&w, 3_072_000);
+    write(&w.p("pc/windows-free"), "not a number", 0o644);
+    assert_eq!(run(&pc_("3000"), tree), ("pc".into(), Value::Null));
+    write(&w.p("pc/windows-fails"), "", 0o644);
+    assert_eq!(run(&pc_("3000"), tree), ("pc".into(), Value::Null));
+    fs::remove_file(w.p("pc/windows-fails")).unwrap();
+    fs::rename(w.p("pc/powershell.exe"), w.p("pc/powershell.off")).unwrap();
+    assert_eq!(run(&pc_("3000"), tree), ("pc".into(), Value::Null));
+    assert_eq!(
+        memory(&w.records().pop().unwrap()),
+        serde_json::json!([4, 0.2, 3000, null, 3000])
+    );
+    fs::rename(w.p("pc/powershell.off"), w.p("pc/powershell.exe")).unwrap();
+    // The policy's bound is the one taken.
+    w.policy(&format!(
+        r#"{{"hosts": {{"pc": {{"ssh": "tester@fake-pc", "work": "{}", "busy_load": 0.75, "min_available_mb": 4096}}}}}}"#,
+        w.s("pc/work")
+    ));
+    assert_eq!(
+        run("check: on this host (pc_memory_low)", &d),
+        ("local".into(), "pc_memory_low".into())
+    );
+    // Linux's memory unread: the probe did not answer, and nothing of it is kept.
+    write(&w.p("pc/meminfo"), "MemTotal: 32000000 kB\n", 0o644);
+    assert_eq!(
+        run("check: on this host (pc_unreachable)", &d),
+        ("local".into(), "pc_unreachable".into())
+    );
+    let r = w.records().pop().unwrap();
+    assert_eq!(
+        memory(&r),
+        serde_json::json!([null, null, null, null, null])
+    );
+    // PowerShell ran once per probe that reached it, as the page's one call: no profile, no input.
+    let calls = fs::read_to_string(w.p("pc/powershell-calls")).unwrap();
+    let new: Vec<&str> = calls[calls_before.len()..].lines().collect();
+    assert_eq!(new.len(), 8, "{calls}");
+    for c in new {
+        assert_eq!(
+            c,
+            "-NoProfile -NonInteractive -Command (Get-CimInstance Win32_OperatingSystem).FreePhysicalMemory"
+        );
+    }
+    meminfo(&w, 16_777_216);
+    write(&w.p("pc/windows-free"), "8388608", 0o644);
+    w.policy(&format!(
+        r#"{{"hosts": {{"pc": {{"ssh": "tester@fake-pc", "work": "{}", "busy_load": 0.75}}}}}}"#,
+        w.s("pc/work")
+    ));
+    // The default command is ./check; its exit status is the call's.
     let out = w.ap(&[&d]);
     assert_eq!(out.status.code(), Some(3));
     assert_eq!(lines(&out.stdout), [format!("check ran in {tree}")]);
     assert_eq!(
         lines(&out.stderr),
-        ["check: on pc (4 CPUs, load 0.20)", "check err"]
+        [
+            "check: on pc (4 CPUs, load 0.20, 8192 MB available)",
+            "check err"
+        ]
     );
     w.no_policy();
     let out = w.ap(&[&d]);
@@ -796,9 +953,45 @@ fn r10_at_the_timeout_the_status_is_124_and_no_process_is_left() {
             t.elapsed()
         );
         assert!(!running(token), "{place}: a process of the call is left");
+        // The memory sampler as well, though it is a session of its own.
+        assert!(!running(&sampler(&w)), "{place}: the sampler is left");
         let r = w.records().pop().unwrap();
         assert_eq!(r["exit"], 124);
+        if place == "pc" {
+            assert_eq!(r["pc_min_wsl_available_mb"], 16384);
+        }
     }
+    // The connection cut while the command runs: the script is killed, and its sampler ends by itself.
+    w.policy(&format!(
+        r#"{{"hosts": {{"pc": {{"ssh": "tester@fake-pc", "work": "{}", "busy_load": 0.75}}}}}}"#,
+        w.s("pc/work")
+    ));
+    write(&w.p("pc/cut"), "", 0o644);
+    let out = w.ap(&[
+        &d,
+        "--timeout",
+        "30",
+        "--",
+        "sh",
+        "-c",
+        "sleep 3; :",
+        "ap-check-cut-c3",
+    ]);
+    assert_eq!(out.status.code(), Some(0), "{out:?}");
+    assert_eq!(
+        lines(&out.stderr).last().unwrap(),
+        "check: on this host (pc_lost)"
+    );
+    let t = Instant::now();
+    while running(&sampler(&w)) && t.elapsed() < Duration::from_secs(10) {
+        std::thread::sleep(Duration::from_millis(200));
+    }
+    assert!(!running(&sampler(&w)), "the sampler is left after the cut");
+}
+
+/// The command line of a sampler of this world's calls.
+fn sampler(w: &World) -> String {
+    format!("ap-check-sampler {}", w.s("pc/work/tmp/"))
 }
 
 // spec: specs/ap/check.md#R11
@@ -815,7 +1008,7 @@ fn r11_a_lost_call_runs_here_once_and_the_commands_255_is_its_own() {
     assert_eq!(
         lines(&out.stderr),
         [
-            "check: on pc (4 CPUs, load 0.10)",
+            "check: on pc (4 CPUs, load 0.10, 8192 MB available)",
             "check: on this host (pc_lost)"
         ]
     );
@@ -824,6 +1017,11 @@ fn r11_a_lost_call_runs_here_once_and_the_commands_255_is_its_own() {
     assert_eq!(
         (r["host"].as_str(), r["reason"].as_str()),
         (Some("local"), Some("pc_lost"))
+    );
+    // What the probe read is kept; no lowest memory came back.
+    assert_eq!(
+        (&r["pc_available_mb"], &r["pc_min_wsl_available_mb"]),
+        (&Value::from(8192), &Value::Null)
     );
     // The command ran there, but its status never came back: once more here.
     fs::remove_file(w.p("pc/lose")).unwrap();
@@ -841,7 +1039,10 @@ fn r11_a_lost_call_runs_here_once_and_the_commands_255_is_its_own() {
     fs::remove_file(w.p("pc/lose-after")).unwrap();
     let out = w.ap(&[&d, "--", "sh", "-c", "exit 255"]);
     assert_eq!(out.status.code(), Some(255));
-    assert_eq!(lines(&out.stderr), ["check: on pc (4 CPUs, load 0.10)"]);
+    assert_eq!(
+        lines(&out.stderr),
+        ["check: on pc (4 CPUs, load 0.10, 8192 MB available)"]
+    );
     let r = w.records().pop().unwrap();
     assert_eq!(
         (r["host"].as_str(), r["exit"].as_i64()),
@@ -960,6 +1161,12 @@ fn r15_each_call_appends_one_record_line() {
         "exit",
         "head",
         "host",
+        "pc_available_mb",
+        "pc_cpus",
+        "pc_load",
+        "pc_min_wsl_available_mb",
+        "pc_windows_available_mb",
+        "pc_wsl_available_mb",
         "reason",
         "repository",
         "seconds",
@@ -988,6 +1195,19 @@ fn r15_each_call_appends_one_record_line() {
         (Some("pc"), &Value::Null, Some(7))
     );
     assert_eq!(r[0]["command"], serde_json::json!(["sh", "-c", "exit 7"]));
+    // On the PC: what the probe read, and the lowest Linux memory while the command ran.
+    for (k, v) in [
+        ("pc_cpus", Value::from(4)),
+        ("pc_load", Value::from(0.1)),
+        ("pc_wsl_available_mb", Value::from(16384)),
+        ("pc_windows_available_mb", Value::from(8192)),
+        ("pc_available_mb", Value::from(8192)),
+        ("pc_min_wsl_available_mb", Value::from(16384)),
+    ] {
+        assert_eq!((k, &r[0][k]), (k, &v));
+        // Here without a probe: nothing of the PC.
+        assert_eq!((k, &r[1][k]), (k, &Value::Null));
+    }
     assert_eq!(
         (
             r[1]["host"].as_str(),
@@ -997,6 +1217,30 @@ fn r15_each_call_appends_one_record_line() {
         (Some("local"), Some("no_pc_in_policy"), Some(3))
     );
     assert_eq!(r[1]["command"], serde_json::json!(["./check"]));
+    // The lowest MemAvailable while the command ran, sampled every 2 seconds outside it, in MB
+    // rounded down; no PowerShell meanwhile.
+    w.policy(&format!(
+        r#"{{"hosts": {{"pc": {{"ssh": "tester@fake-pc", "work": "{}", "busy_load": 0.75}}}}}}"#,
+        w.s("pc/work")
+    ));
+    let used = "touch \"$1/running\"; printf 'MemAvailable: 1049599 kB\\n' > \"$1/meminfo\"; sleep 5; \
+                printf 'MemAvailable: 16777216 kB\\n' > \"$1/meminfo\"; rm \"$1/running\"";
+    let calls = fs::read_to_string(w.p("pc/powershell-calls")).unwrap();
+    let out = w.ap(&[&d, "--", "sh", "-c", used, "x", &w.s("pc")]);
+    assert_eq!(out.status.code(), Some(0), "{out:?}");
+    let r = w.records().pop().unwrap();
+    assert_eq!(
+        (
+            &r["host"],
+            &r["pc_wsl_available_mb"],
+            &r["pc_min_wsl_available_mb"]
+        ),
+        (&Value::from("pc"), &Value::from(16384), &Value::from(1024))
+    );
+    let after = fs::read_to_string(w.p("pc/powershell-calls")).unwrap();
+    assert_eq!(after[calls.len()..].lines().count(), 1, "{after}");
+    assert!(!after.contains("during"), "{after}");
+    w.no_policy();
     // A record that cannot be written is said, and the status stays the command's.
     let out = w
         .command(&[&d, "--", "sh", "-c", "exit 5"])

@@ -122,6 +122,10 @@ fn r12_the_host_shape_passes_every_reader_after_one_read() {
         p.as_object_mut().unwrap().remove(m);
     }
     assert_eq!(check(&Fake::json(&p), None).unwrap()["status"], "ok");
+    // The PC's optional memory bound is taken by the reader `check`.
+    let mut p = host();
+    p["hosts"]["pc"]["min_available_mb"] = json!(4096);
+    assert_eq!(check(&Fake::json(&p), None).unwrap()["status"], "ok");
 }
 
 // spec: specs/ap/policy.md#R14
@@ -186,6 +190,16 @@ fn r14_one_planted_fault_per_reader_is_refused_by_that_reader() {
             json!({"pc": {"ssh": "nobody", "work": "/w", "busy_load": 0.5}})
         ),
         policy_invalid("check", "hosts.pc.ssh is not user@host")
+    );
+    assert_eq!(
+        refused(
+            "hosts",
+            json!({"pc": {"ssh": "u@pc", "work": "/w", "busy_load": 0.5, "min_available_mb": -1}})
+        ),
+        policy_invalid(
+            "check",
+            "hosts.pc.min_available_mb is not a whole number from 0 to 1048576"
+        )
     );
 }
 

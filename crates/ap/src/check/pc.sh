@@ -1,7 +1,8 @@
 # The PC's side of `ap check` (specs/ap/check.md R6 to R12), run as `bash -c` through `tailscale ssh`
 # with the payload of the worktree's state on standard input. Arguments: <work> <key> <nonce>
 # <seconds> <command>... Once the command's exit status is known it is the last thing written: one line
-# NUL `ap-check <nonce> <status>` on standard error. Without that line the caller counts the call lost.
+# NUL `ap-check <nonce> <status> <MB>` on standard error, <MB> the lowest MemAvailable of this Linux
+# while the command ran, `-` where no command ran. Without that line the caller counts the call lost.
 work=$1 key=$2 nonce=$3 limit=$4
 shift 4
 start=$(date +%s)
@@ -18,7 +19,10 @@ tree=$work/trees/$key repo=$work/repos/$key target=$work/targets/$key home=$work
 in=$work/tmp/$nonce.in tmp=$work/tmp/$nonce
 # Removes paths; a link is removed, never followed (find does not follow one, even as an argument).
 clean() { find "$@" -type d ! -perm -u=rwx -exec chmod u+rwx {} + 2>/dev/null; rm -rf -- "$@"; }
-trap 'clean "$in" "$tmp"' EXIT
+# The sampler of the memory (R11), its own process group and session: ended with the whole group.
+sampler=
+unsample() { [ -z "$sampler" ] || { kill -KILL -- "-$sampler" 2>/dev/null; wait "$sampler" 2>/dev/null; sampler=; }; }
+trap 'unsample; clean "$in" "$tmp"' EXIT
 mkdir -p -- "$work/trees" "$work/repos" "$work/targets" "$home" "$work/locks" "$work/used" "$in" "$tmp" || { say "work directory"; exit 3; }
 tar -x -C "$in" -f - || { say "payload"; exit 3; }
 cat >/dev/null
@@ -31,7 +35,7 @@ wait=$((start + limit - $(date +%s)))
 if ! flock -w "$wait" 9; then
   [ $(($(date +%s) - start)) -ge "$limit" ] || { say "lock"; exit 3; }
   clean "$in" "$tmp"; trap - EXIT
-  printf '\0ap-check %s %s\n' "$nonce" 124 >&2
+  printf '\0ap-check %s %s -\n' "$nonce" 124 >&2
   exit 0
 fi
 touch -- "$work/used/$key"
@@ -75,12 +79,26 @@ g update-index -z --index-info < "$in/index-info" || { say "index"; exit 3; }
 g update-index -q --refresh >/dev/null 2>&1
 mkdir -p -- "$target" || { say "target"; exit 3; }
 
-# The command: uid 0 of a user namespace, the root read-only but the tree (not its .git), the target directory, the
-# cargo home and the temporary directory, the network kept, under nice and the time left (R8, R10).
+# The memory while the command runs (R11): MemAvailable of this Linux in kB, read here, outside the
+# command's namespaces, once as it starts and every 2 seconds; the lowest kept in a file of the call
+# that the command cannot write. No Windows process runs meanwhile. The sampler writes nothing to
+# the session's streams and ends with this script (its group killed; by itself once the script is gone).
+mem() { sed -n 's/^MemAvailable: *\([0-9][0-9]*\) kB$/\1/p' /proc/meminfo 2>/dev/null; }
+low=$in/low
 left=$((start + limit - $(date +%s)))
 if [ "$left" -lt 1 ]; then
   rc=124
+  printf -- '-\n' > "$low"
 else
+  m=$(mem)
+  printf '%s\n' "${m:--}" > "$low"
+  setsid bash -c 'low=$(cat -- "$1"); while sleep 2 && kill -0 "$2" 2>/dev/null; do
+      m=$(sed -n "s/^MemAvailable: *\([0-9][0-9]*\) kB\$/\1/p" /proc/meminfo 2>/dev/null)
+      case $m in "" | *[!0-9]*) continue ;; esac
+      case $low in "" | *[!0-9]*) ;; *) [ "$m" -lt "$low" ] || continue ;; esac
+      low=$m; printf "%s\n" "$low" > "$1.new" && mv -f -- "$1.new" "$1"
+    done' ap-check-sampler "$low" "$$" </dev/null >/dev/null 2>&1 &
+  sampler=$!
   timeout -k 10 "$left" nice -n 10 bwrap --unshare-user --uid 0 --gid 0 --unshare-pid --die-with-parent --new-session \
     --ro-bind / / --dev /dev --proc /proc --bind "$tmp" /tmp \
     --bind "$tree" "$tree" --ro-bind "$repo" "$tree/.git" --bind "$target" "$target" --bind "$home" "$home" \
@@ -89,7 +107,10 @@ else
   rc=$?
   case $rc in 124 | 137) [ $(($(date +%s) - start)) -lt "$limit" ] || rc=124 ;; esac
 fi
+unsample
+lowest=$(cat -- "$low" 2>/dev/null)
+case $lowest in "" | *[!0-9]*) lowest=- ;; *) lowest=$((lowest / 1024)) ;; esac
 touch -- "$work/used/$key"
 clean "$in" "$tmp"
 trap - EXIT
-printf '\0ap-check %s %s\n' "$nonce" "$rc" >&2
+printf '\0ap-check %s %s %s\n' "$nonce" "$rc" "$lowest" >&2
