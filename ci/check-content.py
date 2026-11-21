@@ -30,7 +30,7 @@ CHANGING = {
 }
 # Names removed from the repository (skills, files): a file under content/ that still names one is a route to nothing.
 # A later removal adds its names here; the rule stays the one fault `retired_name`.
-RETIRED_NAMES = ["lessons-loop", "hindsight-control", "memory/README.md", "publish-memory", "evaluate-memory"]
+RETIRED_NAMES = ["lessons-loop", "hindsight-control", "memory/README.md", "publish-memory", "evaluate-memory", "explain-precisely"]
 errors = []
 
 

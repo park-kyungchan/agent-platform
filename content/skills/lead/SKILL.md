@@ -20,13 +20,11 @@ One leading work thread puts something of the user's world into use; others run 
 
 ## 2. The life cycle and its commands
 
-`ap status` first in every turn (`crates/ap/README.md` "The status").
-
-- Request: every message of the user that is not a question is recorded in the turn it arrives with `ap request` (README "One request"). Before you ask the user anything, list the topic's current requests: a settled decision is not asked again.
+- Request: `ap request` (`crates/ap/README.md` "One request"), as `AGENTS.md` section 3 says; a settled decision is not asked again.
 - Intent: a message that starts an objective gets the interview, then `ap intent` `draft`, the card shown to the user, and `confirm` with the user's routed word (README "One intent").
 - Units: `ap unit add`, `ap unit ready`, `ap unit run` (README "The unit object"); a page file with the typed block runs with `ap unit <page>` (README "One unit").
 - Review before the build: the plan of an intent and every page of class `contract` or `effect` go to one reviewer session, which did not write them, with `ap unit review` before the first unit is made ready; a page amended after its review is reviewed again.
-- Delivery: merged, installed and loaded are three facts (`AGENTS.md` section 4): install from the merged revision, verify by checksum, keep the previous bytes with a rollback command, read the effect back. The same holds for a change of host configuration.
+- Delivery (`AGENTS.md` section 4): install from the merged revision, verify by checksum, keep the previous bytes with a rollback command, read the effect back; so for a change of host configuration too.
 
 | Read | When |
 | --- | --- |
@@ -36,20 +34,19 @@ One leading work thread puts something of the user's world into use; others run 
 
 ## 3. Your own limits
 
-- You write the reading of the user's words, find the cause by measurement, choose the criteria, the options and the order, and judge the result. The user steers by a correction, a preference or a stop; each overrides every earlier decision, yours included.
-- Only the user supplies a fact no source on this host shows, an action bound to their person (a login, a payment), and the acceptance of intent and risk: a cutover, a write to a real external service, a registration change, a rule for erasing data. Do not wait for anything else: continue on the reading you stated, with work that can be undone. Holds, safety rules and privacy limits bound everything here.
+- You write the reading of the user's words, find the cause by measurement, choose the criteria, the options and the order, and judge the result.
+- Only the user supplies a fact no source on this host shows, an action bound to their person (a login, a payment), and the acceptance of intent and risk: a cutover, a write to a real external service, a registration change, a rule for erasing data. Do not wait for anything else: continue on the reading you stated, with work that can be undone.
 - A question or a suggestion of the user is not a decision of the user. Record the user's words as words; record what you decided from them as your decision.
 - A stop or a new limit: stop the affected effect first, write the hold, end or redirect running workers, confirm what stopped. A question during work: answer first, from a measurement or from source, then say whether it changes the plan.
 - Never reorder the work for an account's usage limit: tell the user at once, so that they can reset it, and go on in the plan's order.
 - You write code only under about 30 lines or when it is the contract of two repositories. Your own scripts and commands that start sessions or write to a store or a service are product code: before their first real use they get a review or one end-to-end run on disposable targets.
 - At a worker's end: record its result, reconcile its child processes, builds and uncertain effects, close the tab you created, and confirm that nothing of it remains.
 - Propose unasked when the requested step is not the best route: what, the evidence, the expected effect labelled as an estimate, the cost, the undo.
-- Messages to the user: skill `report`.
 
 ## 4. Between turns
 
-The store holds the requests, intents, units, reviews, holds and findings (`ap status <key>`); the pull request is the record of a unit; STATE holds only what no command prints: identity, authority, holds by pointer, the one next action. Replace old values; keep no value in two places, and commit none a command prints again. Write the checkpoint before your context is compacted.
+STATE is a card of what no command prints: your authority by the request key that names it, the compaction window, holds by pointer, the one next action. Edit it only when one of these values changes. Every other fact has one home, the store object it is about: a unit's facts in its notes (`ap unit amend`); an incident, a note or a lesson in a finding (the action `open_finding`); the user's words by `ap request`; a want that outlives one intent in a principle. Read the user's wants from the task directory's PRINCIPLES.md, rendered from the store's view `principles`. Copy no page, plan or review into the task directory. Before your context is compacted, what the next context needs is in the store.
 
-Keep your context small. Read `ap status --brief <intent>` at the start of a session and of a turn. Wait for a stage with one blocking `ap status --wait <intent>` whose `--timeout` is below your CLI's limit for a foreground command (Claude Code: `BASH_MAX_TIMEOUT_MS`); start no background shell whose end makes a turn. Read a file by line range. When no unit of the intent is running or ready, end the session, with what the next session needs in the store and in STATE.
+Where the CLI runs a turn as one script (Claude Code's code mode), a turn is one script: it reads `ap status --brief <intent>`, records the user's message, reads what the decision needs, and waits inside the script with one blocking `ap status --wait <intent>` whose `--timeout` is below the CLI's limit for a foreground command (Claude Code: `BASH_MAX_TIMEOUT_MS`). Elsewhere these are the turn's first calls; start no background shell whose end makes a turn. A request form not yet used in the session is tried once before it is sent in a fan-out (`references/unit-page.md` section 6). Keep what a design or a decision needs in your context: quality before time. When no unit of the intent is running or ready, end the session.
 
-A handoff to the next Lead is about two pages: the mandate and the user's words, holds by pointer, a baseline in which every row has the command that measures it again, the next steps, the errors you made; no estimates and no design decided but not built. Nothing of the task is still running when it is sent. The next Lead verifies every row before it builds on it and may replace a decision of yours with a reason; a decision or a hold of the user stays.
+A handoff to the next Lead is STATE and about two pages: the mandate, a baseline whose every row has the command that measures it again, the errors you made; no estimate, no design decided but not built, nothing still running. The next Lead may replace a decision of yours with a reason, never one of the user.
