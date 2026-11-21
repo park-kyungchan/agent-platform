@@ -1,7 +1,7 @@
 # Public runtime guidance content
 
 Reviewed distribution source for canonical `AGENTS.md`, runtime references and
-the generic `herdr`, `herdr-hermes`, `explain-precisely`, `lead` and `report` skill bundles. Repository source is edited through review and then installed on the host.
+the generic `herdr`, `herdr-hermes`, `lead` and `report` skill bundles. Repository source is edited through review and then installed on the host.
 This README is repository documentation, not an owned host entry.
 
 Generic Academy routing belongs to education-platform; private teaching/reporting
