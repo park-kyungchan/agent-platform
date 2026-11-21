@@ -7,6 +7,11 @@ BACKUP_DIR="${AP_BACKUP_DIR:-/var/lib/agent-platform/install}"
 while [[ "$BACKUP_DIR" != / && "$BACKUP_DIR" == */ ]]; do
   BACKUP_DIR="${BACKUP_DIR%/}"
 done
+BUILD_BASE="${AP_INSTALL_BUILD_DIR:-/var/lib/agent-platform/build}"
+# Strip trailing slashes: the check reads the base itself, never through a link.
+while [[ "$BUILD_BASE" != / && "$BUILD_BASE" == */ ]]; do
+  BUILD_BASE="${BUILD_BASE%/}"
+done
 INSTALLED="$INSTALL_DIR/ap"
 LOCK_FILE="/var/lib/agent-platform/build.lock"
 INSTALL_LOCK_FILE="${AP_INSTALL_LOCK:-/run/lock/ap-install.lock}"
@@ -58,6 +63,105 @@ check_backup_dir_usable() {
   fi
   if [[ ! -d "$BACKUP_DIR" || -L "$BACKUP_DIR" || ! -w "$BACKUP_DIR" ]]; then
     refuse "backup_dir_unusable" "$LINENO"
+  fi
+}
+
+# True when the component, read as it stands (never through a link), is a
+# directory owned by root or by the running uid that no group or other account
+# can write; a sticky directory counts as writable.
+build_component_safe() {
+  local path="$1"
+  if [[ -L "$path" ]]; then
+    return 1
+  fi
+  local meta=""
+  meta="$(stat -c '%u %a %F' -- "$path" 2>/dev/null)" || return 1
+  local owner="${meta%% *}"
+  local rest="${meta#* }"
+  local mode="${rest%% *}"
+  local kind="${rest#* }"
+  if [[ "$kind" != directory ]]; then
+    return 1
+  fi
+  if [[ "$owner" != 0 && "$owner" != "$EUID" ]]; then
+    return 1
+  fi
+  if (( (8#$mode & 8#1022) != 0 )); then
+    return 1
+  fi
+  return 0
+}
+
+# Walks the existing components of BUILD_BASE from / down; prints the deepest
+# failing one (empty when none) and stops at an absent component, a link or a
+# non-directory, so nothing is ever read through a link.
+build_base_failing_component() {
+  local failing=""
+  if ! build_component_safe /; then
+    failing=/
+  fi
+  local rest="${BUILD_BASE#/}"
+  local current=""
+  local comp=""
+  while [[ -n "$rest" ]]; do
+    comp="${rest%%/*}"
+    if [[ "$rest" == */* ]]; then
+      rest="${rest#*/}"
+    else
+      rest=""
+    fi
+    if [[ -z "$comp" ]]; then
+      continue
+    fi
+    current="$current/$comp"
+    if [[ ! -e "$current" && ! -L "$current" ]]; then
+      break
+    fi
+    if ! build_component_safe "$current"; then
+      failing="$current"
+    fi
+    if [[ -L "$current" || ! -d "$current" ]]; then
+      break
+    fi
+  done
+  printf '%s' "$failing"
+}
+
+check_build_base() {
+  if [[ "$BUILD_BASE" != /* ]]; then
+    refuse "build_dir_unsafe" "$LINENO" "$BUILD_BASE"
+  fi
+  # The base is cleared of every entry: the root directory never is one.
+  if [[ "$BUILD_BASE" == / ]]; then
+    refuse "build_dir_unsafe" "$LINENO" "/"
+  fi
+  local failing=""
+  failing="$(build_base_failing_component)"
+  if [[ -n "$failing" ]]; then
+    refuse "build_dir_unsafe" "$LINENO" "$failing"
+  fi
+  if [[ ! -e "$BUILD_BASE" && ! -L "$BUILD_BASE" ]]; then
+    if ! ( umask 077 && mkdir -p -- "$BUILD_BASE" ) 2>/dev/null; then
+      refuse "build_dir_unusable" "$LINENO"
+    fi
+    failing="$(build_base_failing_component)"
+    if [[ -n "$failing" ]]; then
+      refuse "build_dir_unsafe" "$LINENO" "$failing"
+    fi
+  fi
+  if [[ -L "$BUILD_BASE" || ! -d "$BUILD_BASE" ]]; then
+    refuse "build_dir_unusable" "$LINENO"
+  fi
+}
+
+# Removes every entry of the base, left by an install killed before its
+# cleanup; runs under the install lock. A link is removed as a link.
+clear_build_base() {
+  if ! find "$BUILD_BASE" -mindepth 1 -maxdepth 1 -exec rm -rf --one-file-system -- {} + 2>/dev/null; then
+    refuse "build_dir_unusable" "$LINENO"
+  fi
+  if [[ -n "$(find "$BUILD_BASE" -mindepth 1 -maxdepth 1 -print -quit 2>/dev/null)" ]]; then
+    refuse "build_dir_unusable" "$LINENO"
   fi
 }
 
@@ -126,6 +230,8 @@ do_install() {
   check_install_dir_usable
   acquire_install_lock
   check_backup_dir_usable yes
+  check_build_base
+  clear_build_base
   git -C "$REPO_ROOT" worktree prune
   local origin_main=""
   origin_main="$(git -C "$REPO_ROOT" rev-parse origin/main 2>/dev/null || true)"
@@ -135,8 +241,11 @@ do_install() {
   if [[ "$expected" != "$origin_main" ]]; then
     refuse "expected_not_origin_main" "$LINENO"
   fi
-  WORKTREE_DIR="$(mktemp -d)"
   trap cleanup_worktree EXIT
+  if ! WORKTREE_DIR="$(mktemp -d -- "$BUILD_BASE/ap.XXXXXXXXXX")"; then
+    WORKTREE_DIR=""
+    refuse "build_dir_unusable" "$LINENO"
+  fi
   if ! git -C "$REPO_ROOT" worktree add --detach "$WORKTREE_DIR" "$expected" >/dev/null; then
     refuse "worktree_add_failed" "$LINENO"
   fi
