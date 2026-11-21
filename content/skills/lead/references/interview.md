@@ -81,4 +81,4 @@ It does not rest on the model: `add_unit` in the lane `objective` without an int
 | 보드 | The board of the current task | — |
 | 정리, 손봐, 개선 | A request whose target and extent are open | Say first what you change and leave |
 
-A new expression goes into STATE with its reading; at its second task, a row here, by pull request.
+What a new expression resolved to is its request's reading (`ap request`); at its second task, a row of the glossary, by pull request.
