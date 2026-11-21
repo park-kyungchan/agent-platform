@@ -91,7 +91,7 @@
   "ceiling": 170
  },
  "work": {
-  "slots": 3,
+  "slots": 4,
   "slice": "agents.slice",
   "prefix": "ap-unit"
  },
