@@ -50,7 +50,7 @@ Three constraints keep schema admission and execution consistent:
 - R38: Id parameter validation ensures `native_key` is a string of 1 to 512 bytes, so a key accepted by validate is also usable by apply. Other criteria and revision conflicts may still prevent apply.
 - R39: Upsert modifies the live object under that key, or creates it if missing or retracted.
 
-- R40: Installed bytes load through `Schema::check_installed_bytes`: parsing, all other semantic checks and exact-byte pin verification still run, but only `ambiguous_create_key` is exempted. Reads, backup, compact and unaffected actions remain available.
+- R40: Installed bytes load through `Schema::check_installed_bytes`: parsing, all other semantic checks and exact-byte pin verification still run, but only `ambiguous_create_key` is exempted. Reads, backup and unaffected actions remain available.
 - R41: After authorization, validate/apply of an affected action refuse `ambiguous_create_key` with `pointer: /action_types/<action>`, without writing. Apply checks again inside its transaction, before idempotent replay.
 - R42: Schema-set composition rechecks every other rule. Strict `Schema::check_bytes` is required for every new install, including identical-byte reinstall and provenance-only updates of a schema with this violation.
 - R43: To repair, install a higher version using `/native_key` and exactly one required reference to the created type and one create/upsert rule per type. Other affected domains can await their own upgrades.
@@ -132,6 +132,6 @@ This fixes the representation; calendar validity requires tighter ranges too.
 - R96: An existing file that is not 0600 owned by the caller is not appended to. The append is not `fsync`ed.
 - R97: The answer of a refused apply is unchanged, byte for byte.
 - R98: A failure to append the line (a lock or file that cannot be opened, a full disk) never changes it either: the refusal is answered as without the record, and nothing is printed.
-- R99: `refusals.jsonl` is not part of `ont backup` and is not read by `ont compact`.
+- R99: `refusals.jsonl` is not part of `ont backup`.
 - R100: Nothing rotates or trims it: it grows by one line per recorded refusal, and a line holds at most the 65,536 bytes of canonical parameters plus the other members.
 
