@@ -7748,9 +7748,8 @@ fn limits_r2_a_scratch_below_a_linked_ancestor_is_refused() {
 #[test]
 fn r11_the_record_the_stream_and_the_error_file_are_owner_only() {
     let mut f = Fake::new();
-    let bits = |f: &Fake, rel: &str| {
-        std::fs::metadata(f.p(rel)).unwrap().permissions().mode() & 0o777
-    };
+    let bits =
+        |f: &Fake, rel: &str| std::fs::metadata(f.p(rel)).unwrap().permissions().mode() & 0o777;
     // The record while the CLI runs (the fake notes its mode), the stream and the error file of
     // a stage that wrote to standard error, and the record after the end.
     std::fs::write(f.t.join("bin/watch"), f.p("w.md.run.json")).unwrap();
