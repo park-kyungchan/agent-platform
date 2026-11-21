@@ -1,8 +1,8 @@
 //! `ap check` (`specs/ap/check.md`) as a command, against a fake PC: a fake `tailscale` on the
 //! PATH whose `ping` answers unless the file `down` exists and whose `ssh` runs the PC's command
 //! here, as the PC's user would, with only a PC's own environment (`HOME` and `PATH` of the fake
-//! PC), its `/proc/meminfo` and Windows' PowerShell mapped to files of the fake PC; a stand-in `bwrap` on the fake PC's PATH that only changes directory and sets the variables
-//! (one test runs the real `bwrap` instead). Every path is under a scratch directory: the policy
+//! PC), its `/proc/meminfo` and Windows' PowerShell mapped to files of the fake PC; a stand-in `bwrap` on the fake PC's PATH that changes directory, sets the variables and links the tree's `.git`
+//! to its repository, and touches no other path (two tests run the real `bwrap` instead). Every path is under a scratch directory: the policy
 //! file, the record file, the build lock and the PC's work directory.
 use serde_json::Value;
 use sha2::{Digest, Sha256};
@@ -84,16 +84,23 @@ fn meminfo(w: &World, kb: u64) {
 }
 
 const BWRAP: &str = r#"#!/bin/sh
-# A stand-in for bwrap: changes directory and sets the variables it is given, puts a link where a
-# read-only bind of a directory other than the root goes, then runs the command.
+# A stand-in for bwrap: changes directory, sets and unsets the variables it is given, and puts a
+# link for the one bind of the key's repository at the tree's .git: a read-only bind whose
+# destination lies below the fake PC @PC@ and is named .git, from another path. Every other bind and
+# option is passed over: it removes, makes or changes nothing else. Then it runs the command.
 while [ $# -gt 0 ]; do
   case $1 in
   --) shift; break ;;
   --chdir) cd "$2" || exit 1; shift 2 ;;
   --setenv) export "$2=$3"; shift 3 ;;
-  --bind) shift 3 ;;
-  --ro-bind) [ "$3" = / ] || { rm -rf "$3"; ln -s "$2" "$3"; }; shift 3 ;;
-  --dev | --proc | --uid | --gid) shift 2 ;;
+  --unsetenv) unset "$2"; shift 2 ;;
+  --ro-bind)
+    case $3 in
+    @PC@/*/.git) [ "$2" = "$3" ] || { rm -rf "$3"; ln -s "$2" "$3"; } ;;
+    esac
+    shift 3 ;;
+  --bind | --symlink) shift 3 ;;
+  --dev | --proc | --uid | --gid | --remount-ro | --tmpfs | --dir) shift 2 ;;
   *) shift ;;
   esac
 done
@@ -190,7 +197,11 @@ impl World {
             0o755,
         );
         if fake_bwrap {
-            write(&w.p("pc/bin/bwrap"), BWRAP, 0o755);
+            write(
+                &w.p("pc/bin/bwrap"),
+                &BWRAP.replace("@PC@", &w.s("pc")),
+                0o755,
+            );
         }
         fs::create_dir_all(w.p("pc/bin")).unwrap();
         write(&w.p("pc/loadavg"), "0.10 0.10 0.10 1/100 1\n", 0o644);
@@ -811,7 +822,8 @@ fn r7_only_the_payload_and_the_script_reach_the_pc() {
     );
 }
 
-/// Whether the real `bwrap` can make a user namespace here (not on every CI runner).
+/// Whether the real `bwrap` can make the namespaces the PC's script asks for here: a user, a PID
+/// and a network namespace (not on every CI runner).
 fn bwrap_works() -> bool {
     Command::new("bwrap")
         .args([
@@ -821,6 +833,7 @@ fn bwrap_works() -> bool {
             "--gid",
             "0",
             "--unshare-pid",
+            "--unshare-net",
             "--die-with-parent",
             "--new-session",
         ])
@@ -867,6 +880,36 @@ fn outside_tmp(candidates: &[&str]) -> PathBuf {
     panic!("no directory outside /tmp to make the world of r8 in: tried {candidates:?}");
 }
 
+/// The parents of a shown path that the view has of each of `/mnt`, `/run`, `/var`, `/root` and
+/// `/home` (`specs/ap/check.md` R8): the one name below it that leads to the world's root, else absent.
+fn parents_of(root: &Path) -> Vec<String> {
+    ["/mnt", "/run", "/var", "/root", "/home"]
+        .iter()
+        .map(|d| match root.strip_prefix(d) {
+            Ok(rest) => {
+                let name = rest.components().next().unwrap().as_os_str();
+                format!("{d}: {}", name.to_str().unwrap())
+            }
+            Err(_) => format!("{d} absent"),
+        })
+        .collect()
+}
+/// What a sandbox shows of each of the parents of `parents_of`, one line each.
+const PARENTS: &str = "for d in /mnt /run /var /root /home; do if [ -e \"$d\" ] || [ -L \"$d\" ]; then echo \"$d: $(ls -A \"$d\" | tr '\\n' ' ' | sed 's/ $//')\"; else echo \"$d absent\"; fi; done";
+/// The host's `/etc/resolv.conf` resolved through its links, where that is a file outside `/etc`.
+fn resolv_outside_etc() -> Option<PathBuf> {
+    fs::canonicalize("/etc/resolv.conf")
+        .ok()
+        .filter(|r| !r.starts_with("/etc") && r.is_file())
+}
+fn own_net() -> String {
+    fs::read_link("/proc/self/ns/net")
+        .unwrap()
+        .to_str()
+        .unwrap()
+        .to_owned()
+}
+
 // spec: specs/ap/check.md#R8
 #[test]
 fn r8_on_the_pc_the_command_is_uid_0_with_a_read_only_root_but_its_directories() {
@@ -876,32 +919,133 @@ fn r8_on_the_pc_the_command_is_uid_0_with_a_read_only_root_but_its_directories()
     }
     let parent = outside_tmp(&[env!("CARGO_TARGET_TMPDIR"), "/var/tmp"]);
     let w = World::within(Some(&parent), false);
-    let script = "id -u; for p in \"$PWD/x\" \"$CARGO_TARGET_DIR/x\" \"$CARGO_HOME/x\" /tmp/x \"$HOME/x\" /etc/ap-check-x \"$CARGO_TARGET_DIR/../x\" \"$PWD/.git/x\"; do \
-                  if touch \"$p\" 2>/dev/null; then echo \"rw $p\"; else echo \"ro $p\"; fi; done; echo \"tmp $TMPDIR\"";
-    let out = w.ap(&[&w.dir(), "--", "sh", "-c", script]);
+    // The fake account's home: a file outside the toolchain, one in its .cargo/bin, one in its
+    // .rustup; and another key's tree under work.
+    let home = w.s("pc/home");
+    write(&w.p("pc/home/secret"), "s\n", 0o644);
+    write(&w.p("pc/home/.cargo/bin/tool"), "t\n", 0o755);
+    write(&w.p("pc/home/.rustup/settings.toml"), "r\n", 0o644);
+    let other = "0123456789abcdef";
+    write(&w.p(&format!("pc/work/trees/{other}/f")), "o\n", 0o644);
+    let script = "id -u; for p in \"$PWD/x\" \"$CARGO_TARGET_DIR/x\" \"$CARGO_HOME/x\" /tmp/x \"$HOME/x\" /etc/ap-check-x \"$CARGO_TARGET_DIR/../x\" \"$PWD/.git/x\" /ap-check-x \"$HOME/.cargo/bin/x\" \"$HOME/.rustup/x\"; do \
+                  if touch \"$p\" 2>/dev/null; then echo \"rw $p\"; else echo \"ro $p\"; fi; done; echo \"tmp $TMPDIR\"; \
+                  for f in \"$HOME/secret\" \"$HOME/.cargo/bin/tool\" \"$HOME/.rustup/settings.toml\" \"$1/trees/$2/f\" \"$1/repos\" \"$1/tmp\" \"$1/locks\" \"$1/used\"; do \
+                  if [ -e \"$f\" ]; then echo \"seen $f\"; else echo \"unseen $f\"; fi; done; \
+                  echo \"if $(sed -n '3,$p' /proc/net/dev | cut -d: -f1 | tr -d ' ' | tr '\\n' ' ')\"; \
+                  echo \"offline ${CARGO_NET_OFFLINE:-unset}\"";
+    let work = w.s("pc/work");
+    let script = format!("{script}; {PARENTS}; readlink /proc/self/ns/net");
+    let out = w.ap(&[&w.dir(), "--", "sh", "-c", &script, "x", &work, other]);
     assert_eq!(out.status.code(), Some(0), "{out:?}");
     // The real bwrap carries the marker and a cargo setting itself, not the stand-in's --setenv.
     let out_env = w.ap(&[&w.dir(), "--", "sh", "-c", SHOW_ENV]);
     assert_eq!(lines(&out_env.stdout), ["host=pc 0 0 0"], "{out_env:?}");
     let key = w.key(&w.repo);
-    let work = w.s("pc/work");
-    assert_eq!(
-        lines(&out.stdout),
-        [
-            "0".to_owned(),
-            format!("rw {work}/trees/{key}/x"),
-            format!("rw {work}/targets/{key}/x"),
-            format!("rw {work}/cargo-home/x"),
-            "rw /tmp/x".into(),
-            format!("ro {}/x", w.s("pc/home")),
-            "ro /etc/ap-check-x".into(),
-            format!("ro {work}/targets/{key}/../x"),
-            format!("ro {work}/trees/{key}/.git/x"),
-            "tmp /tmp".into(),
-        ]
-    );
+    let mut got = lines(&out.stdout);
+    // A network namespace of its own, with the loopback alone.
+    let net = got.pop().unwrap();
+    assert!(net.starts_with("net:["), "{net}");
+    assert_ne!(net, own_net());
+    let mut want = vec![
+        "0".to_owned(),
+        format!("rw {work}/trees/{key}/x"),
+        format!("rw {work}/targets/{key}/x"),
+        format!("ro {work}/cargo-home/x"),
+        "rw /tmp/x".into(),
+        format!("ro {home}/x"),
+        "ro /etc/ap-check-x".into(),
+        format!("ro {work}/targets/{key}/../x"),
+        format!("ro {work}/trees/{key}/.git/x"),
+        "ro /ap-check-x".into(),
+        format!("ro {home}/.cargo/bin/x"),
+        format!("ro {home}/.rustup/x"),
+        "tmp /tmp".into(),
+        format!("unseen {home}/secret"),
+        format!("seen {home}/.cargo/bin/tool"),
+        format!("seen {home}/.rustup/settings.toml"),
+        format!("unseen {work}/trees/{other}/f"),
+        format!("unseen {work}/repos"),
+        format!("unseen {work}/tmp"),
+        format!("unseen {work}/locks"),
+        format!("unseen {work}/used"),
+        "if lo ".into(),
+        "offline true".into(),
+    ];
+    want.extend(parents_of(&w.root));
+    assert_eq!(got, want);
     // The temporary directory goes with the call.
     assert_eq!(fs::read_dir(w.p("pc/work/tmp")).unwrap().count(), 0);
+}
+
+/// A fake `cargo` for the step of R18 in the real `bwrap`: it says on standard error what it can
+/// write and see; `@TARGET@` is the worktree's target directory and `@RESOLV@` the file the host's
+/// `/etc/resolv.conf` resolves to outside `/etc`, empty where there is none.
+const STEP_CARGO: &str = r#"#!/bin/sh
+for a; do m=$a; done
+t=${m%/Cargo.toml}
+if touch "$t/x" 2>/dev/null; then echo "step tree rw" >&2; else echo "step tree ro" >&2; fi
+if touch "$CARGO_HOME/x" 2>/dev/null; then echo "step cargo home rw" >&2; else echo "step cargo home ro" >&2; fi
+if [ -e @TARGET@ ]; then echo "step target seen" >&2; else echo "step target unseen" >&2; fi
+if [ -z "@RESOLV@" ]; then echo "step resolv none" >&2; elif [ -r "@RESOLV@" ]; then echo "step resolv seen" >&2; else echo "step resolv unseen" >&2; fi
+echo "step dir $PWD" >&2
+echo "step net $(readlink /proc/self/ns/net)" >&2
+"#;
+
+// spec: specs/ap/check.md#R8
+// spec: specs/ap/check.md#R18
+#[test]
+fn r18_the_step_fetches_in_a_sandbox_of_its_own_with_the_network() {
+    if !bwrap_works() {
+        eprintln!("skipped: bwrap cannot make a user namespace on this host");
+        return;
+    }
+    let parent = outside_tmp(&[env!("CARGO_TARGET_TMPDIR"), "/var/tmp"]);
+    let w = World::within(Some(&parent), false);
+    let key = w.key(&w.repo);
+    let target = w.s(&format!("pc/work/targets/{key}"));
+    let resolv = resolv_outside_etc();
+    let resolv_s = resolv.as_ref().map_or("", |r| r.to_str().unwrap());
+    // The fake account's cargo, in its .cargo/bin, put on PATH by its .profile.
+    write(
+        &w.p("pc/home/.cargo/bin/cargo"),
+        &STEP_CARGO
+            .replace("@TARGET@", &target)
+            .replace("@RESOLV@", resolv_s),
+        0o755,
+    );
+    write(
+        &w.p("pc/home/.profile"),
+        "PATH=\"$HOME/.cargo/bin:$PATH\"\n",
+        0o644,
+    );
+    write(&w.repo.join("Cargo.toml"), "[workspace]\n", 0o644);
+    write(&w.repo.join("Cargo.lock"), "version = 4\n", 0o644);
+    let command = "if [ -n \"$1\" ] && [ -e \"$1\" ]; then echo \"command resolv seen\"; else echo \"command resolv unseen\"; fi";
+    let out = w.ap(&[&w.dir(), "--", "sh", "-c", command, "x", resolv_s]);
+    assert_eq!(out.status.code(), Some(0), "{out:?}");
+    assert_eq!(lines(&out.stdout), ["command resolv unseen"], "{out:?}");
+    let step: Vec<String> = lines(&out.stderr)
+        .into_iter()
+        .filter(|l| l.starts_with("step "))
+        .collect();
+    let resolv_line = if resolv.is_some() {
+        "step resolv seen"
+    } else {
+        "step resolv none"
+    };
+    assert_eq!(
+        step,
+        [
+            "step tree ro".to_owned(),
+            "step cargo home rw".into(),
+            "step target unseen".into(),
+            resolv_line.into(),
+            "step dir /tmp".into(),
+            format!("step net {}", own_net()),
+        ],
+        "{out:?}"
+    );
+    assert!(!w.tree().join("x").exists());
 }
 
 // spec: specs/ap/check.md#R6
@@ -1425,4 +1569,323 @@ fn r15_each_call_appends_one_record_line() {
             .unwrap()
             .starts_with("check: the record could not be appended")
     );
+}
+
+/// A fake `cargo` on the fake PC: notes its directory, its arguments and three variables as it has
+/// them, writes to both of its outputs; fails with `cargo-fails`, outlives any bound with `cargo-sleeps`.
+const FAKE_CARGO: &str = r#"#!/bin/sh
+{ echo "dir $PWD"; echo "args $*"; echo "env ${CARGO_HOME-unset} ${CARGO_NET_OFFLINE-unset} ${CARGO_TARGET_DIR-unset}"; } >> @PC@/cargo-calls
+echo cargo-out; echo cargo-err >&2
+[ ! -e @PC@/cargo-fails ] || exit 101
+[ ! -e @PC@/cargo-sleeps ] || exec sh -c 'sleep 60; :' ap-check-fetch-sleep-d4
+exit 0
+"#;
+
+// spec: specs/ap/check.md#R11
+// spec: specs/ap/check.md#R18
+#[test]
+fn r18_the_dependencies_are_fetched_once_before_the_command_and_a_failed_fetch_is_lost() {
+    let w = World::new();
+    let d = w.dir();
+    let tree = w.tree();
+    let tree = tree.to_str().unwrap().to_owned();
+    let work = w.s("pc/work");
+    let target = format!("{work}/targets/{}", w.key(&w.repo));
+    write(
+        &w.p("pc/bin/cargo"),
+        &FAKE_CARGO.replace("@PC@", &w.s("pc")),
+        0o755,
+    );
+    // The login environment sets what the step goes without.
+    write(
+        &w.p("pc/home/.profile"),
+        "export CARGO_NET_OFFLINE=false CARGO_TARGET_DIR=/nowhere\n",
+        0o644,
+    );
+    write(&w.repo.join("Cargo.toml"), "[workspace]\n", 0o644);
+    write(&w.repo.join("Cargo.lock"), "version = 4\n", 0o644);
+    let calls = || {
+        let c = fs::read_to_string(w.p("pc/cargo-calls")).unwrap_or_default();
+        let _ = fs::remove_file(w.p("pc/cargo-calls"));
+        lines(c.as_bytes())
+    };
+    let command = [
+        "--",
+        "sh",
+        "-c",
+        "echo \"command $PWD\" >> \"$1/cargo-calls\"; echo \"ran ${CARGO_NET_OFFLINE-unset} ${CARGO_TARGET_DIR-unset}\"",
+        "x",
+    ];
+    let pc = w.s("pc");
+    let args = [&[d.as_str()][..], &command, &[pc.as_str()]].concat();
+    let out = w.ap(&args);
+    assert_eq!(out.status.code(), Some(0), "{out:?}");
+    // Nothing of the step on standard output; both its outputs on standard error.
+    assert_eq!(
+        lines(&out.stdout),
+        [format!("ran true {target}")],
+        "{out:?}"
+    );
+    let err = lines(&out.stderr);
+    assert!(err[0].starts_with("check: on pc"), "{out:?}");
+    assert!(err.contains(&"cargo-out".to_owned()), "{out:?}");
+    assert!(err.contains(&"cargo-err".to_owned()), "{out:?}");
+    // Once, before the command, started outside the tree, without the command's two variables.
+    let c = calls();
+    assert_eq!(c.len(), 4, "{c:?}");
+    let dir = c[0].strip_prefix("dir ").unwrap();
+    assert!(!dir.starts_with(&tree), "{c:?}");
+    assert_eq!(
+        c[1..],
+        [
+            format!("args fetch --locked --manifest-path {tree}/Cargo.toml"),
+            format!("env {work}/cargo-home unset unset"),
+            format!("command {tree}"),
+        ]
+    );
+    let r = w.records().pop().unwrap();
+    assert_eq!(
+        (r["host"].as_str(), &r["reason"]),
+        (Some("pc"), &Value::Null)
+    );
+    // A tree without both regular files has no step.
+    for change in [
+        "rm Cargo.lock",
+        "rm Cargo.toml && echo v > Cargo.lock",
+        "echo t > Cargo.toml && ln -sfn Cargo.toml Cargo.lock",
+    ] {
+        sh(&w.repo, change);
+        let out = w.ap(&args);
+        assert_eq!(out.status.code(), Some(0), "{change}: {out:?}");
+        assert_eq!(calls(), [format!("command {tree}")], "{change}");
+    }
+    sh(&w.repo, "rm Cargo.lock && echo l > Cargo.lock");
+    // A step that fails: the PC's side failed before the command; the command runs here once.
+    write(&w.p("pc/cargo-fails"), "", 0o644);
+    let out = w.ap(&args);
+    assert_eq!(out.status.code(), Some(0), "{out:?}");
+    let err = lines(&out.stderr);
+    assert!(err.contains(&"check: pc: fetch".to_owned()), "{out:?}");
+    assert_eq!(err.last().unwrap(), "check: on this host (pc_lost)");
+    assert_eq!(lines(&out.stdout).len(), 1, "{out:?}");
+    assert!(lines(&out.stdout)[0].starts_with("ran "), "{out:?}");
+    let c = calls();
+    assert_eq!(c.len(), 4, "{c:?}");
+    assert_eq!(c[3], format!("command {d}"));
+    let r = w.records().pop().unwrap();
+    assert_eq!(
+        (r["host"].as_str(), r["reason"].as_str()),
+        (Some("local"), Some("pc_lost"))
+    );
+    // A step the bound ends: the call's end with 124 and no reading; no command ran; nothing is left.
+    fs::remove_file(w.p("pc/cargo-fails")).unwrap();
+    write(&w.p("pc/cargo-sleeps"), "", 0o644);
+    let t = Instant::now();
+    let timed = [
+        &[d.as_str(), "--timeout", "3"][..],
+        &command,
+        &[pc.as_str()],
+    ]
+    .concat();
+    let out = w.ap(&timed);
+    assert_eq!(out.status.code(), Some(124), "{out:?}");
+    assert!(t.elapsed() < Duration::from_secs(25), "{:?}", t.elapsed());
+    assert!(out.stdout.is_empty(), "{out:?}");
+    assert_eq!(calls().len(), 3);
+    let r = w.records().pop().unwrap();
+    assert_eq!(
+        (
+            r["host"].as_str(),
+            r["exit"].as_i64(),
+            &r["pc_min_wsl_available_mb"]
+        ),
+        (Some("pc"), Some(124), &Value::Null)
+    );
+    assert!(!running("ap-check-fetch-sleep-d4"), "the step is left");
+}
+
+/// A fake `ont` of the PC's account: notes its arguments, fails with `ont-fails`, else prints the
+/// file `ont-version`.
+const FAKE_ONT: &str = r#"#!/bin/sh
+echo "$*" >> @PC@/ont-calls
+[ ! -e @PC@/ont-fails ] || exit 1
+cat @PC@/ont-version
+"#;
+
+// spec: specs/ap/check.md#R4
+// spec: specs/ap/check.md#R15
+// spec: specs/ap/check.md#R19
+#[test]
+fn r19_a_pinned_engine_the_pc_does_not_have_runs_here_as_pc_engine_differs() {
+    let w = World::new();
+    let d = w.dir();
+    let tree = w.tree();
+    let tree = tree.to_str().unwrap().to_owned();
+    let pin = "0123456789abcdef0123456789abcdef01234567";
+    let other = "fedcba9876543210fedcba9876543210fedcba98";
+    write(
+        &w.repo.join("ontology/ENGINE-PIN"),
+        &format!("{pin}\n"),
+        0o644,
+    );
+    let ont = FAKE_ONT.replace("@PC@", &w.s("pc"));
+    write(&w.p("pc/bin/ont"), &ont, 0o755);
+    write(
+        &w.p("pc/ont-version"),
+        &format!("ont 0.1.0 {other}\n"),
+        0o644,
+    );
+    let where_ = ["--", "sh", "-c", "echo \"in $PWD\""];
+    let args = [&[d.as_str()][..], &where_].concat();
+    let ont_calls = || {
+        let c = fs::read_to_string(w.p("pc/ont-calls")).unwrap_or_default();
+        let _ = fs::remove_file(w.p("pc/ont-calls"));
+        lines(c.as_bytes())
+    };
+    let differs = |what: &str, load: f64| {
+        let _ = fs::remove_file(w.p("pc/remote"));
+        let out = w.ap(&args);
+        assert_eq!(out.status.code(), Some(0), "{what}: {out:?}");
+        assert_eq!(
+            lines(&out.stderr),
+            ["check: on this host (pc_engine_differs)"],
+            "{what}"
+        );
+        assert_eq!(lines(&out.stdout), [format!("in {d}")], "{what}");
+        // The PC's script is not started; the probe's readings are kept, as for pc_busy.
+        assert!(!w.p("pc/remote").exists(), "{what}");
+        let r = w.records().pop().unwrap();
+        assert_eq!(
+            (r["host"].as_str(), r["reason"].as_str()),
+            (Some("local"), Some("pc_engine_differs")),
+            "{what}"
+        );
+        for (k, v) in [
+            ("pc_cpus", Value::from(4)),
+            ("pc_load", Value::from(load)),
+            ("pc_wsl_available_mb", Value::from(16384)),
+            ("pc_windows_available_mb", Value::from(8192)),
+            ("pc_available_mb", Value::from(8192)),
+            ("pc_min_wsl_available_mb", Value::Null),
+        ] {
+            assert_eq!((k, &r[k]), (k, &v), "{what}");
+        }
+    };
+    // Another revision: once `ont --version`, in the probe.
+    differs("another engine", 0.1);
+    assert_eq!(ont_calls(), ["--version"]);
+    write(&w.p("pc/ont-fails"), "", 0o644);
+    differs("a failing ont", 0.1);
+    fs::remove_file(w.p("pc/ont-fails")).unwrap();
+    // A busy PC with another engine: the engine is decided first.
+    write(&w.p("pc/loadavg"), "3.00 0.10 0.10 1/100 1\n", 0o644);
+    differs("busy with another engine", 3.0);
+    write(&w.p("pc/loadavg"), "0.10 0.10 0.10 1/100 1\n", 0o644);
+    // No ont at all: the probe has still answered.
+    fs::remove_file(w.p("pc/bin/ont")).unwrap();
+    differs("no ont", 0.1);
+    // A pin that is not 40 hexadecimal digits equals none, even the same text.
+    write(&w.repo.join("ontology/ENGINE-PIN"), "abc\n", 0o644);
+    write(&w.p("pc/bin/ont"), &ont, 0o755);
+    write(&w.p("pc/ont-version"), "ont 0.1.0 abc\n", 0o644);
+    differs("a pin that is no revision", 0.1);
+    // The same revision, from the ont the account's .profile puts on PATH: the PC takes the call.
+    fs::remove_file(w.p("pc/bin/ont")).unwrap();
+    write(&w.p("pc/home/.cargo/bin/ont"), &ont, 0o755);
+    write(
+        &w.p("pc/home/.profile"),
+        "PATH=\"$HOME/.cargo/bin:$PATH\"\n",
+        0o644,
+    );
+    write(
+        &w.repo.join("ontology/ENGINE-PIN"),
+        &format!(" {pin} \n"),
+        0o644,
+    );
+    write(&w.p("pc/ont-version"), &format!("ont 0.1.0 {pin}\n"), 0o644);
+    let _ = ont_calls();
+    let on_pc = |what: &str| {
+        let out = w.ap(&args);
+        assert_eq!(out.status.code(), Some(0), "{what}: {out:?}");
+        assert_eq!(
+            lines(&out.stderr),
+            ["check: on pc (4 CPUs, load 0.10, 8192 MB available)"],
+            "{what}"
+        );
+        assert_eq!(lines(&out.stdout), [format!("in {tree}")], "{what}");
+        let r = w.records().pop().unwrap();
+        assert_eq!(
+            (r["host"].as_str(), &r["reason"]),
+            (Some("pc"), &Value::Null)
+        );
+    };
+    on_pc("the same engine");
+    assert_eq!(ont_calls(), ["--version"]);
+    // A worktree without the file is placed as before, whatever the PC's engine.
+    write(
+        &w.p("pc/ont-version"),
+        &format!("ont 0.1.0 {other}\n"),
+        0o644,
+    );
+    fs::remove_file(w.repo.join("ontology/ENGINE-PIN")).unwrap();
+    on_pc("no pin");
+    fs::remove_file(w.p("pc/home/.cargo/bin/ont")).unwrap();
+    on_pc("no pin and no ont");
+}
+
+/// `command` run under the umask `mask`, with its environment.
+fn with_umask(command: &Command, mask: &str) -> Command {
+    let mut c = Command::new("sh");
+    c.arg("-c")
+        .arg(format!("umask {mask} && exec \"$0\" \"$@\""))
+        .arg(command.get_program())
+        .args(command.get_args())
+        .stdin(Stdio::null());
+    for (k, v) in command.get_envs() {
+        match v {
+            Some(v) => c.env(k, v),
+            None => c.env_remove(k),
+        };
+    }
+    c
+}
+
+// spec: specs/ap/check.md#R15
+#[test]
+fn r15_a_record_file_is_made_with_mode_0600_and_one_that_exists_keeps_its_mode() {
+    let w = World::new();
+    w.no_policy();
+    let d = w.dir();
+    let mode = |p: &Path| fs::metadata(p).unwrap().permissions().mode() & 0o7777;
+    for mask in ["022", "077", "000"] {
+        let log = w.p(&format!("log-{mask}.jsonl"));
+        let mut c = w.command(&[&d, "--", "true"]);
+        c.env("AP_CHECKS_LOG", &log);
+        let out = with_umask(&c, mask).output().unwrap();
+        assert_eq!(out.status.code(), Some(0), "{out:?}");
+        assert_eq!(mode(&log), 0o600, "umask {mask}");
+        assert_eq!(fs::read_to_string(&log).unwrap().lines().count(), 1);
+    }
+    // A file that exists is appended to, its mode unchanged.
+    let log = w.p("existing.jsonl");
+    write(&log, "", 0o644);
+    let mut c = w.command(&[&d, "--", "true"]);
+    c.env("AP_CHECKS_LOG", &log);
+    let out = with_umask(&c, "077").output().unwrap();
+    assert_eq!(out.status.code(), Some(0), "{out:?}");
+    assert_eq!(mode(&log), 0o644);
+    assert_eq!(fs::read_to_string(&log).unwrap().lines().count(), 1);
+    // A device: written to, its mode unchanged.
+    let before = mode(Path::new("/dev/null"));
+    let out = w
+        .command(&[&d, "--", "true"])
+        .env("AP_CHECKS_LOG", "/dev/null")
+        .output()
+        .unwrap();
+    assert_eq!(out.status.code(), Some(0), "{out:?}");
+    assert!(
+        !String::from_utf8_lossy(&out.stderr).contains("could not be appended"),
+        "{out:?}"
+    );
+    assert_eq!(mode(Path::new("/dev/null")), before);
 }

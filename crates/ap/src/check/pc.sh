@@ -1,8 +1,9 @@
-# The PC's side of `ap check` (specs/ap/check.md R6 to R12), run as `bash -c` through `tailscale ssh`
+# The PC's side of `ap check` (specs/ap/check.md R6 to R12 and R18), run as `bash -c` through `tailscale ssh`
 # with the payload of the worktree's state on standard input. Arguments: <work> <key> <nonce>
 # <seconds> <command>... Once the command's exit status is known it is the last thing written: one line
 # NUL `ap-check <nonce> <status> <MB>` on standard error, <MB> the lowest MemAvailable of this Linux
 # while the command ran, `-` where no command ran. Without that line the caller counts the call lost.
+# Before the command, a step fetches the dependencies of a tree with Cargo.toml and Cargo.lock (R18).
 work=$1 key=$2 nonce=$3 limit=$4
 shift 4
 start=$(date +%s)
@@ -31,6 +32,12 @@ unsample() {
   sampler=
 }
 trap 'unsample; clean "$in" "$tmp"' EXIT
+# The bound ran out before any command (the lock wait of R9, the step of R18): the call ends with 124 and `-`.
+out_of_time() {
+  clean "$in" "$tmp"; trap - EXIT
+  printf '\0ap-check %s %s -\n' "$nonce" 124 >&2
+  exit 0
+}
 mkdir -p -- "$work/trees" "$work/repos" "$work/targets" "$home" "$work/locks" "$work/used" "$in" "$tmp" || { say "work directory"; exit 3; }
 tar -x -C "$in" -f - || { say "payload"; exit 3; }
 cat >/dev/null
@@ -42,9 +49,7 @@ wait=$((start + limit - $(date +%s)))
 [ "$wait" -ge 0 ] || wait=0
 if ! flock -w "$wait" 9; then
   [ $(($(date +%s) - start)) -ge "$limit" ] || { say "lock"; exit 3; }
-  clean "$in" "$tmp"; trap - EXIT
-  printf '\0ap-check %s %s -\n' "$nonce" 124 >&2
-  exit 0
+  out_of_time
 fi
 touch -- "$work/used/$key"
 
@@ -87,6 +92,58 @@ g update-index -z --index-info < "$in/index-info" || { say "index"; exit 3; }
 g update-index -q --refresh >/dev/null 2>&1
 mkdir -p -- "$target" || { say "target"; exit 3; }
 
+# What a sandbox of this script sees of the PC (R8), and nothing else: the system's programs
+# read-only at their own paths (a link stays a link); the toolchain of the login environment
+# read-only at its own paths, each part where it exists: rustup's home, the bin of the account's
+# own Cargo home, and the file of ont where neither those nor the system's directories show it; a
+# /proc and a /dev of its own; the call's temporary directory at /tmp. No other path of the account's
+# home, of /mnt, /run or /var: the parents of a shown path hold only the names that lead to it, and
+# the root is made read-only once the binds are in place (--remount-ro /).
+rustup_home=${RUSTUP_HOME:-$HOME/.rustup}
+cargo_bin=${CARGO_HOME:-$HOME/.cargo}/bin
+ont=$(command -v ont 2>/dev/null) || ont=
+case $ont in /*) [ -f "$ont" ] || ont= ;; *) ont= ;; esac
+case $ont in /usr/* | /etc/* | /bin/* | /sbin/* | /lib/* | /lib32/* | /lib64/* | /libx32/* | "$rustup_home"/* | "$cargo_bin"/*) ont= ;; esac
+view=(--ro-bind /usr /usr --ro-bind /etc /etc)
+for p in /bin /sbin /lib /lib32 /lib64 /libx32; do
+  if [ -L "$p" ]; then
+    view+=(--symlink "$(readlink -- "$p")" "$p")
+  elif [ -d "$p" ]; then
+    view+=(--ro-bind "$p" "$p")
+  fi
+done
+for p in "$rustup_home" "$cargo_bin"; do
+  case $p in /*) [ ! -d "$p" ] || view+=(--ro-bind "$p" "$p") ;; esac
+done
+[ -z "$ont" ] || view+=(--ro-bind "$ont" "$ont")
+view+=(--dev /dev --proc /proc --bind "$tmp" /tmp)
+# One namespace each for the user (uid 0) and the processes, ended with the sandbox.
+ns=(--unshare-user --uid 0 --gid 0 --unshare-pid --die-with-parent --new-session)
+
+# The dependencies (R18): `cargo fetch` of the tree's lock file before the command, which has no
+# network. It reads the tree as data and runs none of its code: started outside the tree, so that
+# no .cargo/config.toml or rust-toolchain.toml of the tree chooses a program, a toolchain or a
+# source; in a sandbox of the view above with the PC's network, the cargo home writable, the tree
+# read-only, no target directory, and the file /etc/resolv.conf resolves to where that lies outside
+# /etc. Its outputs go to standard error. The bound ending it ends the call; a failure otherwise is
+# the PC's side failing before the command: no status line, so the call is lost and runs there.
+if [ -f "$tree/Cargo.toml" ] && [ ! -L "$tree/Cargo.toml" ] && [ -f "$tree/Cargo.lock" ] && [ ! -L "$tree/Cargo.lock" ]; then
+  resolv=()
+  r=$(readlink -f /etc/resolv.conf 2>/dev/null) || r=
+  case $r in /etc/* | '') ;; /*) [ ! -f "$r" ] || resolv=(--ro-bind "$r" "$r") ;; esac
+  left=$((start + limit - $(date +%s)))
+  [ "$left" -ge 1 ] || out_of_time
+  timeout -k 10 "$left" nice -n 10 bwrap "${ns[@]}" "${view[@]}" ${resolv[@]+"${resolv[@]}"} \
+    --ro-bind "$tree" "$tree" --ro-bind "$repo" "$tree/.git" --bind "$home" "$home" --remount-ro / \
+    --setenv CARGO_HOME "$home" --setenv TMPDIR /tmp --unsetenv CARGO_NET_OFFLINE --unsetenv CARGO_TARGET_DIR \
+    --chdir /tmp -- cargo fetch --locked --manifest-path "$tree/Cargo.toml" </dev/null >&2
+  fetched=$?
+  if [ "$fetched" -ne 0 ]; then
+    case $fetched in 124 | 137) [ $(($(date +%s) - start)) -lt "$limit" ] || out_of_time ;; esac
+    say "fetch"; exit 3
+  fi
+fi
+
 # The memory while the command runs (R11): MemAvailable of this Linux in kB, read here, outside the
 # command's namespaces: once by this script itself before the command starts, so a command however
 # short has its reading, then every 2 seconds by a sampler that keeps the lowest in a file under $in,
@@ -110,11 +167,13 @@ else
       done' ap-check-sampler "$low" "$$" "$first" "$((start + limit))" </dev/null >/dev/null 2>&1 &
     sampler=$!
   fi
-  timeout -k 10 "$left" nice -n 10 bwrap --unshare-user --uid 0 --gid 0 --unshare-pid --die-with-parent --new-session \
-    --ro-bind / / --dev /dev --proc /proc --bind "$tmp" /tmp \
-    --bind "$tree" "$tree" --ro-bind "$repo" "$tree/.git" --bind "$target" "$target" --bind "$home" "$home" \
+  # The command (R8): the view above, a network namespace of its own with the loopback alone, the
+  # tree and the target directory writable, the cargo home read-only, the network off for cargo.
+  timeout -k 10 "$left" nice -n 10 bwrap "${ns[@]}" --unshare-net "${view[@]}" \
+    --bind "$tree" "$tree" --ro-bind "$repo" "$tree/.git" --bind "$target" "$target" --ro-bind "$home" "$home" --remount-ro / \
     --setenv CARGO_TARGET_DIR "$target" --setenv CARGO_HOME "$home" --setenv TMPDIR /tmp \
     --setenv AP_CHECK_HOST pc --setenv CARGO_INCREMENTAL 0 --setenv CARGO_PROFILE_DEV_DEBUG 0 --setenv CARGO_PROFILE_TEST_DEBUG 0 \
+    --setenv CARGO_NET_OFFLINE true \
     --chdir "$tree" -- "$@" </dev/null
   rc=$?
   case $rc in 124 | 137) [ $(($(date +%s) - start)) -lt "$limit" ] || rc=124 ;; esac
