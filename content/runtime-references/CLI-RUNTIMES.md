@@ -40,6 +40,7 @@ Every pointer resolves to `/root/.agents/AGENTS.md`. If a CLI does not show that
 - Codex always runs with `--no-daemon` in a Herdr terminal. Do not replace this with an app-server workflow.
 - Muse: `MUSE_NO_AUTO_UPDATE=1` stops the updater from running during the command. `--disable-reminders` removes two built-in reminder agents and the extra model requests they make; use it for workers. `muse exec --provider echo` (without `--model`) runs a session with no model call, which is the cheap way to inspect what a session loads. Muse's session record does not store the effort of the main request.
 - Resume by exact session ID, not `--last`, when several sessions exist. A resumed session keeps older instructions and tool definitions: read the task's STATE again before any effect.
+- A blocking `ap status --wait <intent>` gets a `--timeout` below the CLI's limit for a foreground command (Claude Code: `BASH_MAX_TIMEOUT_MS`): the default of 14,400 s is above it.
 - If a flag is rejected or missing, read that CLI's installed `--help`. Do not run every CLI's help for every task.
 - Looking at a CLI's help, configuration or session list does not release a hold on logging in or running a model with it; the hold is in the store (`ap status --text`, HOLDS).
 - Update a CLI only with its own updater and only when the task authorizes it. Do not copy an installation recipe.
@@ -211,8 +212,8 @@ In code mode a turn is one JavaScript script run in a REPL, and a shell command 
 
 | Need | Form |
 | --- | --- |
-| The wait at the end of a turn | One blocking `ap status --wait <intent>` inside the script, whose `--timeout` is below the CLI's limit for a foreground command (`BASH_MAX_TIMEOUT_MS`) |
+| The wait at the end of a turn | One blocking `ap status --wait <intent>` inside the script, its `--timeout` as section 2 says |
 | The byte count of a text `s` | `unescape(encodeURIComponent(s)).length`. The REPL has no `Buffer`, `TextEncoder`, `require` or `process` |
 | A request on standard input | Write the request to a file and redirect it with `< file`. Never `< /dev/stdin` |
-| A regular expression, or other text with backslashes, in a shell command | Hold it in a JavaScript string and put it into the command as a `${}` value. A backslash written in the template itself reaches the shell doubled: `sed -n '/^## 2\\./,$p'` written there matched nothing |
+| A regular expression, or other text with backslashes, in a shell command | Hold it in a JavaScript string and put it into the command as a `${}` value. The template passes its text to the shell as written: a backslash doubled for JavaScript stays doubled, so `sed -n '/^## 2\\./,$p'` written in the template matched nothing |
 | A message the user sent during the turn | A line of the session record (section 3) with `"type":"queue-operation"` and `"operation":"enqueue"`; its `content` holds the text and its `timestamp` the time. It is not a `user` line. Pick it by its text, not as the last line of the record |

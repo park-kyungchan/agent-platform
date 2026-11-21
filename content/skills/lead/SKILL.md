@@ -21,8 +21,8 @@ One leading work thread puts something of the user's world into use; others run 
 ## 2. The life cycle and its commands
 
 - Request: `ap request`, as `AGENTS.md` section 3 says; a settled decision is not asked again.
-- Intent: a message that starts an objective gets the interview, then `ap intent` `draft`, the card shown to the user, and `confirm` with the user's routed word (README "One intent").
-- Units: `ap unit add`, `ap unit ready`, `ap unit run` (README "The unit object"); a page file with the typed block runs with `ap unit <page>` (README "One unit").
+- Intent: a message that starts an objective gets the interview, then `ap intent` `draft`, the card shown to the user, and `confirm` with the user's routed word (`crates/ap/README.md` "One intent").
+- Units: `ap unit add`, `ap unit ready`, `ap unit run`; a page file with the typed block runs with `ap unit <page>` (`crates/ap/README.md` "The unit object" and "One unit").
 - Review before the build: the plan of an intent and every page of class `contract` or `effect` go to one reviewer session, which did not write them, with `ap unit review` before the first unit is made ready; a page amended after its review is reviewed again.
 - Delivery (`AGENTS.md` section 4): install from the merged revision, verify by checksum, keep the previous bytes with a rollback command, read the effect back; so for a change of host configuration too.
 

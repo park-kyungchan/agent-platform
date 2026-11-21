@@ -1,10 +1,10 @@
 # Working alongside other agents: ownership, handoff, return
 
-Read this when you hand work to another agent, receive work, or share a repository, a build or a service with one. It uses the task's STATE and Git. It adds no registry, lease database, watcher or scheduler.
+Read this when you hand work to another agent, receive work, or share a repository, a build or a service with one. It uses the store and Git. It adds no registry, lease database, watcher or scheduler.
 
 ## 1. Ownership before anyone writes
 
-- The unit's page (`ap unit page <key>`) names, for each writer: the checkout, branch and base revision, the files it may write, and the shared targets it must not touch; for work outside a unit, the packet of section 2 names them.
+- The unit's page (`ap unit page <key>`) names, for each writer: the repository, branch and base revision, the files it may write (its write set), and the shared targets it must not touch; its worktree is the one `ap unit run` makes. For work outside a unit, the packet of section 2 names them.
 - Keep three kinds of work apart: read-only review, implementation in its own worktree, and integration.
 - Two agents may read the same checkout. Two agents that write need separate Git worktrees or file sets that do not overlap.
 - A worktree separates files only. It does not separate global settings, databases, ports, service accounts or a shared build directory.
