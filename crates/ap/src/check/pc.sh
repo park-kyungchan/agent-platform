@@ -114,6 +114,7 @@ else
     --ro-bind / / --dev /dev --proc /proc --bind "$tmp" /tmp \
     --bind "$tree" "$tree" --ro-bind "$repo" "$tree/.git" --bind "$target" "$target" --bind "$home" "$home" \
     --setenv CARGO_TARGET_DIR "$target" --setenv CARGO_HOME "$home" --setenv TMPDIR /tmp \
+    --setenv AP_CHECK_HOST pc --setenv CARGO_INCREMENTAL 0 --setenv CARGO_PROFILE_DEV_DEBUG 0 --setenv CARGO_PROFILE_TEST_DEBUG 0 \
     --chdir "$tree" -- "$@" </dev/null
   rc=$?
   case $rc in 124 | 137) [ $(($(date +%s) - start)) -lt "$limit" ] || rc=124 ;; esac

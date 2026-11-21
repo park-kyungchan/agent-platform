@@ -465,6 +465,12 @@ fn here(call: &Call, tree: &Tree, deadline: Instant) -> i32 {
         .arg0(program)
         .args(rest)
         .current_dir(&tree.dir)
+        // The marker of the PC is `ap check`'s own, never inherited here; the cargo settings are those
+        // `./check` exports under the build lock, so that every cargo command shares its artifacts (R17).
+        .env_remove("AP_CHECK_HOST")
+        .env("CARGO_INCREMENTAL", "0")
+        .env("CARGO_PROFILE_DEV_DEBUG", "0")
+        .env("CARGO_PROFILE_TEST_DEBUG", "0")
         .stdin(Stdio::null())
         .process_group(0)
         .spawn();
