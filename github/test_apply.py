@@ -422,6 +422,69 @@ class Apply(Base):
         self.assertFalse(list(directory.glob("example-owner__alpha.*")))
         self.assertEqual(self.repos_state()[ALPHA], state["repositories"][ALPHA])
 
+    def test_an_entry_of_only_the_repository_gets_the_rulesets_and_nothing_else(self):
+        settings = json.loads(self.settings.read_text())
+        for entry in settings["repositories"]:
+            if entry["repository"] == GAMMA:
+                entry.clear()
+                entry["repository"] = GAMMA
+        self.settings.write_text(json.dumps(settings))
+        base = f"repos/{GAMMA}"
+        names = ["ruleset:Fixture main", "ruleset:Fixture tags"]
+        # (a) gamma's live actions differ from the fixture's own entry, which this entry does not hold
+        self.assertTrue(self.initial["repositories"][GAMMA]["actions"]["sha_pinning_required"] is False)
+        proc, output = self.check("--repo", GAMMA)
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        gamma = self.results(output)[GAMMA]
+        self.assertEqual((gamma["result"], gamma["code"], gamma["differences"]), ("same", None, []))
+        self.assert_only_gets(self.calls())
+        # (b) live rulesets removed: the two rulesets are the only differences and the only writes
+        bare = copy.deepcopy(self.initial)
+        bare["repositories"][GAMMA]["rulesets"] = []
+        self.set_state(bare)
+        self.log.write_text("")
+        proc, output = self.check("--repo", GAMMA)
+        self.assertEqual(proc.returncode, 1)
+        gamma = self.results(output)[GAMMA]
+        self.assertEqual(gamma["result"], "differs")
+        self.assertEqual([(d["setting"], d["present"]) for d in gamma["differences"]], [(n, None) for n in names])
+        self.assert_only_gets(self.calls())
+        self.log.write_text("")
+        proc, output, directory = self.apply("--repo", GAMMA)
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        applied = self.results(output)[GAMMA]
+        self.assertEqual(applied["result"], "applied")
+        self.assertEqual([(self.method(c), self.endpoint(c)) for c in self.writes()], [("POST", f"{base}/rulesets")] * 2)
+        proc, output = self.check("--repo", GAMMA)
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        self.assertEqual(self.results(output)[GAMMA]["result"], "same")
+        script = Path(applied["undo"]).read_text()
+        self.assertEqual(re.findall(r"^call (\S+) (\S+)", script, re.M), [
+            ("DELETE", f"{base}/rulesets/9002"), ("DELETE", f"{base}/rulesets/9001")])
+        undo = self.run_undo(applied["undo"])
+        self.assertEqual(undo.returncode, 0, undo.stdout)
+        self.assert_reads_equal(bare["repositories"])
+        # (c) classic protection: refused with the same differences and no write
+        classic = copy.deepcopy(bare)
+        classic["repositories"][GAMMA]["classic_protection"] = True
+        self.set_state(classic)
+        self.log.write_text("")
+        proc, output = self.check("--repo", GAMMA)
+        self.assertEqual(proc.returncode, 1)
+        refused_check = self.results(output)[GAMMA]
+        self.assertEqual((refused_check["result"], refused_check["code"]), ("refused", "classic_protection_present"))
+        self.assertEqual([(d["setting"], d["present"]) for d in refused_check["differences"]], [(n, None) for n in names])
+        self.assert_only_gets(self.calls())
+        self.log.write_text("")
+        proc, output, refused_dir = self.apply("--repo", GAMMA, name="refused")
+        self.assertEqual(proc.returncode, 1)
+        refused = self.results(output)[GAMMA]
+        self.assertEqual((refused["result"], refused["code"], refused["undo"]), ("refused", "classic_protection_present", None))
+        self.assertEqual([(d["setting"], d["present"]) for d in refused["differences"]], [(n, None) for n in names])
+        self.assert_only_gets(self.calls())
+        self.assertEqual(os.listdir(refused_dir), [])
+        self.assertEqual(self.repos_state()[GAMMA], classic["repositories"][GAMMA])
+
     def test_read_failed_before_a_write_stops_the_run(self):
         self.set_faults(fail_get={f"{ALPHA}/rulesets": 500})
         proc, output, directory = self.apply()
@@ -562,13 +625,13 @@ class Files(unittest.TestCase):
                   "actions": {"enabled": True, "allowed_actions": "selected", "sha_pinning_required": True,
                               "selected_actions": {"github_owned_allowed": True, "verified_allowed": False,
                                                    "patterns_allowed": ["Swatinem/rust-cache@*"]}},
-                  "vulnerability_alerts": True, "automated_security_fixes": True,
-                  "secret_scanning": "enabled", "secret_scanning_push_protection": "enabled"}
+                  "vulnerability_alerts": True, "automated_security_fixes": True}
         self.assertEqual(entries, [
             dict(public, repository="park-kyungchan/agent-platform"),
             dict(public, repository="park-kyungchan/ontology-platform"),
             {"repository": "park-kyungchan/education-platform", "settings": settings,
              "actions": {"enabled": True, "allowed_actions": "all", "sha_pinning_required": True}},
+            {"repository": "park-kyungchan/agent-vps-operations"},
         ])
         self.assertEqual(json.loads((HERE / "repositories.json").read_text())["rulesets"], ["ruleset-main.json", "ruleset-tags.json"])
         self.assertEqual([(r["name"], r["target"]) for r in rulesets],
