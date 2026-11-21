@@ -11,3 +11,14 @@ TimeoutStartSec=90
 # No Slice=: the service runs outside the slice it sets, so the quota does not throttle it.
 # The command reads the policy file's path as `ap run` does (`/etc/agent-platform/policy.json`).
 Environment=HOME=/root
+NoNewPrivileges=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectKernelTunables=yes
+ProtectControlGroups=yes
+ProtectHostname=yes
+LockPersonality=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+SystemCallArchitectures=native
+ProtectSystem=full
