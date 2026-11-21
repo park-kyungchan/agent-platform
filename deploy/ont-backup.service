@@ -7,3 +7,14 @@ ExecStart=/usr/local/lib/agent-platform/backup-store.sh
 Slice=agents.slice
 Nice=10
 Environment=HOME=/root
+NoNewPrivileges=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectKernelTunables=yes
+ProtectControlGroups=yes
+ProtectHostname=yes
+LockPersonality=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+SystemCallArchitectures=native
+ProtectSystem=full

@@ -2037,9 +2037,16 @@ fn r18_the_unit_files() {
     }
     let readme = include_str!("../../../deploy/README.md");
     assert!(readme.contains("## The watch"));
-    assert!(readme.contains(
-        "install -m 0644 deploy/ap-watch.service deploy/ap-watch.timer /etc/systemd/system/"
-    ));
+    let (_, section) = readme.split_once("\n## The watch\n").unwrap();
+    let section = section
+        .split_once("\n## ")
+        .map_or(section, |(head, _)| head);
+    assert!(section.contains("ap-watch.service") && section.contains("ap-watch.timer"));
+    assert!(
+        !section
+            .lines()
+            .any(|l| l.starts_with("install -m 0644 deploy/"))
+    );
     assert!(readme.contains("/etc/systemd/system/ap-watch.service.d/path.conf"));
     for d in ap::watch::DETECTORS {
         assert!(readme.contains(&format!("- `{d}`:")), "{d}");
