@@ -69,7 +69,8 @@
   "permission_mode": "auto",
   "models": [
    "opus",
-   "gemini-4-argon-high"
+   "gemini-4-argon-high",
+   "fable"
   ],
   "directory": "/var/lib/agent-platform/reviews",
   "task": "workspace-strategy-reassessment-20261109"
