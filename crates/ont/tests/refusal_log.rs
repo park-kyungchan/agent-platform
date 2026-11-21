@@ -1106,10 +1106,7 @@ fn without_a_role_ids_and_lines_are_as_before() {
     let mut db =
         ont_store::Store::open_schema_existing(std::path::Path::new(&without.store())).unwrap();
     let (seq, entry) = db.action_log().unwrap().remove(0);
-    assert_eq!(
-        entry.actor,
-        actor(Some("ag"), None, None)
-    );
+    assert_eq!(entry.actor, actor(Some("ag"), None, None));
     assert_eq!(
         std::fs::read_to_string(without.0.join("edits.jsonl")).unwrap(),
         format!("{}\n", ont::action::log_line(seq, &entry))
@@ -1156,7 +1153,10 @@ fn log_rows_carry_the_host_and_filter_by_it() {
     assert_eq!(rows[0]["request_id"], "h2");
     assert_eq!(rows[0]["actor"], actor(None, None, None));
     for outcome in ["applied", "refused"] {
-        let none = log(&t, json!({"outcome":outcome,"actor":{"host":"no-such-node-0"}}));
+        let none = log(
+            &t,
+            json!({"outcome":outcome,"actor":{"host":"no-such-node-0"}}),
+        );
         assert_eq!(none["rows"], json!([]), "{none}");
     }
     // The old line is returned as written, with no `host` and no `claimed`.

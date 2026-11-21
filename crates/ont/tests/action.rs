@@ -1723,7 +1723,8 @@ fn engine_writes_principal_and_host_into_the_actor() {
         ("r3", Some("ag"), Some("s1"), Some("lead")),
         ("r4", None, Some("s1"), None),
     ] {
-        let mut body = json!({"action_type":"create_tag","parameters":{"label":rid},"request_id":rid});
+        let mut body =
+            json!({"action_type":"create_tag","parameters":{"label":rid},"request_id":rid});
         for (name, v) in [("agent", agent), ("session", session), ("role", role)] {
             if let Some(v) = v {
                 body[name] = json!(v);
@@ -1838,7 +1839,11 @@ fn forged_host_and_account_are_recorded_as_the_true_ones() {
         let mut body = json!({"action_type":"create_tag","parameters":{"label":"g"}});
         body[member] = json!("forged");
         let (code, ans) = apply(&t, body);
-        assert_eq!((code, ans["code"].as_str()), (2, Some("invalid_request")), "{ans}");
+        assert_eq!(
+            (code, ans["code"].as_str()),
+            (2, Some("invalid_request")),
+            "{ans}"
+        );
     }
     assert_eq!(counts(&t), before);
 }
@@ -1852,7 +1857,10 @@ fn criteria_read_the_engine_written_host() {
     for (name, operand) in [
         ("this_node_tag", json!({"host":node})),
         ("other_node_tag", json!({"host":"no-such-node-0"})),
-        ("this_account_tag", json!({"principal":format!("uid:{}", kernel_uid())})),
+        (
+            "this_account_tag",
+            json!({"principal":format!("uid:{}", kernel_uid())}),
+        ),
         ("named_agent_tag", json!("claimed-agent")),
         ("word_agent_tag", json!("agent")),
     ] {
@@ -1862,7 +1870,10 @@ fn criteria_read_the_engine_written_host() {
             "submission_criteria":[{"code":"actor_matches","message":"The actor does not match.","all":[{"actor":operand}]}],
             "rules":[{"create_object":"tag","set":{"label":"$label"}}]
         });
-        schema["grants"][0]["actions"].as_array_mut().unwrap().push(json!(name));
+        schema["grants"][0]["actions"]
+            .as_array_mut()
+            .unwrap()
+            .push(json!(name));
     }
     install_bytes(&t, &serde_json::to_vec(&schema).unwrap());
     let go = |action: &str, label: &str, agent: Option<&str>| {
@@ -1877,15 +1888,27 @@ fn criteria_read_the_engine_written_host() {
     let (code, ans) = go("this_account_tag", "b", None);
     assert_eq!(code, 0, "{ans}");
     let (code, ans) = go("other_node_tag", "c", None);
-    assert_eq!((code, ans["code"].as_str()), (2, Some("submission_criteria")), "{ans}");
+    assert_eq!(
+        (code, ans["code"].as_str()),
+        (2, Some("submission_criteria")),
+        "{ans}"
+    );
     // The string form holds for the claimed agent equal to its operand.
     let (code, ans) = go("named_agent_tag", "d", Some("claimed-agent"));
     assert_eq!(code, 0, "{ans}");
     let (code, ans) = go("named_agent_tag", "e", None);
-    assert_eq!((code, ans["code"].as_str()), (2, Some("submission_criteria")), "{ans}");
+    assert_eq!(
+        (code, ans["code"].as_str()),
+        (2, Some("submission_criteria")),
+        "{ans}"
+    );
     // The word `agent` is no longer the principal.
     let (code, ans) = go("word_agent_tag", "f", None);
-    assert_eq!((code, ans["code"].as_str()), (2, Some("submission_criteria")), "{ans}");
+    assert_eq!(
+        (code, ans["code"].as_str()),
+        (2, Some("submission_criteria")),
+        "{ans}"
+    );
     assert_eq!(ans["failed"], json!(["actor_matches"]));
     let (code, ans) = go("word_agent_tag", "g", Some("agent"));
     assert_eq!(code, 0, "{ans}");
@@ -1923,10 +1946,16 @@ fn now_is_refused_at_the_default_store() {
         }
     }
     // `--now` without `--store` is still `now_requires_store`.
-    let args: Vec<String> = ["--now", "1", "describe"].iter().map(|s| s.to_string()).collect();
+    let args: Vec<String> = ["--now", "1", "describe"]
+        .iter()
+        .map(|s| s.to_string())
+        .collect();
     let out = ont::run(&args, &b"{}"[..], 1000, 1000);
     let v: Value = serde_json::from_str(out.stdout.trim()).unwrap();
-    assert_eq!((out.code, v["code"].as_str()), (2, Some("now_requires_store")));
+    assert_eq!(
+        (out.code, v["code"].as_str()),
+        (2, Some("now_requires_store"))
+    );
     // Another store with `--now` is not refused by this rule.
     install(&t);
     let (code, ans) = run_store(&t, &["describe"], &json!({}));
