@@ -255,7 +255,11 @@ impl World {
             .env("XDG_CONFIG_HOME", self.p("xdg"))
             .stdin(Stdio::null());
         // `ap check` sets these itself: the test fails when it does not, and passes on the PC too.
-        for v in CARGO_SETTINGS.map(|(n, _)| n).into_iter().chain(["AP_CHECK_HOST"]) {
+        for v in CARGO_SETTINGS
+            .map(|(n, _)| n)
+            .into_iter()
+            .chain(["AP_CHECK_HOST"])
+        {
             c.env_remove(v);
         }
         c
