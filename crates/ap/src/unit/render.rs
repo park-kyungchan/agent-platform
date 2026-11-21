@@ -220,6 +220,12 @@ fn repository_part(
     repository: &str,
     u: &Value,
 ) -> Result<(String, String), Failure> {
+    let (mut out, commit) = map_part(s, repository, u)?;
+    out.push_str(&protected_section(u));
+    Ok((out, commit))
+}
+/// The repository part without the section of a `plain` unit: `AGENTS.md` and the map lines, and the commit.
+fn map_part(s: &mut impl System, repository: &str, u: &Value) -> Result<(String, String), Failure> {
     let clone = clone_of(s, repository)?;
     let named = git(
         s,
@@ -256,10 +262,18 @@ fn repository_part(
         out.push_str("The map could not be read.\n");
         return Ok((out, commit));
     };
+    // The literal of a pattern of the grammar: its exact path, or its directory and a `/`; a text of
+    // neither form meets no entry.
     let patterns = u["write_set"].as_array().into_iter().flatten();
-    let literals: Vec<&str> = patterns
-        .filter_map(|p| p.as_str()?.split('*').next())
-        .filter(|p| !p.is_empty())
+    let literals: Vec<String> = (patterns.filter_map(Value::as_str))
+        .filter_map(|t| {
+            let p = crate::review::write_set_pattern(t);
+            match (p.grammar, p.reading) {
+                (true, crate::review::Reading::Exact(path)) => Some(path.to_owned()),
+                (true, crate::review::Reading::Below(dir)) => Some(format!("{dir}/")),
+                _ => None,
+            }
+        })
         .collect();
     let meets = |path: &str| {
         !path.is_empty()
@@ -291,6 +305,27 @@ fn repository_part(
         out.push_str("No entry of the map meets the write set.\n");
     }
     Ok((out, commit))
+}
+/// The sentence under the heading of the protected paths (`specs/ap/unit.md` R40).
+const PROTECTED_SENTENCE: &str = "This unit is of class plain: its run stops protected_path_changed when it changes one of these paths, compared without case, whatever its write set names. A page that needs one is class contract, lane objective.";
+/// `## Protected paths` after the repository part of a unit of class `plain`, printed from the lists the
+/// run's check reads (R40); empty for another class.
+fn protected_section(u: &Value) -> String {
+    use super::drive::{PROTECTED_CONFIGS, PROTECTED_EXACT, PROTECTED_NAMES, PROTECTED_TREES};
+    if u["class"] != "plain" {
+        return String::new();
+    }
+    format!(
+        "\n## Protected paths\n\n{PROTECTED_SENTENCE}\n\
+         - exactly: {}\n\
+         - the last component, in any directory: {}\n\
+         - the last two components, in any directory: {}\n\
+         - the first component, the path itself or anything under it: {}\n",
+        PROTECTED_EXACT.join(", "),
+        PROTECTED_NAMES.join(", "),
+        PROTECTED_CONFIGS.join(", "),
+        PROTECTED_TREES.join(", "),
+    )
 }
 /// A member of a map's entry: a string, or an array of strings.
 fn names(v: &Value) -> Vec<&str> {

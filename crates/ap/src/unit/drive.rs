@@ -67,11 +67,11 @@ impl From<Failure> for Halt {
 type Step<T = ()> = Result<T, Halt>;
 /// The paths a unit of class `plain` may not change (R36), every name lower-case: exactly these
 /// whole paths.
-const PROTECTED_EXACT: [&str; 2] = ["check", "review.md"];
+pub(super) const PROTECTED_EXACT: [&str; 2] = ["check", "review.md"];
 /// The last component, in any directory: Cargo, rustfmt and rustup read the configuration files
 /// below the root too, and a build script or a manifest of any package runs or steers a build that
 /// delivery makes as root.
-const PROTECTED_NAMES: [&str; 9] = [
+pub(super) const PROTECTED_NAMES: [&str; 9] = [
     "clippy.toml",
     ".clippy.toml",
     "rustfmt.toml",
@@ -83,23 +83,28 @@ const PROTECTED_NAMES: [&str; 9] = [
     "cargo.lock",
 ];
 /// The last two components, in any directory: Cargo's configuration below the root.
-const PROTECTED_CONFIGS: [&str; 2] = [".cargo/config.toml", ".cargo/config"];
+pub(super) const PROTECTED_CONFIGS: [&str; 2] = [".cargo/config.toml", ".cargo/config"];
 /// The first component: the path itself or anything under it.
-const PROTECTED_TREES: [&str; 10] = [
+pub(super) const PROTECTED_TREES: [&str; 10] = [
     "ci", ".github", "specs", "scripts", ".cargo", "deploy", "etc", "content", "github", "ontology",
 ];
+/// Whether the first component of `path` is one of the protected trees, compared without case: the
+/// path itself and everything under it is protected (R36).
+pub(super) fn protected_tree(path: &str) -> bool {
+    let first = path.split('/').next().unwrap_or(path).to_lowercase();
+    PROTECTED_TREES.contains(&first.as_str())
+}
 /// A path a unit of class `plain` may not change (R36): `path` is repository-relative, and every
 /// name is compared without case (`CI/x`, `.GitHub/…`).
-fn protected(path: &str) -> bool {
+pub(super) fn protected(path: &str) -> bool {
     let path = path.to_lowercase();
     let last = path.rsplit('/').next().unwrap_or(&path);
-    let first = path.split('/').next().unwrap_or(&path);
     let config = PROTECTED_CONFIGS
         .iter()
         .any(|c| path == *c || path.ends_with(&format!("/{c}")));
     PROTECTED_EXACT.contains(&path.as_str())
         || PROTECTED_NAMES.contains(&last)
-        || PROTECTED_TREES.contains(&first)
+        || protected_tree(&path)
         || config
 }
 /// `gh pr merge` with `words`: `Err` with the redacted reply when it failed (no reply: empty).

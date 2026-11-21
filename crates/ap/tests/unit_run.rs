@@ -2430,6 +2430,37 @@ fn r36_a_plain_unit_stops_on_a_protected_path_and_a_contract_unit_goes_on() {
     assert_eq!(a["waits_for"], "approve", "{a}");
 }
 
+// spec: specs/ap/unit-run.md#R16
+#[test]
+fn r16_a_stored_text_outside_the_grammar_is_read_as_on_the_base() {
+    // A unit stored with `src/*` (the verbs refuse it, another client of the store may write it): the
+    // text is the path named `src/*` and nothing else, so a change of `src/a.rs` is outside the set.
+    let mut f = F::new();
+    let (a, status) = f.edit(
+        "plain",
+        json!(["src/*"]),
+        &[],
+        "mkdir src; echo x > src/a.rs",
+    );
+    assert_eq!((a["state"].as_str(), status), (Some("stopped"), 3), "{a}");
+    assert_eq!(a["stop_cause"], "path_outside_write_set", "{a}");
+    assert!(
+        a["stop_detail"].as_str().unwrap().contains("src/a.rs"),
+        "{a}"
+    );
+    // A final `/**` covers the descendants of the literal text before it, a bracket included.
+    let mut f = F::new();
+    let edit = "mkdir -p 'a/[b]'; echo x > 'a/[b]/x.rs'";
+    let (a, status) = f.edit("plain", json!(["a/[b]/**"]), &[], edit);
+    assert_eq!((a["state"].as_str(), status), (Some("merged"), 0), "{a}");
+    // And the same text is no cover for a path of another name.
+    let mut f = F::new();
+    let edit = "mkdir -p a/b; echo x > a/b/x.rs";
+    let (a, status) = f.edit("plain", json!(["a/[b]/**"]), &[], edit);
+    assert_eq!((a["state"].as_str(), status), (Some("stopped"), 3), "{a}");
+    assert_eq!(a["stop_cause"], "path_outside_write_set", "{a}");
+}
+
 // spec: specs/ap/unit-run.md#R17
 #[test]
 fn r17_the_required_check_and_the_review_threads() {

@@ -1,7 +1,9 @@
 //! `ap unit add|amend|ready|drop|page`: a unit's page as an object of the store, made ready only after
 //! its acceptance checks ended on the base as their kinds require (`specs/ap/unit.md`).
+use super::drive::{protected, protected_tree};
 use super::render::{self, Role};
 use crate::host::{Failure, Host, LIMIT, System, error, fail, id, new_session_id};
+use crate::review::{Reading, WRITE_SET_FORMS, write_set_pattern};
 use crate::store::{self, Actor, at, bad, shaped, sized};
 use serde_json::{Map, Value, json};
 use std::{
@@ -310,14 +312,17 @@ fn entries(
 ) -> Option<Value> {
     let list = b.list(r, k, max)?;
     for (i, e) in list.iter().enumerate() {
-        let checked = e.as_str().filter(|e| {
-            (1..=bytes).contains(&e.len()) && !e.chars().any(char::is_control) && ok(e)
-        });
-        b.text(
-            checked.ok_or_else(|| bad(&format!("{k}.{i}"))),
-            Some(e),
-            bytes,
-        );
+        let within = e
+            .as_str()
+            .filter(|e| (1..=bytes).contains(&e.len()) && !e.chars().any(char::is_control));
+        let checked = within.filter(|e| ok(e));
+        let mut refused = bad(&format!("{k}.{i}"));
+        if k == "write_set" && text_rule(Some(e), bytes) == FORM {
+            // An entry refused by the rule `form` names both forms (R11): a text of neither form, one
+            // with a control character, and a value that is no string.
+            refused.detail = json!({"forms": WRITE_SET_FORMS});
+        }
+        b.text(checked.ok_or(refused), Some(e), bytes);
     }
     Some(json!(list))
 }
@@ -345,8 +350,63 @@ pub fn branch_ok(b: &str) -> bool {
         && b.split('/')
             .all(|c| !c.is_empty() && !c.starts_with('.') && !c.ends_with(".lock"))
 }
-fn pattern_ok(p: &str) -> bool {
-    !p.starts_with('/') && !p.split('/').any(|c| c == "..")
+/// The patterns of a stored or requested `write_set`: its entries that are strings, in order (the
+/// store types the property as an array of strings; another entry is skipped, as `outside` skips it).
+fn patterns(list: Option<&Value>) -> Vec<&str> {
+    let entries = list.and_then(Value::as_array).into_iter().flatten();
+    entries.filter_map(Value::as_str).collect()
+}
+/// The refusal of the patterns `hit`, at most ten of them shown, with their number.
+fn pattern_refusal(code: &'static str, hit: &[&str], more: (&str, Value)) -> Failure {
+    let mut detail =
+        json!({"patterns": hit.iter().take(10).collect::<Vec<_>>(), "count": hit.len()});
+    detail[more.0] = more.1;
+    fail(code, "write_set", detail)
+}
+/// R38: a stored pattern of neither form of R11 refuses `ready` and the look at a page.
+fn write_set_form(patterns: &[&str]) -> Result<(), Failure> {
+    let hit: Vec<&str> = (patterns.iter().copied())
+        .filter(|p| !write_set_pattern(p).grammar)
+        .collect();
+    match hit.is_empty() {
+        true => Ok(()),
+        false => Err(pattern_refusal(
+            "write_set_form",
+            &hit,
+            ("forms", json!(WRITE_SET_FORMS)),
+        )),
+    }
+}
+/// Whether a pattern of the grammar can only match protected paths (R39): an exact path that R36
+/// protects, or a directory that is, or lies under, a protected tree.
+fn only_protected(pattern: &str) -> bool {
+    let p = write_set_pattern(pattern);
+    p.grammar
+        && match p.reading {
+            Reading::Exact(path) => protected(path),
+            Reading::Below(dir) => protected_tree(dir),
+        }
+}
+/// R39: a unit of class `plain` whose pattern can only match protected paths is refused; the class
+/// `contract` or `effect` never is. A text of neither form is not judged (R38 refuses it).
+fn plain_writes_protected(class: Option<&str>, patterns: &[&str]) -> Result<(), Failure> {
+    let hit: Vec<&str> = (patterns.iter().copied())
+        .filter(|p| class == Some("plain") && only_protected(p))
+        .collect();
+    match hit.is_empty() {
+        true => Ok(()),
+        false => Err(pattern_refusal(
+            "plain_writes_protected",
+            &hit,
+            ("needs", json!("class contract, lane objective")),
+        )),
+    }
+}
+/// R38 and then R39 on the stored page of `u`, as `ready` and the look at a page judge it.
+pub(super) fn write_set_judged(u: &Value) -> Result<(), Failure> {
+    let stored = patterns(u.get("write_set"));
+    write_set_form(&stored)?;
+    plain_writes_protected(u["class"].as_str(), &stored)
 }
 fn read_first_ok(e: &str) -> bool {
     let Some((path, range)) = e.rsplit_once(':') else {
@@ -453,7 +513,7 @@ fn page_parameters(b: &mut Breaks, r: &Value, op: &str, key: &str) -> (Value, Ve
         }
     }
     let lists: [List; 3] = [
-        ("write_set", 60, 200, pattern_ok),
+        ("write_set", 60, 200, |e| write_set_pattern(e).grammar),
         ("read_first", 40, 300, read_first_ok),
         ("specs", 20, 300, spec_ok),
     ];
@@ -576,9 +636,20 @@ fn write(
     if op == "ready" {
         return ready(s, store, &actor, rid, key, after);
     }
+    if op == "add" {
+        plain_writes_protected(p["class"].as_str(), &patterns(p.get("write_set")))?;
+    }
     // `amend` and `drop` of a unit the store does not have: the actions would answer another refusal.
-    if op != "add" && at(store::get(s, store, "unit", key), "unit")?.is_none() {
-        return Err(error("unknown_unit", "unit"));
+    if op != "add" {
+        let Some(stored) = at(store::get(s, store, "unit", key), "unit")? else {
+            return Err(error("unknown_unit", "unit"));
+        };
+        // The class and the write set the unit would have: the request's where it gives them (R39).
+        if op == "amend" && (r.get("class").is_some() || r.get("write_set").is_some()) {
+            let class = p.get("class").unwrap_or(&stored["class"]);
+            let set = p.get("write_set").or(stored.get("write_set"));
+            plain_writes_protected(class.as_str(), &patterns(set))?;
+        }
     }
     for d in &depends {
         if at(store::get(s, store, "unit", d), "depends_on")?.is_none() {
@@ -631,6 +702,7 @@ fn ready(
     }
     let (mut base, mut checks) = (Value::Null, vec![]);
     if u["state"] == "draft" {
+        write_set_judged(&u)?;
         if (u["class"] == "contract" || u["class"] == "effect")
             && !accepted_page(s, store, key, &digest)?
         {
