@@ -78,6 +78,11 @@ fn args(words: &[&str]) -> Vec<String> {
     words.iter().map(|w| (*w).to_owned()).collect()
 }
 
+/// An entry of `deploy/`: its mode, its object type and its bytes.
+type Unit = (&'static str, &'static str, Vec<u8>);
+/// A setup of the fake and the `systemctl` calls it leads to.
+type Case = (fn(&mut W), &'static [&'static str]);
+
 struct Commit {
     id: String,
     parents: Vec<String>,
@@ -173,6 +178,19 @@ struct W {
     /// commands of a checkout run the real `git` instead.
     cos: Vec<Co>,
     real_git: bool,
+    /// `deploy/` of each commit (none named: an empty directory): name, mode, object type, bytes.
+    deploy: BTreeMap<String, BTreeMap<String, Unit>>,
+    /// `git ls-tree <commit> deploy/` fails; a checkout fails.
+    units_fail: bool,
+    checkout_fails: bool,
+    /// The unit files whose `git show` fails.
+    lost_units: Vec<String>,
+    /// The `systemctl` calls (their words joined by a space) that exit 1, and the timers
+    /// `is-enabled` does not answer `enabled` for.
+    systemctl_fails: Vec<String>,
+    not_enabled: Vec<String>,
+    /// The length of `calls` at each `rollback-check`.
+    checks_at: Vec<usize>,
 }
 
 impl W {
@@ -187,7 +205,14 @@ impl W {
             NEXT.fetch_add(1, Ordering::SeqCst)
         ));
         let _ = std::fs::remove_dir_all(&t);
-        for d in ["bin", "backup", "agents", "content-backup", "reports"] {
+        for d in [
+            "bin",
+            "backup",
+            "agents",
+            "content-backup",
+            "reports",
+            "units",
+        ] {
             std::fs::create_dir_all(t.join(d)).unwrap();
         }
         let mut chain = vec![Commit {
@@ -256,6 +281,13 @@ impl W {
             ls_tree_fails: false,
             cos: vec![],
             real_git: false,
+            deploy: BTreeMap::new(),
+            units_fail: false,
+            checkout_fails: false,
+            lost_units: vec![],
+            systemctl_fails: vec![],
+            not_enabled: vec![],
+            checks_at: vec![],
         };
         w.lock = w.p("deliver.lock");
         for n in 1..=k {
@@ -309,6 +341,32 @@ fn installer(file: Option<&str>, tree: Option<&str>, exit: i32, out: &str, err: 
 impl W {
     fn p(&self, rel: &str) -> String {
         self.t.join(rel).to_str().unwrap().to_owned()
+    }
+    /// The entry `deploy/<name>` of `commit`: its mode, object type and bytes.
+    fn unit_at(&self, commit: &str, name: &str) -> Option<Unit> {
+        self.deploy.get(commit)?.get(name).cloned()
+    }
+    /// `deploy/<name>` with `bytes` at each commit c(n) of `ns`.
+    fn unit(&mut self, ns: impl IntoIterator<Item = u32>, name: &str, bytes: &str) {
+        for n in ns {
+            let entry = ("100644", "blob", bytes.as_bytes().to_vec());
+            self.deploy
+                .entry(c(n))
+                .or_default()
+                .insert(name.into(), entry);
+        }
+    }
+    /// The host's copy of a unit file, under `AP_UNIT_DIR`.
+    fn host(&self, name: &str) -> String {
+        self.p(&format!("units/{name}"))
+    }
+    /// The `systemctl` calls, in order, their words joined by a space.
+    fn systemctl(&self) -> Vec<String> {
+        self.calls
+            .iter()
+            .filter(|(p, _, _)| p == "systemctl")
+            .map(|(_, a, _)| a.join(" "))
+            .collect()
     }
     fn tip(&self) -> String {
         self.chain.last().unwrap().id.clone()
@@ -492,7 +550,43 @@ impl W {
                 let origin = self.origin_once.take().unwrap_or_else(|| self.tip());
                 Self::text(!self.fetch_fails, &format!("{origin}\n"))
             }
-            ["checkout", "--quiet", "--force", "--detach", _] => Self::text(true, ""),
+            ["checkout", "--quiet", "--force", "--detach", _] => {
+                Self::text(!self.checkout_fails, "")
+            }
+            ["ls-tree", k, "deploy/"] => {
+                let lines: String = self
+                    .deploy
+                    .get(*k)
+                    .into_iter()
+                    .flatten()
+                    .map(|(n, (mode, kind, b))| {
+                        format!("{mode} {kind} {}\tdeploy/{n}\n", &sha(b)[..40])
+                    })
+                    .collect();
+                Self::text(!self.units_fail, &lines)
+            }
+            ["ls-tree", k, path] if path.starts_with("deploy/") => {
+                let line = self
+                    .unit_at(k, &path["deploy/".len()..])
+                    .map_or(String::new(), |(mode, kind, b)| {
+                        format!("{mode} {kind} {}\t{path}\n", &sha(&b)[..40])
+                    });
+                Self::text(true, &line)
+            }
+            ["rev-list", "--first-parent", base, "--", path] => {
+                let name = path.strip_prefix("deploy/").unwrap();
+                let mut at = self.chain.iter().find(|x| x.id == *base);
+                let mut lines = String::new();
+                while let Some(x) = at {
+                    let parent = self.chain.iter().find(|p| x.parents.first() == Some(&p.id));
+                    let before = parent.and_then(|p| self.unit_at(&p.id, name));
+                    if self.unit_at(&x.id, name) != before {
+                        lines.push_str(&format!("{}\n", x.id));
+                    }
+                    at = parent;
+                }
+                Self::text(true, &lines)
+            }
             ["ls-tree", tip, "--", "ontology/migrate"] => {
                 assert_eq!(*tip, self.tip());
                 let entry = self.migrate_mode.map_or(String::new(), |m| {
@@ -509,6 +603,11 @@ impl W {
                         true,
                         &json!({"format": 1, "version": self.tip_schema}).to_string(),
                     ),
+                    p if p.starts_with("deploy/") => match self.unit_at(commit, &p[7..]) {
+                        _ if self.lost_units.iter().any(|n| p[7..] == **n) => Self::text(false, ""),
+                        Some((_, "blob", b)) => Self::text(true, &String::from_utf8(b).unwrap()),
+                        _ => Self::text(false, ""),
+                    },
                     _ => panic!("unexpected show {spec}"),
                 }
             }
@@ -706,6 +805,7 @@ impl System for W {
     fn call(&mut self, program: &str, a: &[String], body: &Value, ms: u64) -> Answer {
         if program == "bash" && a.len() == 3 && a[1] == "rollback-check" {
             self.checks.push((a[0].clone(), a[2].clone()));
+            self.checks_at.push(self.calls.len());
             return Self::text(!self.old_script && !self.refused.contains(&a[2]), "");
         }
         self.calls.push((program.into(), a.to_vec(), body.clone()));
@@ -730,6 +830,15 @@ impl System for W {
                     self.nested_result = Some(execute(&mut *second, &r));
                 }
                 Self::text(true, &format!("Avail\n{}M\n", self.free))
+            }
+            "systemctl" => {
+                assert_eq!(ms, 120_000);
+                let words = a.join(" ");
+                if a[0] == "is-enabled" {
+                    let on = !self.not_enabled.contains(&a[1]);
+                    return Self::text(on, if on { "enabled\n" } else { "disabled\n" });
+                }
+                Self::text(!self.systemctl_fails.contains(&words), "")
             }
             "flock" => {
                 if a[0] == "-n" {
@@ -840,6 +949,7 @@ impl System for W {
             ("AP_CONTENT_DST".into(), self.p("agents")),
             ("AP_CONTENT_BACKUP_DIR".into(), self.p("content-backup")),
             ("AP_DELIVER_LOCK".into(), self.lock.clone()),
+            ("AP_UNIT_DIR".into(), self.p("units")),
             ("ONT_INSTALL_BIN_DIR".into(), self.p("ont-bin")),
             ("ONT_INSTALL_STATE_DIR".into(), self.p("ont-state")),
         ]
@@ -1971,10 +2081,17 @@ fn d12_rollback_exact_calls() {
         )
     };
     let id = oid("install", &format!("act-ap.{back}.rb1"));
+    let git = |words: &[&str]| {
+        let mut a = args(&["-C", &clone]);
+        a.extend(args(words));
+        ("git".to_owned(), a, Value::Null)
+    };
     let want = vec![
         search(vec![eq("target", target()), eq("status", json!("running"))]),
         version.clone(),
         show(&here),
+        // The clone at C, the commit the pair was read at, before any of its scripts (R47).
+        git(&["checkout", "--quiet", "--force", "--detach", &here]),
         search(vec![
             eq("target", target()),
             eq("commit", json!(here)),
@@ -1998,6 +2115,9 @@ fn d12_rollback_exact_calls() {
         launch("install-content.sh", &w.tarball()),
         launch("install-ap.sh", &kept(&w)),
         version,
+        // The unit files of A's `from` and of C (R48).
+        git(&["ls-tree", &back, "deploy/"]),
+        git(&["ls-tree", &here, "deploy/"]),
         apply(
             json!({"action_type": "close_install", "request_id": format!("ap.{back}.rb1.close"), "agent": "ap-deliver",
             "parameters": {"install": id, "outcome": "installed", "to": back}}),
@@ -2526,7 +2646,7 @@ fn d2_exit_codes_of_the_limits() {
 
 // ---- D7 the record -----------------------------------------------------------------------------
 
-const MEMBERS: [&str; 18] = [
+const MEMBERS: [&str; 19] = [
     "at",
     "by",
     "repository",
@@ -2545,6 +2665,7 @@ const MEMBERS: [&str; 18] = [
     "rollback_content",
     "index",
     "closed",
+    "units",
 ];
 fn members(v: &Value) -> Vec<String> {
     let mut keys: Vec<String> = v.as_object().unwrap().keys().cloned().collect();
@@ -2828,7 +2949,6 @@ fn d10_exact_calls_of_an_install() {
             "+refs/heads/main:refs/remotes/origin/main",
         ]),
         git(&["rev-parse", "--verify", "refs/remotes/origin/main^{commit}"]),
-        git(&["checkout", "--quiet", "--force", "--detach", &tip]),
         version.clone(),
         git(&["show", &format!("{from}:content/SHA256SUMS")]),
         git(&["show", &format!("{tip}:ontology/ENGINE-PIN")]),
@@ -2862,6 +2982,8 @@ fn d10_exact_calls_of_an_install() {
             args(&["-n", &w.p("build.lock"), "true"]),
             Value::Null,
         ),
+        // T is checked out once step 6 accepted it and step 7 passed (R47).
+        git(&["checkout", "--quiet", "--force", "--detach", &tip]),
         index.clone(),
         search(
             "install",
@@ -2877,6 +2999,8 @@ fn d10_exact_calls_of_an_install() {
         launch("install-content.sh"),
         version,
         git(&["show", &format!("{tip}:content/SHA256SUMS")]),
+        // The unit files of T (R48): `deploy/` of the fake holds none.
+        git(&["ls-tree", &tip, "deploy/"]),
         apply(
             json!({"action_type": "close_install", "request_id": format!("ap.{tip}.1.close"), "agent": "ap-deliver",
             "parameters": {"install": oid("install", &format!("act-ap.{tip}.1")), "outcome": "installed", "to": tip,
@@ -4820,4 +4944,623 @@ fn deliver_r36_the_service_counts_exit_2_as_no_failure_of_the_unit() {
         .filter(|l| l.starts_with("SuccessExitStatus="))
         .collect();
     assert_eq!(success, ["SuccessExitStatus=2"]);
+}
+
+// ---- U the clone's tree and the unit files (specs/ap/deliver.md R47 to R52) ---------------------
+
+/// The positions in `calls` of the clone's `git checkout`s.
+fn checkouts(w: &W, clone: &str) -> Vec<(usize, String)> {
+    w.calls
+        .iter()
+        .enumerate()
+        .filter(|(_, (p, a, _))| p == "git" && a[0] == "-C" && a[1] == clone && a[2] == "checkout")
+        .map(|(n, (_, a, _))| (n, a.last().unwrap().clone()))
+        .collect()
+}
+/// The record's rows of `units`: (name, result, enabled).
+fn unit_rows(v: &Value) -> Vec<(String, String, Value)> {
+    v["units"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|r| {
+            let keys: Vec<&String> = r.as_object().unwrap().keys().collect();
+            assert_eq!(
+                keys,
+                ["after", "before", "enabled", "name", "result"],
+                "{r}"
+            );
+            (
+                r["name"].as_str().unwrap().to_owned(),
+                r["result"].as_str().unwrap().to_owned(),
+                r["enabled"].clone(),
+            )
+        })
+        .collect()
+}
+fn urow(name: &str, result: &str, enabled: Value) -> (String, String, Value) {
+    (name.into(), result.into(), enabled)
+}
+/// The names under `AP_UNIT_DIR`, sorted.
+fn host_names(w: &W) -> Vec<String> {
+    let mut names: Vec<String> = std::fs::read_dir(w.p("units"))
+        .unwrap()
+        .map(|e| e.unwrap().file_name().into_string().unwrap())
+        .collect();
+    names.sort();
+    names
+}
+
+// spec: specs/ap/deliver.md#R47
+#[test]
+fn u1_a_refusal_of_steps_3_to_7_makes_no_checkout() {
+    let setups: [fn(&mut W); 6] = [
+        |w| w.reviews.retain(|r| r["head"] != h(2)),
+        |w| w.pin = "f".repeat(40),
+        |w| w.tip_schema = 9,
+        |w| w.free = 10,
+        |w| w.build_busy = true,
+        |w| {
+            w.closed("forward", &c(2), &c(0), "installed", "timer:1");
+        },
+    ];
+    for (n, setup) in setups.iter().enumerate() {
+        let mut w = W::new();
+        setup(&mut w);
+        let r = if n == 5 { w.timer() } else { w.request() };
+        let (v, _) = w.run_with(&r);
+        assert_eq!(v["end"], "refused", "{n} {v}");
+        assert_eq!(checkouts(&w, &w.p("state/r")), [], "{n} {v}");
+        assert_eq!(v["units"], Value::Null, "{n}");
+    }
+}
+
+// spec: specs/ap/deliver.md#R47
+// spec: specs/ap/deliver.md#R28
+#[test]
+fn u1_the_tip_is_checked_out_after_its_chain_and_before_the_first_script() {
+    let mut w = W::new();
+    let (v, exit) = w.run();
+    assert_eq!((end(&v), exit), (("installed", ""), 0), "{v}");
+    let co = checkouts(&w, &w.p("state/r"));
+    assert_eq!(co.len(), 1);
+    assert_eq!(co[0].1, c(2));
+    let last_review = w
+        .calls
+        .iter()
+        .rposition(|(p, a, b)| p == "ont" && a[0] == "search" && b["object_type"] == "review")
+        .unwrap();
+    let first_launch = w.calls.iter().position(|(p, _, _)| p == "bash").unwrap();
+    let flock = w.calls.iter().position(|(p, _, _)| p == "flock").unwrap();
+    assert!(last_review < co[0].0 && flock < co[0].0 && co[0].0 < first_launch);
+    assert!(co[0].0 < w.at("start_install").unwrap());
+    // The handle's `rollback-check` runs from that tree too.
+    assert!(!w.checks_at.is_empty() && w.checks_at.iter().all(|n| *n > co[0].0));
+    // A checkout that fails is `fetch_failed`, before any attempt.
+    let mut w = W::new();
+    w.checkout_fails = true;
+    let (v, exit) = w.run();
+    refused(&w, &v, exit, "fetch_failed");
+    assert!(w.applies("start_install").is_empty());
+}
+
+// spec: specs/ap/deliver.md#R47
+// spec: specs/ap/deliver.md#R33
+#[test]
+fn u1_a_rollback_checks_c_out_before_rollback_check() {
+    let mut w = W::new();
+    installed_by_a(&mut w);
+    let (v, exit) = rolls(&mut w);
+    assert_eq!((end(&v), exit), (("installed", ""), 0), "{v}");
+    let co = checkouts(&w, &w.p("state/r"));
+    assert_eq!(co.iter().map(|x| x.1.clone()).collect::<Vec<_>>(), [c(2)]);
+    assert!(!w.checks_at.is_empty() && w.checks_at.iter().all(|n| *n > co[0].0));
+    let first_launch = w.calls.iter().position(|(p, _, _)| p == "bash").unwrap();
+    assert!(co[0].0 < first_launch);
+    // A checkout that fails: `fetch_failed`, no attempt.
+    let mut w = W::new();
+    installed_by_a(&mut w);
+    w.checkout_fails = true;
+    let (v, exit) = rolls(&mut w);
+    refused(&w, &v, exit, "fetch_failed");
+    assert!(w.checks.is_empty());
+}
+
+// spec: specs/ap/deliver.md#R47
+// spec: specs/ap/deliver.md#R21
+#[test]
+fn u1_a_dead_call_is_read_and_repaired_from_its_commit() {
+    // At its commit: the close's `rollback-check` runs from the tree of that commit.
+    let mut w = W::new();
+    w.dead_attempt(&c(2), &c(0), &sha(&binary(&c(0))));
+    (w.file, w.tree, w.bytes) = (Some(c(2)), Some(c(2)), binary(&c(2)));
+    tarball_at(&w, "100500Z-3", Some(0));
+    let (v, _) = w.run();
+    assert_eq!(v["closed"]["outcome"], "installed", "{v}");
+    let co = checkouts(&w, &w.p("state/r"));
+    assert_eq!(co[0].1, c(2));
+    assert!(!w.checks_at.is_empty() && co[0].0 < w.checks_at[0]);
+    // At neither: the repair checks the attempt's commit out before its first script.
+    let mut w = W::new();
+    dead_forward(&mut w, Some(2), Some(0));
+    let (v, _) = w.run();
+    let co = checkouts(&w, &w.p("state/r"));
+    let first_launch = w.calls.iter().position(|(p, _, _)| p == "bash").unwrap();
+    assert_eq!(co[0].1, c(2), "{v}");
+    assert!(co[0].0 < first_launch);
+    // A checkout that fails there: `attempt_running` with the attempt.
+    let mut w = W::new();
+    let id = dead_forward(&mut w, Some(2), Some(0));
+    w.checkout_fails = true;
+    let (v, _) = w.run();
+    assert_eq!(end(&v), ("refused", "attempt_running"), "{v}");
+    assert_eq!(v["detail"], json!({"install": id}));
+    assert!(w.launched().is_empty());
+}
+
+// spec: specs/ap/deliver.md#R47
+// spec: specs/ap/deliver.md#R43
+#[test]
+fn u1_the_pin_is_checked_out_after_its_chain() {
+    let mut w = W::engine();
+    let (v, exit) = w.run();
+    assert_eq!((end(&v), exit), (("installed", ""), 0), "{v}");
+    let co = checkouts(&w, &w.p("state/engine"));
+    assert_eq!(co.len(), 1);
+    assert_eq!(co[0].1, ec(2));
+    let last_review = w
+        .calls
+        .iter()
+        .rposition(|(p, a, b)| p == "ont" && a[0] == "search" && b["object_type"] == "review")
+        .unwrap();
+    let launch = w.calls.iter().position(|(p, _, _)| p == "bash").unwrap();
+    assert!(last_review < co[0].0 && co[0].0 < launch);
+    // The clone of the repository is at T, accepted, before the marker and the engine (R42).
+    let own = checkouts(&w, &w.p("state/r"));
+    assert_eq!(own.iter().map(|x| x.1.clone()).collect::<Vec<_>>(), [c(2)]);
+    // `engine_not_accepted` leaves the engine clone's HEAD where it was.
+    let mut w = W::engine();
+    w.reviews.retain(|r| r["head"] != eh(2));
+    let (v, _) = w.run();
+    assert_eq!(end(&v), ("refused", "engine_not_accepted"), "{v}");
+    assert_eq!(checkouts(&w, &w.p("state/engine")), []);
+    assert_eq!(v["units"], Value::Null);
+}
+
+/// Three merges, the pair at c(1): the unit step goes from c(1) to c(3), and c(0) is older than its
+/// base on the first-parent chain.
+fn from_one() -> W {
+    let mut w = W::with(3);
+    (w.file, w.tree, w.bytes) = (Some(c(1)), Some(c(1)), binary(&c(1)));
+    w
+}
+
+// spec: specs/ap/deliver.md#R48
+// spec: specs/ap/deliver.md#R49
+// spec: specs/ap/deliver.md#R51
+#[test]
+fn u2_each_result_of_one_file() {
+    let mut w = from_one();
+    w.unit(2..=3, "a.timer", "A new\n");
+    w.unit(0..=3, "b.service", "B\n");
+    w.unit(0..=1, "c.service", "C base\n");
+    w.unit(2..=3, "c.service", "C new\n");
+    w.unit([0], "d.service", "D old\n");
+    w.unit([1], "d.service", "D base\n");
+    w.unit(2..=3, "d.service", "D new\n");
+    w.unit(0..=1, "e.service", "E\n");
+    w.unit(2..=3, "e.service", "E new\n");
+    w.unit(0..=3, "f.timer", "F\n");
+    w.unit(0..=3, "g.timer", "G\n");
+    // Entries that are no unit files: a link, a directory, other files, a name out of the set.
+    let tip = w.deploy.get_mut(&c(3)).unwrap();
+    tip.insert("h.timer".into(), ("120000", "blob", b"a.timer".to_vec()));
+    tip.insert("i.timer".into(), ("040000", "tree", vec![]));
+    tip.insert(
+        "README.md".into(),
+        ("100644", "blob", b"# deploy\n".to_vec()),
+    );
+    tip.insert("deliver.json".into(), ("100644", "blob", b"{}\n".to_vec()));
+    tip.insert("j k.service".into(), ("100644", "blob", b"J\n".to_vec()));
+    tip.insert("l.timer.d".into(), ("100644", "blob", b"L\n".to_vec()));
+    std::fs::write(w.host("b.service"), "B\n").unwrap();
+    std::fs::write(w.host("c.service"), "C base\n").unwrap();
+    std::fs::write(w.host("d.service"), "D old\n").unwrap();
+    std::fs::write(w.host("e.service"), "E by hand\n").unwrap();
+    std::os::unix::fs::symlink(w.host("b.service"), w.host("f.timer")).unwrap();
+    std::fs::create_dir(w.host("g.timer")).unwrap();
+    let (v, exit) = w.run();
+    assert_eq!(
+        (end(&v), exit),
+        (("installed", "units_host_differs"), 0),
+        "{v}"
+    );
+    assert_eq!(
+        (v["outcome"].clone(), v["to"].clone()),
+        (json!("installed"), json!(c(3)))
+    );
+    let close = &w.applies("close_install")[0]["parameters"];
+    assert_eq!(close["code"], "units_host_differs");
+    assert_eq!(close["outcome"], "installed");
+    let t = json!(true);
+    assert_eq!(
+        unit_rows(&v),
+        [
+            urow("a.timer", "written", t),
+            urow("b.service", "same", Value::Null),
+            urow("c.service", "written", Value::Null),
+            urow("d.service", "written", Value::Null),
+            urow("e.service", "host_differs", Value::Null),
+            urow("f.timer", "host_differs", Value::Null),
+            urow("g.timer", "host_differs", Value::Null),
+        ]
+    );
+    let read = |n: &str| std::fs::read_to_string(w.host(n)).unwrap();
+    assert_eq!(
+        [
+            read("a.timer"),
+            read("c.service"),
+            read("d.service"),
+            read("e.service")
+        ],
+        ["A new\n", "C new\n", "D new\n", "E by hand\n"]
+    );
+    let mode = std::fs::metadata(w.host("a.timer")).unwrap();
+    assert_eq!(
+        std::os::unix::fs::PermissionsExt::mode(&mode.permissions()) & 0o777,
+        0o644
+    );
+    assert!(
+        std::fs::symlink_metadata(w.host("f.timer"))
+            .unwrap()
+            .file_type()
+            .is_symlink()
+    );
+    assert!(std::fs::metadata(w.host("g.timer")).unwrap().is_dir());
+    // Nothing else is made: no temporary name stays, no entry that is no unit file.
+    assert_eq!(
+        host_names(&w),
+        [
+            "a.timer",
+            "b.service",
+            "c.service",
+            "d.service",
+            "e.service",
+            "f.timer",
+            "g.timer"
+        ]
+    );
+    let units = v["units"].as_array().unwrap();
+    let digest = |s: &str| json!(sha(s.as_bytes()));
+    assert_eq!(
+        (&units[0]["before"], &units[0]["after"]),
+        (&Value::Null, &digest("A new\n"))
+    );
+    assert_eq!(
+        (&units[2]["before"], &units[2]["after"]),
+        (&digest("C base\n"), &digest("C new\n"))
+    );
+    assert_eq!(
+        (&units[4]["before"], &units[4]["after"]),
+        (&digest("E by hand\n"), &digest("E by hand\n"))
+    );
+    assert_eq!(
+        (&units[5]["before"], &units[6]["after"]),
+        (&Value::Null, &Value::Null)
+    );
+    assert_eq!(
+        w.systemctl(),
+        [
+            "daemon-reload",
+            "enable --now a.timer",
+            "is-enabled a.timer"
+        ]
+    );
+    assert_eq!(w.last().as_ref(), Some(&v));
+}
+
+// spec: specs/ap/deliver.md#R49
+#[test]
+fn u2_a_file_whose_history_the_clone_cannot_answer_is_failed() {
+    let mut w = W::new();
+    w.unit(0..=2, "a.service", "A\n");
+    std::fs::write(w.host("a.service"), "A by hand\n").unwrap();
+    // The bytes of the tip cannot be read: failed, the host's copy untouched.
+    w.deploy
+        .get_mut(&c(2))
+        .unwrap()
+        .get_mut("a.service")
+        .unwrap()
+        .1 = "commit";
+    w.deploy
+        .get_mut(&c(2))
+        .unwrap()
+        .get_mut("a.service")
+        .unwrap()
+        .0 = "160000";
+    let (v, exit) = w.run();
+    // A gitlink is no unit file: no row at all.
+    assert_eq!((end(&v), exit), (("installed", ""), 0), "{v}");
+    assert_eq!(unit_rows(&v), []);
+    // `git show` of the tip's file fails.
+    let mut w = W::new();
+    w.unit(0..=2, "a.service", "A\n");
+    w.unit([2], "a.service", "A new\n");
+    w.lost_units = vec!["a.service".into()];
+    std::fs::write(w.host("a.service"), "A\n").unwrap();
+    let (v, exit) = w.run();
+    assert_eq!((end(&v), exit), (("installed", "units_failed"), 0), "{v}");
+    assert_eq!(unit_rows(&v), [urow("a.service", "failed", Value::Null)]);
+    assert_eq!(std::fs::read_to_string(w.host("a.service")).unwrap(), "A\n");
+    assert_eq!(w.systemctl(), Vec::<String>::new());
+}
+
+// spec: specs/ap/deliver.md#R50
+#[test]
+fn u3_the_calls_of_the_service_manager_and_their_order() {
+    // A timer new to the host; a changed timer; a changed service alone; nothing to write.
+    let cases: [Case; 4] = [
+        (
+            |w| w.unit(1..=2, "n.timer", "N\n"),
+            &[
+                "daemon-reload",
+                "enable --now n.timer",
+                "is-enabled n.timer",
+            ],
+        ),
+        (
+            |w| {
+                w.unit([0], "t.timer", "T0\n");
+                w.unit(1..=2, "t.timer", "T2\n");
+                std::fs::write(w.host("t.timer"), "T0\n").unwrap();
+            },
+            &["daemon-reload", "try-restart t.timer"],
+        ),
+        (
+            |w| {
+                w.unit([0], "s.service", "S0\n");
+                w.unit(1..=2, "s.service", "S2\n");
+                std::fs::write(w.host("s.service"), "S0\n").unwrap();
+            },
+            &["daemon-reload"],
+        ),
+        (
+            |w| {
+                w.unit(0..=2, "t.timer", "T\n");
+                w.unit(0..=2, "s.service", "S\n");
+                std::fs::write(w.host("t.timer"), "T\n").unwrap();
+                std::fs::write(w.host("s.service"), "S\n").unwrap();
+            },
+            &[],
+        ),
+    ];
+    for (n, (setup, want)) in cases.iter().enumerate() {
+        let mut w = W::new();
+        setup(&mut w);
+        let before = host_names(&w);
+        let (v, exit) = w.run();
+        assert_eq!((end(&v), exit), (("installed", ""), 0), "{n} {v}");
+        assert_eq!(w.systemctl(), *want, "{n}");
+        // The service manager is called after the files are written.
+        if let Some(reload) = w.calls.iter().position(|(p, _, _)| p == "systemctl") {
+            assert!(
+                w.calls
+                    .iter()
+                    .skip(reload)
+                    .all(|(p, a, _)| p != "git" || a[2] != "show")
+            );
+        }
+        if want.is_empty() {
+            assert_eq!(host_names(&w), before);
+            let same = unit_rows(&v).iter().all(|r| r.1 == "same");
+            assert!(same, "{v}");
+        }
+    }
+}
+
+// spec: specs/ap/deliver.md#R51
+// spec: specs/ap/deliver.md#R30
+// spec: specs/ap/deliver.md#R34
+// spec: specs/ap/deliver.md#R36
+#[test]
+fn u4_the_codes_change_neither_the_end_nor_the_exit() {
+    let failing: [fn(&mut W); 4] = [
+        |w| w.systemctl_fails = vec!["daemon-reload".into()],
+        |w| w.not_enabled = vec!["n.timer".into()],
+        |w| w.units_fail = true,
+        |w| std::fs::remove_dir(w.p("units")).unwrap(),
+    ];
+    for (n, setup) in failing.iter().enumerate() {
+        let mut w = W::new();
+        w.unit(1..=2, "n.timer", "N\n");
+        setup(&mut w);
+        let (v, exit) = w.run();
+        assert_eq!(
+            (end(&v), exit),
+            (("installed", "units_failed"), 0),
+            "{n} {v}"
+        );
+        assert_eq!(v["outcome"], "installed");
+        assert_eq!(
+            w.applies("close_install")[0]["parameters"]["code"],
+            "units_failed"
+        );
+        let rows = unit_rows(&v);
+        match n {
+            0 => {
+                assert_eq!(rows, [urow("n.timer", "written", Value::Null)]);
+                assert_eq!(w.systemctl(), ["daemon-reload"]);
+            }
+            1 => assert_eq!(rows, [urow("n.timer", "written", json!(false))]),
+            2 => {
+                assert_eq!(rows, []);
+                assert_eq!(w.systemctl(), Vec::<String>::new());
+            }
+            _ => {
+                assert_eq!(rows, [urow("n.timer", "failed", Value::Null)]);
+                assert_eq!(v["units"][0]["after"], Value::Null);
+                assert_eq!(w.systemctl(), Vec::<String>::new());
+                assert!(!w.t.join("units").exists());
+            }
+        }
+    }
+    // An installer's code comes first.
+    let mut w = W::new();
+    w.same_content = true;
+    let content = w.inst.get_mut("content").unwrap();
+    (content.tree, content.exit, content.out) = (None, 2, String::new());
+    w.unit(1..=2, "n.timer", "N\n");
+    w.not_enabled = vec!["n.timer".into()];
+    let (v, exit) = w.run();
+    assert_eq!(
+        (end(&v), exit),
+        (("installed", "content_refused"), 0),
+        "{v}"
+    );
+    assert_eq!(unit_rows(&v), [urow("n.timer", "written", json!(false))]);
+    // No step at another end: `failed_restored`, `current`, a refusal, a dead call's close.
+    let others: [fn(&mut W); 3] = [
+        |w| w.inst.get_mut("content").unwrap().tree = None,
+        |w| (w.file, w.tree, w.bytes) = (Some(c(2)), Some(c(2)), binary(&c(2))),
+        |w| {
+            w.dead_attempt(&c(2), &c(0), &sha(&binary(&c(0))));
+            (w.file, w.tree, w.bytes) = (Some(c(2)), Some(c(2)), binary(&c(2)));
+        },
+    ];
+    for (n, setup) in others.iter().enumerate() {
+        let mut w = W::new();
+        w.unit(1..=2, "n.timer", "N\n");
+        setup(&mut w);
+        let (v, _) = w.run();
+        assert_ne!(v["end"], "installed", "{n} {v}");
+        assert_eq!(v["units"], Value::Null, "{n}");
+        assert_eq!(w.systemctl(), Vec::<String>::new());
+        assert_eq!(host_names(&w), Vec::<String>::new());
+    }
+}
+
+// spec: specs/ap/deliver.md#R48
+// spec: specs/ap/deliver.md#R49
+// spec: specs/ap/deliver.md#R50
+#[test]
+fn u5_a_rollback_restores_and_removes() {
+    let setup = |w: &mut W| {
+        installed_by_a(w);
+        w.unit([0], "x.timer", "X0\n");
+        w.unit(1..=2, "x.timer", "X2\n");
+        w.unit(0..=2, "y.service", "Y\n");
+        w.unit(1..=2, "z.timer", "Z\n");
+        w.unit([2], "v.service", "V\n");
+        w.unit([2], "w.timer", "W\n");
+        for (n, b) in [
+            ("x.timer", "X2\n"),
+            ("y.service", "Y\n"),
+            ("z.timer", "Z\n"),
+            ("w.timer", "W by hand\n"),
+        ] {
+            std::fs::write(w.host(n), b).unwrap();
+        }
+    };
+    let mut w = W::new();
+    setup(&mut w);
+    let (v, exit) = rolls(&mut w);
+    assert_eq!(
+        (end(&v), exit),
+        (("installed", "units_host_differs"), 0),
+        "{v}"
+    );
+    assert_eq!(v["to"], c(0));
+    assert_eq!(
+        unit_rows(&v),
+        [
+            urow("v.service", "same", Value::Null),
+            urow("w.timer", "host_differs", Value::Null),
+            urow("x.timer", "written", Value::Null),
+            urow("y.service", "same", Value::Null),
+            urow("z.timer", "removed", Value::Null),
+        ]
+    );
+    assert_eq!(
+        w.systemctl(),
+        [
+            "disable --now z.timer",
+            "daemon-reload",
+            "try-restart x.timer"
+        ]
+    );
+    assert_eq!(std::fs::read_to_string(w.host("x.timer")).unwrap(), "X0\n");
+    assert_eq!(host_names(&w), ["w.timer", "x.timer", "y.service"]);
+    assert_eq!(v["units"][4]["after"], Value::Null);
+    // A timer whose `disable --now` fails keeps its file.
+    let mut w = W::new();
+    setup(&mut w);
+    w.systemctl_fails = vec!["disable --now z.timer".into()];
+    let (v, exit) = rolls(&mut w);
+    assert_eq!((end(&v), exit), (("installed", "units_failed"), 0), "{v}");
+    assert_eq!(unit_rows(&v)[4], urow("z.timer", "failed", Value::Null));
+    assert_eq!(
+        host_names(&w),
+        ["w.timer", "x.timer", "y.service", "z.timer"]
+    );
+    assert_eq!(
+        w.systemctl(),
+        [
+            "disable --now z.timer",
+            "daemon-reload",
+            "try-restart x.timer"
+        ]
+    );
+}
+
+/// The lines every service of `deploy/` carries in `[Service]` (R52).
+const CONFINEMENT: [&str; 10] = [
+    "NoNewPrivileges=yes",
+    "ProtectKernelModules=yes",
+    "ProtectKernelLogs=yes",
+    "ProtectKernelTunables=yes",
+    "ProtectControlGroups=yes",
+    "ProtectHostname=yes",
+    "LockPersonality=yes",
+    "RestrictRealtime=yes",
+    "RestrictSUIDSGID=yes",
+    "SystemCallArchitectures=native",
+];
+
+// spec: specs/ap/deliver.md#R52
+#[test]
+fn u6_every_service_of_deploy_is_confined() {
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../deploy");
+    let mut seen = 0;
+    for e in std::fs::read_dir(&dir).unwrap() {
+        let path = e.unwrap().path();
+        let name = path.file_name().unwrap().to_str().unwrap().to_owned();
+        if !name.ends_with(".service") {
+            continue;
+        }
+        seen += 1;
+        let text = std::fs::read_to_string(&path).unwrap();
+        let mut section = "";
+        let mut service = vec![];
+        for l in text.lines() {
+            if l.starts_with('[') {
+                section = l;
+            } else if section == "[Service]" {
+                service.push(l);
+            }
+        }
+        let count = |line: &str| text.lines().filter(|l| *l == line).count();
+        for line in CONFINEMENT {
+            assert_eq!(count(line), 1, "{name}: {line}");
+            assert!(service.contains(&line), "{name}: {line} outside [Service]");
+        }
+        let full = usize::from(name != "ap-deliver.service");
+        assert_eq!(count("ProtectSystem=full"), full, "{name}");
+        assert_eq!(full == 1, service.contains(&"ProtectSystem=full"), "{name}");
+        assert!(
+            !text
+                .lines()
+                .any(|l| l.starts_with("ProtectSystem=") && l != "ProtectSystem=full")
+        );
+    }
+    assert!(seen >= 7);
 }

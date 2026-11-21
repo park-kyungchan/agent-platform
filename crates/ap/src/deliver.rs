@@ -1,7 +1,8 @@
 //! `ap deliver`: one call brings the pair `ap` and content of this repository to the accepted tip
 //! of `main` and leaves its record in the store (README "Delivery"). Every program it starts goes
 //! through `System`; the lock is the only file it holds, `<state>` the only directory it writes,
-//! except that a request with `checkouts` may fast-forward those checkouts (`specs/ap/deliver.md`).
+//! except that a request with `checkouts` may fast-forward those checkouts and an install writes the
+//! unit files of `deploy/` under `AP_UNIT_DIR` (`specs/ap/deliver.md` R48 to R51).
 use crate::host::{Host, LIMIT, System, args, complete_id, digest, id, ont, refused};
 use crate::review::{accepting, field, objects};
 use crate::run::{stamp, write};
@@ -50,6 +51,8 @@ struct Call<'a> {
     by: Value,
     /// The host lock; installers inherit it.
     lock: Option<File>,
+    /// `AP_UNIT_DIR`: the host's directory of unit files (`specs/ap/deliver.md` R48).
+    units: String,
     /// `content/SHA256SUMS` of each commit read so far: a commit's file never changes.
     sums: RefCell<HashMap<String, String>>,
     /// With `engine`: its clone, and the engine installer's two directories (README "The engine
@@ -196,6 +199,15 @@ fn git_at(s: &mut impl System, clone: &str, words: &[&str]) -> Option<String> {
     argv.extend(args(words));
     let ms = if words[0] == "fetch" { 600_000 } else { 60_000 };
     run(s, "git", argv, ms)
+}
+/// `git checkout` of a clone at a commit it judged (R47): the only checkout of the command.
+fn checkout(s: &mut impl System, clone: &str, commit: &str) -> bool {
+    git_at(
+        s,
+        clone,
+        &["checkout", "--quiet", "--force", "--detach", commit],
+    )
+    .is_some()
 }
 /// The strings of an array member (`past`).
 fn strs(v: &Value) -> Vec<&str> {
@@ -491,6 +503,10 @@ fn dead(s: &mut impl System, c: &mut Call, a: &Value) -> Step<bool> {
             (p["outcome"], p["code"]) = (json!("not_started"), json!("dead_call"))
         }
         Some(_) => {
+            // The handle's `rollback-check` runs from the clone's tree, at the commit read (R47).
+            if !checkout(s, &c.clone, &commit) {
+                return Err(running());
+            }
             p["outcome"] = json!("installed");
             (p["rollback_binary"], p["rollback_content"]) = (
                 json!(kept_copy(s, c, &f("from_sha256"))),
@@ -502,6 +518,10 @@ fn dead(s: &mut impl System, c: &mut Call, a: &Value) -> Step<bool> {
             // A dead rollback, or a clone with no manifest of either commit, is not repaired.
             let none = |s: &mut _, x: &str| manifest(s, c, x).is_none();
             if kind != "forward" || none(s, &commit) || none(s, &from) {
+                return Err(running());
+            }
+            // The repair runs the scripts of the attempt's commit, which step 6 accepted (R47).
+            if !checkout(s, &c.clone, &commit) {
                 return Err(running());
             }
             return Ok(repair(s, c, a, &request));
@@ -794,9 +814,8 @@ fn deliver(s: &mut impl System, c: &mut Call) -> Step<()> {
         .map(|t| t.trim().to_owned())
         .filter(|t| hex40(t));
     let tip = tip.ok_or(No("fetch_failed", Value::Null))?;
-    git(s, c, &["checkout", "--quiet", "--force", "--detach", &tip])
-        .ok_or(No("fetch_failed", Value::Null))?;
     c.rec["tip"] = json!(tip);
+    // Steps 4 to 7 read the clone's objects only; its tree moves to T only once T is judged (R47).
     // 4. The pair.
     let file = version(s, c);
     let from = match file.filter(|v| tree_at(s, c, v)) {
@@ -807,6 +826,7 @@ fn deliver(s: &mut impl System, c: &mut Call) -> Step<()> {
                     limits(s, c, &target, None)?;
                 }
                 room(s, c)?;
+                judged(s, c, &tip)?;
                 marker(s, c, &tip)?;
             }
             c.rec["end"] = json!("current");
@@ -863,6 +883,7 @@ fn deliver(s: &mut impl System, c: &mut Call) -> Step<()> {
         }
     }
     room(s, c)?;
+    judged(s, c, &tip)?;
     if c.engine.is_some() {
         marker(s, c, &tip)?;
     }
@@ -874,6 +895,13 @@ fn deliver(s: &mut impl System, c: &mut Call) -> Step<()> {
     }
     // 8. The attempt, applied before any installer.
     deliver_pair(s, c, &target, &tip, &from, (head, review, reviews))
+}
+/// The clone's tree at T, after step 7 and before the marker, the schema and step 8 (R47, R28).
+fn judged(s: &mut impl System, c: &Call, tip: &str) -> Step<()> {
+    match checkout(s, &c.clone, tip) {
+        true => Ok(()),
+        false => Err(No("fetch_failed", Value::Null)),
+    }
 }
 /// Step 7: room where `<state>` lies, and the build lock free or freed within the bound.
 fn room(s: &mut impl System, c: &mut Call) -> Step<()> {
@@ -975,8 +1003,16 @@ fn deliver_pair(
             },
         )
     };
-    // 11. The close, after the read; 12. the index again.
-    let p = json!({"install": c.rec["install"], "outcome": outcome, "to": to, "code": first_code(&ran[..ran.len().min(2)])});
+    // The unit files, only when the read found the pair at T (R48); then 11. the close, after the
+    // read; 12. the index again.
+    let mut code = first_code(&ran[..ran.len().min(2)]);
+    if outcome == "installed" {
+        let units = units(s, c, &from, &tip, false);
+        if code.is_null() {
+            code = units;
+        }
+    }
+    let p = json!({"install": c.rec["install"], "outcome": outcome, "to": to, "code": code});
     close(s, c, &format!("ap.{tip}.{attempt}"), p, h);
     c.rec["index"]["after"] = json!(index(s, c));
     Ok(())
@@ -1061,6 +1097,10 @@ fn rollback(s: &mut impl System, c: &mut Call, target: &Value) -> Step<()> {
     let here = file.filter(|v| tree_at(s, c, v));
     let here = here.ok_or(No("pair_differs", Value::Null))?;
     c.rec["from"] = json!(here);
+    // The scripts of C, the commit this call read the pair at, before `rollback-check` (R47).
+    if !checkout(s, &c.clone, &here) {
+        return Err(No("fetch_failed", Value::Null));
+    }
     let nothing = || No("nothing_to_roll_back", Value::Null);
     let kind = |k: &str| ("kind", json!(k));
     let (found, _) = search(
@@ -1137,7 +1177,14 @@ fn rollback(s: &mut impl System, c: &mut Call, target: &Value) -> Step<()> {
     } else {
         left_at(outcome, &here)
     };
-    let p = json!({"install": c.rec["install"], "outcome": outcome, "to": to, "code": first_code(&ran)});
+    let mut code = first_code(&ran);
+    if outcome == "installed" {
+        let units = units(s, c, &here, &back, true);
+        if code.is_null() {
+            code = units;
+        }
+    }
+    let p = json!({"install": c.rec["install"], "outcome": outcome, "to": to, "code": code});
     let h = (kept_copy(s, c, &from_sha256), None);
     close(s, c, &request, p, h);
     c.rec["index"]["after"] = json!(index(s, c));
@@ -1244,12 +1291,6 @@ fn engine_install(s: &mut impl System, c: &mut Call, pin: &str, from: &str) -> S
         let why = json!({"commit": pin, "why": "not_on_chain"});
         return Err(No("engine_not_accepted", why));
     }
-    git_at(
-        s,
-        &eclone,
-        &["checkout", "--quiet", "--force", "--detach", pin],
-    )
-    .ok_or_else(fetch_failed)?;
     let chain = Chain {
         clone: &eclone,
         repository,
@@ -1257,6 +1298,10 @@ fn engine_install(s: &mut impl System, c: &mut Call, pin: &str, from: &str) -> S
         code: "engine_not_accepted",
     };
     let (head, review, reviews) = accepted(s, c, &chain, from, pin)?;
+    // The pin is checked out only once its chain is accepted (R47).
+    if !checkout(s, &eclone, pin) {
+        return Err(fetch_failed());
+    }
     c.rec["index"] = json!({"before": index(s, c), "after": null});
     let filter = [("target", target.clone()), ("commit", json!(pin))];
     let attempt = search(s, c, "install", &filter)?.0.len() + 1;
@@ -1486,11 +1531,251 @@ fn forward(s: &mut impl System, path: &str) -> Value {
     let result = steps(s, path, &mut from, &mut to);
     json!({"path": path, "from": from, "to": to, "result": result})
 }
+/// A host entry under `AP_UNIT_DIR`: none, a regular file and its bytes, or anything else (a link, a
+/// directory, a file that cannot be read).
+enum Entry {
+    Absent,
+    File(Vec<u8>),
+    Other,
+}
+fn entry(path: &str) -> Entry {
+    match std::fs::symlink_metadata(path) {
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Entry::Absent,
+        Ok(m) if m.file_type().is_file() => std::fs::read(path).map_or(Entry::Other, Entry::File),
+        _ => Entry::Other,
+    }
+}
+/// The SHA-256 of the regular file at `path`; null for no regular file.
+fn file_digest(path: &str) -> Value {
+    match entry(path) {
+        Entry::File(b) => json!(digest(&b)),
+        _ => Value::Null,
+    }
+}
+/// The name of a unit file: ASCII letters, digits, `@`, `_`, `.` and `-`, ending in `.service` or
+/// `.timer`.
+fn unit_name(n: &str) -> bool {
+    (n.ends_with(".service") || n.ends_with(".timer"))
+        && n.bytes()
+            .all(|b| b.is_ascii_alphanumeric() || b"@_.-".contains(&b))
+}
+/// The unit files of commit `k` (R48): the blobs of mode 100644 directly in `deploy/` that have a
+/// unit file's name, from the clone's objects; None when the clone cannot answer.
+fn unit_files(s: &mut impl System, c: &Call, k: &str) -> Option<Vec<String>> {
+    let out = git(s, c, &["ls-tree", k, "deploy/"])?;
+    let mut names: Vec<String> = out
+        .lines()
+        .filter_map(|l| {
+            let (meta, path) = l.split_once('\t')?;
+            let name = path.strip_prefix("deploy/")?;
+            let meta: Vec<&str> = meta.split(' ').collect();
+            let blob = meta.len() == 3 && meta[0] == "100644" && meta[1] == "blob";
+            (blob && unit_name(name)).then(|| name.to_owned())
+        })
+        .collect();
+    names.sort();
+    names.dedup();
+    Some(names)
+}
+/// Whether `bytes` are those `deploy/<name>` has at `base` or had at a commit of the first-parent
+/// chain of `base` (R49), from the clone's objects; None when the clone cannot answer.
+fn had(s: &mut impl System, c: &Call, base: &str, name: &str, bytes: &[u8]) -> Option<bool> {
+    let path = format!("deploy/{name}");
+    // Every version the chain held is the file at one of the commits that changed it.
+    let changed = git(s, c, &["rev-list", "--first-parent", base, "--", &path])?;
+    let mut seen = HashSet::new();
+    for commit in changed.lines().filter(|l| !l.is_empty()) {
+        let listed = git(s, c, &["ls-tree", commit, &path])?;
+        let blob = listed.lines().next().and_then(|l| {
+            let meta: Vec<&str> = l.split_once('\t')?.0.split(' ').collect();
+            (meta.len() == 3 && meta[1] == "blob").then(|| meta[2].to_owned())
+        });
+        // No blob at that commit: the commit removed the file.
+        let Some(blob) = blob else { continue };
+        if !seen.insert(blob) {
+            continue;
+        }
+        let old = git(s, c, &["show", &format!("{commit}:{path}")])?;
+        if old.as_bytes() == bytes {
+            return Some(true);
+        }
+    }
+    Some(false)
+}
+/// One `systemctl` call through the call's `System`, bound to 120 seconds (R50): its stdout when it
+/// exited 0.
+fn systemctl(s: &mut impl System, words: &[&str]) -> Option<String> {
+    run(s, "systemctl", args(words), 120_000)
+}
+/// The bytes under a temporary name of `dir`, mode 0644, renamed over `<name>`; a write that fails
+/// leaves the previous file.
+fn put(dir: &str, name: &str, bytes: &[u8]) -> bool {
+    use std::os::unix::fs::{OpenOptionsExt, PermissionsExt};
+    let tmp = format!("{dir}/.{name}.ap-deliver-{}.tmp", std::process::id());
+    let _ = std::fs::remove_file(&tmp);
+    let wrote = (|| {
+        let mut f = OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .mode(0o644)
+            .open(&tmp)?;
+        f.write_all(bytes)?;
+        f.set_permissions(std::fs::Permissions::from_mode(0o644))?;
+        f.sync_all()?;
+        std::fs::rename(&tmp, format!("{dir}/{name}"))
+    })();
+    if wrote.is_err() {
+        let _ = std::fs::remove_file(&tmp);
+    }
+    wrote.is_ok()
+}
+/// One row of the unit step and what the step does with it.
+struct Unit {
+    name: String,
+    before: Value,
+    result: &'static str,
+    enabled: Value,
+    /// The bytes of `to`, for a file to write.
+    bytes: Option<Vec<u8>>,
+    /// The host had no entry of the name.
+    new: bool,
+}
+/// The unit files of `to` on the host, from `base` (R48 to R51): the record's `units`, and the
+/// step's code. It changes neither the outcome nor the end.
+fn units(s: &mut impl System, c: &mut Call, base: &str, to: &str, rollback: bool) -> Value {
+    let dir = c.units.clone();
+    let names = unit_files(s, c, to);
+    let gone: Option<Vec<String>> = match &names {
+        Some(n) if rollback => {
+            unit_files(s, c, base).map(|b| b.into_iter().filter(|x| !n.contains(x)).collect())
+        }
+        Some(_) => Some(vec![]),
+        None => None,
+    };
+    let (Some(names), Some(gone)) = (names, gone) else {
+        c.rec["units"] = json!([]);
+        return json!("units_failed");
+    };
+    let mut rows = vec![];
+    let all = names.into_iter().map(|n| (n, true));
+    for (name, kept) in all.chain(gone.into_iter().map(|n| (n, false))) {
+        let host = entry(&format!("{dir}/{name}"));
+        let before = match &host {
+            Entry::File(b) => json!(digest(b)),
+            _ => Value::Null,
+        };
+        let new = matches!(host, Entry::Absent);
+        let mut bytes = None;
+        let result = if kept {
+            match (git(s, c, &["show", &format!("{to}:deploy/{name}")]), host) {
+                (None, _) => "failed",
+                (Some(w), Entry::File(b)) if w.as_bytes() == b => "same",
+                (Some(w), Entry::Absent) => {
+                    bytes = Some(w.into_bytes());
+                    "written"
+                }
+                (Some(w), Entry::File(b)) => match had(s, c, base, &name, &b) {
+                    Some(true) => {
+                        bytes = Some(w.into_bytes());
+                        "written"
+                    }
+                    Some(false) => "host_differs",
+                    None => "failed",
+                },
+                (Some(_), Entry::Other) => "host_differs",
+            }
+        } else {
+            // A name of `base` that `to` does not have: an absent file is as `to` has it.
+            match host {
+                Entry::Absent => "same",
+                Entry::Other => "host_differs",
+                Entry::File(b) => match had(s, c, base, &name, &b) {
+                    Some(true) => "removed",
+                    Some(false) => "host_differs",
+                    None => "failed",
+                },
+            }
+        };
+        rows.push(Unit {
+            name,
+            before,
+            result,
+            enabled: Value::Null,
+            bytes,
+            new,
+        });
+    }
+    rows.sort_by(|a, b| a.name.cmp(&b.name));
+    let mut failed = rows.iter().any(|r| r.result == "failed");
+    // A timer to remove is disabled and stopped before any file is written or removed; when that
+    // fails its file stays.
+    for r in &mut rows {
+        if r.result == "removed"
+            && r.name.ends_with(".timer")
+            && systemctl(s, &["disable", "--now", &r.name]).is_none()
+        {
+            (r.result, failed) = ("failed", true);
+        }
+    }
+    let mut changed = false;
+    for r in &mut rows {
+        let done = match (r.result, &r.bytes) {
+            ("written", Some(b)) => put(&dir, &r.name, b),
+            ("removed", _) => std::fs::remove_file(format!("{dir}/{}", r.name)).is_ok(),
+            _ => continue,
+        };
+        changed |= done;
+        if !done {
+            (r.result, failed) = ("failed", true);
+        }
+    }
+    // A reload only after a file was written or removed; one that fails ends the step.
+    let reloaded = changed && systemctl(s, &["daemon-reload"]).is_some();
+    failed |= changed && !reloaded;
+    if reloaded {
+        for r in rows
+            .iter_mut()
+            .filter(|r| r.result == "written" && r.name.ends_with(".timer"))
+        {
+            if r.new {
+                let started = systemctl(s, &["enable", "--now", &r.name]).is_some();
+                let enabled = systemctl(s, &["is-enabled", &r.name])
+                    .is_some_and(|o| o.trim_end() == "enabled");
+                r.enabled = json!(enabled);
+                failed |= !started || !enabled;
+            } else if systemctl(s, &["try-restart", &r.name]).is_none() {
+                failed = true;
+            }
+        }
+    }
+    // Each file read back: a written one must have the digest of `to`.
+    let mut out = vec![];
+    for r in &rows {
+        let after = file_digest(&format!("{dir}/{}", r.name));
+        if r.result == "written"
+            && r.bytes.as_deref().map(|b| json!(digest(b))) != Some(after.clone())
+        {
+            failed = true;
+        }
+        out.push(
+            json!({"name": r.name, "before": r.before, "after": after, "result": r.result,
+            "enabled": r.enabled}),
+        );
+    }
+    c.rec["units"] = json!(out);
+    if failed {
+        json!("units_failed")
+    } else if rows.iter().any(|r| r.result == "host_differs") {
+        json!("units_host_differs")
+    } else {
+        Value::Null
+    }
+}
 fn record() -> Value {
     json!({"at": stamp(SystemTime::now()), "by": null, "repository": null, "target": TARGET, "tip": null,
         "from": null, "end": "refused", "outcome": null, "code": null, "detail": null, "install": null,
         "attempt": null, "installers": [], "to": null, "rollback_binary": null, "rollback_content": null,
-        "index": null, "closed": null})
+        "index": null, "closed": null, "units": null})
 }
 fn invalid(field: &str) -> (Value, u8) {
     let mut rec = record();
@@ -1517,6 +1802,7 @@ pub fn execute(s: &mut impl System, r: &Value) -> (Value, u8) {
         dir: var(&env, "AP_INSTALL_DIR", "/usr/local/bin"),
         backup: var(&env, "AP_BACKUP_DIR", "/var/lib/agent-platform/install"),
         dst: var(&env, "AP_CONTENT_DST", "/root/.agents"),
+        units: var(&env, "AP_UNIT_DIR", "/etc/systemd/system"),
         bk: var(
             &env,
             "AP_CONTENT_BACKUP_DIR",

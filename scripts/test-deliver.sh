@@ -5,15 +5,18 @@
 # installer, and checks that the next call leaves the pair at one commit (`sha256sum -c`). It fabricates
 # no attempt. Every path it touches lies under one directory made with `mktemp -d` and removed at the end:
 # a scratch origin repository, a scratch store reached through a wrapper named `ont` first on PATH, every
-# installer variable and AP_DELIVER_LOCK. It never calls systemctl. The origin's install-content.sh is
+# installer variable, AP_DELIVER_LOCK and AP_UNIT_DIR. It never calls the host's systemctl: a `systemctl`
+# shim first on PATH records its arguments and answers `enabled` to is-enabled. The origin's install-content.sh is
 # this repository's file unchanged; its install-ap.sh differs only in the build lock's path; a `cargo`
 # shim writes a file that answers --version with the commit it is built from. Passes i and j give the
 # request the member `engine`: a scratch engine repository whose `scripts/install-ont.sh` is a fake (the
 # real script's own `git fetch origin` and ancestor check, then a file that answers --version with the
 # pin), and a merged higher version of the work schema with an `ontology/migrate` that records its call,
 # installed on the scratch store. The engine file and the store lie under ONT_INSTALL_BIN_DIR and
-# ONT_INSTALL_STATE_DIR of that directory.
-# One line `walk pass=<a..j> k=<k> pair=<commit or neither> outcome=<outcome>` per case, then
+# ONT_INSTALL_STATE_DIR of that directory. The origin carries deploy/walk.service and deploy/walk.timer, which
+# pass a writes under AP_UNIT_DIR and pass k changes, edits by hand, rolls back and leaves after a tip
+# without an accepting review.
+# One line `walk pass=<a..k> k=<k> pair=<commit or neither> outcome=<outcome>` per case, then
 # `deliver-walk: ok`. Under CI=true it is skipped: the engine there has no object for the target's key.
 # Under AP_CHECK_HOST=pc it is skipped too (`deliver-walk: skipped (pc)`): the walk needs this host's engine
 # store and the installed `ap`, which the local PC lacks. AP_CHECK_HOST is `ap check`'s marker of a command
@@ -37,12 +40,12 @@ host_count() {
 }
 host_before=$(host_count)
 
-mkdir -p "$W"/{bin,tmp,origin,store,work/walk,install,backup,agents,content-backup,state,reports}
+mkdir -p "$W"/{bin,tmp,origin,store,work/walk,install,backup,agents,content-backup,state,reports,units}
 export TMPDIR=$W/tmp GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1
 export GIT_AUTHOR_NAME=walk GIT_AUTHOR_EMAIL=walk@example.invalid GIT_COMMITTER_NAME=walk GIT_COMMITTER_EMAIL=walk@example.invalid
 export AP_INSTALL_DIR=$W/install AP_BACKUP_DIR=$W/backup AP_INSTALL_LOCK=$W/install.lock
 export AP_CONTENT_DST=$W/agents AP_CONTENT_BACKUP_DIR=$W/content-backup AP_DELIVER_LOCK=$W/deliver.lock
-export ONT_INSTALL_BIN_DIR=$W/ont-bin ONT_INSTALL_STATE_DIR=$W/ont-state
+export ONT_INSTALL_BIN_DIR=$W/ont-bin ONT_INSTALL_STATE_DIR=$W/ont-state AP_UNIT_DIR=$W/units
 STORE=$ONT_INSTALL_STATE_DIR/ont/ontology.sqlite
 mkdir -p "$ONT_INSTALL_BIN_DIR" "$ONT_INSTALL_STATE_DIR/ont"
 unset INVOCATION_ID CARGO_TARGET_DIR
@@ -76,7 +79,14 @@ case " $* " in
 esac
 exit "$rc"
 EOF
-chmod 0755 "$W/bin/ont" "$W/bin/cargo" "$W/bin/mv"
+# The systemctl shim: one line of arguments per call in $WALK/systemctl.log; is-enabled answers enabled.
+cat > "$W/bin/systemctl" <<'EOF'
+#!/bin/sh
+printf '%s\n' "$*" >> "$WALK/systemctl.log"
+[ "${1:-}" != is-enabled ] || echo enabled
+exit 0
+EOF
+chmod 0755 "$W/bin/ont" "$W/bin/cargo" "$W/bin/mv" "$W/bin/systemctl"
 export PATH=$W/bin:$PATH
 
 # The scratch store: the work schema with the task source reading this directory only (its version is
@@ -108,6 +118,9 @@ content() {
 }
 git -C "$O" init -q -b main
 content 0
+mkdir -p "$O/deploy"
+printf '[Unit]\nDescription=walk\n\n[Service]\nType=oneshot\nExecStart=/bin/true\n' > "$O/deploy/walk.service"
+printf '[Timer]\nOnCalendar=*:0/10\n\n[Install]\nWantedBy=timers.target\n' > "$O/deploy/walk.timer"
 git -C "$O" add -A && git -C "$O" commit -q -m "walk 0"
 C0=$(git -C "$O" rev-parse HEAD)
 # A merge of a branch that changes every content file, and an accepting review of its head; it prints
@@ -120,11 +133,13 @@ merge() {
   [ ! -e "$W/next-pin" ] || cp "$W/next-pin" "$O/ontology/ENGINE-PIN"
   [ ! -e "$W/next-schema" ] || cp "$W/next-schema" "$O/ontology/work.schema.json"
   [ ! -e "$W/next-migrate" ] || install -m 0755 "$W/next-migrate" "$O/ontology/migrate"
+  [ ! -e "$W/next-timer" ] || cp "$W/next-timer" "$O/deploy/walk.timer"
+  [ ! -e "$W/next-service" ] || cp "$W/next-service" "$O/deploy/walk.service"
   git -C "$O" add -A && git -C "$O" commit -q -m "change $n"
   local head; head=$(git -C "$O" rev-parse HEAD)
   git -C "$O" checkout -q main
   git -C "$O" merge -q --no-ff -m "merge $n" "b$n"
-  accept "$head" walk/origin
+  [ -e "$W/no-accept" ] || accept "$head" walk/origin
   git -C "$O" rev-parse HEAD
 }
 # An accepting review of the head $1 in the repository $2.
@@ -176,11 +191,20 @@ CARGO_TARGET_DIR=$W/boot-target bash "$W/boot/scripts/install-ap.sh" install "$C
 bash "$W/boot/scripts/install-content.sh" install "$C0" > /dev/null
 [ "$(pair)" = "$C0" ] || fail "the pair is not at the first commit"
 
-# (a) An install; it counts the renames of one content install.
+# spec: specs/ap/deliver.md#R48
+# spec: specs/ap/deliver.md#R50
+# (a) An install; it counts the renames of one content install. The two unit files are new to the host:
+# both written, then daemon-reload and enable --now of the timer.
 M=$(merge)
 echo 0 > "$W/count"; call lead; N=$(cat "$W/count"); rm -f "$W/count"
 [ "$RC" = 0 ] && [ "$(member 'r["end"]')" = installed ] && [ "$(pair)" = "$M" ] || fail "pass a (exit $RC)"
 [ "$N" -ge 2 ] || fail "pass a counted $N renames"
+cmp -s "$AP_UNIT_DIR/walk.service" "$O/deploy/walk.service" && cmp -s "$AP_UNIT_DIR/walk.timer" "$O/deploy/walk.timer" ||
+  fail "pass a: the unit files"
+[ "$(cat "$W/systemctl.log")" = "$(printf 'daemon-reload\nenable --now walk.timer\nis-enabled walk.timer')" ] || fail "pass a: systemctl"
+[ "$(member '[(u["name"], u["result"], u["enabled"]) for u in r["units"]]')" = "[('walk.service', 'written', None), ('walk.timer', 'written', True)]" ] &&
+  [ "$(member 'r["code"]')" = null ] || fail "pass a: the record's units"
+[ "$(stat -c %a "$AP_UNIT_DIR/walk.timer")" = 644 ] || fail "pass a: the mode of a unit file"
 line a 0 "$(pair)" "$(member 'r["outcome"]')"
 
 # spec: specs/ap/deliver.md#R21
@@ -421,6 +445,41 @@ python3 -I -c 'import json, os, sys; s = json.load(open(sys.argv[1]))["schema"];
 assert s["from"] == v and s["to"] == v + 1 and s["migrate"] == "ok" and os.path.isfile(s["backup"]), s' "$W/out.json" "$V0" ||
   fail "pass j: the record's schema"
 line j 0 "$(pair)" "$(member 'r["schema"]["migrate"]')"
+
+# spec: specs/ap/deliver.md#R47
+# spec: specs/ap/deliver.md#R49
+# spec: specs/ap/deliver.md#R51
+# (k) The unit files on the host follow the installed commit. A hand edit of walk.service, then a merge
+# that changes both files: walk.timer is written and restarted, walk.service is left (`units_host_differs`).
+# A Lead's rollback restores walk.timer to the previous commit's bytes. A tip without an accepting review
+# leaves HEAD of the clone where it was.
+printf '# by hand\n' >> "$AP_UNIT_DIR/walk.service"
+HAND=$(sha256sum "$AP_UNIT_DIR/walk.service")
+printf '[Timer]\nOnCalendar=*:0/20\n\n[Install]\nWantedBy=timers.target\n' > "$W/next-timer"
+printf '[Unit]\nDescription=walk again\n\n[Service]\nType=oneshot\nExecStart=/bin/true\n' > "$W/next-service"
+M=$(merge); rm "$W/next-timer" "$W/next-service"
+: > "$W/systemctl.log"; call engine
+[ "$RC" = 0 ] && [ "$(member 'r["end"]')" = installed ] && [ "$(pair)" = "$M" ] && [ "$(member 'r["code"]')" = units_host_differs ] ||
+  fail "pass k: the install (exit $RC)"
+[ "$(member '[(u["name"], u["result"]) for u in r["units"]]')" = "[('walk.service', 'host_differs'), ('walk.timer', 'written')]" ] ||
+  fail "pass k: the record's units"
+[ "$(sha256sum "$AP_UNIT_DIR/walk.service")" = "$HAND" ] && git -C "$O" show "$M:deploy/walk.timer" | cmp -s - "$AP_UNIT_DIR/walk.timer" ||
+  fail "pass k: the unit files after the install"
+[ "$(cat "$W/systemctl.log")" = "$(printf 'daemon-reload\ntry-restart walk.timer')" ] || fail "pass k: systemctl of the install"
+line k 0 "$(pair)" "$(member 'r["code"]')"
+: > "$W/systemctl.log"; call rollback
+[ "$RC" = 0 ] && [ "$(member 'r["end"]')" = installed ] && [ "$(pair)" = "$(git -C "$O" rev-parse "$M^1")" ] || fail "pass k: the rollback (exit $RC)"
+git -C "$O" show "$M^1:deploy/walk.timer" | cmp -s - "$AP_UNIT_DIR/walk.timer" && [ "$(sha256sum "$AP_UNIT_DIR/walk.service")" = "$HAND" ] ||
+  fail "pass k: the unit files after the rollback"
+[ "$(cat "$W/systemctl.log")" = "$(printf 'daemon-reload\ntry-restart walk.timer')" ] || fail "pass k: systemctl of the rollback"
+line k 1 "$(pair)" "$(member 'r["code"]')"
+HEAD=$(git -C "$CLONE" rev-parse HEAD)
+: > "$W/no-accept"; M=$(merge); rm "$W/no-accept"
+: > "$W/systemctl.log"; call engine
+[ "$RC" = 2 ] && [ "$(member 'r["code"]')" = not_accepted ] && [ "$(git -C "$CLONE" rev-parse HEAD)" = "$HEAD" ] &&
+  [ "$(git -C "$CLONE" rev-parse refs/remotes/origin/main)" = "$M" ] && [ ! -s "$W/systemctl.log" ] ||
+  fail "pass k: a tip without an accepting review moved the clone (exit $RC)"
+line k 2 "$(pair)" not_accepted
 
 [ "$(host_count)" = "$host_before" ] || fail "the host store's install objects changed"
 echo "deliver-walk: ok"
