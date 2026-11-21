@@ -9,6 +9,7 @@ The Ontology engine of this host: one generic engine, no domain knowledge. A dom
 | `ont-core` | The schema language and the data model: identity, observations with their knowledge state, coverage, freshness and lineage, scopes, grants |
 | `ont-store` | The store: one SQLite file per store, atomic appends, snapshot reads |
 | `ont` | The command `ont` and its library: `schema check`, `schema install`, `describe`, `get`, `search`, `around`, `aggregate`, `render`, `index`, `action list`, `action validate`, `action apply`, `backup` and `mcp` (the same reads and actions as an MCP server over standard input and output) |
+| `ont-gen` | The generator of a typed Rust module from one schema file: a type per object type, value type, action type and function, both directions of every link, and call functions that send each request through an engine the consumer implements |
 
 The reads and the action commands (`describe`, `get`, `search`, `around`, `aggregate`, `render`, `action ...`) read one JSON request on standard input and print one JSON answer; `schema check`, `schema install`, `index` and `backup` take arguments only; `mcp` speaks the MCP protocol. `ont --help` lists every form and the request fields. The contract of each command is in [specs/ont/](specs/ont/).
 
@@ -17,6 +18,7 @@ The reads and the action commands (`describe`, `get`, `search`, `around`, `aggre
 - Agents of every CLI on this host, through the installed command `ont` and its MCP server.
 - `agent-platform`: its schema `ontology/work.schema.json` and the command `ap`, which calls the installed `ont`.
 - Domain crates in other repositories, which pin this repository by Git revision and link `ont`, `ont-core` and `ont-store` as libraries. The first is `edu-academy-ontology` of `education-platform`, on a branch that is not merged yet.
+- A consumer may generate the Rust types of its schema with `ont-gen` in its build script (`specs/ont/gen.md`), pinned at the revision it pins the engine at.
 
 A change of an answer's shape or of the schema language is a change of a contract those users rely on.
 

@@ -1,0 +1,103 @@
+{
+  "format": "ontology-schema/v1",
+  "domain": "example",
+  "version": 1,
+  "namespace": {"instance": "test", "account": "example"},
+  "value_types": {
+    "shade": {"base": "string", "enum": ["light", "dark"]},
+    "code": {"base": "string", "pattern": "[A-Z]{3}"}
+  },
+  "object_types": {
+    "shelf": {
+      "description": "A shelf that holds items.",
+      "owner": "ontology",
+      "primary_key": {"from": "/native_key"},
+      "title": "label",
+      "properties": {
+        "label": {"type": "string", "required": true}
+      }
+    },
+    "item": {
+      "description": "An item on a shelf.",
+      "owner": "ontology",
+      "primary_key": {"from": "/native_key"},
+      "title": "name",
+      "properties": {
+        "name": {"type": "string", "required": true, "description": "The item's name."},
+        "price": {"type": "decimal", "required": true},
+        "made_on": {"type": "date", "required": true},
+        "count": {"type": "integer", "required": true},
+        "seen_at": {"type": "timestamp", "required": true},
+        "fragile": {"type": "boolean", "required": true},
+        "shelf": {"type": {"ref": "shelf"}, "required": true},
+        "backups": {"type": {"array": {"ref": "shelf"}}, "required": true},
+        "shade": {"type": {"value_type": "shade"}, "required": true},
+        "code": {"type": {"value_type": "code"}, "required": true},
+        "detail": {"type": {"struct": {"note": "string", "weight": "integer"}}, "required": true},
+        "kind": {"type": "string", "required": false}
+      }
+    }
+  },
+  "link_types": {
+    "item_shelf": {
+      "from": "item", "via": "shelf", "to": "shelf", "cardinality": "many_to_one",
+      "names": {"forward": "shelf", "reverse": "items"}
+    },
+    "item_backup": {
+      "from": "item", "via": "backups", "to": "shelf", "cardinality": "many_to_many",
+      "names": {"forward": "backups", "reverse": "backed_items"}
+    }
+  },
+  "action_types": {
+    "add_shelf": {
+      "description": "Adds a shelf.",
+      "parameters": {
+        "shelf": {"type": {"ref": "shelf"}, "required": true},
+        "label": {"type": "string", "required": true, "description": "The shelf's label."}
+      },
+      "rules": [{"create_object": "shelf", "set": {"label": "$label"}}]
+    },
+    "add_item": {
+      "description": "Adds an item to a shelf.",
+      "parameters": {
+        "item": {"type": {"ref": "item"}, "required": true},
+        "name": {"type": "string", "required": true},
+        "price": {"type": "decimal", "required": true},
+        "made_on": {"type": "date", "required": true},
+        "count": {"type": "integer", "required": true},
+        "seen_at": {"type": "timestamp", "required": true},
+        "fragile": {"type": "boolean", "required": true},
+        "shelf": {"type": {"ref": "shelf"}, "required": true},
+        "backups": {"type": {"array": {"ref": "shelf"}}, "required": true},
+        "shade": {"type": {"value_type": "shade"}, "required": true},
+        "code": {"type": {"value_type": "code"}, "required": true},
+        "detail": {"type": {"struct": {"note": "string", "weight": "integer"}}, "required": true},
+        "type": {"type": "string", "required": false, "description": "The item's kind, when known."}
+      },
+      "submission_criteria": [
+        {"code": "shelf_exists", "message": "The shelf must exist.", "all": [{"exists": "$shelf"}]}
+      ],
+      "rules": [{"create_object": "item", "set": {
+        "name": "$name", "price": "$price", "made_on": "$made_on", "count": "$count",
+        "seen_at": "$seen_at", "fragile": "$fragile", "shelf": "$shelf", "backups": "$backups",
+        "shade": "$shade", "code": "$code", "detail": "$detail", "kind": "$type"
+      }}]
+    }
+  },
+  "functions": {
+    "echo": {
+      "description": "Answers its parameters.",
+      "parameters": {
+        "word": {"type": "string", "required": true, "description": "A word."},
+        "shelf": {"type": {"ref": "shelf"}, "required": false},
+        "count": {"type": "integer", "required": false}
+      },
+      "program": "/bin/cat",
+      "answer_bytes": 4096,
+      "timeout_ms": 10000
+    }
+  },
+  "grants": [
+    {"principal": "agent", "scope": {}, "read": ["shelf", "item"], "derive": [], "actions": ["add_shelf", "add_item"]}
+  ]
+}
