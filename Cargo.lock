@@ -196,6 +196,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "ont-gen"
+version = "0.1.0"
+dependencies = [
+ "ont",
+ "ont-core",
+ "serde_json",
+]
+
+[[package]]
 name = "ont-store"
 version = "0.1.0"
 dependencies = [

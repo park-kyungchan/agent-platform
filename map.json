@@ -69,6 +69,23 @@
    ]
   },
   {
+   "name": "ont-gen",
+   "purpose": "The generator of a typed Rust module from the bytes of one schema file, for consumers of the engine.",
+   "paths": [
+    "crates/ont-gen/"
+   ],
+   "entry": [
+    "crates/ont-gen/src/lib.rs:1-20"
+   ],
+   "spec": [
+    "specs/ont/gen.md"
+   ],
+   "tests": [
+    "crates/ont-gen/tests/generate.rs",
+    "crates/ont-gen/tests/engine.rs"
+   ]
+  },
+  {
    "name": "specs",
    "purpose": "The specifications of the engine contracts, moved from the crate READMEs.",
    "paths": [
