@@ -17,10 +17,10 @@ One word for one thing. Read this when a word in an instruction, a packet or the
 | --- | --- | --- | --- |
 | board | A task's items with their state, its objectives and order, printed from the store (its holds: the view `active_holds`); where the store is not in use, an optional file that holds no value a command can produce | `ap backlog <task key> --text` | `dashboard file` |
 | design note | The Lead's written design of a store format, the schema of an authoritative store, or the order of record and effect on a real target: use, decision, invariants as executables, pull requests, undo | `DESIGN-<topic>.md` in the task directory; its form: `/root/.agents/skills/lead/references/judging.md` section 1 | `design doc` |
-| checkpoint | The content of STATE at a moment, complete enough for a new session to continue from it | A STATE whose header carries the time it was written | `snapshot file` |
-| work thread | One line of work inside a task that serves a named KPI or guardrail and has one owner and one next action | A line of STATE's open threads, or a row of a board file where the task keeps one | `workstream` |
+| checkpoint | What a new session continues from: the intent's objects in the store and the STATE card | The answer of `ap status --brief <intent>` with the STATE card that names the intent | `snapshot file` |
+| work thread | One line of work inside a task that serves a named KPI or guardrail and has one owner and one next action | A unit of the store, or a row of a board file where the task keeps one | `workstream` |
 | tier | The amount of reasoning a piece of work needs: mechanical, bounded judgment, open judgment | A packet line `Tier: mechanical` | `difficulty level` |
-| assignment file | Where a task says which runtime, account and model serves which work: each stage's request, written by the Lead; STATE names a standing choice | The `model`, `effort`, `account` and `next_accounts` of a stage's request file | `routing table` |
+| assignment file | Where a task says which runtime, account and model serves which work: each stage's request, written by the Lead; a standing choice is the policy file's `accounts` and the unit's tiers | The `model`, `effort`, `account` and `next_accounts` of a stage's request file | `routing table` |
 | dispatch | Starting one worker run with one packet | `ap unit <page>` for a unit of work, `ap run < <request file>` for one stage; a Herdr pane only for work the user watches (`CONCURRENT-WORK.md` section 5) | — |
 | progress message | A message to the user that says where the task stands; not a worker's report | The board of skill `report` and what changed | — |
 | acceptance | A closed `review` object with the verdict `accept` for a head, written by `ap unit` after the gate, the page's acceptance executable, the write set and one accepting verifier; the status `lead-review=success` on that head is derived from it. For a unit with a real effect, a schema, a store format or a guard of a live request the Lead reads the diff before the merge | The `review` object that `ap unit` closed for a head | `sign-off` |
@@ -92,4 +92,4 @@ Only the Lead needs this section. The user speaks Korean, shortens names, and so
 | 보드 | The board of the current task | — |
 | 정리, 손봐, 개선 | A request whose target and extent are open | State what you will change and what you will leave before starting |
 
-A new expression is written in the task's STATE under "Words the user used" with what it resolved to. When the same expression appears in a second task, add a row here through a pull request; most expressions never need a row, because the three-step resolution above already finds them.
+What a new expression resolved to is the reading of the request that holds it (`ap request`). When the same expression appears in a second task, add a row here through a pull request; most expressions never need a row, because the three-step resolution above already finds them.
