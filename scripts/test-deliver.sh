@@ -15,9 +15,14 @@
 # ONT_INSTALL_STATE_DIR of that directory.
 # One line `walk pass=<a..j> k=<k> pair=<commit or neither> outcome=<outcome>` per case, then
 # `deliver-walk: ok`. Under CI=true it is skipped: the engine there has no object for the target's key.
+# Under AP_CHECK_HOST=pc it is skipped too (`deliver-walk: skipped (pc)`): the walk needs this host's engine
+# store and the installed `ap`, which the local PC lacks. AP_CHECK_HOST is `ap check`'s marker of a command
+# on the PC (specs/ap/check.md R17), which `ap check` removes from a command it runs here; it is no variable
+# of this host. The Lead's delivery check runs the walk without it, here.
 set -euo pipefail
 [ "$#" -eq 2 ] || { echo "usage: scripts/test-deliver.sh <ont binary> <ap binary>" >&2; exit 2; }
 if [ "${CI:-}" = true ]; then echo "deliver-walk: skipped (CI)"; exit 0; fi
+if [ "${AP_CHECK_HOST:-}" = pc ]; then echo "deliver-walk: skipped (pc)"; exit 0; fi
 ONT=$(realpath -- "$1"); AP=$(realpath -- "$2")
 REPO=$(cd -- "$(dirname -- "$(realpath "$0")")/.." && pwd -P)
 MV=$(command -v mv)

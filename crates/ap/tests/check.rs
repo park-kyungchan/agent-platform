@@ -128,6 +128,15 @@ done"#;
 /// Every file and link of the tree but `.git`, sorted.
 const FOUND: &str = "export LC_ALL=C; find . -path ./.git -prune -o \\( -type f -o -type l \\) -print | sed 's#^\\./##' | sort";
 
+/// The cargo settings `./check` exports under the build lock, which `ap check` sets for its command.
+const CARGO_SETTINGS: [(&str, &str); 3] = [
+    ("CARGO_INCREMENTAL", "0"),
+    ("CARGO_PROFILE_DEV_DEBUG", "0"),
+    ("CARGO_PROFILE_TEST_DEBUG", "0"),
+];
+/// A command that prints the marker and the three settings, one line.
+const SHOW_ENV: &str = "echo \"host=${AP_CHECK_HOST:-unset} ${CARGO_INCREMENTAL:-unset} ${CARGO_PROFILE_DEV_DEBUG:-unset} ${CARGO_PROFILE_TEST_DEBUG:-unset}\"";
+
 struct World {
     root: PathBuf,
     repo: PathBuf,
@@ -245,6 +254,10 @@ impl World {
             .env("GIT_CONFIG_GLOBAL", self.p("gitconfig"))
             .env("XDG_CONFIG_HOME", self.p("xdg"))
             .stdin(Stdio::null());
+        // `ap check` sets these itself: the test fails when it does not, and passes on the PC too.
+        for v in CARGO_SETTINGS.map(|(n, _)| n).into_iter().chain(["AP_CHECK_HOST"]) {
+            c.env_remove(v);
+        }
         c
     }
     fn ap(&self, args: &[&str]) -> Output {
@@ -618,6 +631,34 @@ fn r5_here_a_command_other_than_check_takes_the_build_lock() {
     );
 }
 
+// spec: specs/ap/check.md#R17
+#[test]
+fn r17_ap_check_host_is_pc_on_the_pc_only_and_the_cargo_settings_are_set_on_both() {
+    let w = World::new();
+    let d = w.dir();
+    // On the stub PC.
+    let out = w.ap(&[&d, "--", "sh", "-c", SHOW_ENV]);
+    assert_eq!(lines(&out.stdout), ["host=pc 0 0 0"], "{out:?}");
+    // Here, with and without the build lock, and with an inherited marker that ap check removes.
+    w.no_policy();
+    let out = w
+        .command(&[&d, "--", "sh", "-c", SHOW_ENV])
+        .env("AP_CHECK_HOST", "pc")
+        .output()
+        .unwrap();
+    assert_eq!(lines(&out.stdout), ["host=unset 0 0 0"], "{out:?}");
+    write(&w.p("build.lock"), "", 0o644);
+    let out = w.ap(&[&d, "--", "sh", "-c", SHOW_ENV]);
+    assert_eq!(lines(&out.stdout), ["host=unset 0 0 0"], "{out:?}");
+    // An inherited setting of another value is replaced.
+    let out = w
+        .command(&[&d, "--", "sh", "-c", SHOW_ENV])
+        .env("CARGO_INCREMENTAL", "1")
+        .output()
+        .unwrap();
+    assert_eq!(lines(&out.stdout), ["host=unset 0 0 0"], "{out:?}");
+}
+
 // spec: specs/ap/check.md#R6
 #[test]
 fn r6_the_pc_tree_is_the_worktree_as_git_lists_it() {
@@ -808,6 +849,9 @@ fn r8_on_the_pc_the_command_is_uid_0_with_a_read_only_root_but_its_directories()
                   if touch \"$p\" 2>/dev/null; then echo \"rw $p\"; else echo \"ro $p\"; fi; done; echo \"tmp $TMPDIR\"";
     let out = w.ap(&[&w.dir(), "--", "sh", "-c", script]);
     assert_eq!(out.status.code(), Some(0), "{out:?}");
+    // The real bwrap carries the marker and a cargo setting itself, not the stand-in's --setenv.
+    let out_env = w.ap(&[&w.dir(), "--", "sh", "-c", SHOW_ENV]);
+    assert_eq!(lines(&out_env.stdout), ["host=pc 0 0 0"], "{out_env:?}");
     let key = w.key(&w.repo);
     let work = w.s("pc/work");
     assert_eq!(
