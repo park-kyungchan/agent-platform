@@ -3978,7 +3978,11 @@ fn a_carried_review_is_not_a_round() {
     let v = indicators_of(&mut f, Some("vps"));
     let b = &v["units"][1];
     assert_eq!(
-        (b["unit"].clone(), b["rounds"].clone(), b["first_verdict"].clone()),
+        (
+            b["unit"].clone(),
+            b["rounds"].clone(),
+            b["first_verdict"].clone()
+        ),
         (json!("u-b"), json!(1), json!("accept"))
     );
 }

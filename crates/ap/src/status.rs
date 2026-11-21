@@ -886,7 +886,10 @@ fn indicator(
     });
     reviews.sort_by_key(|(k, r)| (text(&r["closed_at"]).to_owned(), k.clone()));
     // A review `carry_review` made is a verdict but not a round: it is left out of the count alone.
-    let rounds = reviews.iter().filter(|(_, r)| r["carried_from"].is_null()).count();
+    let rounds = reviews
+        .iter()
+        .filter(|(_, r)| r["carried_from"].is_null())
+        .count();
     let runs = of_unit(s, store, ("runs_of_unit", "run"), key)?;
     let mut tokens = serde_json::Map::new();
     for role in runs

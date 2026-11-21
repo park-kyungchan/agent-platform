@@ -966,8 +966,17 @@ impl F {
                 if failed.is_empty() {
                     let mut c = json!({"kind": "packet", "head": p["head"], "status": "closed",
                         "verdict": "accept", "started_at": now, "closed_at": now, "carried_from": p["review"]});
-                    for m in ["task", "model", "effort", "prompt", "prompt_sha256", "repository", "unit",
-                        "report", "report_sha256"] {
+                    for m in [
+                        "task",
+                        "model",
+                        "effort",
+                        "prompt",
+                        "prompt_sha256",
+                        "repository",
+                        "unit",
+                        "report",
+                        "report_sha256",
+                    ] {
                         c[m] = r[m].clone();
                     }
                     self.put("review", &key, c);
@@ -3792,7 +3801,10 @@ fn an_update_outside_the_write_set_keeps_the_accept() {
     assert_eq!(packets.len(), 2);
     let (first, judged) = (packets[0].0.clone(), packets[0].1["head"].clone());
     let head = a["head"].as_str().unwrap().to_owned();
-    assert_eq!(json!(f.origin(&["rev-parse", &format!("{head}^1")])), judged);
+    assert_eq!(
+        json!(f.origin(&["rev-parse", &format!("{head}^1")])),
+        judged
+    );
     // `carry_review` with the accepting review of the head moved from and the new head, then the accept.
     let carried = f.bodies("carry_review");
     assert_eq!(carried.len(), 1);
@@ -3802,7 +3814,10 @@ fn an_update_outside_the_write_set_keeps_the_accept() {
     let at = actions.iter().position(|x| x == "carry_review").unwrap();
     assert_eq!(actions[at + 1], "accept_unit");
     let (made, r) = &packets[1];
-    assert_eq!((r["head"].as_str(), r["verdict"].as_str()), (Some(head.as_str()), Some("accept")));
+    assert_eq!(
+        (r["head"].as_str(), r["verdict"].as_str()),
+        (Some(head.as_str()), Some("accept"))
+    );
     assert_eq!(r["carried_from"]["native_key"], *first);
     assert!(r["round"].is_null(), "{r}");
     // The answer names the carry; the review list holds both, the carried one without a round.
@@ -3859,7 +3874,11 @@ fn an_update_outside_the_write_set_keeps_the_accept() {
     assert_eq!(a["waits_for"], "approve", "{a}");
     let (b, _) = f.ok();
     assert_eq!(
-        (b["state"].as_str(), b["updates"].as_u64(), b["rounds"].as_u64()),
+        (
+            b["state"].as_str(),
+            b["updates"].as_u64(),
+            b["rounds"].as_u64()
+        ),
         (Some("accepted"), Some(1), Some(1)),
         "{b}"
     );
@@ -3867,7 +3886,11 @@ fn an_update_outside_the_write_set_keeps_the_accept() {
     f.push_from_elsewhere("main", "notes-main.md");
     let (c, _) = f.ok();
     assert_eq!(
-        (c["state"].as_str(), c["updates"].as_u64(), c["rounds"].as_u64()),
+        (
+            c["state"].as_str(),
+            c["updates"].as_u64(),
+            c["rounds"].as_u64()
+        ),
         (Some("accepted"), Some(1), Some(1)),
         "{c}"
     );
@@ -3898,7 +3921,11 @@ fn an_update_inside_the_write_set_goes_to_the_verifier() {
     f.ok();
     let (b, _) = f.ok();
     assert_eq!(
-        (b["state"].as_str(), b["updates"].as_u64(), b["rounds"].as_u64()),
+        (
+            b["state"].as_str(),
+            b["updates"].as_u64(),
+            b["rounds"].as_u64()
+        ),
         (Some("accepted"), Some(1), Some(2)),
         "{b}"
     );
@@ -3936,7 +3963,11 @@ fn an_author_commit_and_an_update_go_to_the_verifier() {
     f.push_from_elsewhere("main", "notes-main.md");
     let (b, _) = f.ok();
     assert_eq!(
-        (b["state"].as_str(), b["updates"].as_u64(), b["rounds"].as_u64()),
+        (
+            b["state"].as_str(),
+            b["updates"].as_u64(),
+            b["rounds"].as_u64()
+        ),
         (Some("accepted"), Some(1), Some(2)),
         "{b}"
     );

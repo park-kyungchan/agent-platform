@@ -1461,7 +1461,11 @@ impl Run {
             return Ok(None);
         };
         let mut words = vec!["diff"];
-        words.extend(DIFF_OPTIONS.into_iter().chain([first.as_str(), base.as_str()]));
+        words.extend(
+            DIFF_OPTIONS
+                .into_iter()
+                .chain([first.as_str(), base.as_str()]),
+        );
         let Ok(diff) = review::git(s, &wt, &words) else {
             return Ok(None);
         };
@@ -1479,7 +1483,9 @@ impl Run {
             Err(f) if f.code == store::REFUSED => return Ok(None),
             Err(f) => return Err(f.into()),
         };
-        let made = applied.made("review").and_then(|i| i["native_key"].as_str());
+        let made = applied
+            .made("review")
+            .and_then(|i| i["native_key"].as_str());
         let made = made.filter(|k| key_ok(k)).map(str::to_owned);
         let review = made.ok_or_else(|| error("store_answer_unreadable", "carry_review"))?;
         let mut text = format!(
