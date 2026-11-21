@@ -28,6 +28,7 @@ case "$act" in
   implementclash) commit "widget $n" src/widgets.rs; push; mainmove src/widgets.rs "main's widget $n"; touch "$here/pr-open"; echo "Implemented." ;;
   acceptmain) mainmove src/other.rs "other $n"; verdict accept ;;
   repairmain) mainmove src/other.rs "other $n"; verdict repair ;;
+  acceptoutside) mainmove docs/other.md "other $n"; verdict accept ;;
   close)     touch "$here/pr-closed"; verdict accept ;;
   ghdown)    touch "$here/gh-down"; verdict accept ;;
   nopr)      cat "$here/nopr-answer" 2>/dev/null || echo "A rule of the page cannot hold: an invented reason." ;;
