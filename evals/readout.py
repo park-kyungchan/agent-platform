@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """Read-out of K1 (cost of the same work) and the field reading of K2 (implementer tier).
 
-Reads records that already exist and nothing else; stores nothing, writes no file, calls no store.
+Reads records that already exist and nothing else; stores nothing, writes no file, calls no store (with --detail the
+one read of the store is `ap status <key>` per merged pull request of a head branch `unit/<key>`, and it only reads).
   Claude session records   <account>/projects/**/*.jsonl   keys: type, sessionId, cwd, gitBranch, timestamp,
                            message.id, message.model, message.usage (top-level members and cache_creation),
                            the name of a tool_use block
@@ -13,8 +14,11 @@ Reads records that already exist and nothing else; stores nothing, writes no fil
   Reviewer answers         the first line of the answer file of a reviewer stage; of a page or plan review of the
                            window, the lines that begin `blocking` (after leading spaces, `-`, `*`, `<digits>.`),
                            counted by the kind they name and never printed
+  --detail also reads      the stage streams <units>/<key>/*.stream.jsonl (and their run records' `model`) and, for the review
+                           keys `ap status <key>` names, <reviews>/<key>.md.run.json (`cwd`) and .md.stream.jsonl:
+                           type, subtype, model of `init`, total_cost_usd, num_turns, message.usage (counts), compact_boundary
   --calibrate also reads   total_cost_usd of the `result` lines of the stream of first-run stages
-It prints no message text, no tool input and no path. Prices: evals/prices.tsv.
+It prints no message text, no tool input and no path, and writes nothing. Prices: evals/prices.tsv.
 Run: python3 -I -B evals/readout.py --since 2026-11-11 --until 2026-11-14
 """
 import argparse
@@ -39,6 +43,9 @@ BLOCKING_KINDS = {  # the closed lists of the frames reviewer.md and plan-review
     "plan": ("unreached_criterion", "dependency", "conflict", "unguarded_effect"),
 }
 BLOCKING_LINE = re.compile(r"(?:[ \-*]|\d+\.)*blocking(?:[ ]([a-z_]+):)?")
+UNIT_KEY = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*")
+REVIEW_KEY = re.compile(r"act-rq-[0-9a-f]{32}")
+MODEL_NAME = re.compile(r"[A-Za-z0-9._:/+-]{1,80}")
 REPOS = ("park-kyungchan/agent-platform", "park-kyungchan/ontology-platform", "park-kyungchan/education-platform")
 
 
@@ -385,6 +392,113 @@ def fmt(c):
     return " ".join(f"{k}={c[k]:,}" for k in KINDS) + f" usd={c['usd']:.2f}"
 
 
+def unit_key(branch):
+    """The unit key of a head branch `unit/<key>`, or None (also for a key that is no plain file name)."""
+    if not isinstance(branch, str) or not branch.startswith("unit/"):
+        return None
+    key = branch[len("unit/"):]
+    return key if UNIT_KEY.fullmatch(key) and ".." not in key else None
+
+
+def stage_of(path):
+    """One stage stream: cost and turns from its `result` lines (the CLI's own figures), the model of its `system` `init`
+    line, peak context (largest input + cache read + cache creation of one message), compactions. None when unreadable."""
+    out = {"usd": 0.0, "turns": 0, "peak_ctx": 0, "compactions": 0, "model": "unknown"}
+    try:
+        with open(path, encoding="utf-8", errors="replace") as fh:
+            for raw in fh:
+                try:
+                    o = json.loads(raw)
+                except ValueError:
+                    continue
+                if not isinstance(o, dict):
+                    continue
+                if o.get("type") == "result":
+                    c = o.get("total_cost_usd")
+                    out["usd"] += c if isinstance(c, (int, float)) and not isinstance(c, bool) else 0
+                    out["turns"] += num(o.get("num_turns"))
+                elif o.get("type") == "system" and o.get("subtype") == "compact_boundary":
+                    out["compactions"] += 1
+                elif o.get("type") == "system" and o.get("subtype") == "init":
+                    m = o.get("model")
+                    out["model"] = m if isinstance(m, str) and MODEL_NAME.fullmatch(m) else "unknown"
+                elif o.get("type") == "assistant" and isinstance(o.get("message"), dict) and isinstance(o["message"].get("usage"), dict):
+                    u = o["message"]["usage"]
+                    cc = u.get("cache_creation")
+                    write = num(cc.get("ephemeral_5m_input_tokens")) + num(cc.get("ephemeral_1h_input_tokens")) if isinstance(cc, dict) \
+                        else num(u.get("cache_creation_input_tokens"))
+                    out["peak_ctx"] = max(out["peak_ctx"], num(u.get("input_tokens")) + num(u.get("cache_read_input_tokens")) + write)
+    except OSError:
+        return None
+    return out
+
+
+def run_ap(key):
+    """`ap status <key>` answered as an object, or None when it fails, times out or answers no JSON object."""
+    try:
+        r = subprocess.run(["ap", "status", key], capture_output=True, text=True, check=False, timeout=60)
+        o = json.loads(r.stdout) if r.returncode == 0 else None
+    except (OSError, ValueError, subprocess.SubprocessError):
+        return None
+    return o if isinstance(o, dict) else None
+
+
+def natural(name):
+    head = name.split(".")[0]
+    return (int(head) if head.isdigit() else float("inf"), name)
+
+
+def record_of(path, suffix):
+    try:
+        o = json.loads(Path(str(path)[:-len(".stream.jsonl")] + suffix).read_text(encoding="utf-8", errors="replace"))
+    except (OSError, ValueError):
+        return None
+    return o if isinstance(o, dict) else None
+
+
+def unit_report(key, stage_dirs):
+    """The stages of one unit and the model of its first implementer's run record: {"stages", "impl", "ap_failed"}.
+    Streams: <units>/<key>/*.stream.jsonl (name without the stream suffix and a trailing `.md`; the role is the second
+    dotted part, `implementer` or `fixer`). Reviews: the `reviews[].review` keys of `ap status <key>` that have a run
+    record and a stream under <reviews>; `verifier` when the run record's cwd is under /units/<key>/, else `page review`."""
+    by_base = {}
+    for d in stage_dirs:
+        by_base.setdefault(Path(d).name, Path(d))
+    stages, impl = [], None
+    units = by_base.get("units")
+    names = sorted(((p.name[:-len(".stream.jsonl")], p) for p in (units / key).glob("*.stream.jsonl")), key=lambda v: natural(v[0])) if units else []
+    for raw, p in names:
+        name = raw[:-len(".md")] if raw.endswith(".md") else raw
+        role = name.split(".")[1] if name.count(".") >= 1 and name.split(".")[1] else "unknown"
+        s = stage_of(p)
+        if s is None:
+            continue
+        stages.append({"role": role, "name": name, **s})
+        if impl is None and role == "implementer":
+            rec = record_of(p, ".run.json")
+            impl = rec["model"] if rec and isinstance(rec.get("model"), str) and MODEL_NAME.fullmatch(rec["model"]) else None
+    answer = run_ap(key)
+    reviews = by_base.get("reviews")
+    if answer is not None and reviews:
+        found = sorted({r["review"] for r in answer.get("reviews") or [] if isinstance(r, dict) and isinstance(r.get("review"), str)
+                        and REVIEW_KEY.fullmatch(r["review"])})
+        for k in found:
+            stream = reviews / f"{k}.md.stream.jsonl"
+            rec = record_of(stream, ".run.json")
+            s = stage_of(stream) if rec is not None else None
+            if s is not None:
+                stages.append({"role": "verifier" if f"/units/{key}/" in str(rec.get("cwd") or "") + "/" else "page review", "name": k, **s})
+    return {"stages": stages, "impl": impl, "ap_failed": answer is None}
+
+
+def stage_lines(key, pr_label, rep):
+    out = [f"stage {key} {s['role']} {s['name']} model={s['model']} usd={s['usd']:.2f} turns={s['turns']} peak_ctx={s['peak_ctx']} "
+           f"compactions={s['compactions']}" for s in rep["stages"]]
+    out.append(f"unit {key} {pr_label} stages={len(rep['stages'])} usd={sum(s['usd'] for s in rep['stages']):.2f}"
+               + (" ap_status_failed=1" if rep["ap_failed"] else ""))
+    return out
+
+
 def main(argv=None):
     here = Path(__file__).resolve().parent
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
@@ -401,7 +515,7 @@ def main(argv=None):
     ap.add_argument("--repo", action="append", help="owner/name (default: the three platform repositories)")
     ap.add_argument("--prices", default=str(here / "prices.tsv"))
     ap.add_argument("--list-no-reviewer", action="store_true", help="list the numbers of merged pull requests without a reviewer stage")
-    ap.add_argument("--detail", action="store_true", help="one K2 line per merged pull request")
+    ap.add_argument("--detail", action="store_true", help="one K2 line per merged pull request; after it, the stages of a unit/<key> pull request, and a closing `lead share=` line")
     ap.add_argument("--calibrate", action="store_true", help="also compare the cost of first-run stages with the CLI's own figure")
     a = ap.parse_args(argv)
     for d in (a.since, a.until):
@@ -448,9 +562,23 @@ def main(argv=None):
               + f" K1 engineering usd per merged pull request = " + (f"{eng / len(mine):.2f}" if mine else "n/a")
               + f"; role lead usd={lead:.2f} share of the route={100 * lead / eng if eng else 0:.1f}%")
     reading = k2(prs, a.stages, branches, session_cwd, a.platforms_root)
+    reports, stages_usd = {}, 0.0  # with --detail only: the stages of each merged pull request of a head branch unit/<key>
     if a.detail:
+        heads = {(r.split("/")[1], p["number"]): (r, unit_key(p.get("headRefName"))) for r, p in prs}
+        by_key = {}
+        for r in reading:
+            full, key = heads[(r["repo"], r["number"])]
+            if key is None:
+                continue
+            if key not in by_key:  # one `ap status` read per unit
+                by_key[key] = unit_report(key, a.stage_dir)
+                stages_usd += sum(s["usd"] for s in by_key[key]["stages"])
+            reports[(r["repo"], r["number"])] = (stage_lines(key, f"{full}#{r['number']}", by_key[key]))
+            r["impl"] = by_key[key]["impl"] or r["impl"]
         for r in sorted(reading, key=lambda r: (r["repo"], r["number"])):
             print(f"K2 {r['repo']}#{r['number']} implementer={r['impl']} verifier={r['verifier'] or 'none'} first verdict={bucket(r['verdict'])} lines={r['lines']}")
+            for line in reports.get((r["repo"], r["number"]), ()):
+                print(line)
     by_impl = collections.defaultdict(lambda: collections.defaultdict(list))
     for r in reading:
         by_impl[r["impl"]][bucket(r["verdict"])].append(r)
@@ -494,6 +622,9 @@ def main(argv=None):
                 ratios[s["model"]].append(session_usd[s["session"]] / figure)
         for fam, r in sorted(ratios.items()):
             print(f"calibrate family={fam} stages={len(r)} median(readout/cli)={statistics.median(r):.3f} min={min(r):.3f} max={max(r):.3f}")
+    if a.detail:  # two bases: lead_usd is priced from token counts as K1 prices them, stages_usd is the CLI's own total_cost_usd
+        lead = sum(c["usd"] for by_role in rows.values() for (role, _), c in by_role.items() if role == "lead")
+        print(f"lead share=" + (f"{100 * lead / (lead + stages_usd):.1f}%" if lead + stages_usd else "n/a") + f" lead_usd={lead:.2f} stages_usd={stages_usd:.2f}")
 
 
 if __name__ == "__main__":
