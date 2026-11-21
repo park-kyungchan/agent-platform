@@ -409,6 +409,7 @@ fn the_library_and_the_mcp_tool_record() {
     let request = ont::action::ApplyActionRequest {
         op: None,
         action_type: "create_tag".into(),
+        domain: None,
         parameters: json!({"label":5}),
         agent: None,
         session: None,
@@ -1050,6 +1051,7 @@ fn the_role_has_the_bounds_of_agent() {
     let request = ont::action::ValidateActionRequest {
         op: None,
         action_type: "create_tag".into(),
+        domain: None,
         parameters: json!({"label":"a"}),
         agent: None,
         session: None,

@@ -468,6 +468,7 @@ fn crash_between_commit_and_append_is_repaired_by_next_write() {
     let req = ont::action::ApplyActionRequest {
         op: Some("apply_action".into()),
         action_type: "record_note".into(),
+        domain: None,
         parameters: json!({"title":"crashed","task":task_id()}),
         agent: Some("tester".into()),
         session: None,
@@ -603,6 +604,7 @@ fn embedding_uses_only_public_library_items() {
         &ont::action::ValidateActionRequest {
             op: None,
             action_type: "record_note".into(),
+            domain: None,
             parameters: json!({"title":"embedded","task":task_id()}),
             agent: None,
             session: Some("s1".into()),
@@ -620,6 +622,7 @@ fn embedding_uses_only_public_library_items() {
         &ont::action::ApplyActionRequest {
             op: None,
             action_type: "record_note".into(),
+            domain: None,
             parameters: json!({"title":"embedded","task":task_id()}),
             agent: None,
             session: Some("s1".into()),
@@ -1154,6 +1157,7 @@ fn b4_validate_with_request_id_equals_apply_and_actor_bounds() {
     let vreq = ont::action::ValidateActionRequest {
         op: None,
         action_type: "record_note".into(),
+        domain: None,
         parameters: json!({"title":"rid","task":task_id()}),
         agent: Some("agent-a".into()),
         session: None,
@@ -1167,6 +1171,7 @@ fn b4_validate_with_request_id_equals_apply_and_actor_bounds() {
     let areq = ont::action::ApplyActionRequest {
         op: None,
         action_type: "record_note".into(),
+        domain: None,
         parameters: json!({"title":"rid","task":task_id()}),
         agent: Some("agent-a".into()),
         session: None,

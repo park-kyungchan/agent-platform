@@ -6,7 +6,8 @@ use crate::principal::{EngineIdentity, Principal, engine_identity};
 use crate::refusal::{open_store, st, store_err};
 use crate::{Answer, Context, Failure, Refusal, internal, sha256_hex};
 use ont_core::schema::{
-    ActionType, Condition, Criterion, Owner, PropertyType, ScalarType, Schema, SchemaSet,
+    ActionRule, ActionType, Condition, Criterion, Owner, PropertyType, ScalarType, Schema,
+    SchemaSet,
 };
 use ont_core::{
     Change, Coverage, Id, Knowledge, Lineage, Object, Observation, Query, Response, Scope,
@@ -113,6 +114,10 @@ pub struct ValidateActionRequest {
     #[serde(default)]
     pub op: Option<String>,
     pub action_type: String,
+    /// The installed domain whose action type `action_type` names; absent
+    /// or null names none (`specs/ont/action.md` R105).
+    #[serde(default)]
+    pub domain: Option<String>,
     #[serde(default)]
     pub parameters: Value,
     #[serde(default)]
@@ -144,6 +149,10 @@ pub struct ApplyActionRequest {
     #[serde(default)]
     pub op: Option<String>,
     pub action_type: String,
+    /// The installed domain whose action type `action_type` names; absent
+    /// or null names none (`specs/ont/action.md` R105).
+    #[serde(default)]
+    pub domain: Option<String>,
     #[serde(default)]
     pub parameters: Value,
     #[serde(default)]
@@ -238,15 +247,53 @@ fn rule_input(params: &BTreeMap<String, Value>, expression: &Value) -> Option<St
         .then(|| parameter_field(names.iter().next().map(String::as_str).unwrap_or("")))
 }
 
-fn find_action_type<'a>(set: &'a SchemaSet, name: &str) -> Option<(&'a Schema, &'a ActionType)> {
-    for domain in set.pins().keys() {
-        if let Some(schema) = set.schema(domain)
-            && let Some(at) = schema.action_types.get(name)
-        {
-            return Some((schema, at));
-        }
+/// The action type `name` of the domain `domain` names, or of the only
+/// installed domain that declares it (`specs/ont/action.md` R105). Only the
+/// request and the installed schemas decide: never a grant, never the order
+/// of domain names.
+fn resolve_action_type<'a>(
+    set: &'a SchemaSet,
+    name: &str,
+    domain: Option<&str>,
+) -> Result<(&'a Schema, &'a ActionType), Failure> {
+    let unknown_action = || {
+        Failure::from(Refusal::input(
+            "unknown_action",
+            "/action_type",
+            "an installed action type; use action list",
+        ))
+    };
+    if let Some(d) = domain {
+        let schema = set.schema(d).ok_or_else(|| {
+            Failure::from(Refusal::input(
+                "unknown_domain",
+                "/domain",
+                "a domain installed in this store",
+            ))
+        })?;
+        let at = schema.action_types.get(name).ok_or_else(unknown_action)?;
+        return Ok((schema, at));
     }
-    None
+    let declaring: Vec<(&Schema, &ActionType)> = set
+        .pins()
+        .keys()
+        .filter_map(|d| set.schema(d))
+        .filter_map(|schema| schema.action_types.get(name).map(|at| (schema, at)))
+        .collect();
+    match declaring.as_slice() {
+        [] => Err(unknown_action()),
+        [one] => Ok(*one),
+        many => Err(Refusal::input(
+            "action_ambiguous",
+            "/domain",
+            "one of the domains that declare the action type",
+        )
+        .with(
+            "domains",
+            json!(many.iter().map(|(s, _)| &s.domain).collect::<Vec<_>>()),
+        )
+        .into()),
+    }
 }
 fn valid_actor_field(s: &str) -> bool {
     !s.is_empty()
@@ -410,6 +457,16 @@ fn cmp_values(a: &Value, b: &Value) -> Option<std::cmp::Ordering> {
         }
         (Value::String(x), Value::String(y)) => Some(x.cmp(y)),
         _ => None,
+    }
+}
+/// Two operands of a comparison of a declared decimal (R111): both strings
+/// in the decimal spelling, in `ont-core`'s decimal order; any other operand
+/// is unevaluable.
+fn decimal_order(a: &Value, b: &Value) -> Result<std::cmp::Ordering, Failure> {
+    match (a, b) {
+        (Value::String(x), Value::String(y)) => ont_core::schema::compare_decimal(x, y)
+            .ok_or_else(|| Refusal::new("criterion_not_evaluable").into()),
+        _ => Err(Refusal::new("criterion_not_evaluable").into()),
     }
 }
 fn value_matches(schema: &Schema, ty: &PropertyType, v: &Value) -> bool {
@@ -712,6 +769,8 @@ fn check_reference_inputs(
 struct Eval<'a> {
     principal: &'a Principal,
     set: &'a SchemaSet,
+    /// The action's own schema: its parameters' value types and its links.
+    schema: &'a Schema,
     snap: &'a Snapshot,
     params: &'a BTreeMap<String, Value>,
     actor: &'a Value,
@@ -886,12 +945,27 @@ impl Eval<'_> {
             Condition::Eq(p) => self.compare_eq(p, ctx),
             Condition::Ne(p) => Ok(!self.compare_eq(p, ctx)?),
             Condition::In(p) => {
+                let decimal = self.declared_decimal(&p[0], ctx, true)
+                    || self.declared_decimal(&p[1], ctx, false);
                 let a = self
                     .resolve(&p[0], ctx, true)?
                     .ok_or_else(Self::not_evaluable)?;
                 let b = self
                     .resolve(&p[1], ctx, false)?
                     .ok_or_else(Self::not_evaluable)?;
+                if decimal {
+                    // Every member is compared as a decimal (R111).
+                    return match b {
+                        Value::Array(items) => {
+                            let mut out = false;
+                            for i in &items {
+                                out |= decimal_order(&a, i)? == std::cmp::Ordering::Equal;
+                            }
+                            Ok(out)
+                        }
+                        _ => Ok(false),
+                    };
+                }
                 Ok(match b {
                     Value::Array(items) => items
                         .iter()
@@ -937,12 +1011,18 @@ impl Eval<'_> {
         }
     }
     fn compare_eq(&mut self, p: &[Value; 2], ctx: Option<&SchemaHead>) -> Result<bool, Failure> {
+        let property_position = !p.iter().any(|v| v.as_str() == Some("$now"));
+        let decimal = self.declared_decimal(&p[0], ctx, property_position)
+            || self.declared_decimal(&p[1], ctx, false);
         let a = self
-            .resolve(&p[0], ctx, !p.iter().any(|v| v.as_str() == Some("$now")))?
+            .resolve(&p[0], ctx, property_position)?
             .ok_or_else(Self::not_evaluable)?;
         let b = self
             .resolve(&p[1], ctx, false)?
             .ok_or_else(Self::not_evaluable)?;
+        if decimal {
+            return Ok(decimal_order(&a, &b)? == std::cmp::Ordering::Equal);
+        }
         Self::values_equal(&a, &b)
     }
     fn compare_order(
@@ -951,13 +1031,72 @@ impl Eval<'_> {
         ctx: Option<&SchemaHead>,
         ok: impl Fn(std::cmp::Ordering) -> bool,
     ) -> Result<bool, Failure> {
+        let property_position = !p.iter().any(|v| v.as_str() == Some("$now"));
+        let decimal = self.declared_decimal(&p[0], ctx, property_position)
+            || self.declared_decimal(&p[1], ctx, false);
         let a = self
-            .resolve(&p[0], ctx, !p.iter().any(|v| v.as_str() == Some("$now")))?
+            .resolve(&p[0], ctx, property_position)?
             .ok_or_else(Self::not_evaluable)?;
         let b = self
             .resolve(&p[1], ctx, false)?
             .ok_or_else(Self::not_evaluable)?;
+        if decimal {
+            return decimal_order(&a, &b).map(&ok);
+        }
         cmp_values(&a, &b).map(&ok).ok_or_else(Self::not_evaluable)
+    }
+    /// Whether a comparison operand names a parameter or a property whose
+    /// declared type is `decimal` (R111); a literal names none. The operand
+    /// is read as [`Eval::resolve`] reads it.
+    fn declared_decimal(
+        &self,
+        v: &Value,
+        ctx: Option<&SchemaHead>,
+        property_position: bool,
+    ) -> bool {
+        let Value::String(s) = v else {
+            return false;
+        };
+        if let Some(p) = s.strip_prefix('$') {
+            if p == "now" {
+                return false;
+            }
+            if let Some((name, prop)) = p.split_once('.') {
+                return match self.at.parameters.get(name).map(|d| &d.ty) {
+                    Some(PropertyType::Ref(r)) => self.property_decimal(&r.target, prop),
+                    _ => false,
+                };
+            }
+            return self
+                .at
+                .parameters
+                .get(p)
+                .is_some_and(|d| ont_core::schema::is_decimal_type(self.schema, &d.ty));
+        }
+        if !property_position {
+            return false;
+        }
+        if let Some(head) = ctx {
+            return self.property_decimal(&head.id.object_type, s);
+        }
+        // A bare name: a property of the action's only reference parameter.
+        let mut refs = self.at.parameters.values().filter_map(|d| match &d.ty {
+            PropertyType::Ref(r) => Some(&r.target),
+            _ => None,
+        });
+        match (refs.next(), refs.next()) {
+            (Some(target), None) => self.property_decimal(target, s),
+            _ => false,
+        }
+    }
+    fn property_decimal(&self, object_type: &str, property: &str) -> bool {
+        self.set.schema_of(object_type).is_some_and(|schema| {
+            schema
+                .object_types
+                .get(object_type)
+                .and_then(|t| t.properties.get(property))
+                .is_some_and(|p| ont_core::schema::is_decimal_type(schema, &p.ty))
+        })
     }
     // Presence-style reads hide inadmissible heads exactly as missing heads.
     // All admission decisions still go through the shared reference boundary.
@@ -999,15 +1138,9 @@ impl Eval<'_> {
         let Some(from_id) = id_from_value(&from_val) else {
             return Ok(false);
         };
-        let mut found = None;
-        for schema in self.set.pins().keys().filter_map(|d| self.set.schema(d)) {
-            for lt in schema.link_types.values() {
-                if lt.names.forward == link.link || lt.names.reverse == link.link {
-                    found = Some(lt.clone());
-                }
-            }
-        }
-        let Some(lt) = found else {
+        // The link of the action's own schema (R107); a link of the same name
+        // in another installed domain is not followed.
+        let Some(lt) = own_link(self.schema, &link.link).cloned() else {
             return Err(Refusal::new("criterion_not_evaluable")
                 .with("link", json!(link.link))
                 .into());
@@ -1053,9 +1186,11 @@ impl Eval<'_> {
 }
 type CriteriaOutcome = (Vec<Value>, BTreeMap<String, Value>, Vec<Criterion>);
 type ObjectState = (BTreeMap<String, Knowledge>, Option<String>, bool, Scope);
+#[allow(clippy::too_many_arguments)]
 fn eval_criteria(
     principal: &Principal,
     set: &SchemaSet,
+    schema: &Schema,
     snap: &Snapshot,
     at: &ActionType,
     params: &BTreeMap<String, Value>,
@@ -1065,6 +1200,7 @@ fn eval_criteria(
     let mut ev = Eval {
         principal,
         set,
+        schema,
         snap,
         params,
         actor,
@@ -1103,6 +1239,8 @@ struct Planned {
     inputs: BTreeMap<String, String>,
 }
 struct Planner<'a> {
+    /// The action type's name, for a refusal's pointer.
+    action_name: String,
     principal: &'a Principal,
     schema: &'a Schema,
     set: &'a SchemaSet,
@@ -1193,38 +1331,56 @@ impl<'a> Planner<'a> {
             )
         })
     }
-    fn ref_target(&self, object_type: &str) -> Option<Id> {
-        self.params
-            .values()
-            .find_map(|v| id_from_value(v).filter(|id| id.object_type == object_type))
+    /// The object a rule of R108 edits: the supplied value of the parameter
+    /// its `target` names, or of the only declared reference parameter to
+    /// its type. `None` when the request does not supply it; no other
+    /// parameter value is read as a target.
+    fn rule_target(
+        &self,
+        at: &ActionType,
+        rule: &ActionRule,
+        object_type: &str,
+    ) -> Result<Option<Id>, Failure> {
+        let name = at.rule_target_parameter(rule, object_type).map_err(|()| {
+            let i = at
+                .rules
+                .iter()
+                .position(|r| std::ptr::eq(r, rule))
+                .unwrap_or(0);
+            ambiguous_rule_target(&self.action_name, i)
+        })?;
+        Ok(name
+            .and_then(|name| self.params.get(name))
+            .and_then(id_from_value)
+            .filter(|id| id.object_type == object_type))
     }
-    fn ref_target_typed(&self, at: &ActionType, object_type: &str) -> Option<Id> {
-        for (name, def) in &at.parameters {
-            if let PropertyType::Ref(r) = &def.ty
-                && r.target == object_type
-                && let Some(v) = self.params.get(name)
-                && let Some(id) = id_from_value(v)
-            {
-                return Some(id);
-            }
-        }
-        self.ref_target(object_type)
+    /// The refusal of a rule whose target the request does not supply: at the
+    /// parameter `target` names; without `target`, at the only reference
+    /// parameter when the request gives it a value that is no object id,
+    /// else at `/parameters` (as on the base).
+    fn missing_target(
+        &self,
+        at: &ActionType,
+        rule: &ActionRule,
+        object_type: &str,
+        what: &str,
+    ) -> Failure {
+        let field = match (&rule.target, at.rule_target_parameter(rule, object_type)) {
+            (Some(_), Ok(Some(name))) => parameter_field(name),
+            (None, Ok(Some(name))) if self.params.contains_key(name) => parameter_field(name),
+            _ => "/parameters".to_string(),
+        };
+        invalid_parameter(&field, what)
     }
-    fn target_field(&self, at: &ActionType, object_type: &str) -> String {
-        let names: Vec<_> = at
-            .parameters
-            .iter()
-            .filter(|(name, def)| {
-                self.params.contains_key(*name)
-                    && matches!(&def.ty, PropertyType::Ref(r) if r.target == object_type)
-            })
-            .map(|(name, _)| name)
-            .collect();
-        if names.len() == 1 {
-            parameter_field(names[0])
-        } else {
-            "/parameters".to_string()
-        }
+    fn required_target(
+        &self,
+        at: &ActionType,
+        rule: &ActionRule,
+        object_type: &str,
+        what: &str,
+    ) -> Result<Id, Failure> {
+        self.rule_target(at, rule, object_type)?
+            .ok_or_else(|| self.missing_target(at, rule, object_type, what))
     }
     fn create_key(&self, at: &ActionType, object_type: &str) -> Result<String, Failure> {
         let ty = self
@@ -1366,12 +1522,12 @@ impl<'a> Planner<'a> {
                     || rule.create_or_modify_object.is_some())
             {
                 if let Some(t) = &rule.modify_object {
-                    self.modify_target(at, t, None)?;
+                    self.modify_target(at, rule, t, None)?;
                 }
                 continue;
             }
             if let Some(t) = &rule.create_object {
-                edits.push(self.do_create(at, t, &set_map, false)?);
+                edits.push(self.do_create(at, rule, t, &set_map, false)?);
             } else if let Some(t) = &rule.create_or_modify_object {
                 // Pointer keys designate the upsert target as well as new keys.
                 if self
@@ -1381,37 +1537,39 @@ impl<'a> Planner<'a> {
                     .and_then(|ty| ty.primary_key.from.as_deref())
                     .is_some_and(|p| p.starts_with('/'))
                 {
-                    edits.push(self.do_create(at, t, &set_map, true)?);
+                    edits.push(self.do_create(at, rule, t, &set_map, true)?);
                 } else {
-                    // Action-id keyed types retain their reference-target behavior.
-                    if let Some(id) = self.ref_target_typed(at, t)
-                        && self.snap.unreadable_occupied.contains(&Snapshot::key(&id))
+                    // Action-id keyed types edit the object of their target
+                    // parameter (R108); an absent target creates.
+                    let target = self.rule_target(at, rule, t)?;
+                    if let Some(id) = &target
+                        && self.snap.unreadable_occupied.contains(&Snapshot::key(id))
                     {
                         return Err(Refusal::new("rule_reference_unavailable").into());
                     }
-                    if let Some(id) = self.ref_target_typed(at, t)
+                    if let Some(id) = target
                         && self.state(&id).is_some_and(|(_, _, r, _)| !r)
                     {
-                        edits.push(self.do_modify(at, t, &set_map, Some(id))?);
+                        edits.push(self.do_modify(at, rule, t, &set_map, Some(id))?);
                     } else {
-                        edits.push(self.do_create(at, t, &set_map, true)?);
+                        edits.push(self.do_create(at, rule, t, &set_map, true)?);
                     }
                 }
             } else if let Some(t) = &rule.modify_object {
-                edits.push(self.do_modify(at, t, &set_map, None)?);
+                edits.push(self.do_modify(at, rule, t, &set_map, None)?);
             } else if let Some(t) = &rule.delete_object {
-                let id = self.ref_target_typed(at, t).ok_or_else(|| {
-                    invalid_parameter(
-                        &self.target_field(at, t),
-                        "an object id parameter whose object_type matches the rule target",
-                    )
-                })?;
+                let id = self.required_target(
+                    at,
+                    rule,
+                    t,
+                    "an object id parameter whose object_type matches the rule target",
+                )?;
                 let (_, head, _, scope) = self.target_state(&id)?;
                 edits.push(self.push(id, scope, Change::Retraction, head, BTreeMap::new()));
             } else if let Some(r) = &rule.set_reference {
-                edits.extend(self.do_set_ref(at, r, false)?);
+                edits.extend(self.do_set_ref(at, rule, r, false)?);
             } else if let Some(r) = &rule.clear_reference {
-                edits.extend(self.do_set_ref(at, r, true)?);
+                edits.extend(self.do_set_ref(at, rule, r, true)?);
             }
             let mut assignments: BTreeMap<String, Option<String>> = rule
                 .set
@@ -1443,6 +1601,7 @@ impl<'a> Planner<'a> {
     fn do_create(
         &mut self,
         at: &ActionType,
+        rule: &ActionRule,
         t: &str,
         set_map: &BTreeMap<String, Value>,
         or_modify: bool,
@@ -1467,7 +1626,7 @@ impl<'a> Planner<'a> {
             if or_modify {
                 // The key (from a parameter or a pointer) names an
                 // existing object: plan a modification, as in validate.
-                return self.do_modify(at, t, set_map, Some(id));
+                return self.do_modify(at, rule, t, set_map, Some(id));
             }
             return Err(revision_conflict(&id));
         }
@@ -1482,21 +1641,19 @@ impl<'a> Planner<'a> {
     fn modify_target(
         &self,
         at: &ActionType,
+        rule: &ActionRule,
         t: &str,
         target: Option<Id>,
     ) -> Result<(Id, ObjectState), Failure> {
-        let id = target
-            .or_else(|| {
-                self.params
-                    .values()
-                    .find_map(|v| id_from_value(v).filter(|i| i.object_type == t))
-            })
-            .ok_or_else(|| {
-                invalid_parameter(
-                    &self.target_field(at, t),
-                    "an object id parameter whose object_type matches the rule target",
-                )
-            })?;
+        let id = match target {
+            Some(id) => id,
+            None => self.required_target(
+                at,
+                rule,
+                t,
+                "an object id parameter whose object_type matches the rule target",
+            )?,
+        };
         Ok((id.clone(), self.target_state(&id)?))
     }
     // Admit original live heads even after an earlier rule overlaid them. Only
@@ -1512,11 +1669,12 @@ impl<'a> Planner<'a> {
     fn do_modify(
         &mut self,
         at: &ActionType,
+        rule: &ActionRule,
         t: &str,
         set_map: &BTreeMap<String, Value>,
         target: Option<Id>,
     ) -> Result<Value, Failure> {
-        let (id, (cur, head, _, scope)) = self.modify_target(at, t, target)?;
+        let (id, (cur, head, _, scope)) = self.modify_target(at, rule, t, target)?;
         let mut fields = cur;
         for (k, v) in set_map {
             fields.insert(k.clone(), Knowledge::Value(v.clone()));
@@ -1526,18 +1684,16 @@ impl<'a> Planner<'a> {
     fn do_set_ref(
         &mut self,
         at: &ActionType,
+        rule: &ActionRule,
         r: &ont_core::schema::ReferenceRule,
         clear: bool,
     ) -> Result<Option<Value>, Failure> {
-        let _ = at;
-        let id = self
-            .ref_target_typed_from_schema(&r.object_type)
-            .ok_or_else(|| {
-                invalid_parameter(
-                    &self.target_field(at, &r.object_type),
-                    "an object id parameter whose object_type matches the reference rule target",
-                )
-            })?;
+        let id = self.required_target(
+            at,
+            rule,
+            &r.object_type,
+            "an object id parameter whose object_type matches the reference rule target",
+        )?;
         let (cur, head, _, scope) = self.target_state(&id)?;
         let mut fields = cur;
         if clear {
@@ -1570,11 +1726,6 @@ impl<'a> Planner<'a> {
             }
         }
         Ok(Some(self.push(id, scope, Change::Update, head, fields)))
-    }
-    fn ref_target_typed_from_schema(&self, object_type: &str) -> Option<Id> {
-        self.params
-            .values()
-            .find_map(|v| id_from_value(v).filter(|i| i.object_type == object_type))
     }
 }
 /// The one field check shared by validate and apply: every planned
@@ -2043,8 +2194,16 @@ fn insert_snap(snap: &mut Snapshot, h: SchemaHead, max: usize) -> Result<(), Fai
     }
     Ok(())
 }
+/// The link type of `schema` whose forward or reverse name is `name`; link
+/// names are unique inside one schema and may repeat across domains.
+fn own_link<'a>(schema: &'a Schema, name: &str) -> Option<&'a ont_core::schema::LinkType> {
+    schema
+        .link_types
+        .values()
+        .find(|lt| lt.names.forward == name || lt.names.reverse == name)
+}
 fn collect_linked_scans(
-    set: &SchemaSet,
+    schema: &Schema,
     snap: &Snapshot,
     params: &BTreeMap<String, Value>,
     c: &Condition,
@@ -2052,31 +2211,29 @@ fn collect_linked_scans(
 ) {
     match c {
         Condition::Linked(link) => {
-            for schema in set.pins().keys().filter_map(|d| set.schema(d)) {
-                for lt in schema.link_types.values() {
-                    if lt.names.reverse == link.link
-                        && let Some(id) = link
-                            .from
-                            .strip_prefix('$')
-                            .and_then(|p| params.get(p))
-                            .and_then(id_from_value)
-                        && snap.live(&id).is_some()
-                    {
-                        out.insert((lt.from.clone(), lt.via.clone(), id));
-                    }
-                }
+            // Only the action's own schema's link is scanned (R107).
+            if let Some(lt) = own_link(schema, &link.link)
+                && lt.names.reverse == link.link
+                && let Some(id) = link
+                    .from
+                    .strip_prefix('$')
+                    .and_then(|p| params.get(p))
+                    .and_then(id_from_value)
+                && snap.live(&id).is_some()
+            {
+                out.insert((lt.from.clone(), lt.via.clone(), id));
             }
             if let Some(g) = &link.condition {
                 for cs in [&g.all, &g.any, &g.none].into_iter().flatten() {
                     for x in cs {
-                        collect_linked_scans(set, snap, params, x, out);
+                        collect_linked_scans(schema, snap, params, x, out);
                     }
                 }
             }
         }
         Condition::All(cs) | Condition::Any(cs) | Condition::NoneOf(cs) => {
             for x in cs {
-                collect_linked_scans(set, snap, params, x, out);
+                collect_linked_scans(schema, snap, params, x, out);
             }
         }
         _ => {}
@@ -2370,9 +2527,11 @@ fn presence_only_parameters(
     only.retain(|name| !reads.contains(name));
     only
 }
+#[allow(clippy::too_many_arguments)]
 fn load_snapshot(
     ctx: &Context,
     set: &SchemaSet,
+    schema: &Schema,
     principal: &Principal,
     at: &ActionType,
     params: &BTreeMap<String, Value>,
@@ -2415,7 +2574,7 @@ fn load_snapshot(
     for crit in &at.submission_criteria {
         for cs in [&crit.all, &crit.any, &crit.none].into_iter().flatten() {
             for c in cs {
-                collect_linked_scans(set, &snap, params, c, &mut scan_types);
+                collect_linked_scans(schema, &snap, params, c, &mut scan_types);
             }
         }
     }
@@ -2460,7 +2619,7 @@ fn augment_planner(
                 .object_types
                 .get(t)
                 .is_some_and(|ty| ty.primary_key.from.as_deref() == Some("$action_id"))
-            && let Some(id) = planner.ref_target_typed(at, t)
+            && let Ok(Some(id)) = planner.rule_target(at, rule, t)
         {
             load_creation_target(
                 &mut planner.snap,
@@ -2606,19 +2765,38 @@ fn check_create_keys(schema: &Schema, at: &ActionType, name: &str) -> Result<(),
     Ok(())
 }
 
+// An installed schema may keep a rule whose target parameter it does not
+// determine (`specs/ont/action.md` R110); refuse only the affected action,
+// after authorization and before anything is read or written.
+fn check_rule_targets(schema: &Schema, at: &ActionType, name: &str) -> Result<(), Failure> {
+    for (i, rule) in at.rules.iter().enumerate() {
+        if let Some(t) = rule.targeted_type(schema)
+            && at.rule_target_parameter(rule, t).is_err()
+        {
+            return Err(ambiguous_rule_target(name, i));
+        }
+    }
+    Ok(())
+}
+fn ambiguous_rule_target(name: &str, rule: usize) -> Failure {
+    Refusal::new("ambiguous_rule_target")
+        .with(
+            "pointer",
+            json!(format!(
+                "/action_types/{}/rules/{rule}",
+                name.replace('~', "~0").replace('/', "~1")
+            )),
+        )
+        .into()
+}
+
 pub fn validate_action(ctx: &Context, req: &ValidateActionRequest) -> Result<Answer, Failure> {
     // Read once, before any refusal: the one identity this call uses.
     let identity = engine_identity()?;
     let mut store = open_store(&ctx.store, false)?;
     let set = st!(store.schema_set()).clone();
     let principal = Principal::bind(&set)?;
-    let (schema, at) = find_action_type(&set, &req.action_type).ok_or_else(|| {
-        Failure::from(Refusal::input(
-            "unknown_action",
-            "/action_type",
-            "an installed action type; use action list",
-        ))
-    })?;
+    let (schema, at) = resolve_action_type(&set, &req.action_type, req.domain.as_deref())?;
     let (schema, at) = (schema.clone(), at.clone());
     if !principal
         .view()
@@ -2640,6 +2818,7 @@ pub fn validate_action(ctx: &Context, req: &ValidateActionRequest) -> Result<Ans
         .into());
     }
     check_create_keys(&schema, &at, &req.action_type)?;
+    check_rule_targets(&schema, &at, &req.action_type)?;
     let params = validate_parameters(&schema, &at, &req.parameters)?;
     let params_canon = canonical(&Value::Object(
         params.iter().map(|(k, v)| (k.clone(), v.clone())).collect(),
@@ -2648,6 +2827,7 @@ pub fn validate_action(ctx: &Context, req: &ValidateActionRequest) -> Result<Ans
     let snap = load_snapshot(
         ctx,
         &set,
+        &schema,
         &principal,
         &at,
         &params,
@@ -2655,8 +2835,9 @@ pub fn validate_action(ctx: &Context, req: &ValidateActionRequest) -> Result<Ans
         &mut store,
     )?;
     let references = check_reference_inputs(&principal, &snap, &at, &params, ctx.now)?;
-    let (criteria, basis_map, failed) =
-        eval_criteria(&principal, &set, &snap, &at, &params, &actor, ctx.now)?;
+    let (criteria, basis_map, failed) = eval_criteria(
+        &principal, &set, &schema, &snap, &at, &params, &actor, ctx.now,
+    )?;
     let stale = references.stale
         || criteria
             .iter()
@@ -2699,6 +2880,7 @@ pub fn validate_action(ctx: &Context, req: &ValidateActionRequest) -> Result<Ans
             &request_action_id,
         );
         let mut planner = Planner {
+            action_name: req.action_type.clone(),
             principal: &principal,
             schema: &schema,
             set: &set,
@@ -2766,13 +2948,16 @@ fn submission_hint(codes: &[String]) -> String {
 }
 
 /// Refusal codes of the store or of a failure, never recorded in
-/// `refusals.jsonl`; `unknown_action` and `invalid_request` arise before the
-/// action type is known except `invalid_request` at `/parameters`.
+/// `refusals.jsonl`; `unknown_action`, `unknown_domain`, `action_ambiguous`
+/// and `invalid_request` arise before the action type is known except
+/// `invalid_request` at `/parameters`.
 fn records_refusal(code: &str) -> bool {
     !code.starts_with("store_")
         && !matches!(
             code,
             "unknown_action"
+                | "unknown_domain"
+                | "action_ambiguous"
                 | "projection_stale"
                 | "action_domain_mismatch"
                 | "action_schema_mismatch"
@@ -2835,13 +3020,7 @@ fn apply_found(
     let set = st!(store.schema_set()).clone();
     let principal = Principal::bind(&set)?;
     let revision = principal.revision()?;
-    let (schema, at) = find_action_type(&set, &req.action_type).ok_or_else(|| {
-        Failure::from(Refusal::input(
-            "unknown_action",
-            "/action_type",
-            "an installed action type; use action list",
-        ))
-    })?;
+    let (schema, at) = resolve_action_type(&set, &req.action_type, req.domain.as_deref())?;
     let (schema, at) = (schema.clone(), at.clone());
     *found = Some((
         schema.domain.clone(),
@@ -2855,6 +3034,7 @@ fn apply_found(
         return Err(Refusal::new("action_forbidden").into());
     }
     check_create_keys(&schema, &at, &req.action_type)?;
+    check_rule_targets(&schema, &at, &req.action_type)?;
     let params = validate_parameters(&schema, &at, &req.parameters)?;
     let params_canon = canonical(&Value::Object(
         params.iter().map(|(k, v)| (k.clone(), v.clone())).collect(),
@@ -2865,14 +3045,14 @@ fn apply_found(
     let write_result = store.write(ctx.now, |tx| {
         let tx_set = tx.schema_set().clone();
         let run = |tx: &mut ont_store::schema_mode::SchemaWrite<'_>| -> Result<ApplyOutcome, Failure> {
-            let (tschema, tat) = find_action_type(&tx_set, &req.action_type)
-                .ok_or_else(|| Failure::from(Refusal::input("unknown_action", "/action_type", "an installed action type; use action list")))?;
+            let (tschema, tat) = resolve_action_type(&tx_set, &req.action_type, req.domain.as_deref())?;
             let (tschema, tat) = (tschema.clone(), tat.clone());
             let tprincipal = Principal::bind(&tx_set)?;
             if !tprincipal.view().action_types(&tschema.domain).contains(&req.action_type) {
                 return Err(Refusal::new("action_forbidden").into());
             }
             check_create_keys(&tschema, &tat, &req.action_type)?;
+            check_rule_targets(&tschema, &tat, &req.action_type)?;
             let tparams = validate_parameters(&tschema, &tat, &req.parameters)?;
             // Idempotent retry inside the transaction.
             if let Some(rid) = &req.request_id {
@@ -2882,15 +3062,15 @@ fn apply_found(
                     rid,
                 );
                 if let Some((_, entry)) = tx.find_action(&derived).map_err(store_err)? {
-                    if entry.action_type == req.action_type && canonical(&entry.parameters) == params_canon {
+                    if entry.action_type == req.action_type && entry.domain == tschema.domain && canonical(&entry.parameters) == params_canon {
                         return Ok(ApplyOutcome::Already { action_id: derived, edits: entry.edits.clone() });
                     }
                     return Err(Refusal::new("request_id_reused").into());
                 }
             }
-            let snap = load_snapshot(ctx, &tx_set, &tprincipal, &tat, &tparams, &req.expected, tx)?;
+            let snap = load_snapshot(ctx, &tx_set, &tschema, &tprincipal, &tat, &tparams, &req.expected, tx)?;
             let references = check_reference_inputs(&tprincipal, &snap, &tat, &tparams, ctx.now)?;
-            let (criteria, basis_map, failed) = eval_criteria(&tprincipal, &tx_set, &snap, &tat, &tparams, &actor, ctx.now)?;
+            let (criteria, basis_map, failed) = eval_criteria(&tprincipal, &tx_set, &tschema, &snap, &tat, &tparams, &actor, ctx.now)?;
             if references.stale || criteria.iter().any(|c| c["precondition"] == "rule_value_stale") {
                 return Err(Refusal::new("rule_value_stale").into());
             }
@@ -2916,7 +3096,7 @@ fn apply_found(
                 )
             });
             let action_id = allocate_action_id(ctx.now, &req.action_type, &params_canon, &basis_json, log_len, &request_action_id);
-            let mut planner = Planner { principal: &tprincipal, schema: &tschema, set: &tx_set, snap: snap.clone(), params: &tparams, action_id: action_id.clone(), now: ctx.now, basis: BTreeMap::new(), edit_index: 0, planned: Vec::new(), overlay: BTreeMap::new() };
+            let mut planner = Planner { action_name: req.action_type.clone(), principal: &tprincipal, schema: &tschema, set: &tx_set, snap: snap.clone(), params: &tparams, action_id: action_id.clone(), now: ctx.now, basis: BTreeMap::new(), edit_index: 0, planned: Vec::new(), overlay: BTreeMap::new() };
             augment_planner(&mut planner, &tat, ctx.snapshot_max_heads, tx)?;
             let edits = planner.plan(&tat)?;
             check_planned(&tx_set, &planner)?;
@@ -2939,7 +3119,7 @@ fn apply_found(
             Ok(o) => { outcome = Some(o); Ok(()) }
             Err(f) => {
                 // The record names the domain and version this transaction read.
-                if let Some((tschema, _)) = find_action_type(&tx_set, &req.action_type) {
+                if let Ok((tschema, _)) = resolve_action_type(&tx_set, &req.action_type, req.domain.as_deref()) {
                     *found = Some((tschema.domain.clone(), tx_set.pin(&tschema.domain).map(|p| p.version).unwrap_or(0)));
                 }
                 captured = Some(f);
@@ -3117,8 +3297,17 @@ mod tests {
                 access_reads: 0,
                 scans: 0,
             };
-            let snap =
-                load_snapshot(&ctx, &set, &principal, &at, &params, &None, &mut source).unwrap();
+            let snap = load_snapshot(
+                &ctx,
+                &set,
+                set.schema("work").unwrap(),
+                &principal,
+                &at,
+                &params,
+                &None,
+                &mut source,
+            )
+            .unwrap();
             assert!(snap.heads.is_empty());
             assert!(snap.unreadable_occupied.is_empty());
             assert_eq!(source.payload_reads, 0);
@@ -3193,10 +3382,28 @@ mod tests {
                 scans: 0,
                 access_reads: 0,
             };
-            let snap =
-                load_snapshot(&ctx, &set, &principal, &at, &params, &None, &mut source).unwrap();
-            let (results, basis, failed) =
-                eval_criteria(&principal, &set, &snap, &at, &params, &json!({}), 1000).unwrap();
+            let snap = load_snapshot(
+                &ctx,
+                &set,
+                set.schema("work").unwrap(),
+                &principal,
+                &at,
+                &params,
+                &None,
+                &mut source,
+            )
+            .unwrap();
+            let (results, basis, failed) = eval_criteria(
+                &principal,
+                &set,
+                set.schema("work").unwrap(),
+                &snap,
+                &at,
+                &params,
+                &json!({}),
+                1000,
+            )
+            .unwrap();
             assert_eq!(results[0]["passed"], state != "omitted", "{state}");
             assert_eq!(failed.is_empty(), state != "omitted");
             assert!(basis.is_empty());
@@ -3213,6 +3420,7 @@ mod tests {
                 let snap = load_snapshot(
                     &ctx,
                     &set,
+                    set.schema("work").unwrap(),
                     &principal,
                     &property_at,
                     &params,
@@ -3223,6 +3431,7 @@ mod tests {
                 let (results, basis, _) = eval_criteria(
                     &principal,
                     &set,
+                    set.schema("work").unwrap(),
                     &snap,
                     &property_at,
                     &params,
@@ -3275,11 +3484,13 @@ mod tests {
                 set_reference: None,
                 clear_reference: None,
                 set: BTreeMap::new(),
+                target: None,
             }],
         };
         let params = BTreeMap::new();
         let principal = Principal::bind(&set).unwrap();
         let mut planner = Planner {
+            action_name: "probe".to_string(),
             principal: &principal,
             schema: &schema,
             set: &set,
@@ -3320,6 +3531,7 @@ mod tests {
         let set = SchemaSet::new(vec![checked]).unwrap();
         let principal = Principal::bind(&set).unwrap();
         let mut planner = Planner {
+            action_name: "probe".to_string(),
             principal: &principal,
             schema: &schema,
             set: &set,
@@ -3361,6 +3573,7 @@ mod tests {
                 let key_planner = Planner {
                     schema: &schema,
                     ..Planner {
+                        action_name: planner.action_name.clone(),
                         principal: planner.principal,
                         schema: planner.schema,
                         set: planner.set,
@@ -3557,6 +3770,7 @@ mod tests {
                     .primary_key
                     .from = Some("/native_key".into());
                 let key_planner = Planner {
+                    action_name: planner.action_name.clone(),
                     schema: &schema,
                     principal: planner.principal,
                     set: planner.set,
