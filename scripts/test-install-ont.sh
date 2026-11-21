@@ -268,17 +268,84 @@ rm "$TMP/tools/install"
 # Refuse before cargo, and record that df received the mktemp build path.
 printf '#!/bin/sh\nprintf "%%s\\n" "$3" >"$ONT_DF_LOG"\nprintf "Avail\\n${ONT_TEST_AVAIL:-9}G\\n"\n' >"$TMP/tools/df"
 chmod +x "$TMP/tools/df"
-expect_refusal 'free space on the build file system is under 10 GiB' env PATH="$TMP/tools:$PATH" ONT_DF_LOG="$TMP/df-path" TMPDIR="$TMP" ONT_INSTALL_TEST=1 ONT_INSTALL_BIN_DIR="$BIN1" ONT_INSTALL_STATE_DIR="$STATE1" "$INSTALL" install "$GOOD"
-case $(cat "$TMP/df-path") in "$TMP"/tmp.*) ;; *) fail 'df did not inspect temporary build directory' ;; esac
+# The fixture root is trusted so the case holds wherever $TMP lies.
+expect_refusal 'free space on the build file system is under 10 GiB' env PATH="$TMP/tools:$PATH" ONT_DF_LOG="$TMP/df-path" TMPDIR="$TMP" ONT_INSTALL_TEST=1 ONT_INSTALL_TEST_TRUST="$TMP" ONT_INSTALL_BIN_DIR="$BIN1" ONT_INSTALL_STATE_DIR="$STATE1" "$INSTALL" install "$GOOD"
+case $(cat "$TMP/df-path") in "$STATE1"/build/install.*) ;; *) fail 'df did not inspect the new directory under the build base' ;; esac
 
 # At exactly 10 GiB, the guard passes and the disposable build reaches cargo.
 printf '#!/bin/sh\nexit 77\n' >"$TMP/tools/cargo"
 # The Cargo stub does no build; CI hosts need no real host-specific lock path.
-printf '#!/bin/sh\nshift\nexec "$@"\n' >"$TMP/tools/flock"
+# The stub grants the build base lock (flock -n <fd>) and runs the command
+# under the Cargo lock.
+printf '#!/bin/sh\n[ "$1" != -n ] || exit 0\nshift\nexec "$@"\n' >"$TMP/tools/flock"
 chmod +x "$TMP/tools/cargo" "$TMP/tools/flock"
 set +e
-env PATH="$TMP/tools:$PATH" ONT_TEST_AVAIL=10 ONT_DF_LOG="$TMP/df-path" TMPDIR="$TMP" ONT_INSTALL_TEST=1 ONT_INSTALL_BIN_DIR="$BIN1" ONT_INSTALL_STATE_DIR="$STATE1" "$INSTALL" install "$GOOD" >"$TMP/ten-gib" 2>&1
+env PATH="$TMP/tools:$PATH" ONT_TEST_AVAIL=10 ONT_DF_LOG="$TMP/df-path" TMPDIR="$TMP" ONT_INSTALL_TEST=1 ONT_INSTALL_TEST_TRUST="$TMP" ONT_INSTALL_BIN_DIR="$BIN1" ONT_INSTALL_STATE_DIR="$STATE1" "$INSTALL" install "$GOOD" >"$TMP/ten-gib" 2>&1
 code=$?
 set -e
 [ "$code" -eq 77 ] || fail "10 GiB did not reach the stand-in cargo (status $code)"
+
+# spec: specs/ont/cli.md#R14
+# The build base: every existing component of its path is checked without
+# following a link, a missing base is made 0700, one install owns it at a
+# time and removes what a killed install left. The df stub refuses before
+# Cargo; flock is the real one.
+R14=$TMP/r14
+mkdir -m 0700 "$R14" "$R14/tools"
+printf '#!/bin/sh\nprintf "Avail\\n9G\\n"\n' >"$R14/tools/df"
+chmod +x "$R14/tools/df"
+r14_install() {
+  # $1 = state directory; the fixture root is trusted.
+  env PATH="$R14/tools:$PATH" ONT_INSTALL_TEST=1 ONT_INSTALL_TEST_TRUST="$TMP" ONT_INSTALL_BIN_DIR="$R14/bin" ONT_INSTALL_STATE_DIR="$1" "$INSTALL" install "$GOOD"
+}
+expect_line() {
+  # $1 = the exact line the last refusal must hold.
+  grep -qxF -- "$1" "$TMP/refusal" || fail "missing refusal line: $1"
+}
+# A base under a directory any account can write.
+mkdir -m 0700 "$R14/open"
+chmod 0777 "$R14/open"
+expect_refusal 'build_dir_unsafe' r14_install "$R14/open/s"
+expect_line "refused: build_dir_unsafe: $R14/open"
+[ ! -e "$R14/open/s" ] || fail 'created a base under an unsafe directory'
+# A base whose path holds a symbolic link.
+mkdir -m 0700 "$R14/real"
+ln -s "$R14/real" "$R14/link"
+expect_refusal 'build_dir_unsafe' r14_install "$R14/link/s"
+expect_line "refused: build_dir_unsafe: $R14/link"
+[ ! -e "$R14/real/s" ] || fail 'created a base through a link'
+# A base that is itself a link, written with a trailing slash.
+mkdir -m 0700 "$R14/s2" "$R14/elsewhere"
+ln -s "$R14/elsewhere" "$R14/s2/build"
+expect_refusal 'build_dir_unsafe' r14_install "$R14/s2/"
+expect_line "refused: build_dir_unsafe: $R14/s2/build"
+# A created base and its missing parents are 0700.
+expect_refusal 'free space on the build file system is under 10 GiB' r14_install "$R14/new/p/s"
+for d in "$R14/new" "$R14/new/p" "$R14/new/p/s" "$R14/new/p/s/build"; do
+  [ "$(stat -c %a "$d")" = 700 ] || fail "created $d is not 0700"
+done
+[ -z "$(find "$R14/new/p/s/build" -mindepth 1 ! -name .lock)" ] || fail 'build directory was not cleaned up'
+# A second install while the lock is held.
+exec 8>>"$R14/new/p/s/build/.lock"
+flock -n 8 || fail 'could not take the build base lock'
+expect_refusal 'install_busy' r14_install "$R14/new/p/s" 8>&-
+expect_line 'refused: install_busy'
+exec 8>&-
+# Leftovers of a killed install are removed by the next one; a link is
+# removed as a link and its target is untouched.
+mkdir -m 0700 "$R14/new/p/s/build/install.left" "$R14/outside"
+printf 'x\n' >"$R14/new/p/s/build/install.left/file"
+printf 'keep\n' >"$R14/outside/file"
+ln -s "$R14/outside" "$R14/new/p/s/build/install.link"
+expect_refusal 'free space on the build file system is under 10 GiB' r14_install "$R14/new/p/s"
+[ ! -e "$R14/new/p/s/build/install.left" ] || fail 'leftover build directory was not removed'
+[ ! -L "$R14/new/p/s/build/install.link" ] || fail 'leftover link was not removed'
+[ "$(cat "$R14/outside/file")" = keep ] || fail 'removal followed a link out of the base'
+[ -f "$R14/new/p/s/build/.lock" ] || fail 'the lock file was removed'
+# The trust hook needs the test flag and must lie above the base.
+expect_refusal 'ONT_INSTALL_TEST_TRUST require ONT_INSTALL_TEST=1' env ONT_INSTALL_TEST_TRUST="$TMP" "$INSTALL" check
+expect_refusal 'ONT_INSTALL_TEST_TRUST must be a directory above the build base' env PATH="$R14/tools:$PATH" ONT_INSTALL_TEST=1 ONT_INSTALL_TEST_TRUST="$R14/elsewhere" ONT_INSTALL_BIN_DIR="$R14/bin" ONT_INSTALL_STATE_DIR="$R14/new/p/s" "$INSTALL" install "$GOOD"
+# A relative base is refused.
+expect_refusal 'build_dir_unsafe' env PATH="$R14/tools:$PATH" ONT_INSTALL_TEST=1 ONT_INSTALL_BIN_DIR="$R14/bin" ONT_INSTALL_STATE_DIR=relative-state "$INSTALL" install "$GOOD"
+expect_line 'refused: build_dir_unsafe: relative-state/build'
 printf 'test-install-ont: PASS\n'

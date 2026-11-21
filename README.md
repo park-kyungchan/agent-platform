@@ -23,7 +23,7 @@ A change of an answer's shape or of the schema language is a change of a contrac
 ## Check, install
 
 - `./check` is the one check: format, lints as errors, all tests, the test of the install script. The CI job `rust` runs the same file and is the required check of `main`.
-- `scripts/install-ont.sh install <commit>` builds and installs the command from a clean checkout of a commit on `main`; `check` compares the installed files with the record that install wrote (sha256 and commit); `rollback` restores the previous one. It installs no schema and runs no index.
+- `scripts/install-ont.sh install <commit>` builds and installs the command from a clean checkout of a commit on `main`, building in a new 0700 directory under `/var/lib/ontology-platform/build` (never under `/tmp`), and refuses when a component of that path is a link or writable by an account other than root; `check` compares the installed files with the record that install wrote (sha256 and commit); `rollback` restores the previous one. It installs no schema and runs no index.
 
 ## What else is in the tree
 
