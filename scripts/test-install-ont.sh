@@ -314,6 +314,14 @@ ln -s "$R14/real" "$R14/link"
 expect_refusal 'build_dir_unsafe' r14_install "$R14/link/s"
 expect_line "refused: build_dir_unsafe: $R14/link"
 [ ! -e "$R14/real/s" ] || fail 'created a base through a link'
+# Nothing beyond a link is read: an unsafe directory reached only through
+# the link does not change the named component.
+mkdir -m 0700 "$R14/behind"
+mkdir -m 0700 "$R14/behind/s"
+chmod 0777 "$R14/behind/s"
+ln -s "$R14/behind" "$R14/link2"
+expect_refusal 'build_dir_unsafe' r14_install "$R14/link2/s/z"
+expect_line "refused: build_dir_unsafe: $R14/link2"
 # A base that is itself a link, written with a trailing slash.
 mkdir -m 0700 "$R14/s2" "$R14/elsewhere"
 ln -s "$R14/elsewhere" "$R14/s2/build"

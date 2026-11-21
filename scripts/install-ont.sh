@@ -141,14 +141,17 @@ deepest_unsafe_component() {
   # $1 = absolute normalized path, $2 = trusted test root or empty. Prints the
   # failing existing component nearest $1, or nothing. Each component is read
   # as it stands (never through a link); the trusted root and its ancestors
-  # are not read; the walk stops at the first component that does not exist.
+  # are not read; the walk stops at the first link and at the first
+  # component that does not exist.
   local path=$1 trust=$2 rest p=/ part bad=""
   rest=${path#/}
   while :; do
     if [ -n "$trust" ] && { [ "$p" = / ] || [ "$p" = "$trust" ] || [[ $trust == "$p"/* ]]; }; then
       :
     elif [ -L "$p" ]; then
+      # A path below a link resolves through it: read nothing further.
       bad=$p
+      break
     elif [ ! -e "$p" ]; then
       break
     elif component_unsafe "$p"; then
