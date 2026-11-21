@@ -459,8 +459,10 @@ fn r4_r5_a_repository_at_origin_main_and_the_commit_of_each_file() {
     );
     assert_eq!(records(&dir.at("route/o__beta.sections.jsonl")).len(), 1);
     // A repository whose fetch fails and that had no file is kept with none.
-    let mut failing = Repo::default();
-    failing.fetch_fails = true;
+    let failing = Repo {
+        fetch_fails: true,
+        ..Repo::default()
+    };
     let mut fake = Fake::new(&dir, &[("o/gamma", failing)]);
     let (line, _) = run(&mut fake, &dir, &["--repository", "o/gamma"]);
     assert_eq!(line["kept"][0]["previous"], false);
