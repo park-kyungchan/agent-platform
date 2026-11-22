@@ -45,6 +45,14 @@ fn refused(mut v: Value) -> Answer {
     reply(false, v)
 }
 const ACTIONS: [&str; 4] = ["add_unit", "amend_unit", "ready_unit", "drop_unit"];
+/// The schema's value type `write_pattern`: `^[A-Za-z0-9._][A-Za-z0-9._/+@-]{0,296}(/\*\*)?$`.
+fn write_pattern(v: &Value) -> bool {
+    let Some(t) = v.as_str() else { return false };
+    let body = t.strip_suffix("/**").unwrap_or(t);
+    let first = |c: u8| c.is_ascii_alphanumeric() || b"._".contains(&c);
+    let rest = |c: u8| c.is_ascii_alphanumeric() || b"._/+@-".contains(&c);
+    (1..=297).contains(&body.len()) && first(body.as_bytes()[0]) && body.bytes().skip(1).all(rest)
+}
 type Key = (String, String);
 fn k(kind: &str, key: &str) -> Key {
     (kind.to_owned(), key.to_owned())
@@ -180,6 +188,8 @@ struct F {
     scratch_seen: Vec<bool>,
     /// The next `get` of a unit after an apply fails as a process.
     lose_read_back: bool,
+    /// After the next `get` of this unit, another caller changes it (its revision moves).
+    bump_after_get: Option<&'static str>,
 }
 impl F {
     fn new() -> Self {
@@ -204,6 +214,7 @@ impl F {
             alive: false,
             scratch_seen: vec![],
             lose_read_back: false,
+            bump_after_get: None,
         };
         // Invented objects: a confirmed intent with an accepted plan, and a current request of the user.
         f.put(
@@ -216,7 +227,7 @@ impl F {
             "review",
             "plan-1",
             json!({"kind": "plan", "intent": oid("intent", "widgets"), "status": "closed",
-                "verdict": "accept", "started_at": "2026-11-17T11:00:00Z", "head": "0".repeat(64)}),
+                "verdict": "accept", "started_at": "2026-11-17T23:00:00Z", "head": "0".repeat(64)}),
         );
         f.put(
             "request",
@@ -235,6 +246,20 @@ impl F {
             o[name] = v.clone();
         }
         *self.revisions.get_mut(&k(kind, key)).unwrap() += 1;
+    }
+    /// A change of a stored object by another caller; a unit that stores a digest stores the digest of its page as
+    /// the change leaves it, as an amendment through `ap` does (`specs/ap/unit.md` R42).
+    fn edit(&mut self, kind: &str, key: &str, set: Value) {
+        self.modify(kind, key, set);
+        let o = self.objects.get_mut(&k(kind, key)).unwrap();
+        if kind == "unit" && o.get("page_digest").is_some_and(|d| !d.is_null()) {
+            o["page_digest"] = json!(page_digest(key, o));
+        }
+    }
+    /// A member of a stored object removed, as a unit stored before it existed.
+    fn forget(&mut self, kind: &str, key: &str, member: &str) {
+        let o = self.objects.get_mut(&k(kind, key)).unwrap();
+        o.as_object_mut().unwrap().remove(member);
     }
     fn unit(&self, key: &str) -> &Value {
         &self.objects[&k("unit", key)]
@@ -334,13 +359,27 @@ impl F {
                     p.get("intent").is_none_or(|i| *i == u("intent")),
                     "intent_differs",
                 );
-                let plan = reviewed("plan", "intent", &u("intent"), None);
+                // Version 16: a plan review counts only when it started after the unit was added.
+                let added = u("added_at");
+                let plan = self.objects.iter().any(|((t, _), r)| {
+                    t == "review"
+                        && r["kind"] == "plan"
+                        && r["intent"] == u("intent")
+                        && r["status"] == "closed"
+                        && r["verdict"] == "accept"
+                        && r["started_at"].as_str() > added.as_str()
+                });
                 need(!objective || plan, "plan_not_reviewed");
-                // Version 12: an accepted page review whose head is `page_digest`, whenever it started.
+                // Version 16: the digest given, when the unit stores one, is the stored one; an accepted page
+                // review whose head is the stored digest, whenever it started.
+                let stored = u("page_digest");
+                let given = p.get("page_digest");
+                need(
+                    given.is_none_or(|d| stored.is_null() || *d == stored),
+                    "page_digest_differs",
+                );
                 let class = u("class");
-                let page = p
-                    .get("page_digest")
-                    .is_some_and(|d| reviewed("page", "unit", &p["unit"], Some(d)));
+                let page = !stored.is_null() && reviewed("page", "unit", &p["unit"], Some(&stored));
                 need(
                     (class != "contract" && class != "effect") || page,
                     "page_not_reviewed",
@@ -378,6 +417,15 @@ impl F {
             {
                 return refused(json!({"code": "revision_conflict", "id": e["id"]}));
             }
+        }
+        // Version 16: `amend_unit` needs `page_digest`; a pattern of `write_set` is a `write_pattern`.
+        let malformed = p["write_set"]
+            .as_array()
+            .into_iter()
+            .flatten()
+            .any(|e| !write_pattern(e));
+        if (action == "amend_unit" && p.get("page_digest").is_none()) || malformed {
+            return refused(json!({"code": "invalid_parameter", "field": "/parameters"}));
         }
         let key = p["unit"]["native_key"].as_str().unwrap().to_owned();
         let exists = self.objects.contains_key(&k("unit", &key));
@@ -446,6 +494,10 @@ impl F {
             .map(|(n, v)| (n.clone(), json!({"kind": "value", "value": v})))
             .collect();
         let head = format!("r#{}", self.revisions[&key]);
+        if self.bump_after_get.is_some_and(|b| key == k("unit", b)) {
+            self.bump_after_get = None;
+            *self.revisions.get_mut(&key).unwrap() += 1;
+        }
         ok(json!({"objects": [{"id": id, "head": head,
             "observations": [{"revision": "r#0", "fields": {}}, {"revision": head, "fields": fields}]}]}))
     }
@@ -492,7 +544,7 @@ impl F {
     fn checking(&mut self) {
         if let Some(key) = self.amend_while_checking.take() {
             let now = self.now();
-            self.modify(
+            self.edit(
                 "unit",
                 key,
                 json!({"amended_at": now, "notes": "Changed meanwhile."}),
@@ -836,8 +888,10 @@ fn r3_one_action_with_the_suffix_of_its_op_the_client_ap_and_no_role() {
             (&b["agent"], &b["session"]),
             (&json!("lead"), &json!("s-lead"))
         );
+        // `expected` only on the amendment, with the revision its read gave (R42).
+        let amend = b["action_type"] == "amend_unit";
         assert!(
-            b.get("role").is_none() && b.get("expected").is_none(),
+            b.get("role").is_none() && b.get("expected").is_some() == amend,
             "{b}"
         );
     }
@@ -1541,9 +1595,10 @@ fn r17_amend_takes_every_page_property_but_lane_intent_and_origin() {
         (&json!(false), &json!("draft"))
     );
     let p = &f.applies()[0]["parameters"];
+    let digest = page_digest("u-one", f.unit("u-one"));
     assert_eq!(
         p,
-        &json!({"unit": oid("unit", "u-one"), "notes": "Read the list."})
+        &json!({"unit": oid("unit", "u-one"), "notes": "Read the list.", "page_digest": digest})
     );
     let v = yes(
         &mut f,
@@ -1754,7 +1809,7 @@ fn r20_ready_reads_the_unit_once_and_a_unit_not_draft_runs_nothing() {
     );
     // A contract unit that is not a draft: the store's first failed criterion, `page_not_reviewed`
     // beside it when no accept names the digest; nothing runs before the apply.
-    f.modify("unit", "u-one", json!({"class": "contract"}));
+    f.edit("unit", "u-one", json!({"class": "contract"}));
     f.calls.clear();
     let e = no(
         &mut f,
@@ -1781,7 +1836,7 @@ fn r20_ready_reads_the_unit_once_and_a_unit_not_draft_runs_nothing() {
             "repository": "invented/widgets", "write_set": ["a"], "acceptance": [{"check": "x", "kind": "invariant"}]}),
     );
     yes(&mut f, &["add"], small);
-    f.modify("unit", "u-small", json!({"state": "ready"}));
+    f.edit("unit", "u-small", json!({"state": "ready"}));
     f.calls.clear();
     let _ = ready(&mut f, "u-small");
     assert!(f.applies()[0]["parameters"].get("intent").is_none());
@@ -2366,7 +2421,9 @@ fn fixture() -> (F, Repo) {
             "verifier_questions": "1. Is every widget listed once?", "report": "The pull request's number."}),
     );
     yes(&mut f, &["add"], page);
-    f.modify(
+    // The golden pages are those of a unit without clauses (R45); `## Clauses` has its own test.
+    f.forget("unit", "page-fixture", "clauses");
+    f.edit(
         "unit",
         "page-fixture",
         json!({"head": "b".repeat(40), "pull_request": 7}),
@@ -2599,7 +2656,7 @@ fn r33_the_frames_and_the_change() {
         text(&mut f, &["page", "u-doc", "--for", "reviewer"])
             .ends_with(include_str!("../src/unit/frames/reviewer.md"))
     );
-    f.modify("unit", "page-fixture", json!({"head": null}));
+    f.edit("unit", "page-fixture", json!({"head": null}));
     let e = call(
         &mut f,
         &["page", "page-fixture", "--for", "verifier"],
@@ -2628,7 +2685,7 @@ fn r34_the_digest_is_of_the_page_part_alone() {
     // Not changed by the repository, its AGENTS.md, the intent or what is not on the page.
     r.commit(&[("AGENTS.md", "Changed.\n")]);
     r.fetch();
-    f.modify("intent", "widgets", json!({"outcome": "Another outcome."}));
+    f.edit("intent", "widgets", json!({"outcome": "Another outcome."}));
     f.policy = None;
     assert_eq!(text(&mut f, &["page", "page-fixture", "--digest"]), line);
     // Changed by an amendment of the page.
@@ -3127,7 +3184,7 @@ fn r37_one_refusal_names_every_member_that_breaks_a_rule() {
 /// Stores the unit `key` of class `class` with these patterns, as a client of the store other than `ap` could.
 fn stored(f: &mut F, key: &str, class: &str, set: Value) {
     plain_unit(f, key, check("exit 1", "fails_on_base"));
-    f.modify("unit", key, json!({"class": class, "write_set": set}));
+    f.edit("unit", key, json!({"class": class, "write_set": set}));
 }
 
 // spec: specs/ap/unit.md#R38
@@ -3149,7 +3206,7 @@ fn r38_a_stored_pattern_outside_the_grammar_refuses_ready() {
             json!(["w".repeat(201), "a\tb"]),
         ),
     ] {
-        f.modify("unit", "u-one", json!({"write_set": set}));
+        f.edit("unit", "u-one", json!({"write_set": set}));
         f.calls.clear();
         let e = ready(&mut f, "u-one").unwrap_err();
         assert_eq!(
@@ -3166,18 +3223,18 @@ fn r38_a_stored_pattern_outside_the_grammar_refuses_ready() {
     }
     // At most ten shown, all counted.
     let many: Vec<String> = (0..12).map(|i| format!("m{i}/*")).collect();
-    f.modify("unit", "u-one", json!({"write_set": many}));
+    f.edit("unit", "u-one", json!({"write_set": many}));
     let e = ready(&mut f, "u-one").unwrap_err();
     assert_eq!(e.detail["patterns"], json!(many[..10]));
     assert_eq!(e.detail["count"], 12);
     // A contract unit is judged the same, before the page review it lacks.
-    f.modify("unit", "u-one", json!({"class": "contract"}));
+    f.edit("unit", "u-one", json!({"class": "contract"}));
     f.calls.clear();
     let e = ready(&mut f, "u-one").unwrap_err();
     assert_eq!(e.code, "write_set_form");
     assert_eq!(f.names(), ["get unit"]);
     // A unit that is not draft is not judged: the apply's answer is passed on.
-    f.modify(
+    f.edit(
         "unit",
         "u-one",
         json!({"state": "stopped", "class": "plain"}),
@@ -3187,7 +3244,7 @@ fn r38_a_stored_pattern_outside_the_grammar_refuses_ready() {
     assert_eq!(e.code, "unit_not_draft");
     assert_eq!(f.names(), ["get unit", "apply ready_unit"]);
     // A page of the grammar, an entry that is no string aside, goes on to its checks.
-    f.modify(
+    f.edit(
         "unit",
         "u-one",
         json!({"state": "draft", "write_set": [1, "src/a.rs", "d/**"]}),
@@ -3284,7 +3341,7 @@ fn r39_a_plain_unit_whose_pattern_can_only_match_protected_paths_is_refused() {
         );
         assert_eq!(f.names(), ["get unit"], "one read, nothing applied");
     }
-    f.modify(
+    f.edit(
         "unit",
         "u-am",
         json!({"class": "plain", "write_set": ["src/a.rs"]}),
@@ -3302,7 +3359,7 @@ fn r39_a_plain_unit_whose_pattern_can_only_match_protected_paths_is_refused() {
     assert_eq!(e.detail["patterns"], json!(["specs/x.md"]));
     assert_eq!(f.names(), ["get unit"]);
     // Neither member: not judged, whatever the stored page holds.
-    f.modify("unit", "u-am", json!({"write_set": ["ci/**"]}));
+    f.edit("unit", "u-am", json!({"write_set": ["ci/**"]}));
     yes(
         &mut f,
         &["amend"],
@@ -3312,21 +3369,21 @@ fn r39_a_plain_unit_whose_pattern_can_only_match_protected_paths_is_refused() {
         ),
     );
     // A stored text of neither form is not judged by `amend` (R38 refuses it at `ready`).
-    f.modify("unit", "u-am", json!({"write_set": ["a/*", "ci/**"]}));
+    f.edit("unit", "u-am", json!({"write_set": ["a/*", "ci/**"]}));
     let e = no(
         &mut f,
         &["amend"],
         with(writer("m5"), json!({"unit": "u-am", "class": "plain"})),
     );
     assert_eq!(e.detail["patterns"], json!(["ci/**"]));
-    f.modify("unit", "u-am", json!({"write_set": ["a/*"]}));
+    f.edit("unit", "u-am", json!({"write_set": ["a/*"]}));
     yes(
         &mut f,
         &["amend"],
         with(writer("m6"), json!({"unit": "u-am", "class": "plain"})),
     );
     // A request that moves the unit to contract passes with the same patterns.
-    f.modify("unit", "u-am", json!({"write_set": ["ci/**"]}));
+    f.edit("unit", "u-am", json!({"write_set": ["ci/**"]}));
     yes(
         &mut f,
         &["amend"],
@@ -3455,7 +3512,7 @@ fn r32_a_map_entry_meets_a_pattern_of_the_grammar() {
         (json!(["src/other/x.rs", "src/list/mod.rs"]), 2),
         (json!(["docs"]), 1),
     ] {
-        f.modify("unit", "page-fixture", json!({"write_set": set}));
+        f.edit("unit", "page-fixture", json!({"write_set": set}));
         let got = part(&mut f);
         assert_eq!(lines(&got), found, "{set}\n{got}");
         if found == 0 {
@@ -3465,4 +3522,319 @@ fn r32_a_map_entry_meets_a_pattern_of_the_grammar() {
             );
         }
     }
+}
+
+// spec: specs/ap/unit.md#R41
+#[test]
+fn r41_the_wave_is_given_to_the_action_and_is_no_part_of_the_page() {
+    let mut f = F::new();
+    yes(&mut f, &["add"], with(added("u-one"), json!({"wave": 3})));
+    assert_eq!(f.applies()[0]["parameters"]["wave"], 3);
+    assert_eq!(f.unit("u-one")["wave"], 3);
+    for bad in [
+        json!(0),
+        json!(100),
+        json!("3"),
+        json!(-1),
+        json!(2.5),
+        Value::Null,
+    ] {
+        f.calls.clear();
+        let e = no(&mut f, &["add"], with(added("u-two"), json!({"wave": bad})));
+        assert_eq!(
+            (e.code.as_str(), e.field.as_str()),
+            ("invalid_input", "wave"),
+            "{bad}"
+        );
+        assert_eq!(
+            e.fields.unwrap(),
+            json!([{"field": "wave", "rule": "form", "bytes": null, "limit": null}])
+        );
+        assert!(f.calls.is_empty());
+    }
+    yes(&mut f, &["add"], with(added("u-top"), json!({"wave": 99})));
+    // An amendment of the wave alone keeps the digest, and so an accept.
+    f.edit("unit", "u-one", json!({"class": "contract"}));
+    let digest = page_digest("u-one", f.unit("u-one"));
+    f.page_review("p1", "u-one", &digest, true, "accept");
+    let v = yes(
+        &mut f,
+        &["amend"],
+        with(writer("w1"), json!({"unit": "u-one", "wave": 4})),
+    );
+    assert_eq!(v["page_review_outdated"], false);
+    assert_eq!(f.unit("u-one")["wave"], 4);
+    assert_eq!(page_digest("u-one", f.unit("u-one")), digest);
+    assert_eq!(f.unit("u-one")["page_digest"], json!(digest));
+    let e = no(
+        &mut f,
+        &["amend"],
+        with(writer("w2"), json!({"unit": "u-one", "wave": 100})),
+    );
+    assert_eq!(e.field, "wave");
+}
+
+// spec: specs/ap/unit.md#R42
+#[test]
+fn r42_add_and_amend_store_the_digest_of_the_page_they_leave() {
+    let mut f = F::new();
+    yes(&mut f, &["add"], added("u-one"));
+    let digest = page_digest("u-one", f.unit("u-one"));
+    assert_eq!(f.applies()[0]["parameters"]["page_digest"], json!(digest));
+    assert_eq!(f.unit("u-one")["page_digest"], json!(digest));
+    // An amendment of one member: the digest of the unit as read with that member in its place, and `expected`
+    // with the revision of that read.
+    let read = format!("r#{}", f.revisions[&k("unit", "u-one")]);
+    f.calls.clear();
+    yes(
+        &mut f,
+        &["amend"],
+        with(
+            writer("m1"),
+            json!({"unit": "u-one", "objective": "Every widget, twice."}),
+        ),
+    );
+    assert_eq!(f.names(), ["get unit", "apply amend_unit", "get unit"]);
+    let body = f.applies()[0].clone();
+    let after = page_digest("u-one", f.unit("u-one"));
+    assert_ne!(after, digest);
+    assert_eq!(body["parameters"]["page_digest"], json!(after));
+    assert_eq!(
+        body["expected"],
+        json!([{"id": oid("unit", "u-one"), "revision": read}])
+    );
+    // A unit changed between the read and the apply ends revision_conflict, nothing applied.
+    f.bump_after_get = Some("u-one");
+    let e = no(
+        &mut f,
+        &["amend"],
+        with(writer("m2"), json!({"unit": "u-one", "notes": "Late."})),
+    );
+    assert_eq!(
+        (e.code.as_str(), e.field.as_str(), &e.after),
+        ("revision_conflict", "amend", &None)
+    );
+    assert!(f.unit("u-one").get("notes").is_none());
+}
+
+// spec: specs/ap/unit.md#R43
+#[test]
+fn r43_the_clauses_the_specs_name_in_the_unit_s_repository() {
+    let r = Repo::new(&[("AGENTS.md", "# Widgets\n")]);
+    let mut f = F::new();
+    f.policy = Some(r.policy.clone());
+    let specs = json!([
+        "specs/list.md#R2",
+        "docs/x.md#R1",
+        "specs/list.md",
+        "specs/a.md#R10",
+        "specs/list.md#R2"
+    ]);
+    let clause = |k: &str| oid("clause", &format!("invented/widgets:{k}"));
+    yes(
+        &mut f,
+        &["add"],
+        with(
+            added("u-one"),
+            json!({"repository": "invented/widgets", "specs": specs}),
+        ),
+    );
+    assert_eq!(
+        f.applies()[0]["parameters"]["clauses"],
+        json!([clause("specs/list.md#R2"), clause("specs/a.md#R10")])
+    );
+    // No repository, or no entry of the form: no clauses.
+    f.calls.clear();
+    yes(
+        &mut f,
+        &["add"],
+        with(added("u-bare"), json!({"specs": ["specs/list.md#R2"]})),
+    );
+    yes(
+        &mut f,
+        &["add"],
+        with(
+            added("u-none"),
+            json!({"repository": "invented/widgets", "specs": ["specs/list.md"]}),
+        ),
+    );
+    assert!(
+        f.applies()
+            .iter()
+            .all(|b| b["parameters"].get("clauses").is_none())
+    );
+    // An amendment with specs replaces them; with the repository alone they are derived from the stored specs;
+    // without either none are given; emptied when none is left.
+    f.calls.clear();
+    yes(
+        &mut f,
+        &["amend"],
+        with(
+            writer("m1"),
+            json!({"unit": "u-one", "specs": ["specs/b.md#R1"]}),
+        ),
+    );
+    yes(
+        &mut f,
+        &["amend"],
+        with(
+            writer("m2"),
+            json!({"unit": "u-bare", "repository": "invented/gadgets"}),
+        ),
+    );
+    yes(
+        &mut f,
+        &["amend"],
+        with(writer("m3"), json!({"unit": "u-one", "notes": "n"})),
+    );
+    yes(
+        &mut f,
+        &["amend"],
+        with(
+            writer("m4"),
+            json!({"unit": "u-one", "specs": ["specs/b.md"]}),
+        ),
+    );
+    let given: Vec<Value> = f
+        .applies()
+        .iter()
+        .map(|b| {
+            b["parameters"]
+                .get("clauses")
+                .cloned()
+                .unwrap_or(Value::Null)
+        })
+        .collect();
+    assert_eq!(
+        given,
+        [
+            json!([clause("specs/b.md#R1")]),
+            json!([oid("clause", "invented/gadgets:specs/list.md#R2")]),
+            Value::Null,
+            json!([])
+        ]
+    );
+    assert_eq!(f.unit("u-one")["clauses"], json!([]));
+    // R8's bound is judged once more after the read: a request within it whose clauses from the stored specs
+    // pass it is refused, nothing applied.
+    let long: Vec<String> = (0..20)
+        .map(|i| format!("specs/{}{i:02}.md#R1", "a".repeat(280)))
+        .collect();
+    yes(
+        &mut f,
+        &["add"],
+        with(added("u-big"), json!({"specs": long})),
+    );
+    let text = |n: usize| "t".repeat(n);
+    let req = json!({"unit": "u-big", "repository": "invented/widgets", "interface": text(20_000),
+        "verifier_questions": text(4000), "notes": text(3000), "invariants": text(3000), "objective": text(2000),
+        "not_built": text(1500), "report": text(1000),
+        "acceptance": (0..20).map(|_| json!({"check": text(600), "kind": "invariant"})).collect::<Vec<_>>(),
+        "read_first": (0..25).map(|i| format!("{}{i:02}", "r".repeat(298))).collect::<Vec<_>>()});
+    f.calls.clear();
+    let e = no(&mut f, &["amend"], with(writer("big"), req.clone()));
+    assert_eq!(
+        (e.code.as_str(), e.field.as_str(), &e.after),
+        ("page_too_large", "page", &None)
+    );
+    assert_eq!(f.names(), ["get unit"]);
+    // The same request without the repository is within the bound: the first judgement let it pass.
+    let mut small = req;
+    small.as_object_mut().unwrap().remove("repository");
+    yes(&mut f, &["amend"], with(writer("big2"), small));
+}
+
+// spec: specs/ap/unit.md#R44
+#[test]
+fn r44_a_stored_digest_that_is_not_the_page_s_refuses_ready_first() {
+    let mut f = F::new();
+    plain_unit(&mut f, "u-one", check("exit 1", "fails_on_base"));
+    f.edit("unit", "u-one", json!({"class": "contract"}));
+    let digest = page_digest("u-one", f.unit("u-one"));
+    f.page_review("p1", "u-one", &digest, true, "accept");
+    // A stored digest another caller left: refused before any review is read, any fetch or check.
+    f.modify("unit", "u-one", json!({"page_digest": "f".repeat(64)}));
+    f.calls.clear();
+    let e = ready(&mut f, "u-one").unwrap_err();
+    assert_eq!(
+        (e.code.as_str(), e.field.as_str(), &e.after),
+        ("page_digest_differs", "unit", &None)
+    );
+    assert_eq!(
+        e.detail,
+        json!({"digest": digest, "stored": "f".repeat(64)})
+    );
+    assert!(e.fields.is_none());
+    assert_eq!(f.names(), ["get unit"]);
+    // A unit without a stored digest goes on as before: its review is read; the store refuses it.
+    f.forget("unit", "u-one", "page_digest");
+    f.calls.clear();
+    let e = ready(&mut f, "u-one").unwrap_err();
+    assert_eq!(e.code, "page_not_reviewed");
+    assert_eq!(&f.names()[..2], ["get unit", "render"]);
+    // The stored digest the page's: ready.
+    f.modify("unit", "u-one", json!({"page_digest": digest}));
+    let v: Value = serde_json::from_str(&ready(&mut f, "u-one").unwrap()).unwrap();
+    assert_eq!(v["state"], "ready");
+    assert_eq!(
+        f.applies().last().unwrap()["parameters"]["page_digest"],
+        json!(digest)
+    );
+}
+
+// spec: specs/ap/unit.md#R45
+#[test]
+fn r45_the_clauses_after_the_section_for() {
+    let (mut f, _r) = fixture();
+    let plain = text(&mut f, &["page", "page-fixture"]);
+    let digest = page_digest("page-fixture", f.unit("page-fixture"));
+    assert!(!plain.contains("## Clauses"));
+    let keys = [
+        "invented/widgets:specs/list.md#R2",
+        "invented/widgets:specs/list.md#R1",
+    ];
+    f.modify(
+        "unit",
+        "page-fixture",
+        json!({"clauses": keys.iter().map(|k| oid("clause", k)).collect::<Vec<_>>(), "wave": 7}),
+    );
+    let line = "Sentences of the specifications this page names; one with its tests and the units that name it: `echo '{\"parameters\":{\"key\":\"<key>\"}}' | ap fn clause` (through the stage's door).";
+    let section = format!("\n## Clauses\n\n{line}\n\n- {}\n- {}\n", keys[0], keys[1]);
+    for role in [
+        None,
+        Some("implementer"),
+        Some("verifier"),
+        Some("reviewer"),
+    ] {
+        let mut words = vec!["page", "page-fixture"];
+        if let Some(r) = role {
+            words.extend(["--for", r]);
+        }
+        let with = text(&mut f, &words);
+        let at = with
+            .find("\n## Clauses\n")
+            .unwrap_or_else(|| panic!("{role:?}"));
+        // Directly after `## For`, then the repository part.
+        let before = &with[..at];
+        assert!(
+            before
+                .rfind("\n## ")
+                .is_some_and(|h| before[h..].starts_with("\n## For\n")),
+            "{role:?}"
+        );
+        assert!(
+            with[at..].starts_with(&format!("{section}\n## The repository at ")),
+            "{role:?}"
+        );
+        // Without the section, the text is the text without clauses.
+        if role.is_none() {
+            assert_eq!(with.replacen(&section, "", 1), plain);
+        }
+    }
+    // Neither the clauses nor the wave enter the digest.
+    assert_eq!(page_digest("page-fixture", f.unit("page-fixture")), digest);
+    assert_eq!(
+        text(&mut f, &["page", "page-fixture", "--digest"]),
+        format!("{digest}\n")
+    );
 }

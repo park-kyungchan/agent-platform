@@ -12,18 +12,18 @@ mode=${1:-all}
 [ "$mode" = all ] || [ "$mode" = content ] || { echo "usage: ./check [content]" >&2; exit 2; }
 
 python3 -I -B ci/check-content.py
-python3 -I -B -m unittest discover -s ci -p 'test_check_content.py'
 bash scripts/test-install-content.sh
 bash scripts/test-backup-store.sh
-python3 -I -B -m unittest discover -s ci -p 'test_readout*.py'
-python3 -I -B -m unittest discover -s ci -p 'test_evaluate_case.py'
-python3 -I -B -m unittest discover -s ci -p 'test_lead_suite.py'
-python3 -I -B -m unittest discover -s ci -p 'test_routing_suite.py'
 python3 -I -B -m unittest discover -s github -p 'test_*.py'
 python3 -I -B ci/check-map.py crates/ ci/ content/ deploy/ evals/ github/ ontology/ scripts/ specs/ .github/ check rust-toolchain.toml Cargo.toml Cargo.lock
-python3 -I -B -m unittest discover -s ci -p 'test_check_map.py'
 python3 -I -B ci/check-spec-trace.py
-python3 -I -B -m unittest discover -s ci -p 'test_check_spec_trace.py'
+# Every ci/test_*.py in sorted order, but those that build their stores with the engine: each of these has a step
+# of its own after the build.
+after_build="test_lesson_replay.py test_intake_suite.py"
+for test in $(cd ci && printf '%s\n' test_*.py | LC_ALL=C sort); do
+  case " $after_build " in *" $test "*) continue ;; esac
+  python3 -I -B -m unittest discover -s ci -p "$test"
+done
 if [ "$mode" = content ]; then echo "check: ok (content)"; exit 0; fi
 
 if [ "${CI:-}" != true ] && [ -z "${CHECK_LOCKED:-}" ]; then
@@ -75,17 +75,21 @@ if [ "${CI:-}" = true ] && [ "$(id -u)" != 0 ]; then
 else
   bash ontology/rehearsal.sh "$ont_bin" > /dev/null
 fi
-# The tests of `ap route` that run the real engine (crates/ap/tests/route_engine.rs, ignored by the cargo test
-# above): the test binary is built once and run with --ignored and the engine of $ont_bin; in CI through sudo
-# (the engine admits only uid 0; a bare `sudo cargo test` can lose rustup's toolchain). Each test copies the
-# built ap to a file of mode 0755 of its own temporary directory, owned by the user it runs as.
-route_tests=$(cargo test --locked -p ap --test route_engine --no-run --message-format=json \
-  | python3 -I -B -c 'import json, sys; print(next(m["executable"] for m in map(json.loads, sys.stdin) if m.get("reason") == "compiler-artifact" and m.get("executable") and m["target"]["name"] == "route_engine"))')
-if [ "${CI:-}" = true ] && [ "$(id -u)" != 0 ]; then
-  sudo env "PATH=$PATH" "ONT_BIN=$ont_bin" "$route_tests" --ignored --test-threads=1 --quiet
-else
-  ONT_BIN="$ont_bin" "$route_tests" --ignored --test-threads=1 --quiet
-fi
+# The tests of `ap route` and `ap clause` that run the real engine (crates/ap/tests/route_engine.rs and the ignored
+# tests of crates/ap/tests/clause.rs, ignored by the cargo test above): each test binary is built once and run with
+# --ignored and the engine of $ont_bin; in CI through sudo (the engine admits only uid 0; a bare `sudo cargo test`
+# can lose rustup's toolchain). Each test copies the built ap to a file of mode 0755 of its own temporary
+# directory, owned by the user it runs as.
+engine_tests=$(cargo test --locked -p ap --test route_engine --test clause --no-run --message-format=json \
+  | python3 -I -B -c 'import json, sys; print("\n".join(m["executable"] for m in map(json.loads, sys.stdin) if m.get("reason") == "compiler-artifact" and m.get("executable") and m["target"]["name"] in ("route_engine", "clause")))')
+[ "$(printf '%s\n' "$engine_tests" | grep -c .)" = 2 ] || { echo "engine_tests_missing@check" >&2; exit 1; }
+for route_tests in $engine_tests; do
+  if [ "${CI:-}" = true ] && [ "$(id -u)" != 0 ]; then
+    sudo env "PATH=$PATH" "ONT_BIN=$ont_bin" "$route_tests" --ignored --test-threads=1 --quiet
+  else
+    ONT_BIN="$ont_bin" "$route_tests" --ignored --test-threads=1 --quiet
+  fi
+done
 # The tests of evals/lesson/replay and of evals/intake/run build their stores with that engine (which also admits only uid 0).
 if [ "${CI:-}" = true ] && [ "$(id -u)" != 0 ]; then
   sudo env "ONT_BIN=$ont_bin" python3 -I -B -m unittest discover -s ci -p 'test_lesson_replay.py'

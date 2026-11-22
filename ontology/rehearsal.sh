@@ -943,7 +943,7 @@ apply('triage_decision', 'v9-after-carry', dict(decision=third, triage='none', r
 unchanged = fingerprint()
 assert migrate(9, 10) == dict(carried=0, already=3)
 assert fingerprint() == unchanged and fields(third_request)['route_reason'] == 'carried from version 9'
-for before, after in [(9, 16), (10, 10), (10, 9)]:
+for before, after in [(9, 17), (10, 10), (10, 9)]:
     assert migrate(before, after, 2) == dict(status='unknown_pair')
 assert fingerprint() == unchanged
 assert migrate(9, 10) == dict(carried=0, already=3)
@@ -1754,14 +1754,18 @@ print('gate_row=v14-records-retracted expected=admitted')
 print('v14_gate_rows_complete')
 print('v14 routes: ok')
 
-# Version 15: the repository's file over the objects made under version 14. Every member of version 14 reads the same
-# in canonical JSON; only the function horizon is added.
+# Version 15, pinned in Git by the commit of main that holds it, over the objects made under version 14. Every member
+# of version 14 reads the same in canonical JSON; only the function horizon is added.
 v14_schema = schema
 v14_objects = [o['id'] for t in ('task', 'decision', 'request', 'intent', 'criterion', 'unit', 'review', 'run', 'finding', 'hold', 'principle', 'section', 'component')
                for o in call(['search'], dict(object_type=t, limit=1000))['objects']]
 v14_before = [obj(i) for i in v14_objects]
 v14_views = [(view, args, call(['render'], dict(view=view, args=args))) for view, args, _ in v13_views]
-schema = json.loads(pathlib.Path(repo, 'ontology/work.schema.json').read_text())
+V15_PIN = ('8663375dde9d0557fbde136730766ef1f1d02210', '4fc42799c7cbd47c9e53bd2c3b1e6e2389d915e8aa79f2b501034f3793a1574a')
+v15_bytes = subprocess.check_output(['git', '-C', repo, 'show', V15_PIN[0] + ':ontology/work.schema.json'], timeout=10)
+assert hashlib.sha256(v15_bytes).hexdigest() == V15_PIN[1]
+v15_path = pathlib.Path(store).with_name('pinned-' + V15_PIN[0] + '.json'); v15_path.write_bytes(v15_bytes)
+schema = json.loads(v15_bytes)
 assert schema['version'] == 15
 head = json.loads(json.dumps(schema))
 horizon_fn = head['functions'].pop('horizon')
@@ -1769,7 +1773,7 @@ assert {k: v for k, v in head.items() if k != 'version'} == {k: v for k, v in v1
 assert horizon_fn['program'] == '/usr/local/bin/ap' and horizon_fn['timeout_ms'] == 30000 and horizon_fn['answer_bytes'] == 65536
 assert {n: (p['type'], p['required']) for n, p in horizon_fn['parameters'].items()} == dict(intent=('string', True))
 print('gate_row=v15-only-horizon-added expected=admitted functions=' + str(len(schema['functions'])))
-call(['schema', 'install', str(routed_copy(pathlib.Path(repo, 'ontology/work.schema.json'), 'repository.json', 'repository-route.json'))])
+call(['schema', 'install', str(routed_copy(v15_path, 'pinned-v15.json', 'pinned-v15-route.json'))])
 redirect.trace(work, copies)
 assert [obj(i) for i in v14_objects] == v14_before
 for view, args, before in v14_views:
@@ -1782,8 +1786,178 @@ assert listed['domain'] == 'work' and 'program' not in listed and [p['name'] for
 assert sorted(f['name'] for f in described['functions'] if f['domain'] == 'work') == ['horizon', 'route']
 unchanged = fingerprint()
 assert migrate(14, 15) == dict(carried=0, already=0)
-assert migrate(15, 16, 2) == dict(status='unknown_pair')
 assert fingerprint() == unchanged and [obj(i) for i in v14_objects] == v14_before
 print('v15_migration_rows_complete')
 print('v15 horizon: ok')
+# Version 16: the repository's file over the objects made under version 15. Before it, under version 15: two units of
+# class contract with an accepted page review, and a draft and a running unit whose write_set holds the old form a/*.
+phase = 'v15'
+a16, b16, e_draft, e_running = unit('fixture-v16-a'), unit('fixture-v16-b'), unit('fixture-v16-e-draft'), unit('fixture-v16-e-running')
+tick(); apply('add_unit', 'v16-a', dict(op, unit=a16, **{'class': 'contract'})); apply('add_unit', 'v16-b', dict(op, unit=b16, **{'class': 'contract'}))
+review('page-v16-a', 'page', digest('v16 page a'), unit=a16); review('page-v16-b', 'page', digest('v16 page b'), unit=b16)
+apply('add_unit', 'v16-e-draft', dict(op, unit=e_draft, write_set=['a/*'])); apply('add_unit', 'v16-e-running', dict(op, unit=e_running, write_set=['a/*']))
+apply('ready_unit', 'v16-e-running', dict(unit=e_running, intent=gadget)); apply('start_unit', 'v16-e-running', dict(unit=e_running, intent=gadget))
+assert fields(e_running)['state'] == 'running' and fields(e_draft)['write_set'] == fields(e_running)['write_set'] == ['a/*']
+v15_schema = schema
+v15_objects = [o['id'] for t in ('task', 'decision', 'request', 'intent', 'criterion', 'unit', 'review', 'run', 'finding', 'hold', 'principle', 'section', 'component')
+               for o in call(['search'], dict(object_type=t, limit=1000))['objects']]
+v15_before = [obj(i) for i in v15_objects]
+v15_views = [(view, args, call(['render'], dict(view=view, args=args))) for view, args, _ in v13_views]
+schema = json.loads(pathlib.Path(repo, 'ontology/work.schema.json').read_text())
+assert schema['version'] == 16
+# The schema differs from version 15 only by points 1 to 6 of ontology/README.md, "Version 16": each is taken off a copy,
+# and what is left reads as version 15.
+head, old = json.loads(json.dumps(schema)), json.loads(json.dumps(v15_schema))
+clause_type, clauses_source = head['object_types'].pop('clause'), head['sources'].pop('clauses')
+assert clause_type['owner'] == {'source': 'clauses'} and clause_type['primary_key'] == {'from': '/key'} and 'title' not in clause_type
+assert {n: (p['type'], p['required'], p['from']) for n, p in clause_type['properties'].items()} == dict(
+    repository=('string', True, '/repository'), path=('string', True, '/path'), rule=('string', True, '/rule'), commit=('string', True, '/commit'),
+    line=('integer', True, '/line'), tests_total=('integer', True, '/tests_total'), digest=({'value_type': 'sha256_hex'}, True, '/digest'),
+    text=('string', True, '/text'), tests=({'array': 'string'}, True, '/tests'))
+assert clause_type['properties']['text']['max_bytes'] == 4000
+assert clauses_source == dict(kind='records', glob='/var/lib/agent-platform/clause/*.clauses.jsonl', time_member='observed_at', type_member='type', complete_listing=True, fresh_for_s=3600)
+[grant], [grant15] = head['grants'], old['grants']
+assert grant['read'] == grant15['read'] + ['clause']; grant['read'] = grant15['read']
+clause_fn = head['functions'].pop('clause')
+assert clause_fn['program'] == '/usr/local/bin/ap' and clause_fn['timeout_ms'] == 10000 and clause_fn['answer_bytes'] == 65536
+assert {n: (p['type'], p['required']) for n, p in clause_fn['parameters'].items()} == dict(key=('string', True))
+NEW_FORM, OLD_FORM = {'array': {'value_type': 'write_pattern'}}, {'array': 'string'}
+unit_properties = head['object_types']['unit']['properties']
+for name, kind in (('clauses', {'array': {'ref': 'clause'}}), ('wave', 'integer'), ('page_digest', {'value_type': 'sha256_hex'})):
+    p = unit_properties.pop(name); assert p['type'] == kind and p['required'] is False, name
+assert unit_properties['write_set']['type'] == NEW_FORM and old['object_types']['unit']['properties']['write_set']['type'] == OLD_FORM
+unit_properties['write_set']['type'] = OLD_FORM
+assert head['link_types'].pop('unit_clauses') == {'from': 'unit', 'via': 'clauses', 'to': 'clause', 'cardinality': 'many_to_many', 'names': {'forward': 'unit_clauses', 'reverse': 'clause_units'}}
+for action, made, required in (('add_unit', 'create_object', False), ('amend_unit', 'modify_object', True)):
+    a = head['action_types'][action]
+    for name, kind in (('clauses', {'array': {'ref': 'clause'}}), ('wave', 'integer'), ('page_digest', {'value_type': 'sha256_hex'})):
+        p = a['parameters'].pop(name); assert p['type'] == kind and p['required'] is (required and name == 'page_digest'), (action, name)
+        assert a['rules'][0][made] == 'unit' and a['rules'][0]['set'].pop(name) == '$' + name, (action, name)
+    assert a['parameters']['write_set']['type'] == NEW_FORM; a['parameters']['write_set']['type'] = OLD_FORM
+ready, ready15 = head['action_types']['ready_unit'], old['action_types']['ready_unit']
+codes = [c['code'] for c in ready['submission_criteria']]
+assert codes == [c['code'] for c in ready15['submission_criteria']][:-1] + ['page_digest_differs', 'page_not_reviewed'], codes
+assert ready['parameters']['page_digest']['type'] == ready15['parameters']['page_digest']['type'] and ready['parameters']['page_digest']['required'] is False
+plan, differs, page_check = ready['submission_criteria'][-3:]
+assert '{"gt": ["started_at", "$unit.added_at"]}' in json.dumps(plan) and '"$unit.page_digest"' in json.dumps(page_check) and '$page_digest"' not in json.dumps(page_check).replace('$unit.page_digest', '')
+assert json.dumps(differs['none']) == json.dumps([{'all': [{'present': '$page_digest'}, {'exists': '$unit'}, {'present': '$unit.page_digest'}, {'ne': ['$page_digest', '$unit.page_digest']}]}])
+assert [c for c in ready['submission_criteria'] if c['code'] not in ('plan_not_reviewed', 'page_digest_differs', 'page_not_reviewed')] == ready15['submission_criteria'][:-2]
+head['action_types']['ready_unit'] = ready15
+EDU = ['/home/palantirkc/work/edu-*', '/home/palantirkc/work/*/edu-*', '/home/palantirkc/work/*/*/edu-*']
+for name in ('task_states', 'packets', 'reports'):
+    assert head['sources'][name]['exclude'] == old['sources'][name]['exclude'] + EDU, name
+    head['sources'][name]['exclude'] = old['sources'][name]['exclude']
+assert {k: v for k, v in head.items() if k != 'version'} == {k: v for k, v in old.items() if k != 'version'}
+print('gate_row=v16-only-points-1-to-6 expected=admitted object_types=' + str(len(schema['object_types'])) + ' functions=' + str(len(schema['functions'])))
+# The record source of the clauses reads a directory of the rehearsal's own root instead of the host's clause directory.
+clause_dir = pathlib.Path(store).parent / 'clause'
+HOST_CLAUSE = '/var/lib/agent-platform/clause/'
+def clause_copy(path, label, name):
+    out = routed_copy(path, label, name)
+    copy = json.loads(out.read_text())
+    assert copy['sources']['clauses']['glob'] == HOST_CLAUSE + '*.clauses.jsonl'
+    copy['sources']['clauses']['glob'] = str(clause_dir) + '/*.clauses.jsonl'
+    assert HOST_CLAUSE not in json.dumps(copy['sources'])
+    out.write_text(json.dumps(copy))
+    return out
+call(['schema', 'install', str(clause_copy(pathlib.Path(repo, 'ontology/work.schema.json'), 'repository.json', 'repository-route.json'))])
+redirect.trace(work, copies)
+assert [obj(i) for i in v15_objects] == v15_before
+for view, args, before in v15_views:
+    answer = call(['render'], dict(view=view, args=args))
+    assert answer['rows'] == before['rows'] and answer['markdown'] == before['markdown'].replace('schema=work@15', 'schema=work@16'), view
+print('gate_row=v16-v15-objects-and-views-unchanged expected=admitted objects=' + str(len(v15_objects)) + ' views=' + str(len(v15_views)))
+sizes = []
+for name in ('ont_describe', 'ont_action_list'):
+    wire = subprocess.run([binary, '--store', store, 'mcp'], input=json.dumps(dict(jsonrpc='2.0', id=1, method='tools/call', params=dict(name=name, arguments={}))) + '\n', text=True, capture_output=True, timeout=60)
+    answer = json.loads(wire.stdout.splitlines()[0])['result']; assert wire.returncode == 0 and not answer['isError'], answer
+    sizes.append(len(answer['content'][0]['text'].encode())); assert sizes[-1] <= 262144, (name, sizes[-1])
+print('v16_mcp_bytes=' + ','.join(map(str, sizes)), file=sys.stderr)
+described = call(['describe'], {})
+[listed] = [f for f in described['functions'] if f['name'] == 'clause']
+assert listed['domain'] == 'work' and 'program' not in listed and [p['name'] for p in listed['parameters']] == ['key']
+assert sorted(f['name'] for f in described['functions'] if f['domain'] == 'work') == ['clause', 'horizon', 'route']
+unchanged = fingerprint()
+assert migrate(15, 16) == dict(carried=0, already=0)
+assert migrate(16, 17, 2) == dict(status='unknown_pair')
+assert fingerprint() == unchanged and [obj(i) for i in v15_objects] == v15_before
+print('v16_migration_rows_complete')
+phase = 'v16'
+# The walk of version 16. Each refusal row is before the action it guards; a refusal writes nothing.
+c16 = unit('fixture-v16-c'); apply('add_unit', 'c-plain', dict(op, unit=c16)); assert fields(c16).get('page_digest') is None
+# A plan review counts for a unit only when it started after the unit was added: one for the units above.
+review('plan-v16', 'plan', digest('the plan, version 16'), intent=gadget)
+# (a) A contract unit of version 15 with an accepted page review stores no digest: it is made ready after an amendment.
+apply('ready_unit', 'a-reviewed-digest', dict(unit=a16, intent=gadget, page_digest=digest('v16 page a')), 'page_not_reviewed')
+apply('amend_unit', 'a-no-digest', dict(unit=a16, estimate_lines=40), 'invalid_parameter')
+tick(); apply('amend_unit', 'a-estimate', dict(unit=a16, estimate_lines=40, page_digest=digest('v16 page a')))
+f = fields(a16); assert f['page_digest'] == digest('v16 page a') and f['estimate_lines'] == 40 and f['state'] == 'draft' and f.get('wave') is None and f.get('clauses') is None, f
+apply('ready_unit', 'a-other-digest', dict(unit=a16, intent=gadget, page_digest=digest('another page')), 'page_digest_differs')
+apply('ready_unit', 'a', dict(unit=a16, intent=gadget, page_digest=digest('v16 page a'))); assert fields(a16)['state'] == 'ready'
+# (b) An amendment of the objective stores a new digest: the review of the old one no longer counts.
+tick(); apply('amend_unit', 'b-objective', dict(unit=b16, objective='The invented widget board lists every widget twice.', page_digest=digest('v16 page b2')))
+apply('ready_unit', 'b-old-digest', dict(unit=b16, intent=gadget, page_digest=digest('v16 page b')), ('page_digest_differs', 'page_not_reviewed'))
+apply('ready_unit', 'b-new-digest', dict(unit=b16, intent=gadget, page_digest=digest('v16 page b2')), 'page_not_reviewed')
+# (c) A plain unit needs no digest.
+apply('ready_unit', 'c-plain', dict(unit=c16, intent=gadget)); assert fields(c16)['state'] == 'ready'
+# (d) A unit added after the intent's only accepted plan review waits for a later one; a unit added before it does not.
+tick(); plans_origin = request('v16-plans-origin', 'order', topic='v16-plans'); plans = oid('intent', 'v16-plans')
+apply('draft_intent', 'plans', dict(dp, intent=plans, origin=plans_origin)); apply('add_criterion', 'plans', dict(cp, intent=plans)); confirm('v16-plans-yes', plans)
+d_before, d_after = unit('fixture-v16-d-before'), unit('fixture-v16-d-after')
+tick(); apply('add_unit', 'd-before', dict(op, unit=d_before, intent=plans))
+review('plan-v16-plans', 'plan', digest('the plans, version 16'), intent=plans)
+tick(); apply('add_unit', 'd-after', dict(op, unit=d_after, intent=plans))
+apply('ready_unit', 'd-after-earlier-plan', dict(unit=d_after, intent=plans), 'plan_not_reviewed')
+apply('ready_unit', 'd-before', dict(unit=d_before, intent=plans)); assert fields(d_before)['state'] == 'ready'
+review('plan-v16-plans-2', 'plan', digest('the plans, version 16, again'), intent=plans)
+apply('ready_unit', 'd-after', dict(unit=d_after, intent=plans)); assert fields(d_after)['state'] == 'ready'
+# (e) write_set is an array of write_pattern. A unit stored under version 15 with the old form reads the same, and an
+# action that would write it again is refused by the engine until amend_unit gives it the form.
+e_new = unit('fixture-v16-e-new')
+apply('add_unit', 'e-old-form', dict(op, unit=e_new, write_set=['a/*']), 'invalid_parameter')
+apply('add_unit', 'e-new-form', dict(op, unit=e_new, write_set=['a/**', 'a/b.rs'])); assert fields(e_new)['write_set'] == ['a/**', 'a/b.rs']
+assert obj(e_draft) == v15_before[v15_objects.index(e_draft)] and obj(e_running) == v15_before[v15_objects.index(e_running)]
+apply('drop_unit', 'e-draft-old-form', dict(unit=e_draft, reason='The fixture drops it.'), 'invalid_parameter')
+apply('stop_unit', 'e-running-old-form', dict(unit=e_running, cause='fixture_stop'), 'invalid_parameter')
+tick(); apply('amend_unit', 'e-draft-new-form', dict(unit=e_draft, write_set=['a/**'], page_digest=digest('v16 page e')))
+assert fields(e_draft)['write_set'] == ['a/**'] and fields(e_draft)['page_digest'] == digest('v16 page e')
+apply('amend_unit', 'e-running-new-form', dict(unit=e_running, write_set=['a/**'], page_digest=digest('v16 page e')), 'unit_not_amendable')
+# (f) The clauses: two records indexed, one changed, one retracted; a unit names one of them and one that does not exist.
+def clause_index(code=0):
+    p = subprocess.run([binary, '--store', store, '--now', str(now), 'index', '--source', 'clauses'], text=True, capture_output=True, timeout=60)
+    assert p.returncode == code, (p.returncode, p.stdout, p.stderr)
+    [one] = json.loads(p.stdout)['result']['sources']
+    return one
+def clause_lines(name, records): (clause_dir / name).write_text(''.join(json.dumps(r) + '\n' for r in records))
+assert not clause_dir.exists()
+assert clause_index(2)['code'] == 'glob_root_missing'
+clause_dir.mkdir()
+K1, K2, ABSENT = REPO + ':specs/widgets.md#R1', REPO + ':specs/widgets.md#R2', REPO + ':specs/widgets.md#R99'
+tick()
+clause_1 = dict(type='clause', key=K1, observed_at=now - 1, repository=REPO, path='specs/widgets.md', rule='R1', commit='4' * 40, line=7,
+                digest=digest('- R1: The board lists every widget.'), text='- R1: The board lists every widget.', tests=['tests/widgets.rs:12'], tests_total=1)
+clause_2 = dict(clause_1, key=K2, rule='R2', line=8, digest=digest('- R2: The board is green.'), text='- R2: The board is green.', tests=[], tests_total=0)
+clause_lines('fixture-owner__widgets.clauses.jsonl', [clause_1]); clause_lines('fixture-owner__other.clauses.jsonl', [clause_2])
+assert clause_index()['appended']['initial'] == 2
+found = heads('clause')
+assert found == {K1: {k: v for k, v in clause_1.items() if k not in ('type', 'key', 'observed_at')}, K2: {k: v for k, v in clause_2.items() if k not in ('type', 'key', 'observed_at')}}, found
+assert {k: v.get('value') for k, v in call(['get'], dict(id=oid('clause', K1)))['objects'][0]['observations'][-1]['fields'].items()} == found[K1]
+print('gate_row=v16-clauses-indexed expected=admitted clauses=2')
+tick(); clause_lines('fixture-owner__widgets.clauses.jsonl', [dict(clause_1, observed_at=now - 1, text='- R1: The board lists every widget once.')])
+assert clause_index()['appended']['update'] == 1 and heads('clause')[K1]['text'] == '- R1: The board lists every widget once.'
+f16 = unit('fixture-v16-f')
+apply('add_unit', 'f-clauses', dict(op, unit=f16, clauses=[oid('clause', K1), oid('clause', ABSENT)]))
+assert fields(f16)['clauses'] == [oid('clause', K1), oid('clause', ABSENT)]
+reached = around('clause', {'all': [{'eq': ['repository', REPO]}, {'eq': ['path', 'specs/widgets.md']}, {'eq': ['rule', 'R1']}]}, ['clause_units'])
+assert [o['id'] for o in reached['objects']] == [f16] and reached['basis']['matched'] == 1, reached
+(clause_dir / 'fixture-owner__other.clauses.jsonl').unlink()
+assert clause_index()['appended']['retraction'] == 1 and sorted(heads('clause')) == [K1]
+print('gate_row=v16-clauses-retracted expected=admitted')
+# (g) The wave: set by add_unit, changed by amend_unit.
+g16 = unit('fixture-v16-g')
+apply('add_unit', 'g-wave', dict(op, unit=g16, wave=3)); assert fields(g16)['wave'] == 3
+tick(); apply('amend_unit', 'g-wave', dict(unit=g16, wave=4, page_digest=digest('v16 page g')))
+f = fields(g16); assert f['wave'] == 4 and f['page_digest'] == digest('v16 page g'), f
+print('v16_gate_rows_complete')
+print('v16 clauses: ok')
 PY

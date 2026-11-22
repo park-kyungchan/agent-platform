@@ -3422,12 +3422,14 @@ fn walk_with_the_real_engine() {
     line("pushed-elsewhere", &f, &a);
     assert_eq!(a["state"], "merged", "{a}");
     assert!(f.launch(4).0.contains("--session-id"));
-    // Stopped `acceptance_failed`, amended, made ready and run again.
+    // Stopped `acceptance_failed`, amended, made ready and run again. The plan review of the template's intent
+    // started after its unit was added, so it counts for the unit (schema version 16, `plan_not_reviewed`); an
+    // amendment gives the digest of its page (`page_digest`, required), which a plain unit is not judged by.
     let mut f = F::engine();
     let failing = json!([{"check": "grep -q amended src/widgets.rs", "kind": "fails_on_base"}]);
     f.engine_apply(
         "amend_unit",
-        json!({"unit": oid("unit", KEY), "acceptance": failing}),
+        json!({"unit": oid("unit", KEY), "acceptance": failing, "page_digest": "d".repeat(64)}),
     );
     f.engine_ready();
     f.steps(&["implement", "fix", "accept"]);
@@ -3438,7 +3440,7 @@ fn walk_with_the_real_engine() {
     let passing = json!([{"check": "test -f src/widgets.rs", "kind": "fails_on_base"}]);
     f.engine_apply(
         "amend_unit",
-        json!({"unit": oid("unit", KEY), "acceptance": passing}),
+        json!({"unit": oid("unit", KEY), "acceptance": passing, "page_digest": "d".repeat(64)}),
     );
     f.engine_ready();
     let (a, _) = f.ok();
@@ -3518,7 +3520,7 @@ fn walk_with_the_real_engine() {
     let mut f = F::engine();
     f.engine_apply(
         "amend_unit",
-        json!({"unit": oid("unit", KEY), "branch": "main"}),
+        json!({"unit": oid("unit", KEY), "branch": "main", "page_digest": "d".repeat(64)}),
     );
     f.engine_ready();
     let e = f.refusal();
@@ -3569,7 +3571,7 @@ fn walk_the_merge_with_the_real_engine() {
     let contract = |f: &mut F| {
         f.engine_apply(
             "amend_unit",
-            json!({"unit": oid("unit", KEY), "class": "contract"}),
+            json!({"unit": oid("unit", KEY), "class": "contract", "page_digest": "e".repeat(64)}),
         );
         std::thread::sleep(Duration::from_millis(1100));
         let p = json!({"task": oid("task", "ontology-operational-base"), "kind": "page", "head": "e".repeat(64),

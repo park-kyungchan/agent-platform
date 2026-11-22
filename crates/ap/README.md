@@ -233,7 +233,7 @@ The record `<out>.unit.json` is created exclusively before any effect (the claim
 
 ## The unit object
 
-`ap unit add|amend|ready|drop` and `ap unit page`: `specs/ap/unit.md` (a refusal `invalid_input` of a writing op names every member that breaks a rule in `fields`, each with its rule: R37); `ap unit review`: `specs/ap/unit-review.md`; `ap unit run` and `ap unit approve|reject`: `specs/ap/unit-run.md`.
+`ap unit add|amend|ready|drop` and `ap unit page`: `specs/ap/unit.md` (a refusal `invalid_input` of a writing op names every member that breaks a rule in `fields`, each with its rule: R37; the wave, the stored digest of the page, the clauses its `specs` name, the refusal `page_digest_differs` of `ready` and the section `## Clauses` of the page: R41 to R45); `ap unit review`: `specs/ap/unit-review.md`; `ap unit run` and `ap unit approve|reject`: `specs/ap/unit-run.md`.
 
 `ap unit run` carries an accept across an update (`specs/ap/unit-run.md` R37): when `main` moved under an accepted head and the run's own update merged it without a conflict, the other side changed no path of the unit's write set and the unit's patch is unchanged, the new head is checked (the write set, the acceptance checks, the required check) and the accept is carried to it with the store's `carry_review`, with no verifier session; the call writes `<directory>/<key>/<n>.update.md` (the heads, the bases, the other side's paths, the checks' ends) and its answer names `carried: {review, from, file}`. An author commit, a path of the write set, a conflict or a `repair` verdict still goes to a verifier round. A carried review is a verdict but not a round: neither the unit's `rounds` nor `ap status --indicators` counts it.
 
@@ -352,6 +352,10 @@ What it does not print: the installed revisions (`deploy/README.md`, "Read the s
 ## Routes
 
 `ap route index [--directory <dir>] [--store <path>] [--prune] [--repository <owner/name>]... [--instructions <dir>]`, and `ap` with no argument and `ONT_FN_NAME=route`, the program of the store's function `route` (`ont fn route`): `specs/ap/route.md`. The objects `section` and `component` and the function are those of schema version 14 (`ontology/README.md`, "Version 14: routes"); the timer, its install and the undo are in `deploy/README.md`, "Routes"; the evaluation of the answers is `evals/route/run` (`evals/README.md`, "The route suite").
+
+## Clauses
+
+`ap clause index [--directory <dir>] [--store <path>] [--prune] [--repository <owner/name>]...`, and `ap` with no argument and `ONT_FN_NAME=clause`, the program of the store's function `clause` (`ont fn clause`, served through a stage's door as `ap fn clause`): `specs/ap/clause.md`. The object `clause`, its source, the function and the unit's `clauses`, `wave` and `page_digest` are those of schema version 16 (`ontology/README.md`, "Version 16: clauses, the wave and the stored page digest"). The unit files `deploy/ap-clause.service` and `deploy/ap-clause.timer` (every ten minutes, five after the route index) are installed and the timer enabled by `ap deliver`. A run is read with `systemctl status ap-clause.service`, `journalctl -u ap-clause.service -n 20` (its last line is the answer of `specs/ap/clause.md` R6) and `ls -l /var/lib/agent-platform/clause`; the undo is `systemctl disable --now ap-clause.timer`, after which the records turn stale within an hour and the function answers `stale`.
 
 ## The policy check
 

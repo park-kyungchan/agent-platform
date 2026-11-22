@@ -64,6 +64,11 @@ fn heading(line: &str) -> Option<(usize, String)> {
     Some((level, clean(text)))
 }
 
+/// Whether a line is an ATX heading (R9), whatever surrounds it (`specs/ap/clause.md` R3).
+pub(crate) fn atx_heading(line: &str) -> bool {
+    heading(line).is_some()
+}
+
 /// Control characters made spaces.
 fn clean(text: &str) -> String {
     text.chars()

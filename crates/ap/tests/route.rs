@@ -649,11 +649,29 @@ fn r7_the_components_of_map_json() {
 fn r8_files_written_whole_and_pruned() {
     let dir = Scratch::new();
     let route_dir = dir.at("route");
+    // An absent directory is made with mode 0700, whatever the umask.
+    let mut fake = Fake::new(&dir, &[("o/alpha", alpha())]);
+    run(&mut fake, &dir, &["--repository", "o/alpha"]);
+    let mode = |p: &Path| std::fs::metadata(p).unwrap().permissions().mode() & 0o7777;
+    assert_eq!(mode(&route_dir), 0o700);
+    std::fs::remove_dir_all(&route_dir).unwrap();
+    // A directory of mode 0755 is set to 0700, and a kept file of mode 0644 to 0600.
     std::fs::create_dir(&route_dir).unwrap();
+    std::fs::set_permissions(&route_dir, std::fs::Permissions::from_mode(0o755)).unwrap();
     std::fs::write(route_dir.join("o__gone.sections.jsonl"), "").unwrap();
     std::fs::write(route_dir.join("o__gone.components.jsonl"), "").unwrap();
     std::fs::write(route_dir.join("instructions.sections.jsonl"), "").unwrap();
+    std::fs::set_permissions(
+        route_dir.join("o__gone.sections.jsonl"),
+        std::fs::Permissions::from_mode(0o644),
+    )
+    .unwrap();
     std::fs::write(route_dir.join("notes.txt"), "kept").unwrap();
+    std::fs::set_permissions(
+        route_dir.join("notes.txt"),
+        std::fs::Permissions::from_mode(0o644),
+    )
+    .unwrap();
     std::fs::create_dir(route_dir.join("sub.sections.jsonl")).unwrap();
     std::fs::write(dir.at("elsewhere.jsonl"), "").unwrap();
     std::os::unix::fs::symlink(
@@ -664,15 +682,13 @@ fn r8_files_written_whole_and_pruned() {
     let fresh_tmp = route_dir.join(".ap-route.1.x.sections.jsonl.tmp");
     std::fs::write(&fresh_tmp, "").unwrap();
     // Without --prune nothing is removed.
-    let mut fake = Fake::new(&dir, &[("o/alpha", alpha())]);
     let (line, _) = run(&mut fake, &dir, &["--repository", "o/alpha"]);
     assert_eq!(line["removed"], json!([]));
     assert!(route_dir.join("o__gone.sections.jsonl").exists());
-    let mode = std::fs::metadata(route_dir.join("o__alpha.sections.jsonl"))
-        .unwrap()
-        .permissions()
-        .mode();
-    assert_eq!(mode & 0o777, 0o644);
+    assert_eq!(mode(&route_dir.join("o__alpha.sections.jsonl")), 0o600);
+    assert_eq!(mode(&route_dir), 0o700);
+    assert_eq!(mode(&route_dir.join("o__gone.sections.jsonl")), 0o600);
+    assert_eq!(mode(&route_dir.join("notes.txt")), 0o644);
     // With --prune: the files of a repository no longer named, and the instructions' file when no
     // --instructions is given; the other entries stay.
     let (line, _) = run(&mut fake, &dir, &["--repository", "o/alpha", "--prune"]);

@@ -66,6 +66,7 @@ pub fn page_text(
     let mut out = page_part(key, u, questions);
     out.push('\n');
     out.push_str(&for_part(s, store, u)?);
+    out.push_str(&clauses_part(u));
     let mut commit = None;
     if let Some(repository) = repository {
         out.push('\n');
@@ -196,6 +197,19 @@ fn for_part(s: &mut impl System, store: Option<&str>, u: &Value) -> Result<Strin
         out.push_str("(cut)\n");
     }
     Ok(out)
+}
+/// The line under the heading `## Clauses` (`specs/ap/unit.md` R45).
+const CLAUSES_LINE: &str = "Sentences of the specifications this page names; one with its tests and the units that name it: `echo '{\"parameters\":{\"key\":\"<key>\"}}' | ap fn clause` (through the stage's door).";
+/// `## Clauses` after `## For`, one line per clause the unit names in the stored order; empty for a unit
+/// without clauses (R45). It is no part of the page part.
+fn clauses_part(u: &Value) -> String {
+    let keys = u["clauses"].as_array().into_iter().flatten();
+    let keys: Vec<&str> = keys.filter_map(|c| c["native_key"].as_str()).collect();
+    if keys.is_empty() {
+        return String::new();
+    }
+    let lines: String = keys.iter().map(|k| format!("- {k}\n")).collect();
+    format!("\n## Clauses\n\n{CLAUSES_LINE}\n\n{lines}")
 }
 /// One Git call in the clone: its standard output, when it succeeded.
 fn git(s: &mut impl System, clone: &str, words: &[&str]) -> Option<Vec<u8>> {

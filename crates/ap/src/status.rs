@@ -210,7 +210,7 @@ fn request_row((k, f): &Found) -> Value {
 /// A unit as point R7 gives it; `ended` adds the end of a unit that is not live.
 fn unit_row((k, f): &Found, ended: bool) -> Value {
     let mut o = json!({"unit": k, "intent": key_of(&f["intent"]), "lane": f["lane"], "class": f["class"],
-        "state": f["state"], "repository": f["repository"], "pull_request": f["pull_request"],
+        "wave": f["wave"], "state": f["state"], "repository": f["repository"], "pull_request": f["pull_request"],
         "head": f["head"], "depends_on": keys_of(&f["depends_on"])});
     match f["state"].as_str() {
         Some("ready") => o["waits_on"] = f["waits_on"].clone(),
@@ -229,6 +229,10 @@ fn finding_row((k, f): &Found) -> Value {
 fn hold_row((k, f): &Found) -> Value {
     json!({"hold": k, "effect": f["effect"], "until": f["until"], "unit": key_of(&f["unit"]),
         "intent": key_of(&f["intent"]), "scope": f["scope"]})
+}
+/// ` w<wave>` after a unit's class for a unit that has a wave, else nothing (R17, R45).
+fn wave(w: &Value) -> String {
+    w.as_i64().map_or(String::new(), |n| format!(" w{n}"))
 }
 fn sort_units(units: &mut [Found]) {
     units.sort_by_key(|(k, f)| (rank(&UNITS, &f["state"]), k.clone()));
@@ -608,10 +612,11 @@ fn brief(s: &mut impl System, store: Option<&str>, key: &str) -> Result<Value, F
                 }
             };
             format!(
-                "unit {} {} {}{more}",
+                "unit {} {} {}{}{more}",
                 one(k),
                 value(&u["state"]),
-                value(&u["class"])
+                value(&u["class"]),
+                wave(&u["wave"])
             )
         })
         .collect();
@@ -1237,10 +1242,11 @@ fn overview_text(v: &Value) -> String {
                 _ => String::new(),
             };
             format!(
-                "{} {} {} {at}{more}",
+                "{} {} {}{} {at}{more}",
                 g(u, "unit"),
                 g(u, "state"),
-                g(u, "class")
+                g(u, "class"),
+                wave(&u["wave"])
             )
         }),
     );

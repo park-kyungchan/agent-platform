@@ -1,0 +1,10 @@
+[Unit]
+Description=ap clause index every ten minutes, five minutes after ap route index
+Documentation=https://github.com/park-kyungchan/agent-platform/blob/main/deploy/README.md
+
+[Timer]
+OnCalendar=*:5/10
+Persistent=true
+
+[Install]
+WantedBy=timers.target

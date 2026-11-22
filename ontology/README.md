@@ -36,6 +36,9 @@ directory only when it matches the directory itself, so it is written per depth:
 - any directory named `wt`, `node_modules`, `.git`, or whose name starts with
   `target`, at depth 1, 2 and 3; any directory or file whose name contains
   `private`, `custody`, `student`, `oracle`, `secret` or `credential`, at every depth.
+- any directory whose name begins with `edu-` (the Academy's entries, read only by the Academy's own task) at
+  depth 1, 2 and 3: `/home/palantirkc/work/edu-*`, `/home/palantirkc/work/*/edu-*` and
+  `/home/palantirkc/work/*/*/edu-*`, in the lists of `task_states`, `packets` and `reports` (version 16).
 The list exists because a glob under `work/` would otherwise read those paths.
 Before changing a glob or the list, enumerate matched names (no content) and
 show none lies under an excluded path.
@@ -1391,3 +1394,108 @@ units, reviews, runs, findings, holds, principles, sections, components) and the
 same; the schema differs from version 14 only by `version` and the function; `ont describe` lists the function
 `horizon` with its one parameter and without its program, beside `route`; `ontology/migrate` runs 14 15 (exit 0, the
 store unchanged) and 15 16 (exit 2). The last line of standard output of the rehearsal is `v15 horizon: ok`.
+
+Version 15 stays pinned as stated at the head of section "Version 16: clauses, the wave and the stored page digest"; the migration and the rehearsal as they stand now are described in section "Version 16: clauses, the wave and the stored page digest", "The migration and the rehearsal".
+
+## Version 16: clauses, the wave and the stored page digest
+Version 15 remains pinned at
+`8663375dde9d0557fbde136730766ef1f1d02210:ontology/work.schema.json`,
+sha256 `4fc42799c7cbd47c9e53bd2c3b1e6e2389d915e8aa79f2b501034f3793a1574a`.
+Version 16 changes what points 1 to 6 below name; every other value type, link type, view, source, object type and
+action of version 15 reads the same in canonical JSON.
+
+A clause is one numbered sentence of a specification, so that an implementer and a page reviewer ask what binds a
+change once, with the tests that cite it and the units that name it. `ap clause index` (`specs/ap/clause.md`) writes
+the records on the timer `ap-clause.timer`; `ont fn clause` answers. A unit stores the digest of its page as `ap`
+computed it, so that `ready_unit` compares a page review's `head` with what the store holds and not with a caller's
+parameter.
+
+1. The object type `clause`, owned by the new source `clauses`, without a `title`, keyed by `<owner>/<name>:<path>#R<n>`
+   (`park-kyungchan/agent-platform:specs/ap/unit.md#R11`). Its properties, each from the record's member of its name and
+   each required: `repository`, `path`, `rule` (`R<n>`) and `commit` (strings), `line` and `tests_total` (integers),
+   `digest` (`sha256_hex`), `text` (string, at most 4,000 bytes) and `tests` (array of strings, each `<path>:<line>`).
+   The source `clauses` is of kind `records`: every line of `/var/lib/agent-platform/clause/*.clauses.jsonl`, its time
+   the member `observed_at`, its type the member `type`, `complete_listing` set, `fresh_for_s` 3600. The grant's `read`
+   gains `clause`; it is source-owned, so the grant does not derive it.
+2. The function `clause`: the parameter `key` (string, required), the program `/usr/local/bin/ap`, `timeout_ms` 10000
+   and `answer_bytes` 65536. Its answer is `specs/ap/clause.md` R7 to R9.
+3. `unit` gains three optional properties: `clauses` (an array of references to `clause`), `wave` (integer) and
+   `page_digest` (`sha256_hex`), and the link type `unit_clauses` (`unit` by `clauses` to `clause`, many to many, its
+   reverse `clause_units`). The property `unit.write_set` and the parameter `write_set` of `add_unit` and `amend_unit`
+   are arrays of the value type `write_pattern` (an entry such as `a/*` is `invalid_parameter`).
+4. `add_unit` gains the optional parameters `clauses`, `wave` and `page_digest`; `amend_unit` gains `clauses` and `wave`
+   (optional) and `page_digest` (required: an amendment without it is the engine's `invalid_parameter`). Each rule sets
+   the three properties from them; a parameter not given leaves its property as it is.
+5. `ready_unit`. `page_not_reviewed` holds for a unit of class `contract` or `effect` only when `$unit.page_digest` is
+   present (a `present` guard before the comparison) and a review of kind `page` linked by `unit_reviews` is `closed`
+   with verdict `accept` and has `$unit.page_digest` as its `head`. The parameter `page_digest` stays optional; the new
+   criterion `page_digest_differs`, directly before `page_not_reviewed`, refuses when the parameter and
+   `$unit.page_digest` are both present and not equal. The `where` of `plan_not_reviewed` gains
+   `{"gt": ["started_at", "$unit.added_at"]}`: a plan review counts for a unit only when it started after the unit was
+   added.
+6. The sources `task_states`, `packets` and `reports`: each `exclude` gains `/home/palantirkc/work/edu-*`,
+   `/home/palantirkc/work/*/edu-*` and `/home/palantirkc/work/*/*/edu-*` (section "Directories the sources must never
+   read").
+
+The engine's codes the walk below reads: `amend_unit` without `page_digest` is `invalid_parameter` (field
+`/parameters/page_digest`); `add_unit` with the `write_set` entry `a/*` is `invalid_parameter` (field
+`/parameters/write_set`); an action whose rule writes a stored unit whose `write_set` holds such an entry
+(`ready_unit`, `drop_unit` and `stop_unit` among them) is `invalid_parameter` (field `/parameters`, property
+`write_set`); `amend_unit` of a `running` unit is `unit_not_amendable`.
+
+### What the store does not check
+- That a `page_digest` given to `add_unit` or `amend_unit` is the digest of the page: the engine renders no page; `ap`
+  computes it (`specs/ap/unit.md` R42).
+- That a unit of class `contract` or `effect` has a stored digest: one without (added by another caller than `ap`, or
+  stored before version 16) is not made ready until an amendment stores one. After delivery a `draft` unit of those
+  classes with an accepted page review needs one `ap unit amend` (of `estimate_lines` to its own value, for one).
+- That a stored `write_set` is of the form: a unit stored before version 16 whose `write_set` holds a text that is no
+  `write_pattern` reads as before and is changed by no action. A `draft`, `ready` or `stopped` one is changed again once
+  `amend_unit` gives it a `write_set` of the form; a `running` or `accepted` one never (`unit_not_amendable`), so before
+  delivery the Lead reads that no `running` or `accepted` unit holds such an entry.
+- That `wave` is from 1 to 99: it is any integer (`ap` bounds it, `specs/ap/unit.md` R41).
+- That a clause a unit names exists: a reference to a key without a current clause is stored, and `ont around` from a
+  clause reaches only the units that name it.
+- That a record's lines, text and tests are those of the file at the commit it names: the engine reads the records as
+  `ap clause index` wrote them. A repository whose fetch fails keeps its earlier records, which turn stale after an
+  hour.
+
+### The migration and the rehearsal
+`ontology/migrate` knows version 16; its step is empty (no data migration): it gives no stored unit a digest, a wave or
+clauses and rewrites no stored `write_set`. The line `HIGHEST = 16` names it; `16 17` and `9 17` are pairs it does not
+know (exit 2). The pairs refused on the version 10 part of the rehearsal are (9, 17), (10, 10) and (10, 9). Between the
+installs of the schema and of `ap`, an `ap` of the version before is refused by `amend_unit` (no `page_digest`) and adds
+units without a stored digest, which `ready_unit` then refuses `page_not_reviewed` when they are of class `contract` or
+`effect`: both fail safe.
+
+The second store of the rehearsal installs version 15 from Git by its commit and digest (above) instead of the
+repository's file, with the globs of `sections` and `components` rewritten to a directory of the rehearsal's own root,
+and runs the walk of version 15 on it. Still under version 15 it adds two units of class `contract`, each with an
+accepted page review, and a `draft` and a `running` unit whose `write_set` is `["a/*"]`. Then it installs the
+repository's file over the objects made under version 15, the glob of `clauses` rewritten to that root too: every
+object read under version 15 and the ten views read the same; the schema differs from version 15 only by points 1 to 6
+(each is taken off a copy and the rest compared); `ont describe` lists the function `clause` with its one parameter,
+beside `horizon` and `route`; `ont_describe` and `ont_action_list` stay within 262,144 bytes (the line
+`v16_mcp_bytes=`); `ontology/migrate` runs 15 16 (exit 0, the store unchanged) and 16 17 (exit 2). The walk of version
+16, each refusal before the action it guards:
+
+- (a) on the first `contract` unit, after a plan review of its intent that started after the unit was added:
+  `ready_unit` with the reviewed digest, `page_not_reviewed` (no stored digest); `amend_unit` of `estimate_lines`
+  without `page_digest`, `invalid_parameter`; with it, applied; `ready_unit` with another digest,
+  `page_digest_differs`; with the stored one, applied.
+- (b) on the second: `amend_unit` of the objective with a new digest, then `ready_unit` with the old digest
+  (`page_digest_differs` and `page_not_reviewed`) and with the new one (`page_not_reviewed`).
+- (c) a `plain` unit added without `page_digest` becomes ready.
+- (d) on an intent of its own: a unit added after the intent's only accepted plan review, `plan_not_reviewed`, and
+  ready once a later plan review is closed `accept`; a unit added before the first review is ready without a new one.
+- (e) `add_unit` with the `write_set` entry `a/*`, `invalid_parameter`; with `a/**` and `a/b.rs`, applied; the `draft`
+  and the `running` unit of version 15 read the same; `drop_unit` of the draft and `stop_unit` of the running one are
+  each `invalid_parameter`; `amend_unit` with a `write_set` of the form applies to the draft and is refused
+  `unit_not_amendable` for the running one.
+- (f) an index of `clauses` while its directory is absent fails `glob_root_missing`; two clause lines are indexed
+  (`initial`) and read back by `ont search` and by `ont get` under the key of point 1 with every property; a changed
+  text is an `update`; a unit added with `clauses` naming one of them and a key without a clause is stored, and
+  `ont around` from the clause by `clause_units` reaches it; a removed file retracts its clause.
+- (g) `wave` set by `add_unit` and changed by `amend_unit` reads back.
+
+The last line of standard output of the rehearsal is `v16 clauses: ok`.

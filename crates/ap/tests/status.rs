@@ -826,7 +826,7 @@ fn r4_the_time_and_the_schema_are_the_first_answers_of_the_store() {
     let v = run(&mut f, &Call::Overview);
     // The fake's clock moves with every answer: the first one is the verb's `at`.
     assert_eq!(v["at"], "2026-11-17T12:00:00Z");
-    assert_eq!(v["schema"], 15);
+    assert_eq!(v["schema"], 16);
     let first_schema = v["schema"].clone();
     let members: Vec<&str> = v.as_object().unwrap().keys().map(String::as_str).collect();
     assert_eq!(
@@ -952,13 +952,13 @@ fn r7_live_units_are_ordered_and_carry_what_waits_or_stopped_them() {
     let u = v["units"].as_array().unwrap();
     assert_eq!(
         u[0],
-        json!({"unit": "u-stop", "intent": "beta-index", "lane": "objective", "class": "plain", "state": "stopped",
-        "repository": null, "pull_request": null, "head": null, "depends_on": [], "stop_cause": "ci_failed"})
+        json!({"unit": "u-stop", "intent": "beta-index", "lane": "objective", "class": "plain", "wave": null,
+        "state": "stopped", "repository": null, "pull_request": null, "head": null, "depends_on": [], "stop_cause": "ci_failed"})
     );
     assert_eq!(
         u[2],
-        json!({"unit": "u-run", "intent": "alpha-report", "lane": "objective", "class": "plain", "state": "running",
-        "repository": "o/r", "pull_request": 7, "head": "abc123", "depends_on": []})
+        json!({"unit": "u-run", "intent": "alpha-report", "lane": "objective", "class": "plain", "wave": null,
+        "state": "running", "repository": "o/r", "pull_request": 7, "head": "abc123", "depends_on": []})
     );
     assert_eq!(u[3]["waits_on"], "a unit; a limit");
     assert_eq!(u[3]["depends_on"], json!(["u-run"]));
@@ -970,6 +970,59 @@ fn r7_live_units_are_ordered_and_carry_what_waits_or_stopped_them() {
     assert_eq!(
         (u[4]["intent"].clone(), u[4]["waits_on"].clone()),
         (Value::Null, Value::Null)
+    );
+}
+
+// spec: specs/ap/status.md#R7
+// spec: specs/ap/status.md#R17
+// spec: specs/ap/status.md#R45
+#[test]
+fn r7_r17_r45_a_unit_with_a_wave_shows_it_after_its_class() {
+    let mut f = fixture();
+    f.objects
+        .get_mut(&("unit".to_owned(), "u-run".to_owned()))
+        .unwrap()["wave"] = json!(3);
+    f.objects
+        .get_mut(&("unit".to_owned(), "u-draft".to_owned()))
+        .unwrap()["wave"] = json!(12);
+    // R7: the member after `class`, the unit's wave or null; R14's rows have it too.
+    let v = run(&mut f, &Call::Overview);
+    let u = v["units"].as_array().unwrap();
+    assert_eq!(
+        (u[2]["unit"].clone(), u[2]["wave"].clone()),
+        (json!("u-run"), json!(3))
+    );
+    assert_eq!(
+        (u[0]["unit"].clone(), u[0]["wave"].clone()),
+        (json!("u-stop"), Value::Null)
+    );
+    assert!(u.iter().all(|x| x.get("wave").is_some()));
+    let shown = run(&mut f, &key("alpha-report"));
+    let rows = shown["units"].as_array().unwrap();
+    let draft = rows.iter().find(|r| r["unit"] == "u-draft").unwrap();
+    assert_eq!(draft["wave"], 12);
+    // R17: ` w<wave>` directly after the class; a unit without one as before.
+    let text = text_of(&Call::Overview, &v);
+    let lines: Vec<&str> = text.lines().collect();
+    assert!(lines.contains(&"u-run running plain w3 o/r#7"), "{text}");
+    assert!(lines.contains(&"u-acc accepted plain o/r#9"), "{text}");
+    // R45: the brief's line of a unit.
+    let lines = brief(&mut f, "alpha-report");
+    assert!(
+        lines.iter().any(|l| l == "unit u-run running plain w3"),
+        "{lines:?}"
+    );
+    assert!(
+        lines
+            .iter()
+            .any(|l| l.starts_with("unit u-draft draft plain w12")),
+        "{lines:?}"
+    );
+    assert!(
+        lines
+            .iter()
+            .any(|l| l.starts_with("unit u-ready ready contract waits on")),
+        "{lines:?}"
     );
 }
 
@@ -1341,7 +1394,7 @@ fn r17_the_overview_text_is_one_golden_text() {
     assert!(text.is_ascii());
 }
 const GOLDEN: &str = "\
-status 2026-11-17T12:00:00Z schema work@15
+status 2026-11-17T12:00:00Z schema work@16
 NEEDS THE LEAD
 finding f-urgent: Summary of f-urgent.
 unit u-stop: ci_failed
@@ -1469,7 +1522,7 @@ fn r17_the_text_stays_within_80_lines_and_says_what_it_cut() {
     assert!(text.ends_with("DELIVERY\nunreadable\n"), "{text}");
     assert_eq!(
         text.lines().next(),
-        Some("status 2026-11-17T12:00:00Z schema work@15")
+        Some("status 2026-11-17T12:00:00Z schema work@16")
     );
 }
 

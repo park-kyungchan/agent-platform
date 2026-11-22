@@ -3,6 +3,7 @@
 //! `sections` and `components`, and the answer `ont fn route` gives from their current objects.
 mod parse;
 mod rank;
+pub(crate) use parse::atx_heading;
 pub use parse::{
     HEADING_BYTES, SEPARATOR, Section, TEXT_BYTES, cut, key, lines, sections, text_of,
 };
@@ -39,7 +40,8 @@ const PAGE: u64 = 50;
 const FETCH_MS: u64 = 300_000;
 const GIT_MS: u64 = 60_000;
 const INDEX_MS: u64 = 600_000;
-/// A temporary file of `ap` in the directory older than this is removed by `--prune` (R8).
+/// A temporary file of `ap` in the directory older than this is removed by `--prune` (R8,
+/// `specs/ap/clause.md` R5).
 const TEMPORARY_AGE: Duration = Duration::from_secs(3600);
 const TEMPORARY_PREFIX: &str = ".ap-route.";
 const TEMPORARY_SUFFIX: &str = ".tmp";
@@ -54,16 +56,16 @@ pub struct Options {
     pub instructions: Option<String>,
 }
 
-fn invalid(field: &str, detail: &str) -> Failure {
+pub(crate) fn invalid(field: &str, detail: &str) -> Failure {
     fail("invalid_input", field, json!(detail))
 }
 
-fn absolute(path: &str) -> bool {
+pub(crate) fn absolute(path: &str) -> bool {
     Path::new(path).is_absolute() && !path.contains('\0')
 }
 
 /// `owner/name` of GitHub: an owner of ASCII letters, digits and `-`, a name of those and `.` and `_`.
-fn repository_form(name: &str) -> bool {
+pub(crate) fn repository_form(name: &str) -> bool {
     let Some((owner, repo)) = name.split_once('/') else {
         return false;
     };
@@ -77,6 +79,17 @@ fn repository_form(name: &str) -> bool {
 
 /// The arguments after `index` (R1 to R3); every refusal comes before any effect.
 pub fn options(argv: &[OsString]) -> Result<Options, Failure> {
+    options_of(argv, DIRECTORY, true)
+}
+
+/// The arguments after `index` of a command that writes the files of record sources into one directory, whose
+/// default is `default` (the one the host store's sources read): `ap route index`, and `ap clause index` without
+/// `--instructions` (`specs/ap/clause.md` R1).
+pub(crate) fn options_of(
+    argv: &[OsString],
+    default: &str,
+    instructions: bool,
+) -> Result<Options, Failure> {
     let mut o = Options::default();
     let mut i = 0;
     let usage = || error("usage", "args");
@@ -100,7 +113,7 @@ pub fn options(argv: &[OsString]) -> Result<Options, Failure> {
         let slot = match flag {
             "--directory" => &mut o.directory,
             "--store" => &mut o.store,
-            "--instructions" => &mut o.instructions,
+            "--instructions" if instructions => &mut o.instructions,
             "--repository" => {
                 o.repositories.push(value);
                 i += 2;
@@ -142,7 +155,7 @@ pub fn options(argv: &[OsString]) -> Result<Options, Failure> {
     let default = o
         .directory
         .as_deref()
-        .is_none_or(|d| d.trim_end_matches('/') == DIRECTORY);
+        .is_none_or(|d| d.trim_end_matches('/') == default);
     match (default, o.store.is_some()) {
         (true, true) => Err(invalid(
             "directory",
@@ -162,7 +175,12 @@ pub fn stem_of(repository: &str) -> String {
 }
 
 /// One call of `git` in a clone; its standard output when it exits 0.
-fn git(s: &mut impl System, clone: &str, words: &[&str], ms: u64) -> Result<Vec<u8>, ()> {
+pub(crate) fn git(
+    s: &mut impl System,
+    clone: &str,
+    words: &[&str],
+    ms: u64,
+) -> Result<Vec<u8>, ()> {
     let mut a: Vec<String> = vec!["--literal-pathspecs".into(), "-C".into(), clone.into()];
     a.extend(words.iter().map(|w| (*w).to_owned()));
     match s.call("git", &a, &Value::Null, ms) {
@@ -171,13 +189,13 @@ fn git(s: &mut impl System, clone: &str, words: &[&str], ms: u64) -> Result<Vec<
     }
 }
 
-fn hex40(bytes: &[u8]) -> Option<String> {
+pub(crate) fn hex40(bytes: &[u8]) -> Option<String> {
     let t = String::from_utf8_lossy(bytes).trim().to_owned();
     (t.len() == 40 && t.bytes().all(|b| b.is_ascii_hexdigit())).then_some(t)
 }
 
 /// The last commit at `revision` that changed `path` (R5).
-fn last_commit(
+pub(crate) fn last_commit(
     s: &mut impl System,
     clone: &str,
     revision: &str,
@@ -241,7 +259,9 @@ fn section_records(
 }
 
 /// One entry of `git ls-tree -r -l -z`: mode, type, object, size, path.
-fn tree_entries(listing: &[u8]) -> Vec<(String, String, String, u64, String)> {
+pub(crate) type Entry = (String, String, String, u64, String);
+/// The entries of `git ls-tree -r -l -z`.
+pub(crate) fn tree_entries(listing: &[u8]) -> Vec<Entry> {
     listing
         .split(|b| *b == 0)
         .filter_map(|e| {
@@ -301,14 +321,12 @@ fn component_records(
     Ok(out)
 }
 
-/// The records of one repository at its `origin/main` after `git fetch origin main` (R4, R5, R7); the
-/// reason when the repository keeps its previous files.
-fn repository_records(
+/// `git fetch origin main` in the clone, the commit `origin/main` then names and the entries of its tree (R4,
+/// `specs/ap/clause.md` R2); the reason when the repository keeps its previous files.
+pub(crate) fn fetched_tree(
     s: &mut impl System,
-    repository: &str,
     clone: &str,
-    now: u64,
-) -> Result<(Vec<Value>, Vec<Value>), &'static str> {
+) -> Result<(String, Vec<Entry>), &'static str> {
     git(s, clone, &["fetch", "--quiet", "origin", "main"], FETCH_MS).map_err(|_| "fetch_failed")?;
     let revision = git(
         s,
@@ -326,21 +344,45 @@ fn repository_records(
         GIT_MS,
     )
     .map_err(|_| "listing_failed")?;
+    Ok((revision, tree_entries(&listing)))
+}
+
+/// The bytes of one object of the clone (R4).
+pub(crate) fn blob(
+    s: &mut impl System,
+    clone: &str,
+    object: &str,
+) -> Result<Vec<u8>, &'static str> {
+    git(s, clone, &["cat-file", "blob", object], GIT_MS).map_err(|_| "read_failed")
+}
+
+/// Whether an entry of the tree is a regular file (mode `100644` or `100755`) (R5).
+pub(crate) fn regular(mode: &str, kind: &str) -> bool {
+    kind == "blob" && (mode == "100644" || mode == "100755")
+}
+
+/// The records of one repository at its `origin/main` after `git fetch origin main` (R4, R5, R7); the
+/// reason when the repository keeps its previous files.
+fn repository_records(
+    s: &mut impl System,
+    repository: &str,
+    clone: &str,
+    now: u64,
+) -> Result<(Vec<Value>, Vec<Value>), &'static str> {
+    let (revision, entries) = fetched_tree(s, clone)?;
     let mut sections = vec![];
     let mut components = vec![];
-    for (mode, kind, object, size, path) in tree_entries(&listing) {
-        let regular = kind == "blob" && (mode == "100644" || mode == "100755");
+    for (mode, kind, object, size, path) in entries {
+        let regular = regular(&mode, &kind);
         if regular && path == "map.json" {
-            let bytes =
-                git(s, clone, &["cat-file", "blob", &object], GIT_MS).map_err(|_| "read_failed")?;
+            let bytes = blob(s, clone, &object)?;
             let commit = last_commit(s, clone, &revision, &path)?;
             components = component_records(repository, &bytes, &commit, now)?;
         }
         if !regular || !path.ends_with(".md") || size > FILE_BYTES || path.len() > PATH_BYTES {
             continue;
         }
-        let bytes =
-            git(s, clone, &["cat-file", "blob", &object], GIT_MS).map_err(|_| "read_failed")?;
+        let bytes = blob(s, clone, &object)?;
         let commit = last_commit(s, clone, &revision, &path)?;
         sections.extend(section_records(
             Some(repository),
@@ -397,11 +439,50 @@ fn instruction_records(
     Ok(out)
 }
 
-/// One file of the directory written whole under a temporary name and renamed, mode 0644 (R8).
+/// The mode of the directory and of the files of the sources in it (R8, `specs/ap/clause.md` R5).
+const DIRECTORY_MODE: u32 = 0o700;
+const FILE_MODE: u32 = 0o600;
+
+/// The directory a command writes (R8, `specs/ap/clause.md` R5): made with mode 0700 when it is absent, set to
+/// 0700 when it has another mode, refused when it is not a directory (a symbolic link included).
+pub(crate) fn directory(dir: &Path) -> Result<(), Failure> {
+    let io = || error("io_error", "directory");
+    match std::fs::symlink_metadata(dir) {
+        Ok(m) if m.is_dir() => {
+            if m.permissions().mode() & 0o7777 != DIRECTORY_MODE {
+                std::fs::set_permissions(dir, std::fs::Permissions::from_mode(DIRECTORY_MODE))
+                    .map_err(|_| io())?;
+            }
+            Ok(())
+        }
+        Ok(_) => Err(invalid("directory", "is not a directory")),
+        Err(_) => {
+            std::fs::DirBuilder::new()
+                .mode(DIRECTORY_MODE)
+                .create(dir)
+                .map_err(|_| io())?;
+            std::fs::set_permissions(dir, std::fs::Permissions::from_mode(DIRECTORY_MODE))
+                .map_err(|_| io())
+        }
+    }
+}
+
+/// One file of the directory written whole under a temporary name and renamed, mode 0600 (R8).
 fn write_whole(dir: &Path, name: &str, records: &[Value]) -> Result<(), Failure> {
+    write_file(dir, TEMPORARY_PREFIX, name, records)
+}
+
+/// One file of a command's directory written whole under the temporary name `<prefix><pid>.<name>.tmp` and
+/// renamed, mode 0600 (R8, `specs/ap/clause.md` R5).
+pub(crate) fn write_file(
+    dir: &Path,
+    prefix: &str,
+    name: &str,
+    records: &[Value],
+) -> Result<(), Failure> {
     let io = || error("io_error", "directory");
     let tmp = dir.join(format!(
-        "{TEMPORARY_PREFIX}{}.{name}{TEMPORARY_SUFFIX}",
+        "{prefix}{}.{name}{TEMPORARY_SUFFIX}",
         std::process::id()
     ));
     let _ = std::fs::remove_file(&tmp);
@@ -409,7 +490,7 @@ fn write_whole(dir: &Path, name: &str, records: &[Value]) -> Result<(), Failure>
         let mut f = std::fs::OpenOptions::new()
             .write(true)
             .create_new(true)
-            .mode(0o644)
+            .mode(FILE_MODE)
             .open(&tmp)?;
         let mut text = String::new();
         for r in records {
@@ -417,7 +498,7 @@ fn write_whole(dir: &Path, name: &str, records: &[Value]) -> Result<(), Failure>
             text.push('\n');
         }
         f.write_all(text.as_bytes())?;
-        f.set_permissions(std::fs::Permissions::from_mode(0o644))?;
+        f.set_permissions(std::fs::Permissions::from_mode(FILE_MODE))?;
         f.sync_all()?;
         std::fs::rename(&tmp, dir.join(name))
     })();
@@ -437,9 +518,23 @@ pub fn source_of(name: &str) -> Option<(&'static str, &str)> {
         .map(|stem| ("components", stem))
 }
 
+/// The source of a file of a command's directory and its stem, when the file is one of the command's sources.
+pub(crate) type Owned = fn(&str) -> Option<(&'static str, &str)>;
+
 /// `--prune` (R8): the regular files of the directory of a source whose stem is not kept, and `ap`'s own
 /// temporary files older than an hour, removed; nothing else. The names removed.
 fn prune(dir: &Path, keep: &BTreeSet<String>) -> Result<Vec<String>, Failure> {
+    prune_files(dir, keep, TEMPORARY_PREFIX, source_of)
+}
+
+/// `--prune` of a command whose files `owned` names and whose temporary files begin with `prefix` (R8,
+/// `specs/ap/clause.md` R5).
+pub(crate) fn prune_files(
+    dir: &Path,
+    keep: &BTreeSet<String>,
+    prefix: &str,
+    owned: Owned,
+) -> Result<Vec<String>, Failure> {
     let io = || error("io_error", "directory");
     let mut removed = vec![];
     let mut entries: Vec<_> = std::fs::read_dir(dir)
@@ -457,14 +552,14 @@ fn prune(dir: &Path, keep: &BTreeSet<String>) -> Result<Vec<String>, Failure> {
         if !meta.is_file() {
             continue;
         }
-        let stale = name.starts_with(TEMPORARY_PREFIX)
+        let stale = name.starts_with(prefix)
             && name.ends_with(TEMPORARY_SUFFIX)
             && meta
                 .modified()
                 .ok()
                 .and_then(|m| m.elapsed().ok())
                 .is_some_and(|a| a > TEMPORARY_AGE);
-        let other = source_of(&name).is_some_and(|(_, stem)| !keep.contains(stem));
+        let other = owned(&name).is_some_and(|(_, stem)| !keep.contains(stem));
         if stale || other {
             std::fs::remove_file(e.path()).map_err(|_| io())?;
             removed.push(name);
@@ -473,16 +568,39 @@ fn prune(dir: &Path, keep: &BTreeSet<String>) -> Result<Vec<String>, Failure> {
     Ok(removed)
 }
 
+/// Every regular file of the command's sources directly in the directory, a kept one included, set to mode 0600
+/// (R8, `specs/ap/clause.md` R5).
+pub(crate) fn secure(dir: &Path, owned: Owned) -> Result<(), Failure> {
+    let io = || error("io_error", "directory");
+    for e in std::fs::read_dir(dir).map_err(|_| io())?.flatten() {
+        let Ok(name) = e.file_name().into_string() else {
+            continue;
+        };
+        if owned(&name).is_none() {
+            continue;
+        }
+        let Ok(meta) = std::fs::symlink_metadata(e.path()) else {
+            continue;
+        };
+        if meta.is_file() && meta.permissions().mode() & 0o7777 != FILE_MODE {
+            std::fs::set_permissions(e.path(), std::fs::Permissions::from_mode(FILE_MODE))
+                .map_err(|_| io())?;
+        }
+    }
+    Ok(())
+}
+
 /// The records each source's files hold in the directory after the run.
-fn counted(dir: &Path) -> Map<String, Value> {
+pub(crate) fn counted(dir: &Path, owned: Owned, names: &[&str]) -> Map<String, Value> {
     let mut counts = Map::new();
-    counts.insert("sections".into(), json!(0));
-    counts.insert("components".into(), json!(0));
+    for name in names {
+        counts.insert((*name).into(), json!(0));
+    }
     for e in std::fs::read_dir(dir).into_iter().flatten().flatten() {
         let Ok(name) = e.file_name().into_string() else {
             continue;
         };
-        let Some((source, _)) = source_of(&name) else {
+        let Some((source, _)) = owned(&name) else {
             continue;
         };
         if !std::fs::symlink_metadata(e.path()).is_ok_and(|m| m.is_file()) {
@@ -503,18 +621,8 @@ pub fn index(s: &mut impl System, o: &Options) -> Result<(Value, bool), Failure>
         clones.push(crate::unit::object::clone_of(s, r)?);
     }
     let dir = PathBuf::from(o.directory.as_deref().unwrap_or(DIRECTORY));
-    match std::fs::symlink_metadata(&dir) {
-        Ok(m) if m.is_dir() => {}
-        Ok(_) => return Err(invalid("directory", "is not a directory")),
-        Err(_) => std::fs::DirBuilder::new()
-            .mode(0o755)
-            .create(&dir)
-            .map_err(|_| error("io_error", "directory"))?,
-    }
-    let now = s
-        .wall()
-        .duration_since(UNIX_EPOCH)
-        .map_or(0, |d| d.as_secs());
+    directory(&dir)?;
+    let now = seconds(s);
     let mut kept = vec![];
     let mut keep = BTreeSet::new();
     for (repository, clone) in o.repositories.iter().zip(&clones) {
@@ -546,11 +654,36 @@ pub fn index(s: &mut impl System, o: &Options) -> Result<(Value, bool), Failure>
         }
     }
     let removed = if o.prune { prune(&dir, &keep)? } else { vec![] };
-    let answer = store::index(s, o.store.as_deref(), &["sections", "components"], INDEX_MS)?;
-    let counts = counted(&dir);
+    secure(&dir, source_of)?;
+    let names = ["sections", "components"];
+    let answer = store::index(s, o.store.as_deref(), &names, INDEX_MS)?;
+    let (sources, held) = summary(&answer, &counted(&dir, source_of, &names), &names);
+    let directory = dir.to_string_lossy();
+    Ok((
+        json!({"status": if held { "ok" } else { "index_failed" }, "directory": directory,
+            "sources": sources, "kept": kept, "removed": removed}),
+        held,
+    ))
+}
+
+/// The run's time in seconds since 1970.
+pub(crate) fn seconds(s: &impl System) -> u64 {
+    s.wall()
+        .duration_since(UNIX_EPOCH)
+        .map_or(0, |d| d.as_secs())
+}
+
+/// Per source of `names`, the records its files hold and the index answer's `status`, `code`, `appended`,
+/// `renewed` and `retracted` (R13, `specs/ap/clause.md` R6); whether every source held.
+pub(crate) fn summary(
+    answer: &Value,
+    counts: &Map<String, Value>,
+    names: &[&str],
+) -> (Map<String, Value>, bool) {
     let mut sources = Map::new();
     let mut held = answer["status"] == "ok";
-    for name in ["sections", "components"] {
+    for name in names {
+        let name = *name;
         let Some(one) = answer["result"]["sources"]
             .as_array()
             .and_then(|a| a.iter().find(|x| x["source"] == name))
@@ -570,12 +703,7 @@ pub fn index(s: &mut impl System, o: &Options) -> Result<(Value, bool), Failure>
             "retracted": one["appended"]["retraction"]}),
         );
     }
-    let directory = dir.to_string_lossy();
-    Ok((
-        json!({"status": if held { "ok" } else { "index_failed" }, "directory": directory,
-            "sources": sources, "kept": kept, "removed": removed}),
-        held,
-    ))
+    (sources, held)
 }
 
 /// Whether the directory holds a file of the stem from an earlier run.
@@ -585,7 +713,7 @@ fn source_of_files(dir: &Path, stem: &str) -> bool {
     })
 }
 
-fn print(value: &Value, out: bool, status: u8) -> ExitCode {
+pub(crate) fn print(value: &Value, out: bool, status: u8) -> ExitCode {
     let written = if out {
         writeln!(std::io::stdout(), "{value}")
     } else {
@@ -594,7 +722,7 @@ fn print(value: &Value, out: bool, status: u8) -> ExitCode {
     ExitCode::from(if written.is_ok() { status } else { 4 })
 }
 
-fn refusal(e: &Failure) -> Value {
+pub(crate) fn refusal(e: &Failure) -> Value {
     json!({"error": {"code": e.code, "field": e.field, "detail": e.detail}})
 }
 
@@ -607,7 +735,13 @@ pub fn cli(argv: &[OsString]) -> ExitCode {
         Ok(o) => o,
         Err(e) => return print(&refusal(&e), false, 2),
     };
-    match index(&mut Host, &o) {
+    ended(index(&mut Host, &o))
+}
+
+/// The end of an index run (R13, `specs/ap/clause.md` R6): the answer line, exit 0 when every source held, else 3;
+/// a refusal of R1 to R3 exit 2, a failure of its own exit 3.
+pub(crate) fn ended(run: Result<(Value, bool), Failure>) -> ExitCode {
+    match run {
         Ok((v, true)) => print(&v, true, 0),
         Ok((v, false)) => print(&v, true, 3),
         Err(e)
@@ -771,6 +905,14 @@ pub fn answer(s: &mut impl System, store: &str, p: &Value) -> Result<Value, Fail
 /// `ap` with no argument and `ONT_FN_NAME=route` (R15): the parameters on standard input, the answer
 /// on standard output; a refusal on standard error with exit 2, a failure of the store with exit 3.
 pub fn function() -> ExitCode {
+    function_of(answer)
+}
+
+/// A function `ap` answers (R15, `specs/ap/clause.md` R7): the parameters, one JSON value of standard input, and
+/// the store at `ONT_FN_STORE` given to `answer`.
+pub(crate) fn function_of(
+    answer: impl FnOnce(&mut Host, &str, &Value) -> Result<Value, Failure>,
+) -> ExitCode {
     let result = (|| {
         let mut bytes = vec![];
         std::io::stdin()
