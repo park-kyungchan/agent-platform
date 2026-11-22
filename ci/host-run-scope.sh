@@ -19,8 +19,12 @@
 # derived `*.sign-in` is left, and a resume whose home holds a link at `.credentials.json` launches
 # nothing and creates nothing at the link's target; an implementer whose `limits` name a
 # `write` directory, an `over` pair, a `read_only` file and `show` writes that directory and, through
-# the target, the source, but neither its cwd nor the `read_only` file. Skipped, saying so, where `systemctl` is absent or this caller cannot start a
-# transient unit in the system manager.
+# the target, the source, but neither its cwd nor the `read_only` file; a stage with `limits` sees
+# only its view (specs/ap/run-limits.md R16): no key, login, store, socket of the host or other
+# account, its uid map not the host's, no capability, no user namespace of its own, and its `ap check`
+# reads its policy and asks the door. Each case's request gives as `read_only` what its stage reads
+# beyond that view (the fake's directory). Skipped, saying so, where `systemctl` is absent or this
+# caller cannot start a transient unit in the system manager.
 set -uo pipefail
 ap=$(realpath -- "${1:-${CARGO_TARGET_DIR:-$(cd "$(dirname "$0")/.." && pwd -P)/target}/debug/ap}")
 if ! command -v systemctl > /dev/null || [ ! -d /run/systemd/system ]; then
@@ -214,8 +218,8 @@ else
   digests() { sha256sum "$t/acct/.credentials.json" "$t/acct/settings.json" "$t/acctB/.credentials.json" "$t/acctB/settings.json"; }
   before=$(digests)
   echo limits > "$t/bin/mode"
-  printf '{"role":"reviewer","account":"%s","model":"haiku","effort":"low","permission_mode":"auto","cwd":"%s","prompt":"%s","out":"%s","timeout_seconds":90,"limits":{"scratch":"%s"}}' \
-    "$t/acctB" "$t/cwd" "$t/prompt.md" "$t/lb.md" "$t/scratchB" | apr > "$t/lb.out" 2> "$t/lb.err" & bpid=$!
+  printf '{"role":"reviewer","account":"%s","model":"haiku","effort":"low","permission_mode":"auto","cwd":"%s","prompt":"%s","out":"%s","timeout_seconds":90,"limits":{"scratch":"%s","read_only":["%s"]}}' \
+    "$t/acctB" "$t/cwd" "$t/prompt.md" "$t/lb.md" "$t/scratchB" "$t/bin" | apr > "$t/lb.out" 2> "$t/lb.err" & bpid=$!
   bhome=
   for _ in $(seq 100); do
     [ -s "$t/lb.md.run.json" ] && bhome=$(field "$t/lb.md.run.json" home)
@@ -226,7 +230,7 @@ else
   cat "/sys/fs/cgroup$(systemctl show -p ControlGroup --value "$bunit")/cgroup.procs" > "$t/bin/peer.pids" 2> /dev/null
   [ -e "$bhome/ready" ] && [ -s "$t/bin/peer.pids" ] && [ -d "$t/scratchB" ] && [[ "$bhome" == "$t/acctB/homes/"?* ]] \
     && ok "limits: stage B runs in $bunit with $(wc -l < "$t/bin/peer.pids") processes, in its home below acctB/homes" || bad "limits: stage B did not start: $(tail -c 400 "$t/lb.err")"
-  req l.md ",\"limits\":{\"scratch\":\"$t/scratch\"}" | apr > "$t/l.out" 2> "$t/l.err"; rc=$?
+  req l.md ",\"limits\":{\"scratch\":\"$t/scratch\",\"read_only\":[\"$t/bin\"]}}" | apr > "$t/l.out" 2> "$t/l.err"; rc=$?
   ans=$(cat "$t/l.md" 2> /dev/null); home=$(field "$t/l.md.run.json" home)
   { [ "$rc" -eq 0 ] && [ "$(field "$t/l.md.run.json" state)" = ok ] && [ ! -e "$t/cwd/x" ] && [ ! -e "$t/bin/x" ] \
     && [[ "$ans" == "cwd refused (Read-only file system); scratch written; root refused ("*"); peer refused; "* ]]; } \
@@ -242,11 +246,11 @@ else
     && ok "limits: nothing of stage A reached stage B's scratch directory, home or account while B ran" \
     || bad "limits: stage B's files: $(ls -A "$t/scratchB" "$t/acctB" "$bhome" 2> /dev/null | tr '\n' ' ')"
   python3 -I -c 'import json,sys; t=sys.argv[1]; r=json.load(open(t+"/l.md.run.json")); l=r["limits"]
-hidden = l.pop("hidden", None)
+hidden = l.pop("hidden", None); view = l.pop("view", None)
 sys.exit(r.get("home") != t+"/acct/homes/"+r["session"]
-         or l != {"scratch": t+"/scratch", "writable": [r["home"], t+"/scratch"], "bwrap": "/usr/bin/bwrap"}
-         or not isinstance(hidden, list))' "$t" \
-    && ok "limits: the record names its home, the scratch directory, the two writable paths and the hidden list" || bad "limits member: $(field "$t/l.md.run.json" home) $(field "$t/l.md.run.json" limits)"
+         or l != {"scratch": t+"/scratch", "writable": [r["home"], t+"/scratch"], "bwrap": "/usr/bin/bwrap", "read_only": [t+"/bin"]}
+         or not isinstance(hidden, list) or not isinstance(view, list) or "/" in view)' "$t" \
+    && ok "limits: the record names its home, the scratch directory, the two writable paths, the hidden list and the view" || bad "limits member: $(field "$t/l.md.run.json" home) $(field "$t/l.md.run.json" limits)"
   [ ! -e "$t/scratch" ] && ok "limits: the scratch directory is gone after the return" || bad "limits: $t/scratch remains"
   : > "$bhome/go"; wait "$bpid"; rc=$?
   { [ "$rc" -eq 0 ] && [ "$(field "$t/lb.md.run.json" state)" = ok ] && [ ! -e "$t/scratchB" ] && ! systemctl is-active --quiet "$bunit"; } \
@@ -260,20 +264,20 @@ sys.exit(r.get("home") != t+"/acctB/homes/"+r["session"] or r["limits"]["writabl
   # A link left in a home: in place of the empty file bwrap left at `.credentials.json`, a link to a
   # path below /oldroot (bwrap's old root) of a file that does not exist; its resume launches nothing.
   echo answer > "$t/bin/mode"
-  req k.md ",\"limits\":{\"scratch\":\"$t/scratchK\"}" | apr > "$t/k.out" 2> "$t/k.err"; rc=$?
+  req k.md ",\"limits\":{\"scratch\":\"$t/scratchK\",\"read_only\":[\"$t/bin\"]}}" | apr > "$t/k.out" 2> "$t/k.err"; rc=$?
   khome=$(field "$t/k.md.run.json" home)
   { [ "$rc" -eq 0 ] && [ -d "$khome" ] && [ -f "$khome/.credentials.json" ] && [ ! -s "$khome/.credentials.json" ]; } \
     && ok "limits: a first launch left an empty .credentials.json in its home" || bad "limits: first launch: rc=$rc $(tail -c 400 "$t/k.err")"
   rm -f "$khome/.credentials.json"; ln -s "/oldroot$t/no-such-file" "$khome/.credentials.json"
-  printf '{"role":"reviewer","account":"%s","model":"haiku","effort":"low","permission_mode":"auto","cwd":"%s","prompt":"%s","out":"%s","resume":{"record":"%s"},"limits":{"scratch":"%s"}}' \
-    "$t/acct" "$t/cwd" "$t/prompt.md" "$t/k2.md" "$t/k.md.run.json" "$t/scratchK2" | apr > "$t/k2.out" 2> "$t/k2.err"; rc=$?
+  printf '{"role":"reviewer","account":"%s","model":"haiku","effort":"low","permission_mode":"auto","cwd":"%s","prompt":"%s","out":"%s","resume":{"record":"%s"},"limits":{"scratch":"%s","read_only":["%s"]}}' \
+    "$t/acct" "$t/cwd" "$t/prompt.md" "$t/k2.md" "$t/k.md.run.json" "$t/scratchK2" "$t/bin" | apr > "$t/k2.out" 2> "$t/k2.err"; rc=$?
   { [ "$rc" -eq 3 ] && [ "$(field "$t/k2.md.run.json" state)" = failed ] && [ "$(field "$t/k2.md.run.json" unmet)" = launch ] \
     && [ ! -e "$t/no-such-file" ] && [ -L "$khome/.credentials.json" ]; } \
     && ok "limits: a resume whose home holds a link at .credentials.json launched nothing, and nothing was made at its target" \
     || bad "limits: link in the home: rc=$rc $(field "$t/k2.md.run.json" state) $(field "$t/k2.md.run.json" unmet) $(ls -d "$t/no-such-file" 2> /dev/null)"
   # An implementer with the four members of limits (specs/ap/run-limits.md R1, R5, R7, R11).
   mkdir -p "$t/wdir" "$t/src" "$t/dst"; echo kept > "$t/wdir/keep"; echo named > "$t/bin/mode"
-  req n.md ",\"limits\":{\"scratch\":\"$t/scratch2\",\"write\":[\"$t/wdir\"],\"over\":[[\"$t/src\",\"$t/dst\"]],\"read_only\":[\"$t/wdir/keep\"],\"show\":[\"~/.config/gh\"]}" \
+  req n.md ",\"limits\":{\"scratch\":\"$t/scratch2\",\"write\":[\"$t/wdir\"],\"over\":[[\"$t/src\",\"$t/dst\"]],\"read_only\":[\"$t/wdir/keep\",\"$t/bin\"],\"show\":[\"~/.config/gh\"]}" \
     | sed 's/"role":"reviewer"/"role":"implementer"/' | apr > "$t/n.out" 2> "$t/n.err"; rc=$?
   ans=$(cat "$t/n.md" 2> /dev/null)
   { [ "$rc" -eq 0 ] && [ "$(field "$t/n.md.run.json" state)" = ok ] && [ -e "$t/wdir/x" ] && [ -e "$t/src/y" ] && [ ! -e "$t/dst/y" ] \
@@ -282,10 +286,10 @@ sys.exit(r.get("home") != t+"/acctB/homes/"+r["session"] or r["limits"]["writabl
     && ok "limits: an implementer wrote its write directory and the over source, not the read_only file, its cwd or /proc/1/root: $ans" \
     || bad "limits: named paths: rc=$rc $ans $(tail -c 400 "$t/n.err")"
   python3 -I -c 'import json,sys; t=sys.argv[1]; l=json.load(open(t+"/n.md.run.json"))["limits"]
-hidden = l.pop("hidden", None)
+hidden = l.pop("hidden", None); l.pop("view", None)
 r = json.load(open(t+"/n.md.run.json"))
 sys.exit(l != {"scratch": t+"/scratch2", "writable": [r["home"], t+"/scratch2", t+"/wdir", t+"/dst"], "bwrap": "/usr/bin/bwrap",
-               "over": [[t+"/src", t+"/dst"]], "read_only": [t+"/wdir/keep"], "show": ["~/.config/gh"]}
+               "over": [[t+"/src", t+"/dst"]], "read_only": [t+"/wdir/keep", t+"/bin"], "show": ["~/.config/gh"]}
          or not isinstance(hidden, list) or any(p.endswith("/.config/gh") for p in hidden))' "$t" \
     && ok "limits: the implementer's record names what it writes, the members as given, and ~/.config/gh shown" || bad "limits member of the implementer: $(field "$t/n.md.run.json" limits)"
   # spec: specs/ap/door.md#R1
@@ -314,8 +318,8 @@ said="route $rc1 $r; other $rc2 $code; check $rc3 $c"
 printf '{"type":"result","subtype":"success","is_error":false,"num_turns":1,"result":"%s","session_id":"%s","usage":{"input_tokens":1,"output_tokens":1},"permission_denials":[]}\n' "$said" "$sid"
 DOOR
   chmod 0755 "$t/bin/claude" "$t/bin/ont" "$t/bin/tailscale"
-  printf '{"role":"reviewer","ont_role":"verifier","account":"%s","model":"haiku","effort":"low","permission_mode":"auto","cwd":"%s","prompt":"%s","out":"%s","timeout_seconds":90,"limits":{"scratch":"%s"},"env":{"AP_POLICY_FILE":"%s"}}' \
-    "$t/acct" "$t/dcwd" "$t/prompt.md" "$t/door.md" "$t/scratch3" "$t/policy-door.json" \
+  printf '{"role":"reviewer","ont_role":"verifier","account":"%s","model":"haiku","effort":"low","permission_mode":"auto","cwd":"%s","prompt":"%s","out":"%s","timeout_seconds":90,"limits":{"scratch":"%s","read_only":["%s","%s","%s"]},"env":{"AP_POLICY_FILE":"%s"}}' \
+    "$t/acct" "$t/dcwd" "$t/prompt.md" "$t/door.md" "$t/scratch3" "$t/bin" "$t/policy-door.json" "$ap" "$t/policy-door.json" \
     | env -i PATH="$t/bin:$PATH" HOME="${HOME:-/root}" LANG=C.UTF-8 AP_POLICY_FILE="$t/policy-door.json" \
       AP_DOOR_LOG="$t/door.jsonl" AP_CHECKS_LOG="$t/checks.jsonl" "$ap" run > "$t/door.out" 2> "$t/door.err"; rc=$?
   ans=$(cat "$t/door.md" 2> /dev/null)
@@ -333,6 +337,70 @@ sys.exit(oct(os.stat(f).st_mode & 0o777) != "0o600" or len(lines) != 3
   { [ ! -e "$t/checks.jsonl" ] && [ ! -e "$t/scratch3.door" ] && [ ! -e "$t/scratch3" ]; } \
     && ok "door: no row of the checks log for a call placed here, and the door and the scratch directory are gone" \
     || bad "door: $(ls -d "$t/checks.jsonl" "$t/scratch3.door" "$t/scratch3" 2> /dev/null | tr '\n' ' ')"
+  # spec: specs/ap/run-limits.md#R16
+  # The view (specs/ap/run-limits.md R16): a verifier stage with limits, in a worktree of a clone
+  # with a GitHub origin, its policy (whose PC no one answers) named in its request and in the
+  # caller's environment; a bin directory of its own (its fake CLI, a tailscale that exits 1 and the
+  # built ap; no fake ont; $t/bin neither on its PATH nor bound). Its fake CLI says, printing no
+  # content, which of the security audit's must-not-see paths exist in its view (test -e and test -L,
+  # never an open), its uid map, its capability sets, and whether a user namespace, the system bus,
+  # `ont describe`, `ap unit run` of a unit and its door answer; and what its `ap check` printed.
+  v=$t/view; mkdir -p "$v/bin"
+  home=$(getent passwd "$(id -u)" | cut -d: -f6)
+  git init -q -b main "$v/repo" && git -C "$v/repo" remote add origin https://github.com/example/view.git \
+    && git -C "$v/repo" -c user.name=t -c user.email=t@e commit -q --allow-empty -m one \
+    && git -C "$v/repo" worktree add -q -b view "$v/wt" 2> /dev/null
+  printf '{"models":{"allowed":["haiku"],"never":[]},"accounts":{"claude":["%s"]},"hosts":{"pc":{"ssh":"nobody@no-such-pc.invalid","work":"/nonexistent/ap-checks","busy_load":0.75}}}' \
+    "$t/acct" > "$v/policy.json"
+  ln -s "$ap" "$v/bin/ap"
+  printf '#!/bin/sh\necho "$*" >> "%s/tailscale.calls"\nexit 1\n' "$t" > "$v/bin/tailscale"
+  for p in "$home/.ssh" "$home/.config/gh" /etc/shadow /etc/agent-platform/credentials /var/lib/ontology-platform \
+    /var/lib/tailscale /run "$t/acctB" "$home/.claude" "$home/.config/rclone/rclone.conf" \
+    "$home/.config/tailscale-oauth.env" "$home/.config/herdr/herdr.sock" "$home/.codex/auth.json" \
+    "$home/.google_authenticator" /etc/ssh/ssh_host_ed25519_key /docker/hindsight/.env /var/backups \
+    /etc/monarx-agent.conf; do echo "$p"; done > "$v/bin/paths"
+  cat > "$v/bin/claude" <<'VIEW'
+#!/usr/bin/env bash
+cat > /dev/null
+sid=; prev=; for a in "$@"; do case "$prev" in --session-id|--resume) sid=$a ;; esac; prev=$a; done
+printf '{"type":"system","subtype":"init","session_id":"%s","mcp_servers":[]}\n' "$sid"
+here=$(cd "$(dirname "$0")" && pwd)
+seen=; while read -r p; do { test -e "$p" || test -L "$p"; } && seen="$seen $p"; done < "$here/paths"
+uid=$(tr -s ' \t' ' ' < /proc/self/uid_map | sed 's/^ //')
+eff=$(awk '/^CapEff/ {print $2}' /proc/self/status); bnd=$(awk '/^CapBnd/ {print $2}' /proc/self/status)
+unshare --user true > /dev/null 2>&1 && ns=made || ns=failed
+conn() { python3 -I -c 'import socket,sys; s=socket.socket(socket.AF_UNIX); s.connect(sys.argv[1])' "$1" > /dev/null 2>&1; }
+conn /run/dbus/system_bus_socket && bus=connected || bus=failed
+conn "$AP_DOOR" && door=connected || door=failed
+echo '{}' | ont describe > /dev/null 2>&1 && ont=0 || ont=nonzero
+ap unit run view-probe-unit < /dev/null > /dev/null 2>&1 && run=0 || run=nonzero
+ap check "$PWD" -- true > /dev/null 2> "$TMPDIR/check.err"; crc=$?
+c=$(tr '\n' '|' < "$TMPDIR/check.err" | tr -d '"\\')
+said="seen:$seen; uid_map $uid; CapEff $eff; CapBnd $bnd; userns $ns; system_bus_socket $bus; ont describe $ont; ap unit run $run; door $door; check $crc $c"
+printf '{"type":"result","subtype":"success","is_error":false,"num_turns":1,"result":"%s","session_id":"%s","usage":{"input_tokens":1,"output_tokens":1},"permission_denials":[]}\n' "$said" "$sid"
+VIEW
+  chmod 0755 "$v/bin/claude" "$v/bin/tailscale"
+  printf '{"role":"reviewer","ont_role":"verifier","account":"%s","model":"haiku","effort":"low","permission_mode":"auto","cwd":"%s","prompt":"%s","out":"%s","timeout_seconds":90,"limits":{"scratch":"%s","read_only":["%s","%s"]},"env":{"AP_POLICY_FILE":"%s"}}' \
+    "$t/acct" "$v/wt" "$t/prompt.md" "$t/view.md" "$t/scratchV" "$v/bin" "$ap" "$v/policy.json" \
+    | env -i PATH="$v/bin:$PATH" HOME="${HOME:-/root}" LANG=C.UTF-8 AP_POLICY_FILE="$v/policy.json" \
+      AP_DOOR_LOG="$t/door-view.jsonl" AP_CHECKS_LOG="$t/checks-view.jsonl" "$ap" run > "$t/view.out" 2> "$t/view.err"; rc=$?
+  ans=$(cat "$t/view.md" 2> /dev/null)
+  echo "     view: $ans"
+  host_map=$(tr -s ' \t' ' ' < /proc/self/uid_map | sed 's/^ //')
+  { [ "$rc" -eq 0 ] && [[ "$ans" == "seen:; "* ]]; } \
+    && ok "view: none of the must-not-see paths exists in the stage's view (~/.ssh, ~/.config/gh, /etc/shadow, /etc/agent-platform/credentials, /var/lib/ontology-platform, /run, the other account, ...)" \
+    || bad "view: paths seen: rc=$rc ${ans%%;*} $(tail -c 400 "$t/view.err")"
+  { [[ "$ans" == *"; uid_map "* ]] && [[ "$ans" != *"; uid_map $host_map;"* ]] \
+    && [[ "$ans" == *"; CapEff 0000000000000000; CapBnd 0000000000000000; userns failed;"* ]]; } \
+    && ok "view: its uid_map is not the host's, CapEff and CapBnd are zero, and unshare --user fails" \
+    || bad "view: namespace and capabilities: $ans"
+  { [[ "$ans" == *"; system_bus_socket failed; ont describe nonzero; ap unit run nonzero; door connected;"* ]]; } \
+    && ok "view: a connect to the system bus fails, ont describe and ap unit run exit non-zero, the door connects" \
+    || bad "view: bus, store and door: $ans"
+  { [[ "$ans" == *"; check 0 check: on this host (pc_unreachable)|"* ]] && [[ "$ans" != *no_pc_in_policy* ]] \
+    && grep -q '^ping ' "$t/tailscale.calls" 2> /dev/null; } \
+    && ok "view: ap check read its policy and asked the door, whose ping failed: check: on this host (pc_unreachable)" \
+    || bad "view: ap check: $ans $(cat "$t/tailscale.calls" 2> /dev/null)"
 fi
 
 [ "$fails" -eq 0 ] && echo "host-run-scope: PASS" || { echo "host-run-scope: $fails FAILED"; exit 1; }

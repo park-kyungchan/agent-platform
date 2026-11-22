@@ -1326,13 +1326,15 @@ impl Run {
     /// home in the scratch directory, the state of `gh` shown only to an author with the host's login
     /// (`host`, R41); for an author also the worktree and what a commit, a merge, a fetch and a push
     /// write of the clone's Git directory, after the run made those paths and set the `origin/main`
-    /// of the stage's own view to the base.
+    /// of the stage's own view to the base; then, read-only, the files its prompt names (`files`:
+    /// the verifier's report for a fixer, the description and the author's answer for a verifier).
     fn limits(
         &self,
         s: &mut impl System,
         n: u64,
         author: bool,
         host: bool,
+        files: &[String],
     ) -> Step<(Value, Value)> {
         let mut dirs = std::fs::DirBuilder::new();
         dirs.mode(0o700);
@@ -1349,6 +1351,9 @@ impl Run {
             limits["show"] = json!(["~/.config/gh"]);
         }
         if !author {
+            if !files.is_empty() {
+                limits["read_only"] = json!(files);
+            }
             return Ok((limits, env));
         }
         let (g, admin) = self.git_dirs(s)?;
@@ -1414,33 +1419,36 @@ impl Run {
             .map(|(from, to)| json!([text(from), text(to)]))
             .collect();
         limits["over"] = json!(pairs);
-        limits["read_only"] = json!([
+        let mut read_only = vec![
             text(&wt.join(".git")),
             text(&a.join("commondir")),
             text(&a.join("gitdir")),
-            text(&worktree_config)
-        ]);
+            text(&worktree_config),
+        ];
+        read_only.extend(files.iter().cloned());
+        limits["read_only"] = json!(read_only);
         Ok((limits, env))
     }
     fn page(&mut self, s: &mut impl System, role: Role) -> Step<String> {
         let u = self.u.clone();
         Ok(render::page_text(s, self.store(), &self.key, &u, Some(role))?.0)
     }
-    /// One author stage of `role` with `git_author`, resuming `from` when given: its record and its
-    /// answer's path (R11 to R13, R21).
+    /// One author stage of `role` with `git_author`, resuming `from` when given, reading `files`
+    /// beside its worktree: its record and its answer's path (R11 to R13, R21, R38).
     fn author(
         &mut self,
         s: &mut impl System,
         role: &str,
         from: Option<&Author>,
         text: &str,
+        files: &[String],
     ) -> Step<(Value, String)> {
         let n = self.next();
         // The credential: the stage token read anew, or the host's login; named in its file (R41).
         let token = self.stage_token(s)?;
         let credential = if token.is_some() { "token" } else { "host" };
         self.prompt(&format!("{n}.credential"), &format!("{credential}\n"))?;
-        let (limits, mut env) = self.limits(s, n, true, token.is_none())?;
+        let (limits, mut env) = self.limits(s, n, true, token.is_none(), files)?;
         if let Some(t) = token {
             env["GH_TOKEN"] = json!(t);
         }
@@ -1507,7 +1515,7 @@ impl Run {
             }
             None => {}
         }
-        let (rec, out) = self.author(s, "implementer", from, &text)?;
+        let (rec, out) = self.author(s, "implementer", from, &text, &[])?;
         self.wait(s)?;
         match self.list(s)? {
             None => stop("no_pull_request", Self::answered(&out, &rec)),
@@ -1539,7 +1547,7 @@ impl Run {
     /// The settling stage: the session of `a` resumed under its role with `continue.md` (R12, R13).
     fn turn(&mut self, s: &mut impl System, a: &Author) -> Step {
         let text = format!("{}\n{CONTINUE}", self.page(s, Role::Implementer)?);
-        self.author(s, &a.role, Some(a), &text)?;
+        self.author(s, &a.role, Some(a), &text, &[])?;
         self.wait(s)
     }
     /// The newest author record, when the author's one turn on an amended page is due (R13).
@@ -1770,12 +1778,17 @@ impl Run {
         let description = self.description(s, number, n)?;
         let mut text = self.page(s, Role::Verifier)?;
         text.push_str(&format!("{DESCRIPTION}{description}{DESCRIPTION_TAIL}\n"));
+        // The files the prompt names, read-only in the stage's view (R38).
+        let mut files = vec![description];
         if let Some((_, judged, what, repaired)) = &resumed {
             let mut round = format!("Head judged before: {judged}\nWhat moved it: {what}\n");
             if *repaired {
                 let answer = self.done.fixer_answer.as_deref().filter(|p| {
                     std::fs::symlink_metadata(p).is_ok_and(|m| m.is_file() && m.len() > 0)
                 });
+                if let Some(a) = answer {
+                    files.push(a.to_owned());
+                }
                 let answer = answer.unwrap_or("none");
                 round.push_str(&format!("Answer of the author: {answer}\n"));
             }
@@ -1799,7 +1812,7 @@ impl Run {
         );
         let mut req = self.stage(&self.verifier, "reviewer", "verifier", (&prompt, ""));
         (req["ont_role"], req["expect"]) = (json!("verifier"), json!({"first_line": "Verdict: *"}));
-        (req["limits"], req["env"]) = self.limits(s, n, false, false)?;
+        (req["limits"], req["env"]) = self.limits(s, n, false, false, &files)?;
         if let Some((record, ..)) = &resumed {
             req["resume"] = json!({"record": record});
         }
@@ -1891,7 +1904,7 @@ impl Run {
         let page = self.page(s, Role::Implementer)?;
         let round = format!("Head judged: {judged}\nVerifier report: {report}\n");
         let text = format!("{page}\n{FIXER}\n## The round\n\n{round}");
-        let (rec, out) = self.author(s, "fixer", Some(from), &text)?;
+        let (rec, out) = self.author(s, "fixer", Some(from), &text, &[report])?;
         let now = self.git(s, &self.wt, &["rev-parse", "HEAD"])?;
         if now == judged {
             return stop("repair_refused", Self::answered(&out, &rec));

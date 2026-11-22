@@ -478,12 +478,16 @@ fn look_at(
         resumed = Some((record, cwd, wd));
     }
     let mut earlier = String::new();
+    // The paths the stage reads outside its working directory (R13): a plan's clones, then the
+    // earlier reports.
+    let mut reports = vec![];
     for k in &new.earlier {
         let report = found(k)
             .filter(|v| v["status"] == "closed")
             .and_then(|v| text_of(v, "report"));
         let report = report.ok_or_else(|| fail("earlier_not_possible", "earlier", json!(k)))?;
         earlier.push_str(&format!("- {k}: {report}\n"));
+        reports.push(report);
     }
     for k in ["model", "effort", "account", "permission_mode"] {
         if !stage.contains_key(k) {
@@ -504,6 +508,7 @@ fn look_at(
     }
     // The text and its digest, from the one read of the subject (R6, R7).
     let repository = text_of(&subject, "repository").filter(|_| look.page);
+    let mut read_only = vec![];
     let (mut text, head, copy) = if look.page {
         let clone = repository.as_deref().map(|r| clone_of(s, r)).transpose()?;
         if let Some(clone) = &clone {
@@ -517,7 +522,8 @@ fn look_at(
             clone.zip(commit),
         )
     } else {
-        let (part, rest) = plan(s, look.store, look.key, &subject)?;
+        let (part, rest, clones) = plan(s, look.store, look.key, &subject)?;
+        read_only = clones;
         let head = digest(part.as_bytes());
         (format!("{part}\n{rest}\n{PLAN_REVIEWER}"), head, None)
     };
@@ -538,7 +544,12 @@ fn look_at(
     if !earlier.is_empty() {
         text.push_str(&format!("\n{EARLIER}\n\n{earlier}"));
     }
+    // The pages of a page's dependencies: the stage reads no store (R6).
+    if look.page {
+        text.push_str(&dependencies(s, look.store, &subject)?);
+    }
     text.push_str(&format!("\nDigest: {head}\n"));
+    read_only.extend(reports);
     let round = list.len() + 1;
     let mut dirs = std::fs::DirBuilder::new();
     dirs.recursive(true).mode(0o700);
@@ -631,11 +642,14 @@ fn look_at(
         req["resume"] = json!({"record": record});
     }
     // A reviewer on the Claude CLI runs under `limits`: it writes only its home of the launch
-    // (`specs/ap/run-limits.md` R14) and its own scratch directory, and the working directory is
-    // read-only to it (R13).
+    // (`specs/ap/run-limits.md` R14) and its own scratch directory, the working directory is
+    // read-only to it, and it reads outside it only a plan's clones and the earlier reports (R13).
     if req.get("runtime").is_none_or(|r| r == "claude") {
         let scratch = look.scratch(&review).to_string_lossy().into_owned();
         req["limits"] = json!({ "scratch": scratch });
+        if !read_only.is_empty() {
+            req["limits"]["read_only"] = json!(read_only);
+        }
     }
     crate::run::admit_stage(s, &req).map_err(|f| match REVIEWER.contains(&f.field.as_str()) {
         true => fail(f.code, &format!("reviewer.{}", f.field), f.detail),
@@ -1022,12 +1036,40 @@ fn ended_line(t: &str) -> String {
     }
 }
 /// The plan part and the rest (`## Repositories`, `## States now`) of the intent `key` read as `intent` (R7).
+/// The section of a page look's dependencies, with the bytes of the writer's
+/// (`specs/ap/unit-write.md` R5): each key of `depends_on` in its order with its state and its page
+/// part, or `(not in the store)`; nothing for a unit without dependencies (R6).
+fn dependencies(s: &mut impl System, store: Option<&str>, u: &Value) -> Result<String, Failure> {
+    let deps: Vec<&str> = u["depends_on"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter_map(|d| d["native_key"].as_str().or(d.as_str()))
+        .collect();
+    if deps.is_empty() {
+        return Ok(String::new());
+    }
+    let mut out = "\n## Pages of the dependencies\n".to_owned();
+    for d in deps {
+        match at(store::get(s, store, "unit", d), "depends_on")? {
+            Some(dep) => {
+                let state = dep["state"].as_str().unwrap_or_default();
+                out.push_str(&format!("\n### {d}: {state}\n\n"));
+                out.push_str(&render::page_part(d, &dep, false));
+            }
+            None => out.push_str(&format!("\n### {d}\n\n(not in the store)\n")),
+        }
+    }
+    Ok(out)
+}
+/// The plan part, the rest of a plan's text, and the clones its `## Repositories` names, in its
+/// order (R7, R13).
 fn plan(
     s: &mut impl System,
     store: Option<&str>,
     key: &str,
     intent: &Value,
-) -> Result<(String, String), Failure> {
+) -> Result<(String, String, Vec<String>), Failure> {
     let eq = |k: &str, v: Value| json!({"eq": [k, v]});
     let by = |o: &Found| {
         (
@@ -1141,10 +1183,12 @@ fn plan(
     if repositories.is_empty() {
         rest.push_str("No unit of the plan has a repository.\n");
     }
+    let mut clones = vec![];
     for r in repositories {
         let clone = clone_of(s, r)?;
         let commit = object::fetch(s, &clone)?;
         rest.push_str(&format!("- {r}: clone {clone}, origin/main at {commit}\n"));
+        clones.push(clone);
     }
     rest.push_str("\n## States now\n\n");
     for (k, u) in &placed {
@@ -1159,5 +1203,5 @@ fn plan(
             c["state"].as_str().unwrap_or_default()
         ));
     }
-    Ok((part, rest))
+    Ok((part, rest, clones))
 }
