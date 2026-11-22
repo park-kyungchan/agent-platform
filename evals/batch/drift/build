@@ -1,0 +1,330 @@
+#!/usr/bin/env -S python3 -I -B
+"""The drift job's builder: one Message Batch request per group of at most twelve numbered requirements of a spec file,
+with the test functions that cite them, read from Git's objects at one commit per repository.
+
+  build --repo <owner>/<name>=<clone> [--repo ...] --model <id> --out <dir> [--rev <rev>] [--results <file>]...
+        [--max-tokens <n>]
+
+Writes requests.jsonl and groups.json into --out and prints one JSON line. Calls no model and no network; starts no
+program but git; reads no file of a checkout and changes no clone. Every refusal is {"status":"<code>"} with exit 2.
+Contract: evals/batch/README.md.
+"""
+import argparse
+import importlib.machinery
+import importlib.util
+import json
+import os
+import re
+import subprocess
+import sys
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+
+
+def load_lib():
+    loader = importlib.machinery.SourceFileLoader("batch_lib", os.path.join(HERE, "..", "lib.py"))
+    mod = importlib.util.module_from_spec(importlib.util.spec_from_loader("batch_lib", loader))
+    loader.exec_module(mod)
+    return mod
+
+
+L = load_lib()
+
+# The two patterns of ci/check-spec-trace.py: a requirement line of a spec file, and a citation.
+REQ_RE = re.compile(r"^- R([0-9]+):")
+CITE_RE = re.compile(r"spec: (specs/[^\s#]+\.md)#R([0-9]+)")
+GROUP = 12
+EXCERPT_LINES = 400
+TEXT_LIMIT = 300_000
+REPO_NAME = re.compile(r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$")
+FN_RE = re.compile(r"^(\s*)(?:pub(?:\([^)]*\))?\s+)?(?:(?:const|async|unsafe|extern(?:\s+\"[^\"]*\")?)\s+)*fn\s+[A-Za-z_]")
+GIT_ENV = {"GIT_OPTIONAL_LOCKS": "0", "GIT_TERMINAL_PROMPT": "0", "GIT_NO_LAZY_FETCH": "1", "GIT_CONFIG_NOSYSTEM": "1"}
+GIT_TIMEOUT = 300
+
+
+class Parser(argparse.ArgumentParser):
+    def error(self, message):
+        raise L.Refuse("usage")
+
+
+def parse(argv):
+    p = Parser(add_help=False, allow_abbrev=False)
+    p.add_argument("--repo", action="append", required=True)
+    p.add_argument("--model", required=True)
+    p.add_argument("--out", required=True)
+    p.add_argument("--rev", default="origin/main")
+    p.add_argument("--results", action="append", default=[])
+    p.add_argument("--max-tokens", default="8000")
+    a = p.parse_args(argv)
+    repos = []
+    for r in a.repo:
+        name, sep, clone = r.partition("=")
+        if not sep or not REPO_NAME.match(name) or not clone or name in [x[0] for x in repos]:
+            raise L.Refuse("usage")
+        repos.append((name, clone))
+    if not a.model or not a.rev or a.rev.startswith("-") or not a.out or any(not r for r in a.results):
+        raise L.Refuse("usage")
+    if not re.fullmatch(r"[0-9]+", a.max_tokens) or not 1024 <= int(a.max_tokens) <= 32000:
+        raise L.Refuse("usage")
+    a.max_tokens = int(a.max_tokens)
+    a.repos = repos
+    return a
+
+
+class Clone:
+    """One repository read from Git's objects at one commit."""
+
+    def __init__(self, name, path, rev):
+        self.name, self.path = name, path
+        self.env = dict(os.environ, **GIT_ENV, GIT_CEILING_DIRECTORIES=os.path.dirname(path.rstrip("/")) or "/")
+        out = self.git(["rev-parse", "--verify", "--quiet", rev + "^{commit}"])
+        self.commit = out.decode("ascii", "replace").strip() if out is not None else ""
+        if not re.fullmatch(r"[0-9a-f]{40}|[0-9a-f]{64}", self.commit):
+            raise L.Refuse("repo_unreadable", repository=name)
+
+    def git(self, args, data=None):
+        command = ["git", "-c", "core.quotePath=false", "-c", "protocol.allow=never", "-C", self.path, *args]
+        try:
+            done = subprocess.run(command, input=data, capture_output=True, timeout=GIT_TIMEOUT, env=self.env)
+        except (OSError, subprocess.TimeoutExpired):
+            return None
+        return done.stdout if done.returncode == 0 else None
+
+    def tree(self):
+        """Every tracked entry as (mode, object, path), by path."""
+        out = self.git(["ls-tree", "-r", "-z", "--full-tree", self.commit])
+        if out is None:
+            raise L.Refuse("repo_unreadable", repository=self.name)
+        entries = []
+        for rec in out.split(b"\0"):
+            if not rec:
+                continue
+            meta, _, path = rec.partition(b"\t")
+            parts = meta.split(b" ")
+            if len(parts) != 3:
+                raise L.Refuse("repo_unreadable", repository=self.name)
+            entries.append((parts[0].decode(), parts[2].decode(), path.decode("utf-8", "surrogateescape")))
+        return sorted(entries, key=lambda e: e[2])
+
+    def blobs(self, objects):
+        """The bytes of each object, by object."""
+        wanted = sorted(set(objects))
+        if not wanted:
+            return {}
+        out = self.git(["cat-file", "--batch"], ("\n".join(wanted) + "\n").encode())
+        if out is None:
+            raise L.Refuse("repo_unreadable", repository=self.name)
+        got, i = {}, 0
+        for obj in wanted:
+            nl = out.find(b"\n", i)
+            header = out[i:nl].split(b" ")
+            if nl < 0 or len(header) != 3 or header[0].decode() != obj or header[1] != b"blob":
+                raise L.Refuse("repo_unreadable", repository=self.name)
+            size = int(header[2])
+            got[obj] = out[nl + 1:nl + 1 + size]
+            i = nl + 1 + size + 1
+        return got
+
+
+def lines_of(data):
+    """The lines as check-spec-trace.py reads them; numbered from 1."""
+    return data.decode("utf-8", "replace").split("\n")
+
+
+def body_lines(lines):
+    """The lines without the empty one after a final newline."""
+    return lines[:-1] if lines and lines[-1] == "" else lines
+
+
+def rust_items(lines):
+    """Every `fn` item as (start, fn line, end), 1-based: from the first of the comment and attribute lines directly
+    above its fn line to the first later line that is `}` at the fn line's indentation."""
+    items = []
+    for i, line in enumerate(lines):
+        m = FN_RE.match(line)
+        if not m:
+            continue
+        indent = m.group(1)
+        end = next((j for j in range(i + 1, len(lines)) if lines[j].rstrip() == indent + "}"), None)
+        if end is None:
+            continue
+        start = i
+        while start > 0 and lines[start - 1].lstrip().startswith(("//", "#[", "#![")):
+            start -= 1
+        items.append((start + 1, i + 1, end + 1))
+    return items
+
+
+def excerpt_range(path, lines, cite_lines, no, cache):
+    """The (first, last) lines of the excerpt of the citation on line `no` of `path`."""
+    if path.endswith(".rs"):
+        if "items" not in cache:
+            cache["items"] = rust_items(lines)
+        holding = [it for it in cache["items"] if it[0] <= no <= it[2]]
+        if holding:
+            first, _, last = max(holding, key=lambda it: (it[0], it[1]))
+            return first, last
+        after = [it for it in cache["items"] if it[0] > no]
+        if after:
+            first, _, last = min(after, key=lambda it: (it[0], it[1]))
+            return first, last
+        return no, no
+    first = no
+    while first - 1 in cite_lines:
+        first -= 1
+    run_end = no
+    while run_end + 1 in cite_lines:
+        run_end += 1
+    nxt = min((c for c in cite_lines if c > run_end), default=None)
+    last = nxt - 1 if nxt is not None else max(len(body_lines(lines)), run_end)
+    return first, last
+
+
+def excerpt_text(lines, first, last):
+    """The excerpt's (first, last, text): over 400 lines it is cut there, and its last line says so."""
+    if last - first + 1 > EXCERPT_LINES:
+        total = last - first + 1
+        last = first + EXCERPT_LINES - 1
+        text = "\n".join(lines[first - 1:last]) + f"\n[excerpt cut at {EXCERPT_LINES} of {total} lines]"
+        return first, last, text
+    return first, last, "\n".join(lines[first - 1:last])
+
+
+def read_clone(clone, counts):
+    """The requirements of the clone's spec files and the citations of its other files."""
+    entries = clone.tree()
+    regular, specs = [], []
+    for mode, obj, path in entries:
+        if L.is_academy(path):
+            counts["academy_skipped"] += 1
+            continue
+        if mode not in ("100644", "100755"):
+            continue
+        regular.append((obj, path))
+    data = clone.blobs([obj for obj, _ in regular])
+    requirements = {}  # path -> [(rule, line)]
+    texts = {}
+    citations = []  # (spec path, rule, test path, line)
+    files = {}
+    for obj, path in regular:
+        raw = data[obj]
+        if path.startswith("specs/") and path.endswith(".md"):
+            text = raw.decode("utf-8", "replace")
+            seen, found = set(), []
+            for no, line in enumerate(text.split("\n"), 1):
+                m = REQ_RE.match(line)
+                if not m or m.group(1) in seen:
+                    continue
+                seen.add(m.group(1))
+                found.append(("R" + m.group(1), no))
+            texts[path] = text
+            requirements[path] = found
+            counts["requirements"] += len(found)
+        if path.endswith(".md") or b"spec: " not in raw:
+            continue
+        lines = lines_of(raw)
+        cite_lines = set()
+        for no, line in enumerate(lines, 1):
+            for m in CITE_RE.finditer(line):
+                counts["citations"] += 1
+                cite_lines.add(no)
+                citations.append((m.group(1), "R" + m.group(2), path, no))
+        if cite_lines:
+            files[path] = (lines, cite_lines, {})
+    return requirements, texts, citations, files
+
+
+def user_text(name, path, spec_text, rules, tests, excerpts):
+    parts = [f"Repository: {name}", f"Spec: {path}", "", f'<spec path="{path}">', spec_text, "</spec>", "",
+             "Rules of this group: " + ", ".join(r for r, _ in rules), "", "Citing tests, as <path>:<line> of the citation:"]
+    for rule, _ in rules:
+        parts.append(f"{rule}: " + (", ".join(f"{p}:{n}" for p, n in tests[rule]) if tests[rule] else "none"))
+    parts += ["", "Excerpts:"]
+    for (p, first, last), text in excerpts:
+        parts += [f'<excerpt location="{p}:{first}-{last}">', text, "</excerpt>"]
+    return "\n".join(parts) + "\n"
+
+
+def settled_keys(paths, counts):
+    settled = set()
+    for path in paths:
+        for parsed in L.result_lines(path):
+            if parsed is None:
+                counts["result_lines_skipped"] += 1
+            elif parsed[1]["type"] == "succeeded":
+                settled.add(parsed[0])
+    return settled
+
+
+def run(argv):
+    a = parse(argv)
+    # The Academy rule before any read: the names and the strings as given, then each path resolved.
+    for name, clone in a.repos:
+        L.refuse_academy(name)
+        L.refuse_academy(clone)
+    L.refuse_academy(a.out)
+    for r in a.results:
+        L.refuse_academy(r)
+    clones = [(name, L.resolve(clone)) for name, clone in a.repos]
+    out = L.resolve(a.out)
+    results = [L.resolve(r) for r in a.results]
+
+    counts = {"requirements": 0, "citations": 0, "academy_skipped": 0, "result_lines_skipped": 0}
+    resolved = [Clone(name, path, a.rev) for name, path in clones]
+    settled = settled_keys(results, counts)
+    with open(os.path.join(HERE, "prompt.md"), encoding="utf-8") as f:
+        system = f.read()
+    with open(os.path.join(HERE, "verdict.schema.json"), encoding="utf-8") as f:
+        schema = json.load(f)
+
+    groups, lines = [], []
+    for clone in sorted(resolved, key=lambda c: c.name):
+        requirements, texts, citations, files = read_clone(clone, counts)
+        cited = {}
+        for spec_path, rule, test_path, no in citations:
+            cited.setdefault((spec_path, rule), set()).add((test_path, no))
+        built = []
+        for path in sorted(requirements):
+            reqs = requirements[path]
+            for i in range(0, len(reqs), GROUP):
+                built.append((path, reqs[i:i + GROUP]))
+        built.sort(key=lambda b: (b[0], int(b[1][0][0][1:])))
+        for path, rules in built:
+            tests = {rule: sorted(cited.get((path, rule), ())) for rule, _ in rules}
+            ranges = {}
+            for rule, _ in rules:
+                for test_path, no in tests[rule]:
+                    flines, cite_lines, cache = files[test_path]
+                    first, last = excerpt_range(test_path, flines, cite_lines, no, cache)
+                    ranges[(test_path, first, last)] = None
+            excerpts = []
+            for test_path, first, last in sorted(ranges):
+                first, last, text = excerpt_text(files[test_path][0], first, last)
+                excerpts.append(((test_path, first, last), text))
+            text = user_text(clone.name, path, texts[path], rules, tests, excerpts)
+            params = {"model": a.model, "max_tokens": a.max_tokens, "system": system,
+                      "messages": [{"role": "user", "content": text}],
+                      "output_config": {"format": {"type": "json_schema", "schema": schema}}}
+            k = L.key(params)
+            if len(text.encode("utf-8")) > TEXT_LIMIT:
+                state = "too_large"
+            elif k in settled:
+                state = "settled"
+            else:
+                state = "requested"
+                lines.append(L.request_line(params))
+            groups.append({"key": k, "repository": clone.name, "commit": clone.commit, "path": path,
+                           "rules": [{"rule": rule, "line": no, "tests": [f"{p}:{n}" for p, n in tests[rule]]}
+                                     for rule, no in rules],
+                           "state": state})
+
+    doc = {"job": "drift", "model": a.model, "groups": groups}
+    L.write_files(out, [("requests.jsonl", "".join(x + "\n" for x in lines).encode("utf-8")),
+                        ("groups.json", (json.dumps(doc, indent=1, ensure_ascii=False) + "\n").encode("utf-8"))])
+    states = [g["state"] for g in groups]
+    return {"status": "ok", "out": out, "groups": len(groups), "requested": states.count("requested"),
+            "settled": states.count("settled"), "too_large": states.count("too_large"), **counts}, 0
+
+
+if __name__ == "__main__":
+    sys.exit(L.main(run))
