@@ -17,7 +17,7 @@ Purpose: an agent of any CLI learns from `ap` itself which verbs it has, the req
 | Verb | Contract |
 | --- | --- |
 | `version` | this file |
-| `run` | `specs/ap/run.md`, with `specs/ap/run-limits.md`, `specs/ap/run-object.md` and `specs/ap/policy.md` |
+| `run` | `specs/ap/run.md`, with `specs/ap/run-limits.md`, `specs/ap/door.md`, `specs/ap/run-object.md` and `specs/ap/policy.md` |
 | `unit` (the store forms `add`, `amend`, `ready`, `drop`, `page`, `review`, `run`, `approve`, `reject`) | `specs/ap/unit.md`, `specs/ap/unit-review.md`, `specs/ap/unit-run.md` |
 | `deliver` | `specs/ap/deliver.md` |
 | `request` | `specs/ap/request.md` |
@@ -28,6 +28,7 @@ Purpose: an agent of any CLI learns from `ap` itself which verbs it has, the req
 | `policy` | `specs/ap/policy.md` R12 to R16 |
 | `watch` | `specs/ap/watch.md` |
 | `check` | `specs/ap/check.md` |
+| `fn` | `specs/ap/door.md` |
 | `route` (and `ap` with no argument as the function `route`) | `specs/ap/route.md` |
 | `gate`, `review`, `accept`, `backlog`, `state`, `row`, and `unit` with a page or a request on standard input | their sections of `crates/ap/README.md` (verbs to be removed; no specification) |
 

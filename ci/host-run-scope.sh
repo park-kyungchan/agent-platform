@@ -223,6 +223,51 @@ sys.exit(l != {"scratch": t+"/scratch2", "writable": [t+"/acct", t+"/scratch2", 
                "over": [[t+"/src", t+"/dst"]], "read_only": [t+"/wdir/keep"], "show": ["~/.config/gh"]}
          or not isinstance(hidden, list) or any(p.endswith("/.config/gh") for p in hidden))' "$t" \
     && ok "limits: the implementer's record names what it writes, the members as given, and ~/.config/gh shown" || bad "limits member of the implementer: $(field "$t/n.md.run.json" limits)"
+  # spec: specs/ap/door.md#R1
+  # The door (specs/ap/door.md): a verifier stage with limits asks for route and for another
+  # function, and runs `ap check` for its worktree, whose PC (a host that does not exist) the ping
+  # of a fake tailscale never reaches. The fakes ont and tailscale lie in bin, which the view cannot
+  # write: their files show they ran outside it. The stage's ap check reads this second policy.
+  printf '{"models":{"allowed":["haiku"],"never":[]},"accounts":{"claude":["%s","%s"]},"hosts":{"pc":{"ssh":"nobody@no-such-pc.invalid","work":"/nonexistent/ap-checks","busy_load":0.75}}}' \
+    "$t/acct" "$t/acctB" > "$t/policy-door.json"
+  mkdir -p "$t/dcwd"; printf '#!/bin/sh\necho checked\n' > "$t/dcwd/check"; chmod 0755 "$t/dcwd/check"
+  git -C "$t/dcwd" init -q -b main && git -C "$t/dcwd" remote add origin https://github.com/example/door.git \
+    && git -C "$t/dcwd" add -A && git -C "$t/dcwd" -c user.name=t -c user.email=t@e commit -q -m one
+  ln -s "$ap" "$t/bin/ap"
+  printf '#!/bin/sh\nprintf "%%s ONT_ROLE=%%s\\n" "$*" "$ONT_ROLE" >> "$(dirname "$0")/ont.calls"\ncat > /dev/null\necho route-answer\n' > "$t/bin/ont"
+  printf '#!/bin/sh\necho "$*" >> "$(dirname "$0")/tailscale.calls"\nexit 1\n' > "$t/bin/tailscale"
+  cat > "$t/bin/claude" <<'DOOR'
+#!/usr/bin/env bash
+cat > /dev/null
+sid=; prev=; for a in "$@"; do case "$prev" in --session-id|--resume) sid=$a ;; esac; prev=$a; done
+printf '{"type":"system","subtype":"init","session_id":"%s","mcp_servers":[]}\n' "$sid"
+r=$(ap fn route < /dev/null 2> /dev/null); rc1=$?
+ap fn other < /dev/null > /dev/null 2> "$TMPDIR/other.err"; rc2=$?
+grep -q '"not_admitted"' "$TMPDIR/other.err" && code=not_admitted || code=other
+c=$(ap check "$PWD" 2>&1 | tr '\n' '|'); rc3=${PIPESTATUS[0]}
+said="route $rc1 $r; other $rc2 $code; check $rc3 $c"
+printf '{"type":"result","subtype":"success","is_error":false,"num_turns":1,"result":"%s","session_id":"%s","usage":{"input_tokens":1,"output_tokens":1},"permission_denials":[]}\n' "$said" "$sid"
+DOOR
+  chmod 0755 "$t/bin/claude" "$t/bin/ont" "$t/bin/tailscale"
+  printf '{"role":"reviewer","ont_role":"verifier","account":"%s","model":"haiku","effort":"low","permission_mode":"auto","cwd":"%s","prompt":"%s","out":"%s","timeout_seconds":90,"limits":{"scratch":"%s"},"env":{"AP_POLICY_FILE":"%s"}}' \
+    "$t/acct" "$t/dcwd" "$t/prompt.md" "$t/door.md" "$t/scratch3" "$t/policy-door.json" \
+    | env -i PATH="$t/bin:$PATH" HOME="${HOME:-/root}" LANG=C.UTF-8 AP_POLICY_FILE="$t/policy-door.json" \
+      AP_DOOR_LOG="$t/door.jsonl" AP_CHECKS_LOG="$t/checks.jsonl" "$ap" run > "$t/door.out" 2> "$t/door.err"; rc=$?
+  ans=$(cat "$t/door.md" 2> /dev/null)
+  { [ "$rc" -eq 0 ] && [ "$ans" = "route 0 route-answer; other 2 not_admitted; check 0 check: on this host (pc_unreachable)|checked|" ]; } \
+    && ok "door: ap fn route answered, ap fn other was refused not_admitted, ap check ran here after pc_unreachable: $ans" \
+    || bad "door: rc=$rc $ans $(tail -c 400 "$t/door.err")"
+  { [ "$(cat "$t/bin/ont.calls" 2> /dev/null)" = "fn route ONT_ROLE=verifier" ] && grep -q '^ping ' "$t/bin/tailscale.calls" 2> /dev/null; } \
+    && ok "door: the engine was asked as the verifier and the ping ran, both outside the view" \
+    || bad "door: ont $(cat "$t/bin/ont.calls" 2> /dev/null) tailscale $(cat "$t/bin/tailscale.calls" 2> /dev/null)"
+  python3 -I -c 'import json,os,sys; t=sys.argv[1]; f=t+"/door.jsonl"
+lines=[json.loads(l) for l in open(f)]
+sys.exit(oct(os.stat(f).st_mode & 0o777) != "0o600" or len(lines) != 3
+         or any(l["run"] != t+"/door.md.run.json" or l["role"] != "verifier" for l in lines))' "$t" \
+    && ok "door: its record is mode 0600 with three lines of this stage's run and role" || bad "door: record $(ls -l "$t/door.jsonl" 2> /dev/null) $(cat "$t/door.jsonl" 2> /dev/null)"
+  { [ ! -e "$t/checks.jsonl" ] && [ ! -e "$t/scratch3.door" ] && [ ! -e "$t/scratch3" ]; } \
+    && ok "door: no row of the checks log for a call placed here, and the door and the scratch directory are gone" \
+    || bad "door: $(ls -d "$t/checks.jsonl" "$t/scratch3.door" "$t/scratch3" 2> /dev/null | tr '\n' ' ')"
 fi
 
 [ "$fails" -eq 0 ] && echo "host-run-scope: PASS" || { echo "host-run-scope: $fails FAILED"; exit 1; }
