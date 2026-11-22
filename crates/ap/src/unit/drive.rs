@@ -7,6 +7,7 @@
 use super::object::{self, branch_ok, clone_of};
 use super::page_review::{self, key_ok, stage_unit, unit_ended};
 use super::render::{self, Role};
+use super::scan;
 use crate::host::{Failure, Host, System, args, digest, error, fail, id, new_session_id};
 use crate::review::{self, DIFF_OPTIONS, GIT_SAFE};
 use crate::store::{self, Actor, Applied, Lead, at};
@@ -1624,6 +1625,11 @@ impl Run {
                     json!({"paths": shown, "count": hit.len()}),
                 );
             }
+        }
+        // R44: the lines the head adds, before the acceptance checks, the gate and the verifier.
+        let notes = self.u["notes"].as_str().unwrap_or_default();
+        if let Err(e) = scan::scan(s, wt, base, head, notes) {
+            return stop(e.cause, e.detail);
         }
         let merge_base = self.git(s, wt, &["merge-base", base, head])?;
         self.done.checks += 1;

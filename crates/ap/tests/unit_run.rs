@@ -5959,3 +5959,32 @@ fn r43_the_report_of_each_closed_round_is_posted_as_one_comment() {
         "{a}"
     );
 }
+
+// spec: specs/ap/unit-run.md#R44
+#[test]
+fn r44_a_line_of_a_token_form_stops_the_unit_before_its_verifier_and_an_admission_takes_it() {
+    // The token is built at run time, so that no line of this file holds the form.
+    let token = format!("{}{}_{}", "gh", "p", "aB3dE5".repeat(6));
+    let edit = format!("mkdir docs; printf '%s\\n' '{token}' > docs/fixture.txt");
+    let mut f = F::new();
+    let (a, status) = f.edit("plain", json!(["docs/**"]), &[], &edit);
+    assert_eq!((a["state"].as_str(), status), (Some("stopped"), 3), "{a}");
+    assert_eq!(a["stop_cause"], "secret_in_diff", "{a}");
+    assert_eq!(
+        detail(&a),
+        json!({"lines": [{"path": "docs/fixture.txt", "line": 1, "form": "github_token"}], "count": 1}),
+        "{a}"
+    );
+    for piece in token.as_bytes().windows(8) {
+        let piece = std::str::from_utf8(piece).unwrap();
+        assert!(!a.to_string().contains(piece), "{piece}");
+    }
+    assert!(f.packets().is_empty());
+    assert_eq!(f.merges(), (0, 0));
+    // The same edit with the admission of that path and that line's digest is merged.
+    let digest = format!("{:x}", Sha256::digest(token.as_bytes()));
+    let mut f = F::new();
+    f.set_unit(json!({"notes": format!("Admitted line: docs/fixture.txt {digest}")}));
+    let (a, status) = f.edit("plain", json!(["docs/**"]), &[], &edit);
+    assert_eq!((a["state"].as_str(), status), (Some("merged"), 0), "{a}");
+}
