@@ -2903,6 +2903,10 @@ impl Object {
         p["model"] = json!(q.model);
         p["effort"] = json!(q.effort);
         p["account"] = json!(component.filter(|n| n.len() <= 200));
+        p["host"] = crate::host::id("host", "local");
+        p["uses"] = component
+            .filter(|n| n.len() <= 200)
+            .map_or(Value::Null, |n| crate::host::id("account", n));
         p["session"] = json!(self.session);
         p["record"] = json!(fits(record_path(&q.out)));
         p["stream"] = json!(fits(format!("{}.stream.jsonl", q.out)));

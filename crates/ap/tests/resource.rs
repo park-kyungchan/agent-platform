@@ -2119,7 +2119,7 @@ fn check_r21_every_record_line_of_ap_check_becomes_a_check_record() {
 
 // spec: specs/ap/run-object.md#R15
 #[test]
-fn run_object_r15_start_run_and_start_install_take_a_host_that_ap_run_does_not_give() {
+fn run_object_r15_start_run_and_start_install_take_a_host() {
     let schema: Value =
         serde_json::from_str(include_str!("../../../ontology/work.schema.json")).unwrap();
     assert!(schema["version"].as_u64().unwrap() >= 17);
@@ -2148,9 +2148,6 @@ fn run_object_r15_start_run_and_start_install_take_a_host_that_ap_run_does_not_g
             "{action}"
         );
     }
-    // `ap run` builds its start without them.
-    let run_rs = include_str!("../src/run.rs");
-    assert!(!run_rs.contains("\"uses\""));
 }
 
 /// The real engine: a scratch store of the repository's schema whose two record sources read a scratch directory and

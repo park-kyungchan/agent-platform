@@ -2078,6 +2078,51 @@ fn rolls(w: &mut W) -> (Value, u8) {
 }
 
 // spec: specs/ap/deliver.md#R19
+#[test]
+fn r19_every_start_install_names_the_host_local() {
+    let host = oid("host", "local");
+    // The pair's forward attempt.
+    let mut w = W::new();
+    let (v, exit) = w.run();
+    assert_eq!((end(&v), exit), (("installed", ""), 0), "{v}");
+    let starts = w.applies("start_install");
+    assert_eq!(starts.len(), 1);
+    assert_eq!(starts[0]["parameters"]["host"], host);
+    assert_eq!(w.installs[0]["host"], host);
+    let close = &w.applies("close_install")[0]["parameters"];
+    assert!(close.get("host").is_none(), "{close}");
+    // A Lead's rollback.
+    let mut w = W::new();
+    installed_by_a(&mut w);
+    let (v, exit) = rolls(&mut w);
+    assert_eq!((end(&v), exit), (("installed", ""), 0), "{v}");
+    let starts = w.applies("start_install");
+    assert_eq!(starts.len(), 1);
+    assert_eq!(starts[0]["parameters"]["kind"], "rollback");
+    assert_eq!(starts[0]["parameters"]["host"], host);
+    assert_eq!(w.installs.last().unwrap()["host"], host);
+    assert!(
+        w.applies("close_install")[0]["parameters"]
+            .get("host")
+            .is_none()
+    );
+    // The engine's attempt.
+    let mut w = W::engine();
+    let (v, exit) = w.run();
+    assert_eq!((end(&v), exit), (("installed", ""), 0), "{v}");
+    let starts = w.applies("start_install");
+    assert_eq!(starts.len(), 1);
+    assert_eq!(starts[0]["parameters"]["target"], etarget());
+    assert_eq!(starts[0]["parameters"]["host"], host);
+    assert_eq!(w.installs.last().unwrap()["host"], host);
+    assert!(
+        w.applies("close_install")[0]["parameters"]
+            .get("host")
+            .is_none()
+    );
+}
+
+// spec: specs/ap/deliver.md#R19
 // spec: specs/ap/deliver.md#R33
 #[test]
 fn d12_rollback_exact_calls() {
@@ -2163,7 +2208,7 @@ fn d12_rollback_exact_calls() {
             json!({"action_type": "start_install", "request_id": format!("ap.{back}.rb1"), "agent": "ap-deliver",
             "parameters": {"target": target(), "kind": "rollback", "repository": "o/r", "commit": back, "attempt": 1,
                 "from": here, "from_sha256": sha(&binary(&here)), "rolls_back": a, "by": "session-1",
-                "reason": "after a merge"}}),
+                "reason": "after a merge", "host": oid("host", "local")}}),
         ),
         launch("install-content.sh", &w.tarball()),
         launch("install-ap.sh", &kept(&w)),
@@ -3059,7 +3104,8 @@ fn d10_exact_calls_of_an_install() {
             json!({"action_type": "start_install", "request_id": format!("ap.{tip}.1"), "agent": "ap-deliver",
             "parameters": {"target": target(), "kind": "forward", "repository": "o/r", "commit": tip, "attempt": 1,
                 "from": from, "from_sha256": sha(&binary(&from)), "by": "session-1", "reason": "after a merge",
-                "head": h(2), "review": w.accepting(2), "reviews": [w.accepting(1), w.accepting(2)]}}),
+                "head": h(2), "review": w.accepting(2), "reviews": [w.accepting(1), w.accepting(2)],
+                "host": oid("host", "local")}}),
         ),
         launch("install-ap.sh"),
         launch("install-content.sh"),
@@ -3524,7 +3570,8 @@ fn e_engine_at_the_pin_after_the_installer_is_installed_and_the_call_ends() {
         start["parameters"],
         json!({"target": etarget(), "kind": "forward", "repository": "o/engine", "commit": pin,
             "attempt": 1, "from": from, "from_sha256": sha(&engine_binary(&from)), "by": "session-1",
-            "reason": "after a merge", "head": eh(2), "review": review(2), "reviews": [review(1), review(2)]})
+            "reason": "after a merge", "head": eh(2), "review": review(2), "reviews": [review(1), review(2)],
+            "host": oid("host", "local")})
     );
     let close = &w.applies("close_install")[0];
     assert_eq!(close["request_id"], format!("ont.{pin}.1.close"));
