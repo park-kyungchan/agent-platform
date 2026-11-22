@@ -10142,17 +10142,21 @@ fn limits_r16_the_policy_file_of_the_request_or_the_default_and_never_a_hidden_o
             .unwrap()
             .contains(&json!(policy))
     );
-    // A file inside a hidden path, a link to one, a path inside the store's directory, and a
-    // directory: no word names it, and the default is not bound in its place.
+    // A file inside a hidden path, a link to one, a path inside the store's directory, a
+    // directory, and a file of `/etc` but the default, named and through a link: no word names it,
+    // and the default is not bound in its place.
     std::fs::write(f.t.join("home/.ssh/policy.json"), "{}").unwrap();
     let hidden = f.p("home/.ssh/policy.json");
     std::os::unix::fs::symlink(&hidden, f.p("link.json")).unwrap();
     std::fs::create_dir(f.t.join("policy-dir")).unwrap();
+    std::os::unix::fs::symlink("/etc/shadow", f.p("etc-link.json")).unwrap();
     let cases = [
         hidden.clone(),
         f.p("link.json"),
         "/var/lib/ontology-platform/policy.json".to_owned(),
         f.p("policy-dir"),
+        "/etc/shadow".to_owned(),
+        f.p("etc-link.json"),
     ];
     for (i, p) in cases.iter().enumerate() {
         let mut r = f.limited(&format!("n{i}.md"));
@@ -10161,7 +10165,7 @@ fn limits_r16_the_policy_file_of_the_request_or_the_default_and_never_a_hidden_o
         assert_eq!(v["state"], "ok", "{p}: {v}");
         let n = 2 + i;
         let view = f.view_words(n);
-        let shown = |w: &String| w == p || w == &hidden || w == default;
+        let shown = |w: &String| w == p || w == &hidden || w == default || w == "/etc/shadow";
         assert!(!view.iter().any(shown), "{p}: {view:?}");
     }
 }

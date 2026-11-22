@@ -639,8 +639,8 @@ fn gitdir(dot: &Path, cwd: &str) -> Option<PathBuf> {
 }
 /// The policy file the stage's own `ap check` reads (`AP_POLICY_FILE` of the launch's environment
 /// when set and not empty, else the default), when it is a regular file and neither the path as
-/// written nor the file it resolves to is a hidden path or inside one, or inside the store's
-/// directory (R16 (i)).
+/// written nor the file it resolves to is a hidden path or inside one, inside the store's
+/// directory, or under `/etc` but the default (R16 (i)).
 fn policy_shown(env: &[(String, String)], home: &str, work_root: &Path) -> Option<String> {
     let p = variable(env, "AP_POLICY_FILE")
         .filter(|p| !p.is_empty())
@@ -650,7 +650,11 @@ fn policy_shown(env: &[(String, String)], home: &str, work_root: &Path) -> Optio
         return None;
     }
     let resolved = std::fs::canonicalize(path).ok()?;
-    let barred = |x: &Path| in_hidden(&lossy(x), home, work_root) || x.starts_with(STORE_DIR);
+    let barred = |x: &Path| {
+        in_hidden(&lossy(x), home, work_root)
+            || x.starts_with(STORE_DIR)
+            || (x.starts_with("/etc") && x != Path::new(POLICY_DEFAULT))
+    };
     (!barred(path) && !barred(&resolved)).then(|| p.to_owned())
 }
 /// The `bwrap` arguments that hide these paths: a directory becomes an empty one the stage cannot

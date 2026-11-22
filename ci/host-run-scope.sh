@@ -230,7 +230,7 @@ else
   cat "/sys/fs/cgroup$(systemctl show -p ControlGroup --value "$bunit")/cgroup.procs" > "$t/bin/peer.pids" 2> /dev/null
   [ -e "$bhome/ready" ] && [ -s "$t/bin/peer.pids" ] && [ -d "$t/scratchB" ] && [[ "$bhome" == "$t/acctB/homes/"?* ]] \
     && ok "limits: stage B runs in $bunit with $(wc -l < "$t/bin/peer.pids") processes, in its home below acctB/homes" || bad "limits: stage B did not start: $(tail -c 400 "$t/lb.err")"
-  req l.md ",\"limits\":{\"scratch\":\"$t/scratch\",\"read_only\":[\"$t/bin\"]}}" | apr > "$t/l.out" 2> "$t/l.err"; rc=$?
+  req l.md ",\"limits\":{\"scratch\":\"$t/scratch\",\"read_only\":[\"$t/bin\"]}" | apr > "$t/l.out" 2> "$t/l.err"; rc=$?
   ans=$(cat "$t/l.md" 2> /dev/null); home=$(field "$t/l.md.run.json" home)
   { [ "$rc" -eq 0 ] && [ "$(field "$t/l.md.run.json" state)" = ok ] && [ ! -e "$t/cwd/x" ] && [ ! -e "$t/bin/x" ] \
     && [[ "$ans" == "cwd refused (Read-only file system); scratch written; root refused ("*"); peer refused; "* ]]; } \
@@ -264,7 +264,7 @@ sys.exit(r.get("home") != t+"/acctB/homes/"+r["session"] or r["limits"]["writabl
   # A link left in a home: in place of the empty file bwrap left at `.credentials.json`, a link to a
   # path below /oldroot (bwrap's old root) of a file that does not exist; its resume launches nothing.
   echo answer > "$t/bin/mode"
-  req k.md ",\"limits\":{\"scratch\":\"$t/scratchK\",\"read_only\":[\"$t/bin\"]}}" | apr > "$t/k.out" 2> "$t/k.err"; rc=$?
+  req k.md ",\"limits\":{\"scratch\":\"$t/scratchK\",\"read_only\":[\"$t/bin\"]}" | apr > "$t/k.out" 2> "$t/k.err"; rc=$?
   khome=$(field "$t/k.md.run.json" home)
   { [ "$rc" -eq 0 ] && [ -d "$khome" ] && [ -f "$khome/.credentials.json" ] && [ ! -s "$khome/.credentials.json" ]; } \
     && ok "limits: a first launch left an empty .credentials.json in its home" || bad "limits: first launch: rc=$rc $(tail -c 400 "$t/k.err")"

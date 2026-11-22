@@ -1035,7 +1035,6 @@ fn ended_line(t: &str) -> String {
         false => format!("{t}\n"),
     }
 }
-/// The plan part and the rest (`## Repositories`, `## States now`) of the intent `key` read as `intent` (R7).
 /// The section of a page look's dependencies, with the bytes of the writer's
 /// (`specs/ap/unit-write.md` R5): each key of `depends_on` in its order with its state and its page
 /// part, or `(not in the store)`; nothing for a unit without dependencies (R6).
@@ -1062,8 +1061,8 @@ fn dependencies(s: &mut impl System, store: Option<&str>, u: &Value) -> Result<S
     }
     Ok(out)
 }
-/// The plan part, the rest of a plan's text, and the clones its `## Repositories` names, in its
-/// order (R7, R13).
+/// The plan part and the rest (`## Repositories`, `## States now`) of the intent `key` read as `intent` (R7).
+/// Also the clones its `## Repositories` names, in its order (R13).
 fn plan(
     s: &mut impl System,
     store: Option<&str>,
