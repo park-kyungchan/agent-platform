@@ -1,0 +1,21 @@
+{
+ "type": "object",
+ "properties": {
+  "rules": {
+   "type": "array",
+   "items": {
+    "type": "object",
+    "properties": {
+     "rule": {"type": "string"},
+     "verdict": {"type": "string", "enum": ["tested", "untested", "miscited"]},
+     "tests": {"type": "array", "items": {"type": "string"}},
+     "why": {"type": "string"}
+    },
+    "required": ["rule", "verdict", "tests", "why"],
+    "additionalProperties": false
+   }
+  }
+ },
+ "required": ["rules"],
+ "additionalProperties": false
+}
