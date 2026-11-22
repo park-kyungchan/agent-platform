@@ -75,15 +75,16 @@ if [ "${CI:-}" = true ] && [ "$(id -u)" != 0 ]; then
 else
   bash ontology/rehearsal.sh "$ont_bin" > /dev/null
 fi
-# The tests of `ap route`, `ap clause` and `ap resource` that run the real engine (crates/ap/tests/route_engine.rs and
-# the ignored tests of crates/ap/tests/clause.rs and crates/ap/tests/resource.rs, ignored by the cargo test above):
+# The tests of `ap route`, `ap clause`, `ap resource` and `ap api` that run the real engine (crates/ap/tests/route_engine.rs
+# and the ignored tests of crates/ap/tests/clause.rs, crates/ap/tests/resource.rs and crates/ap/tests/api.rs, ignored by
+# the cargo test above):
 # each test binary is built once and run with
 # --ignored and the engine of $ont_bin; in CI through sudo (the engine admits only uid 0; a bare `sudo cargo test`
 # can lose rustup's toolchain). Each test copies the built ap to a file of mode 0755 of its own temporary
 # directory, owned by the user it runs as.
-engine_tests=$(cargo test --locked -p ap --test route_engine --test clause --test resource --no-run --message-format=json \
-  | python3 -I -B -c 'import json, sys; print("\n".join(m["executable"] for m in map(json.loads, sys.stdin) if m.get("reason") == "compiler-artifact" and m.get("executable") and m["target"]["name"] in ("route_engine", "clause", "resource")))')
-[ "$(printf '%s\n' "$engine_tests" | grep -c .)" = 3 ] || { echo "engine_tests_missing@check" >&2; exit 1; }
+engine_tests=$(cargo test --locked -p ap --test route_engine --test clause --test resource --test api --no-run --message-format=json \
+  | python3 -I -B -c 'import json, sys; print("\n".join(m["executable"] for m in map(json.loads, sys.stdin) if m.get("reason") == "compiler-artifact" and m.get("executable") and m["target"]["name"] in ("route_engine", "clause", "resource", "api")))')
+[ "$(printf '%s\n' "$engine_tests" | grep -c .)" = 4 ] || { echo "engine_tests_missing@check" >&2; exit 1; }
 for route_tests in $engine_tests; do
   if [ "${CI:-}" = true ] && [ "$(id -u)" != 0 ]; then
     sudo env "PATH=$PATH" "ONT_BIN=$ont_bin" "$route_tests" --ignored --test-threads=1 --quiet

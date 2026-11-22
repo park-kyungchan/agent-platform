@@ -1633,3 +1633,56 @@ no run names; an index of the two sources while their directory is absent (`glob
 check line indexed (`initial`), read by `ont get` with every property, reached by `ont around` from their host by
 `host_samples` and `host_checks`, and retracted with their files. The last line of standard output of the rehearsal is
 `v17 resources: ok`.
+
+## Version 18: the credit's ledger
+Version 17 remains pinned at
+`9683153aeb4f8ba0e855a78a94a2338d94587680:ontology/work.schema.json`,
+sha256 `e944d88e686926eb4f1295e89ab6836d5280f004b43d12e154ea1eba0981510d`.
+Version 18 changes what point 1 below names (`run`, `start_run` and `close_run`) and adds the function of point 2; every
+other value type, source, object type, link type, action, view and function of version 17 reads the same in canonical
+JSON.
+
+The Claude API credit has one ledger, the store's runs: a Message Batch that `ap api batch` (`specs/ap/api.md`) submits
+is a `run` of role `batch` on the credit's account, reserved at its worst case before the submit and settled by the
+results' `usage` after it, so one function sums every spend and no second ledger exists.
+
+1. `run` gains the optional properties `job` (string, at most 40 bytes: the job of the policy's member `api` the batch
+   ran for), `reserved_usd_micros` and `settled_usd_micros` (integers, whole micro-USD: the worst case reserved before
+   the submit, and the settlement of the results). `start_run` gains the optional parameters `job` and
+   `reserved_usd_micros`, and `close_run` the optional parameter `settled_usd_micros`, which their rules set as the
+   run's properties of those names; a parameter not given leaves its property as it is. No criterion reads them, and
+   none of the six carries a description.
+2. The function `api_spend`: the parameter `month` (string, required, `YYYY-MM`), the program `/usr/local/bin/ap`,
+   `answer_bytes` 65536, `timeout_ms` 30000, one description of at most 200 bytes. Its answer is `specs/ap/api.md` R17.
+   Nothing else of the schema changes.
+
+The rule of the spend (`specs/ap/api.md` R9), which the admission of `ap api batch` and `api_spend` share: the spend of
+a period is the runs whose `role` is `batch` and whose `started_at` falls in it; a run counts its `settled_usd_micros`
+when it is `closed` and has one, else its `reserved_usd_micros` (a running run, and a closed one without a settlement:
+an uncertain submit, a poll that timed out, a close that failed). The read is one search of `run` by `role` and
+`started_at`, two required properties, so a running run leaves its page qualified. The periods are the UTC calendar
+month and the UTC day.
+
+### What the store does not check
+- An amount may be negative: the engine stores the integer it is given.
+- A settlement may pass its reservation: the results' `usage` is what the batch cost, whatever the worst case was.
+- `job` need name no job of the policy: the policy is the verb's, not the store's.
+- `uses` may dangle: no `account` object of the credit need exist (version 17's rule).
+
+### The migration and the rehearsal
+`ontology/migrate` knows version 18; its step is empty (no data migration): no stored run gains a job or an amount. The
+line `HIGHEST = 18` names it; `18 19` and `9 19` are pairs it does not know (exit 2). The pairs refused on the version
+10 part of the rehearsal are (9, 19), (10, 10) and (10, 9). An `ap` of the version before sends `start_run` and
+`close_run` without the new parameters, which apply as on version 17; `ap run` sends them so in this version too.
+
+The second store of the rehearsal now installs version 17 from Git by its commit and digest (above) instead of the
+repository's file, and runs the walk of version 17 on it. Then it installs the repository's file over the objects made
+under version 17: every object read under version 17 and the ten views read the same; the schema differs from version
+17 only by points 1 and 2 (each is taken off a copy and the rest compared); `ont describe` lists `api_spend` with
+`month` beside `capacity`, `clause`, `gate`, `horizon` and `route`; `ont_describe` and `ont_action_list` stay within
+262,144 bytes (the line `v18_mcp_bytes=`); `ontology/migrate` runs 17 18 (exit 0, the store unchanged) and 18 19 (exit
+2). The walk of version 18: `start_run` with `job` and `reserved_usd_micros`, then `close_run` with
+`settled_usd_micros`, read back by `ont get`; a close without a settlement, which keeps the reservation alone; a
+negative reservation and a settlement above it, and a job no policy names, stored as given; a `start_run` and a
+`close_run` without the new parameters, which read as on version 17. The last line of standard output of the rehearsal
+is `v18 credit: ok`.

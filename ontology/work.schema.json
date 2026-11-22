@@ -1,7 +1,7 @@
 {
   "format": "ontology-schema/v1",
   "domain": "work",
-  "version": 17,
+  "version": 18,
   "namespace": {
     "instance": "vps://palantirkc",
     "account": "root"
@@ -1289,7 +1289,10 @@
         "stream": {"type": {"value_type": "file_path"}, "required": false, "description": "The raw stream of the run."},
         "running_in": {"type": {"ref": "unit"}, "required": false, "description": "The unit while the run is running; cleared by close_run."},
         "host": {"type": {"ref": "host"}, "required": false},
-        "uses": {"type": {"ref": "account"}, "required": false}
+        "uses": {"type": {"ref": "account"}, "required": false},
+        "job": {"type": "string", "required": false, "max_bytes": 40},
+        "reserved_usd_micros": {"type": "integer", "required": false},
+        "settled_usd_micros": {"type": "integer", "required": false}
       }
     },
     "finding": {
@@ -4021,14 +4024,16 @@
         "record": {"type": {"value_type": "file_path"}, "required": false, "description": "The run record."},
         "stream": {"type": {"value_type": "file_path"}, "required": false, "description": "The raw stream of the run."},
         "host": {"type": {"ref": "host"}, "required": false},
-        "uses": {"type": {"ref": "account"}, "required": false}
+        "uses": {"type": {"ref": "account"}, "required": false},
+        "job": {"type": "string", "required": false, "max_bytes": 40},
+        "reserved_usd_micros": {"type": "integer", "required": false}
       },
       "submission_criteria": [
         {"code": "unknown_unit", "message": "Name an existing unit (search unit).", "none": [{"all": [{"present": "$unit"}, {"none": [{"exists": "$unit"}]}]}]},
         {"code": "unknown_intent", "message": "Name an existing intent (search intent).", "none": [{"all": [{"present": "$intent"}, {"none": [{"exists": "$intent"}]}]}]}
       ],
       "rules": [
-        {"create_object": "run", "set": {"unit": "$unit", "intent": "$intent", "role": "$role", "runtime": "$runtime", "model": "$model", "effort": "$effort", "account": "$account", "session": "$session", "record": "$record", "stream": "$stream", "status": "running", "started_at": "$now", "running_in": "$unit", "host": "$host", "uses": "$uses"}}
+        {"create_object": "run", "set": {"unit": "$unit", "intent": "$intent", "role": "$role", "runtime": "$runtime", "model": "$model", "effort": "$effort", "account": "$account", "session": "$session", "record": "$record", "stream": "$stream", "status": "running", "started_at": "$now", "running_in": "$unit", "host": "$host", "uses": "$uses", "job": "$job", "reserved_usd_micros": "$reserved_usd_micros"}}
       ]
     },
     "close_run": {
@@ -4044,13 +4049,14 @@
         "output_tokens": {"type": "integer", "required": false, "description": "Output tokens."},
         "limit": {"type": "string", "required": false, "max_bytes": 300, "description": "The usage-limit reading as the run record holds it."},
         "record": {"type": {"value_type": "file_path"}, "required": false, "description": "The run record."},
-        "stream": {"type": {"value_type": "file_path"}, "required": false, "description": "The raw stream of the run."}
+        "stream": {"type": {"value_type": "file_path"}, "required": false, "description": "The raw stream of the run."},
+        "settled_usd_micros": {"type": "integer", "required": false}
       },
       "submission_criteria": [
         {"code": "run_not_running", "message": "Choose a running run.", "all": [{"exists": "$run"}, {"eq": ["$run.status", "running"]}]}
       ],
       "rules": [
-        {"modify_object": "run", "set": {"state": "$state", "session": "$session", "served_by": "$served_by", "input_tokens": "$input_tokens", "cache_read_tokens": "$cache_read_tokens", "cache_write_tokens": "$cache_write_tokens", "output_tokens": "$output_tokens", "limit": "$limit", "record": "$record", "stream": "$stream", "status": "closed", "ended_at": "$now"}},
+        {"modify_object": "run", "set": {"state": "$state", "session": "$session", "served_by": "$served_by", "input_tokens": "$input_tokens", "cache_read_tokens": "$cache_read_tokens", "cache_write_tokens": "$cache_write_tokens", "output_tokens": "$output_tokens", "limit": "$limit", "record": "$record", "stream": "$stream", "status": "closed", "ended_at": "$now", "settled_usd_micros": "$settled_usd_micros"}},
         {"clear_reference": {"object_type": "run", "property": "running_in"}}
       ]
     },
@@ -4377,6 +4383,15 @@
       "program": "/usr/local/bin/ap",
       "answer_bytes": 65536,
       "timeout_ms": 600000
+    },
+    "api_spend": {
+      "description": "The API credit's spend of a UTC month by job: settled runs of role batch at their settlement, the others at their reservation (specs/ap/api.md R17).",
+      "parameters": {
+        "month": {"type": "string", "required": true}
+      },
+      "program": "/usr/local/bin/ap",
+      "answer_bytes": 65536,
+      "timeout_ms": 30000
     }
   },
   "grants": [
