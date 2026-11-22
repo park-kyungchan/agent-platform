@@ -40,6 +40,15 @@ const SAFE: [&str; 4] = [
     "core.fsmonitor=false",
 ];
 const KEY: &str = "widgets-list";
+/// The fixed script of the App's signature (R42).
+const SIGN: &str = r#"printf %s "$1" | openssl dgst -sha256 -sign "$2" -binary"#;
+/// What the fake `openssl` signs with, the installation the fake service names and the installation
+/// token it makes: all invented.
+const SIGNATURE: &[u8] = b"invented-signature-bytes";
+const INSTALLATION: u64 = 77;
+const INSTALLATION_TOKEN: &str = "ghs_InventedInstallation42";
+/// The App id of the tests' policy: invented.
+const APP_ID: u64 = 424_242;
 
 fn oid(kind: &str, key: &str) -> Value {
     json!({"object_type":kind,"namespace":{"instance":"vps://invented","account":"root"},"native_key":key})
@@ -167,6 +176,21 @@ struct F {
     check_wraps: Vec<Vec<String>>,
     /// From this launch on, the host has no units (a check runs by plain `sh`).
     no_units_after: Option<usize>,
+    /// The body of the pull request (`pr view --json body`); `None`: an answer without `body`.
+    body: Option<String>,
+    /// The read of the body fails.
+    body_fails: bool,
+    /// Every `gh pr comment`: its words.
+    comments: Vec<Vec<String>>,
+    /// Every `gh pr comment` fails.
+    comment_fails: bool,
+    /// The step of the App's status that fails (R42): `openssl`, `installation`, `access_tokens`,
+    /// `status`; with `-missing` after it, the answer lacks its member.
+    app_fails: Option<&'static str>,
+    /// The `Authorization` header of each status posted, when it had one.
+    status_headers: Vec<Option<String>>,
+    /// The port's wall clock, when the test fixes it.
+    wall: Option<SystemTime>,
 }
 impl F {
     fn new() -> Self {
@@ -177,7 +201,7 @@ impl F {
             NEXT.fetch_add(1, Ordering::SeqCst)
         ));
         let _ = std::fs::remove_dir_all(&t);
-        for d in ["bin", "a1", "a2", "a3", "seed"] {
+        for d in ["bin", "a1", "a2", "a3", "seed", "secrets"] {
             std::fs::create_dir_all(t.join(d)).unwrap();
         }
         let t = std::fs::canonicalize(&t).unwrap();
@@ -243,6 +267,13 @@ impl F {
             launch_envs: vec![],
             check_wraps: vec![],
             no_units_after: None,
+            body: Some("An invented description of the change.\n".into()),
+            body_fails: false,
+            comments: vec![],
+            comment_fails: false,
+            app_fails: None,
+            status_headers: vec![],
+            wall: None,
         };
         f.policy(json!({}));
         f.put("task", "invented-task", json!({"status": "open"}));
@@ -275,7 +306,7 @@ impl F {
                 "claude/reviewer": [self.p("a2")], "claude": [self.p("a3")]},
             "repositories": {"invented/widgets": {"clone": self.p("clone")}},
             "reviews": {"task": "invented-task", "directory": self.p("reviews")},
-            "units": {"directory": self.p("units")}});
+            "units": {"directory": self.p("units"), "github": self.github(None)}});
         for (key, v) in extra.as_object().unwrap() {
             match v {
                 Value::Null => {
@@ -285,6 +316,23 @@ impl F {
             }
         }
         std::fs::write(self.t.join("policy.json"), policy.to_string()).unwrap();
+    }
+    /// `units.github`: the Lead's App (an invented id and key path), and `stage_tokens` when given.
+    fn github(&self, tokens: Option<Value>) -> Value {
+        let mut g = json!({"lead_app": {"id": APP_ID, "key": self.p("secrets/app.pem")}});
+        if let Some(t) = tokens {
+            g["stage_tokens"] = t;
+        }
+        g
+    }
+    /// The stage token of `invented/widgets` in its own file, named by `units.github.stage_tokens`.
+    fn token(&self, text: &str) -> String {
+        let path = self.p("secrets/widgets.token");
+        std::fs::write(&path, text).unwrap();
+        let tokens = json!({"invented/widgets": path});
+        let units = json!({"directory": self.p("units"), "github": self.github(Some(tokens))});
+        self.policy(json!({"units": units}));
+        path
     }
     fn steps(&self, steps: &[&str]) {
         std::fs::write(self.t.join("bin/steps"), steps.join("\n") + "\n").unwrap();
@@ -1070,6 +1118,16 @@ impl F {
                 if self.t.join("bin/gh-down").exists() {
                     return said(self.gh_says);
                 }
+                // The description a verifier round reads (R19).
+                if a[3..] == ["--repo", "invented/widgets", "--json", "body"] {
+                    if self.body_fails {
+                        return said(self.gh_says);
+                    }
+                    return ok(match &self.body {
+                        Some(b) => json!({"body": b}),
+                        None => json!({"title": "An invented title."}),
+                    });
+                }
                 let (state, head, commit) = match &self.merged {
                     Some((h, c)) => ("MERGED", json!(h), json!({"oid": c})),
                     None if self.t.join("bin/pr-closed").exists() => {
@@ -1145,14 +1203,54 @@ impl F {
                     .collect();
                 ok(json!({"state": "success", "statuses": list}))
             }
-            ("api", "--method") => {
-                let head = a[3].rsplit('/').next().unwrap().to_owned();
+            // The report as a comment (R43).
+            ("pr", "comment") => {
+                self.comments.push(a.to_vec());
+                match self.comment_fails {
+                    true => said("HTTP 502: an invented failure"),
+                    false => ok(json!({})),
+                }
+            }
+            // The App's installation, its token and a status, by the path the call names (R42).
+            ("api", "--method" | "-H") if !a.iter().any(|w| w == "graphql") => {
+                let path = a
+                    .iter()
+                    .find(|w| w.starts_with("repos/") || w.starts_with("app/"))
+                    .unwrap()
+                    .clone();
+                let header = a.windows(2).find(|w| w[0] == "-H").map(|w| w[1].clone());
+                let fails = |step: &str| self.app_fails == Some(step);
+                let missing = |step: &str| {
+                    self.app_fails
+                        .is_some_and(|f| f == format!("{step}-missing"))
+                };
+                if path.ends_with("/installation") {
+                    return match () {
+                        _ if fails("installation") => said(self.gh_says),
+                        _ if missing("installation") => ok(json!({"message": "invented"})),
+                        _ => ok(json!({"id": INSTALLATION, "app_id": APP_ID})),
+                    };
+                }
+                if path.starts_with("app/installations/") {
+                    return match () {
+                        _ if fails("access_tokens") => said(self.gh_says),
+                        _ if missing("access_tokens") => ok(json!({"token": ""})),
+                        _ => ok(
+                            json!({"token": INSTALLATION_TOKEN, "expires_at": "2099-01-01T00:00:00Z"}),
+                        ),
+                    };
+                }
+                if fails("status") {
+                    return said(self.gh_says);
+                }
+                let head = path.rsplit('/').next().unwrap().to_owned();
                 let field = |k: &str| {
                     let f = a.iter().find_map(|w| w.strip_prefix(&format!("{k}=")));
                     f.unwrap().to_owned()
                 };
                 self.statuses
                     .push((head, field("state"), field("description")));
+                self.status_headers.push(header);
                 ok(json!({}))
             }
             ("api", "graphql") => {
@@ -1212,6 +1310,24 @@ impl System for F {
                     success: false,
                     bytes: vec![],
                     stdout: vec![],
+                })
+            }
+            // The App's signature (R42): the fake `openssl` signs with invented bytes.
+            "sh" if args.get(1).map(String::as_str) == Some(SIGN) => {
+                let fails = self.app_fails == Some("openssl");
+                let empty = self.app_fails == Some("openssl-missing");
+                let stdout = match fails || empty {
+                    true => vec![],
+                    false => SIGNATURE.to_vec(),
+                };
+                let bytes = match fails {
+                    true => b"invented: unable to load key".to_vec(),
+                    false => stdout.clone(),
+                };
+                Ok(Reply {
+                    success: !fails,
+                    bytes,
+                    stdout,
                 })
             }
             "systemctl" => {
@@ -1331,6 +1447,9 @@ impl System for F {
     }
     fn policy_file(&self) -> Option<PathBuf> {
         Some(self.t.join("policy.json"))
+    }
+    fn wall(&self) -> SystemTime {
+        self.wall.unwrap_or_else(SystemTime::now)
     }
     fn environment(&self) -> Vec<(String, String)> {
         self.env.clone()
@@ -1556,7 +1675,10 @@ fn r3_the_units_member_and_where_a_run_keeps_its_files() {
     // The directory through a link is resolved once: the worktree is under the resolved path.
     std::os::unix::fs::symlink(f.t.join("real-units"), f.t.join("units-link")).unwrap();
     std::fs::create_dir(f.t.join("real-units")).unwrap();
-    f.policy(json!({"units": {"directory": f.p("units-link"), "timeouts": {"verifier": 600}}}));
+    f.policy(
+        json!({"units": {"directory": f.p("units-link"), "timeouts": {"verifier": 600},
+        "github": f.github(None)}}),
+    );
     f.steps(&["implement", "repair", "fix", "accept"]);
     assert_eq!(f.ok().0["state"], "merged");
     let home = f.t.join("real-units").join(KEY);
@@ -2689,9 +2811,12 @@ fn r25_the_answer() {
             "reviews",
             "updates",
             "merged_commit",
-            "cleanup"
+            "cleanup",
+            "credentials"
         ])
     );
+    let host = json!([{"stage": 1, "role": "implementer", "credential": "host"}]);
+    assert_eq!(a["credentials"], host);
     assert_eq!(
         (
             a["state"].as_str(),
@@ -4236,10 +4361,13 @@ fn r38_every_stage_runs_under_limits_and_an_author_writes_its_worktree_and_its_o
         assert_eq!(wrap[..want.len()], want[..], "{role}: {wrap:?}");
         let tail = ["--cap-drop", "ALL", "--chdir", wt.to_str().unwrap(), "--"];
         assert_eq!(wrap[wrap.len() - 5..], tail.map(str::to_owned), "{role}");
-        // Only hidden paths after the named ones, and the state of `gh` not among them.
+        // Only hidden paths after the named ones, and the state of `gh` not among an author's
+        // with the host's login (a verifier's hides it, R41).
         let hidden = f.stage_hidden(i, want.len());
         assert!(!hidden.iter().any(|w| w == "--bind"), "{hidden:?}");
-        assert!(!wrap.iter().any(|w| w.ends_with("/.config/gh")), "{wrap:?}");
+        if author {
+            assert!(!wrap.iter().any(|w| w.ends_with("/.config/gh")), "{wrap:?}");
+        }
         // A Cargo home in the stage's scratch directory, never root's.
         let env = &f.launch_envs[i];
         let cargo: Vec<&String> = env
@@ -4264,7 +4392,8 @@ fn r38_every_stage_runs_under_limits_and_an_author_writes_its_worktree_and_its_o
                 .unwrap(),
         };
         let limits = &rec["limits"];
-        assert_eq!(limits["show"], json!(["~/.config/gh"]), "{role}: {rec}");
+        let show = author.then(|| json!(["~/.config/gh"]));
+        assert_eq!(limits.get("show").cloned(), show, "{role}: {rec}");
         assert_eq!(
             limits["scratch"],
             json!(format!("{}/scratch/{n}", home.display()))
@@ -4989,4 +5118,721 @@ fn r40_the_path_of_a_link_is_written_with_the_replacement_character_for_a_byte_t
         "{a}"
     );
     assert_eq!(std::fs::read_to_string(&outside).unwrap(), "ff kept\n");
+}
+
+// ---- The credential of a stage, the description, the comment, the status as the Lead's App -----
+
+/// Every regular file under `dir`, read; no link followed.
+fn files(dir: &Path) -> Vec<(PathBuf, Vec<u8>)> {
+    let mut out = vec![];
+    let mut todo = vec![dir.to_path_buf()];
+    while let Some(d) = todo.pop() {
+        for e in std::fs::read_dir(&d).into_iter().flatten().flatten() {
+            let p = e.path();
+            let m = std::fs::symlink_metadata(&p).unwrap();
+            if m.is_dir() {
+                todo.push(p);
+            } else if m.is_file() {
+                let bytes = std::fs::read(&p).unwrap();
+                out.push((p, bytes));
+            }
+        }
+    }
+    out
+}
+/// No byte of `secret` in the answer, a call of `ont` (an action's body, a read), a file under the
+/// units directory (prompts, records, answers, the credential and description files) or the reviews.
+fn nowhere(f: &F, a: &Value, secret: &str) {
+    assert!(!a.to_string().contains(secret), "{a}");
+    for c in f.calls.iter().filter(|c| c.0 == "ont") {
+        let words = c.1.join(" ") + &c.2.to_string();
+        assert!(!words.contains(secret), "{secret} in {c:?}");
+    }
+    for dir in [f.t.join("units"), f.t.join("reviews")] {
+        for (p, bytes) in files(&dir) {
+            let found = bytes.windows(secret.len()).any(|w| w == secret.as_bytes());
+            assert!(!found, "{secret} in {}", p.display());
+        }
+    }
+}
+/// The value of `name` in the environment of launch `i` (from 0).
+fn env_of(f: &F, i: usize, name: &str) -> Option<String> {
+    let env = &f.launch_envs[i];
+    env.iter().find(|(k, _)| k == name).map(|(_, v)| v.clone())
+}
+/// The reviews of kind `packet` by their round (two may start in one second).
+fn by_round(f: &F) -> Vec<(String, Value)> {
+    let mut list = f.packets();
+    list.sort_by_key(|(_, r)| r["round"].as_u64());
+    list
+}
+/// The records of the stages 1 to 4 of `implement, repair, fix, accept`, in order.
+fn four_records(f: &F) -> Vec<Value> {
+    let read =
+        |p: PathBuf| -> Value { serde_json::from_slice(&std::fs::read(p).unwrap()).unwrap() };
+    let reviews: Vec<Value> = (by_round(f).into_iter())
+        .map(|(k, _)| read(f.t.join(format!("reviews/{k}.md.run.json"))))
+        .collect();
+    vec![
+        read(f.home().join("1.implementer.md.run.json")),
+        reviews[0].clone(),
+        read(f.home().join("3.fixer.md.run.json")),
+        reviews[1].clone(),
+    ]
+}
+/// Base64url without padding, decoded.
+fn unb64url(t: &str) -> Vec<u8> {
+    const A: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
+    let (mut bits, mut n, mut out) = (0u32, 0, vec![]);
+    for c in t.bytes() {
+        let v = A
+            .iter()
+            .position(|a| *a == c)
+            .unwrap_or_else(|| panic!("{t}")) as u32;
+        (bits, n) = ((bits << 6) | v, n + 6);
+        if n >= 8 {
+            n -= 8;
+            out.push((bits >> n) as u8);
+            bits &= (1 << n) - 1;
+        }
+    }
+    out
+}
+/// The words of the status call of before (R42): no header.
+fn status_words(head: &str, state: &str, description: &str) -> Vec<String> {
+    [
+        "api",
+        "--method",
+        "POST",
+        &format!("repos/invented/widgets/statuses/{head}"),
+        "-f",
+        &format!("state={state}"),
+        "-f",
+        "context=lead-review",
+        "-f",
+        &format!("description={description}"),
+    ]
+    .map(str::to_owned)
+    .to_vec()
+}
+/// The status calls of `gh`, by their words.
+fn status_calls(f: &F) -> Vec<Vec<String>> {
+    let posts = f.calls.iter().filter(|c| c.0 == "gh");
+    let posts = posts.filter(|c| c.1.iter().any(|w| w.contains("/statuses/")));
+    posts.map(|c| c.1.clone()).collect()
+}
+
+// spec: specs/ap/unit-run.md#R41
+// spec: specs/ap/unit-run.md#R3
+#[test]
+fn r41_a_policy_without_the_leads_app_is_refused_before_anything() {
+    let units = |f: &F, g: Option<Value>| {
+        let mut u = json!({"directory": f.p("units")});
+        if let Some(g) = g {
+            u["github"] = g;
+        }
+        json!({"units": u})
+    };
+    let tokens = json!({"invented/widgets": "/invented/widgets.token"});
+    for g in [None, Some(json!({})), Some(json!({"stage_tokens": tokens}))] {
+        let mut f = F::new();
+        f.policy(units(&f, g.clone()));
+        let e = f.refusal();
+        assert_eq!(code(&e), ("github_not_mapped", "lead_app", 2), "{g:?}");
+        assert!(
+            f.actions().is_empty() && !f.t.join("units").exists(),
+            "{g:?}"
+        );
+        assert_eq!(f.launches, 0);
+    }
+    // Each malformed member, named by the reader of `units` (R3), before the check of R41.
+    let app = json!({"id": 1, "key": "/invented/app.pem"});
+    let many: serde_json::Map<String, Value> = (0..33)
+        .map(|i| (format!("invented/r{i}"), json!("/invented/t")))
+        .collect();
+    let lead = "units.github.lead_app";
+    let st = "units.github.stage_tokens";
+    for (g, member) in [
+        (json!([]), "units.github"),
+        (json!({"other": 1}), "units.github.other"),
+        (json!({"lead_app": {"id": 0, "key": "/k"}}), lead),
+        (
+            json!({"lead_app": {"id": 4_294_967_296_u64, "key": "/k"}}),
+            lead,
+        ),
+        (json!({"lead_app": {"id": -1, "key": "/k"}}), lead),
+        (json!({"lead_app": {"id": 1.5, "key": "/k"}}), lead),
+        (json!({"lead_app": {"id": "1", "key": "/k"}}), lead),
+        (json!({"lead_app": {"id": 1}}), lead),
+        (json!({"lead_app": {"key": "/k"}}), lead),
+        (json!({"lead_app": {"id": 1, "key": "relative"}}), lead),
+        (json!({"lead_app": {"id": 1, "key": "/a b"}}), lead),
+        (
+            json!({"lead_app": {"id": 1, "key": "/k", "other": 1}}),
+            lead,
+        ),
+        (json!({"lead_app": [1, "/k"]}), lead),
+        (json!({"lead_app": app, "stage_tokens": {}}), st),
+        (json!({"lead_app": app, "stage_tokens": many}), st),
+        (json!({"lead_app": app, "stage_tokens": []}), st),
+        (
+            json!({"lead_app": app, "stage_tokens": {"widgets": "/t"}}),
+            st,
+        ),
+        (
+            json!({"lead_app": app, "stage_tokens": {"invented/..": "/t"}}),
+            st,
+        ),
+        (
+            json!({"lead_app": app, "stage_tokens": {"in vented/w": "/t"}}),
+            st,
+        ),
+        (
+            json!({"lead_app": app, "stage_tokens": {"invented/widgets": "t"}}),
+            st,
+        ),
+        (
+            json!({"lead_app": app, "stage_tokens": {"invented/widgets": 1}}),
+            st,
+        ),
+    ] {
+        let mut f = F::new();
+        f.policy(units(&f, Some(g.clone())));
+        let e = f.refusal();
+        assert_eq!(code(&e), ("policy_invalid", "policy", 2), "{g}");
+        let detail = e.detail.as_str().unwrap();
+        assert!(detail.starts_with(member), "{g}: {detail}");
+        assert!(f.actions().is_empty() && !f.t.join("units").exists(), "{g}");
+    }
+    // The bounds themselves pass: the largest id, 32 repositories; no file the member names opened.
+    let mut f = F::new();
+    let mut tokens: serde_json::Map<String, Value> = (0..31)
+        .map(|i| (format!("invented/r{i}"), json!("/invented/absent/t")))
+        .collect();
+    tokens.insert("in-vented/w.x_y".into(), json!("/invented/absent/u"));
+    let g = json!({"lead_app": {"id": 4_294_967_295_u64, "key": "/invented/absent/app.pem"},
+        "stage_tokens": tokens});
+    f.policy(units(&f, Some(g)));
+    f.steps(&["implement", "accept"]);
+    let (a, _) = f.ok();
+    assert_eq!(a["state"], "merged", "{a}");
+}
+
+// spec: specs/ap/unit-run.md#R41
+// spec: specs/ap/unit-run.md#R38
+// spec: specs/ap/unit-run.md#R25
+// spec: specs/ap/unit-run.md#R42
+#[test]
+fn r41_an_author_of_a_repository_without_a_stage_token_keeps_the_hosts_login() {
+    for other in [false, true] {
+        let mut f = F::new();
+        if other {
+            let tokens = json!({"invented/other": f.p("secrets/other.token")});
+            let units = json!({"directory": f.p("units"), "github": f.github(Some(tokens))});
+            f.policy(json!({"units": units}));
+        }
+        f.steps(&["implement", "repair", "fix", "accept"]);
+        let (a, _) = f.ok();
+        assert_eq!(a["state"], "merged", "{a}");
+        let want = json!([
+            {"stage": 1, "role": "implementer", "credential": "host"},
+            {"stage": 3, "role": "fixer", "credential": "host"}
+        ]);
+        assert_eq!(a["credentials"], want, "{a}");
+        let records = four_records(&f);
+        for (i, author) in [true, false, true, false].into_iter().enumerate() {
+            let n = i + 1;
+            assert_eq!(env_of(&f, i, "GH_TOKEN"), None, "{n}");
+            let file = f.home().join(format!("{n}.credential"));
+            match author {
+                true => {
+                    assert_eq!(std::fs::read_to_string(&file).unwrap(), "host\n");
+                    assert_eq!(mode(&file), 0o600);
+                }
+                false => assert!(!file.exists(), "{n}"),
+            }
+            let show = author.then(|| json!(["~/.config/gh"]));
+            assert_eq!(records[i]["limits"].get("show").cloned(), show, "{n}");
+        }
+        // R42: the base's one call, word for word, and no signature.
+        let (key, _) = by_round(&f).pop().unwrap();
+        let head = a["head"].as_str().unwrap();
+        let description = format!("review {key} accept");
+        assert_eq!(
+            status_calls(&f),
+            [status_words(head, "success", &description)]
+        );
+        assert_eq!(f.status_headers, [None]);
+        assert!(!f.calls.iter().any(|c| c.0 == "sh" && c.1[1] == SIGN));
+    }
+}
+
+// spec: specs/ap/unit-run.md#R41
+// spec: specs/ap/unit-run.md#R38
+// spec: specs/ap/unit-run.md#R25
+#[test]
+fn r41_a_stage_token_reaches_each_author_stage_alone_and_is_read_anew() {
+    let mut f = F::new();
+    let (first, second) = (
+        "github_pat_InventedStageToken01",
+        "github_pat_InventedStageToken02",
+    );
+    // A final carriage return and line feed are dropped.
+    let path = f.token(&format!("{first}\r\n"));
+    // The implementer's stage replaces the token: the fixer reads the new one.
+    let edit =
+        format!("mkdir -p src; echo widget >> src/widgets.rs; printf '%s\\n' {second} > {path}\n");
+    std::fs::write(f.t.join("bin/edit.sh"), edit).unwrap();
+    f.steps(&["edit", "repair", "fix", "accept"]);
+    let (a, _) = f.ok();
+    assert_eq!(a["state"], "merged", "{a}");
+    let want = json!([
+        {"stage": 1, "role": "implementer", "credential": "token"},
+        {"stage": 3, "role": "fixer", "credential": "token"}
+    ]);
+    assert_eq!(a["credentials"], want, "{a}");
+    let tokens = [Some(first), None, Some(second), None];
+    let records = four_records(&f);
+    for (i, token) in tokens.into_iter().enumerate() {
+        let n = i + 1;
+        assert_eq!(env_of(&f, i, "GH_TOKEN").as_deref(), token, "{n}");
+        // No stage with a token, and no verifier, is shown the state of `gh`.
+        assert!(records[i]["limits"].get("show").is_none(), "{n}");
+        assert!(records[i]["limits"]["scratch"].is_string(), "{n}");
+        let file = f.home().join(format!("{n}.credential"));
+        match token {
+            Some(_) => assert_eq!(std::fs::read_to_string(&file).unwrap(), "token\n"),
+            None => assert!(!file.exists(), "{n}"),
+        }
+    }
+    // The verifier's view: no `GH_TOKEN`, and the Cargo home still there.
+    assert!(env_of(&f, 1, "CARGO_HOME").is_some());
+    nowhere(&f, &a, first);
+    nowhere(&f, &a, second);
+    // A settling stage is an author's: it gets the token too.
+    let mut f = F::new();
+    let token = "github_pat_InventedStageToken03";
+    f.token(token);
+    f.steps(&["dirty", "settle", "accept"]);
+    let (a, _) = f.ok();
+    assert_eq!(a["state"], "merged", "{a}");
+    assert_eq!(
+        [0, 1, 2].map(|i| env_of(&f, i, "GH_TOKEN")),
+        [Some(token.into()), Some(token.into()), None]
+    );
+    let want = json!([
+        {"stage": 1, "role": "implementer", "credential": "token"},
+        {"stage": 2, "role": "implementer", "credential": "token"}
+    ]);
+    assert_eq!(a["credentials"], want, "{a}");
+    nowhere(&f, &a, token);
+}
+
+// spec: specs/ap/unit-run.md#R41
+// spec: specs/ap/unit-run.md#R22
+#[test]
+fn r41_a_stage_token_that_cannot_be_read_or_has_another_form_stops_before_any_launch() {
+    let long = format!("github_pat_{}", "a".repeat(256));
+    let cases: [(Option<&str>, &str); 7] = [
+        (None, "read"),
+        (Some("gho_InventedLogin1\n"), "form"),
+        (Some(""), "form"),
+        (Some("\n"), "form"),
+        (Some("github_pat_InventedA\ngithub_pat_InventedB\n"), "form"),
+        (Some("github_pat_Invented-Dash"), "form"),
+        (Some(&long), "form"),
+    ];
+    for (text, reason) in cases {
+        let mut f = F::new();
+        let path = f.token(text.unwrap_or_default());
+        if text.is_none() {
+            std::fs::remove_file(&path).unwrap();
+        }
+        f.steps(&["implement", "accept"]);
+        let a = f.stopped("stage_token_unreadable");
+        let detail = json!({"reason": reason}).to_string();
+        assert_eq!(a["stop_detail"], detail, "{text:?}");
+        assert_eq!(f.unit()["stop_detail"], detail);
+        assert_eq!(f.launches, 0, "{text:?}");
+        assert!(!f.home().join("1.credential").exists());
+        assert!(a.get("credentials").is_none(), "{a}");
+        if let Some(t) = text.map(str::trim_end).filter(|t| !t.is_empty()) {
+            nowhere(&f, &a, t.lines().next().unwrap());
+        }
+    }
+}
+
+// spec: specs/ap/unit-run.md#R42
+// spec: specs/ap/unit-run.md#R31
+#[test]
+fn r42_the_status_is_posted_as_the_leads_app_with_a_fresh_installation_token() {
+    let mut f = F::new();
+    let token = "github_pat_InventedStageToken04";
+    f.token(token);
+    let wall = SystemTime::now();
+    f.wall = Some(wall);
+    f.steps(&["implement", "accept"]);
+    let (a, _) = f.ok();
+    assert_eq!(a["state"], "merged", "{a}");
+    let w = wall.duration_since(UNIX_EPOCH).unwrap().as_secs();
+    let at = f.first(|c| c.0 == "sh" && c.1[1] == SIGN).unwrap();
+    let calls = &f.calls[at..at + 5];
+    // (b) The signature: the fixed script, the input and the key's path as arguments, no input.
+    let b = &calls[0];
+    assert_eq!(b.1.len(), 5, "{b:?}");
+    assert_eq!(b.1[..3], ["-c", SIGN, "sh"].map(str::to_owned));
+    assert_eq!(b.1[4], f.p("secrets/app.pem"));
+    assert!(b.2.is_null());
+    // (a) The signing input: the header and the claims, base64url without padding.
+    let input = &b.1[3];
+    let (header, claims) = input.split_once('.').unwrap();
+    assert_eq!(unb64url(header), br#"{"alg":"RS256","typ":"JWT"}"#);
+    let want = format!(r#"{{"iat":{},"exp":{},"iss":"{APP_ID}"}}"#, w - 60, w + 540);
+    assert_eq!(String::from_utf8(unb64url(claims)).unwrap(), want);
+    assert!(!input.contains(['=', '+', '/']), "{input}");
+    // (c) The installation, with the JWT: the input, a `.` and the signature.
+    let c = &calls[1];
+    let bearer = c.1[2].clone();
+    let jwt = bearer.strip_prefix("Authorization: Bearer ").unwrap();
+    let (signed, signature) = jwt.rsplit_once('.').unwrap();
+    assert_eq!(
+        (signed, unb64url(signature).as_slice()),
+        (input.as_str(), SIGNATURE)
+    );
+    assert_eq!(
+        (c.0.as_str(), c.1.clone(), c.2.clone()),
+        (
+            "gh",
+            ["api", "-H", &bearer, "repos/invented/widgets/installation"]
+                .map(str::to_owned)
+                .to_vec(),
+            Value::Null
+        )
+    );
+    // (d) The installation token for this repository and the statuses alone.
+    let d = &calls[2];
+    let path = format!("app/installations/{INSTALLATION}/access_tokens");
+    let words = [
+        "api", "--method", "POST", "-H", &bearer, &path, "--input", "-",
+    ];
+    assert_eq!(
+        (d.0.as_str(), d.1.clone()),
+        ("gh", words.map(str::to_owned).to_vec())
+    );
+    assert_eq!(
+        d.2,
+        json!({"repositories": ["widgets"], "permissions": {"statuses": "write"}})
+    );
+    // (e) The status call of before, with the installation token's header after `api`.
+    let (key, _) = f.packets().pop().unwrap();
+    let head = a["head"].as_str().unwrap();
+    let mut words = status_words(head, "success", &format!("review {key} accept"));
+    let header = format!("Authorization: Bearer {INSTALLATION_TOKEN}");
+    words.splice(1..1, ["-H".to_owned(), header.clone()]);
+    assert_eq!((calls[3].0.as_str(), &calls[3].1), ("gh", &words));
+    assert_eq!(f.status_headers, [Some(header)]);
+    assert!(!calls[3].1.iter().any(|w| w.contains(jwt)));
+    // Then the merge pinned to the head.
+    assert_eq!(calls[4].1[..2], ["pr", "merge"].map(str::to_owned));
+    // The JWT and the installation token are words of (c) to (e) alone, and nowhere else.
+    let with = |t: &str| {
+        let calls = f.calls.iter();
+        calls
+            .filter(|c| c.1.iter().any(|w| w.contains(t)) || c.2.to_string().contains(t))
+            .count()
+    };
+    assert_eq!((with(jwt), with(INSTALLATION_TOKEN)), (2, 1));
+    for secret in [jwt, INSTALLATION_TOKEN, token, signature] {
+        nowhere(&f, &a, secret);
+    }
+    // A failure at each step: `status_failed`, nothing called or merged after it.
+    let steps = [
+        ("openssl", "sh", Some("invented: unable to load key")),
+        ("openssl-missing", "sh", Some("")),
+        ("installation", "/installation", None),
+        (
+            "installation-missing",
+            "/installation",
+            Some("installation"),
+        ),
+        ("access_tokens", "/access_tokens", None),
+        (
+            "access_tokens-missing",
+            "/access_tokens",
+            Some("access_tokens"),
+        ),
+        ("status", "/statuses/", None),
+    ];
+    for (step, call, detail) in steps {
+        let mut f = F::new();
+        f.token(token);
+        f.gh_says = LEAKY;
+        f.app_fails = Some(step);
+        f.steps(&["implement", "accept"]);
+        let (a, status) = f.ok();
+        assert_eq!(
+            (a["state"].as_str(), a["refused"].as_str(), status),
+            (Some("accepted"), Some("status_failed"), 3),
+            "{step}: {a}"
+        );
+        assert_eq!(f.merges(), (0, 0), "{step}");
+        assert!(f.statuses.is_empty(), "{step}");
+        let failed = f.calls.iter().rposition(|c| match call {
+            "sh" => c.0 == "sh" && c.1[1] == SIGN,
+            _ => c.0 == "gh" && c.1.iter().any(|w| w.contains(call)),
+        });
+        let failed = failed.unwrap_or_else(|| panic!("{step}"));
+        let later = f.calls[failed + 1..].iter();
+        assert!(
+            !later.clone().any(|c| c.0 == "gh" || c.0 == "sh"),
+            "{step}: {:?}",
+            later.collect::<Vec<_>>()
+        );
+        let said = a["detail"].as_str().unwrap();
+        match detail {
+            Some(d) => assert_eq!(said, d, "{step}"),
+            None => redacted(said),
+        }
+        nowhere(&f, &a, token);
+    }
+}
+
+// spec: specs/ap/unit-run.md#R42
+// spec: specs/ap/unit-run.md#R34
+#[test]
+fn r42_reject_posts_as_the_app_where_a_stage_token_exists_and_else_as_before() {
+    let accepted = |tokens: bool| {
+        let mut f = F::new();
+        if tokens {
+            f.token("github_pat_InventedStageToken05");
+        }
+        f.set_unit(json!({"class": "contract"}));
+        f.steps(&["implement", "accept"]);
+        let (a, _) = f.ok();
+        assert_eq!(a["waits_for"], "approve", "{a}");
+        (f, a["head"].as_str().unwrap().to_owned())
+    };
+    let reject = |f: &mut F, id: &str| {
+        let r = json!({"request_id": id, "reason": "The list shows a widget twice."});
+        f.decide("reject", "lead-1", r).unwrap()["lead_review"].clone()
+    };
+    // As the App: the signature, the installation, its token, the status with its header.
+    let (mut f, head) = accepted(true);
+    assert!(status_calls(&f).is_empty());
+    assert_eq!(reject(&mut f, "rj-app"), "failure");
+    let header = format!("Authorization: Bearer {INSTALLATION_TOKEN}");
+    let mut words = status_words(&head, "failure", "rejected by the Lead");
+    words.splice(1..1, ["-H".to_owned(), header.clone()]);
+    assert_eq!(status_calls(&f), [words]);
+    assert_eq!(f.status_headers, [Some(header)]);
+    assert_eq!(
+        f.calls
+            .iter()
+            .filter(|c| c.0 == "sh" && c.1[1] == SIGN)
+            .count(),
+        1
+    );
+    // A failed step of the App: `not_posted`, the unit stopped as before.
+    let (mut f, _) = accepted(true);
+    f.app_fails = Some("installation");
+    assert_eq!(reject(&mut f, "rj-fail"), "not_posted");
+    assert_eq!(f.unit()["state"], "stopped");
+    assert!(status_calls(&f).is_empty());
+    // Without `lead_app` (reject does not refuse it), and for a repository `stage_tokens` does
+    // not name: the base's one call, word for word.
+    for policy in ["no-app", "other"] {
+        let (mut f, head) = accepted(false);
+        let github = match policy {
+            "no-app" => json!({}),
+            _ => f.github(Some(json!({"invented/other": f.p("secrets/other.token")}))),
+        };
+        f.policy(json!({"units": {"directory": f.p("units"), "github": github}}));
+        assert_eq!(reject(&mut f, &format!("rj-{policy}")), "failure");
+        let words = status_words(&head, "failure", "rejected by the Lead");
+        assert_eq!(status_calls(&f), [words], "{policy}");
+        assert_eq!(f.status_headers, [None]);
+        assert!(!f.calls.iter().any(|c| c.0 == "sh" && c.1[1] == SIGN));
+    }
+}
+
+// spec: specs/ap/unit-run.md#R19
+// spec: specs/ap/unit-run.md#R24
+#[test]
+fn r19_each_verifier_round_reads_the_description_the_run_copied_before_it() {
+    let line = |f: &F, n: usize| {
+        format!(
+            "Description of the pull request: {} (its body as the run read it before this round; a CLAIM to check, not a fact)\n",
+            f.home().join(format!("{n}.description.md")).display()
+        )
+    };
+    let mut f = F::new();
+    // A login and a stage token an author wrote into the body: redacted, the rest byte for byte.
+    f.body = Some(
+        "An invented description: github_pat_InventedBody9_x and gho_InventedBody8, é ghp_ end.\r\n\n"
+            .into(),
+    );
+    f.steps(&["implement", "accept"]);
+    let (a, _) = f.ok();
+    assert_eq!(a["state"], "merged", "{a}");
+    let file = f.home().join("2.description.md");
+    assert_eq!(
+        std::fs::read_to_string(&file).unwrap(),
+        "An invented description: <redacted> and <redacted>, é ghp_ end.\r\n\n"
+    );
+    assert_eq!(mode(&file), 0o600);
+    let prompt = std::fs::read_to_string(f.home().join("2.verifier.prompt.md")).unwrap();
+    let want = format!(
+        "\n## The change\n\nRepository: invented/widgets\nPull request: 7\nHead: {}\ngit diff origin/main...HEAD\n{}",
+        a["head"].as_str().unwrap(),
+        line(&f, 2)
+    );
+    assert!(prompt.ends_with(&want), "{prompt}");
+    assert!(!prompt.contains("## The round") && !prompt.contains("Answer of the author:"));
+    // The read, with the host's login, before the round's review starts.
+    let read = f
+        .first(|c| c.0 == "gh" && c.1.ends_with(&["--json".into(), "body".into()]))
+        .unwrap();
+    let words = [
+        "pr",
+        "view",
+        "7",
+        "--repo",
+        "invented/widgets",
+        "--json",
+        "body",
+    ];
+    assert_eq!(f.calls[read].1, words.map(str::to_owned));
+    let start = f
+        .first(|c| c.0 == "ont" && c.2["action_type"] == "start_unit_review")
+        .unwrap();
+    assert!(read < start);
+    // A second look after a repair: a new description file, and the fixer's answer named.
+    let mut f = F::new();
+    f.steps(&["implement", "repair", "fix", "accept"]);
+    let (a, _) = f.ok();
+    assert_eq!(a["state"], "merged", "{a}");
+    let packets = f.packets();
+    let repair = packets
+        .iter()
+        .find(|(_, r)| r["verdict"] == "repair")
+        .unwrap();
+    let judged = repair.1["head"].as_str().unwrap().to_owned();
+    let prompt = std::fs::read_to_string(f.home().join("4.verifier.prompt.md")).unwrap();
+    let round = format!(
+        "{}\n{SECOND_LOOK}\n## The round\n\nHead judged before: {judged}\nWhat moved it: the author's repair\nAnswer of the author: {}\n",
+        line(&f, 4),
+        f.home().join("3.fixer.md").display()
+    );
+    assert!(prompt.ends_with(&round), "{prompt}");
+    for n in [2, 4] {
+        assert!(
+            f.home().join(format!("{n}.description.md")).is_file(),
+            "{n}"
+        );
+    }
+    let reads = f.calls.iter().filter(|c| c.1.ends_with(&["body".into()]));
+    assert_eq!(reads.count(), 2);
+    // A second look after an update alone: no answer of the author.
+    let mut f = F::new();
+    f.set_unit(json!({"class": "contract"}));
+    f.steps(&["implement", "acceptmain", "accept"]);
+    f.ok();
+    f.ok();
+    let (_, prompt) = f.launch(3);
+    assert!(prompt.contains("## The round"), "{prompt}");
+    assert!(
+        prompt.contains("What moved it: a merge of origin/main\n"),
+        "{prompt}"
+    );
+    assert!(!prompt.contains("Answer of the author:"), "{prompt}");
+    assert!(
+        prompt.contains("Description of the pull request: "),
+        "{prompt}"
+    );
+    // A read that fails, and an answer without `body`: no review started, no verifier launched.
+    for broken in ["fails", "absent"] {
+        let mut f = F::new();
+        f.gh_says = LEAKY;
+        match broken {
+            "fails" => f.body_fails = true,
+            _ => f.body = None,
+        }
+        f.steps(&["implement", "accept"]);
+        let a = f.stopped("github_unreadable");
+        let d: Value = serde_json::from_str(a["stop_detail"].as_str().unwrap()).unwrap();
+        assert_eq!(d["call"], "pr view", "{broken}: {d}");
+        if broken == "fails" {
+            redacted(d["reply"].as_str().unwrap());
+        }
+        let validated = f.first(|c| c.0 == "ont" && c.2["action_type"] == "start_unit_review");
+        assert!(validated.is_none(), "{broken}");
+        assert!(f.packets().is_empty() && f.launches == 1, "{broken}");
+        assert!(!f.home().join("2.description.md").exists());
+    }
+}
+
+// spec: specs/ap/unit-run.md#R43
+// spec: specs/ap/unit-run.md#R23
+#[test]
+fn r43_the_report_of_each_closed_round_is_posted_as_one_comment() {
+    let comment = |f: &F, key: &str| -> Vec<String> {
+        let report = f.p(&format!("reviews/{key}.md"));
+        let words = [
+            "pr",
+            "comment",
+            "7",
+            "--repo",
+            "invented/widgets",
+            "--body-file",
+        ];
+        let mut w = words.map(str::to_owned).to_vec();
+        w.push(report);
+        w
+    };
+    let mut f = F::new();
+    f.steps(&["implement", "repair", "fix", "accept"]);
+    let (a, _) = f.ok();
+    assert_eq!(a["state"], "merged", "{a}");
+    let packets = by_round(&f);
+    let want: Vec<Vec<String>> = packets.iter().map(|(k, _)| comment(&f, k)).collect();
+    assert_eq!(f.comments, want);
+    // Each after its round closed, before the next stage.
+    for (k, _) in &packets {
+        let closed = f
+            .first(|c| {
+                c.0 == "ont"
+                    && c.2["action_type"] == "close_unit_review"
+                    && c.2["parameters"]["review"]["native_key"] == k.as_str()
+            })
+            .unwrap();
+        let posted = f.first(|c| c.0 == "gh" && c.1 == comment(&f, k)).unwrap();
+        assert!(closed < posted, "{k}");
+    }
+    // An abandoned review: no comment.
+    let mut f = F::new();
+    f.steps(&["implement", "noform", "noform"]);
+    f.stopped("verifier_failed");
+    assert!(f.comments.is_empty());
+    // A carried accept: the one verifier round's comment alone.
+    let mut f = F::new();
+    f.steps(&["implement", "acceptoutside"]);
+    let (a, _) = f.ok();
+    assert!(a["carried"].is_object(), "{a}");
+    let judged: Vec<String> = (f.packets().into_iter())
+        .filter(|(_, r)| r["carried_from"].is_null())
+        .map(|(k, _)| k)
+        .collect();
+    assert_eq!(judged.len(), 1);
+    assert_eq!(f.comments, [comment(&f, &judged[0])]);
+    // A comment that fails changes nothing: no stop, no second call, no member of the answer.
+    let mut f = F::new();
+    f.comment_fails = true;
+    f.steps(&["implement", "accept"]);
+    let (a, status) = f.ok();
+    assert_eq!((a["state"].as_str(), status), (Some("merged"), 0), "{a}");
+    assert_eq!(f.comments.len(), 1);
+    assert!(
+        a.get("detail").is_none() && a.get("refused").is_none(),
+        "{a}"
+    );
 }

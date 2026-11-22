@@ -25,6 +25,12 @@ use std::{
 };
 
 const FIXER: &str = include_str!("frames/fixer.md");
+/// The line that names a verifier round's description file, after `## The change` (R19).
+const DESCRIPTION: &str = "Description of the pull request: ";
+const DESCRIPTION_TAIL: &str =
+    " (its body as the run read it before this round; a CLAIM to check, not a fact)";
+/// The form of a stage token: `github_pat_` and 1 to 255 of these (R41).
+const PAT: &str = "github_pat_";
 const SECOND_LOOK: &str = include_str!("frames/second-look.md");
 const CONTINUE: &str = include_str!("frames/continue.md");
 const UNITS: &str = "/var/lib/agent-platform/units";
@@ -234,6 +240,38 @@ fn cut(t: &str, max: usize) -> String {
         end -= 1;
     }
     t[..end].to_owned()
+}
+/// `body` byte for byte, but each match of `gh[opsur]_[A-Za-z0-9]+` or `github_pat_[A-Za-z0-9_]+`
+/// (R22's first two patterns) replaced by `<redacted>`, and nothing cut (R19).
+fn scrubbed(body: &str) -> String {
+    let b = body.as_bytes();
+    let run = |from: usize, keep: fn(u8) -> bool| {
+        let end = (from..b.len()).find(|j| !keep(b[*j])).unwrap_or(b.len());
+        (end > from).then_some(end)
+    };
+    let (mut out, mut kept, mut i) = (String::with_capacity(body.len()), 0, 0);
+    while i < b.len() {
+        let r = &b[i..];
+        let login = r.len() > 4 && r.starts_with(b"gh") && b"opsur".contains(&r[2]) && r[3] == b'_';
+        let end = match () {
+            _ if r.starts_with(PAT.as_bytes()) => {
+                run(i + PAT.len(), |c| c.is_ascii_alphanumeric() || c == b'_')
+            }
+            _ if login => run(i + 4, |c| c.is_ascii_alphanumeric()),
+            _ => None,
+        };
+        match end {
+            // A match begins and ends on ASCII bytes, so on character boundaries.
+            Some(end) => {
+                out.push_str(&body[kept..i]);
+                out.push_str("<redacted>");
+                (kept, i) = (end, end);
+            }
+            None => i += 1,
+        }
+    }
+    out.push_str(&body[kept..]);
+    out
 }
 fn text<'a>(v: &'a Value, k: &str) -> Option<&'a str> {
     v[k].as_str().filter(|t| !t.is_empty())
@@ -461,6 +499,10 @@ struct Done {
     updates: u32,
     /// The last accept this call carried to an updated head: `{review, from, file}` (R25, R37).
     carried: Option<Value>,
+    /// The credential of each author stage this call admitted (R25, R41).
+    credentials: Vec<Value>,
+    /// The answer file of the newest fixer stage of this call (R19).
+    fixer_answer: Option<String>,
 }
 /// The heads this call's own fixer and updates moved, one after the other, from the head `from`
 /// (R19).
@@ -487,6 +529,8 @@ struct Run {
     implementer: Value,
     verifier: Value,
     timeouts: Map<String, Value>,
+    /// The file of the repository's stage token, when `units.github.stage_tokens` names it (R41).
+    token_file: Option<String>,
     base: String,
     applied: bool,
     done: Done,
@@ -513,6 +557,9 @@ pub(crate) fn units(policy: &Value) -> Result<(String, Map<String, Value>), Fail
             {
                 directory = d.clone();
             }
+            ("github", g) => {
+                github_member(g)?;
+            }
             ("timeouts", Value::Object(t)) => {
                 for (name, n) in t {
                     let seconds = n.as_u64().filter(|n| (1..=86_400).contains(n));
@@ -532,6 +579,75 @@ pub(crate) fn units(policy: &Value) -> Result<(String, Map<String, Value>), Fail
         }
     }
     Ok((directory, timeouts))
+}
+/// The member `units.github` (R3): the Lead's App, and the file of each repository's stage token.
+#[derive(Default)]
+pub(crate) struct Github {
+    /// The App's id and the path of its private key (R42).
+    pub lead_app: Option<(u64, String)>,
+    /// The path of the stage token's file by repository (R41).
+    pub stage_tokens: Map<String, Value>,
+}
+/// A path of the form `units.directory` has (R3).
+fn path_form(d: &str) -> bool {
+    d.starts_with('/')
+        && (2..=400).contains(&d.len())
+        && d.bytes().all(|c| (b'!'..=b'~').contains(&c))
+}
+/// `<owner>/<name>` of `specs/ap/unit.md` R9.
+fn repository_form(t: &str) -> bool {
+    let part = |p: &str| {
+        !p.is_empty()
+            && p.bytes()
+                .all(|c| c.is_ascii_alphanumeric() || b"._-".contains(&c))
+    };
+    matches!(t.split_once('/'), Some((o, n)) if part(o) && part(n) && n != "." && n != "..")
+}
+/// `units.github.lead_app`: exactly `{"id": <1 to 4,294,967,295>, "key": <path>}` (R3, R42).
+pub(crate) fn lead_app(v: &Value) -> Result<(u64, String), Failure> {
+    let m = v.as_object().filter(|m| m.len() == 2);
+    let id = m.and_then(|m| m.get("id")?.as_u64());
+    let id = id.filter(|n| (1..=u64::from(u32::MAX)).contains(n));
+    let key = m.and_then(|m| m.get("key")?.as_str().filter(|k| path_form(k)));
+    let why = "is not {\"id\": an integer of 1 to 4,294,967,295, \"key\": a path}";
+    id.zip(key.map(str::to_owned))
+        .ok_or_else(|| invalid("units.github.lead_app", why))
+}
+/// The member `units.github` read by its form alone: no file it names is opened (R3).
+fn github_member(g: &Value) -> Result<Github, Failure> {
+    let g = g
+        .as_object()
+        .ok_or_else(|| invalid("units.github", "is not an object"))?;
+    let mut out = Github::default();
+    for (k, v) in g {
+        match k.as_str() {
+            "lead_app" => out.lead_app = Some(lead_app(v)?),
+            "stage_tokens" => {
+                let why = "is not 1 to 32 repositories <owner>/<name>, each with a path";
+                let m = v.as_object().filter(|m| (1..=32).contains(&m.len()));
+                let ok = m.is_some_and(|m| {
+                    m.iter()
+                        .all(|(r, p)| repository_form(r) && p.as_str().is_some_and(path_form))
+                });
+                match (m, ok) {
+                    (Some(m), true) => out.stage_tokens = m.clone(),
+                    _ => return Err(invalid("units.github.stage_tokens", why)),
+                }
+            }
+            other => {
+                let member = format!("units.github.{other}");
+                return Err(invalid(&member, "is not a member of this form"));
+            }
+        }
+    }
+    Ok(out)
+}
+/// `units.github` of the policy, or none (R3, R41).
+pub(crate) fn github(policy: &Value) -> Result<Github, Failure> {
+    match policy.get("units").and_then(|u| u.get("github")) {
+        None => Ok(Github::default()),
+        Some(g) => github_member(g),
+    }
 }
 /// A tier as members of an `ap run` request, its accounts by `specs/ap/policy.md` R6 (R4).
 fn tier(u: &Value, which: &str, role: &str, policy: &Value) -> Result<Value, Failure> {
@@ -608,6 +724,7 @@ pub(crate) struct Checked {
     timeouts: Map<String, Value>,
     implementer: Value,
     verifier: Value,
+    github: Github,
 }
 /// The checks `ap unit run` makes on the unit `u` of the key `key` before any action (R2 to R4): the
 /// key, the repository, the branch, the policy's entries and the tiers. The dispatch pass
@@ -634,9 +751,11 @@ pub(crate) fn checked(s: &mut impl System, key: &str, u: &Value) -> Result<Check
         .ok_or_else(|| error("invalid_input", "task"))?
         .to_owned();
     let (directory, timeouts) = units(&policy)?;
+    let github = github(&policy)?;
     let implementer = tier(u, "implementer", "implementer", &policy)?;
     let verifier = tier(u, "verifier", "reviewer", &policy)?;
     Ok(Checked {
+        github,
         repo: repo.to_owned(),
         branch,
         clone,
@@ -659,6 +778,12 @@ fn prepare(s: &mut impl System, store: Option<&str>, key: &str) -> Result<(Run, 
     let u = at(store::get(s, store, "unit", key), "unit")?;
     let u = u.ok_or_else(|| error("unknown_unit", "unit"))?;
     let c = checked(s, key, &u)?;
+    // The status needs the Lead's App; the run alone refuses its absence, before the lock (R41).
+    if c.github.lead_app.is_none() {
+        return Err(error("github_not_mapped", "lead_app"));
+    }
+    let token_file = c.github.stage_tokens.get(&c.repo);
+    let token_file = token_file.and_then(Value::as_str).map(str::to_owned);
     let (home, lock) = locked(&c.directory, key)?;
     let drawn = new_session_id(s)?.replace('-', "");
     let dir = c.reviews.get("directory").and_then(Value::as_str);
@@ -677,6 +802,7 @@ fn prepare(s: &mut impl System, store: Option<&str>, key: &str) -> Result<(Run, 
         implementer: c.implementer,
         verifier: c.verifier,
         timeouts: c.timeouts,
+        token_file,
         u,
         base: String::new(),
         applied: false,
@@ -1196,11 +1322,18 @@ impl Run {
             false => stop("worktree_failed", "git directory"),
         }
     }
-    /// The `limits` and the `env` of the stage `<n>` (R38): a scratch directory of its own, the state
-    /// of `gh` shown, a Cargo home in the scratch directory; for an author also the worktree and what
-    /// a commit, a merge, a fetch and a push write of the clone's Git directory, after the run made
-    /// those paths and set the `origin/main` of the stage's own view to the base.
-    fn limits(&self, s: &mut impl System, n: u64, author: bool) -> Step<(Value, Value)> {
+    /// The `limits` and the `env` of the stage `<n>` (R38): a scratch directory of its own, a Cargo
+    /// home in the scratch directory, the state of `gh` shown only to an author with the host's login
+    /// (`host`, R41); for an author also the worktree and what a commit, a merge, a fetch and a push
+    /// write of the clone's Git directory, after the run made those paths and set the `origin/main`
+    /// of the stage's own view to the base.
+    fn limits(
+        &self,
+        s: &mut impl System,
+        n: u64,
+        author: bool,
+        host: bool,
+    ) -> Step<(Value, Value)> {
         let mut dirs = std::fs::DirBuilder::new();
         dirs.mode(0o700);
         let made = |dirs: &std::fs::DirBuilder, p: &Path| match dirs.create(p) {
@@ -1211,7 +1344,10 @@ impl Run {
         made(&dirs, &scratch).map_err(|_| Halt::Stop("io_error".into(), "scratch".into()))?;
         let at = scratch.join(n.to_string()).to_string_lossy().into_owned();
         let env = json!({"CARGO_HOME": format!("{at}/cargo")});
-        let mut limits = json!({"scratch": at, "show": ["~/.config/gh"]});
+        let mut limits = json!({"scratch": at});
+        if author && host {
+            limits["show"] = json!(["~/.config/gh"]);
+        }
         if !author {
             return Ok((limits, env));
         }
@@ -1300,7 +1436,14 @@ impl Run {
         text: &str,
     ) -> Step<(Value, String)> {
         let n = self.next();
-        let (limits, env) = self.limits(s, n, true)?;
+        // The credential: the stage token read anew, or the host's login; named in its file (R41).
+        let token = self.stage_token(s)?;
+        let credential = if token.is_some() { "token" } else { "host" };
+        self.prompt(&format!("{n}.credential"), &format!("{credential}\n"))?;
+        let (limits, mut env) = self.limits(s, n, true, token.is_none())?;
+        if let Some(t) = token {
+            env["GH_TOKEN"] = json!(t);
+        }
         let prompt = self.prompt(&format!("{n}.{role}.prompt.md"), text)?;
         let out = self
             .home
@@ -1320,7 +1463,36 @@ impl Run {
             req["resume"] = json!({"record": a.path});
         }
         let (rec, _) = crate::run::execute(s, &req).map_err(refused)?;
+        let admitted = json!({"stage": n, "role": role, "credential": credential});
+        self.done.credentials.push(admitted);
+        if role == "fixer" {
+            self.done.fixer_answer = Some(out.clone());
+        }
         Ok((rec, out))
+    }
+    /// The stage token of the unit's repository, read anew through the port, or `None` for the host's
+    /// login (R41): a file that cannot be read, or text of another form, stops the unit.
+    fn stage_token(&self, s: &impl System) -> Step<Option<String>> {
+        let Some(path) = &self.token_file else {
+            return Ok(None);
+        };
+        let unreadable = |reason: &str| stop("stage_token_unreadable", json!({"reason": reason}));
+        let Ok(bytes) = s.read(path) else {
+            return unreadable("read");
+        };
+        let text = match bytes.strip_suffix(b"\n") {
+            Some(t) => t.strip_suffix(b"\r").unwrap_or(t),
+            None => &bytes[..],
+        };
+        let rest = text.strip_prefix(PAT.as_bytes());
+        let ok = rest.is_some_and(|r| {
+            (1..=255).contains(&r.len())
+                && r.iter().all(|c| c.is_ascii_alphanumeric() || *c == b'_')
+        });
+        match ok {
+            true => Ok(Some(String::from_utf8_lossy(text).into_owned())),
+            false => unreadable("form"),
+        }
     }
     /// No pull request: the implementer, fresh or resumed (R11).
     fn implement(&mut self, s: &mut impl System, t: &Tree) -> Step {
@@ -1511,7 +1683,11 @@ impl Run {
     /// The record of the newest verdict's session, the head it judged and what moved it, when the
     /// round on `head` resumes it (R19): only when this call's own fixer and updates moved the judged
     /// head to `head`, and no move of another since.
-    fn second_look(&self, v: &Verdicts, head: &str) -> Option<(String, String, &'static str)> {
+    fn second_look(
+        &self,
+        v: &Verdicts,
+        head: &str,
+    ) -> Option<(String, String, &'static str, bool)> {
         let since = v.list.iter().rfind(|(_, r)| v.later(r));
         let abandoned = since.is_some_and(|(_, r)| r["verdict"] == "abandoned");
         let (k, r) = v.newest()?;
@@ -1531,7 +1707,20 @@ impl Run {
         let record = format!("{}.run.json", self.report(k)?);
         let fit = own.is_some() && !self.done.moved && !abandoned && !writer;
         let fit = fit && json_file(&record).is_some();
-        fit.then(|| (record, judged.to_owned(), what))
+        let repaired = own.is_some_and(|o| o.repair);
+        fit.then(|| (record, judged.to_owned(), what, repaired))
+    }
+    /// The body of pull request `number`, read with the host's login and written to
+    /// `<directory>/<key>/<n>.description.md` with every login and stage token redacted (R19): its path.
+    fn description(&self, s: &mut impl System, number: u64, n: u64) -> Step<String> {
+        let v = self.gh(
+            s,
+            &format!("pr view {number} --repo {} --json body", self.repo),
+        )?;
+        let Some(body) = v["body"].as_str() else {
+            return stop("github_unreadable", json!({"call": "pr view"}));
+        };
+        self.prompt(&format!("{n}.description.md"), &scrubbed(body))
     }
     /// One validate naming the review's key, the admission of the stage, the start (R19).
     fn start_review(&mut self, s: &mut impl System, body: &Value, req: &mut Value) -> Step<String> {
@@ -1576,12 +1765,22 @@ impl Run {
         v: &Verdicts,
     ) -> Step<(String, String)> {
         let resumed = self.second_look(v, head);
+        let n = self.next();
+        // The description as the run read it with the host's login, before the round (R19).
+        let description = self.description(s, number, n)?;
         let mut text = self.page(s, Role::Verifier)?;
-        if let Some((_, judged, what)) = &resumed {
-            let round = format!("Head judged before: {judged}\nWhat moved it: {what}\n");
+        text.push_str(&format!("{DESCRIPTION}{description}{DESCRIPTION_TAIL}\n"));
+        if let Some((_, judged, what, repaired)) = &resumed {
+            let mut round = format!("Head judged before: {judged}\nWhat moved it: {what}\n");
+            if *repaired {
+                let answer = self.done.fixer_answer.as_deref().filter(|p| {
+                    std::fs::symlink_metadata(p).is_ok_and(|m| m.is_file() && m.len() > 0)
+                });
+                let answer = answer.unwrap_or("none");
+                round.push_str(&format!("Answer of the author: {answer}\n"));
+            }
             text.push_str(&format!("\n{SECOND_LOOK}\n## The round\n\n{round}"));
         }
-        let n = self.next();
         let prompt = self.prompt(&format!("{n}.verifier.prompt.md"), &text)?;
         let t = &self.verifier;
         let p = json!({"task": id("task", &self.task), "kind": "packet", "head": head,
@@ -1600,7 +1799,7 @@ impl Run {
         );
         let mut req = self.stage(&self.verifier, "reviewer", "verifier", (&prompt, ""));
         (req["ont_role"], req["expect"]) = (json!("verifier"), json!({"first_line": "Verdict: *"}));
-        (req["limits"], req["env"]) = self.limits(s, n, false)?;
+        (req["limits"], req["env"]) = self.limits(s, n, false, false)?;
         if let Some((record, ..)) = &resumed {
             req["resume"] = json!({"record": record});
         }
@@ -1663,6 +1862,18 @@ impl Run {
             let detail = json!({"review": review, "cause": "writer_cannot_review"});
             return stop("verifier_failed", detail);
         }
+        // The report as ONE comment, with the host's login; its failure changes nothing (R43).
+        let n = number.to_string();
+        let words = [
+            "pr",
+            "comment",
+            &n,
+            "--repo",
+            &self.repo,
+            "--body-file",
+            &out,
+        ];
+        let _ = s.call("gh", &args(&words), &Value::Null, 60_000);
         // The moves of this call are counted again from this verdict.
         self.done.own = None;
         Ok((verdict.to_owned(), review))
@@ -2279,6 +2490,9 @@ impl Run {
             "merged_commit": merged});
         if let Some(c) = &self.done.carried {
             a["carried"] = c.clone();
+        }
+        if !self.done.credentials.is_empty() {
+            a["credentials"] = json!(self.done.credentials);
         }
         if let Some(c) = &out.cleanup {
             a["cleanup"] = c.clone();

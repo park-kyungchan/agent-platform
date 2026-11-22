@@ -288,6 +288,113 @@ pub(crate) fn git(
     require!(reply.success => "process_failed", "git");
     String::from_utf8(reply.stdout).map_err(|_| error("process_failed", "git"))
 }
+/// The fixed script of the App's RS256 signature: the signing input and the key's path are its
+/// arguments, never part of its text (`specs/ap/unit-run.md` R42).
+pub(crate) const SIGN: &str = r#"printf %s "$1" | openssl dgst -sha256 -sign "$2" -binary"#;
+/// Base64url without padding.
+fn b64url(bytes: &[u8]) -> String {
+    const A: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
+    let mut out = String::with_capacity(bytes.len() * 4 / 3 + 3);
+    for chunk in bytes.chunks(3) {
+        let n =
+            (chunk.iter().enumerate()).fold(0u32, |n, (i, b)| n | (u32::from(*b) << (16 - 8 * i)));
+        for i in 0..=chunk.len() {
+            out.push(A[(n >> (18 - 6 * i)) as usize & 63] as char);
+        }
+    }
+    out
+}
+/// The Lead's App for a status on `repository` (R42): `None` (the one call of before) with no policy
+/// file, no JSON object, no `units.github.lead_app`, or a `stage_tokens` that does not name the
+/// repository, whose authors hold the host's login.
+fn lead_app(s: &impl System, repository: &str) -> Result<Option<(u64, String)>, Failure> {
+    let Some(file) = s.policy_file() else {
+        return Ok(None);
+    };
+    let Ok(bytes) = s.read(&file.to_string_lossy()) else {
+        return Ok(None);
+    };
+    let Ok(v) = serde_json::from_slice::<Value>(&bytes) else {
+        return Ok(None);
+    };
+    let g = &v["units"]["github"];
+    let named = g["stage_tokens"].get(repository).is_some();
+    match g.get("lead_app").filter(|_| named) {
+        None => Ok(None),
+        Some(app) => crate::unit::drive::lead_app(app).map(Some),
+    }
+}
+/// A step of the App that failed: `process_failed` with the reply through R22's one redaction.
+fn app_failed(field: &str, reply: &[u8]) -> Failure {
+    fail("process_failed", field, json!(crate::unit::redact(reply)))
+}
+/// One `gh` call of the App within 30 seconds: the member `member` of its answer, or `Err` with the
+/// redacted reply of a failed call, or the member's name alone (no byte of the answer) (R42).
+fn app_call(
+    s: &mut impl System,
+    words: &[&str],
+    input: &Value,
+    member: &str,
+) -> Result<Value, Failure> {
+    let reply = s.call("gh", &args(words), input, 30_000);
+    let reply = reply.map_err(|_| app_failed("gh", b""))?;
+    if !reply.success {
+        return Err(app_failed("gh", &reply.bytes));
+    }
+    let v: Option<Value> = serde_json::from_slice(&reply.stdout).ok();
+    let found = v.map(|v| v[member].clone()).filter(|m| !m.is_null());
+    let word = if member == "id" {
+        "installation"
+    } else {
+        "access_tokens"
+    };
+    found.ok_or_else(|| fail("process_failed", "gh", json!(word)))
+}
+/// A fresh installation token of the App `id` for `repository`, with the statuses alone: the JWT
+/// signed by `openssl` with the key at `key` (never opened here), the installation, its token (R42).
+fn installation_token(
+    s: &mut impl System,
+    repository: &str,
+    (id, key): (u64, &str),
+) -> Result<String, Failure> {
+    let epoch = std::time::UNIX_EPOCH;
+    let w = s.wall().duration_since(epoch).map_or(0, |d| d.as_secs());
+    let header = b64url(br#"{"alg":"RS256","typ":"JWT"}"#);
+    let claims = format!(
+        r#"{{"iat":{},"exp":{},"iss":"{id}"}}"#,
+        w.saturating_sub(60),
+        w + 540
+    );
+    let input = format!("{header}.{}", b64url(claims.as_bytes()));
+    let signed = s.call(
+        "sh",
+        &args(&["-c", SIGN, "sh", &input, key]),
+        &Value::Null,
+        30_000,
+    );
+    let signature = match signed {
+        Ok(r) if r.success && !r.stdout.is_empty() => r.stdout,
+        Ok(r) => return Err(app_failed("openssl", &r.bytes)),
+        Err(_) => return Err(app_failed("openssl", b"")),
+    };
+    let bearer = format!("Authorization: Bearer {input}.{}", b64url(&signature));
+    let path = format!("repos/{repository}/installation");
+    let found = app_call(s, &["api", "-H", &bearer, &path], &Value::Null, "id")?;
+    let installation = found.as_u64().filter(|n| *n > 0);
+    let installation =
+        installation.ok_or_else(|| fail("process_failed", "gh", json!("installation")))?;
+    let name = repository.split_once('/').map_or(repository, |(_, n)| n);
+    let body = json!({"repositories": [name], "permissions": {"statuses": "write"}});
+    let path = format!("app/installations/{installation}/access_tokens");
+    let words = [
+        "api", "--method", "POST", "-H", &bearer, &path, "--input", "-",
+    ];
+    let token = app_call(s, &words, &body, "token")?;
+    let token = token.as_str().filter(|t| !t.is_empty()).map(str::to_owned);
+    token.ok_or_else(|| fail("process_failed", "gh", json!("access_tokens")))
+}
+/// The status `lead-review` on a head: as the Lead's App where the policy names it and a stage token
+/// of the repository, else the one call of before with the host's login (`specs/ap/unit-run.md` R42).
 pub(crate) fn post(
     s: &mut impl System,
     f: &Value,
@@ -295,27 +402,24 @@ pub(crate) fn post(
     description: &str,
 ) -> Result<(), Failure> {
     require!(description.len() <= 140 => "invalid_input", "description");
-    let reply = s.call(
-        "gh",
-        &args(&[
-            "api",
-            "--method",
-            "POST",
-            &format!(
-                "repos/{}/statuses/{}",
-                text(f, "repository")?,
-                text(f, "head")?
-            ),
-            "-f",
-            &format!("state={state}"),
-            "-f",
-            "context=lead-review",
-            "-f",
-            &format!("description={description}"),
-        ]),
-        &Value::Null,
-        30_000,
-    )?;
+    let (repository, head) = (text(f, "repository")?, text(f, "head")?);
+    let mut words = args(&["api"]);
+    if let Some((id, key)) = lead_app(s, repository)? {
+        let token = installation_token(s, repository, (id, &key))?;
+        words.extend(args(&["-H", &format!("Authorization: Bearer {token}")]));
+    }
+    words.extend(args(&[
+        "--method",
+        "POST",
+        &format!("repos/{repository}/statuses/{head}"),
+        "-f",
+        &format!("state={state}"),
+        "-f",
+        "context=lead-review",
+        "-f",
+        &format!("description={description}"),
+    ]));
+    let reply = s.call("gh", &words, &Value::Null, 30_000)?;
     // A call that failed says why in its reply: redacted here, so every caller gets it redacted.
     match reply.success {
         true => Ok(()),
