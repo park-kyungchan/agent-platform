@@ -1,19 +1,20 @@
 //! `ap work`: the dispatch pass (`specs/ap/work.md`). One pass, under the lock `work.lock` of the units
 //! directory, reads the units of the store and the run units of the service manager once, and starts
 //! each unit that may start as `ap unit run <key>` in a transient unit of its own; a `ready` unit that
-//! does not start gets what it waits on as its `waits_on`.
-use crate::host::{Failure, Host, System, error, fail, id, new_session_id};
+//! does not start gets what it waits on as its `waits_on`. When the policy has a writer, the pass also
+//! starts the writer of each draft unit of a horizon that has no page (R23 to R25).
+use crate::host::{Failure, Host, LIMIT, System, error, fail, id, new_session_id};
 use crate::quota;
 use crate::run::KEEP;
 use crate::store::{self, Actor};
 use crate::unit::drive::{self, key_form};
-use crate::unit::object;
+use crate::unit::{object, page_write, render};
 use serde_json::{Value, json};
 use std::{
     collections::BTreeSet,
     ffi::OsString,
     fs::File,
-    io::{ErrorKind, Write},
+    io::{ErrorKind, Read as _, Write},
     os::unix::fs::{DirBuilderExt, OpenOptionsExt},
     path::{Path, PathBuf},
     process::ExitCode,
@@ -35,6 +36,9 @@ pub(crate) struct Work {
     slots: usize,
     slice: String,
     pub(crate) prefix: String,
+    /// The writers in flight a pass may reach (R24), and the prefix of their units.
+    pages: usize,
+    page_prefix: String,
 }
 fn invalid(member: &str, why: &str) -> Failure {
     fail("policy_invalid", "policy", json!(format!("{member} {why}")))
@@ -56,7 +60,7 @@ pub(crate) fn work(policy: &Value) -> Result<Option<Work>, Failure> {
         .ok_or_else(|| invalid("work", "is not an object"))?;
     if let Some(k) = w
         .keys()
-        .find(|k| !["slots", "slice", "prefix"].contains(&k.as_str()))
+        .find(|k| !["slots", "slice", "prefix", "pages", "page_prefix"].contains(&k.as_str()))
     {
         return Err(invalid(
             "work",
@@ -79,20 +83,40 @@ pub(crate) fn work(policy: &Value) -> Result<Option<Work>, Failure> {
             .map(str::to_owned)
             .ok_or_else(|| invalid(&format!("work.{k}"), why)),
     };
+    let form =
+        "is not 1 to 16 characters of a-z0-9- that begin with a letter and do not end with -";
+    let slice = text(
+        "slice",
+        quota::slice_ok,
+        "agents.slice",
+        "is not a slice name of a-z0-9 and .slice",
+    )?;
+    let prefix = text("prefix", prefix_ok, "ap-unit", form)?;
+    let pages = match w.get("pages") {
+        None => 2,
+        Some(v) => v
+            .as_u64()
+            .filter(|n| *n <= 8)
+            .ok_or_else(|| invalid("work.pages", "is not an integer from 0 to 8"))?
+            as usize,
+    };
+    let page_prefix = text("page_prefix", prefix_ok, "ap-page", form)?;
+    // The writers' units and the runs' units are told apart by their names (R3).
+    let meets = |a: &str, b: &str| a.strip_prefix(b).is_some_and(|r| r.starts_with('-'));
+    let clash =
+        page_prefix == prefix || meets(&page_prefix, &prefix) || meets(&prefix, &page_prefix);
+    if policy.get("writer").is_some() && clash {
+        return Err(invalid(
+            "work.page_prefix",
+            "is the prefix, or one of the two begins with the other and -",
+        ));
+    }
     Ok(Some(Work {
         slots,
-        slice: text(
-            "slice",
-            quota::slice_ok,
-            "agents.slice",
-            "is not a slice name of a-z0-9 and .slice",
-        )?,
-        prefix: text(
-            "prefix",
-            prefix_ok,
-            "ap-unit",
-            "is not 1 to 16 characters of a-z0-9- that begin with a letter and do not end with -",
-        )?,
+        slice,
+        prefix,
+        pages,
+        page_prefix,
     }))
 }
 /// The policy file as one JSON object; None when the host names none or it does not exist (R2).
@@ -171,11 +195,14 @@ pub fn cli(argv: &[OsString]) -> ExitCode {
     ExitCode::from(if written.is_ok() { status } else { 4 })
 }
 
-/// With `--store` the policy names the scratch units directory, slice and prefix (R3).
+/// With `--store` the policy names the scratch units directory, slice and prefix, and with a writer
+/// the prefix of the writers' units and the pages directory (R3).
 pub(crate) fn scratch(policy: &Value, store: Option<&str>) -> Result<(), Failure> {
     let named = |k: &str| policy["work"].get(k).is_some();
     let scratch = policy["units"].get("directory").is_some() && named("slice") && named("prefix");
-    if store.is_some() && !scratch {
+    let pages = policy.get("writer").is_none()
+        || (named("page_prefix") && policy["writer"].get("directory").is_some());
+    if store.is_some() && !(scratch && pages) {
         return Err(error("invalid_input", "policy"));
     }
     Ok(())
@@ -197,6 +224,8 @@ pub fn execute(s: &mut impl System, store: Option<&str>) -> Result<Value, Box<Re
     let Some(w) = work(&policy).map_err(before)? else {
         return Ok(json!({"skipped": "no work"}));
     };
+    // A writer of a wrong form refuses the pass before the lock, whatever `pages` (R24).
+    let writer = page_write::writer(&policy).map_err(before)?;
     scratch(&policy, store).map_err(before)?;
     let (directory, _) = drive::units(&policy).map_err(before)?;
     let cpu = quota::config(s).map_err(before)?;
@@ -207,6 +236,10 @@ pub fn execute(s: &mut impl System, store: Option<&str>) -> Result<Value, Box<Re
         return Ok(json!({"skipped": "pass_running"}));
     };
     let drawn = new_session_id(s).map_err(before)?.replace('-', "");
+    // Only with a writer and `pages` above 0 does the pass reach the writers (R24).
+    let pages = writer
+        .filter(|_| w.pages > 0)
+        .map(|wr| PathBuf::from(wr.directory));
     let mut pass = Pass {
         store: store.map(str::to_owned),
         root,
@@ -217,6 +250,7 @@ pub fn execute(s: &mut impl System, store: Option<&str>) -> Result<Value, Box<Re
         count: 0,
         started: vec![],
         load: None,
+        pages,
     };
     pass.run(s).map_err(|f| {
         Box::new(Refusal {
@@ -399,6 +433,8 @@ struct Pass {
     started: Vec<String>,
     /// The one reading of the load: the busy share and `outside` (R13).
     load: Option<(i64, i64, i64)>,
+    /// The pages directory, in a pass that reaches the writers (R24).
+    pages: Option<PathBuf>,
 }
 /// A candidate's end in this pass.
 enum End {
@@ -569,9 +605,101 @@ impl Pass {
             Some((busy, _, outside)) => (json!(busy), json!(outside)),
             None => (Value::Null, Value::Null),
         };
+        let mut answer = json!({"started": self.started, "cut": cut, "not_restarted": not_restarted,
+            "waiting": waiting, "in_flight": in_flight, "busy": busy, "outside": outside});
+        if let Some(pages) = self.pages.clone() {
+            answer["pages"] = self.writers(s, &pages)?;
+        }
+        Ok(answer)
+    }
+
+    /// The writers (R24): every draft unit of a horizon that has no page and a write set, by
+    /// `added_at`, then key, started up to `pages` in flight; the answer's member `pages` (R25).
+    fn writers(&mut self, s: &mut impl System, pages: &Path) -> Result<Value, Failure> {
+        let all = vec![json!({"in": ["state", ["draft"]]})];
+        let drafts = store::at(store::search(s, self.store(), "unit", all), "units")?;
+        let mut intents: Vec<String> = vec![];
+        for (key, f) in &drafts {
+            let intent = f["intent"]["native_key"].as_str();
+            if let Some(i) = intent.filter(|_| f["lane"] == "objective" && key_form(key))
+                && !intents.iter().any(|k| k == i)
+            {
+                intents.push(i.to_owned());
+            }
+        }
+        let mut candidates: Vec<(String, String)> = vec![];
+        for intent in &intents {
+            for h in horizon_of(s, self.store(), intent, &drafts)? {
+                let f = drafts.iter().find(|(k, _)| *k == h.key).map(|(_, f)| f);
+                let written =
+                    f.is_some_and(|f| f["write_set"].as_array().is_some_and(|w| !w.is_empty()));
+                let objective = f.is_some_and(|f| f["lane"] == "objective");
+                if h.page == "none" && written && objective && key_form(&h.key) {
+                    candidates.push((h.added_at, h.key));
+                }
+            }
+        }
+        candidates.sort();
+        candidates.dedup();
+        let live = live_units(s, &self.work.page_prefix)?;
+        let named = |k: &str| candidates.iter().any(|(_, c)| c == k);
+        let others: Vec<String> = live
+            .iter()
+            .filter(|(_, k)| !k.as_deref().is_some_and(named))
+            .map(|(n, _)| n.clone())
+            .collect();
+        let mut in_flight: Vec<String> = vec![];
+        for (_, key) in &candidates {
+            let running = live.iter().any(|(_, k)| k.as_deref() == Some(key.as_str()));
+            if running || lock_held(pages, key) {
+                in_flight.push(key.clone());
+            }
+        }
+        let flying = in_flight.len() + others.len();
+        let (mut started, mut not_restarted, mut waiting) = (vec![], vec![], vec![]);
+        for (_, key) in &candidates {
+            if in_flight.contains(key) {
+                continue;
+            }
+            let home = pages.join(key);
+            if home.join("started").symlink_metadata().is_ok() {
+                not_restarted.push(key.clone());
+                continue;
+            }
+            let n = flying + started.len();
+            if n >= self.work.pages {
+                waiting.push(
+                    json!({"unit": key, "waits_on": format!("pages {n}/{}", self.work.pages)}),
+                );
+                continue;
+            }
+            let mut dirs = std::fs::DirBuilder::new();
+            dirs.recursive(true).mode(0o700);
+            let made =
+                dirs.create(&home).is_ok() && home.symlink_metadata().is_ok_and(|m| m.is_dir());
+            if !made {
+                return Err(fail("io_error", "started", json!(key)));
+            }
+            let path = home.join("started");
+            let mut options = std::fs::OpenOptions::new();
+            options.write(true).create_new(true).mode(0o600);
+            options.custom_flags(rustix::fs::OFlags::NOFOLLOW.bits() as i32);
+            options
+                .open(&path)
+                .map_err(|_| fail("io_error", "started", json!(key)))?;
+            let argv = self.command(s, key, true);
+            let called = s.call("systemd-run", &argv, &Value::Null, 60_000);
+            if called.is_ok_and(|r| r.success) {
+                started.push(key.clone());
+            } else {
+                let _ = std::fs::remove_file(&path);
+                waiting.push(json!({"unit": key, "waits_on": "start failed"}));
+            }
+        }
+        in_flight.extend(others);
         Ok(
-            json!({"started": self.started, "cut": cut, "not_restarted": not_restarted,
-            "waiting": waiting, "in_flight": in_flight, "busy": busy, "outside": outside}),
+            json!({"started": started, "not_restarted": not_restarted, "waiting": waiting,
+            "in_flight": in_flight}),
         )
     }
 
@@ -696,7 +824,7 @@ impl Pass {
             .open(&path)
             .and_then(|mut file| file.write_all(revision.as_bytes()));
         written.map_err(|_| fail("io_error", "started", json!(key)))?;
-        let argv = self.command(s, key);
+        let argv = self.command(s, key, false);
         let called = s.call("systemd-run", &argv, &Value::Null, 60_000);
         if called.is_ok_and(|r| r.success) {
             self.started.push(key.to_owned());
@@ -711,9 +839,14 @@ impl Pass {
             End::Waits(why)
         })
     }
-    /// The arguments of `systemd-run` for the unit `key` (R14).
-    fn command(&self, s: &impl System, key: &str) -> Vec<String> {
-        let unit = format!("{}-{key}", self.work.prefix);
+    /// The arguments of `systemd-run` for the unit `key` (R14): its run, or with `writer` its page's
+    /// writer (R24).
+    fn command(&self, s: &impl System, key: &str, writer: bool) -> Vec<String> {
+        let prefix = match writer {
+            true => &self.work.page_prefix,
+            false => &self.work.prefix,
+        };
+        let unit = format!("{prefix}-{key}");
         let mut argv: Vec<String> = [
             "--unit",
             &unit,
@@ -736,7 +869,7 @@ impl Pass {
             "--".into(),
             this_ap(),
             "unit".into(),
-            "run".into(),
+            if writer { "write" } else { "run" }.into(),
             key.to_owned(),
         ]);
         if let Some(store) = self.store() {
@@ -755,4 +888,142 @@ fn this_ap() -> String {
     let path = std::fs::read_link("/proc/self/exe").unwrap_or_default();
     let path = path.to_string_lossy();
     path.strip_suffix(" (deleted)").unwrap_or(&path).to_owned()
+}
+
+/// One unit of a horizon (R23).
+pub struct Horizon {
+    pub key: String,
+    pub class: Value,
+    pub page: &'static str,
+    added_at: String,
+}
+/// Whether the unit `key`, read as `u`, has a review of kind `page`, `closed` with the verdict
+/// `accept`, whose `head` is its page digest as read (R23).
+fn page_accepted(
+    s: &mut impl System,
+    store: Option<&str>,
+    key: &str,
+    u: &Value,
+) -> Result<bool, Failure> {
+    let digest = render::page_digest(key, u);
+    let keys = store::at(
+        store::view_keys(s, store, "reviews_of_unit", json!({ "unit": key })),
+        "reviews",
+    )?;
+    for k in keys {
+        let Some(v) = store::at(store::get(s, store, "review", &k), "reviews")? else {
+            continue;
+        };
+        if v["kind"] == "page"
+            && v["status"] == "closed"
+            && v["verdict"] == "accept"
+            && v["head"] == digest
+        {
+            return Ok(true);
+        }
+    }
+    Ok(false)
+}
+/// The horizon of the intent `intent` among the draft units `drafts` (R23): the drafts of that intent
+/// whose every dependency counts, by `added_at`, then key, each with the state of its page.
+pub fn horizon_of(
+    s: &mut impl System,
+    store: Option<&str>,
+    intent: &str,
+    drafts: &[store::Found],
+) -> Result<Vec<Horizon>, Failure> {
+    let mut found = vec![];
+    for (key, f) in drafts {
+        if f["state"] != "draft" || f["intent"]["native_key"] != intent {
+            continue;
+        }
+        let mut counts = true;
+        for d in f["depends_on"].as_array().into_iter().flatten() {
+            let Some(d) = d["native_key"].as_str() else {
+                counts = false;
+                break;
+            };
+            let dep = store::at(store::get(s, store, "unit", d), "depends_on")?;
+            let ok = match dep {
+                None => false,
+                Some(dep) => match dep["state"].as_str().unwrap_or_default() {
+                    "merged" | "done" | "ready" | "running" | "accepted" | "stopped" => true,
+                    "draft" => page_accepted(s, store, d, &dep)?,
+                    _ => false,
+                },
+            };
+            if !ok {
+                counts = false;
+                break;
+            }
+        }
+        if !counts {
+            continue;
+        }
+        let page = if page_accepted(s, store, key, f)? {
+            "accepted"
+        } else if f["acceptance"].as_array().is_some_and(|a| !a.is_empty()) {
+            "written"
+        } else {
+            "none"
+        };
+        found.push(Horizon {
+            key: key.clone(),
+            class: f["class"].clone(),
+            page,
+            added_at: f["added_at"].as_str().unwrap_or_default().to_owned(),
+        });
+    }
+    found.sort_by(|a, b| (&a.added_at, &a.key).cmp(&(&b.added_at, &b.key)));
+    Ok(found)
+}
+/// The function `horizon` (R23): `{"intent": <key>}` against the store `store`; the answer, or the
+/// refusal with its exit (2 a refusal, 3 a read that failed).
+pub fn horizon(s: &mut impl System, store: &str, p: &Value) -> Result<Value, (Failure, u8)> {
+    let refuse = |f: Failure| (f, 2);
+    let failed = |f: Failure| (f, 3);
+    let one = p.as_object().is_some_and(|o| o.len() == 1);
+    let key = p["intent"]
+        .as_str()
+        .filter(|k| one && (1..=512).contains(&k.len()));
+    let key = key.ok_or_else(|| refuse(error("invalid_input", "intent")))?;
+    let read = store::at(store::get(s, Some(store), "intent", key), "intent").map_err(failed)?;
+    if read.is_none() {
+        return Err(refuse(error("unknown_intent", "intent")));
+    }
+    let all = vec![json!({"in": ["state", ["draft"]]})];
+    let drafts = store::at(store::search(s, Some(store), "unit", all), "units").map_err(failed)?;
+    let units = horizon_of(s, Some(store), key, &drafts).map_err(failed)?;
+    let units: Vec<Value> = units
+        .iter()
+        .map(|h| json!({"unit": h.key, "class": h.class, "page": h.page}))
+        .collect();
+    Ok(json!({"intent": key, "units": units}))
+}
+/// `ap` with no argument and `ONT_FN_NAME=horizon` (R23): the parameters on standard input, the store
+/// at `ONT_FN_STORE`; the answer on standard output, or the error object on standard error.
+pub fn function() -> ExitCode {
+    let result = (|| {
+        let mut bytes = vec![];
+        let read = std::io::stdin().take(LIMIT + 1).read_to_end(&mut bytes);
+        if read.is_err() || bytes.len() as u64 > LIMIT {
+            return Err((error("invalid_input", "stdin"), 2));
+        }
+        let p: Value =
+            serde_json::from_slice(&bytes).map_err(|_| (error("invalid_input", "stdin"), 2))?;
+        let store = std::env::var("ONT_FN_STORE")
+            .ok()
+            .filter(|v| v.starts_with('/'));
+        let store = store.ok_or_else(|| (error("invalid_input", "ONT_FN_STORE"), 2))?;
+        horizon(&mut Host, &store, &p)
+    })();
+    let (written, status) = match result {
+        Ok(v) => (writeln!(std::io::stdout(), "{v}"), 0),
+        Err((f, status)) => {
+            let v =
+                json!({"error": {"code": store::code(&f), "field": f.field, "detail": f.detail}});
+            (writeln!(std::io::stderr(), "{v}"), status)
+        }
+    };
+    ExitCode::from(if written.is_ok() { status } else { 4 })
 }

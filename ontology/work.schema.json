@@ -1,7 +1,7 @@
 {
   "format": "ontology-schema/v1",
   "domain": "work",
-  "version": 14,
+  "version": 15,
   "namespace": {
     "instance": "vps://palantirkc",
     "account": "root"
@@ -4162,6 +4162,15 @@
       "program": "/usr/local/bin/ap",
       "answer_bytes": 65536,
       "timeout_ms": 2000
+    },
+    "horizon": {
+      "description": "The draft units of an intent whose every dependency is merged, done, ready, running, accepted or stopped, or a draft with an accepted page, and the state of each one's page (specs/ap/work.md R23).",
+      "parameters": {
+        "intent": {"type": "string", "required": true, "description": "The intent's key."}
+      },
+      "program": "/usr/local/bin/ap",
+      "answer_bytes": 65536,
+      "timeout_ms": 30000
     }
   },
   "grants": [

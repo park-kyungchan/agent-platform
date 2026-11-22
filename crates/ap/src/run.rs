@@ -1,6 +1,6 @@
 //! One stage of a unit: one headless Claude Code (or Codex, Muse Code or Antigravity CLI) session in a transient systemd
-//! scope under `agents.slice`, ended at its time bound, its exit or (a reviewer only) its first
-//! `result` event, after which the whole scope is stopped. One record `<out>.run.json` per run; no
+//! scope under `agents.slice`, ended at its time bound, its exit or (a reviewer or a writer only)
+//! its first `result` event, after which the whole scope is stopped. One record `<out>.run.json` per run; no
 //! other ledger, no store write.
 use crate::host::{
     Failure, LIMIT, System, args, digest, error, fail, new_session_id, require, text,
@@ -22,12 +22,19 @@ use std::{
 
 const SLICE: &str = "agents.slice";
 /// The default time bound of each role, in seconds.
-pub(crate) const ROLES: [(&str, u64); 3] = [
+pub(crate) const ROLES: [(&str, u64); 4] = [
     ("implementer", 5_400),
     ("fixer", 3_600),
     ("reviewer", 3_300),
+    ("writer", 5_400),
 ];
-const MODES: [&str; 6] = [
+/// A stage that ends at its first `result` and starts over on a next account without the
+/// continuation: a reviewer, and a page's writer, which is as a reviewer there (R15, R20, R21, R23,
+/// R53).
+fn first_result(role: &str) -> bool {
+    role == "reviewer" || role == "writer"
+}
+pub(crate) const MODES: [&str; 6] = [
     "acceptEdits",
     "auto",
     "bypassPermissions",
@@ -157,11 +164,13 @@ impl Runtime {
         }
     }
     /// The roles this runtime builds: Codex has no reviewer, and an `agy` stage no other role (its
-    /// `HOME` is the account, so a writing stage's `git`, `gh` and `cargo` lose their files).
+    /// `HOME` is the account, so a writing stage's `git`, `gh` and `cargo` lose their files); a
+    /// page's writer runs on Claude alone (R53).
     fn role_ok(self, role: &str) -> bool {
         match self {
-            Self::Claude | Self::Muse => true,
-            Self::Codex => role != "reviewer",
+            Self::Claude => true,
+            Self::Muse => role != "writer",
+            Self::Codex => role != "reviewer" && role != "writer",
             Self::Agy => role == "reviewer",
         }
     }
@@ -430,8 +439,15 @@ fn flag(r: &Value, key: &str) -> Result<bool, Failure> {
 }
 fn word(r: &Value, key: &str, max: usize) -> Result<String, Failure> {
     let value = text(r, key)?;
-    require!(value.len() <= max && value.bytes().all(|c| c.is_ascii_alphanumeric() || b"._-[]".contains(&c)) => "invalid_input", key);
+    require!(word_ok(value, max) => "invalid_input", key);
     Ok(value.to_owned())
+}
+/// A model or an effort as a request may name it: at most `max` bytes of letters, digits and `._-[]`.
+pub(crate) fn word_ok(value: &str, max: usize) -> bool {
+    value.len() <= max
+        && value
+            .bytes()
+            .all(|c| c.is_ascii_alphanumeric() || b"._-[]".contains(&c))
 }
 fn paths(r: &Value, key: &str, max: usize) -> Result<Vec<String>, Failure> {
     let Some(v) = r.get(key) else {
@@ -519,7 +535,8 @@ fn listed_paths(o: &serde_json::Map<String, Value>, key: &str, max: usize) -> Op
     let list = v.as_array().filter(|a| (1..=max).contains(&a.len()))?;
     list.iter().map(listed).collect()
 }
-/// The `limits` of a request: a reviewer, an implementer or a fixer on the Claude CLI only; a
+/// The `limits` of a request: a reviewer, an implementer, a fixer or a writer (with `scratch` alone,
+/// `specs/ap/run.md` R53) on the Claude CLI only; a
 /// `scratch`, an absolute path without `..`, apart from the accounts, the cwd, the out, the prompt
 /// and the paths it writes by its components as written; the optional `write`, `over`, `read_only`
 /// and `show`; never with `expect.file` (`specs/ap/run-limits.md` R1).
@@ -573,8 +590,10 @@ fn scratch(
     let held = [out, prompt]
         .iter()
         .any(|h| writes.iter().any(|w| Path::new(h).starts_with(w)));
-    let roles = ["reviewer", "implementer", "fixer"];
-    let stage = roles.contains(&role) && runtime == Runtime::Claude && !expect_file;
+    let roles = ["reviewer", "implementer", "fixer", "writer"];
+    // A writer's `limits` names no path but its scratch directory (`specs/ap/run.md` R53).
+    let only_scratch = role != "writer" || o.len() == 1;
+    let stage = roles.contains(&role) && runtime == Runtime::Claude && !expect_file && only_scratch;
     require!(stage && !up && !inside && !holds && !held => "invalid_input", "limits");
     // The hidden list's `~`: without a passwd entry for this user there is no list to hide (R10).
     let home = s.home().map(|h| h.to_string_lossy().into_owned());
@@ -984,6 +1003,8 @@ fn request_at(s: &mut impl System, r: &Value, at_cwd: bool) -> Result<Request, F
             [&cwd, &out, &prompt],
         )?),
     };
+    // No writer stage without `limits` (R53).
+    require!(role != "writer" || limits.is_some() => "invalid_input", "limits");
     // A typed answer is the Claude CLI's: its answer is the object, not a text with a first line.
     let schema = match r.get("answer_schema") {
         None => None,
@@ -1150,7 +1171,7 @@ fn request_at(s: &mut impl System, r: &Value, at_cwd: bool) -> Result<Request, F
             (!p.contains(name) && !p.chars().any(char::is_control)).then_some(p)
         };
         let (p, a) = (fit("prompt")?, fit("answer")?);
-        let work = if role == "reviewer" { "" } else { MOVED_WORK };
+        let work = if first_result(role) { "" } else { MOVED_WORK };
         // One pass: a path that holds the literal `{A}` stays as the record has it.
         let (head, rest) = MOVED.split_once("{P}")?;
         let (middle, tail) = rest.split_once("{A}")?;
@@ -2208,10 +2229,10 @@ fn attempt(
         Ok(child) => child,
         Err(_) => return not_launched(record, "launch"),
     };
-    // A reviewer's stage ends at its first result; an implementer's or a fixer's only at the
-    // CLI's exit or the bound, because a result is not final while a shell it started lives.
+    // A reviewer's or a writer's stage ends at its first result; an implementer's or a fixer's only
+    // at the CLI's exit or the bound, because a result is not final while a shell it started lives.
     let mut seen = Seen {
-        first_only: q.role == "reviewer",
+        first_only: first_result(&q.role),
         runtime: q.runtime,
         spent: q.spent,
         model: q.model.clone(),
@@ -2531,7 +2552,7 @@ pub fn execute(s: &mut impl System, r: &Value) -> Result<(Value, u8), Failure> {
             // a launch of a resumed call after the first is a move and gets its own.
             let lead = match &q.moved {
                 Some(text) if i > 0 => Some(text.as_str()),
-                _ if q.resume.is_none() && worked_before && q.role != "reviewer" => {
+                _ if q.resume.is_none() && worked_before && !first_result(&q.role) => {
                     Some(CONTINUATION)
                 }
                 _ => None,

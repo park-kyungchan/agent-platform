@@ -35,7 +35,7 @@ For `install`, `origin/main` means the local ref, so run `git fetch` first; the 
 
 ## One stage
 
-`ap run < request.json`: `specs/ap/run.md` (the request R1 to R6, the refusals before any effect R7 to R10, the run and its record R11 to R29), with `specs/ap/run-limits.md`, `specs/ap/run-object.md` and `specs/ap/policy.md`. The record, the stream and the error file are mode 0600 (R11).
+`ap run < request.json`: `specs/ap/run.md` (the request R1 to R6, the refusals before any effect R7 to R10, the run and its record R11 to R29), with `specs/ap/run-limits.md`, `specs/ap/run-object.md` and `specs/ap/policy.md`. The record, the stream and the error file are mode 0600 (R11). The role `writer`, a unit's page writer, runs on Claude only, under `limits` with its scratch directory alone, and ends at its first result as a reviewer does (`specs/ap/run.md` R53).
 
 ### A stage with limits
 
@@ -237,6 +237,10 @@ The record `<out>.unit.json` is created exclusively before any effect (the claim
 
 `ap unit run` carries an accept across an update (`specs/ap/unit-run.md` R37): when `main` moved under an accepted head and the run's own update merged it without a conflict, the other side changed no path of the unit's write set and the unit's patch is unchanged, the new head is checked (the write set, the acceptance checks, the required check) and the accept is carried to it with the store's `carry_review`, with no verifier session; the call writes `<directory>/<key>/<n>.update.md` (the heads, the bases, the other side's paths, the checks' ends) and its answer names `carried: {review, from, file}`. An author commit, a path of the write set, a conflict or a `repair` verdict still goes to a verifier round. A carried review is a verdict but not a round: neither the unit's `rounds` nor `ap status --indicators` counts it.
 
+## The page writer
+
+`ap unit write <key> [--store <path>]`: `specs/ap/unit-write.md`.
+
 ## One case
 
 `ap unit < request.json` with the member `case` is a case call: it runs a past unit again, in a copy that holds only that unit's base, and judges it by the tests the unit was accepted with. One record says whether a stage of the named model made those tests pass; with no stage the call shows whether the case is valid. It is one pass, like a unit call: at most one stage, no fixer, no step repeated. It starts no `gh` and no `ont`, makes no network call and writes nothing outside `worktree` and the files of `out`; what the stage and the commands of the case do is theirs.
@@ -331,7 +335,7 @@ What it does not print: the installed revisions (`deploy/README.md`, "Read the s
 
 ## The dispatch pass
 
-`ap work [--store <path>]`: `specs/ap/work.md`; the timer, its install, the switch and the undo are in `deploy/README.md`, "The dispatch pass".
+`ap work [--store <path>]`: `specs/ap/work.md`; the timer, its install, the switch and the undo are in `deploy/README.md`, "The dispatch pass". With the policy's member `writer` the pass also starts `ap unit write <key>` for the draft units of each intent's horizon that have no page, `ap` with no argument and `ONT_FN_NAME=horizon` being that horizon as the store's function (`specs/ap/work.md` R23 to R25).
 
 ## The watch
 
@@ -351,7 +355,7 @@ What it does not print: the installed revisions (`deploy/README.md`, "Read the s
 
 ## The policy check
 
-`ap policy check [<file>]`: `specs/ap/policy.md` R12 to R16.
+`ap policy check [<file>]`: `specs/ap/policy.md` R12 to R16. Its last reader, `writer`, reads the member `writer` of the page writer (`specs/ap/unit-write.md` R2).
 
 ## One check
 

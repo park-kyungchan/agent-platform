@@ -24,6 +24,8 @@ use std::{
 static NEXT: AtomicU32 = AtomicU32::new(0);
 const STORE: &str = "/invented/scratch/store.sqlite";
 const PREFIX: &str = "aptest";
+/// The prefix of the writers' units (R24).
+const PAGES: &str = "aptestpg";
 const SLICE: &str = "aptest.slice";
 const CPU_STAT: &str = "/sys/fs/cgroup/aptest.slice/cpu.stat";
 const UUID: &str = "0123abcd-4567-89ef-0123-456789abcdef";
@@ -93,6 +95,12 @@ struct W {
     clock: Cell<Duration>,
     /// A lock the test holds, let go at the first pause.
     held: Option<Held>,
+    /// The objects of the store that are not units (intents, reviews), by kind and key.
+    others: BTreeMap<(String, String), Value>,
+    /// The lines `systemctl list-units` prints for the writers' units.
+    listed_pages: String,
+    /// Every call of `ont` fails.
+    broken: bool,
 }
 impl W {
     fn new() -> Self {
@@ -133,6 +141,9 @@ impl W {
             base: Instant::now(),
             clock: Cell::default(),
             held: None,
+            others: BTreeMap::new(),
+            listed_pages: String::new(),
+            broken: false,
         };
         w.policy_with(json!({}));
         w
@@ -296,6 +307,9 @@ impl W {
     }
     fn ont(&mut self, args: &[String], input: &Value) -> Answer {
         assert_eq!(args[args.len() - 2..], ["--store", STORE], "{args:?}");
+        if self.broken {
+            return broken("ont");
+        }
         if self
             .store_dies_after
             .is_some_and(|n| self.applies >= n && n > 0)
@@ -318,6 +332,39 @@ impl W {
                     true,
                     &json!({"status": "ok", "result": {"basis": {"qualified": true},
                     "objects": objects, "continuation": null}}),
+                )
+            }
+            "get" if input["id"]["object_type"] != "unit" => {
+                let id = &input["id"];
+                let at = (
+                    id["object_type"].as_str().unwrap().to_owned(),
+                    id["native_key"].as_str().unwrap().to_owned(),
+                );
+                let Some(f) = self.others.get(&at) else {
+                    return reply(false, &json!({"status": "refused", "code": "unavailable"}));
+                };
+                reply(
+                    true,
+                    &json!({"status": "ok", "result": {"objects": [{"id": id, "head": "r#1",
+                    "observations": [{"revision": "r#1", "fields": wrap(f)}]}]}}),
+                )
+            }
+            "render" => {
+                assert_eq!(input["view"], "reviews_of_unit");
+                let unit = &input["args"]["unit"];
+                let rows: Vec<&String> = self
+                    .others
+                    .iter()
+                    .filter(|((t, _), r)| t == "review" && r["unit"]["native_key"] == *unit)
+                    .map(|((_, k), _)| k)
+                    .collect();
+                let mut table = "| Key | Kind |\n| --- | --- |\n".to_owned();
+                for k in &rows {
+                    table.push_str(&format!("| {k} | page |\n"));
+                }
+                reply(
+                    true,
+                    &json!({"status": "ok", "markdown": table, "rows": rows.len(), "truncated": false}),
                 )
             }
             "get" => {
@@ -386,6 +433,11 @@ impl System for W {
         match (program, &words[..]) {
             ("ont", _) => self.ont(args, input),
             ("git", ["check-ref-format", "--branch", _]) => text(true, ""),
+            ("systemctl", ["list-units", "--all", "--plain", "--no-legend", pattern])
+                if *pattern == format!("{PAGES}-*") =>
+            {
+                text(true, &self.listed_pages)
+            }
             ("systemctl", ["list-units", "--all", "--plain", "--no-legend", pattern]) => {
                 assert_eq!(*pattern, format!("{PREFIX}-*"));
                 match &self.listed {
@@ -397,7 +449,9 @@ impl System for W {
                 text(true, &format!("/{SLICE}\n"))
             }
             ("systemd-run", ["--unit", unit, ..]) => {
-                let key = unit.strip_prefix(&format!("{PREFIX}-")).unwrap();
+                let key = (unit.strip_prefix(&format!("{PAGES}-")))
+                    .or_else(|| unit.strip_prefix(&format!("{PREFIX}-")))
+                    .unwrap();
                 assert!(!words.contains(&"--wait"), "the pass waited: {words:?}");
                 text(!self.run_fails.contains(key), "")
             }
@@ -1589,4 +1643,337 @@ fn r22_a_merge_run_starts_whatever_the_slots_and_the_cpu_reading_say() {
     let v = w.ok();
     assert_eq!(keys(&v["started"]), ["m"]);
     assert_eq!(waiting(&v), pairs(&[("r", "slots 1/1")]));
+}
+
+/// The id of an intent.
+fn iid(key: &str) -> Value {
+    json!({"object_type": "intent", "namespace": {"instance": "vps://palantirkc", "account": "root"}, "native_key": key})
+}
+impl W {
+    /// A draft unit of the lane `objective` of the intent `intent`, added at second `at`, with
+    /// dependencies `deps` and the write set `ws`.
+    fn draft(&mut self, key: &str, intent: &str, at: u32, deps: &[&str], ws: &[&str]) {
+        let deps: Vec<Value> = deps.iter().map(|d| uid(d)).collect();
+        self.put(
+            key,
+            json!({"lane": "objective", "class": "contract", "intent": iid(intent),
+            "objective": format!("invented {key}"), "repository": "o/r", "write_set": ws,
+            "state": "draft", "added_at": format!("2026-11-18T10:00:{at:02}Z"), "depends_on": deps}),
+        );
+    }
+    /// A review of kind `page` of the unit `unit`, closed with `verdict` at the head `head`.
+    fn review(&mut self, key: &str, unit: &str, verdict: &str, head: &str) {
+        self.others.insert(
+            ("review".into(), key.into()),
+            json!({"kind": "page", "status": "closed", "verdict": verdict, "head": head,
+            "unit": uid(unit)}),
+        );
+    }
+    /// An accepted page of the unit `key` as it is now.
+    fn accept_page(&mut self, review: &str, key: &str) {
+        let digest = ap::unit::render::page_digest(key, self.f(key));
+        self.review(review, key, "accept", &digest);
+    }
+    fn intent(&mut self, key: &str) {
+        self.others.insert(
+            ("intent".into(), key.into()),
+            json!({"status": "confirmed"}),
+        );
+    }
+    fn horizon(&mut self, p: Value) -> Result<Value, (String, u8)> {
+        ap::work::horizon(self, STORE, &p)
+            .map_err(|(f, status)| (format!("{}@{}", f.code, f.field), status))
+    }
+    /// The policy with a writer and `pages`.
+    fn writers(&mut self, pages: u64) {
+        let dir = self.p("pages");
+        self.policy_with(json!({
+            "writer": {"model": "opus", "effort": "high", "permission_mode": "auto", "directory": dir},
+            "work": {"prefix": PREFIX, "slice": SLICE, "page_prefix": PAGES, "pages": pages}}));
+    }
+}
+fn horizon_units(v: &Value) -> Vec<(String, String)> {
+    let all = v["units"].as_array().unwrap().iter();
+    all.map(|u| {
+        (
+            u["unit"].as_str().unwrap().to_owned(),
+            u["page"].as_str().unwrap().to_owned(),
+        )
+    })
+    .collect()
+}
+
+// spec: specs/ap/work.md#R23
+#[test]
+fn r23_the_horizon_of_an_intent() {
+    let mut w = W::new();
+    w.intent("i1");
+    w.intent("i2");
+    // The dependencies of every kind.
+    for (key, state) in [
+        ("d-merged", "merged"),
+        ("d-done", "done"),
+        ("d-ready", "ready"),
+        ("d-running", "running"),
+        ("d-accepted", "accepted"),
+        ("d-stopped", "stopped"),
+        ("d-dropped", "dropped"),
+    ] {
+        w.draft(key, "i9", 1, &[], &["x/**"]);
+        w.set(key, json!({ "state": state }));
+    }
+    w.draft("d-page", "i9", 1, &[], &["x/**"]);
+    w.set("d-page", json!({"state": "draft", "intent": iid("i9")}));
+    w.accept_page("rv-page", "d-page");
+    // An accept of an older digest does not count.
+    w.draft("d-old", "i9", 1, &[], &["x/**"]);
+    w.accept_page("rv-old", "d-old");
+    w.set("d-old", json!({"objective": "amended since"}));
+    let every = [
+        "d-merged",
+        "d-done",
+        "d-ready",
+        "d-running",
+        "d-accepted",
+        "d-stopped",
+        "d-page",
+    ];
+    w.draft("x-all", "i1", 3, &every, &["a/**"]);
+    w.draft("x-old", "i1", 1, &["d-old"], &["a/**"]);
+    w.draft("x-dropped", "i1", 1, &["d-dropped"], &["a/**"]);
+    w.draft("x-ghost", "i1", 1, &["ghost"], &["a/**"]);
+    w.draft("x-none", "i1", 2, &[], &["a/**"]);
+    w.draft("x-a-written", "i1", 2, &[], &["a/**"]);
+    w.set(
+        "x-a-written",
+        json!({"acceptance": [{"check": "true", "kind": "invariant"}]}),
+    );
+    w.draft("x-accepted", "i1", 4, &[], &["a/**"]);
+    w.set(
+        "x-accepted",
+        json!({"acceptance": [{"check": "true", "kind": "invariant"}]}),
+    );
+    w.accept_page("rv-x", "x-accepted");
+    w.draft("y-other", "i2", 1, &[], &["a/**"]);
+    let v = w.horizon(json!({"intent": "i1"})).unwrap();
+    assert_eq!(v["intent"], "i1");
+    assert_eq!(
+        horizon_units(&v),
+        pairs(&[
+            ("x-a-written", "written"),
+            ("x-none", "none"),
+            ("x-all", "none"),
+            ("x-accepted", "accepted"),
+        ])
+    );
+    assert_eq!(v["units"][0]["class"], "contract");
+    // Only reads: no apply and no validate.
+    assert!(w.bodies("apply").is_empty() && w.bodies("validate").is_empty());
+    // The refusals: an intent the store does not have, input of another form, a read that fails.
+    assert_eq!(
+        w.horizon(json!({"intent": "nope"})).unwrap_err(),
+        ("unknown_intent@intent".into(), 2)
+    );
+    for bad in [
+        json!({"intent": 1}),
+        json!({"intent": "i1", "x": 1}),
+        json!([]),
+    ] {
+        assert_eq!(w.horizon(bad).unwrap_err().1, 2);
+    }
+    w.broken = true;
+    assert_eq!(w.horizon(json!({"intent": "i1"})).unwrap_err().1, 3);
+}
+
+// spec: specs/ap/work.md#R24
+#[test]
+fn r24_the_writers_of_the_pages() {
+    let pass_of = |w: &mut W| {
+        let v = w.ok();
+        v["pages"].clone()
+    };
+    // `pages` 2 and four candidates: two start, two wait.
+    let mut w = W::new();
+    w.writers(2);
+    for (i, key) in ["c1", "c2", "c3", "c4"].iter().enumerate() {
+        w.draft(key, "i1", i as u32, &[], &["a/**"]);
+    }
+    let p = pass_of(&mut w);
+    assert_eq!(keys(&p["started"]), ["c1", "c2"]);
+    assert_eq!(
+        waiting(&p),
+        pairs(&[("c3", "pages 2/2"), ("c4", "pages 2/2")])
+    );
+    let runs = w.calls_of("systemd-run");
+    assert_eq!(runs.len(), 2);
+    let first = &runs[0];
+    assert_eq!(first[..2], ["--unit".to_owned(), format!("{PAGES}-c1")]);
+    let at = first.iter().position(|a| a == "--").unwrap();
+    assert_eq!(
+        first[at + 2..],
+        ["unit", "write", "c1", "--store", STORE].map(str::to_owned)
+    );
+    for key in ["c1", "c2"] {
+        let started = w.dir.join("pages").join(key).join("started");
+        let mode = std::fs::metadata(&started).unwrap().permissions().mode();
+        assert_eq!(mode & 0o777, 0o600);
+    }
+    assert!(!w.dir.join("pages/c3").exists());
+    // The next pass starts none again: `started` holds them.
+    w.reset();
+    let p = pass_of(&mut w);
+    assert_eq!(keys(&p["not_restarted"]), ["c1", "c2"]);
+    assert_eq!(keys(&p["started"]), ["c3", "c4"]);
+    // A live writer's unit, a held lock, a file `started` and an empty write set each keep a unit from a start.
+    let mut w = W::new();
+    w.writers(8);
+    for (i, key) in ["e1", "e2", "e3", "e4"].iter().enumerate() {
+        w.draft(key, "i1", i as u32, &[], &["a/**"]);
+    }
+    w.set("e4", json!({"write_set": []}));
+    w.listed_pages = format!("{PAGES}-e1.service loaded active running e1\n");
+    let _lock = hold(&w.dir.join("pages/e2/lock"));
+    std::fs::create_dir_all(w.dir.join("pages/e3")).unwrap();
+    std::fs::write(w.dir.join("pages/e3/started"), "").unwrap();
+    let p = pass_of(&mut w);
+    assert_eq!(p["started"], json!([]));
+    assert_eq!(keys(&p["in_flight"]), ["e1", "e2"]);
+    assert_eq!(keys(&p["not_restarted"]), ["e3"]);
+    assert_eq!(p["waiting"], json!([]));
+    assert!(w.calls_of("systemd-run").is_empty());
+    // A failed `systemd-run` leaves no file `started`.
+    let mut w = W::new();
+    w.writers(2);
+    w.draft("f1", "i1", 1, &[], &["a/**"]);
+    w.run_fails.insert("f1".into());
+    let p = pass_of(&mut w);
+    assert_eq!(waiting(&p), pairs(&[("f1", "start failed")]));
+    assert!(!w.dir.join("pages/f1/started").exists());
+    // A draft with a page, or whose dependency is a draft without one, is no candidate.
+    let mut w = W::new();
+    w.writers(2);
+    w.draft("g0", "i1", 1, &[], &["a/**"]);
+    w.set(
+        "g0",
+        json!({"acceptance": [{"check": "true", "kind": "invariant"}]}),
+    );
+    w.draft("g1", "i1", 2, &["g0"], &["a/**"]);
+    let p = pass_of(&mut w);
+    assert_eq!(p["started"], json!([]));
+    // A writer starts while every slot is taken, and while the load is over the limit.
+    let mut w = W::new();
+    w.writers(2);
+    w.ready("r", &["r/**"], 1);
+    w.draft("s1", "i1", 1, &[], &["a/**"]);
+    w.live(&[
+        "aptest-d1.service loaded active running d",
+        "aptest-d2.service loaded active running d",
+        "aptest-d3.service loaded active running d",
+    ]);
+    let v = w.ok();
+    assert_eq!(waiting(&v), pairs(&[("r", "slots 3/3")]));
+    assert_eq!(keys(&v["pages"]["started"]), ["s1"]);
+    assert_eq!(v["started"], json!([]));
+    let mut w = W::new();
+    w.writers(2);
+    let mut policy: Value =
+        serde_json::from_slice(&std::fs::read(w.dir.join("policy.json")).unwrap()).unwrap();
+    policy["quota"] = json!({"slice": SLICE, "busy_limit": 50});
+    std::fs::write(w.dir.join("policy.json"), policy.to_string()).unwrap();
+    w.ready("r", &["r/**"], 1);
+    w.draft("s1", "i1", 1, &[], &["a/**"]);
+    w.load(4, 60, 200);
+    let v = w.ok();
+    assert_eq!(waiting(&v), pairs(&[("r", "cpu over 50%")]));
+    assert_eq!(keys(&v["pages"]["started"]), ["s1"]);
+    // A writer of a wrong form refuses the pass before the lock, whatever `pages`.
+    let mut w = W::new();
+    w.policy_with(json!({"writer": {"model": "opus"},
+        "work": {"prefix": PREFIX, "slice": SLICE, "page_prefix": PAGES, "pages": 0}}));
+    assert_eq!(w.refused(), ("policy_invalid@policy".into(), 2));
+    assert!(!w.root().exists());
+    // `page_prefix` equal to `prefix`, or one beginning with the other and `-`: refused only with a writer.
+    for page_prefix in [PREFIX, "aptest-p"] {
+        let mut w = W::new();
+        w.policy_with(
+            json!({"work": {"prefix": PREFIX, "slice": SLICE, "page_prefix": page_prefix}}),
+        );
+        w.ok();
+        w.writers(2);
+        let mut policy: Value =
+            serde_json::from_slice(&std::fs::read(w.dir.join("policy.json")).unwrap()).unwrap();
+        policy["work"]["page_prefix"] = json!(page_prefix);
+        std::fs::write(w.dir.join("policy.json"), policy.to_string()).unwrap();
+        let e = w.pass().unwrap_err();
+        assert_eq!((e.failure.code, e.status), ("policy_invalid", 2));
+        assert!(
+            e.failure
+                .detail
+                .as_str()
+                .unwrap()
+                .starts_with("work.page_prefix")
+        );
+    }
+    // With `--store`, a writer needs `work.page_prefix` and `writer.directory`.
+    let mut w = W::new();
+    w.policy_with(
+        json!({"writer": {"model": "opus", "effort": "high", "permission_mode": "auto"}}),
+    );
+    assert_eq!(w.refused(), ("invalid_input@policy".into(), 2));
+}
+
+// spec: specs/ap/work.md#R25
+#[test]
+fn r25_the_member_pages_only_in_a_pass_of_the_writers() {
+    // Without a writer, and with a writer and `pages` 0, the same calls and the same answer.
+    let run = |writer: bool| {
+        let mut w = W::new();
+        match writer {
+            true => w.writers(0),
+            false => w.policy_with(json!({})),
+        }
+        w.ready("r", &["r/**"], 1);
+        w.draft("c1", "i1", 1, &[], &["a/**"]);
+        let v = w.ok();
+        let calls: Vec<(String, Vec<String>)> = w
+            .calls
+            .borrow()
+            .iter()
+            .map(|c| (c.0.clone(), c.1.clone()))
+            .collect();
+        (v, calls)
+    };
+    let (without, calls) = run(false);
+    let (with, calls_with) = run(true);
+    assert_eq!(without, with);
+    assert!(without.get("pages").is_none());
+    assert_eq!(calls.len(), calls_with.len());
+    // A pass of R24: the member `pages` with its four lists; its files are the directories and `started`.
+    let mut w = W::new();
+    w.writers(1);
+    w.draft("c1", "i1", 1, &[], &["a/**"]);
+    w.draft("c2", "i1", 2, &[], &["a/**"]);
+    w.listed_pages = format!("{PAGES}-gone.service loaded active running x\n");
+    let v = w.ok();
+    let p = &v["pages"];
+    let members: BTreeSet<&str> = p.as_object().unwrap().keys().map(String::as_str).collect();
+    assert_eq!(
+        members,
+        BTreeSet::from(["started", "not_restarted", "waiting", "in_flight"])
+    );
+    assert_eq!(keys(&p["in_flight"]), [format!("{PAGES}-gone.service")]);
+    assert_eq!(
+        waiting(p),
+        pairs(&[("c1", "pages 1/1"), ("c2", "pages 1/1")])
+    );
+    assert!(w.bodies("apply").is_empty(), "no action for a writer");
+    assert_eq!(tree(&w.dir.join("pages")), BTreeSet::new());
+    let mut w = W::new();
+    w.writers(1);
+    w.draft("c1", "i1", 1, &[], &["a/**"]);
+    w.ok();
+    assert_eq!(
+        tree(&w.dir.join("pages")),
+        BTreeSet::from(["c1/".to_owned(), "c1/started".to_owned()])
+    );
 }

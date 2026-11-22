@@ -1352,3 +1352,42 @@ unchanged, and a changed text is an `update`; a line of the other type fails the
 text over 4,000 bytes `value_constraint_violation`, and neither changes a head; a file removed retracts its section,
 and an empty directory retracts every section and component. The last line of standard output of the rehearsal is
 `v14 routes: ok`.
+
+Version 14 stays pinned as stated at the head of section "Version 15: the horizon"; the migration and the rehearsal as they stand now are described in section "Version 15: the horizon", "The migration and the rehearsal".
+
+## Version 15: the horizon
+Version 14 remains pinned at
+`d0d469fc8b9cfa390c82b27acffbedd26388d342:ontology/work.schema.json`,
+sha256 `b0af778a40e7bdb87219ea91c41720e5866ddcd0d7f5910f106d2698edae36b7`.
+Version 15 only adds to version 14: the function `horizon`. Every other member of the schema reads the same in
+canonical JSON.
+
+The horizon answers which draft units of an intent may have their pages written now, so that the dispatch pass starts
+their writers (`specs/ap/work.md` R23 to R25, `specs/ap/unit-write.md`) and a Lead asks once instead of reading each
+unit's dependencies.
+
+### The function
+The function `horizon` (`specs/ont/fn.md` R1 of the engine) has the parameter `intent` (string, required: the
+intent's key), the program `/usr/local/bin/ap`, `timeout_ms` 30000 and `answer_bytes` 65536. Its answer is
+`specs/ap/work.md` R23: `{"intent", "units": [{"unit", "class", "page"}]}`, the draft units of the intent whose every
+dependency is `merged` or `done`, `ready`, `running`, `accepted` or `stopped`, or a draft with a review of kind `page`
+closed `accept` at its page digest.
+
+### What the store does not check
+- That the program at `/usr/local/bin/ap` answers the function: an `ap` older than this change refuses an empty
+  argument list, and the call is `function_failed`.
+- That the answer is current when it is read: it is computed from the objects at the call.
+
+### The migration and the rehearsal
+`ontology/migrate` knows version 15; its step is empty (no data migration), so a store at version 14 carries on with
+`ontology/migrate` 14 15 changing nothing. The line `HIGHEST = 15` names it; `15 16` and `9 16` are pairs it does not
+know (exit 2). The pairs refused on the version 10 part of the rehearsal are (9, 16), (10, 10) and (10, 9).
+
+The second store of the rehearsal installs version 14 from Git by its commit and digest (above) instead of the
+repository's file, with the globs of the two sources rewritten to a directory of the rehearsal's own root, and runs
+the walk of version 14 on it. Then it installs the repository's file over the objects made under version 14, the
+globs rewritten the same way: every object read under version 14 (tasks, decisions, requests, intents, criteria,
+units, reviews, runs, findings, holds, principles, sections, components) and the ten views of version 14 read the
+same; the schema differs from version 14 only by `version` and the function; `ont describe` lists the function
+`horizon` with its one parameter and without its program, beside `route`; `ontology/migrate` runs 14 15 (exit 0, the
+store unchanged) and 15 16 (exit 2). The last line of standard output of the rehearsal is `v15 horizon: ok`.

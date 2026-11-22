@@ -1,7 +1,7 @@
 //! `ap policy check`: the host's policy file run through every reader `ap` has of it, without an
 //! effect (`specs/ap/policy.md` R12 to R16).
 use crate::host::{Answer, Failure, Host, System, error};
-use crate::unit::{drive, object, page_review};
+use crate::unit::{drive, object, page_review, page_write};
 use crate::{quota, run, work};
 use serde_json::{Value, json};
 use std::{
@@ -12,7 +12,7 @@ use std::{
 };
 
 /// The readers, in the order the check runs them (R12).
-const READERS: [&str; 7] = [
+const READERS: [&str; 8] = [
     "models",
     "quota",
     "units",
@@ -20,6 +20,7 @@ const READERS: [&str; 7] = [
     "repositories",
     "work",
     "check",
+    "writer",
 ];
 
 /// The file as read once: every reader meets this answer for the path, never the file system.
@@ -101,6 +102,7 @@ pub fn check(s: &impl System, file: Option<&Path>) -> Result<Value, Refusal> {
     }
     at("work", work::work(&value).map(drop))?;
     at("check", crate::check::hosts(&value).map(drop))?;
+    at("writer", page_write::writer(&value).map(drop))?;
     let path = w.file.to_str().unwrap_or_default();
     Ok(json!({"status": "ok", "path": path, "sha256": sha256, "readers": READERS}))
 }
