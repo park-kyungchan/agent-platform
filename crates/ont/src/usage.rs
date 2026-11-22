@@ -6,6 +6,7 @@ use serde_json::{Value, json};
 pub(crate) enum Command {
     SchemaCheck,
     SchemaInstall,
+    SchemaGen,
     Describe,
     Get,
     Backup,
@@ -58,6 +59,16 @@ const SPECS: &[Spec] = &[
         stdin: false,
         fields: "",
         example: "ont schema install --from /repo --commit <sha> --path work.schema.json",
+    },
+    Spec {
+        command: SchemaGen,
+        words: &["schema", "gen"],
+        files: &[1],
+        form: "schema gen FILE",
+        options: &[],
+        stdin: false,
+        fields: "",
+        example: "ont schema gen /tmp/work.schema.json",
     },
     Spec {
         command: Describe,

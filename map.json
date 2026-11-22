@@ -58,7 +58,8 @@
     "specs/ont/mcp.md",
     "specs/ont/render.md",
     "specs/ont/cli.md",
-    "specs/ont/fn.md"
+    "specs/ont/fn.md",
+    "specs/ont/gen.md"
    ],
    "tests": [
     "crates/ont/tests/action.rs",
