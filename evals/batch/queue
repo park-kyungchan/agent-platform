@@ -1,0 +1,266 @@
+#!/usr/bin/env -S python3 -I -B
+"""The queue of the API credit: one pass of the drift job with no session, run by ap-api-nightly.service and
+ap-api-weekly.service.
+
+  queue --pass nightly|weekly --model <id>
+
+From the installed commit K only: the files of evals/batch at K are copied out of delivery's clone into the pass's
+directory, and its builder, `ap api batch` and its reader run from that copy. One JSON line on standard output;
+standard error stays empty. Calls no model and opens no socket itself: the one call of the API credit is `ap api
+batch`, which alone admits, caps and stops. Contract: evals/batch/README.md, section "The queue".
+"""
+import calendar
+import datetime
+import glob
+import io
+import json
+import os
+import re
+import subprocess
+import sys
+import tarfile
+
+PASSES = ("nightly", "weekly")
+REPOSITORIES = ("park-kyungchan/agent-platform", "park-kyungchan/ontology-platform")
+MODEL = re.compile(r"^claude-[a-z0-9.-]{1,57}$")
+COMMIT = re.compile(r"^[0-9a-f]{40}$")
+NOW = re.compile(r"^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$")
+SOAK_DAYS = 6
+GIT_ENV = {"GIT_OPTIONAL_LOCKS": "0", "GIT_TERMINAL_PROMPT": "0", "GIT_NO_LAZY_FETCH": "1", "GIT_CONFIG_NOSYSTEM": "1"}
+GIT_TIMEOUT = 300
+
+
+class Stop(Exception):
+    """An answer `{"status": <code>}` with its exit, before anything is written."""
+
+    def __init__(self, code, exit_code=3):
+        super().__init__(code)
+        self.code, self.exit_code = code, exit_code
+
+
+def variable(name, default):
+    """A variable of the environment when it is set and not empty, else the host's default."""
+    value = os.environ.get(name, "")
+    return value if value else default
+
+
+def arguments(argv):
+    """`--pass nightly|weekly --model <id>`, each once, in any order; anything else is `usage`."""
+    if len(argv) != 4:
+        raise Stop("usage", 2)
+    given = {}
+    for flag, value in (argv[0:2], argv[2:4]):
+        if flag not in ("--pass", "--model") or flag in given:
+            raise Stop("usage", 2)
+        given[flag] = value
+    if given["--pass"] not in PASSES or not MODEL.match(given["--model"]):
+        raise Stop("usage", 2)
+    return given["--pass"], given["--model"]
+
+
+def start_time():
+    """The start of the pass: `AP_QUEUE_NOW` when the tests set it, else the clock."""
+    given = os.environ.get("AP_QUEUE_NOW", "")
+    if not given:
+        return datetime.datetime.now(datetime.timezone.utc).replace(microsecond=0)
+    if not NOW.match(given):
+        raise Stop("usage", 2)
+    try:
+        return datetime.datetime.strptime(given, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=datetime.timezone.utc)
+    except ValueError:
+        raise Stop("usage", 2) from None
+
+
+def queue_word(start):
+    """`soak` in the last six days of the start's UTC month (the credit's month of `ap api batch`), else `standard`."""
+    days = calendar.monthrange(start.year, start.month)[1]
+    return "soak" if start.day > days - SOAK_DAYS else "standard"
+
+
+def git(clone, words, text=True):
+    env = dict(os.environ, **GIT_ENV)
+    return subprocess.run(["git", "-c", "protocol.allow=never", "-C", clone, *words], env=env,
+                          stdin=subprocess.DEVNULL, capture_output=True, text=text, timeout=GIT_TIMEOUT)
+
+
+def installed(ap_bin, clone):
+    """K, the commit the installed `ap` names, which must be the HEAD of delivery's clone; else `not_installed`."""
+    try:
+        version = subprocess.run([ap_bin, "--version"], stdin=subprocess.DEVNULL, capture_output=True, text=True,
+                                 timeout=60)
+        lines = version.stdout.splitlines()
+        words = lines[0].split() if version.returncode == 0 and lines else []
+        commit = words[2] if len(words) >= 3 and words[0] == "ap" else ""
+        if not COMMIT.match(commit):
+            raise Stop("not_installed")
+        head = git(clone, ["rev-parse", "--verify", "--quiet", "HEAD^{commit}"])
+    except (OSError, subprocess.SubprocessError, UnicodeDecodeError):
+        raise Stop("not_installed") from None
+    if head.returncode != 0 or head.stdout.strip() != commit:
+        raise Stop("not_installed")
+    return commit
+
+
+def programs_of(clone, commit):
+    """The files of evals/batch at K, read from the clone's objects (`git archive`), as a tar archive in memory."""
+    try:
+        archive = git(clone, ["archive", "--format=tar", commit, "--", "evals/batch"], text=False)
+    except (OSError, subprocess.SubprocessError):
+        raise Stop("not_installed") from None
+    if archive.returncode != 0 or not archive.stdout:
+        raise Stop("not_installed")
+    return archive.stdout
+
+
+def clones():
+    """The clone of each repository, read as specs/ap/unit.md R22 reads it from the policy file (specs/ap/policy.md
+    R1)."""
+    path = variable("AP_POLICY_FILE", "/etc/agent-platform/policy.json")
+    try:
+        with open(path, "rb") as f:
+            raw = f.read()
+    except FileNotFoundError:
+        raise Stop("repository_not_mapped") from None
+    except OSError:
+        raise Stop("policy_invalid") from None
+    try:
+        policy = json.loads(raw)
+    except ValueError:
+        raise Stop("policy_invalid") from None
+    if not isinstance(policy, dict):
+        raise Stop("policy_invalid")
+    if "repositories" not in policy:
+        raise Stop("repository_not_mapped")
+    mapped = policy["repositories"]
+    if not isinstance(mapped, dict):
+        raise Stop("policy_invalid")
+    found = {}
+    for name in REPOSITORIES:
+        if name not in mapped:
+            raise Stop("repository_not_mapped")
+        entry = mapped[name]
+        if not isinstance(entry, dict):
+            raise Stop("policy_invalid")
+        if "clone" not in entry:
+            raise Stop("repository_not_mapped")
+        clone = entry["clone"]
+        if (not isinstance(clone, str) or not clone.startswith("/") or "\0" in clone
+                or ".." in clone.split("/")):
+            raise Stop("policy_invalid")
+        found[name] = clone
+    return found
+
+
+def make_pass_dir(state, start, name):
+    """`<state>/drift/<start>-<pass>`, mode 0700; `pass_exists` when it is there."""
+    drift = os.path.join(state, "drift")
+    os.makedirs(drift, mode=0o700, exist_ok=True)
+    path = os.path.join(drift, start.strftime("%Y%m%dT%H%M%SZ") + "-" + name)
+    try:
+        os.mkdir(path, 0o700)
+    except FileExistsError:
+        raise Stop("pass_exists") from None
+    os.chmod(path, 0o700)
+    return path
+
+
+def unpack(archive, programs):
+    os.mkdir(programs, 0o700)
+    with tarfile.open(fileobj=io.BytesIO(archive), mode="r:") as tar:
+        tar.extractall(programs, filter="data")
+
+
+def parsed(text):
+    """The one JSON line a program printed (its last line that is not empty), or None."""
+    lines = [line for line in text.splitlines() if line.strip()]
+    if not lines:
+        return None
+    try:
+        return json.loads(lines[-1])
+    except ValueError:
+        return None
+
+
+def step(argv, cwd, answer_on_error=False):
+    """One program: `{"exit", "answer"}`. The answer is the JSON line of its standard output, or for a program that
+    answers a failure on standard error (`ap api batch`), of its standard error when it exits other than 0."""
+    try:
+        done = subprocess.run(argv, cwd=cwd, stdin=subprocess.DEVNULL, capture_output=True)
+    except OSError:
+        return {"exit": None, "answer": None}
+    out = done.stdout.decode("utf-8", "replace")
+    if answer_on_error and done.returncode != 0:
+        out = done.stderr.decode("utf-8", "replace")
+    return {"exit": done.returncode, "answer": parsed(out)}
+
+
+def run(argv):
+    name, model = arguments(argv)
+    ap_bin = variable("AP_BIN", "/usr/local/bin/ap")
+    clone = variable("AP_DELIVER_CLONE", "/var/lib/agent-platform/deliver/agent-platform")
+    state = variable("AP_API_STATE", "/var/lib/agent-platform/api")
+    start = start_time()
+    # (a) K, and the programs of K; (b) the clones; nothing is written before both are read.
+    commit = installed(ap_bin, clone)
+    archive = programs_of(clone, commit)
+    repos = clones()
+    # (c) The pass's directory and its copy of evals/batch at K.
+    pass_dir = make_pass_dir(state, start, name)
+    programs = os.path.join(pass_dir, "programs")
+    unpack(archive, programs)
+    jobs = os.path.join(programs, "evals", "batch", "drift")
+    build_dir, batch_dir = os.path.join(pass_dir, "build"), os.path.join(pass_dir, "batch")
+    # (d) The queue word.
+    word = queue_word(start)
+    answer = {"status": "failed", "pass": name, "model": model, "queue": word, "commit": commit, "dir": pass_dir,
+              "build": None, "batch": None, "read": None}
+    # (e) The build: a nightly pass gives every earlier pass's result file, a weekly pass none.
+    python = [sys.executable, "-I", "-B"]
+    build = python + [os.path.join(jobs, "build")]
+    for repository in REPOSITORIES:
+        build += ["--repo", repository + "=" + repos[repository]]
+    build += ["--model", model, "--out", build_dir]
+    if name == "nightly":
+        mine = os.path.join(pass_dir, "batch", "results.jsonl")
+        earlier = sorted(glob.glob(os.path.join(glob.escape(state), "drift", "*", "batch", "results.jsonl")))
+        for results in earlier:
+            if results != mine and os.path.isfile(results):
+                build += ["--results", results]
+    answer["build"] = step(build, pass_dir)
+    if answer["build"]["exit"] != 0:
+        return answer, 1
+    requested = (answer["build"]["answer"] or {}).get("requested")
+    if not isinstance(requested, int) or isinstance(requested, bool):
+        return answer, 1
+    # (f) Nothing requested: no batch and no read. Else one call of `ap api batch`, then the read when it settled.
+    if requested == 0:
+        answer["status"] = "ok"
+        return answer, 0
+    batch = [ap_bin, "api", "batch", "drift", "--requests", os.path.join(build_dir, "requests.jsonl"),
+             "--out", batch_dir, "--queue", word]
+    answer["batch"] = step(batch, pass_dir, answer_on_error=True)
+    if answer["batch"]["exit"] != 0:
+        return answer, 1
+    read = python + [os.path.join(jobs, "read"), "--groups", os.path.join(build_dir, "groups.json"),
+                     "--results", os.path.join(batch_dir, "results.jsonl")]
+    answer["read"] = step(read, pass_dir)
+    if answer["read"]["exit"] != 0:
+        return answer, 1
+    answer["status"] = "ok"
+    return answer, 0
+
+
+def main():
+    try:
+        answer, code = run(sys.argv[1:])
+    except Stop as stop:
+        answer, code = {"status": stop.code}, stop.exit_code
+    except Exception:  # noqa: BLE001 - the answer is one line whatever failed; standard error stays empty
+        answer, code = {"status": "internal_error"}, 3
+    sys.stdout.write(json.dumps(answer, ensure_ascii=False) + "\n")
+    sys.stdout.flush()
+    sys.exit(code)
+
+
+if __name__ == "__main__":
+    main()

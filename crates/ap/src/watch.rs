@@ -1,4 +1,4 @@
-//! `ap watch` (`specs/ap/watch.md`): one pass of the nine detectors under the lock `pass.lock` of
+//! `ap watch` (`specs/ap/watch.md`): one pass of the ten detectors under the lock `pass.lock` of
 //! the watch directory. Each detector reads its sources and yields signals, or is `unreadable`; per
 //! signal the pass opens, sees again or reopens the finding of its key, and per detector that read
 //! it closes each live finding of that detector it did not yield (`open_finding`,
@@ -7,6 +7,7 @@
 //! `ap watch --record-login` records the login reading the detector `login` compares with.
 pub mod accounts;
 pub mod checks;
+pub mod credit;
 pub mod detect;
 pub mod drift;
 pub mod login;
@@ -30,8 +31,9 @@ use std::{
 /// The watch directory of the host (R1); a test passes its own.
 pub const DIRECTORY: &str = "/var/lib/agent-platform/watch";
 /// The detectors in the order of a pass (R4, R20).
-pub const DETECTORS: [&str; 9] = [
+pub const DETECTORS: [&str; 10] = [
     "delivery", "login", "services", "host", "records", "accounts", "checks", "runtimes", "drift",
+    "credit",
 ];
 /// Fixed CLI subcommands and flags `ap run` invokes per runtime (R26).
 pub struct RuntimeSpec {
@@ -151,6 +153,7 @@ pub fn families(detector: &str) -> Vec<String> {
         "checks" => &["main red", "dependabot", "settings"],
         "runtimes" => &["cli"],
         "drift" => &["drift", "inventory"],
+        "credit" => &credit::FAMILIES,
         _ => &[],
     };
     let mut all: Vec<String> = fixed.iter().map(|f| (*f).to_owned()).collect();
@@ -484,7 +487,7 @@ fn read_policy(s: &impl System) -> Result<Option<Value>, String> {
         .map(Some)
 }
 
-/// One pass (R3 to R9, R20 to R27).
+/// One pass (R3 to R9, R20 to R31).
 fn pass(s: &mut impl System, dir: &Path) -> (Value, u8) {
     let wall = s.wall();
     let (now, at) = (seconds(wall), stamp(wall));
@@ -514,7 +517,8 @@ fn pass(s: &mut impl System, dir: &Path) -> (Value, u8) {
             "accounts" => accounts::detect(s, now, &policy),
             "checks" => checks::detect(s, &policy),
             "runtimes" => runtimes::detect(s, member(d)),
-            _ => drift::detect(s),
+            "drift" => drift::detect(s),
+            _ => credit::detect(s, now, &policy),
         };
         readings.push((d, reading));
     }

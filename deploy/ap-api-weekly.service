@@ -1,0 +1,29 @@
+[Unit]
+Description=ap API queue, weekly: the full drift pass on claude-opus-5-5 (one run)
+Documentation=https://github.com/park-kyungchan/agent-platform/blob/main/deploy/README.md
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/python3 -I -B /var/lib/agent-platform/deliver/agent-platform/evals/batch/queue --pass weekly --model claude-opus-5-5
+# ap api batch polls a batch for up to 25 hours (specs/ap/api.md R13); the build and the read take minutes.
+TimeoutStartSec=26h
+StateDirectory=agent-platform/api
+StateDirectoryMode=0700
+Slice=agents.slice
+Nice=10
+Environment=HOME=/root
+Environment=TZ=UTC
+Environment=PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin
+NoNewPrivileges=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectKernelTunables=yes
+ProtectControlGroups=yes
+ProtectHostname=yes
+LockPersonality=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+SystemCallArchitectures=native
+ProtectSystem=full

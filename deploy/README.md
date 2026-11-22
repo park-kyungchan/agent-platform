@@ -351,7 +351,7 @@ systemctl is-active ap-route.service                  # until it answers inactiv
 
 ## The watch
 
-`ap watch` (`specs/ap/watch.md`) is one pass: under the lock `pass.lock` of `/var/lib/agent-platform/watch/` the nine detectors read the host, and the pass opens, sees again, reopens and closes findings of the store whose detector is `watch:<name>`; it writes nothing else but its `state.json`, and it stops, starts, restarts and kills nothing:
+`ap watch` (`specs/ap/watch.md`) is one pass: under the lock `pass.lock` of `/var/lib/agent-platform/watch/` the ten detectors read the host, and the pass opens, sees again, reopens and closes findings of the store whose detector is `watch:<name>`; it writes nothing else but its `state.json`, and it stops, starts, restarts and kills nothing:
 
 - `delivery`: reads `/var/lib/agent-platform/deliver/last.json` for age, end state and checkout forwarding.
 - `login`: compares the SSH and sudoers login path with `login.json` (the TOTP secret file by `stat` alone).
@@ -362,6 +362,7 @@ systemctl is-active ap-route.service                  # until it answers inactiv
 - `checks`: checks GitHub `main` workflow conclusions, open Dependabot alerts and `github/apply --check` settings drift for policy repositories.
 - `runtimes`: checks `--version` and `--help` flags of `claude`, `muse` and `agy` against the flags `ap run` invokes.
 - `drift`: compares by SHA-256, without fetching, three sources with the host's files: the files listed in `deployments/host-artifacts.json` at `origin/main` of `agent-vps-operations`; the unit files of `deploy/` at the commit the installed `ap` names, read from delivery's clone `/var/lib/agent-platform/deliver/agent-platform`, with `/etc/systemd/system/<name>`; and the files of `etc/` at the tip delivery's last fetch of the operations repository read (its clone `/var/lib/agent-platform/deliver/agent-vps-operations`), each with the host's file of the same path under `/`.
+- `credit`: when the policy has the member `api` (`specs/ap/api.md` R3), reads the runs of role `batch` of the store by the rule `ap api batch` counts with: the month's counted spend at 80 % of a stop (`stop standard`, `stop soak`), a batch run still running more than 26 hours after its start (`unsettled <run>`), and the key file's mode by `stat` alone, never its bytes (`key mode`, urgent, when it is not a regular file of mode 600); without the member it reads nothing and its findings are neither seen nor closed.
 
 `ap-watch.service` (`Type=oneshot`, run of `/usr/local/bin/ap watch`, `Nice=10`, `TZ=UTC` so that `systemctl` prints the times the pass reads in UTC, a `PATH` with `/usr/sbin` for `sshd`, no `Restart=`) is one pass; `ap-watch.timer` starts one at every fifth minute (`OnCalendar=*:0/5`) and makes up no pass missed while the host was down. Each pass is a new process of the installed `ap`: a delivery of `ap` reaches the next pass with no restart. The answer of each pass is one line in the journal.
 
@@ -398,6 +399,33 @@ Undo: disable the timer and wait until a pass that is going on has ended; the un
 ```sh
 systemctl disable --now ap-watch.timer
 systemctl is-active ap-watch.service                  # until it answers inactive or failed, not activating
+```
+
+## The API queue
+
+`ap-api-nightly.service` and `ap-api-weekly.service` (`Type=oneshot`, `python3 -I -B` of `evals/batch/queue` in delivery's clone `/var/lib/agent-platform/deliver/agent-platform`, in `agents.slice`, `Nice=10`, `TZ=UTC`, `TimeoutStartSec=26h` because `ap api batch` polls a batch up to 25 hours, `StateDirectory=agent-platform/api` with mode 0700, no `Restart=`) each run one pass of the drift job on the API credit with no session. `ap-api-nightly.timer` starts the nightly pass at 18:00 UTC every day (`--pass nightly --model claude-sonnet-5-5`: only the groups no earlier pass settled); `ap-api-weekly.timer` the weekly pass at 06:00 UTC on Sundays (`--pass weekly --model claude-opus-5-5`: the full pass). Both timers are `Persistent=true`: a time missed while the host was down is made up at boot.
+
+A pass (`evals/batch/README.md`, section "The queue"): it checks that delivery's clone is at the commit K the installed `ap` names (else it writes nothing and answers `not_installed`), copies `evals/batch` of K into its directory `/var/lib/agent-platform/api/drift/<start>-<pass>/`, and runs from that copy the builder, one `ap api batch drift` (`--queue soak` in the last six days of the UTC month, else `standard`) and the reader, which opens at most ten findings of the detector `batch:drift` a pass and counts the rest. The queue computes no amount: the admission, the caps and the stops are `ap api batch`'s. The answer of each pass is one JSON line in the journal: `status`, `queue`, `commit`, `dir` and per step `exit` and `answer`.
+
+A refused or failed pass exits 1 and fails its service, so the detector `services` of `ap watch` reports `failed ap-api-nightly.service` (or the weekly one) until the next pass succeeds. Two refusals of `ap api batch` belong here too: `over_max_requests` (the build asks more groups than `api.jobs.drift.max_requests` of the policy) and `budget_exceeded` (a cap or the month's stop would be passed); the cause is `batch.answer` of the journal's line. A pass whose batch is submitted keeps its worst case reserved against drift's cap, the day's cap and the stop until it settles, so a pass that starts while another one polls can be refused `budget_exceeded`. There is no retry before the next timer.
+
+`ap deliver` installs the four unit files and enables both timers (section "The unit files"). The policy's member `api`, the key file and `repositories` are the host's configuration; nothing else is by hand.
+
+Read the state:
+
+```sh
+systemctl list-timers ap-api-nightly.timer ap-api-weekly.timer
+journalctl -u ap-api-nightly.service -n 1 -o cat      # the answer of the last nightly pass
+journalctl -u ap-api-weekly.service -n 1 -o cat       # the answer of the last weekly pass
+echo '{"parameters":{"month":"YYYY-MM"}}' | ont fn api_spend   # the month's spend by job, as the admission counts it
+ap status                                             # the findings of batch:drift and watch:credit
+```
+
+Undo: disable both timers; the unit files stay in place. A pass that is already polling goes on and keeps its batch; one whose run never settles (its process stopped, a poll timeout) counts at its reservation and is reported by the detector `credit` as `unsettled` 26 hours after its start, and its close is the Lead's, by hand (`specs/ap/api.md`, "Not included"). The pass directories under `/var/lib/agent-platform/api/drift/` stay as records.
+
+```sh
+systemctl disable --now ap-api-nightly.timer ap-api-weekly.timer
+systemctl is-active ap-api-nightly.service ap-api-weekly.service   # inactive or failed once no pass runs
 ```
 
 ## The status page
