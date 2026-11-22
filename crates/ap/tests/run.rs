@@ -4,16 +4,24 @@
 //! exercised by ci/host-run-scope.sh.
 #[path = "fixtures/work/forks.rs"]
 mod forks;
-use ap::host::{Answer, Failure, Host, Reply, System};
+use ap::host::{Answer, Failure, Host, Network, Reply, System, WayOut};
 use ap::run::execute;
 use serde_json::{Value, json};
 use sha2::Digest;
 use std::{
     collections::BTreeMap,
-    os::unix::{fs::PermissionsExt, process::CommandExt},
+    io::Write,
+    net::{IpAddr, SocketAddr, TcpListener, TcpStream},
+    os::{
+        fd::AsRawFd,
+        unix::{fs::PermissionsExt, process::CommandExt},
+    },
     path::{Path, PathBuf},
     process::{Child, Command},
-    sync::atomic::{AtomicU32, Ordering},
+    sync::{
+        Arc, Mutex,
+        atomic::{AtomicBool, AtomicU32, Ordering},
+    },
     time::Instant,
 };
 
@@ -75,6 +83,76 @@ struct Fake {
     auth: Vec<(Vec<String>, u64)>,
     /// The sign-in such a call writes over the account's, by a rename (as the CLI saves one).
     renew: Option<String>,
+    /// The socket of the last listener `network()` made, as `/proc/self/fd` names it
+    /// (`socket:[<inode>]`), and whether it answers that the network cannot be made
+    /// (`specs/ap/run-limits.md` R17).
+    inode: Option<String>,
+    network_fails: bool,
+    /// The proxy's way out (R18).
+    way: Arc<FakeWay>,
+}
+/// The proxy's way out in these tests (`specs/ap/run-limits.md` R18): a name maps to the addresses
+/// a test gives it; a connection to any address reaches the test's own listener, which answers a
+/// marker line and echoes, unless the test makes every connection fail. Every name it resolved and
+/// every address it was asked to connect to are noted.
+#[derive(Default)]
+struct FakeWay {
+    names: Mutex<BTreeMap<String, Vec<IpAddr>>>,
+    fail: AtomicBool,
+    marker: Mutex<Option<u16>>,
+    resolved: Mutex<Vec<String>>,
+    connects: Mutex<Vec<SocketAddr>>,
+}
+impl FakeWay {
+    /// `name` resolves to `addresses` (none: no address); the marker listener runs.
+    fn map(&self, name: &str, addresses: &[&str]) {
+        let found = addresses.iter().map(|a| a.parse().unwrap()).collect();
+        self.names.lock().unwrap().insert(name.to_owned(), found);
+        let mut marker = self.marker.lock().unwrap();
+        if marker.is_none() {
+            let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+            *marker = Some(listener.local_addr().unwrap().port());
+            std::thread::spawn(move || {
+                for mut stream in listener.incoming().flatten() {
+                    std::thread::spawn(move || {
+                        let _ = stream.write_all(b"marker\n");
+                        if let Ok(mut back) = stream.try_clone() {
+                            let _ = std::io::copy(&mut back, &mut stream);
+                        }
+                    });
+                }
+            });
+        }
+    }
+    fn connects(&self) -> Vec<SocketAddr> {
+        self.connects.lock().unwrap().clone()
+    }
+}
+impl WayOut for FakeWay {
+    fn resolve(&self, name: &str) -> std::io::Result<Vec<IpAddr>> {
+        self.resolved.lock().unwrap().push(name.to_owned());
+        Ok(self
+            .names
+            .lock()
+            .unwrap()
+            .get(name)
+            .cloned()
+            .unwrap_or_default())
+    }
+    fn connect(
+        &self,
+        address: SocketAddr,
+        within: std::time::Duration,
+    ) -> std::io::Result<TcpStream> {
+        self.connects.lock().unwrap().push(address);
+        let port = *self.marker.lock().unwrap();
+        match port {
+            Some(port) if !self.fail.load(Ordering::SeqCst) => {
+                TcpStream::connect_timeout(&SocketAddr::from(([127, 0, 0, 1], port)), within)
+            }
+            _ => Err(std::io::ErrorKind::ConnectionRefused.into()),
+        }
+    }
 }
 /// What one call of the fake `ont` does, in place of the engine's answer.
 #[derive(Clone)]
@@ -238,6 +316,11 @@ impl Fake {
             ("CLAUDE_CONFIG_DIR".into(), "/root/.claude".into()),
             ("CLAUDE_CODE_ENTRYPOINT".into(), "cli".into()),
             ("FOO".into(), "bar".into()),
+            // The proxy's record of every test is a file of its own (`specs/ap/run-limits.md` R19).
+            (
+                "AP_EGRESS_LOG".into(),
+                t.join("egress.jsonl").to_str().unwrap().to_owned(),
+            ),
         ];
         let home = Some(t.join("home"));
         Self {
@@ -267,6 +350,9 @@ impl Fake {
             home,
             auth: vec![],
             renew: None,
+            inode: None,
+            network_fails: false,
+            way: Arc::new(FakeWay::default()),
         }
     }
     /// How far the fake's clocks (`now` and `wall`) stand ahead of the real ones: the seconds the
@@ -531,6 +617,19 @@ impl System for Fake {
             let _ = std::fs::create_dir(p);
         }
         self.env.clone()
+    }
+    /// The default's listener, whose socket is noted; or no network at all.
+    fn network(&mut self) -> std::io::Result<Network> {
+        if self.network_fails {
+            return Err(std::io::ErrorKind::PermissionDenied.into());
+        }
+        let network = ap::host::loopback()?;
+        let fd = format!("/proc/self/fd/{}", network.listener.as_raw_fd());
+        self.inode = Some(std::fs::read_link(fd)?.to_str().unwrap().to_owned());
+        Ok(network)
+    }
+    fn way_out(&self) -> Arc<dyn WayOut> {
+        self.way.clone()
     }
 }
 fn code(r: Result<(Value, u8), Failure>) -> String {
@@ -8196,8 +8295,9 @@ fn limits_r7_the_record_names_the_limits_before_the_launch_and_at_the_end() {
     let hidden: Vec<String> = f.hidden().into_iter().map(|(p, _)| p).collect();
     let home = home_of(&v, 0);
     let view = f.view_of(&[f.p("cwd")], &s, false, None).sources;
+    let egress = &v["limits"]["egress"];
     let want = json!({"scratch": s, "writable": [home, s], "bwrap": BWRAP, "hidden": hidden,
-        "view": view});
+        "view": view, "egress": egress});
     assert_eq!((&v["state"], &v["limits"]), (&json!("ok"), &want), "{v}");
     assert_eq!(f.record("w.md"), v);
     // What a call killed during its stage leaves: the record names the scratch directory.
@@ -9224,7 +9324,8 @@ fn limits_r5_the_named_paths_follow_the_scratch_in_their_order_and_the_record_na
     assert!(!hidden.contains(&gh), "{v}");
     let want = json!({"scratch": s, "writable": [home_of(&v, 0), s, f.p("w2"), f.p("w1"), f.p("dst"), f.p("src")],
         "bwrap": BWRAP, "hidden": hidden, "over": r["limits"]["over"], "read_only": r["limits"]["read_only"],
-        "show": ["~/.config/gh"], "view": view.clone()});
+        "show": ["~/.config/gh"], "view": view.clone(), "egress": v["limits"]["egress"]});
+    assert!(v["limits"]["egress"].is_object(), "{v}");
     assert_eq!(v["limits"], want, "{v}");
     assert_eq!(f.record("x.md"), v);
     // Without `show` the view does not hold the path: no word names it and it is not hidden;
@@ -10308,4 +10409,412 @@ fn limits_r16_no_bind_holds_a_path_of_the_audits_must_not_see_list() {
         let held = targets.iter().find(|t| Path::new(p).starts_with(t));
         assert!(held.is_none(), "{p} in {held:?}: {after:?}");
     }
+}
+
+// ---- The stage's network (specs/ap/run-limits.md R17 to R20) ----------------------------------
+
+const FAKE_EGRESS: &str = include_str!("fixtures/run_limits/fake-egress.sh");
+/// A global address the fake way out gives a listed name; a connection to it reaches the test's
+/// listener.
+const GLOBAL: &str = "192.0.2.10";
+/// The names of `specs/ap/run-limits.md` R18, in its order: the first for every role, all five
+/// for an implementer, a fixer and a verifier.
+const LISTED: [&str; 5] = [
+    "api.anthropic.com",
+    "github.com",
+    "api.github.com",
+    "index.crates.io",
+    "static.crates.io",
+];
+const ADMITTED: &str = "HTTP/1.1 200 Connection established | marker";
+const FORM: &str = "HTTP/1.1 400 Bad Request";
+const FORBIDDEN: &str = "HTTP/1.1 403 Forbidden";
+const METHOD: &str = "HTTP/1.1 405 Method Not Allowed";
+const GATEWAY: &str = "HTTP/1.1 502 Bad Gateway";
+impl Fake {
+    /// The fake of `fixtures/run_limits/fake-egress.sh` in place of the CLI, asking `asks` of its
+    /// proxy, and the five names of R18 resolving to a global address.
+    fn egress(&self, asks: &[&str]) {
+        std::fs::write(self.t.join("bin/claude"), FAKE_EGRESS).unwrap();
+        let mode = std::fs::Permissions::from_mode(0o755);
+        std::fs::set_permissions(self.t.join("bin/claude"), mode).unwrap();
+        let mut text = asks.join("\n");
+        text.push('\n');
+        std::fs::write(self.t.join("bin/asks"), text).unwrap();
+        forks::settled();
+        for name in LISTED {
+            self.way.map(name, &[GLOBAL]);
+        }
+    }
+    /// What the stage read back from its proxy: one entry per exchange, in the order they ended.
+    fn exchanges(&self, out: &str) -> Vec<String> {
+        let text = self.text(out);
+        text.split(';')
+            .filter(|e| !e.is_empty())
+            .map(str::to_owned)
+            .collect()
+    }
+    /// The lines of the proxy's record (R19).
+    fn egress_lines(&self) -> Vec<Value> {
+        let text = std::fs::read_to_string(self.t.join("egress.jsonl")).unwrap_or_default();
+        text.lines()
+            .map(|l| serde_json::from_str(l).unwrap())
+            .collect()
+    }
+}
+/// The `name`, `port`, `status` and `reason` of each line of the record.
+fn judged(lines: &[Value]) -> Vec<Value> {
+    lines
+        .iter()
+        .map(|l| json!([l["name"], l["port"], l["status"], l["reason"]]))
+        .collect()
+}
+
+// spec: specs/ap/run-limits.md#R17
+#[test]
+fn limits_r17_every_launch_names_the_one_proxy_and_no_way_past_it() {
+    let mut f = Fake::new();
+    f.egress(&["CONNECT api.anthropic.com:443 HTTP/1.1"]);
+    std::fs::write(f.t.join("bin/cut-a1"), "").unwrap();
+    let mut r = f.limited("x.md");
+    r["next_accounts"] = json!([f.p("a2")]);
+    // The request's `env` names upper-case variables only (`specs/ap/run.md` R3).
+    r["env"] = json!({"HTTPS_PROXY": "http://elsewhere:1", "HTTP_PROXY": "http://elsewhere:2",
+        "NO_PROXY": "*", "ALL_PROXY": "socks5://elsewhere:3"});
+    let (v, _) = f.run(&r).unwrap();
+    assert_eq!(
+        (&v["state"], &v["account"]),
+        (&json!("ok"), &json!(f.p("a2"))),
+        "{v}"
+    );
+    let proxy = v["limits"]["egress"]["proxy"].as_str().unwrap().to_owned();
+    let port: u16 = (proxy.strip_prefix("http://127.0.0.1:").unwrap().parse()).unwrap();
+    assert!(port > 0, "{proxy}");
+    for n in 0..2 {
+        let given = &f.launch_envs[n];
+        for name in ["HTTPS_PROXY", "https_proxy", "HTTP_PROXY", "http_proxy"] {
+            let values: Vec<&String> = (given.iter().filter(|(k, _)| k == name))
+                .map(|(_, v)| v)
+                .collect();
+            assert_eq!(values, [&proxy], "{n}: {name}");
+        }
+        for name in ["NO_PROXY", "no_proxy", "ALL_PROXY", "all_proxy"] {
+            assert!(!given.iter().any(|(k, _)| k == name), "{n}: {name}");
+        }
+        let env = f.text(&format!("bin/env.{}", n + 1));
+        assert!(env.lines().any(|l| l == format!("https_proxy={proxy}")));
+        assert!(
+            !env.lines()
+                .any(|l| l.to_ascii_uppercase().starts_with("NO_PROXY="))
+        );
+        // The words after `systemd-run … --` are those of R5 and R16: no `--unshare-net`.
+        let after = f.after_unit(n);
+        let want = f.bwrap(&["a1", "a2"], "x.md", n);
+        assert_eq!(after[..want.len()], want[..], "{after:?}");
+        assert_eq!(after[want.len()], "claude");
+        assert!(!f.launches[n].iter().any(|w| w == "--unshare-net"));
+    }
+    // Both launches reached the one proxy of the call.
+    let lines = f.egress_lines();
+    assert_eq!(
+        judged(&lines),
+        vec![json!(["api.anthropic.com", 443, 200, null]); 2],
+        "{lines:?}"
+    );
+    assert_eq!(f.exchanges("x.md"), [ADMITTED]);
+    assert_eq!(f.way.connects().len(), 2);
+}
+
+// spec: specs/ap/run-limits.md#R18
+#[test]
+fn limits_r18_a_reviewer_reaches_the_model_provider_alone_and_another_form_is_refused() {
+    let mut f = Fake::new();
+    f.egress(&[
+        "bg silent",
+        "CONNECT api.anthropic.com:443 HTTP/1.1\tping",
+        "CONNECT API.Anthropic.COM.:443 HTTP/1.1",
+        "CONNECT github.com:443 HTTP/1.1",
+        "CONNECT api.anthropic.com:22 HTTP/1.1",
+        "CONNECT 127.0.0.1:443 HTTP/1.1",
+        "CONNECT [::1]:443 HTTP/1.1",
+        "CONNECT api.anthropic.com:0443 HTTP/1.1",
+        "CONNECT  api.anthropic.com:443 HTTP/1.1",
+        "CONNECT api.anthropic.com HTTP/1.1",
+        "GET http://api.anthropic.com/ HTTP/1.1",
+        "big",
+    ]);
+    let (v, _) = f.run(&f.limited("x.md")).unwrap();
+    assert_eq!(v["state"], "ok", "{v}");
+    assert_eq!(v["limits"]["egress"]["names"], json!(["api.anthropic.com"]));
+    // The silent client gets its 400 after every other client was served.
+    let pinged = format!("{ADMITTED} | ping");
+    let want = [
+        pinged.as_str(),
+        ADMITTED,
+        FORBIDDEN,
+        FORBIDDEN,
+        FORBIDDEN,
+        FORBIDDEN,
+        FORM,
+        FORM,
+        FORM,
+        METHOD,
+        FORM,
+        FORM,
+    ];
+    assert_eq!(f.exchanges("x.md"), want);
+    assert_eq!(
+        judged(&f.egress_lines()),
+        [
+            json!(["api.anthropic.com", 443, 200, null]),
+            json!(["API.Anthropic.COM.", 443, 200, null]),
+            json!(["github.com", 443, 403, "not_listed"]),
+            json!(["api.anthropic.com", 22, 403, "port"]),
+            json!(["127.0.0.1", 443, 403, "literal"]),
+            json!(["[::1]", 443, 403, "literal"]),
+            json!([null, null, 400, "form"]),
+            json!([null, null, 400, "form"]),
+            json!([null, null, 400, "form"]),
+            json!([null, null, 405, "method"]),
+            json!([null, null, 400, "form"]),
+            json!([null, null, 400, "form"]),
+        ]
+    );
+    // Only the two admitted requests were resolved and connected, to port 443 of the address.
+    assert_eq!(
+        *f.way.resolved.lock().unwrap(),
+        ["api.anthropic.com", "api.anthropic.com"]
+    );
+    let to: SocketAddr = format!("{GLOBAL}:443").parse().unwrap();
+    assert_eq!(f.way.connects(), [to, to]);
+}
+
+// spec: specs/ap/run-limits.md#R18
+#[test]
+fn limits_r18_each_role_reaches_the_names_of_its_list() {
+    let all: Vec<String> = (LISTED.iter())
+        .map(|n| format!("CONNECT {n}:443 HTTP/1.1"))
+        .collect();
+    let all: Vec<&str> = all.iter().map(String::as_str).collect();
+    for (role, ont_role) in [
+        ("implementer", None),
+        ("fixer", None),
+        ("reviewer", Some("verifier")),
+    ] {
+        let mut f = Fake::new();
+        f.egress(&all);
+        let mut r = f.limited("x.md");
+        r["role"] = json!(role);
+        if let Some(o) = ont_role {
+            r["ont_role"] = json!(o);
+        }
+        let (v, _) = f.run(&r).unwrap();
+        assert_eq!(v["state"], "ok", "{role}: {v}");
+        assert_eq!(v["limits"]["egress"]["names"], json!(LISTED), "{role}");
+        assert_eq!(f.exchanges("x.md"), [ADMITTED; 5], "{role}");
+        let lines = f.egress_lines();
+        let want = ont_role.unwrap_or(role);
+        assert!(lines.iter().all(|l| l["role"] == want), "{lines:?}");
+    }
+    for role in ["reviewer", "writer"] {
+        let mut f = Fake::new();
+        f.egress(&all);
+        let mut r = f.limited("x.md");
+        r["role"] = json!(role);
+        let (v, _) = f.run(&r).unwrap();
+        assert_eq!(v["state"], "ok", "{role}: {v}");
+        assert_eq!(v["limits"]["egress"]["names"], json!(["api.anthropic.com"]));
+        assert_eq!(
+            f.exchanges("x.md"),
+            [ADMITTED, FORBIDDEN, FORBIDDEN, FORBIDDEN, FORBIDDEN]
+        );
+        let reasons: Vec<Value> = f
+            .egress_lines()
+            .iter()
+            .map(|l| l["reason"].clone())
+            .collect();
+        assert_eq!(reasons[1..], vec![json!("not_listed"); 4], "{role}");
+        assert!(f.egress_lines().iter().all(|l| l["role"] == role));
+    }
+}
+
+// spec: specs/ap/run-limits.md#R18
+#[test]
+fn limits_r18_a_name_of_a_local_address_no_address_or_no_connection_is_refused() {
+    let mut f = Fake::new();
+    f.egress(&["CONNECT api.anthropic.com:443 HTTP/1.1"]);
+    let local: [&[&str]; 7] = [
+        &["100.64.0.1"],
+        &["10.0.0.1"],
+        &["127.0.0.1"],
+        &["169.254.1.1"],
+        &["fd7a:115c:a1e0::1"],
+        &["::ffff:127.0.0.1"],
+        &[GLOBAL, "100.64.0.1"],
+    ];
+    for (n, addresses) in local.into_iter().enumerate() {
+        f.way.map("api.anthropic.com", addresses);
+        let out = format!("a{n}.md");
+        let (v, _) = f.run(&f.limited(&out)).unwrap();
+        assert_eq!(v["state"], "ok", "{addresses:?}: {v}");
+        assert_eq!(f.exchanges(&out), [FORBIDDEN], "{addresses:?}");
+        let last = f.egress_lines().pop().unwrap();
+        assert_eq!(last["reason"], "address", "{addresses:?}");
+    }
+    assert!(f.way.connects().is_empty(), "{:?}", f.way.connects());
+    // No address: 502 `unresolved`; no connection: 502 `unreachable`.
+    f.way.map("api.anthropic.com", &[]);
+    let (v, _) = f.run(&f.limited("u.md")).unwrap();
+    assert_eq!(v["state"], "ok", "{v}");
+    assert_eq!(f.exchanges("u.md"), [GATEWAY]);
+    assert_eq!(f.egress_lines().pop().unwrap()["reason"], "unresolved");
+    assert!(f.way.connects().is_empty());
+    f.way.map("api.anthropic.com", &[GLOBAL]);
+    f.way.fail.store(true, Ordering::SeqCst);
+    let (v, _) = f.run(&f.limited("c.md")).unwrap();
+    assert_eq!(v["state"], "ok", "{v}");
+    assert_eq!(f.exchanges("c.md"), [GATEWAY]);
+    assert_eq!(f.egress_lines().pop().unwrap()["reason"], "unreachable");
+    let to: SocketAddr = format!("{GLOBAL}:443").parse().unwrap();
+    assert_eq!(f.way.connects(), [to]);
+}
+
+// spec: specs/ap/run-limits.md#R19
+#[test]
+fn limits_r19_one_line_of_seven_members_per_request_in_the_file_the_environment_names() {
+    let mut f = Fake::new();
+    f.egress(&[
+        "CONNECT [::1]:443 HTTP/1.1",
+        "GET http://api.anthropic.com/ HTTP/1.1",
+        "CONNECT api.anthropic.com HTTP/1.1",
+        "CONNECT api.anthropic.com:443 HTTP/1.1",
+    ]);
+    let (v, _) = f.run(&f.limited("x.md")).unwrap();
+    assert_eq!(v["state"], "ok", "{v}");
+    let file = f.t.join("egress.jsonl");
+    let mode = std::fs::metadata(&file).unwrap().permissions().mode() & 0o777;
+    assert_eq!(mode, 0o600);
+    let lines = f.egress_lines();
+    assert_eq!(
+        judged(&lines),
+        [
+            json!(["[::1]", 443, 403, "literal"]),
+            json!([null, null, 405, "method"]),
+            json!([null, null, 400, "form"]),
+            json!(["api.anthropic.com", 443, 200, null]),
+        ]
+    );
+    for l in &lines {
+        let keys: Vec<&String> = l.as_object().unwrap().keys().collect();
+        assert_eq!(
+            keys,
+            ["at", "name", "port", "reason", "role", "run", "status"]
+        );
+        assert_eq!(l["run"], f.p("x.md.run.json"));
+        assert_eq!(l["role"], "reviewer");
+        let at = l["at"].as_str().unwrap();
+        assert!(
+            at.len() == 20 && at.ends_with('Z') && at.as_bytes()[10] == b'T',
+            "{at}"
+        );
+    }
+    // An existing file keeps its mode; another file named by the environment gets the lines.
+    std::fs::set_permissions(&file, std::fs::Permissions::from_mode(0o640)).unwrap();
+    let (v, _) = f.run(&f.limited("y.md")).unwrap();
+    assert_eq!(v["state"], "ok", "{v}");
+    assert_eq!(f.egress_lines().len(), 8);
+    let mode = std::fs::metadata(&file).unwrap().permissions().mode() & 0o777;
+    assert_eq!(mode, 0o640);
+    let other = f.t.join("other.jsonl");
+    f.env.retain(|(k, _)| k != "AP_EGRESS_LOG");
+    f.env
+        .push(("AP_EGRESS_LOG".into(), other.to_str().unwrap().into()));
+    let (v, _) = f.run(&f.limited("z.md")).unwrap();
+    assert_eq!(v["state"], "ok", "{v}");
+    assert_eq!(f.egress_lines().len(), 8);
+    let text = std::fs::read_to_string(&other).unwrap();
+    assert_eq!(text.lines().count(), 4);
+    assert!(text.contains(&f.p("z.md.run.json")));
+    // A stage that asks nothing leaves no line.
+    let mut g = Fake::new();
+    let (v, _) = g.run(&g.limited("x.md")).unwrap();
+    assert_eq!(v["state"], "ok", "{v}");
+    assert!(!g.t.join("egress.jsonl").exists());
+}
+
+// spec: specs/ap/run-limits.md#R20
+#[test]
+fn limits_r20_after_the_call_the_listener_is_let_go_and_a_relayed_connection_ends() {
+    let mut f = Fake::new();
+    f.egress(&["hold CONNECT api.anthropic.com:443 HTTP/1.1"]);
+    let (v, _) = f.run(&f.limited("x.md")).unwrap();
+    assert_eq!(v["state"], "ok", "{v}");
+    assert_eq!(f.exchanges("x.md"), [ADMITTED]);
+    let socket = f.inode.clone().unwrap();
+    assert!(socket.starts_with("socket:["), "{socket}");
+    for entry in std::fs::read_dir("/proc/self/fd").unwrap().flatten() {
+        let link = std::fs::read_link(entry.path()).unwrap_or_default();
+        assert_ne!(
+            link.to_str(),
+            Some(socket.as_str()),
+            "{}",
+            entry.path().display()
+        );
+    }
+    // The client's end of the connection relayed at the close reads the end of the file.
+    let held = f.t.join("bin/held");
+    let begun = Instant::now();
+    while !held.exists() && begun.elapsed() < std::time::Duration::from_secs(20) {
+        std::thread::sleep(std::time::Duration::from_millis(50));
+    }
+    assert_eq!(f.text("bin/held"), "eof\n");
+}
+
+// spec: specs/ap/run-limits.md#R7
+// spec: specs/ap/run-limits.md#R17
+#[test]
+fn limits_r7_the_record_names_the_proxy_and_none_where_the_network_cannot_be_made() {
+    let mut f = Fake::new();
+    let (v, _) = f.run(&f.limited("x.md")).unwrap();
+    assert_eq!(v["state"], "ok", "{v}");
+    let egress = &v["limits"]["egress"];
+    let proxy = egress["proxy"].as_str().unwrap();
+    assert!(proxy.starts_with("http://127.0.0.1:"), "{egress}");
+    assert_eq!(egress["names"], json!(["api.anthropic.com"]));
+    assert_eq!(f.record("x.md")["limits"]["egress"], *egress);
+    // No network: nothing launched, the record without `egress`.
+    f.network_fails = true;
+    let (v, status) = f.run(&f.limited("y.md")).unwrap();
+    assert_eq!(
+        (status, &v["state"], &v["unmet"]),
+        (3, &json!("failed"), &json!("launch")),
+        "{v}"
+    );
+    assert_eq!(f.launches.len(), 1);
+    assert_eq!(v["limits"]["scratch"], f.p("scratch"));
+    assert!(v["limits"].get("egress").is_none(), "{v}");
+    assert!(!Path::new(&f.p("scratch")).exists());
+    assert!(!f.t.join("egress.jsonl").exists());
+}
+
+// spec: specs/ap/run-limits.md#R9
+#[test]
+fn limits_r9_a_request_without_limits_has_no_proxy() {
+    let mut f = Fake::new();
+    let mut r = f.request("x.md");
+    r["env"] = json!({"NO_PROXY": "*"});
+    let (v, _) = f.run(&r).unwrap();
+    assert_eq!(v["state"], "ok", "{v}");
+    assert!(f.inode.is_none());
+    assert!(v.get("limits").is_none());
+    let given = &f.launch_envs[0];
+    for name in ["HTTPS_PROXY", "https_proxy", "HTTP_PROXY", "http_proxy"] {
+        assert!(!given.iter().any(|(k, _)| k == name), "{name}");
+    }
+    assert_eq!(
+        given.iter().filter(|(k, _)| k == "NO_PROXY").count(),
+        1,
+        "the request's env as before"
+    );
+    assert!(!f.t.join("egress.jsonl").exists());
 }

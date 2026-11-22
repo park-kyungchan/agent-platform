@@ -22,7 +22,10 @@
 # the target, the source, but neither its cwd nor the `read_only` file; a stage with `limits` sees
 # only its view (specs/ap/run-limits.md R16): no key, login, store, socket of the host or other
 # account, its uid map not the host's, no capability, no user namespace of its own, and its `ap check`
-# reads its policy and asks the door. Each case's request gives as `read_only` what its stage reads
+# reads its policy and asks the door; a reviewer stage with `limits` has `lo` alone in a network
+# namespace of its own (specs/ap/run-limits.md R17 to R19): no address of the host, no name server,
+# no abstract socket of the host, and its proxy refuses a name off its list and an address, each
+# with its line in AP_EGRESS_LOG. Each case's request gives as `read_only` what its stage reads
 # beyond that view (the fake's directory). Skipped, saying so, where `systemctl` is absent or this
 # caller cannot start a transient unit in the system manager.
 set -uo pipefail
@@ -88,6 +91,27 @@ elif [ "$(cat "$here/mode")" = named ]; then
   said="$(w "$top/wdir/x" write); $(w "$top/dst/y" over); $(w "$top/wdir/keep" keep); keep removal $(c rm -f "$top/wdir/keep"); keep rename $(c mv "$top/wdir/keep" "$top/wdir/moved"); $(w "$PWD/n" cwd); $(w "/proc/1/root$PWD/m" root)"
   printf '{"type":"result","subtype":"success","is_error":false,"num_turns":1,"result":"%s","session_id":"%s","usage":{"input_tokens":1,"output_tokens":1},"permission_denials":[]}\n' "$said" "$sid"
   exit 0
+elif [ "$(cat "$here/mode")" = egress ]; then
+  # The stage's network (specs/ap/run-limits.md R17, R18): what it reaches, printing no content:
+  # the interfaces of /proc/net/dev, whether its ns/net is the script's, each TCP connect (3 s) that
+  # did not fail, the abstract socket, a lookup, and the status lines of two requests to its proxy.
+  ifs=$(awk -F: 'NR > 2 {gsub(/[ \t]/, "", $1); print $1}' /proc/net/dev | sort | paste -sd, -)
+  [ "$(readlink /proc/self/ns/net)" != "$(cat "$here/netns")" ] && ns=other || ns=same
+  tcp() { python3 -I -c 'import socket,sys; socket.create_connection((sys.argv[1], int(sys.argv[2])), timeout=3)' "$1" "$2" > /dev/null 2>&1; }
+  reached=
+  while read -r a; do tcp "$a" 22 && reached="$reached $a:22"; done < "$here/addrs"
+  for a in 127.0.0.53 100.100.100.100; do tcp "$a" 53 && reached="$reached $a:53"; done
+  python3 -I -c 'import socket,sys; s=socket.socket(socket.AF_UNIX); s.settimeout(3); s.connect("\0"+sys.argv[1])' "$(cat "$here/abstract")" > /dev/null 2>&1 \
+    && reached="$reached abstract"
+  getent hosts github.com > /dev/null 2>&1 && reached="$reached getent"
+  ask() { python3 -I -c 'import os,socket,sys
+host, port = os.environ["HTTPS_PROXY"].split("//", 1)[1].rsplit(":", 1)
+s = socket.create_connection((host, int(port)), timeout=10)
+s.sendall(("CONNECT %s HTTP/1.1\r\nHost: %s\r\n\r\n" % (sys.argv[1], sys.argv[1])).encode())
+print(s.makefile("rb").readline().decode().strip())' "$1" 2> /dev/null || echo "no answer"; }
+  said="interfaces $ifs; namespace $ns; reached:$reached; example.com $(ask example.com:443); 127.0.0.1 $(ask 127.0.0.1:443)"
+  printf '{"type":"result","subtype":"success","is_error":false,"num_turns":1,"result":"%s","session_id":"%s","usage":{"input_tokens":1,"output_tokens":1},"permission_denials":[]}\n' "$said" "$sid"
+  exit 0
 fi
 if [ "$(cat "$here/mode")" = answer ]; then
   printf '{"type":"result","subtype":"success","is_error":false,"num_turns":1,"result":"ready","session_id":"%s","usage":{"input_tokens":1,"output_tokens":1},"permission_denials":[]}\n' "$sid"
@@ -104,7 +128,8 @@ field() { python3 -I -c 'import json,sys; v=json.load(open(sys.argv[1])); print(
 alive() { [ -e "/proc/$1" ] && [ "$(awk '{print $3}' "/proc/$1/stat" 2> /dev/null)" != Z ]; }
 fails=0; ok() { echo "ok   $1"; }; bad() { echo "FAIL $1"; fails=$((fails+1)); }
 apr() { env -i PATH="$t/bin:$PATH" HOME="${HOME:-/root}" LANG=C.UTF-8 HERDR_ENV=1 HERDR_PANE_ID=w0:p0 \
-  CLAUDE_CODE_ENTRYPOINT=cli CLAUDE_CONFIG_DIR=/root/.claude AP_POLICY_FILE="$t/policy.json" "$ap" run; }
+  CLAUDE_CODE_ENTRYPOINT=cli CLAUDE_CONFIG_DIR=/root/.claude AP_POLICY_FILE="$t/policy.json" \
+  AP_EGRESS_LOG="$t/egress.jsonl" "$ap" run; }
 
 # 1. An answer with a forked sleeper left behind: the run ends at the answer, in agents.slice, and
 #    nothing of it remains.
@@ -246,7 +271,7 @@ else
     && ok "limits: nothing of stage A reached stage B's scratch directory, home or account while B ran" \
     || bad "limits: stage B's files: $(ls -A "$t/scratchB" "$t/acctB" "$bhome" 2> /dev/null | tr '\n' ' ')"
   python3 -I -c 'import json,sys; t=sys.argv[1]; r=json.load(open(t+"/l.md.run.json")); l=r["limits"]
-hidden = l.pop("hidden", None); view = l.pop("view", None)
+hidden = l.pop("hidden", None); view = l.pop("view", None); l.pop("egress", None)
 sys.exit(r.get("home") != t+"/acct/homes/"+r["session"]
          or l != {"scratch": t+"/scratch", "writable": [r["home"], t+"/scratch"], "bwrap": "/usr/bin/bwrap", "read_only": [t+"/bin"]}
          or not isinstance(hidden, list) or not isinstance(view, list) or "/" in view)' "$t" \
@@ -286,12 +311,46 @@ sys.exit(r.get("home") != t+"/acctB/homes/"+r["session"] or r["limits"]["writabl
     && ok "limits: an implementer wrote its write directory and the over source, not the read_only file, its cwd or /proc/1/root: $ans" \
     || bad "limits: named paths: rc=$rc $ans $(tail -c 400 "$t/n.err")"
   python3 -I -c 'import json,sys; t=sys.argv[1]; l=json.load(open(t+"/n.md.run.json"))["limits"]
-hidden = l.pop("hidden", None); l.pop("view", None)
+hidden = l.pop("hidden", None); l.pop("view", None); l.pop("egress", None)
 r = json.load(open(t+"/n.md.run.json"))
 sys.exit(l != {"scratch": t+"/scratch2", "writable": [r["home"], t+"/scratch2", t+"/wdir", t+"/dst"], "bwrap": "/usr/bin/bwrap",
                "over": [[t+"/src", t+"/dst"]], "read_only": [t+"/wdir/keep", t+"/bin"], "show": ["~/.config/gh"]}
          or not isinstance(hidden, list) or any(p.endswith("/.config/gh") for p in hidden))' "$t" \
     && ok "limits: the implementer's record names what it writes, the members as given, and ~/.config/gh shown" || bad "limits member of the implementer: $(field "$t/n.md.run.json" limits)"
+  # spec: specs/ap/run-limits.md#R17
+  # spec: specs/ap/run-limits.md#R18
+  # spec: specs/ap/run-limits.md#R19
+  # The stage's network: a reviewer stage with limits, given the host's addresses (every address of
+  # every interface), the script's own ns/net and an abstract socket the script listens on. Its
+  # interfaces are `lo` alone, its namespace is another, every connect and the lookup fail, and its
+  # proxy refuses `CONNECT example.com:443` (not_listed) and `CONNECT 127.0.0.1:443` (literal),
+  # each with its line in AP_EGRESS_LOG; no listed name is asked, so the case needs no network.
+  echo egress > "$t/bin/mode"
+  ip -o addr show | awk '{print $4}' | cut -d/ -f1 > "$t/bin/addrs"
+  readlink /proc/self/ns/net > "$t/bin/netns"
+  echo "ap-egress-$$" > "$t/bin/abstract"
+  python3 -I -c 'import socket,sys,time; s=socket.socket(socket.AF_UNIX); s.bind("\0"+sys.argv[1]); s.listen(); time.sleep(300)' "ap-egress-$$" &
+  echo $! > "$t/bin/abstract.pid"
+  for _ in $(seq 50); do
+    python3 -I -c 'import socket,sys; s=socket.socket(socket.AF_UNIX); s.connect("\0"+sys.argv[1])' "ap-egress-$$" 2> /dev/null && break; sleep 0.1
+  done
+  req e.md ",\"limits\":{\"scratch\":\"$t/scratchE\",\"read_only\":[\"$t/bin\"]}" | apr > "$t/e.out" 2> "$t/e.err"; rc=$?
+  kill "$(cat "$t/bin/abstract.pid")" 2> /dev/null
+  ans=$(cat "$t/e.md" 2> /dev/null)
+  echo "     egress: $ans"
+  { [ "$rc" -eq 0 ] && [ "$(field "$t/e.md.run.json" state)" = ok ] && [ -s "$t/bin/addrs" ] \
+    && [ "$ans" = "interfaces lo; namespace other; reached:; example.com HTTP/1.1 403 Forbidden; 127.0.0.1 HTTP/1.1 403 Forbidden" ]; } \
+    && ok "egress: the stage has lo alone in another namespace; port 22 of each of the host's $(wc -l < "$t/bin/addrs") addresses, 127.0.0.53:53, 100.100.100.100:53, the abstract socket and getent fail; the proxy answered 403 twice" \
+    || bad "egress: rc=$rc $ans $(tail -c 400 "$t/e.err")"
+  python3 -I -c 'import json,os,sys; t=sys.argv[1]; f=t+"/egress.jsonl"
+lines=[json.loads(l) for l in open(f)]
+e=json.load(open(t+"/e.md.run.json"))["limits"]["egress"]
+sys.exit(oct(os.stat(f).st_mode & 0o777) != "0o600" or len(lines) != 2
+         or any(l["run"] != t+"/e.md.run.json" or l["role"] != "reviewer" or l["status"] != 403 for l in lines)
+         or [(l["name"], l["port"], l["reason"]) for l in lines] != [("example.com", 443, "not_listed"), ("127.0.0.1", 443, "literal")]
+         or e["names"] != ["api.anthropic.com"] or not e["proxy"].startswith("http://127.0.0.1:"))' "$t" \
+    && ok "egress: AP_EGRESS_LOG is mode 0600 with two lines of this reviewer, not_listed and literal; the record names the proxy and api.anthropic.com" \
+    || bad "egress: record $(ls -l "$t/egress.jsonl" 2> /dev/null) $(cat "$t/egress.jsonl" 2> /dev/null) $(field "$t/e.md.run.json" limits)"
   # spec: specs/ap/door.md#R1
   # The door (specs/ap/door.md): a verifier stage with limits asks for route and for another
   # function, and runs `ap check` for its worktree, whose PC (a host that does not exist) the ping
