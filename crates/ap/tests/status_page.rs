@@ -1,5 +1,10 @@
 //! The systemd unit files and README section of the status page.
 
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "a test fails by panicking, so an unwrap or an expect in its helpers is how it reports"
+)]
 #[test]
 fn the_status_page_unit_files_and_readme_section() {
     let service = include_str!("../../../deploy/ap-status-page.service");

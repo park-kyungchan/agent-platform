@@ -1,6 +1,11 @@
 //! `ap state` against a fixture task directory made here: a Git repository whose `runs/` holds
 //! records of the shapes of real ones (members copied, no session id). `systemctl` and the process
 //! table are answered by the fake `System`; Git is the real one, in the temporary directory.
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "a test fails by panicking, so an unwrap or an expect in its helpers is how it reports"
+)]
 use ap::host::{Answer, Failure, Host, Reply, System};
 use serde_json::{Value, json};
 use std::{

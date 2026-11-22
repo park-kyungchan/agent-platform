@@ -2,6 +2,11 @@
 //! `ont log` and `ont action apply` of the four finding actions, with the schema's criteria), `stat`,
 //! `find`, `sh` (for `sshd -T`), `systemctl`, `df`, `ps` and the files a pass reads. The watch directory
 //! is a temporary directory: no test reaches the host's store, units or files.
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "a test fails by panicking, so an unwrap or an expect in its helpers is how it reports"
+)]
 use ap::host::{Answer, Failure, Reply, System};
 use ap::watch::RUNTIMES;
 use ap::watch::checks::{GITHUB_APPLY, GITHUB_REPOSITORIES};

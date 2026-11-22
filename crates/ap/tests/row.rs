@@ -1,4 +1,9 @@
 //! `ap row` (README "One row") against a fake of `ont` and a session record made in the test.
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "a test fails by panicking, so an unwrap or an expect in its helpers is how it reports"
+)]
 use ap::{
     host::{Answer, Failure, Reply, System},
     row::{Refusal, execute},

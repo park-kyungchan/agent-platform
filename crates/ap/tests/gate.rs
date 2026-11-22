@@ -1,6 +1,11 @@
 //! `ap gate` against a fake GitHub: every `gh api graphql` reading is scripted, `gh pr ready` is
 //! recorded, and the clock is virtual (a pause moves it). Each test names the case of
 //! `await-autoreview.sh` or of the gate part of `deliver.sh` it now holds.
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "a test fails by panicking, so an unwrap or an expect in its helpers is how it reports"
+)]
 use ap::gate::execute;
 use ap::host::{Answer, Failure, Reply, System};
 use serde_json::{Value, json};

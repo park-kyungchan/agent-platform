@@ -97,11 +97,12 @@ pub(crate) fn fields(
         .flatten()
         .filter(|o| o["revision"] == head)
         .collect();
-    require!(observations.len() == 1 && observations[0]["change"] != "retraction" && observations[0]["fields"].is_object() => code, field);
+    require!(observations.len() == 1 && observations[0]["change"] != "retraction" => code, field);
+    let fields = observations[0]["fields"]
+        .as_object()
+        .ok_or_else(|| error(code, field))?;
     Ok(Value::Object(
-        observations[0]["fields"]
-            .as_object()
-            .unwrap()
+        fields
             .iter()
             .map(|(k, v)| {
                 (

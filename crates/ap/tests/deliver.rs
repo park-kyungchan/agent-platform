@@ -6,6 +6,11 @@
 //! what the case says from a real child. Every call is recorded in order. No test builds,
 //! installs, fetches or touches the host's store; the lock, the backup directories, the reports
 //! and the state directory are files of a temporary directory.
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "a test fails by panicking, so an unwrap or an expect in its helpers is how it reports"
+)]
 use ap::deliver::{check_request, execute};
 use ap::host::{Answer, Failure, Reply, System};
 use serde_json::{Value, json};
@@ -129,6 +134,8 @@ struct W {
     /// For each launch: whether the lock's descriptor was open in this process without
     /// close-on-exec, so that the child inherits it.
     lock_inherited: Vec<bool>,
+    /// The same for each call of a program that is no launch: none of them inherits the lock.
+    call_inherited: Vec<bool>,
     /// A second call, started while this one runs (at its `df`).
     nested: Option<Box<W>>,
     nested_result: Option<(Value, u8)>,
@@ -266,6 +273,7 @@ impl W {
             index_fails: false,
             inst: BTreeMap::new(),
             lock_inherited: vec![],
+            call_inherited: vec![],
             nested: None,
             nested_result: None,
             lock: String::new(),
@@ -844,6 +852,7 @@ fn inherited(path: &str) -> bool {
 }
 impl System for W {
     fn call(&mut self, program: &str, a: &[String], body: &Value, ms: u64) -> Answer {
+        self.call_inherited.push(inherited(&self.lock));
         if program == "bash" && a.len() == 3 && a[1] == "rollback-check" {
             self.checks.push((a[0].clone(), a[2].clone()));
             self.checks_at.push(self.calls.len());
@@ -2907,6 +2916,19 @@ fn d9_installers_inherit_the_lock() {
     let (v, _) = w.run();
     assert_eq!(w.launched(), ["ap", "content"], "{v}");
     assert_eq!(w.lock_inherited, [true, true]);
+}
+
+// spec: specs/ap/deliver.md#R16
+#[test]
+fn d9_no_other_program_of_a_call_inherits_the_lock() {
+    // Every installer launch saw the lock inheritable; no call of a program (the reads of the
+    // pair, `git`, the build lock, `rollback-check`) did: the lock is close-on-exec again after
+    // each launch, whatever the launch answered. A rollback installer is a launch and inherits it.
+    let mut w = W::new();
+    let (v, _) = w.run();
+    assert_eq!(w.launched(), ["ap", "content"], "{v}");
+    assert!(!w.lock_inherited.is_empty() && w.lock_inherited.iter().all(|&i| i));
+    assert!(!w.call_inherited.is_empty() && w.call_inherited.iter().all(|&i| !i));
 }
 
 // ---- D10 the exact calls of one install ---------------------------------------------------------

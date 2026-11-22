@@ -4,6 +4,11 @@
 //! engine renders it. Git and `sh` run for real on scratch repositories under a temporary directory; the
 //! fake's `units()` is false except in the tests that read the `systemd-run` command line, which the fake
 //! answers itself: no test starts a unit of the service manager or reaches the host's store or policy file.
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "a test fails by panicking, so an unwrap or an expect in its helpers is how it reports"
+)]
 use ap::{
     host::{Answer, Failure, Host, Reply, System},
     unit::object::{Refusal, arguments, branch_ok, execute},

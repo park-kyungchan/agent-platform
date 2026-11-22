@@ -42,7 +42,7 @@ fi
 
 bash scripts/test-install-ap.sh
 cargo fmt --all -- --check
-cargo clippy --workspace --all-targets --locked -- -D warnings
+CARGO_BUILD_WARNINGS=deny cargo clippy --workspace --all-targets --locked
 # The review tests need a private root that this check creates and removes.
 AP_S03_TEST_ROOT=$(mktemp -d "$PWD/.ap-rust-test.XXXXXXXX")
 export AP_S03_TEST_ROOT

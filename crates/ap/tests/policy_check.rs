@@ -1,5 +1,10 @@
 //! `ap policy check` against a fake host (`specs/ap/policy.md` R12 to R16): the fake answers the one
 //! read of the file and refuses every program call; nothing here touches the host's policy file.
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "a test fails by panicking, so an unwrap or an expect in its helpers is how it reports"
+)]
 use ap::host::{Answer, Failure, System};
 use ap::policy::{Refusal, check};
 use serde_json::{Value, json};

@@ -741,10 +741,16 @@ fn installer(s: &mut impl System, c: &mut Call, name: &str, words: &[&str]) -> R
             err.try_clone().ok()?,
         ];
         // The installer inherits the lock: it stays held while one lives.
-        let fd = |flags| c.lock.as_ref().map(|l| rustix::io::fcntl_setfd(l, flags));
-        fd(rustix::io::FdFlags::empty());
-        let child = s.launch(&argv, &env, &cwd, files);
-        fd(rustix::io::FdFlags::CLOEXEC);
+        // The guard sets close-on-exec again when the launch ends, on every path out of it.
+        let child = {
+            let _inherit = c.lock.as_ref().map(|l| {
+                let _ = rustix::io::fcntl_setfd(l, rustix::io::FdFlags::empty());
+                std::mem::DropGuard::new(l, |l| {
+                    let _ = rustix::io::fcntl_setfd(l, rustix::io::FdFlags::CLOEXEC);
+                })
+            });
+            s.launch(&argv, &env, &cwd, files)
+        };
         let status = child.ok()?.wait().ok()?;
         let exit = status.code().or_else(|| status.signal().map(|n| 128 + n))?;
         Some((exit, back(out), back(err)))

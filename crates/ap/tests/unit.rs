@@ -5,6 +5,11 @@
 //! unit launcher replaced as in tests/run.rs; a virtual clock for the gate. The work root is the
 //! temporary directory's `work/` through `System::work_root`. The fake answers `gh` with JSON that
 //! holds every member the command may ask for (no `--jq`).
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "a test fails by panicking, so an unwrap or an expect in its helpers is how it reports"
+)]
 use ap::host::{Answer, Failure, Host, Reply, System};
 use ap::unit::execute;
 use serde_json::{Value, json};

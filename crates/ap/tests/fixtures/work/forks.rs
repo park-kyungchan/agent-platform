@@ -6,7 +6,10 @@
 //! fork of a test binary is made inside `forking` (std's `spawn`, `output` and `status` return only after
 //! the child's `exec`), and a test that takes a lock again after a close first calls `settled`, which
 //! returns once no fork of the binary is between its fork and its `exec`.
-#![allow(dead_code)]
+#![allow(
+    dead_code,
+    reason = "each test binary that includes this module uses only part of it"
+)]
 use std::{
     process::{Command, Stdio},
     sync::{OnceLock, RwLock},

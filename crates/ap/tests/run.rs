@@ -2,6 +2,11 @@
 //! only through the `System` trait: the `systemd-run … --` prefix is checked and dropped, the fake
 //! runs in its own process group, and `systemctl stop <unit>` kills that group. The real unit is
 //! exercised by ci/host-run-scope.sh.
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "a test fails by panicking, so an unwrap or an expect in its helpers is how it reports"
+)]
 #[path = "fixtures/work/forks.rs"]
 mod forks;
 use ap::host::{Answer, Failure, Host, Network, Reply, System, WayOut};

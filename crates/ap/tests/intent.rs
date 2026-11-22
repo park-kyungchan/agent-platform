@@ -2,6 +2,11 @@
 //! engine does: the schema's actions on `intent`, `criterion` and `end_delegation` with their refusals,
 //! request ids replayed as `already_applied`, the actor's role from the request member `role` or else
 //! from `ONT_ROLE`, `expected` revisions, and searches qualified as the engine qualifies them.
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "a test fails by panicking, so an unwrap or an expect in its helpers is how it reports"
+)]
 use ap::{
     host::{Answer, Failure, Reply, System},
     intent::{execute, text_of},

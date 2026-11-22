@@ -1,6 +1,11 @@
 //! The scan of the added lines for a secret (`specs/ap/unit-run.md` R44): the five forms, the reading
 //! of two commits made with `git` in a temporary directory, the admissions and the detail. Every
 //! secret-shaped text here is built at run time from parts, so that no line of this file holds a form.
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "a test fails by panicking, so an unwrap or an expect in its helpers is how it reports"
+)]
 // spec: specs/ap/unit-run.md#R44
 use ap::host::Host;
 use ap::unit::scan::{Ended, Hit, added, admissions, detail, form, scan};
