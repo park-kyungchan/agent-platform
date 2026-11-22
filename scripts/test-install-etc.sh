@@ -48,6 +48,8 @@ kept_dir=$root/var/backups/agent-platform-etc
 export AP_ETC_ROOT=$root AP_ETC_CLONE=$clone AP_ETC_ORIGIN=file://$origin
 export FAKE_ONT_DB=$scratch/reviews.jsonl
 : >"$FAKE_ONT_DB"
+export FAKE_ONT_GETS=$scratch/gets.log
+: >"$FAKE_ONT_GETS"
 
 cat >"$scratch/bin/ap" <<'EOF'
 #!/usr/bin/env bash
@@ -72,14 +74,41 @@ cat >"$scratch/bin/ont" <<'EOF'
 #!/usr/bin/env -S python3 -I
 import json, os, sys
 
-if sys.argv[1:] != ["search"]:
+verb = sys.argv[1:]
+if verb not in (["search"], ["get"]):
     sys.exit(2)
-if os.environ.get("FAKE_ONT_FAIL"):
+if os.environ.get("FAKE_ONT_FAIL") or (verb == ["get"] and os.environ.get("FAKE_ONT_GET_FAIL")):
     print("{}")
     sys.exit(1)
 q = json.load(sys.stdin)
-assert q["object_type"] == "review"
 rows = [json.loads(line) for line in open(os.environ["FAKE_ONT_DB"]) if line.strip()]
+
+
+def ident(key):
+    return {"object_type": "review", "namespace": {"instance": "local", "account": "root"}, "native_key": key}
+
+
+def fields_of(r):
+    out = {}
+    for k, v in r.items():
+        if k != "key":
+            out[k] = {"kind": "value", "value": ident(v) if k == "carried_from" else v}
+    return out
+
+
+if verb == ["get"]:
+    with open(os.environ["FAKE_ONT_GETS"], "a") as log:
+        log.write(q["id"]["native_key"] + "\n")
+    assert sorted(q) == ["id"] and q["id"] == ident(q["id"]["native_key"]), q
+    stale = {"fields": {"kind": {"kind": "value", "value": "stale"}}}
+    objects = [
+        {"id": q["id"], "observations": [stale, {"fields": fields_of(r)}]}
+        for r in rows
+        if r["key"] == q["id"]["native_key"]
+    ]
+    print(json.dumps({"status": "ok", "result": {"objects": objects}}))
+    sys.exit(0)
+assert q["object_type"] == "review"
 conds = q["where"]["all"]
 assert sorted(c["eq"][0] for c in conds) == ["head", "kind", "status"], conds
 chosen = [r for r in rows if all(r.get(c["eq"][0]) == c["eq"][1] for c in conds)]
@@ -87,11 +116,7 @@ page = int(os.environ.get("FAKE_ONT_PAGE", "0")) or 1000
 start = int(q.get("continuation") or 0)
 chunk = chosen[start:start + page]
 more = str(start + page) if start + page < len(chosen) else None
-objects = []
-for r in chunk:
-    fields = {k: {"kind": "value", "value": v} for k, v in r.items() if k != "key"}
-    ident = {"object_type": "review", "namespace": {"instance": "local", "account": "root"}, "native_key": r["key"]}
-    objects.append({"id": ident, "head": {"fields": fields}})
+objects = [{"id": ident(r["key"]), "head": {"fields": fields_of(r)}} for r in chunk]
 print(json.dumps({"status": "ok", "result": {"basis": {"qualified": True}, "objects": objects, "continuation": more}}))
 EOF
 chmod 0755 "$scratch/bin/ap" "$scratch/bin/cmp" "$scratch/bin/date" "$scratch/bin/ont"
@@ -494,6 +519,101 @@ FAKE_DATE=20261101T000033Z inst install "${M[12]}"
 ok "install after a rollback with no commit recorded checks the commit alone" rc_is 0
 ok "and checks the target against the recorded digest" target_is 12
 ok "no staging directory is left after the cases" not compgen -G "$clone/.git/etc-stage.*"
+
+# ---- a review that ap unit run carried to an updated head ----------------------------------------------------------
+# A carried review has carried_from and no pull_request: it counts by the number of the review it was carried from,
+# read with ont get. The merges 14 to 26 are added to the origin after every case above.
+add_row() { # <key> <kind> <head> <status> <verdict> <repository> <pull_request or -> <carried_from or ->
+  python3 -I -c '
+import json, sys
+k, kind, head, status, verdict, repository, number, carried = sys.argv[1:]
+r = {"key": k, "kind": kind, "head": head, "status": status, "verdict": verdict, "repository": repository}
+if number != "-":
+    r["pull_request"] = int(number)
+if carried != "-":
+    r["carried_from"] = carried
+print(json.dumps(r))' "$@" >>"$FAKE_ONT_DB"
+}
+carried_chain() { # <n> <length>: reviews c<n>_1 .. c<n>_<length>, the first of the head of merge n, the last with number n
+  local n=$1 len=$2 i h
+  for ((i = 1; i <= len; i++)); do
+    h=$other_head
+    [[ $i != 1 ]] || h=${H[$n]}
+    if ((i < len)); then
+      add_row "c${n}_$i" packet "$h" closed accept "$repo" - "c${n}_$((i + 1))"
+    else
+      add_row "c${n}_$i" packet "$h" closed accept "$repo" "$n" -
+    fi
+  done
+}
+for n in 14 15 16 17 18 19 20 21 22 23 24 25 26; do merge_pr "$n" -; done
+git -C "$work" push -q origin main
+add_row c14 packet "${H[14]}" closed accept "$repo" - o14 # one step
+add_row o14 packet "$other_head" closed accept "$repo" 14 -
+add_row c15 packet "${H[15]}" closed accept "$repo" - m15 # two steps
+add_row m15 packet "$other_head" closed accept "$repo" - o15
+add_row o15 packet "$other_head" closed accept "$repo" 15 -
+add_row c16 packet "${H[16]}" closed accept "$repo" - o16 # the origin has another number
+add_row o16 packet "$other_head" closed accept "$repo" 99 -
+add_row c17 packet "${H[17]}" closed accept "$repo" - o17 # the origin has no number and no carried_from
+add_row o17 packet "$other_head" closed accept "$repo" - -
+carried_chain 18 21 # a chain of 21 reviews
+carried_chain 19 20 # a chain of 20 reviews
+add_row c20 packet "${H[20]}" closed accept "$repo" - o20 # the origin is not closed
+add_row o20 packet "$other_head" running accept "$repo" 20 -
+add_row c21 packet "${H[21]}" closed accept "$repo" - o21 # the origin does not accept
+add_row o21 packet "$other_head" closed reject "$repo" 21 -
+add_row c22 packet "${H[22]}" closed accept "$repo" - o22 # the origin is of another repository
+add_row o22 packet "$other_head" closed accept other/repository 22 -
+add_row c23 packet "${H[23]}" closed accept "$repo" 99 o23 # a number that is present is not looked past
+add_row o23 packet "$other_head" closed accept "$repo" 23 -
+add_row c24 packet "${H[24]}" closed accept "$repo" - o24 # the origin is of another kind
+add_row o24 design "$other_head" closed accept "$repo" 24 -
+add_row c25 packet "${H[25]}" closed accept "$repo" - nowhere25 # the origin is not in the store
+add_row c26 packet "${H[26]}" closed accept "$repo" - o26 # a get that fails
+add_row o26 packet "$other_head" closed accept "$repo" 26 -
+
+carried_state() { # <n>: the record at the merge before n
+  set_state "${M[$(($1 - 1))]}" "$(($1 - 1))"
+  : >"$FAKE_ONT_GETS"
+}
+carried_state 14
+FAKE_DATE=20261103T000014Z inst install "${M[14]}"
+ok "a carried review whose origin has the merge's number installs" rc_is 0
+ok "and installs the merge's file" target_is 14
+ok "the origin was read with one get" equals "$(<"$FAKE_ONT_GETS")" o14
+carried_state 15
+FAKE_DATE=20261103T000015Z inst install "${M[15]}"
+ok "a carried chain of two installs" rc_is 0
+ok "and installs the merge's file (chain of two)" target_is 15
+ok "the chain of two was read with two gets" equals "$(<"$FAKE_ONT_GETS")" "$(printf 'm15\no15')"
+carried_state 19
+FAKE_DATE=20261103T000019Z inst install "${M[19]}"
+ok "a carried chain of 20 reviews installs" rc_is 0
+ok "and installs the merge's file (chain of 20)" target_is 19
+for n in 16 17 18 20 21 22 23 24; do
+  carried_state "$n"
+  before=$(sig)
+  inst install "${M[$n]}"
+  ok "merge $n (carried, not accepted by the number): exit 2" rc_is 2
+  ok "merge $n is not_accepted" equals "$ERR" "not_accepted ${M[$n]}"
+  ok "merge $n wrote nothing" equals "$(sig)" "$before"
+done
+carried_state 25
+before=$(sig)
+inst install "${M[25]}"
+ok "a carried_from that names no review in the store is store_unreadable" contains "$ERR" store_unreadable
+ok "a carried_from that names no review exits 2" rc_is 2
+ok "a carried_from that names no review wrote nothing" equals "$(sig)" "$before"
+carried_state 26
+before=$(sig)
+FAKE_ONT_GET_FAIL=1 inst install "${M[26]}"
+ok "a failing get is store_unreadable" equals "$ERR" "store_unreadable ${M[26]}"
+ok "a failing get exits 2" rc_is 2
+ok "a failing get wrote nothing" equals "$(sig)" "$before"
+carried_state 26
+FAKE_DATE=20261103T000026Z inst install "${M[26]}"
+ok "the same merge installs when the get answers" rc_is 0
 
 if [[ $failures -ne 0 ]]; then
   printf 'test-install-etc: failed (%d of %d)\n' "$failures" "$checks" >&2

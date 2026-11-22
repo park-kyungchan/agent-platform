@@ -161,7 +161,11 @@ source_ok() { # <commit>: the policy file is a regular blob there
 # ---- the accepted check --------------------------------------------------------------------------
 # ap deliver's step 6 for this repository: a merge whose second parent has the merge's tree and for which
 # the store holds a closed accepting review of kind packet for that head, this repository and the number of
-# the merge's subject. The store is read through `ont search`; no GitHub read.
+# the merge's subject. A review that `ap unit run` carried to an updated head (`carried_from`, no
+# `pull_request`) counts by the number of the review it was carried from: that review is read with `ont get`,
+# must be of kind packet, closed, accept and of this repository, and holds the number or is itself carried,
+# followed the same way, at most 20 reviews in all. A `pull_request` that is present is never looked past.
+# The store is read through `ont search` and `ont get`; no GitHub read.
 REVIEW_PY=$(
   cat <<'PY'
 import json, subprocess, sys
@@ -179,6 +183,57 @@ def complete(i):
     names = [i.get("object_type"), i.get("native_key")]
     names += [i["namespace"].get("instance"), i["namespace"].get("account")]
     return all(isinstance(n, str) and n for n in names)
+
+
+MAX_CHAIN = 20
+
+
+def gfields(o):  # the fields of the newest observation of an `ont get` object
+    obs = o.get("observations")
+    if not isinstance(obs, list) or not obs or not isinstance(obs[-1], dict):
+        raise ValueError("no observation")
+    f = obs[-1].get("fields")
+    if not isinstance(f, dict):
+        raise ValueError("no fields")
+    return f
+
+
+def gvalue(f, k):
+    return (f.get(k) or {}).get("value")
+
+
+def is_number(n):
+    return isinstance(n, int) and not isinstance(n, bool)
+
+
+def followed(ref):
+    """True when the chain of carried reviews that starts at ref ends at pull request pr."""
+    seen = 1  # the carried review found by the search is the first of the at most MAX_CHAIN
+    while True:
+        if seen >= MAX_CHAIN or not isinstance(ref, dict) or ref.get("object_type") != "review":
+            return False
+        seen += 1
+        try:
+            p = subprocess.run(["ont", "get"], input=json.dumps({"id": ref}).encode(), capture_output=True, timeout=60)
+            v = json.loads(p.stdout)
+            ok = p.returncode == 0 and v["status"] == "ok"
+            objects = v["result"]["objects"]
+            f = gfields(objects[0]) if ok else None
+        except Exception:
+            sys.exit(2)
+        if not ok:
+            sys.exit(2)
+        if not (
+            gvalue(f, "kind") == "packet"
+            and gvalue(f, "status") == "closed"
+            and gvalue(f, "verdict") == "accept"
+            and gvalue(f, "repository") == repo
+        ):
+            return False
+        number = gvalue(f, "pull_request")
+        if number is not None:
+            return is_number(number) and number == pr
+        ref = gvalue(f, "carried_from")
 
 
 query = {
@@ -206,12 +261,12 @@ for _ in range(20):
             and field(o, "status") == "closed"
             and field(o, "verdict") == "accept"
             and field(o, "repository") == repo
-            and isinstance(number, int)
-            and not isinstance(number, bool)
-            and number == pr
             and complete(o.get("id"))
         ):
-            sys.exit(0)
+            if is_number(number) and number == pr:
+                sys.exit(0)
+            if number is None and field(o, "carried_from") is not None and followed(field(o, "carried_from")):
+                sys.exit(0)
     cont = result.get("continuation")
     if cont is None:
         sys.exit(1)
