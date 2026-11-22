@@ -78,6 +78,24 @@ ont --version                                                      # the engine'
 
 Undo: remove the member `engine` from `/etc/agent-platform/deliver.json`; delivery then stops on a difference of the engine or the schema as before (`engine_differs`, `schema_differs`) and reads no marker. An installed engine goes back with the engine's own rollback, with the timer stopped: `bash /var/lib/agent-platform/deliver/ontology-platform/scripts/install-ont.sh rollback`. A schema is repaired by a higher version, installed forward; delivery never restores the store from a backup.
 
+## The engine of a pin
+
+A stage of `ap run` holds no credential for `park-kyungchan/ontology-platform` (`specs/ap/unit-run.md` R38) and sees `/usr` read-only (`specs/ap/run-limits.md` R16), so `./check` in a stage cannot build the engine of a pin.
+
+The Lead's step, for each unit whose branch moves `ontology/ENGINE-PIN` to a commit `<pin>` of ontology-platform's main: before that unit's first stage (`ap unit run`) and outside any stage, build `ont` from a clean checkout at `<pin>` (its HEAD is the pin and nothing is changed, so that its `--version` names the pin; the target directory lies outside the checkout, as `.github/workflows/rust.yml` builds it) with `cargo build --locked --release -p ont` under the build lock `/var/lib/agent-platform/build.lock`, install it as `/usr/local/bin/ont-<pin>` and read it back:
+
+```sh
+git -C <checkout> rev-parse HEAD                      # <pin>
+git -C <checkout> status --porcelain                  # prints nothing
+flock /var/lib/agent-platform/build.lock sh -c 'cd <checkout> && cargo build --locked --release -p ont --target-dir <target>'
+install -m 0755 -o root -g root <target>/release/ont /usr/local/bin/ont-<pin>
+/usr/local/bin/ont-<pin> --version                    # ont 0.1.0 <pin>
+```
+
+What `./check` then does (`ci/engine-pin.sh`, called before the Rust build with the pin), in this order: when `<dir>/ont-<pin>` is an executable file whose `--version` prints `ont 0.1.0 <pin>`, that file is the engine, and the line `check: engine <dir>/ont-<pin> (pinned)` says so; else the `ont` on PATH when it names the pin (`(path)`); else the base's `cargo install` of the pin into `${CARGO_TARGET_DIR:-$PWD/target}/engine-pin`, whose output is `engine-pin/install.log` (`(built)`). `<dir>` is `CHECK_ENGINE_DIR` when it is set and not empty, else `/usr/local/bin`. The steps after it take the engine as a link `engine-pin/pinned/ont` to the pinned file: some tests (`crates/ap/tests/route_engine.rs`, `clause.rs`, `resource.rs`) put the directory of `ONT_BIN` first on PATH so that `ap` reaches the engine by the name `ont`, and the directory of `/usr/local/bin/ont-<pin>` holds the host's installed engine, another revision. When none of the three holds, as in a stage whose Lead did not do the step (its build has no credential and fails), `./check` ends with exit 3 and the one line `engine_missing@ci/engine-pin.sh: <file> is not the engine of the pin, nor is ont on PATH, and the build of the pin failed (<install.log>); see deploy/README.md, "The engine of a pin"`; the network error stays in `install.log`. On a CI runner the engine is the one `rust.yml` puts on PATH.
+
+The order in delivery: with `engine` in the request, a merged move of the pin is installed as `/usr/local/bin/ont` by a call that ends there, and the `ap` and `content/` of that tip are installed only by the next call (`specs/ap/deliver.md` R42, R43); without `engine` delivery stops `engine_differs` (R24) and installs neither. So delivery installs the engine of a pin before the `ap` that pins it, and `/usr/local/bin/ont-<pin>` serves the stages before the merge. Old `ont-<pin>` files are not removed by any of this.
+
 ## The configuration files
 
 With the member `etc` (`specs/ap/deliver.md` R53 to R57) the host's configuration files follow the accepted tip of `main` of the operations repository `park-kyungchan/agent-vps-operations`; today that is `/etc/agent-platform/policy.json`, the policy of models and accounts that `ap run` enforces. A change of the policy is a merged unit of that repository, and the next run of the timer installs it. In each call that ends `current` or `installed` and is no rollback, after every other step and before the checkouts, delivery:

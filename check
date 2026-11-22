@@ -40,6 +40,12 @@ if [ "${CI:-}" != true ] && [ -z "${CHECK_LOCKED:-}" ]; then
   fi
 fi
 
+# The engine of ontology/ENGINE-PIN for the rehearsal and every step after it, chosen by ci/engine-pin.sh before
+# the Rust build so that a missing engine refuses first (deploy/README.md, "The engine of a pin").
+pin=$(tr -d '[:space:]' < ontology/ENGINE-PIN)
+[[ "$pin" =~ ^[0-9a-f]{40}$ ]] || { echo "engine_pin_invalid@ontology/ENGINE-PIN" >&2; exit 2; }
+ont_bin=$(bash ci/engine-pin.sh "$pin")
+
 bash scripts/test-install-ap.sh
 cargo fmt --all -- --check
 CARGO_BUILD_WARNINGS=deny cargo clippy --workspace --all-targets --locked
@@ -55,17 +61,7 @@ bash ci/host-run-scope.sh "${CARGO_TARGET_DIR:-$PWD/target}/debug/ap"
 
 # The schema against a real engine: ontology/work.schema.json is installed into a
 # disposable store of the engine revision in ontology/ENGINE-PIN, and every action
-# answer `ap` parses is asserted. The engine is the installed `ont` when it is that
-# revision; otherwise it is built from the pin.
-pin=$(tr -d '[:space:]' < ontology/ENGINE-PIN)
-[[ "$pin" =~ ^[0-9a-f]{40}$ ]] || { echo "engine_pin_invalid@ontology/ENGINE-PIN" >&2; exit 2; }
-ont_bin=$(command -v ont || true)
-if [ -z "$ont_bin" ] || [ "$("$ont_bin" --version 2>/dev/null)" != "ont 0.1.0 $pin" ]; then
-  root=${CARGO_TARGET_DIR:-$PWD/target}/engine-pin
-  cargo install --locked --git https://github.com/park-kyungchan/ontology-platform --rev "$pin" \
-    --root "$root" --target-dir "$root/build" ont
-  ont_bin=$root/bin/ont
-fi
+# answer `ap` parses is asserted. The engine is the one chosen before the build (ci/engine-pin.sh).
 # The engine admits only uid 0, so in CI the rehearsal runs through sudo. The index sources of the schema name
 # the host's work directory; the rehearsal reads fixture files of the repository (ontology/fixtures/work) that it
 # copies under its own temporary root, and makes nothing under /home/palantirkc/work.
