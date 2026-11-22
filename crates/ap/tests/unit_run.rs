@@ -1615,7 +1615,9 @@ fn r4_the_accounts_of_each_stage_by_the_policy_order() {
     let mut f = F::new();
     f.steps(&["implement", "repair", "fix", "accept"]);
     assert_eq!(f.ok().0["state"], "merged");
-    let dir = |n: usize| f.launch(n).0.split('|').next().unwrap().to_owned();
+    // The account of a stage's home of the launch (`specs/ap/run-limits.md` R14).
+    let account = |field: &str| field.split("/homes/").next().unwrap().to_owned();
+    let dir = |n: usize| account(f.launch(n).0.split('|').next().unwrap());
     // `claude/implementer` before `claude`; the fixer has the implementer's accounts and resumes on
     // the record's; `claude/reviewer` for the verifier.
     assert_eq!(
@@ -1628,7 +1630,7 @@ fn r4_the_accounts_of_each_stage_by_the_policy_order() {
     f.policy(json!({"accounts": {"claude/opus": [f.p("a3")], "claude/fixer": [f.p("a3")]}}));
     f.steps(&["implement", "accept"]);
     assert_eq!(f.ok().0["state"], "merged");
-    assert_eq!(f.launch(1).0.split('|').next().unwrap(), f.p("a3"));
+    assert_eq!(account(f.launch(1).0.split('|').next().unwrap()), f.p("a3"));
 }
 
 // spec: specs/ap/unit-run.md#R5
@@ -4169,10 +4171,26 @@ impl F {
         words
     }
     /// The words of launch `i` (from 0) between those of `stage_words` and `--cap-drop`: the
-    /// hidden paths.
+    /// hidden paths, after the words of the home of the launch (`--tmpfs <a>` through the last
+    /// `--remount-ro <a>`, `specs/ap/run-limits.md` R5), which are left out.
     fn stage_hidden(&self, i: usize, words: usize) -> Vec<String> {
         let wrap = &self.wraps[i];
-        wrap[words..wrap.len() - 5].to_vec()
+        let mut at = words;
+        let mut accounts = vec![];
+        while wrap[at] == "--tmpfs" && wrap[at + 2] != "--remount-ro" {
+            accounts.push(wrap[at + 1].clone());
+            at += 2;
+        }
+        let ro: Vec<String> = (accounts.iter())
+            .flat_map(|a| ["--remount-ro".to_owned(), a.clone()])
+            .collect();
+        if !ro.is_empty() {
+            let end = (at..wrap.len())
+                .find(|&j| wrap[j..].starts_with(&ro))
+                .unwrap();
+            at = end + ro.len();
+        }
+        wrap[at..wrap.len() - 5].to_vec()
     }
 }
 /// The mode bits of a path.

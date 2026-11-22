@@ -70,6 +70,11 @@ struct Fake {
     at_pause: Option<AtPause>,
     /// The home of the passwd entry (`home()`): `<t>/home`, or none.
     home: Option<PathBuf>,
+    /// Every call of `env … claude auth status` (`specs/ap/run-limits.md` R15), with its bound: the
+    /// fake answers it itself and never starts the installed CLI.
+    auth: Vec<(Vec<String>, u64)>,
+    /// The sign-in such a call writes over the account's, by a rename (as the CLI saves one).
+    renew: Option<String>,
 }
 /// What one call of the fake `ont` does, in place of the engine's answer.
 #[derive(Clone)]
@@ -260,7 +265,15 @@ impl Fake {
             pauses: vec![],
             at_pause: None,
             home,
+            auth: vec![],
+            renew: None,
         }
+    }
+    /// How far the fake's clocks (`now` and `wall`) stand ahead of the real ones: the seconds the
+    /// file `<t>/clock` holds, which a test or a fake CLI writes, else none.
+    fn shift(&self) -> std::time::Duration {
+        let text = std::fs::read_to_string(self.t.join("clock")).unwrap_or_default();
+        std::time::Duration::from_secs(text.trim().parse().unwrap_or(0))
     }
     fn p(&self, rel: &str) -> String {
         self.t.join(rel).to_str().unwrap().to_owned()
@@ -326,6 +339,25 @@ fn kill_group(pgid: u32) {
 }
 impl System for Fake {
     fn call(&mut self, program: &str, args: &[String], input: &Value, ms: u64) -> Answer {
+        // The sign-in's renewal (`specs/ap/run-limits.md` R15): answered here, never by the CLI.
+        if program == "env" && args.ends_with(&["claude".into(), "auth".into(), "status".into()]) {
+            self.auth.push((args.to_vec(), ms));
+            self.events.push("auth".into());
+            if let Some(text) = self.renew.clone() {
+                let account = args
+                    .iter()
+                    .find_map(|a| a.strip_prefix("CLAUDE_CONFIG_DIR="));
+                let file = Path::new(account.unwrap()).join(".credentials.json");
+                let tmp = file.with_extension("tmp");
+                std::fs::write(&tmp, text).unwrap();
+                std::fs::rename(&tmp, &file).unwrap();
+            }
+            return Ok(Reply {
+                success: false,
+                bytes: b"not read\n".to_vec(),
+                stdout: b"not read\n".to_vec(),
+            });
+        }
         if program == "env" {
             self.git_calls.push(args.to_vec());
             if args.iter().any(|a| a == "rev-parse")
@@ -464,6 +496,12 @@ impl System for Fake {
     }
     fn units(&self) -> bool {
         self.units
+    }
+    fn now(&self) -> Instant {
+        Instant::now() + self.shift()
+    }
+    fn wall(&self) -> std::time::SystemTime {
+        std::time::SystemTime::now() + self.shift()
     }
     fn policy_file(&self) -> Option<PathBuf> {
         self.policy.clone()
@@ -7496,6 +7534,16 @@ fn run_object_r13_a_request_without_the_members_never_reaches_the_store() {
 // ---- A reviewer stage with limits (specs/ap/run-limits.md) ------------------------------------
 
 const FAKE_LIMITS: &str = include_str!("fixtures/run_limits/fake-claude.sh");
+/// In front of `fixtures/run_limits/fake-claude.sh` (`claude-limits`): the account of the home it is
+/// given as its `CLAUDE_CONFIG_DIR`, the home as `STAGE_HOME`.
+const LIMITS_WRAPPER: &str = "#!/usr/bin/env bash\nexport STAGE_HOME=$CLAUDE_CONFIG_DIR\ncase $CLAUDE_CONFIG_DIR in */homes/*) export CLAUDE_CONFIG_DIR=${CLAUDE_CONFIG_DIR%/homes/*} ;; esac\nexec \"$(dirname \"$0\")/claude-limits\" \"$@\"\n";
+/// The home of launch `n` (from 0) of a record: `<account>/homes/<session>` of its entry of
+/// `attempts` (`specs/ap/run-limits.md` R14).
+fn home_of(rec: &Value, n: usize) -> String {
+    let entry = &rec["attempts"][n];
+    let (account, session) = (entry["account"].as_str(), entry["session"].as_str());
+    format!("{}/homes/{}", account.unwrap(), session.unwrap())
+}
 impl Fake {
     /// A reviewer request on `out` whose `limits` name the scratch directory `<t>/scratch`.
     fn limited(&self, out: &str) -> Value {
@@ -7512,14 +7560,35 @@ impl Fake {
         r["limits"] = json!({"scratch": self.p("scratch")});
         r
     }
-    /// The fake of `fixtures/run_limits` in place of the CLI.
+    /// The fake of `fixtures/run_limits` in place of the CLI, behind a wrapper that passes it the
+    /// account of the home it is given (`specs/ap/run-limits.md` R14) and exports that home as
+    /// `STAGE_HOME` (to the file `then` too).
     fn limits_fake(&self) {
-        std::fs::write(self.t.join("bin/claude"), FAKE_LIMITS).unwrap();
+        std::fs::write(self.t.join("bin/claude-limits"), FAKE_LIMITS).unwrap();
+        std::fs::write(self.t.join("bin/claude"), LIMITS_WRAPPER).unwrap();
+        for name in ["claude", "claude-limits"] {
+            let mode = std::fs::Permissions::from_mode(0o755);
+            std::fs::set_permissions(self.t.join("bin").join(name), mode).unwrap();
+        }
         forks::settled();
     }
-    /// What a launch on `account` runs between `systemd-run … --` and the CLI.
-    fn bwrap(&self, account: &str) -> Vec<String> {
-        let (home, scratch, cwd) = (self.p(account), self.p("scratch"), self.p("cwd"));
+    /// What a launch of the stage `out` (its first launch, from 0: `n`) on `account` runs between
+    /// `systemd-run … --` and the CLI, the request's accounts `accounts` (R5, R14).
+    fn bwrap(&self, accounts: &[&str], out: &str, n: usize) -> Vec<String> {
+        let rec = self.record(out);
+        let account = rec["attempts"][n]["account"].as_str().unwrap().to_owned();
+        let home = home_of(&rec, n);
+        let all: Vec<String> = accounts.iter().map(|a| self.p(a)).collect();
+        let cwd = self.p("cwd");
+        let base = self.bwrap_base(&account);
+        let home_words = self.home_words(&all, &account, &home);
+        (base.into_iter().chain(home_words).chain(self.hiding()))
+            .chain(["--cap-drop", "ALL", "--chdir", &cwd, "--"].map(str::to_owned))
+            .collect()
+    }
+    /// The words of the base up to the bind of the scratch directory, for a launch on `account`.
+    fn bwrap_base(&self, account: &str) -> Vec<String> {
+        let scratch = self.p("scratch");
         [
             BWRAP,
             "--unshare-pid",
@@ -7534,17 +7603,44 @@ impl Fake {
             "/proc/sys",
             "/proc/sys",
             "--bind",
-            &home,
-            &home,
+            account,
+            account,
             "--bind",
             &scratch,
             &scratch,
         ]
         .map(str::to_owned)
-        .into_iter()
-        .chain(self.hiding())
-        .chain(["--cap-drop", "ALL", "--chdir", &cwd, "--"].map(str::to_owned))
-        .collect()
+        .to_vec()
+    }
+    /// The words of the home of a launch on `account` in `home`, the request's accounts `accounts`
+    /// (absolute): each account hidden, the home bound, the derived sign-in when the account has
+    /// one now and its `CLAUDE.md` when that is a regular file now, each account read-only (R5).
+    fn home_words(&self, accounts: &[String], account: &str, home: &str) -> Vec<String> {
+        let mut once: Vec<&String> = vec![];
+        for a in accounts {
+            if !once.contains(&a) {
+                once.push(a);
+            }
+        }
+        let mut words = vec![];
+        for a in &once {
+            words.extend(["--tmpfs".to_owned(), (*a).clone()]);
+        }
+        words.extend(["--bind", home, home].map(str::to_owned));
+        if Path::new(account).join(".credentials.json").exists() {
+            let derived = format!("{home}.sign-in");
+            let at = format!("{home}/.credentials.json");
+            words.extend(["--ro-bind".to_owned(), derived, at]);
+        }
+        let md = Path::new(account).join("CLAUDE.md");
+        if std::fs::metadata(&md).is_ok_and(|m| m.is_file()) {
+            let at = format!("{home}/CLAUDE.md");
+            words.extend(["--ro-bind".to_owned(), md.display().to_string(), at]);
+        }
+        for a in &once {
+            words.extend(["--remount-ro".to_owned(), (*a).clone()]);
+        }
+        words
     }
     /// The hidden list as it exists now (`specs/ap/run-limits.md` R10): each path with whether it
     /// is a directory. Under the fake's home and work root what `Fake::new` made; the host's own
@@ -7877,7 +7973,8 @@ fn limits_r5_bwrap_comes_after_the_unit_and_binds_the_account_of_each_launch() {
     assert_eq!(v["state"], "ok", "{v}");
     for (n, account) in [(0, "a1"), (1, "a2")] {
         let after = f.after_unit(n);
-        let want = f.bwrap(account);
+        let want = f.bwrap(&["a1", "a2"], "x.md", n);
+        assert_eq!(after[12..15], ["--bind", &f.p(account), &f.p(account)]);
         assert_eq!(after[..want.len()], want[..], "{after:?}");
         assert_eq!(after[want.len()], "claude");
         assert_eq!(after.iter().filter(|a| *a == BWRAP).count(), 1);
@@ -7892,7 +7989,9 @@ fn limits_r5_bwrap_comes_after_the_unit_and_binds_the_account_of_each_launch() {
         (&v["state"], &v["account"]),
         (&json!("ok"), &json!(f.p("a2")))
     );
-    assert_eq!(f.after_unit(2)[..f.bwrap("a2").len()], f.bwrap("a2")[..]);
+    let want = f.bwrap(&["a1", "a2"], "y.md", 0);
+    assert_eq!(f.after_unit(2)[12..15], ["--bind", &f.p("a2"), &f.p("a2")]);
+    assert_eq!(f.after_unit(2)[..want.len()], want[..]);
 }
 
 // spec: specs/ap/run-limits.md#R6
@@ -7922,9 +8021,10 @@ fn limits_r6_tmpdir_and_cargo_target_dir_name_the_scratch_directory() {
     for name in ["TMPDIR", "CARGO_TARGET_DIR"] {
         assert_eq!(given.iter().filter(|(k, _)| k == name).count(), 1, "{name}");
     }
+    // The home of the launch (R14), in place of the account.
     assert_eq!(
         lines("CLAUDE_CONFIG_DIR"),
-        [format!("CLAUDE_CONFIG_DIR={}", f.p("a1"))]
+        [format!("CLAUDE_CONFIG_DIR={}", v["home"].as_str().unwrap())]
     );
 }
 
@@ -7937,7 +8037,8 @@ fn limits_r7_the_record_names_the_limits_before_the_launch_and_at_the_end() {
     let (v, _) = f.run(&f.limited("w.md")).unwrap();
     let s = f.p("scratch");
     let hidden: Vec<String> = f.hidden().into_iter().map(|(p, _)| p).collect();
-    let want = json!({"scratch": s, "writable": [f.p("a1"), s], "bwrap": BWRAP, "hidden": hidden});
+    let home = home_of(&v, 0);
+    let want = json!({"scratch": s, "writable": [home, s], "bwrap": BWRAP, "hidden": hidden});
     assert_eq!((&v["state"], &v["limits"]), (&json!("ok"), &want), "{v}");
     assert_eq!(f.record("w.md"), v);
     // What a call killed during its stage leaves: the record names the scratch directory.
@@ -7947,12 +8048,12 @@ fn limits_r7_the_record_names_the_limits_before_the_launch_and_at_the_end() {
         (&seen["state"], &seen["limits"]),
         (&json!("running"), &want)
     );
-    // The member is the only key a request without `limits` does not have.
+    // The member and the home (R14) are the only keys a request without `limits` does not have.
     f.clear("a1");
     let (plain, _) = f.run(&f.request("p.md")).unwrap();
     let keys = |v: &Value| v.as_object().unwrap().keys().cloned().collect::<Vec<_>>();
     let mut with = keys(&plain);
-    with.push("limits".into());
+    with.extend(["home".into(), "limits".into()]);
     with.sort();
     assert_eq!(keys(&v), with);
 }
@@ -8430,7 +8531,7 @@ fn limits_r10_the_hidden_paths_come_after_the_binds_each_by_its_kind() {
     let (v, _) = f.run(&f.limited("x.md")).unwrap();
     assert_eq!(v["state"], "ok", "{v}");
     let after = f.after_unit(0);
-    let want = f.bwrap("a1");
+    let want = f.bwrap(&["a1"], "x.md", 0);
     assert_eq!(after[..want.len()], want[..], "{after:?}");
     let at = |w: &[String]| after.windows(w.len()).position(|x| x == w);
     let words = |w: &[&str]| w.iter().map(|x| (*x).to_owned()).collect::<Vec<_>>();
@@ -8865,7 +8966,7 @@ fn limits_r5_the_named_paths_follow_the_scratch_in_their_order_and_the_record_na
     let (v, _) = f.run(&r).unwrap();
     assert_eq!(v["state"], "ok", "{v}");
     let after = f.after_unit(0);
-    let base = f.bwrap("a1");
+    let base = f.bwrap(&["a1"], "x.md", 0);
     let named: Vec<String> = [
         "--bind",
         &f.p("w2"),
@@ -8888,8 +8989,8 @@ fn limits_r5_the_named_paths_follow_the_scratch_in_their_order_and_the_record_na
     ]
     .map(str::to_owned)
     .to_vec();
-    // The base's words to the scratch directory, then the named paths, then the hidden ones but
-    // `~/.config/gh`, which `show` names.
+    // The base's words to the scratch directory, then the named paths, then the words of the home
+    // (R14) and the hidden ones but `~/.config/gh`, which `show` names.
     let scratch_end = base.iter().position(|w| w == "--cap-drop").unwrap();
     let hiding: Vec<String> = base[18..scratch_end].to_vec();
     let mut want = base[..18].to_vec();
@@ -8903,7 +9004,7 @@ fn limits_r5_the_named_paths_follow_the_scratch_in_their_order_and_the_record_na
     // The record: what the stage writes, the members as given, the hidden list but the one shown.
     let hidden: Vec<String> = f.hidden().into_iter().map(|(p, _)| p).collect();
     let s = f.p("scratch");
-    let want = json!({"scratch": s, "writable": [f.p("a1"), s, f.p("w2"), f.p("w1"), f.p("dst"), f.p("src")],
+    let want = json!({"scratch": s, "writable": [home_of(&v, 0), s, f.p("w2"), f.p("w1"), f.p("dst"), f.p("src")],
         "bwrap": BWRAP, "hidden": hidden, "over": r["limits"]["over"], "read_only": r["limits"]["read_only"],
         "show": ["~/.config/gh"]});
     assert_eq!(v["limits"], want, "{v}");
@@ -8921,13 +9022,645 @@ fn limits_r5_the_named_paths_follow_the_scratch_in_their_order_and_the_record_na
         after[18..21],
         ["--bind", &f.p("w1"), &f.p("w1")].map(str::to_owned)
     );
-    assert!(!after[21..].iter().any(|w| w == "--bind"), "{after:?}");
+    // Then the words of the home (R14), whose one `--bind` is the home's.
+    let home = home_of(&v, 0);
+    let words = f.home_words(&[f.p("a1")], &f.p("a1"), &home);
+    assert_eq!(after[21..21 + words.len()], words[..], "{after:?}");
+    assert!(
+        !after[21 + words.len()..].iter().any(|w| w == "--bind"),
+        "{after:?}"
+    );
     assert_eq!(v["limits"]["hidden"][0], json!(gh), "{v}");
     assert_eq!(
         v["limits"]["writable"],
-        json!([f.p("a1"), f.p("scratch"), f.p("w1")])
+        json!([home, f.p("scratch"), f.p("w1")])
     );
     for k in ["over", "read_only", "show", "write"] {
         assert!(v["limits"].get(k).is_none(), "{k}: {v}");
     }
+}
+
+// ---- The home and the sign-in of a stage with limits (specs/ap/run-limits.md R14, R15) ----------
+
+/// The milliseconds of the real wall clock (the fake's `wall` without a shift).
+fn wall_ms() -> u64 {
+    let since = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH);
+    since.unwrap().as_millis() as u64
+}
+/// An invented sign-in: the access token `invented-access-<tag>`, the refresh token
+/// `invented-refresh-<tag>`, its end `expires` (milliseconds since the epoch) and members beside.
+fn sign_in(tag: &str, expires: Value) -> String {
+    json!({"claudeAiOauth": {"accessToken": format!("invented-access-{tag}"),
+        "refreshToken": format!("invented-refresh-{tag}"), "expiresAt": expires,
+        "refreshTokenExpiresAt": 1_900_000_000_000_u64, "scopes": ["user:inference", "user:profile"],
+        "subscriptionType": "invented"}, "organizationUuid": "invented-org"})
+    .to_string()
+}
+/// A day from now, in milliseconds since the epoch.
+fn a_day_ahead() -> Value {
+    json!(wall_ms() + 86_400_000)
+}
+impl Fake {
+    /// Writes the sign-in of `account` (a directory of `t`).
+    fn signed_in(&self, account: &str, text: &str) {
+        std::fs::write(self.t.join(account).join(".credentials.json"), text).unwrap();
+    }
+    /// The names under `<account>/homes`, sorted.
+    fn homes(&self, account: &str) -> Vec<String> {
+        let dir = self.t.join(account).join("homes");
+        let mut names: Vec<String> = std::fs::read_dir(dir)
+            .into_iter()
+            .flatten()
+            .map(|e| e.unwrap().file_name().into_string().unwrap())
+            .collect();
+        names.sort();
+        names
+    }
+    /// The value of a variable in the environment file `env.<n>` of the fake CLI.
+    fn variable(&self, n: usize, name: &str) -> Option<String> {
+        let env = self.text(&format!("bin/env.{n}"));
+        let prefix = format!("{name}=");
+        env.lines()
+            .find_map(|l| l.strip_prefix(&prefix).map(str::to_owned))
+    }
+}
+/// Mode bits of a path.
+fn bits(p: &str) -> u32 {
+    std::fs::metadata(p).unwrap().permissions().mode() & 0o777
+}
+
+// spec: specs/ap/run-limits.md#R14
+#[test]
+fn limits_r14_a_new_session_runs_in_its_home_below_the_account_with_mode_0700() {
+    let mut f = Fake::new();
+    std::fs::write(f.t.join("bin/watch"), f.p("w.md.run.json")).unwrap();
+    f.mode("a1", "watch");
+    let (v, status) = f.run(&f.limited("w.md")).unwrap();
+    assert_eq!((status, &v["state"]), (0, &json!("ok")), "{v}");
+    let session = v["session"].as_str().unwrap();
+    let home = format!("{}/homes/{session}", f.p("a1"));
+    assert_eq!(v["home"], json!(home), "{v}");
+    assert_eq!(home_of(&v, 0), home);
+    assert_eq!((bits(&home), bits(&f.p("a1/homes"))), (0o700, 0o700));
+    assert_eq!(f.homes("a1"), [session]);
+    // The record names the home before the launch, and the CLI runs there.
+    let seen: Value =
+        serde_json::from_slice(&std::fs::read(f.t.join("bin/seen.json")).unwrap()).unwrap();
+    assert_eq!(
+        (&seen["state"], &seen["home"]),
+        (&json!("running"), &json!(home))
+    );
+    assert_eq!(f.variable(1, "CLAUDE_CONFIG_DIR"), Some(home.clone()));
+    assert_eq!(f.calls()[0].split('|').next(), Some(home.as_str()));
+    assert_eq!(v["limits"]["writable"][0], json!(home));
+    assert_eq!(f.record("w.md"), v);
+    // A launch on a next account has its home below that account.
+    f.mode("a1", "limit1");
+    let mut r = f.limited("n.md");
+    r["next_accounts"] = json!([f.p("a2")]);
+    let (v, _) = f.run(&r).unwrap();
+    assert_eq!(
+        (&v["state"], &v["account"]),
+        (&json!("ok"), &json!(f.p("a2")))
+    );
+    let (first, second) = (home_of(&v, 0), home_of(&v, 1));
+    assert!(
+        first.starts_with(&format!("{}/homes/", f.p("a1"))),
+        "{first}"
+    );
+    assert!(
+        second.starts_with(&format!("{}/homes/", f.p("a2"))),
+        "{second}"
+    );
+    assert_eq!(
+        (v["home"].as_str(), f.homes("a1").len()),
+        (Some(second.as_str()), 2)
+    );
+    assert_eq!(f.variable(2, "CLAUDE_CONFIG_DIR"), Some(first));
+    assert_eq!(f.variable(3, "CLAUDE_CONFIG_DIR"), Some(second.clone()));
+    assert_eq!(v["limits"]["writable"][0], json!(second));
+    assert!(Path::new(&second).is_dir());
+}
+
+// spec: specs/ap/run-limits.md#R14
+#[test]
+fn limits_r14_a_resume_and_an_ask_run_in_the_home_of_the_session_they_continue() {
+    let mut f = Fake::new();
+    let (v, _) = f.run(&f.limited("x.md")).unwrap();
+    assert_eq!(v["state"], "ok", "{v}");
+    let home = v["home"].as_str().unwrap().to_owned();
+    let (v, _) = f.run(&f.resume(f.limited("y.md"), "y.md", "x.md")).unwrap();
+    assert_eq!(v["state"], "ok", "{v}");
+    assert_eq!(
+        (v["home"].as_str(), f.homes("a1").len()),
+        (Some(home.as_str()), 1)
+    );
+    assert_eq!(f.variable(2, "CLAUDE_CONFIG_DIR"), Some(home.clone()));
+    assert!(f.after_unit(1).contains(&"--resume".to_owned()));
+    // An ask continues the session of the launch it asks, in its home.
+    let mut r = f.limited("a.md");
+    r["expect"] = json!({"first_line": "Report:*"});
+    let (v, _) = f.run(&r).unwrap();
+    assert_eq!(v["attempts"].as_array().unwrap().len(), 2, "{v}");
+    assert_eq!(v["attempts"][1]["asked"], true, "{v}");
+    let asked = home_of(&v, 0);
+    assert_eq!(home_of(&v, 1), asked);
+    assert_eq!(v["home"], json!(asked));
+    assert_eq!(f.variable(3, "CLAUDE_CONFIG_DIR"), Some(asked.clone()));
+    assert_eq!(f.variable(4, "CLAUDE_CONFIG_DIR"), Some(asked));
+    assert_eq!(f.homes("a1").len(), 2);
+}
+
+// spec: specs/ap/run-limits.md#R14
+// spec: specs/ap/run-limits.md#R9
+#[test]
+fn limits_r14_a_resume_whose_session_has_no_home_is_refused_before_any_effect() {
+    use std::os::unix::fs::symlink;
+    let mut f = Fake::new();
+    // A session that ran without `limits` has no home: its resume with them is refused.
+    let (v, _) = f.run(&f.request("p.md")).unwrap();
+    assert_eq!(v["state"], "ok", "{v}");
+    assert!(v.get("home").is_none() && !Path::new(&f.p("a1/homes")).exists());
+    // Refused before any effect: nothing launched, no file of `y.md`, no scratch directory.
+    let refused = |f: &mut Fake, earlier: &str, limits: bool| {
+        let r = match limits {
+            true => f.limited("y.md"),
+            false => f.request("y.md"),
+        };
+        let r = f.resume(r, "y.md", earlier);
+        let launches = f.launches.len();
+        assert_eq!(
+            code(f.run(&r)),
+            "invalid_input@resume",
+            "{earlier} {limits}"
+        );
+        assert_eq!(f.launches.len(), launches);
+        assert!(!Path::new(&f.p("scratch")).exists());
+        for suffix in ["", ".run.json", ".stream.jsonl", ".err"] {
+            assert!(!Path::new(&f.p(&format!("y.md{suffix}"))).exists());
+        }
+    };
+    refused(&mut f, "p.md", true);
+    assert!(!Path::new(&f.p("a1/homes")).exists());
+    // A home that is a link, a file, `homes` itself or outside `homes`.
+    let (v, _) = f.run(&f.limited("x.md")).unwrap();
+    let (home, session) = (v["home"].as_str().unwrap().to_owned(), v["session"].clone());
+    std::fs::rename(&home, f.p("moved")).unwrap();
+    symlink(f.p("moved"), &home).unwrap();
+    refused(&mut f, "x.md", true);
+    std::fs::remove_file(&home).unwrap();
+    std::fs::write(&home, "").unwrap();
+    refused(&mut f, "x.md", true);
+    std::fs::remove_file(&home).unwrap();
+    refused(&mut f, "x.md", true);
+    std::fs::rename(f.p("moved"), &home).unwrap();
+    for named in [".", "..", "../cwd"] {
+        f.tamper("x.md", |rec| rec["session"] = json!(named));
+        refused(&mut f, "x.md", true);
+    }
+    // A request without `limits` that resumes a record with a home.
+    f.tamper("x.md", |rec| rec["session"] = session.clone());
+    refused(&mut f, "x.md", false);
+    // With its home in place the resume runs.
+    let (v, _) = f.run(&f.resume(f.limited("y.md"), "y.md", "x.md")).unwrap();
+    assert_eq!(
+        (&v["state"], &v["home"]),
+        (&json!("ok"), &json!(home)),
+        "{v}"
+    );
+}
+
+// spec: specs/ap/run-limits.md#R14
+// spec: specs/ap/run-limits.md#R9
+#[test]
+fn limits_r14_a_request_without_limits_makes_no_home_and_reads_no_sign_in() {
+    let mut f = Fake::new();
+    // A sign-in at its end would be renewed under `limits`; without them nothing reads it.
+    let text = sign_in("p", json!(wall_ms() + 100_000));
+    f.signed_in("a1", &text);
+    let (v, _) = f.run(&f.request("p.md")).unwrap();
+    assert_eq!(v["state"], "ok", "{v}");
+    assert!(v.get("home").is_none() && v.get("limits").is_none());
+    assert!(!Path::new(&f.p("a1/homes")).exists());
+    assert!(f.auth.is_empty());
+    assert_eq!(f.variable(1, "CLAUDE_CONFIG_DIR"), Some(f.p("a1")));
+    assert_eq!(f.text("a1/.credentials.json"), text);
+}
+
+// spec: specs/ap/run-limits.md#R14
+#[test]
+fn limits_r14_a_home_that_cannot_be_made_launches_nothing() {
+    let mut f = Fake::new();
+    std::fs::write(f.t.join("a1/homes"), "").unwrap();
+    let (v, status) = f.run(&f.limited("x.md")).unwrap();
+    assert_eq!(
+        (status, &v["state"], &v["unmet"]),
+        (3, &json!("failed"), &json!("launch")),
+        "{v}"
+    );
+    assert!(f.launches.is_empty() && f.calls().is_empty());
+    assert!(v["home"].as_str().unwrap().starts_with(&f.p("a1/homes/")));
+    assert!(!Path::new(&f.p("scratch")).exists());
+}
+
+// spec: specs/ap/run-limits.md#R15
+#[test]
+fn limits_r15_the_stage_reads_a_derived_sign_in_without_the_refresh_token() {
+    let mut f = Fake::new();
+    f.limits_fake();
+    let text = sign_in("a", a_day_ahead());
+    f.signed_in("a1", &text);
+    // While the stage runs: the derived file, its mode and its bytes.
+    let then = format!(
+        "cp \"$STAGE_HOME.sign-in\" {0}/seen.sign-in\nstat -c '%a' \"$STAGE_HOME.sign-in\" > {0}/seen.mode\n",
+        f.p("bin")
+    );
+    std::fs::write(f.t.join("bin/then"), then).unwrap();
+    let (v, status) = f.run(&f.limited("x.md")).unwrap();
+    assert_eq!((status, &v["state"]), (0, &json!("ok")), "{v}");
+    let home = v["home"].as_str().unwrap().to_owned();
+    let derived = std::fs::read(f.t.join("bin/seen.sign-in")).unwrap();
+    assert_eq!(f.text("bin/seen.mode").trim(), "600");
+    assert_eq!(derived.len() % 4096, 0);
+    let body = String::from_utf8(derived.clone()).unwrap();
+    let trimmed = body.trim_end_matches(' ');
+    assert!(trimmed.len() > 4000 || derived.len() == 4096);
+    let read: Value = serde_json::from_str(trimmed).unwrap();
+    let mut want: Value = serde_json::from_str(&text).unwrap();
+    let oauth = want["claudeAiOauth"].as_object_mut().unwrap();
+    oauth.remove("refreshToken");
+    oauth.remove("refreshTokenExpiresAt");
+    assert_eq!(read, want);
+    assert!(!body.contains("invented-refresh"));
+    // The bind, and nothing left after the end; the account's sign-in as it was, never renewed.
+    let words = f.after_unit(0);
+    let bind = [
+        "--ro-bind".to_owned(),
+        format!("{home}.sign-in"),
+        format!("{home}/.credentials.json"),
+    ];
+    assert!(words.windows(3).any(|w| w == bind), "{words:?}");
+    assert!(!Path::new(&format!("{home}.sign-in")).exists());
+    assert_eq!(f.text("a1/.credentials.json"), text);
+    assert!(f.auth.is_empty());
+    // No byte of a token in the record, the stream, the error file, the answer or the call's answer.
+    let mut seen = vec![v.to_string()];
+    for rel in ["x.md", "x.md.run.json", "x.md.stream.jsonl", "x.md.err"] {
+        if let Ok(b) = std::fs::read(f.t.join(rel)) {
+            seen.push(String::from_utf8_lossy(&b).into_owned());
+        }
+    }
+    for s in seen {
+        assert!(
+            !s.contains("invented-access") && !s.contains("invented-refresh"),
+            "{s}"
+        );
+    }
+}
+
+// spec: specs/ap/run-limits.md#R15
+#[test]
+fn limits_r15_a_sign_in_of_another_form_launches_nothing_and_leaves_no_derived_file() {
+    let mut f = Fake::new();
+    let big = format!("{}{}", sign_in("b", a_day_ahead()), " ".repeat(65_536));
+    let cases = [
+        ("not json", "invented-access-x".to_owned()),
+        ("a list", json!([sign_in("l", a_day_ahead())]).to_string()),
+        (
+            "no oauth",
+            json!({"accessToken": "invented-access-y"}).to_string(),
+        ),
+        (
+            "oauth a text",
+            json!({"claudeAiOauth": "invented-access-z"}).to_string(),
+        ),
+        (
+            "no accessToken",
+            json!({"claudeAiOauth": {"refreshToken": "invented-refresh-n"}}).to_string(),
+        ),
+        (
+            "empty accessToken",
+            json!({"claudeAiOauth": {"accessToken": ""}}).to_string(),
+        ),
+        (
+            "accessToken a number",
+            json!({"claudeAiOauth": {"accessToken": 7}}).to_string(),
+        ),
+        ("over 65,536 bytes", big),
+    ];
+    for (n, (name, text)) in cases.into_iter().enumerate() {
+        f.signed_in("a1", &text);
+        let out = format!("m{n}.md");
+        let (v, status) = f.run(&f.limited(&out)).unwrap();
+        assert_eq!(
+            (status, &v["state"], &v["unmet"]),
+            (3, &json!("failed"), &json!("launch")),
+            "{name}: {v}"
+        );
+        assert!(f.launches.is_empty(), "{name}");
+        assert!(!v.to_string().contains("invented-"), "{name}");
+        let left = f.homes("a1");
+        assert!(
+            !left.iter().any(|h| h.ends_with(".sign-in")),
+            "{name}: {left:?}"
+        );
+        assert_eq!(f.text("a1/.credentials.json"), text, "{name}");
+    }
+    // A sign-in that cannot be read.
+    std::fs::remove_file(f.t.join("a1/.credentials.json")).unwrap();
+    std::fs::create_dir(f.t.join("a1/.credentials.json")).unwrap();
+    let (v, _) = f.run(&f.limited("d.md")).unwrap();
+    assert_eq!(
+        (&v["state"], &v["unmet"]),
+        (&json!("failed"), &json!("launch"))
+    );
+    assert!(f.launches.is_empty() && f.auth.is_empty());
+}
+
+// spec: specs/ap/run-limits.md#R15
+#[test]
+fn limits_r15_an_account_without_a_sign_in_is_launched_without_the_bind() {
+    let mut f = Fake::new();
+    let (v, _) = f.run(&f.limited("x.md")).unwrap();
+    assert_eq!(v["state"], "ok", "{v}");
+    let words = f.after_unit(0);
+    assert!(
+        !words
+            .iter()
+            .any(|w| w.ends_with(".sign-in") || w.ends_with("/.credentials.json"))
+    );
+    assert!(f.auth.is_empty() && f.homes("a1").len() == 1);
+}
+
+// spec: specs/ap/run-limits.md#R15
+#[test]
+fn limits_r15_claude_auth_status_runs_outside_the_limits_when_the_end_is_near() {
+    let mut f = Fake::new();
+    let account = f.p("a1");
+    let words: Vec<String> = [
+        "-i",
+        &format!("PATH={}", std::env::var("PATH").unwrap_or_default()),
+        "HOME=/root",
+        "LANG=C.UTF-8",
+        &format!("CLAUDE_CONFIG_DIR={account}"),
+        "claude",
+        "auth",
+        "status",
+    ]
+    .map(str::to_owned)
+    .to_vec();
+    // 100 seconds left, and an end that is past: one call each, with the caller's variables of
+    // R13 and not the request's `env`, bound to 30 seconds, before the launch.
+    for (n, left) in [100_000_i64, -1_000].into_iter().enumerate() {
+        f.signed_in("a1", &sign_in("near", json!(wall_ms() as i64 + left)));
+        let mut r = f.limited(&format!("n{n}.md"));
+        r["env"] = json!({"X_Y": "1"});
+        f.events.clear();
+        let (v, _) = f.run(&r).unwrap();
+        assert_eq!(v["state"], "ok", "{v}");
+        assert_eq!(f.auth.len(), n + 1);
+        assert_eq!(f.auth[n], (words.clone(), 30_000));
+        assert_eq!(f.events, ["probe", "auth", "launch"]);
+    }
+    // Ten minutes left, an end that is no number, or no sign-in: no call.
+    for (n, expires) in [json!(wall_ms() + 600_000), json!("soon")]
+        .into_iter()
+        .enumerate()
+    {
+        f.signed_in("a1", &sign_in("far", expires));
+        let (v, _) = f.run(&f.limited(&format!("f{n}.md"))).unwrap();
+        assert_eq!(v["state"], "ok", "{v}");
+    }
+    assert_eq!(f.auth.len(), 2);
+    // A sign-in the call replaced is the one derived.
+    f.limits_fake();
+    let then = format!("cp \"$STAGE_HOME.sign-in\" {}/seen.sign-in\n", f.p("bin"));
+    std::fs::write(f.t.join("bin/then"), then).unwrap();
+    f.signed_in("a1", &sign_in("old", json!(wall_ms() + 100_000)));
+    f.renew = Some(sign_in("new", a_day_ahead()));
+    let (v, _) = f.run(&f.limited("r.md")).unwrap();
+    assert_eq!((v["state"].as_str(), f.auth.len()), (Some("ok"), 3), "{v}");
+    let seen = f.text("bin/seen.sign-in");
+    assert!(seen.contains("invented-access-new") && !seen.contains("invented-access-old"));
+    assert!(!seen.contains("invented-refresh"));
+}
+
+// spec: specs/ap/run-limits.md#R15
+#[test]
+fn limits_r15_a_sign_in_renewed_while_the_stage_runs_reaches_its_file_in_place() {
+    let mut f = Fake::new();
+    f.limits_fake();
+    let ends = wall_ms() + 100_000;
+    f.signed_in("a1", &sign_in("first", json!(ends)));
+    // The stage notes its file's inode, then the account's sign-in is replaced by a rename and
+    // the clock moves 31 seconds (a reading is due, a call is not: one ran at 0), then again at 62
+    // seconds (a call is due). Each time the stage waits until its file holds the new token.
+    let (bin, account, clock) = (f.p("bin"), f.p("a1"), f.p("clock"));
+    let step = |tag: &str, at: u64| {
+        format!(
+            "printf '%s' '{text}' > {account}/next && mv {account}/next {account}/.credentials.json\n\
+             echo {at} > {clock}\n\
+             for _ in $(seq 200); do grep -q invented-access-{tag} \"$STAGE_HOME.sign-in\" && break; sleep 0.1; done\n\
+             stat -c '%i %s' \"$STAGE_HOME.sign-in\" >> {bin}/seen.inode\n\
+             cp \"$STAGE_HOME.sign-in\" {bin}/seen.{tag}\n",
+            text = sign_in(tag, json!(ends))
+        )
+    };
+    let then = format!(
+        "stat -c '%i %s' \"$STAGE_HOME.sign-in\" > {bin}/seen.inode\n{}{}",
+        step("second", 31),
+        step("third", 62)
+    );
+    std::fs::write(f.t.join("bin/then"), then).unwrap();
+    let (v, _) = f.run(&f.limited("x.md")).unwrap();
+    assert_eq!(v["state"], "ok", "{v}");
+    let inodes: Vec<String> = f
+        .text("bin/seen.inode")
+        .lines()
+        .map(str::to_owned)
+        .collect();
+    assert_eq!(inodes.len(), 3, "{inodes:?}");
+    assert!(inodes.iter().all(|i| *i == inodes[0]), "{inodes:?}");
+    for tag in ["second", "third"] {
+        let seen = f.text(&format!("bin/seen.{tag}"));
+        assert!(
+            seen.contains(&format!("invented-access-{tag}")),
+            "{tag}: {seen}"
+        );
+        assert!(!seen.contains("invented-refresh"), "{tag}");
+    }
+    // A call before the launch and one at 62 seconds, none at 31: at most one in 60 seconds.
+    assert_eq!(f.auth.len(), 2, "{:?}", f.auth);
+    assert!(!Path::new(&format!("{}.sign-in", v["home"].as_str().unwrap())).exists());
+}
+
+// spec: specs/ap/run-limits.md#R15
+#[test]
+fn limits_r15_a_link_or_a_directory_in_the_home_launches_nothing() {
+    use std::os::unix::fs::symlink;
+    let mut f = Fake::new();
+    let (v, _) = f.run(&f.limited("x.md")).unwrap();
+    assert_eq!(v["state"], "ok", "{v}");
+    let home = v["home"].as_str().unwrap().to_owned();
+    std::fs::write(f.t.join("existing"), "kept\n").unwrap();
+    let launches = f.launches.len();
+    let mut n = 0;
+    for name in [".credentials.json", "CLAUDE.md"] {
+        let at = format!("{home}/{name}");
+        for kind in ["missing", "oldroot", "existing", "directory"] {
+            n += 1;
+            let missing = f.p(&format!("missing-{n}"));
+            match kind {
+                "missing" => symlink(&missing, &at).unwrap(),
+                "oldroot" => symlink(format!("/oldroot{missing}"), &at).unwrap(),
+                "existing" => symlink(f.p("existing"), &at).unwrap(),
+                _ => std::fs::create_dir(&at).unwrap(),
+            }
+            let out = format!("r{n}.md");
+            let (v, status) = f.run(&f.resume(f.limited(&out), &out, "x.md")).unwrap();
+            assert_eq!(
+                (status, &v["state"], &v["unmet"]),
+                (3, &json!("failed"), &json!("launch")),
+                "{name} {kind}: {v}"
+            );
+            assert_eq!(f.launches.len(), launches, "{name} {kind}");
+            assert!(!Path::new(&missing).exists(), "{name} {kind}");
+            assert!(!Path::new(&format!("/oldroot{missing}")).exists());
+            assert_eq!(f.text("existing"), "kept\n");
+            match kind {
+                "directory" => std::fs::remove_dir(&at).unwrap(),
+                _ => std::fs::remove_file(&at).unwrap(),
+            }
+        }
+    }
+    // A regular file at each name is covered by the binds: the launch is made.
+    for name in [".credentials.json", "CLAUDE.md"] {
+        std::fs::write(format!("{home}/{name}"), "").unwrap();
+    }
+    let (v, _) = f
+        .run(&f.resume(f.limited("ok.md"), "ok.md", "x.md"))
+        .unwrap();
+    assert_eq!(v["state"], "ok", "{v}");
+}
+
+// spec: specs/ap/run-limits.md#R5
+// spec: specs/ap/run-limits.md#R14
+// spec: specs/ap/run-limits.md#R15
+#[test]
+fn limits_r5_the_words_of_the_home_stand_between_the_named_paths_and_the_hidden_ones() {
+    let mut f = Fake::new();
+    // One account, without a sign-in and a `CLAUDE.md`.
+    let (v, _) = f.run(&f.limited("x.md")).unwrap();
+    assert_eq!(v["state"], "ok", "{v}");
+    let (a1, a2, home) = (f.p("a1"), f.p("a2"), home_of(&v, 0));
+    let after = f.after_unit(0);
+    let base = f.bwrap_base(&a1);
+    assert_eq!(after[..18], base[..], "{after:?}");
+    let words = ["--tmpfs", &a1, "--bind", &home, &home, "--remount-ro", &a1].map(str::to_owned);
+    assert_eq!(after[18..25], words, "{after:?}");
+    let want = f.bwrap(&["a1"], "x.md", 0);
+    assert_eq!(after[..want.len()], want[..], "{after:?}");
+    // Two accounts (the request's `next_accounts` repeats both), each with a sign-in and a
+    // `CLAUDE.md`, the second a link to a regular file; the first launch is cut.
+    f.signed_in("a1", &sign_in("one", a_day_ahead()));
+    f.signed_in("a2", &sign_in("two", a_day_ahead()));
+    std::fs::write(f.t.join("a1/CLAUDE.md"), "one\n").unwrap();
+    std::fs::write(f.t.join("md"), "two\n").unwrap();
+    std::os::unix::fs::symlink(f.p("md"), f.p("a2/CLAUDE.md")).unwrap();
+    f.mode("a1", "limit1");
+    let mut r = f.limited("y.md");
+    r["next_accounts"] = json!([a2, a1, a2]);
+    let (v, _) = f.run(&r).unwrap();
+    assert_eq!(
+        (&v["state"], &v["account"]),
+        (&json!("ok"), &json!(a2)),
+        "{v}"
+    );
+    for (n, account) in [(0, &a1), (1, &a2)] {
+        let home = home_of(&v, n);
+        let after = f.after_unit(n + 1);
+        assert_eq!(after[..18], f.bwrap_base(account)[..], "{after:?}");
+        let words: Vec<String> = [
+            "--tmpfs",
+            &a1,
+            "--tmpfs",
+            &a2,
+            "--bind",
+            &home,
+            &home,
+            "--ro-bind",
+            &format!("{home}.sign-in"),
+            &format!("{home}/.credentials.json"),
+            "--ro-bind",
+            &format!("{account}/CLAUDE.md"),
+            &format!("{home}/CLAUDE.md"),
+            "--remount-ro",
+            &a1,
+            "--remount-ro",
+            &a2,
+        ]
+        .map(str::to_owned)
+        .to_vec();
+        assert_eq!(after[18..18 + words.len()], words[..], "{after:?}");
+        let hiding = f.hiding();
+        assert_eq!(after[35..35 + hiding.len()], hiding[..], "{after:?}");
+        assert_eq!(after[35 + hiding.len()], "--cap-drop");
+    }
+    // A `CLAUDE.md` that is no regular file is not bound.
+    std::fs::remove_file(f.t.join("a1/CLAUDE.md")).unwrap();
+    std::fs::create_dir(f.t.join("a1/CLAUDE.md")).unwrap();
+    f.clear("a1");
+    let (v, _) = f.run(&f.limited("z.md")).unwrap();
+    assert_eq!(v["state"], "ok", "{v}");
+    let after = f.after_unit(3);
+    assert!(!after.iter().any(|w| w.ends_with("CLAUDE.md")), "{after:?}");
+    assert!(after.iter().any(|w| w.ends_with(".sign-in")), "{after:?}");
+}
+
+// spec: specs/ap/run-limits.md#R1
+#[test]
+fn limits_r1_a_path_equal_to_or_inside_an_account_is_refused() {
+    let mut f = Fake::new();
+    for d in ["a1/cwd", "a1/w", "a2/src", "a1/keep"] {
+        std::fs::create_dir_all(f.t.join(d)).unwrap();
+    }
+    f.named();
+    let root = f.t.clone();
+    let p = move |rel: &str| root.join(rel).to_str().unwrap().to_owned();
+    type Change<'a> = Box<dyn Fn(&mut Value) + 'a>;
+    let set = |r: &mut Value, k: &str, v: Value| r["limits"][k] = v;
+    let cases: Vec<(&str, Change)> = vec![
+        (
+            "cwd in the account",
+            Box::new(|r| r["cwd"] = json!(p("a1/cwd"))),
+        ),
+        (
+            "write in the account",
+            Box::new(|r| set(r, "write", json!([p("a1/w")]))),
+        ),
+        (
+            "write is the account",
+            Box::new(|r| set(r, "write", json!([p("a1")]))),
+        ),
+        (
+            "over source in a next account",
+            Box::new(|r| set(r, "over", json!([[p("a2/src"), p("dst")]]))),
+        ),
+        (
+            "over target is a next account",
+            Box::new(|r| set(r, "over", json!([[p("src"), p("a2")]]))),
+        ),
+        (
+            "read_only in the account",
+            Box::new(|r| set(r, "read_only", json!([p("a1//keep")]))),
+        ),
+    ];
+    for (name, change) in cases {
+        let mut r = f.named_request("x.md", "implementer");
+        r["next_accounts"] = json!([p("a2")]);
+        change(&mut r);
+        assert_eq!(code(f.run(&r)), "invalid_input@limits", "{name}");
+    }
+    assert!(f.probes.is_empty() && f.launches.is_empty());
+    f.untouched("x.md");
 }

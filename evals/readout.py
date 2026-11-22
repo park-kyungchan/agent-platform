@@ -3,7 +3,7 @@
 
 Reads records that already exist and nothing else; stores nothing, writes no file, calls no store (with --detail the
 one read of the store is `ap status <key>` per merged pull request of a head branch `unit/<key>`, and it only reads).
-  Claude session records   <account>/projects/**/*.jsonl   keys: type, sessionId, cwd, gitBranch, timestamp,
+  Claude session records   <account>/projects/**/*.jsonl and <account>/homes/*/projects/**/*.jsonl (a stage's home)   keys: type, sessionId, cwd, gitBranch, timestamp,
                            message.id, message.model, message.usage (top-level members and cache_creation),
                            the name of a tool_use block
   Stage records            <work>/*/**/*.run.json and, per --stage-dir, <dir>/*.run.json and <dir>/*/*.run.json
@@ -92,6 +92,18 @@ def jsonl(path, lines):
                 yield o
             else:
                 lines["unreadable"] += 1
+
+
+def projects_dirs(accounts):
+    """The directories of Claude session records, for each account in the order given: <account>/projects when it is
+    a directory, then <account>/homes/<name>/projects of each home of a stage with limits that has one, by <name>."""
+    found = []
+    for account in accounts:
+        found += [Path(account) / "projects"] if (Path(account) / "projects").is_dir() else []
+        homes = Path(account) / "homes"
+        names = sorted(h.name for h in homes.iterdir()) if homes.is_dir() else []
+        found += [homes / n / "projects" for n in names if (homes / n / "projects").is_dir()]
+    return found
 
 
 def read_claude(projects_dirs, since_epoch):
@@ -504,7 +516,7 @@ def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("--since", required=True)
     ap.add_argument("--until", required=True)
-    ap.add_argument("--accounts", nargs="*", help="Claude configuration directories (default: ~/.claude*)")
+    ap.add_argument("--accounts", nargs="*", help="Claude configuration directories, read at <account>/projects/**/*.jsonl and <account>/homes/*/projects/**/*.jsonl (default: ~/.claude*)")
     ap.add_argument("--codex-dir", default=str(Path.home() / ".codex" / "sessions"))
     ap.add_argument("--work-root", default="/home/palantirkc/work")
     ap.add_argument("--platforms-root", default="/home/palantirkc/platforms")
@@ -526,7 +538,7 @@ def main(argv=None):
     a.stages, st_lines = read_stages(a.work_root, a.stage_dir)
     accounts = a.accounts if a.accounts is not None else [str(p.parent) for p in sorted(Path.home().glob(".claude*/projects"))]
     since_epoch = datetime.datetime.fromisoformat(a.since).replace(tzinfo=datetime.timezone.utc).timestamp()
-    c_msgs, branches, session_cwd, c_lines = read_claude([Path(x) / "projects" for x in accounts if (Path(x) / "projects").is_dir()], since_epoch)
+    c_msgs, branches, session_cwd, c_lines = read_claude(projects_dirs(accounts), since_epoch)
     x_msgs, x_lines = read_codex(a.codex_dir, since_epoch)
     totals, rows, leads, outside, session_usd, lesson_files, kinds = aggregate(c_msgs + x_msgs, a)
     prs = [(r, p) for r in (a.repo or REPOS) for p in run_gh(r, a.since, a.until) if a.since <= str(p.get("mergedAt"))[:10] <= a.until]

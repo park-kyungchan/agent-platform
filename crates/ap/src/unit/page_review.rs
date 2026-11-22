@@ -630,8 +630,9 @@ fn look_at(
     if let Some((record, ..)) = &resumed {
         req["resume"] = json!({"record": record});
     }
-    // A reviewer on the Claude CLI runs under `limits`: it writes only its account and its own
-    // scratch directory, and the working directory is read-only to it (R13).
+    // A reviewer on the Claude CLI runs under `limits`: it writes only its home of the launch
+    // (`specs/ap/run-limits.md` R14) and its own scratch directory, and the working directory is
+    // read-only to it (R13).
     if req.get("runtime").is_none_or(|r| r == "claude") {
         let scratch = look.scratch(&review).to_string_lossy().into_owned();
         req["limits"] = json!({ "scratch": scratch });
