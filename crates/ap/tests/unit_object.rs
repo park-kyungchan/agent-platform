@@ -195,6 +195,8 @@ struct F {
     lose_read_back: bool,
     /// After the next `get` of this unit, another caller changes it (its revision moves).
     bump_after_get: Option<&'static str>,
+    /// Whether the page of a search of `clause` is qualified.
+    clauses_qualified: bool,
 }
 impl F {
     fn new() -> Self {
@@ -220,6 +222,7 @@ impl F {
             scratch_seen: vec![],
             lose_read_back: false,
             bump_after_get: None,
+            clauses_qualified: true,
         };
         // Invented objects: a confirmed intent with an accepted plan, and a current request of the user.
         f.put(
@@ -506,6 +509,27 @@ impl F {
         ok(json!({"objects": [{"id": id, "head": head,
             "observations": [{"revision": "r#0", "fields": {}}, {"revision": head, "fields": fields}]}]}))
     }
+    /// `search` of the objects of `clause`, filtered by `eq` as the engine does, one page.
+    fn search(&self, body: &Value) -> Answer {
+        assert_eq!(body["object_type"], "clause", "only clauses are searched");
+        let all = body["where"]["all"].as_array().unwrap();
+        let found = self.objects.iter().filter(|((t, _), o)| {
+            t == "clause"
+                && all
+                    .iter()
+                    .all(|c| o[c["eq"][0].as_str().unwrap()] == c["eq"][1])
+        });
+        let objects: Vec<Value> = found
+            .map(|((_, key), o)| {
+                let fields: Value = (o.as_object().unwrap().iter())
+                    .map(|(n, v)| (n.clone(), json!({"kind": "value", "value": v})))
+                    .collect();
+                json!({"id": oid("clause", key), "head": {"fields": fields}})
+            })
+            .collect();
+        ok(json!({"basis": {"qualified": self.clauses_qualified},
+            "objects": objects, "continuation": null}))
+    }
     fn render(&self, body: &Value) -> Answer {
         assert_eq!(body["view"], "reviews_of_unit");
         let unit = oid("unit", body["args"]["unit"].as_str().unwrap());
@@ -579,6 +603,7 @@ impl System for F {
                     }
                     "get" => self.get(input),
                     "render" => self.render(input),
+                    "search" => self.search(input),
                     other => panic!("ont {other}"),
                 }
             }
@@ -3841,5 +3866,465 @@ fn r45_the_clauses_after_the_section_for() {
     assert_eq!(
         text(&mut f, &["page", "page-fixture", "--digest"]),
         format!("{digest}\n")
+    );
+}
+
+/// A repository whose base holds the files the citations of a page name: a three-line file, a file
+/// without a final line feed, an empty one, a link, a directory and a clause's test.
+fn cited_repo() -> Repo {
+    let r = Repo::new(&[
+        ("AGENTS.md", "# Invented widgets\n"),
+        ("docs/notes.txt", "one\ntwo\nthree\n"),
+        ("docs/nolf.txt", "a\nb"),
+        ("docs/empty.txt", ""),
+        ("specs/w.md", "- R1: a widget is listed once.\n"),
+        ("crates/w/tests/list.rs", "// a test of the list\n"),
+        ("src/list/a.rs", "fn a() {}\n"),
+    ]);
+    std::os::unix::fs::symlink("notes.txt", r.origin.join("docs/link.txt")).unwrap();
+    r.commit(&[]);
+    r
+}
+/// A clause of the store, as `ap clause index` leaves it: its tests are `path:line` citations.
+fn clause(f: &mut F, repository: &str, path: &str, rule: &str, tests: &[&str]) {
+    let key = format!("{repository}:{path}#{rule}");
+    f.put(
+        "clause",
+        &key,
+        json!({"repository": repository, "path": path, "rule": rule, "line": 1, "tests": tests,
+            "tests_total": tests.len(), "text": "A sentence."}),
+    );
+}
+/// A unit of `invented/widgets` with the write set `src/list/**`, the members of `extra` over it.
+fn cited(f: &mut F, r: &Repo, key: &str, extra: Value) {
+    f.policy = Some(r.policy.clone());
+    let req = with(
+        added(key),
+        with(json!({"repository": "invented/widgets"}), extra),
+    );
+    yes(f, &["add"], req);
+}
+/// A page review that accepted the unit's page as it is, for a unit of class `contract`.
+fn accepted(f: &mut F, key: &str) {
+    let digest = page_digest(key, f.unit(key));
+    f.page_review(&format!("pr-{key}"), key, &digest, true, "accept");
+}
+/// The failures a refusal of R46 lists: code, field and entry of each.
+fn listed(e: &Refusal) -> Vec<(String, String, String)> {
+    let all = e.detail["failed"].as_array().unwrap();
+    let text = |v: &Value| v.as_str().unwrap().to_owned();
+    let item = |i: &Value| (text(&i["code"]), text(&i["field"]), text(&i["entry"]));
+    all.iter().map(item).collect()
+}
+fn gone(f: &F) -> (bool, bool, bool) {
+    let git = |w: &str| {
+        let first = |c: &(String, Vec<String>, Value)| c.0 == "git" && c.1[0] == w;
+        f.calls.iter().any(first)
+    };
+    let named = |w: &str| f.names().iter().any(|n| n == w);
+    (git("clone"), named("apply ready_unit"), named("sh -c"))
+}
+
+// spec: specs/ap/unit.md#R46
+#[test]
+fn r46_a_read_first_entry_names_a_path_of_the_base_and_its_range_lies_inside_the_file() {
+    let r = cited_repo();
+    let mut f = F::new();
+    let cases: [(&str, Option<(&str, &str)>); 24] = [
+        (
+            "docs/missing.txt",
+            Some(("read_first_missing", "read_first.0")),
+        ),
+        (
+            "docs/notes.txt:2-9 words",
+            Some(("read_first_range", "read_first.0")),
+        ),
+        ("docs/notes.txt:2-3 the middle and the end", None),
+        ("docs/notes.txt:3-3", None),
+        ("docs/notes.txt", None),
+        ("docs/nolf.txt:1-2", None),
+        (
+            "docs/nolf.txt:1-3",
+            Some(("read_first_range", "read_first.0")),
+        ),
+        (
+            "docs/empty.txt:1-1",
+            Some(("read_first_range", "read_first.0")),
+        ),
+        ("docs/empty.txt", None),
+        ("docs:1-2", Some(("read_first_range", "read_first.0"))),
+        ("docs/ what it is for", None),
+        ("docs", None),
+        ("docs/link.txt", None),
+        (
+            "docs/link.txt:1-1",
+            Some(("read_first_range", "read_first.0")),
+        ),
+        ("/etc/passwd", Some(("read_first_missing", "read_first.0"))),
+        (
+            "Read the notes first",
+            Some(("read_first_missing", "read_first.0")),
+        ),
+        (
+            "docs/notes.txt:5-3",
+            Some(("read_first_missing", "read_first.0")),
+        ),
+        (
+            "docs/notes.txt:0-3",
+            Some(("read_first_missing", "read_first.0")),
+        ),
+        (
+            "./docs/notes.txt",
+            Some(("read_first_missing", "read_first.0")),
+        ),
+        (
+            "docs/../docs/notes.txt",
+            Some(("read_first_missing", "read_first.0")),
+        ),
+        (
+            "docs//notes.txt",
+            Some(("read_first_missing", "read_first.0")),
+        ),
+        ("docs/*", Some(("read_first_missing", "read_first.0"))),
+        (":1-2", Some(("read_first_missing", "read_first.0"))),
+        (
+            "AGENTS.md:1-99999999999999999999999999 all of it",
+            Some(("read_first_range", "read_first.0")),
+        ),
+    ];
+    for (i, (entry, want)) in cases.iter().enumerate() {
+        let key = format!("rf-{i}");
+        cited(&mut f, &r, &key, json!({}));
+        // Stored as it is: an entry whose range is not of R12's form is a text of the store too.
+        f.edit("unit", &key, json!({"read_first": [entry]}));
+        match (ready(&mut f, &key), want) {
+            (Ok(_), None) => {}
+            (Err(e), Some((code, field))) => {
+                assert_eq!(
+                    (e.code.as_str(), e.field.as_str()),
+                    (*code, *field),
+                    "{entry}"
+                );
+                assert_eq!(e.after, None, "{entry}");
+                assert!(e.fields.is_none(), "{entry}");
+                assert_eq!(
+                    e.detail,
+                    json!({"failed": [{"code": code, "field": field, "entry": entry}], "count": 1}),
+                    "{entry}"
+                );
+            }
+            (got, want) => panic!("{entry}: {got:?} against {want:?}"),
+        }
+    }
+}
+
+// spec: specs/ap/unit.md#R46
+#[test]
+fn r46_a_named_clause_is_a_clause_of_the_store_unless_its_file_is_written() {
+    let r = cited_repo();
+    let mut f = F::new();
+    clause(
+        &mut f,
+        "invented/widgets",
+        "specs/w.md",
+        "R1",
+        &["crates/w/tests/list.rs:1"],
+    );
+    // Another repository's clause with the same key parts is no clause of this unit's.
+    clause(&mut f, "invented/other", "specs/o.md", "R1", &[]);
+    cited(
+        &mut f,
+        &r,
+        "cl-present",
+        json!({"specs": ["specs/w.md#R1", "specs/w.md"]}),
+    );
+    ready(&mut f, "cl-present").unwrap();
+    cited(&mut f, &r, "cl-absent", json!({"specs": ["specs/w.md#R2"]}));
+    let e = ready(&mut f, "cl-absent").unwrap_err();
+    assert_eq!(
+        (e.code.as_str(), e.field.as_str()),
+        ("clause_missing", "specs.0")
+    );
+    assert_eq!(
+        e.detail,
+        json!({"failed": [{"code": "clause_missing", "field": "specs.0", "entry": "specs/w.md#R2"}],
+            "count": 1})
+    );
+    // A clause of another repository is no clause of this one.
+    cited(&mut f, &r, "cl-other", json!({"specs": ["specs/o.md#R1"]}));
+    assert_eq!(
+        ready(&mut f, "cl-other").unwrap_err().code,
+        "clause_missing"
+    );
+    // An entry that is a file alone, or of another form, is not judged.
+    cited(
+        &mut f,
+        &r,
+        "cl-form",
+        json!({"specs": ["specs/none.md", "docs/notes.txt#R9"]}),
+    );
+    ready(&mut f, "cl-form").unwrap();
+    // The spec file lies in the write set: the clause may be a new one.
+    for (key, set) in [
+        ("cl-written", json!(["src/list/**", "specs/w.md"])),
+        ("cl-dir", json!(["specs/**"])),
+    ] {
+        let page = json!({"specs": ["specs/w.md#R9"], "write_set": set, "class": "contract"});
+        cited(&mut f, &r, key, page);
+        accepted(&mut f, key);
+        ready(&mut f, key).unwrap();
+    }
+}
+
+// spec: specs/ap/unit.md#R46
+#[test]
+fn r46_a_clause_whose_test_is_written_and_whose_file_is_not_is_named() {
+    let r = cited_repo();
+    let mut f = F::new();
+    clause(
+        &mut f,
+        "invented/widgets",
+        "specs/w.md",
+        "R1",
+        &[
+            "crates/w/tests/list.rs:1",
+            "src/list/t.rs:7",
+            "src/list/u.rs:2",
+        ],
+    );
+    let key = "invented/widgets:specs/w.md#R1";
+    cited(&mut f, &r, "cn-none", json!({}));
+    let e = ready(&mut f, "cn-none").unwrap_err();
+    assert_eq!(
+        (e.code.as_str(), e.field.as_str()),
+        ("clause_unnamed", "specs")
+    );
+    assert_eq!(
+        e.detail,
+        json!({"failed": [{"code": "clause_unnamed", "field": "specs", "entry": key,
+            "test": "src/list/t.rs:7"}], "count": 1})
+    );
+    assert_eq!(e.after, None);
+    assert!(e.fields.is_none());
+    // Named by the clause, and by its file alone; the one named another rule does not name it.
+    for (i, named) in [json!(["specs/w.md#R1"]), json!(["specs/w.md"])]
+        .into_iter()
+        .enumerate()
+    {
+        let unit = format!("cn-named-{i}");
+        cited(&mut f, &r, &unit, json!({"specs": named}));
+        ready(&mut f, &unit).unwrap();
+    }
+    clause(
+        &mut f,
+        "invented/widgets",
+        "specs/w.md",
+        "R2",
+        &["src/list/t.rs:9"],
+    );
+    cited(
+        &mut f,
+        &r,
+        "cn-other-rule",
+        json!({"specs": ["specs/w.md#R1"]}),
+    );
+    let e = ready(&mut f, "cn-other-rule").unwrap_err();
+    assert_eq!(
+        e.detail["failed"][0]["entry"],
+        "invented/widgets:specs/w.md#R2"
+    );
+    // A file in the write set: its clauses are the page's own. A test outside it: nothing to name.
+    let page = json!({"write_set": ["src/list/**", "specs/w.md"], "class": "contract"});
+    cited(&mut f, &r, "cn-file-written", page);
+    accepted(&mut f, "cn-file-written");
+    ready(&mut f, "cn-file-written").unwrap();
+    let mut g = F::new();
+    clause(
+        &mut g,
+        "invented/widgets",
+        "specs/w.md",
+        "R1",
+        &["crates/w/tests/list.rs:1"],
+    );
+    cited(&mut g, &r, "cn-test-outside", json!({}));
+    ready(&mut g, "cn-test-outside").unwrap();
+}
+
+// spec: specs/ap/unit.md#R46
+#[test]
+fn r46_one_refusal_lists_every_failure_in_order_with_its_count() {
+    let r = cited_repo();
+    let mut f = F::new();
+    clause(
+        &mut f,
+        "invented/widgets",
+        "specs/b.md",
+        "R2",
+        &["src/list/b.rs:2"],
+    );
+    clause(
+        &mut f,
+        "invented/widgets",
+        "specs/a.md",
+        "R3",
+        &["src/list/a.rs:1"],
+    );
+    cited(
+        &mut f,
+        &r,
+        "many",
+        json!({"read_first": ["docs/missing.txt", "AGENTS.md", "docs/notes.txt:1-9 why"],
+            "specs": ["specs/z.md#R7", "specs/x.md#R1"]}),
+    );
+    let e = ready(&mut f, "many").unwrap_err();
+    assert_eq!(
+        (e.code.as_str(), e.field.as_str()),
+        ("read_first_missing", "read_first.0")
+    );
+    let want = [
+        ("read_first_missing", "read_first.0", "docs/missing.txt"),
+        ("read_first_range", "read_first.2", "docs/notes.txt:1-9 why"),
+        ("clause_missing", "specs.0", "specs/z.md#R7"),
+        ("clause_missing", "specs.1", "specs/x.md#R1"),
+        ("clause_unnamed", "specs", "invented/widgets:specs/a.md#R3"),
+        ("clause_unnamed", "specs", "invented/widgets:specs/b.md#R2"),
+    ];
+    let want: Vec<(String, String, String)> = want
+        .iter()
+        .map(|(a, b, c)| (a.to_string(), b.to_string(), c.to_string()))
+        .collect();
+    assert_eq!(listed(&e), want);
+    assert_eq!(e.detail["count"], 6);
+    assert_eq!(e.detail["failed"][4]["test"], "src/list/a.rs:1");
+    assert_eq!(e.detail["failed"][5]["test"], "src/list/b.rs:2");
+    // At most fifty are listed, every one counted.
+    let rf: Vec<String> = (0..40).map(|i| format!("docs/none-{i}.txt")).collect();
+    let sp: Vec<String> = (0..20).map(|i| format!("specs/n.md#R{i}")).collect();
+    cited(&mut f, &r, "most", json!({"read_first": rf, "specs": sp}));
+    let e = ready(&mut f, "most").unwrap_err();
+    // The six of the page above are still failing: two unnamed clauses and no more.
+    assert_eq!(e.detail["count"], 62);
+    assert_eq!(listed(&e).len(), 50);
+    assert_eq!(listed(&e)[49].1, "specs.9");
+}
+
+// spec: specs/ap/unit.md#R46
+#[test]
+fn r46_a_refused_call_made_no_copy_ran_no_check_and_applied_nothing() {
+    let r = cited_repo();
+    let mut f = F::new();
+    cited(
+        &mut f,
+        &r,
+        "after-fetch",
+        json!({"read_first": ["docs/missing.txt"]}),
+    );
+    let shown = r.shown();
+    f.calls.clear();
+    let e = ready(&mut f, "after-fetch").unwrap_err();
+    assert_eq!(
+        (e.code.as_str(), e.after.as_deref()),
+        ("read_first_missing", None)
+    );
+    assert_eq!(gone(&f), (false, false, false), "{:?}", f.names());
+    let git: Vec<&String> = (f.calls.iter())
+        .filter(|c| c.0 == "git")
+        .map(|c| &c.1[2])
+        .collect();
+    assert_eq!(git[0], "fetch", "{git:?}");
+    assert!(f.applies().is_empty(), "nothing applied");
+    assert_eq!(f.names().iter().filter(|n| *n == "search").count(), 1);
+    assert_eq!(f.unit("after-fetch")["state"], "draft");
+    // Nothing is added to the clone, and no checkout is read: the objects only.
+    assert_eq!(r.shown(), shown);
+    // A page whose citations hold is then made ready, with its one search.
+    f.calls.clear();
+    f.edit("unit", "after-fetch", json!({"read_first": ["AGENTS.md"]}));
+    ready(&mut f, "after-fetch").unwrap();
+    assert_eq!(f.names().iter().filter(|n| *n == "search").count(), 1);
+    assert_eq!(f.unit("after-fetch")["state"], "ready");
+}
+
+// spec: specs/ap/unit.md#R46
+#[test]
+fn r46_a_search_that_is_not_qualified_is_refused_and_a_store_refusal_is_passed_on() {
+    let r = cited_repo();
+    let mut f = F::new();
+    cited(&mut f, &r, "unq", json!({}));
+    f.clauses_qualified = false;
+    f.calls.clear();
+    let e = ready(&mut f, "unq").unwrap_err();
+    assert_eq!(
+        (e.code.as_str(), e.field.as_str(), e.after.as_deref()),
+        ("store_answer_unqualified", "clause", None)
+    );
+    assert_eq!(gone(&f), (false, false, false));
+    assert_eq!(f.unit("unq")["state"], "draft");
+}
+
+// spec: specs/ap/unit.md#R46
+#[test]
+fn r46_a_contract_page_without_an_accepted_review_is_refused_before_any_read() {
+    let r = cited_repo();
+    let mut f = F::new();
+    cited(
+        &mut f,
+        &r,
+        "rv",
+        json!({"class": "contract", "read_first": ["docs/missing.txt"], "specs": ["specs/w.md#R5"]}),
+    );
+    f.calls.clear();
+    let e = ready(&mut f, "rv").unwrap_err();
+    assert_eq!(e.code, "page_not_reviewed");
+    assert!(
+        f.names()
+            .iter()
+            .all(|n| n != "search" && !n.starts_with("git")),
+        "{:?}",
+        f.names()
+    );
+    // Reviewed, the same page is refused by R46.
+    accepted(&mut f, "rv");
+    let e = ready(&mut f, "rv").unwrap_err();
+    assert_eq!(e.code, "read_first_missing");
+}
+
+// spec: specs/ap/unit.md#R46
+#[test]
+fn r46_a_unit_without_a_repository_and_a_unit_not_draft_are_not_judged() {
+    let r = cited_repo();
+    let mut f = F::new();
+    plain_unit(&mut f, "bare", check("true", "invariant"));
+    yes(
+        &mut f,
+        &["amend"],
+        with(
+            writer("m-bare"),
+            json!({"unit": "bare", "read_first": ["/nowhere", "nothing"], "specs": ["specs/q.md#R1"]}),
+        ),
+    );
+    f.calls.clear();
+    ready(&mut f, "bare").unwrap();
+    assert!(
+        f.names()
+            .iter()
+            .all(|n| n != "search" && !n.starts_with("git")),
+        "{:?}",
+        f.names()
+    );
+    // A unit that is ready is not made ready again, and its page is not read.
+    cited(&mut f, &r, "once", json!({}));
+    ready(&mut f, "once").unwrap();
+    f.edit("unit", "once", json!({"read_first": ["docs/missing.txt"]}));
+    f.calls.clear();
+    let again = with(writer("r-once-again"), json!({"unit": "once"}));
+    let e = no(&mut f, &["ready"], again);
+    assert_eq!(e.code, "unit_not_draft");
+    assert!(
+        f.names()
+            .iter()
+            .all(|n| n != "search" && !n.starts_with("git")),
+        "{:?}",
+        f.names()
     );
 }

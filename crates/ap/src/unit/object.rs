@@ -3,10 +3,11 @@
 use super::drive::{protected, protected_tree};
 use super::render::{self, Role};
 use crate::host::{Failure, Host, LIMIT, System, error, fail, id, new_session_id};
-use crate::review::{Reading, WRITE_SET_FORMS, write_set_pattern};
+use crate::review::{Reading, WRITE_SET_FORMS, outside, write_set_pattern};
 use crate::store::{self, Actor, at, bad, shaped, sized};
 use serde_json::{Map, Value, json};
 use std::{
+    collections::{BTreeMap, BTreeSet},
     ffi::OsString,
     io::{Read, Seek, SeekFrom, Write},
     os::unix::fs::{DirBuilderExt, PermissionsExt},
@@ -410,6 +411,201 @@ pub(super) fn write_set_judged(u: &Value) -> Result<(), Failure> {
     write_set_form(&stored)?;
     plain_writes_protected(u["class"].as_str(), &stored)
 }
+/// The most failures R46's refusal lists.
+const CITATIONS_LISTED: usize = 50;
+/// One failed citation of R46: its code, its field, its entry and, for a clause no entry names, the
+/// first of its tests that lies in the write set.
+struct Cited {
+    code: &'static str,
+    field: String,
+    entry: String,
+    test: Option<String>,
+}
+/// An entry of the tree of the base: its mode and its object.
+struct Node {
+    mode: String,
+    object: String,
+}
+/// The file of the tree `base` at `path`, when the tree has an entry there, read from the objects of
+/// the clone only: no checkout is read and nothing is added (R46). A text that is no relative path of
+/// the tree names none.
+fn node(s: &mut impl System, clone: &str, base: &str, path: &str) -> Result<Option<Node>, Failure> {
+    if !path
+        .split('/')
+        .all(|c| !c.is_empty() && c != "." && c != "..")
+    {
+        return Ok(None);
+    }
+    let words = [
+        "-C",
+        clone,
+        "--literal-pathspecs",
+        "ls-tree",
+        "-z",
+        base,
+        "--",
+        path,
+    ];
+    let listed = git_bytes(s, &words, "ls-tree")?;
+    for line in listed.split(|b| *b == 0) {
+        let line = String::from_utf8_lossy(line);
+        let Some((head, name)) = line.split_once('\t') else {
+            continue;
+        };
+        let parts: Vec<&str> = head.split(' ').collect();
+        if let [mode, _, object] = parts[..]
+            && name == path
+        {
+            return Ok(Some(Node {
+                mode: mode.to_owned(),
+                object: object.to_owned(),
+            }));
+        }
+    }
+    Ok(None)
+}
+/// The lines of a blob of the clone: its bytes split at line feeds, a final line feed ending the last
+/// line, an empty blob having none.
+fn lines(s: &mut impl System, clone: &str, object: &str) -> Result<u64, Failure> {
+    let bytes = git_bytes(s, &["-C", clone, "cat-file", "blob", object], "cat-file")?;
+    let feeds = bytes.iter().filter(|b| **b == b'\n').count() as u64;
+    Ok(feeds + u64::from(bytes.last().is_some_and(|b| *b != b'\n')))
+}
+/// The path and the range of a `read_first` entry (R46 a): its first word, the text before its first
+/// space; when the word ends with `:<from>-<to>` that range's `to`, else the whole word is the path. One
+/// final `/` of the path is dropped.
+fn read_first_word(entry: &str) -> (&str, Option<u64>) {
+    let word = entry.split(' ').next().unwrap_or_default();
+    let digits = |t: &str| !t.is_empty() && t.bytes().all(|c| c.is_ascii_digit());
+    let ranged = word.rsplit_once(':').and_then(|(path, range)| {
+        let (from, to) = range.split_once('-')?;
+        if !digits(from) || !digits(to) {
+            return None;
+        }
+        // At least 1 and not past `to`, compared as numbers of any length.
+        let (from, to) = (from.trim_start_matches('0'), to.trim_start_matches('0'));
+        let ordered = !from.is_empty() && (from.len(), from) <= (to.len(), to);
+        ordered.then(|| (path, to.parse::<u64>().unwrap_or(u64::MAX)))
+    });
+    let (path, to) = match ranged {
+        Some((path, to)) => (path, Some(to)),
+        None => (word, None),
+    };
+    (path.strip_suffix('/').unwrap_or(path), to)
+}
+/// R46: the citations of a page on the base `base` of the clone: every `read_first` entry names a path of
+/// the base, and a range inside the file; every clause a `specs` entry names is a `clause` of the store,
+/// unless its file is in the write set; every clause of the store whose test is in the write set and whose
+/// file is not is named. All failures come in one refusal. A unit without a repository is not judged.
+pub(super) fn citations_judged(
+    s: &mut impl System,
+    store: Option<&str>,
+    u: &Value,
+    clone: &str,
+    base: &str,
+) -> Result<(), Failure> {
+    let Some(repository) = u["repository"].as_str().filter(|r| !r.is_empty()) else {
+        return Ok(());
+    };
+    let set: Vec<String> = patterns(u.get("write_set"))
+        .iter()
+        .map(|p| (*p).to_owned())
+        .collect();
+    let inside = |path: &str| outside(&set, &[path]).is_empty();
+    let filter = vec![json!({"eq": ["repository", repository]})];
+    let found = at(store::search(s, store, "clause", filter), "clause")?;
+    let clauses: BTreeMap<&str, &Value> = found.iter().map(|(k, f)| (k.as_str(), f)).collect();
+    let mut failed: Vec<Cited> = vec![];
+    let listed = |name: &str| -> Vec<(usize, &str)> {
+        let all = u.get(name).and_then(Value::as_array).into_iter().flatten();
+        all.enumerate()
+            .filter_map(|(i, e)| Some((i, e.as_str()?)))
+            .collect()
+    };
+    // (a) The first word of each `read_first` entry.
+    let mut seen: BTreeMap<String, Option<Node>> = BTreeMap::new();
+    let mut counted: BTreeMap<String, u64> = BTreeMap::new();
+    for (i, entry) in listed("read_first") {
+        let (path, to) = read_first_word(entry);
+        if !seen.contains_key(path) {
+            seen.insert(path.to_owned(), node(s, clone, base, path)?);
+        }
+        let code = match (&seen[path], to) {
+            (None, _) => Some("read_first_missing"),
+            (Some(_), None) => None,
+            (Some(n), Some(to)) => {
+                let file = n.mode == "100644" || n.mode == "100755";
+                if file && !counted.contains_key(&n.object) {
+                    counted.insert(n.object.clone(), lines(s, clone, &n.object)?);
+                }
+                (!file || counted[&n.object] < to).then_some("read_first_range")
+            }
+        };
+        if let Some(code) = code {
+            let field = format!("read_first.{i}");
+            failed.push(Cited {
+                code,
+                field,
+                entry: entry.to_owned(),
+                test: None,
+            });
+        }
+    }
+    // (b) The clauses the entries `<path>#R<n>` of `specs` name.
+    let specs = listed("specs");
+    for (i, entry) in &specs {
+        let Some((path, rule)) = entry.rsplit_once('#') else {
+            continue;
+        };
+        let numbered = (rule.strip_prefix('R'))
+            .is_some_and(|n| !n.is_empty() && n.bytes().all(|c| c.is_ascii_digit()));
+        let named = numbered && path.starts_with("specs/") && path.ends_with(".md");
+        let key = crate::clause::key(repository, path, rule);
+        if named && !inside(path) && !clauses.contains_key(key.as_str()) {
+            let field = format!("specs.{i}");
+            failed.push(Cited {
+                code: "clause_missing",
+                field,
+                entry: (*entry).to_owned(),
+                test: None,
+            });
+        }
+    }
+    // (c) The clauses whose test is written and whose file is not, each named by an entry.
+    let names: BTreeSet<&str> = specs.iter().map(|(_, e)| *e).collect();
+    for (key, fields) in &clauses {
+        let unreadable = || error("store_answer_unreadable", "clause");
+        let path = fields["path"].as_str().ok_or_else(unreadable)?;
+        let tests = fields["tests"].as_array().ok_or_else(unreadable)?;
+        let written = |t: &&str| t.rsplit_once(':').is_some_and(|(p, _)| inside(p));
+        let test = tests.iter().filter_map(Value::as_str).find(written);
+        let rule = key.rsplit_once('#').map_or("", |(_, r)| r);
+        let named = names.contains(path) || names.contains(format!("{path}#{rule}").as_str());
+        if let (false, false, Some(test)) = (inside(path), named, test) {
+            let entry = (*key).to_owned();
+            let field = "specs".to_owned();
+            failed.push(Cited {
+                code: "clause_unnamed",
+                field,
+                entry,
+                test: Some(test.to_owned()),
+            });
+        }
+    }
+    let Some(first) = failed.first() else {
+        return Ok(());
+    };
+    let item = |c: &Cited| {
+        let mut item = json!({"code": c.code, "field": c.field, "entry": c.entry});
+        if let Some(test) = &c.test {
+            item["test"] = json!(test);
+        }
+        item
+    };
+    let shown: Vec<Value> = failed.iter().take(CITATIONS_LISTED).map(item).collect();
+    let detail = json!({"failed": shown, "count": failed.len()});
+    Err(fail(first.code, &first.field, detail))
+}
 fn read_first_ok(e: &str) -> bool {
     let Some((path, range)) = e.rsplit_once(':') else {
         return true;
@@ -779,7 +975,7 @@ fn ready(
         {
             return Err(fail("page_not_reviewed", "unit", json!({"digest": digest})));
         }
-        (base, checks) = on_base(s, &u)?;
+        (base, checks) = on_base(s, store, &u)?;
     }
     let applied = at(
         store::ready_unit(s, store, actor, rid, p, &revision),
@@ -907,6 +1103,14 @@ fn git_step(s: &mut impl System, words: &[&str], step: &str) -> Result<String, F
     let reply = reply.ok_or_else(|| fail("git_failed", "clone", json!(step)))?;
     Ok(String::from_utf8_lossy(&reply.stdout).trim().to_owned())
 }
+/// The standard output of one Git step of the clone, as it is; a step that fails is `git_failed`.
+fn git_bytes(s: &mut impl System, words: &[&str], step: &str) -> Result<Vec<u8>, Failure> {
+    let a: Vec<String> = words.iter().map(|w| (*w).to_owned()).collect();
+    let reply = s.call("git", &a, &Value::Null, 60_000);
+    let reply = reply.ok().filter(|r| r.success);
+    let reply = reply.ok_or_else(|| fail("git_failed", "clone", json!(step)))?;
+    Ok(reply.stdout)
+}
 /// `git fetch origin main` in the clone within its bound (R23): the commit `origin/main` then names.
 pub(super) fn fetch(s: &mut impl System, clone: &str) -> Result<String, Failure> {
     let fetch = ["-C", clone, "fetch", "--quiet", "origin", "main"];
@@ -928,12 +1132,19 @@ pub(super) fn copy(s: &mut impl System, clone: &str, dir: &str, base: &str) -> R
     git_step(s, &checkout, "checkout").map(|_| ())
 }
 /// The acceptance checks of `u` on the base, in a throwaway copy (R23 to R27): the base and the checks.
-fn on_base(s: &mut impl System, u: &Value) -> Result<(Value, Vec<Value>), Failure> {
-    let clone = match u["repository"].as_str().filter(|r| !r.is_empty()) {
-        Some(repository) => Some(clone_of(s, repository)?),
-        None => None,
+fn on_base(
+    s: &mut impl System,
+    store: Option<&str>,
+    u: &Value,
+) -> Result<(Value, Vec<Value>), Failure> {
+    let Some(repository) = u["repository"].as_str().filter(|r| !r.is_empty()) else {
+        return checks_on_base(s, u, None, None);
     };
-    checks_on_base(s, u, clone.as_deref(), None)
+    // The fetch, then the citations on the base (R46), then the copy and the checks.
+    let clone = clone_of(s, repository)?;
+    let base = fetch(s, &clone)?;
+    citations_judged(s, store, u, &clone, &base)?;
+    checks_on_base(s, u, Some(&clone), Some(&base))
 }
 /// The criteria of the store's `ready_unit` on the page itself, in the store's order, judged from the
 /// unit as read (`ap unit review`, `specs/ap/unit-review.md` R23): the first that fails, with every
