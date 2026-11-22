@@ -9,7 +9,7 @@ script. The files are the wanted state; GitHub is compared with them and changed
 | --- | --- |
 | `ruleset-main.json` | The ruleset of the branch `main`: no deletion, no force-push, a pull request merged by merge commit only, and the required checks `rust` and `lead-review`. |
 | `ruleset-tags.json` | The ruleset of every tag: no deletion, no force-push. |
-| `repositories.json` | The list of the ruleset files every listed repository gets (`rulesets`) and one entry per repository (`repositories`): the merge buttons (`settings`), the Actions policy (`actions`), Dependabot alerts (`vulnerability_alerts`), Dependabot security pull requests (`automated_security_fixes`) and, for a public repository, secret scanning and its push protection. |
+| `repositories.json` | The list of the ruleset files every listed repository gets (`rulesets`) and one entry per repository (`repositories`): the merge buttons (`settings`), the Actions policy (`actions`), Dependabot alerts (`vulnerability_alerts`), Dependabot security pull requests (`automated_security_fixes`) and secret scanning and its push protection (`secret_scanning`, `secret_scanning_push_protection`). An entry holds `secret_scanning` and `secret_scanning_push_protection` only for a repository whose `repos/<r>` answer holds `security_and_analysis`. An entry may hold `repository` alone, which gets the rulesets and nothing else. |
 | `apply` | The script that compares and applies, through `gh api` with the caller's own login. |
 | `test_apply.py`, `fixtures/` | Its tests, against a fake `gh` (`fixtures/fake_gh.py`) that answers from invented repositories. No test reaches GitHub. |
 
@@ -19,8 +19,15 @@ these six members are equal as JSON values. A member an entry of `repositories.j
 managed: it is never compared and never written. A live ruleset that no file names is reported with
 `wanted` null and is never changed or deleted.
 
-The private repository's entry differs: its Actions policy stays `all` (a pattern of allowed actions
-applies only to public repositories, so it could not admit the cache action there) and it has no alerts
+`park-kyungchan/agent-platform` and `park-kyungchan/ontology-platform` are private: GitHub answers
+`security_and_analysis` null for them, so their entries hold neither `secret_scanning` nor
+`secret_scanning_push_protection`; they hold Actions policy `selected` with a pattern.
+
+The entry `park-kyungchan/agent-vps-operations` holds `repository` alone: it gets both rulesets and nothing
+else of it is compared or written. While the classic protection of its `main` is present, `--check`
+answers `refused` and an apply writes nothing.
+
+The entry `park-kyungchan/education-platform` differs: its Actions policy stays `all`, and it has no alerts
 and no Dependabot member, because those are decided by the owner of that repository.
 
 ## The two commands
@@ -61,6 +68,9 @@ exits 1 when one failed. Read `--check` again after an undo.
 Only the Lead applies, by hand, in a worktree at a merged commit of `main`, one repository at a time
 with `--repo`, after `--check` showed the expected differences. Workers and verifiers run `--check` only.
 No timer, workflow or `ap` verb applies these files.
+
+The classic protection of a refused repository is removed by the Lead by hand, immediately before the
+Lead's apply of that repository, and its `main` has no protection between those two calls.
 
 ## What an undo does not take back
 
