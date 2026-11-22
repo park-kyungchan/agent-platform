@@ -15,7 +15,10 @@ use std::{
     ffi::OsString,
     fs::File,
     io::Write,
-    os::unix::fs::{DirBuilderExt, OpenOptionsExt},
+    os::unix::{
+        ffi::OsStrExt,
+        fs::{DirBuilderExt, OpenOptionsExt},
+    },
     path::{Path, PathBuf},
     process::ExitCode,
     time::{Duration, UNIX_EPOCH},
@@ -134,6 +137,95 @@ fn failed<T>(code: &'static str, field: &str, detail: Value) -> Step<T> {
 fn refused(f: Failure) -> Halt {
     let detail = json!({"code": f.code, "field": f.field});
     Halt::Stop("stage_refused".into(), detail.to_string())
+}
+/// What the read of R40 found.
+#[derive(Debug, PartialEq)]
+enum Links {
+    Clear,
+    /// The symbolic links found, in the order of their raw bytes: every one, and the count.
+    Found(Vec<PathBuf>),
+    /// The first entry the walk could not read, or `<A>` for the bound.
+    Unreadable(PathBuf),
+}
+/// The most entries below `<A>` that R40 reads.
+const ENTRIES: usize = 10_000;
+/// Whether `e` says the entry is not there (R40).
+fn absent(e: &std::io::Error) -> bool {
+    e.kind() == std::io::ErrorKind::NotFound
+}
+/// The read of R40: the components of the branch's ref and reflog below `<G>/refs/heads` and
+/// `<G>/logs/refs/heads`, then `<A>` (when it exists) and every entry below it, each by `lstat`,
+/// no link followed or entered, no recursion, no program and no Git call.
+fn read_links(g: &str, admin: Option<&str>, branch: &str) -> Links {
+    let mut links: Vec<PathBuf> = vec![];
+    for root in [format!("{g}/refs/heads"), format!("{g}/logs/refs/heads")] {
+        let mut at = PathBuf::from(root);
+        for part in branch.split('/') {
+            at.push(part);
+            match at.symlink_metadata() {
+                Ok(m) if m.file_type().is_symlink() => {
+                    links.push(at.clone());
+                    break;
+                }
+                Ok(m) if m.is_dir() => {}
+                Ok(_) => break,
+                Err(e) if absent(&e) => break,
+                Err(_) => return Links::Unreadable(at),
+            }
+        }
+    }
+    if let Some(admin) = admin {
+        let mut todo = vec![PathBuf::from(admin)];
+        let mut seen = 0;
+        while let Some(dir) = todo.pop() {
+            let listing = match std::fs::read_dir(&dir) {
+                Ok(l) => l,
+                Err(e) if absent(&e) => continue,
+                Err(_) => return Links::Unreadable(dir),
+            };
+            for entry in listing {
+                let entry = match entry {
+                    Ok(e) => e,
+                    Err(e) if absent(&e) => continue,
+                    Err(_) => return Links::Unreadable(dir),
+                };
+                seen += 1;
+                if seen > ENTRIES {
+                    return Links::Unreadable(PathBuf::from(admin));
+                }
+                let path = entry.path();
+                match path.symlink_metadata() {
+                    Ok(m) if m.file_type().is_symlink() => links.push(path),
+                    Ok(m) if m.is_dir() => todo.push(path),
+                    Ok(_) => {}
+                    Err(e) if absent(&e) => {}
+                    Err(_) => return Links::Unreadable(path),
+                }
+            }
+        }
+    }
+    links.sort_by(|a, b| a.as_os_str().as_bytes().cmp(b.as_os_str().as_bytes()));
+    match links.is_empty() {
+        true => Links::Clear,
+        false => Links::Found(links),
+    }
+}
+/// A path as UTF-8, U+FFFD in place of a byte sequence that is not (R40).
+fn shown(p: &Path) -> String {
+    String::from_utf8_lossy(p.as_os_str().as_bytes()).into_owned()
+}
+/// The detail of `git_dir_link` (R40): the paths that keep the JSON within R22's bound, and the count.
+fn link_detail(links: &[PathBuf]) -> String {
+    let all: Vec<String> = links.iter().map(|p| shown(p)).collect();
+    let mut kept = all.len();
+    loop {
+        let paths = Value::from(all[..kept].to_vec());
+        let text = format!("{{\"paths\":{paths},\"count\":{}}}", all.len());
+        if text.len() <= DETAIL || kept == 0 {
+            return text;
+        }
+        kept -= 1;
+    }
 }
 /// The first `max` bytes of `t`, cut back to a character boundary.
 fn cut(t: &str, max: usize) -> String {
@@ -310,6 +402,8 @@ struct Tree {
     on_branch: bool,
     ahead: String,
     changed: usize,
+    /// `<G>` and `<A>` of this read, for the reads of R40 before the pass's merges.
+    dirs: (String, String),
 }
 impl Tree {
     fn shown(&self) -> String {
@@ -995,8 +1089,10 @@ impl Run {
             if !held {
                 return stop("branch_in_use", json!({"branch": branch}));
             }
+            self.no_links_to_come(s)?;
             self.git(s, clone, &["worktree", "add", "--quiet", wt, branch])
         } else {
+            self.no_links_to_come(s)?;
             self.git(
                 s,
                 clone,
@@ -1007,6 +1103,11 @@ impl Run {
             .map(|_| ())
             .or_else(|_| stop("worktree_failed", "git worktree add"))
     }
+    /// R40's read before `git worktree add`: `<G>` by one Git call, the two branch paths alone.
+    fn no_links_to_come(&self, s: &mut impl System) -> Step {
+        let g = self.common_dir(s)?;
+        self.no_links(&g, None)
+    }
     /// The worktree as read, after its guards (R8).
     fn tree(&self, s: &mut impl System) -> Step<Tree> {
         if !real_dir(&self.home) || !real_dir(Path::new(&self.wt)) {
@@ -1015,7 +1116,8 @@ impl Run {
         let Some(entry) = self.entry(s)? else {
             return stop("worktree_failed", "no worktree of the clone at this path");
         };
-        self.git_dirs(s)?;
+        let dirs = self.git_dirs(s)?;
+        self.no_links(&dirs.0, Some(&dirs.1))?;
         let on_branch = entry
             .lines()
             .any(|l| l == format!("branch refs/heads/{}", self.branch));
@@ -1043,14 +1145,30 @@ impl Run {
             on_branch,
             ahead,
             changed,
+            dirs,
         })
     }
 
+    /// `<G>`: what `git rev-parse --path-format=absolute --git-common-dir` prints in the clone (R8).
+    fn common_dir(&self, s: &mut impl System) -> Step<String> {
+        let words = ["rev-parse", "--path-format=absolute", "--git-common-dir"];
+        self.git(s, &self.clone, &words)
+    }
+    /// The read of R40 for the unit's branch: a stop `git_dir_link` or `worktree_failed`.
+    fn no_links(&self, g: &str, admin: Option<&str>) -> Step {
+        match read_links(g, admin, &self.branch) {
+            Links::Clear => Ok(()),
+            Links::Found(links) => stop("git_dir_link", link_detail(&links)),
+            Links::Unreadable(at) => stop(
+                "worktree_failed",
+                format!("git directory unreadable: {}", shown(&at)),
+            ),
+        }
+    }
     /// The clone's Git directory `<G>` and the worktree's administrative directory `<A>`, after the
     /// guard that the worktree names its own Git directory and nothing else (R8).
     fn git_dirs(&self, s: &mut impl System) -> Step<(String, String)> {
-        let words = ["rev-parse", "--path-format=absolute", "--git-common-dir"];
-        let g = self.git(s, &self.clone, &words)?;
+        let g = self.common_dir(s)?;
         // The one line of a regular file that is not a link.
         let line = |p: &Path| -> Option<String> {
             p.symlink_metadata()
@@ -1755,6 +1873,7 @@ impl Run {
                     )
                 };
                 if forward {
+                    self.no_links(&t.dirs.0, Some(&t.dirs.1))?;
                     self.git(s, &self.wt, &["merge", "--ff-only", "--quiet", &head])?;
                     self.done.moved = true;
                 } else {
@@ -1780,7 +1899,7 @@ impl Run {
                 continue;
             }
             if !self.contains_base(s, &head) {
-                self.update(s, number, &head, pending)?;
+                self.update(s, number, &head, pending, &t)?;
                 continue;
             }
             self.checks(s, &head)?;
@@ -1839,13 +1958,14 @@ impl Run {
         number: u64,
         head: &str,
         pending: Option<String>,
+        t: &Tree,
     ) -> Step {
         if self.done.updates >= UPDATES {
             return stop("update_limit", json!({"updates": self.done.updates}));
         }
         let merged = match pending {
             Some(m) => m,
-            None => self.merge_base(s)?,
+            None => self.merge_base(s, t)?,
         };
         let word = format!("{}:update", self.session);
         let writers = self.u["writers"].as_array();
@@ -1876,7 +1996,8 @@ impl Run {
         self.wait(s)
     }
     /// The base merged into the worktree's HEAD by the run's own author; a conflict is aborted (R26).
-    fn merge_base(&self, s: &mut impl System) -> Step<String> {
+    fn merge_base(&self, s: &mut impl System, t: &Tree) -> Step<String> {
+        self.no_links(&t.dirs.0, Some(&t.dirs.1))?;
         let message = self.merge_message();
         let mut words = MERGER.to_vec();
         words.extend(["git", "--no-replace-objects", "-C", &self.wt]);
@@ -2039,25 +2160,39 @@ impl Run {
         let dropped = self.u["state"] == "dropped";
         let mut c = json!({});
         let wt = Path::new(&self.wt);
-        let worktree = if wt.symlink_metadata().is_err() {
+        let worktree: Result<&str, String> = if wt.symlink_metadata().is_err() {
             Ok("nothing")
         } else if !real_dir(&self.home) || !real_dir(wt) {
-            Err("not a directory")
+            Err("not a directory".to_owned())
         } else {
             match self.entry(s) {
                 // A worktree that does not name its own Git directory is not removed (R8).
-                Ok(Some(_)) if self.git_dirs(s).is_err() => Err("git directory"),
-                Ok(Some(_)) => {
-                    let mut words = vec!["worktree", "remove"];
-                    words.extend(dropped.then_some("--force"));
-                    words.push(&self.wt);
-                    match self.git_ok(s, &self.clone, &words) {
-                        true => Ok("removed"),
-                        false => Err("git worktree remove refused: the worktree is not clean"),
-                    }
-                }
-                Ok(None) => Err("no worktree of the clone at this path"),
-                Err(_) => Err("git worktree list failed"),
+                Ok(Some(_)) => match self.git_dirs(s) {
+                    Err(_) => Err("git directory".to_owned()),
+                    // Nor is one whose Git directory holds a link or cannot be read (R40).
+                    Ok((g, admin)) => match read_links(&g, Some(&admin), &self.branch) {
+                        Links::Found(links) => {
+                            Err(format!("link in the git directory: {}", shown(&links[0])))
+                        }
+                        Links::Unreadable(at) => {
+                            Err(format!("git directory unreadable: {}", shown(&at)))
+                        }
+                        Links::Clear => {
+                            let mut words = vec!["worktree", "remove"];
+                            words.extend(dropped.then_some("--force"));
+                            words.push(&self.wt);
+                            match self.git_ok(s, &self.clone, &words) {
+                                true => Ok("removed"),
+                                false => {
+                                    Err("git worktree remove refused: the worktree is not clean"
+                                        .to_owned())
+                                }
+                            }
+                        }
+                    },
+                },
+                Ok(None) => Err("no worktree of the clone at this path".to_owned()),
+                Err(_) => Err("git worktree list failed".to_owned()),
             }
         };
         match worktree {

@@ -4720,3 +4720,273 @@ fn r7_the_scratch_directories_go_after_the_leftovers_and_r32_the_scratch_and_rem
     );
     assert!(std::fs::symlink_metadata(&scratch).unwrap().is_symlink());
 }
+
+// ---- A link a stage left in the worktree's Git directory or at the unit's ref (R40) ------------
+
+/// The file a test's link points at, outside the worktree and the Git directory: `name` under the
+/// test's directory, holding one line.
+fn target(f: &F, name: &str) -> PathBuf {
+    let path = f.t.join(format!("outside-{name}"));
+    std::fs::write(&path, format!("{name} kept\n")).unwrap();
+    path
+}
+/// `link` made a link to `to`, whatever stood there.
+fn link_to(link: &Path, to: &Path) {
+    std::fs::create_dir_all(link.parent().unwrap()).unwrap();
+    let _ = std::fs::remove_file(link);
+    std::os::unix::fs::symlink(to, link).unwrap();
+}
+/// A contract unit accepted, its worktree in place and `main` moved: the next call updates the branch.
+fn accepted_and_moved() -> F {
+    let mut f = F::new();
+    f.set_unit(json!({"class": "contract"}));
+    f.steps(&["implement", "accept"]);
+    let (a, _) = f.ok();
+    assert_eq!(a["waits_for"], "approve", "{a}");
+    f.push_from_elsewhere("main", "src/main-moved.rs");
+    f
+}
+/// The calls of `git` and `env` made after the `from`-th whose words hold `word` exactly.
+fn calls_with(f: &F, from: usize, word: &str) -> usize {
+    let words = |c: &&(String, Vec<String>, Value)| c.1.iter().any(|a| a == word);
+    let git_or_env = |c: &&(String, Vec<String>, Value)| c.0 == "git" || c.0 == "env";
+    f.calls[from..]
+        .iter()
+        .filter(git_or_env)
+        .filter(words)
+        .count()
+}
+fn detail(a: &Value) -> Value {
+    serde_json::from_str(a["stop_detail"].as_str().unwrap()).unwrap()
+}
+fn text(p: &Path) -> String {
+    p.to_str().unwrap().to_owned()
+}
+
+// spec: specs/ap/unit-run.md#R40
+#[test]
+fn r40_a_link_at_the_reflog_of_head_stops_the_update_before_its_merge() {
+    let mut f = accepted_and_moved();
+    let (_, admin) = f.git_dirs();
+    let outside = target(&f, "head");
+    link_to(&admin.join("logs/HEAD"), &outside);
+    let from = f.calls.len();
+    let a = f.stopped("git_dir_link");
+    assert_eq!(
+        detail(&a),
+        json!({"paths": [text(&admin.join("logs/HEAD"))], "count": 1}),
+        "{a}"
+    );
+    assert_eq!(a["updates"], 0);
+    assert_eq!(calls_with(&f, from, "merge"), 0);
+    assert_eq!(std::fs::read_to_string(&outside).unwrap(), "head kept\n");
+    // The stop repeats while the link stays.
+    f.set_unit(json!({"state": "stopped"}));
+    f.stopped("git_dir_link");
+    assert_eq!(calls_with(&f, from, "merge"), 0);
+    assert_eq!(std::fs::read_to_string(&outside).unwrap(), "head kept\n");
+}
+
+// spec: specs/ap/unit-run.md#R40
+#[test]
+fn r40_two_links_are_named_in_the_order_of_their_bytes() {
+    let mut f = accepted_and_moved();
+    let (g, admin) = f.git_dirs();
+    let (merge_msg, reflog) = (target(&f, "msg"), target(&f, "reflog"));
+    link_to(&admin.join("MERGE_MSG"), &merge_msg);
+    let branch_log = g.join("logs/refs/heads/unit/widgets-list");
+    assert!(branch_log.is_file(), "the branch has a reflog");
+    link_to(&branch_log, &reflog);
+    let from = f.calls.len();
+    let a = f.stopped("git_dir_link");
+    assert_eq!(
+        detail(&a),
+        json!({"paths": [text(&branch_log), text(&admin.join("MERGE_MSG"))], "count": 2}),
+        "{a}"
+    );
+    assert_eq!(calls_with(&f, from, "merge"), 0);
+    assert_eq!(std::fs::read_to_string(&merge_msg).unwrap(), "msg kept\n");
+    assert_eq!(std::fs::read_to_string(&reflog).unwrap(), "reflog kept\n");
+}
+
+// spec: specs/ap/unit-run.md#R40
+#[test]
+fn r40_a_link_at_the_reflog_of_the_branch_stops_before_the_worktree_is_made() {
+    let mut f = F::new();
+    f.steps(&["implement", "accept"]);
+    let (g, _) = f.git_dirs();
+    let outside = target(&f, "branch");
+    let branch_log = g.join("logs/refs/heads/unit/widgets-list");
+    link_to(&branch_log, &outside);
+    let a = f.stopped("git_dir_link");
+    assert_eq!(
+        detail(&a),
+        json!({"paths": [text(&branch_log)], "count": 1}),
+        "{a}"
+    );
+    assert_eq!(calls_with(&f, 0, "add"), 0, "no `git worktree add`");
+    assert!(!f.wt().exists());
+    assert_eq!(std::fs::read_to_string(&outside).unwrap(), "branch kept\n");
+    // Without a link the Git directory is asked for once, immediately before the add.
+    let mut f = F::new();
+    f.steps(&["implement", "accept"]);
+    f.ok();
+    let add = f
+        .calls
+        .iter()
+        .position(|c| {
+            c.0 == "git" && c.1.iter().any(|w| w == "add") && c.1.contains(&"worktree".into())
+        })
+        .unwrap();
+    let before = &f.calls[add - 1];
+    let clone = f.p("clone");
+    let words = ["rev-parse", "--path-format=absolute", "--git-common-dir"];
+    let at = before.1.iter().position(|w| w == "-C").unwrap();
+    assert_eq!(before.0, "git");
+    assert_eq!(before.1[at + 1], clone, "{:?}", before.1);
+    assert_eq!(before.1[at + 2..at + 6], SAFE, "{:?}", before.1);
+    assert_eq!(before.1[at + 6..], words, "{:?}", before.1);
+    let asked = f.calls[..add]
+        .iter()
+        .filter(|c| c.1.iter().any(|w| w == "--git-common-dir"))
+        .count();
+    assert_eq!(asked, 1);
+}
+
+// spec: specs/ap/unit-run.md#R40
+// spec: specs/ap/unit-run.md#R32
+#[test]
+fn r40_the_cleanup_keeps_a_worktree_whose_git_directory_holds_a_link() {
+    for state in ["merged", "dropped"] {
+        let mut f = F::new();
+        f.steps(&["implement", "repair", "nothing"]);
+        f.stopped("repair_refused");
+        let (_, admin) = f.git_dirs();
+        let (dir, file) = (f.t.join("outside-dir"), f.t.join("outside-dir/inner"));
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::write(&file, "inner kept\n").unwrap();
+        let link = admin.join("a-link");
+        link_to(&link, &dir);
+        f.set_unit(json!({"state": state}));
+        let from = f.calls.len();
+        let (a, status) = f.ok();
+        assert_eq!(status, 0, "{a}");
+        assert_eq!(a["cleanup"]["worktree"], "worktree_kept", "{state}: {a}");
+        assert_eq!(
+            a["cleanup"]["worktree_reason"],
+            format!("link in the git directory: {}", link.display()),
+            "{a}"
+        );
+        assert_eq!(
+            calls_with(&f, from, "remove"),
+            0,
+            "no `git worktree remove`"
+        );
+        assert!(std::fs::symlink_metadata(&link).unwrap().is_symlink());
+        assert_eq!(std::fs::read_link(&link).unwrap(), dir);
+        assert_eq!(std::fs::read_to_string(&file).unwrap(), "inner kept\n");
+        assert!(f.wt().join(".git").is_file());
+    }
+}
+
+// spec: specs/ap/unit-run.md#R40
+#[test]
+fn r40_a_link_at_the_ref_of_the_branch_is_not_followed() {
+    let mut f = accepted_and_moved();
+    let (g, _) = f.git_dirs();
+    let main = git(&f.t.join("clone"), &["rev-parse", "refs/heads/main"]);
+    let reference = g.join("refs/heads/unit/widgets-list");
+    std::fs::remove_file(&reference).unwrap();
+    std::os::unix::fs::symlink("refs/heads/main", &reference).unwrap();
+    let from = f.calls.len();
+    let a = f.stopped("git_dir_link");
+    assert_eq!(
+        detail(&a),
+        json!({"paths": [text(&reference)], "count": 1}),
+        "{a}"
+    );
+    assert_eq!(calls_with(&f, from, "merge"), 0);
+    assert_eq!(
+        git(&f.t.join("clone"), &["rev-parse", "refs/heads/main"]),
+        main
+    );
+}
+
+// spec: specs/ap/unit-run.md#R40
+// spec: specs/ap/unit-run.md#R32
+#[test]
+fn r40_a_git_directory_of_more_than_ten_thousand_entries_is_unreadable_and_no_link() {
+    let mut f = F::new();
+    f.steps(&["implement", "repair", "nothing"]);
+    f.stopped("repair_refused");
+    let (_, admin) = f.git_dirs();
+    let many = admin.join("many");
+    std::fs::create_dir_all(&many).unwrap();
+    for n in 0..10_001 {
+        std::fs::File::create(many.join(format!("e{n}"))).unwrap();
+    }
+    let unreadable = format!("git directory unreadable: {}", admin.display());
+    f.set_unit(json!({"state": "stopped"}));
+    let a = f.stopped("worktree_failed");
+    assert_eq!(a["stop_detail"], unreadable.as_str(), "{a}");
+    // The bound comes before a link, which would answer `git_dir_link` after a whole walk.
+    let outside = target(&f, "bound");
+    link_to(&admin.join("logs/HEAD"), &outside);
+    f.set_unit(json!({"state": "stopped"}));
+    let a = f.stopped("worktree_failed");
+    assert_eq!(a["stop_detail"], unreadable.as_str(), "{a}");
+    assert_eq!(std::fs::read_to_string(&outside).unwrap(), "bound kept\n");
+    // The cleanup of a merged unit keeps the worktree with the same reason.
+    f.set_unit(json!({"state": "merged"}));
+    let from = f.calls.len();
+    let (a, _) = f.ok();
+    assert_eq!(a["cleanup"]["worktree"], "worktree_kept", "{a}");
+    assert_eq!(a["cleanup"]["worktree_reason"], unreadable.as_str(), "{a}");
+    assert_eq!(calls_with(&f, from, "remove"), 0);
+    // Exactly the bound is read: 10,000 entries below the Git directory pass.
+    let mut f = F::new();
+    f.steps(&["implement", "repair", "nothing"]);
+    f.stopped("repair_refused");
+    let (_, admin) = f.git_dirs();
+    let before = walk_count(&admin);
+    let many = admin.join("many");
+    std::fs::create_dir_all(&many).unwrap();
+    for n in 0..(10_000 - before - 1) {
+        std::fs::File::create(many.join(format!("e{n}"))).unwrap();
+    }
+    assert_eq!(walk_count(&admin), 10_000);
+    f.set_unit(json!({"state": "stopped"}));
+    f.stopped("repair_refused");
+}
+/// The entries below `dir`, every level.
+fn walk_count(dir: &Path) -> usize {
+    let mut n = 0;
+    for e in std::fs::read_dir(dir).unwrap().flatten() {
+        n += 1;
+        if e.file_type().unwrap().is_dir() {
+            n += walk_count(&e.path());
+        }
+    }
+    n
+}
+
+// spec: specs/ap/unit-run.md#R40
+#[test]
+fn r40_the_path_of_a_link_is_written_with_the_replacement_character_for_a_byte_that_is_no_utf8() {
+    use std::os::unix::ffi::OsStrExt;
+    let mut f = F::new();
+    f.steps(&["implement", "repair", "nothing"]);
+    f.stopped("repair_refused");
+    let (_, admin) = f.git_dirs();
+    let outside = target(&f, "ff");
+    let name = std::ffi::OsStr::from_bytes(b"bad\xff");
+    link_to(&admin.join(name), &outside);
+    f.set_unit(json!({"state": "stopped"}));
+    let a = f.stopped("git_dir_link");
+    assert_eq!(
+        detail(&a),
+        json!({"paths": [format!("{}/bad\u{FFFD}", admin.display())], "count": 1}),
+        "{a}"
+    );
+    assert_eq!(std::fs::read_to_string(&outside).unwrap(), "ff kept\n");
+}
