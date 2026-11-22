@@ -4236,18 +4236,15 @@ impl F {
         (g, admin)
     }
     /// The words a stage of account `account` and scratch directory `<home>/scratch/<n>` gets in
-    /// front of the hidden paths: an author's with its worktree and its refs (R38).
-    fn stage_words(&self, account: &str, n: usize, author: bool) -> Vec<String> {
+    /// front of the hidden paths, from `--dev /dev` on (the view of `specs/ap/run-limits.md` R16
+    /// before them depends on the host): an author's with its worktree and its refs, then the
+    /// files its prompt names, read-only (R38).
+    fn stage_words(&self, account: &str, n: usize, author: bool, files: &[PathBuf]) -> Vec<String> {
         let text = |p: &Path| p.to_str().unwrap().to_owned();
         let (g, admin) = self.git_dirs();
         let (home, wt) = (self.home(), self.wt());
         let (account, scratch) = (self.p(account), text(&home.join(format!("scratch/{n}"))));
         let mut words: Vec<String> = [
-            BWRAP,
-            "--unshare-pid",
-            "--ro-bind",
-            "/",
-            "/",
             "--dev",
             "/dev",
             "--proc",
@@ -4264,6 +4261,7 @@ impl F {
         ]
         .map(str::to_owned)
         .to_vec();
+        let mut read_only = vec![];
         if author {
             let pairs = [
                 (wt.clone(), wt.clone()),
@@ -4284,20 +4282,31 @@ impl F {
             for (from, to) in pairs {
                 words.extend(["--bind".to_owned(), text(&from), text(&to)]);
             }
-            for p in [
+            read_only.extend([
                 wt.join(".git"),
                 admin.join("commondir"),
                 admin.join("gitdir"),
                 admin.join("config.worktree"),
-            ] {
-                words.extend(["--ro-bind".to_owned(), text(&p), text(&p)]);
-            }
+            ]);
+        }
+        read_only.extend(files.iter().cloned());
+        for p in read_only {
+            words.extend(["--ro-bind".to_owned(), text(&p), text(&p)]);
         }
         words
     }
-    /// The words of launch `i` (from 0) between those of `stage_words` and `--cap-drop`: the
-    /// hidden paths, after the words of the home of the launch (`--tmpfs <a>` through the last
-    /// `--remount-ro <a>`, `specs/ap/run-limits.md` R5), which are left out.
+    /// Where the words of `stage_words` begin in launch `i`, after the three flags and the view.
+    fn dev(&self, i: usize) -> usize {
+        let wrap = &self.wraps[i];
+        assert_eq!(
+            wrap[..4],
+            [BWRAP, "--unshare-user", "--disable-userns", "--unshare-pid"].map(str::to_owned)
+        );
+        wrap.iter().position(|w| w == "--dev").unwrap()
+    }
+    /// The words of launch `i` (from 0) between those of `stage_words`, which end at `words`, and
+    /// `--remount-ro /`: the hidden paths, after the words of the home of the launch (`--tmpfs <a>`
+    /// through the last `--remount-ro <a>`, `specs/ap/run-limits.md` R5), which are left out.
     fn stage_hidden(&self, i: usize, words: usize) -> Vec<String> {
         let wrap = &self.wraps[i];
         let mut at = words;
@@ -4315,8 +4324,34 @@ impl F {
                 .unwrap();
             at = end + ro.len();
         }
-        wrap[at..wrap.len() - 5].to_vec()
+        assert_eq!(wrap[wrap.len() - 7..wrap.len() - 5], ["--remount-ro", "/"]);
+        wrap[at..wrap.len() - 7].to_vec()
     }
+    /// The files the prompt of the verifier's stage `n` names: its description file, then the
+    /// author's answer its round names (R19, R38).
+    fn verifier_files(&self, n: usize) -> Vec<PathBuf> {
+        let home = self.home();
+        let prompt = std::fs::read_to_string(home.join(format!("{n}.verifier.prompt.md"))).unwrap();
+        let mut files = vec![home.join(format!("{n}.description.md"))];
+        let answer = prompt
+            .lines()
+            .find_map(|l| l.strip_prefix("Answer of the author: "))
+            .filter(|a| *a != "none");
+        files.extend(answer.map(PathBuf::from));
+        files
+    }
+}
+/// The hidden paths of a run of hiding words (`specs/ap/run-limits.md` R10), each with its words.
+fn hidden_groups(words: &[String]) -> Vec<(String, Vec<String>)> {
+    let mut groups = vec![];
+    let mut i = 0;
+    while i < words.len() {
+        let n = if words[i] == "--tmpfs" { 4 } else { 3 };
+        let p = words[i + n - 1].clone();
+        groups.push((p, words[i..i + n].to_vec()));
+        i += n;
+    }
+    groups
 }
 /// The mode bits of a path.
 fn mode(p: &Path) -> u32 {
@@ -4353,21 +4388,34 @@ fn r38_every_stage_runs_under_limits_and_an_author_writes_its_worktree_and_its_o
         ("verifier", "a2", false),
     ];
     assert_eq!(f.wraps.len(), 4);
+    // The files the prompts name: the verifier's report for the fixer, the description (and, for
+    // a second look, the author's answer) for a verifier.
+    let report = f.t.join(format!("reviews/{}.md", by_round(&f)[0].0));
     for (i, (role, account, author)) in stages.into_iter().enumerate() {
         let n = i + 1;
         assert!(home.join(format!("{n}.{role}.prompt.md")).exists(), "{n}");
-        let want = f.stage_words(account, n, author);
+        let files = match role {
+            "fixer" => vec![report.clone()],
+            "verifier" => f.verifier_files(n),
+            _ => vec![],
+        };
+        let want = f.stage_words(account, n, author, &files);
         let wrap = &f.wraps[i];
-        assert_eq!(wrap[..want.len()], want[..], "{role}: {wrap:?}");
+        let dev = f.dev(i);
+        assert_eq!(wrap[dev..dev + want.len()], want[..], "{role}: {wrap:?}");
         let tail = ["--cap-drop", "ALL", "--chdir", wt.to_str().unwrap(), "--"];
         assert_eq!(wrap[wrap.len() - 5..], tail.map(str::to_owned), "{role}");
-        // Only hidden paths after the named ones, and the state of `gh` not among an author's
-        // with the host's login (a verifier's hides it, R41).
-        let hidden = f.stage_hidden(i, want.len());
+        // Only hidden paths after the named ones, and the state of `gh` never hidden from an
+        // author with the host's login: its view shows it where the host has it (R16 (j)); a
+        // verifier's view does not hold it (R41).
+        let hidden = f.stage_hidden(i, dev + want.len());
         assert!(!hidden.iter().any(|w| w == "--bind"), "{hidden:?}");
-        if author {
-            assert!(!wrap.iter().any(|w| w.ends_with("/.config/gh")), "{wrap:?}");
-        }
+        let gh = wrap.iter().filter(|w| w.ends_with("/.config/gh")).count();
+        assert!(
+            !hidden.iter().any(|w| w.ends_with("/.config/gh")),
+            "{wrap:?}"
+        );
+        assert!(gh == 0 || (author && gh == 2), "{role}: {wrap:?}");
         // A Cargo home in the stage's scratch directory, never root's.
         let env = &f.launch_envs[i];
         let cargo: Vec<&String> = env
@@ -4399,9 +4447,22 @@ fn r38_every_stage_runs_under_limits_and_an_author_writes_its_worktree_and_its_o
             json!(format!("{}/scratch/{n}", home.display()))
         );
         assert_eq!(limits.get("over").is_some(), author, "{role}: {limits}");
+        let mut read_only: Vec<Value> = match author {
+            true => [
+                wt.join(".git"),
+                f.git_dirs().1.join("commondir"),
+                f.git_dirs().1.join("gitdir"),
+                f.git_dirs().1.join("config.worktree"),
+            ]
+            .iter()
+            .map(|p| json!(p))
+            .collect(),
+            false => vec![],
+        };
+        read_only.extend(files.iter().map(|p| json!(p)));
         assert_eq!(
-            limits.get("read_only").is_some(),
-            author,
+            limits.get("read_only").cloned(),
+            (!read_only.is_empty()).then(|| json!(read_only)),
             "{role}: {limits}"
         );
         let writable = limits["writable"].as_array().unwrap();
@@ -4443,9 +4504,61 @@ fn r38_every_stage_runs_under_limits_and_an_author_writes_its_worktree_and_its_o
     f.steps(&["dirty", "settle", "accept"]);
     let (a, _) = f.ok();
     assert_eq!(a["state"], "merged", "{a}");
-    let want = f.stage_words("a1", 2, true);
-    assert_eq!(f.wraps[1][..want.len()], want[..], "{:?}", f.wraps[1]);
+    let want = f.stage_words("a1", 2, true, &[]);
+    let dev = f.dev(1);
+    assert_eq!(
+        f.wraps[1][dev..dev + want.len()],
+        want[..],
+        "{:?}",
+        f.wraps[1]
+    );
     assert!(f.launch(2).1.ends_with(CONTINUE));
+}
+
+// spec: specs/ap/unit-run.md#R38
+#[test]
+fn r38_a_fixer_and_a_verifier_read_the_files_their_prompts_name() {
+    let mut f = F::new();
+    f.steps(&["implement", "repair", "fix", "accept"]);
+    let (a, _) = f.ok();
+    assert_eq!(a["state"], "merged", "{a}");
+    let home = f.home();
+    let records = four_records(&f);
+    let (key, _) = by_round(&f).remove(0);
+    let report = f.t.join(format!("reviews/{key}.md"));
+    // The fixer's round names the verifier's report; the second verifier's names the author's
+    // answer, beside each verifier's description file.
+    let fixer = std::fs::read_to_string(home.join("3.fixer.prompt.md")).unwrap();
+    assert!(fixer.contains(&format!("Verifier report: {}\n", report.display())));
+    let second = std::fs::read_to_string(home.join("4.verifier.prompt.md")).unwrap();
+    let answer = home.join("3.fixer.md");
+    assert!(second.contains(&format!("Answer of the author: {}\n", answer.display())));
+    let named: [Vec<PathBuf>; 4] = [
+        vec![],
+        vec![home.join("2.description.md")],
+        vec![report],
+        vec![home.join("4.description.md"), answer],
+    ];
+    for (i, files) in named.iter().enumerate() {
+        let read_only = records[i]["limits"]["read_only"].as_array().cloned();
+        let read_only = read_only.unwrap_or_default();
+        let tail = &read_only[read_only.len() - files.len()..];
+        let want: Vec<Value> = files.iter().map(|p| json!(p)).collect();
+        assert_eq!(tail, &want[..], "{i}: {}", records[i]["limits"]);
+        // The fixer's five, a verifier's one or two (`specs/ap/run-limits.md` R1: at most 8).
+        let count = [4, 1, 5, 2][i];
+        assert_eq!(read_only.len(), count, "{i}");
+        // Each a read-only bind of the stage's launch.
+        for p in files {
+            let p = p.to_str().unwrap().to_owned();
+            let bind = ["--ro-bind".to_owned(), p.clone(), p];
+            assert!(
+                f.wraps[i].windows(3).any(|w| w == bind),
+                "{i}: {:?}",
+                f.wraps[i]
+            );
+        }
+    }
 }
 
 // spec: specs/ap/unit-run.md#R38
@@ -4762,17 +4875,27 @@ fn r12_a_check_on_the_head_runs_in_its_view_and_without_units_as_on_the_base() {
         .map(str::to_owned)
     );
     assert_eq!(f.check_wraps[0], run[at..=end]);
-    // The hidden paths are those a stage gets, the state of `gh` too, nothing shown.
+    // The check hides every existing path of the list, the state of `gh` too, nothing shown; a
+    // stage hides those of them a bind of its launch holds or lies in, the state of `gh` not
+    // (`specs/ap/run-limits.md` R10), with the same words.
     let hidden = run[at + head.len()..end - 4].to_vec();
-    let stage = f.stage_hidden(0, f.stage_words("a1", 1, true).len());
-    let mut shown = hidden.clone();
-    if let Some(i) = shown.iter().position(|w| w.ends_with("/.config/gh")) {
-        match shown[i - 1] == "--tmpfs" {
-            true => shown.drain(i - 1..i + 3),
-            false => shown.drain(i - 2..=i),
-        };
+    let dev = f.dev(0);
+    let stage = f.stage_hidden(0, dev + f.stage_words("a1", 1, true, &[]).len());
+    let (check, stage) = (hidden_groups(&hidden), hidden_groups(&stage));
+    let wrap = &f.wraps[0];
+    let mut targets = vec![];
+    for (i, w) in wrap.iter().enumerate() {
+        if (w == "--bind" || w == "--ro-bind") && wrap[i + 1] != "/dev/null" {
+            targets.push(Path::new(&wrap[i + 2]).to_path_buf());
+        }
     }
-    assert_eq!(shown, stage);
+    let related =
+        |p: &str| (targets.iter()).any(|t| Path::new(p).starts_with(t) || t.starts_with(p));
+    let want: Vec<(String, Vec<String>)> = (check.iter())
+        .filter(|(p, _)| related(p) && !p.ends_with("/.config/gh"))
+        .cloned()
+        .collect();
+    assert_eq!(stage, want, "{wrap:?}");
     assert!(!hidden.iter().any(|w| w == "--bind"), "{hidden:?}");
     // Without units: the plain `sh` call of the base, no view.
     let mut f = F::new();

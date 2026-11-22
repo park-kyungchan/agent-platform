@@ -9,7 +9,7 @@
 //! the host's store, policy file or reviews directory.
 use ap::host::{Answer, Failure, Host, Reply, System};
 use ap::unit::page_review::{Refusal, arguments, execute};
-use ap::unit::render::{Role, page, page_digest};
+use ap::unit::render::{Role, page, page_digest, page_part};
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 use std::{
@@ -2744,17 +2744,13 @@ fn r24_the_frames_name_the_kinds_of_a_blocking_finding() {
 
 // ---- A look under `limits` (specs/ap/run-limits.md) -------------------------------------------
 
-/// The words of a launch under `limits` for a look whose working directory is `cwd`, on `account`
-/// with the scratch directory of `review`, up to the hidden paths.
+/// The words of a launch under `limits` for a look on `account` with the scratch directory of
+/// `review`, from `--dev /dev` up to the hidden paths (the view of `specs/ap/run-limits.md` R16
+/// before them depends on the host).
 fn limited(f: &F, account: &str, review: &str) -> Vec<String> {
     let (account, scratch) = (f.p(account), f.dir().join("scratch").join(review));
     let scratch = scratch.to_str().unwrap();
     [
-        BWRAP,
-        "--unshare-pid",
-        "--ro-bind",
-        "/",
-        "/",
         "--dev",
         "/dev",
         "--proc",
@@ -2772,17 +2768,29 @@ fn limited(f: &F, account: &str, review: &str) -> Vec<String> {
     .map(str::to_owned)
     .to_vec()
 }
-/// Checks the launch `wrap` of the look of `review` in `cwd`: the binds, the hidden home, a
-/// working directory that is not bound (read-only), and the record's `limits`.
+/// Checks the launch `wrap` of the look of `review` in `cwd`: the three flags, the binds, the
+/// fake's home outside the view (its `.ssh` neither bound nor hidden), a working directory that is
+/// not bound writable, and the record's `limits`.
 fn under_limits(f: &F, wrap: &[String], review: &str, cwd: &Path, report: &str) {
+    let flags = [BWRAP, "--unshare-user", "--disable-userns", "--unshare-pid"];
+    assert_eq!(wrap[..4], flags.map(str::to_owned), "{wrap:?}");
+    let dev = wrap.iter().position(|w| w == "--dev").unwrap();
     let want = limited(f, "a1", review);
-    assert_eq!(wrap[..want.len()], want[..], "{wrap:?}");
+    assert_eq!(wrap[dev..dev + want.len()], want[..], "{wrap:?}");
     let ssh = f.p("home/.ssh");
-    let hidden = ["--tmpfs", &ssh, "--remount-ro", &ssh].map(str::to_owned);
-    assert!(wrap.windows(4).any(|w| w == hidden), "{wrap:?}");
+    assert!(!wrap.iter().any(|w| w.starts_with(&ssh)), "{wrap:?}");
     let cwd = cwd.to_str().unwrap().to_owned();
-    let tail = ["--cap-drop", "ALL", "--chdir", &cwd, "--"].map(str::to_owned);
-    assert_eq!(wrap[wrap.len() - 5..], tail[..], "{wrap:?}");
+    let tail = [
+        "--remount-ro",
+        "/",
+        "--cap-drop",
+        "ALL",
+        "--chdir",
+        &cwd,
+        "--",
+    ]
+    .map(str::to_owned);
+    assert_eq!(wrap[wrap.len() - 7..], tail[..], "{wrap:?}");
     let bound = wrap.windows(2).any(|w| w[0] == "--bind" && w[1] == cwd);
     assert!(
         !bound,
@@ -2792,9 +2800,10 @@ fn under_limits(f: &F, wrap: &[String], review: &str, cwd: &Path, report: &str) 
     let scratch = f.dir().join("scratch").join(review);
     assert_eq!(limits["scratch"], json!(scratch), "{limits}");
     assert!(
-        limits["hidden"].as_array().unwrap().contains(&json!(ssh)),
+        !limits["hidden"].as_array().unwrap().contains(&json!(ssh)),
         "{limits}"
     );
+    assert!(limits["view"].is_array(), "{limits}");
     // `ap run` made it and removed it after the stage.
     assert!(!scratch.exists());
 }
@@ -2891,4 +2900,105 @@ fn r18_abandon_and_finish_remove_the_scratch_directory_a_killed_run_left() {
         "k"
     );
     assert!(scratch(&f, "other/tmp").is_dir());
+}
+
+// spec: specs/ap/unit-review.md#R6
+#[test]
+fn r6_a_page_look_holds_the_pages_of_the_dependencies_after_the_earlier_reports() {
+    let mut f = F::new();
+    f.unit("dep", "plain", false);
+    f.modify("unit", "dep", json!({"state": "merged"}));
+    f.modify(
+        "unit",
+        "u1",
+        json!({"depends_on": [oid("unit", "dep"), oid("unit", "gone")]}),
+    );
+    let first = first_look(&mut f, "repair");
+    let mut r = f.req("unit", "u1");
+    r["earlier"] = json!([first["review"]]);
+    let (v, _) = f.ok(&r);
+    let digest = page_digest("u1", &f.get("unit", "u1"));
+    assert_eq!(v["digest"], json!(digest));
+    let prompt = std::fs::read_to_string(
+        f.get("review", v["review"].as_str().unwrap())["prompt"]
+            .as_str()
+            .unwrap(),
+    )
+    .unwrap();
+    let earlier = format!(
+        "\n## Earlier reports (claims of earlier reviewers; check them, do not trust them)\n\n- {}: {}\n",
+        first["review"].as_str().unwrap(),
+        first["report"].as_str().unwrap()
+    );
+    let part = page_part("dep", &f.get("unit", "dep"), false);
+    let deps = format!(
+        "\n## Pages of the dependencies\n\n### dep: merged\n\n{part}\n### gone\n\n(not in the store)\n"
+    );
+    assert!(
+        prompt.ends_with(&format!("{earlier}{deps}\nDigest: {digest}\n")),
+        "{prompt}"
+    );
+    // The first look's prompt, without earlier reports: the section right before the digest.
+    let first_prompt = std::fs::read_to_string(
+        f.get("review", first["review"].as_str().unwrap())["prompt"]
+            .as_str()
+            .unwrap(),
+    )
+    .unwrap();
+    assert!(first_prompt.ends_with(&format!("{deps}\nDigest: {digest}\n")));
+    // A unit without dependencies gets no section.
+    f.modify("unit", "u1", json!({"depends_on": []}));
+    let (v, _) = f.ok(&f.req("unit", "u1"));
+    let prompt = std::fs::read_to_string(
+        f.get("review", v["review"].as_str().unwrap())["prompt"]
+            .as_str()
+            .unwrap(),
+    )
+    .unwrap();
+    assert!(
+        !prompt.contains("\n## Pages of the dependencies\n"),
+        "{prompt}"
+    );
+    assert!(!prompt.contains("This unit depends on no unit."));
+}
+
+// spec: specs/ap/unit-review.md#R13
+#[test]
+fn r13_a_look_reads_only_a_plans_clones_and_the_earlier_reports_beside_its_directory() {
+    let mut f = F::new();
+    // A page without `earlier`: no `read_only`.
+    let first = first_look(&mut f, "repair");
+    let rec = record(first["report"].as_str().unwrap());
+    assert!(rec["limits"].get("read_only").is_none(), "{rec}");
+    // A page with `earlier`: each report, in the order of `earlier`.
+    let second = first_look(&mut f, "repair");
+    let mut r = f.req("unit", "u1");
+    r["earlier"] = json!([second["review"], first["review"]]);
+    let (v, _) = f.ok(&r);
+    let rec = record(v["report"].as_str().unwrap());
+    assert_eq!(
+        rec["limits"]["read_only"],
+        json!([second["report"], first["report"]]),
+        "{rec}"
+    );
+    let wrap = f.wraps.last().unwrap();
+    for p in [&second["report"], &first["report"]] {
+        let p = p.as_str().unwrap().to_owned();
+        let bind = ["--ro-bind".to_owned(), p.clone(), p];
+        assert!(wrap.windows(3).any(|w| w == bind), "{wrap:?}");
+    }
+    // A plan: the clone of its `## Repositories`, then, with `earlier`, the report.
+    plan_fixture(&mut f);
+    let (plan, _) = f.ok(&f.req("intent", "widgets"));
+    let rec = record(plan["report"].as_str().unwrap());
+    assert_eq!(rec["limits"]["read_only"], json!([f.p("clone")]), "{rec}");
+    let mut r = f.req("intent", "widgets");
+    r["earlier"] = json!([plan["review"]]);
+    let (v, _) = f.ok(&r);
+    let rec = record(v["report"].as_str().unwrap());
+    assert_eq!(
+        rec["limits"]["read_only"],
+        json!([f.p("clone"), plan["report"]]),
+        "{rec}"
+    );
 }

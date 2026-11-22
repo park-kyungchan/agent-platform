@@ -7537,6 +7537,77 @@ const FAKE_LIMITS: &str = include_str!("fixtures/run_limits/fake-claude.sh");
 /// In front of `fixtures/run_limits/fake-claude.sh` (`claude-limits`): the account of the home it is
 /// given as its `CLAUDE_CONFIG_DIR`, the home as `STAGE_HOME`.
 const LIMITS_WRAPPER: &str = "#!/usr/bin/env bash\nexport STAGE_HOME=$CLAUDE_CONFIG_DIR\ncase $CLAUDE_CONFIG_DIR in */homes/*) export CLAUDE_CONFIG_DIR=${CLAUDE_CONFIG_DIR%/homes/*} ;; esac\nexec \"$(dirname \"$0\")/claude-limits\" \"$@\"\n";
+/// The names of `/etc` a stage sees, in the order of `specs/ap/run-limits.md` R16 (c).
+const ETC: [&str; 33] = [
+    "passwd",
+    "group",
+    "nsswitch.conf",
+    "hosts",
+    "host.conf",
+    "gai.conf",
+    "resolv.conf",
+    "services",
+    "protocols",
+    "networks",
+    "ssl/certs",
+    "ssl/openssl.cnf",
+    "ca-certificates",
+    "ca-certificates.conf",
+    "localtime",
+    "timezone",
+    "ld.so.cache",
+    "ld.so.conf",
+    "ld.so.conf.d",
+    "alternatives",
+    "os-release",
+    "lsb-release",
+    "bash.bashrc",
+    "profile",
+    "inputrc",
+    "shells",
+    "gitconfig",
+    "mime.types",
+    "magic",
+    "magic.mime",
+    "python3",
+    "terminfo",
+    "locale.alias",
+];
+/// The words of a view (R16), the source of each read-only bind in their order (the record's
+/// `view`), and the target of each.
+#[derive(Default)]
+struct View {
+    words: Vec<String>,
+    sources: Vec<String>,
+    targets: Vec<String>,
+}
+impl View {
+    fn bind(&mut self, source: &str, target: &str) {
+        self.words
+            .extend(["--ro-bind", source, target].map(str::to_owned));
+        self.sources.push(source.to_owned());
+        self.targets.push(target.to_owned());
+    }
+    fn present(&mut self, p: &str) {
+        if std::fs::metadata(p).is_ok() {
+            self.bind(p, p);
+        }
+    }
+}
+/// Whether one path is equal to or inside the other, by components.
+fn related(a: &str, b: &str) -> bool {
+    Path::new(a).starts_with(b) || Path::new(b).starts_with(a)
+}
+/// The targets of the `--bind` and `--ro-bind` words of a launch.
+fn bind_targets(words: &[String]) -> Vec<String> {
+    let mut targets = vec![];
+    for (i, w) in words.iter().enumerate() {
+        if (w == "--bind" || w == "--ro-bind") && i + 2 < words.len() {
+            targets.push(words[i + 2].clone());
+        }
+    }
+    targets
+}
 /// The home of launch `n` (from 0) of a record: `<account>/homes/<session>` of its entry of
 /// `attempts` (`specs/ap/run-limits.md` R14).
 fn home_of(rec: &Value, n: usize) -> String {
@@ -7573,7 +7644,8 @@ impl Fake {
         forks::settled();
     }
     /// What a launch of the stage `out` (its first launch, from 0: `n`) on `account` runs between
-    /// `systemd-run … --` and the CLI, the request's accounts `accounts` (R5, R14).
+    /// `systemd-run … --` and the CLI, the request's accounts `accounts`, with the fake's `cwd` and
+    /// scratch directory and without `show` (R5, R14, R16).
     fn bwrap(&self, accounts: &[&str], out: &str, n: usize) -> Vec<String> {
         let rec = self.record(out);
         let account = rec["attempts"][n]["account"].as_str().unwrap().to_owned();
@@ -7583,34 +7655,102 @@ impl Fake {
         let base = self.bwrap_base(&account);
         let home_words = self.home_words(&all, &account, &home);
         (base.into_iter().chain(home_words).chain(self.hiding()))
+            .chain(["--remount-ro", "/"].map(str::to_owned))
             .chain(["--cap-drop", "ALL", "--chdir", &cwd, "--"].map(str::to_owned))
+            .collect()
+    }
+    /// The first words of every launch under `limits`, then the view of R16 for the fake's `cwd`
+    /// and scratch directory, `show` given or not (R5).
+    fn head(&self, show: bool) -> Vec<String> {
+        let view = self.view_of(&[self.p("cwd")], &self.p("scratch"), show, None);
+        [BWRAP, "--unshare-user", "--disable-userns", "--unshare-pid"]
+            .map(str::to_owned)
+            .into_iter()
+            .chain(view.words)
             .collect()
     }
     /// The words of the base up to the bind of the scratch directory, for a launch on `account`.
     fn bwrap_base(&self, account: &str) -> Vec<String> {
         let scratch = self.p("scratch");
-        [
-            BWRAP,
-            "--unshare-pid",
-            "--ro-bind",
-            "/",
-            "/",
-            "--dev",
-            "/dev",
-            "--proc",
-            "/proc",
-            "--ro-bind",
-            "/proc/sys",
-            "/proc/sys",
-            "--bind",
-            account,
-            account,
-            "--bind",
-            &scratch,
-            &scratch,
-        ]
-        .map(str::to_owned)
-        .to_vec()
+        let mut words = self.head(false);
+        words.extend(
+            [
+                "--dev",
+                "/dev",
+                "--proc",
+                "/proc",
+                "--ro-bind",
+                "/proc/sys",
+                "/proc/sys",
+                "--bind",
+                account,
+                account,
+                "--bind",
+                &scratch,
+                &scratch,
+            ]
+            .map(str::to_owned),
+        );
+        words
+    }
+    /// The view of `specs/ap/run-limits.md` R16 of a launch from the fake's environment (its
+    /// `PATH`) and home: `dirs` the working directory and its Git directories as (g) binds them,
+    /// `scratch` the request's, `show` given or not, `policy` the request's `AP_POLICY_FILE`. What
+    /// depends on the host (the links beside `/usr`, the names of `/etc`, the build lock, the
+    /// default policy file, the CLI on `PATH`) is expected by the same existence rule.
+    fn view_of(&self, dirs: &[String], scratch: &str, show: bool, policy: Option<&str>) -> View {
+        let mut v = View::default();
+        v.words.extend(["--tmpfs", "/tmp"].map(str::to_owned));
+        v.present("/usr");
+        for p in ["/bin", "/lib", "/lib64", "/sbin"] {
+            match std::fs::read_link(p) {
+                Ok(to) => v.words.extend([
+                    "--symlink".to_owned(),
+                    to.to_str().unwrap().to_owned(),
+                    p.to_owned(),
+                ]),
+                Err(_) => v.present(p),
+            }
+        }
+        for name in ETC {
+            v.present(&format!("/etc/{name}"));
+        }
+        for rel in [
+            "home/.rustup",
+            "home/.cargo/bin",
+            "home/.agents",
+            "home/.gitconfig",
+            "home/.config/git",
+        ] {
+            v.present(&self.p(rel));
+        }
+        let path = self.env.iter().find(|(k, _)| k == "PATH");
+        let path = path.map_or("/bin:/usr/bin", |(_, v)| v.as_str());
+        let cwd = self.p("cwd");
+        let found = path.split(':').find_map(|d| {
+            let at = Path::new(if d.is_empty() { cwd.as_str() } else { d }).join("claude");
+            let m = std::fs::metadata(&at).ok()?;
+            (m.is_file() && m.permissions().mode() & 0o111 != 0).then_some(at)
+        });
+        if let Some(at) = found {
+            let file = std::fs::canonicalize(&at).unwrap();
+            v.bind(file.to_str().unwrap(), at.to_str().unwrap());
+        }
+        v.present("/var/lib/agent-platform/build.lock");
+        for d in dirs {
+            v.bind(d, d);
+        }
+        // The door exists while the call's launches run (R13), and is gone after the call.
+        let door = format!("{scratch}.door");
+        v.bind(&door, &door);
+        let policy = policy.unwrap_or("/etc/agent-platform/policy.json");
+        if std::fs::metadata(policy).is_ok_and(|m| m.is_file()) {
+            v.bind(policy, policy);
+        }
+        if show {
+            v.present(&self.p("home/.config/gh"));
+        }
+        v
     }
     /// The words of the home of a launch on `account` in `home`, the request's accounts `accounts`
     /// (absolute): each account hidden, the home bound, the derived sign-in when the account has
@@ -7645,7 +7785,7 @@ impl Fake {
     /// The hidden list as it exists now (`specs/ap/run-limits.md` R10): each path with whether it
     /// is a directory. Under the fake's home and work root what `Fake::new` made; the host's own
     /// paths as this host has them.
-    fn hidden(&self) -> Vec<(String, bool)> {
+    fn hidden_now(&self) -> Vec<(String, bool)> {
         let host = [
             "/etc/agent-platform/credentials",
             "/etc/agent-platform/ci",
@@ -7664,6 +7804,18 @@ impl Fake {
             .chain(host)
             .chain([(self.p("work/edu-a"), true), (self.p("work/edu-b"), false)])
             .collect()
+    }
+    /// The paths of the hidden list that get arguments at a launch of the fake's `limited`
+    /// request: those equal to, inside or holding a bind target of it (R10). Nothing of the
+    /// fake's own.
+    fn hidden(&self) -> Vec<(String, bool)> {
+        let mut targets = self
+            .view_of(&[self.p("cwd")], &self.p("scratch"), false, None)
+            .targets;
+        targets.extend(["a1", "a2", "scratch"].map(|a| self.p(a)));
+        let mut hidden = self.hidden_now();
+        hidden.retain(|(p, _)| targets.iter().any(|t| related(p, t)));
+        hidden
     }
     /// The `bwrap` words that hide the paths of `hidden()`.
     fn hiding(&self) -> Vec<String> {
@@ -7971,10 +8123,12 @@ fn limits_r5_bwrap_comes_after_the_unit_and_binds_the_account_of_each_launch() {
     r["next_accounts"] = json!([f.p("a2")]);
     let (v, _) = f.run(&r).unwrap();
     assert_eq!(v["state"], "ok", "{v}");
+    // The account's bind follows the view (R16) and the words of `/dev`, `/proc` and `/proc/sys`.
+    let b = f.head(false).len() + 7;
     for (n, account) in [(0, "a1"), (1, "a2")] {
         let after = f.after_unit(n);
         let want = f.bwrap(&["a1", "a2"], "x.md", n);
-        assert_eq!(after[12..15], ["--bind", &f.p(account), &f.p(account)]);
+        assert_eq!(after[b..b + 3], ["--bind", &f.p(account), &f.p(account)]);
         assert_eq!(after[..want.len()], want[..], "{after:?}");
         assert_eq!(after[want.len()], "claude");
         assert_eq!(after.iter().filter(|a| *a == BWRAP).count(), 1);
@@ -7990,7 +8144,10 @@ fn limits_r5_bwrap_comes_after_the_unit_and_binds_the_account_of_each_launch() {
         (&json!("ok"), &json!(f.p("a2")))
     );
     let want = f.bwrap(&["a1", "a2"], "y.md", 0);
-    assert_eq!(f.after_unit(2)[12..15], ["--bind", &f.p("a2"), &f.p("a2")]);
+    assert_eq!(
+        f.after_unit(2)[b..b + 3],
+        ["--bind", &f.p("a2"), &f.p("a2")]
+    );
     assert_eq!(f.after_unit(2)[..want.len()], want[..]);
 }
 
@@ -8038,7 +8195,9 @@ fn limits_r7_the_record_names_the_limits_before_the_launch_and_at_the_end() {
     let s = f.p("scratch");
     let hidden: Vec<String> = f.hidden().into_iter().map(|(p, _)| p).collect();
     let home = home_of(&v, 0);
-    let want = json!({"scratch": s, "writable": [home, s], "bwrap": BWRAP, "hidden": hidden});
+    let view = f.view_of(&[f.p("cwd")], &s, false, None).sources;
+    let want = json!({"scratch": s, "writable": [home, s], "bwrap": BWRAP, "hidden": hidden,
+        "view": view});
     assert_eq!((&v["state"], &v["limits"]), (&json!("ok"), &want), "{v}");
     assert_eq!(f.record("w.md"), v);
     // What a call killed during its stage leaves: the record names the scratch directory.
@@ -8528,18 +8687,19 @@ fn run_r41_a_muse_stage_writes_no_file_under_its_account() {
 #[test]
 fn limits_r10_the_hidden_paths_come_after_the_binds_each_by_its_kind() {
     let mut f = Fake::new();
-    let (v, _) = f.run(&f.limited("x.md")).unwrap();
+    // A `read_only` home and work root: each hidden path inside them gets its arguments.
+    let mut r = f.limited("x.md");
+    r["limits"]["read_only"] = json!([f.p("home"), f.p("work")]);
+    let (v, _) = f.run(&r).unwrap();
     assert_eq!(v["state"], "ok", "{v}");
     let after = f.after_unit(0);
-    let want = f.bwrap(&["a1"], "x.md", 0);
-    assert_eq!(after[..want.len()], want[..], "{after:?}");
     let at = |w: &[String]| after.windows(w.len()).position(|x| x == w);
     let words = |w: &[&str]| w.iter().map(|x| (*x).to_owned()).collect::<Vec<_>>();
     let (ssh, netrc) = (f.p("home/.ssh"), f.p("home/.netrc"));
     let (a, b) = (f.p("work/edu-a"), f.p("work/edu-b"));
-    let scratch = f.p("scratch");
-    let binds = at(&words(&["--bind", &scratch, &scratch])).unwrap();
-    let drop = at(&words(&["--cap-drop", "ALL"])).unwrap();
+    let work = f.p("work");
+    let binds = at(&words(&["--ro-bind", &work, &work])).unwrap();
+    let drop = at(&words(&["--remount-ro", "/", "--cap-drop", "ALL"])).unwrap();
     for hidden in [
         words(&["--tmpfs", &ssh, "--remount-ro", &ssh]),
         words(&["--ro-bind", "/dev/null", &netrc]),
@@ -8561,14 +8721,16 @@ fn limits_r10_the_hidden_paths_come_after_the_binds_each_by_its_kind() {
         !hidden.iter().any(|p| p.starts_with("/root/")),
         "{hidden:?}"
     );
-    assert_eq!(hidden[..2], [netrc.clone(), ssh.clone()]);
-    assert_eq!(hidden[hidden.len() - 2..], [a.clone(), b.clone()]);
+    // The host's paths of the list lie in no bind of the launch: none of them is hidden.
+    assert_eq!(hidden, [netrc.clone(), ssh.clone(), a.clone(), b.clone()]);
     // What exists at the launch: a path made since, a link followed to its kind, a dangling link
     // left out.
     std::fs::write(f.t.join("home/.git-credentials"), "").unwrap();
     std::os::unix::fs::symlink(f.p("work/other"), f.p("work/edu-c")).unwrap();
     std::os::unix::fs::symlink(f.p("nowhere"), f.p("work/edu-d")).unwrap();
-    let (v, _) = f.run(&f.limited("y.md")).unwrap();
+    let mut r = f.limited("y.md");
+    r["limits"]["read_only"] = json!([f.p("home"), f.p("work")]);
+    let (v, _) = f.run(&r).unwrap();
     let c = f.p("work/edu-c");
     let names = v["limits"]["hidden"].as_array().unwrap();
     assert_eq!(names[0], json!(f.p("home/.git-credentials")), "{v}");
@@ -8583,6 +8745,47 @@ fn limits_r10_the_hidden_paths_come_after_the_binds_each_by_its_kind() {
     assert_eq!(code(f.run(&f.limited("z.md"))), "limits_unavailable@limits");
     assert_eq!((f.probes.len(), f.launches.len()), (probes, 2));
     assert!(!Path::new(&f.p("z.md.run.json")).exists());
+}
+
+// spec: specs/ap/run-limits.md#R10
+#[test]
+fn limits_r10_only_a_hidden_path_a_bind_holds_or_lies_in_gets_its_arguments() {
+    let mut f = Fake::new();
+    // Nothing of the fake's home or work root is bound: no hidden path gets arguments.
+    let (v, _) = f.run(&f.limited("x.md")).unwrap();
+    assert_eq!(v["state"], "ok", "{v}");
+    let after = f.after_unit(0);
+    let ssh = f.p("home/.ssh");
+    assert!(!after.iter().any(|w| w.starts_with(&ssh)), "{after:?}");
+    let hidden = v["limits"]["hidden"].as_array().unwrap();
+    assert!(!hidden.contains(&json!(ssh)), "{v}");
+    // Each hidden path the launch names lies in or holds a bind target of it.
+    let cli = after.iter().position(|w| w == "claude").unwrap();
+    let targets = bind_targets(&after[..cli]);
+    for p in hidden {
+        let p = p.as_str().unwrap();
+        assert!(targets.iter().any(|t| related(p, t)), "{p}: {after:?}");
+    }
+    // A `read_only` file inside `~/.ssh`: `.ssh` is hidden, its words after that bind.
+    std::fs::write(f.t.join("home/.ssh/id_ed25519"), "").unwrap();
+    let key = f.p("home/.ssh/id_ed25519");
+    let mut r = f.limited("y.md");
+    r["limits"]["read_only"] = json!([key]);
+    let (v, _) = f.run(&r).unwrap();
+    assert_eq!(v["state"], "ok", "{v}");
+    let after = f.after_unit(1);
+    let bind = ["--ro-bind", &key, &key].map(str::to_owned);
+    let bound = after.windows(3).position(|w| w == bind).unwrap();
+    let hide = ["--tmpfs", &ssh, "--remount-ro", &ssh].map(str::to_owned);
+    let hidden_at = after.windows(4).position(|w| w == hide).unwrap();
+    assert!(bound < hidden_at, "{after:?}");
+    assert_eq!(v["limits"]["hidden"], json!([ssh]), "{v}");
+    // A hidden path inside a `read_only` directory gets its arguments too.
+    let mut r = f.limited("z.md");
+    r["limits"]["read_only"] = json!([f.p("home")]);
+    let (v, _) = f.run(&r).unwrap();
+    let hidden = &v["limits"]["hidden"];
+    assert_eq!(hidden, &json!([f.p("home/.netrc"), ssh]), "{v}");
 }
 
 // spec: specs/ap/run-limits.md#R10
@@ -8989,48 +9192,72 @@ fn limits_r5_the_named_paths_follow_the_scratch_in_their_order_and_the_record_na
     ]
     .map(str::to_owned)
     .to_vec();
-    // The base's words to the scratch directory, then the named paths, then the words of the home
-    // (R14) and the hidden ones but `~/.config/gh`, which `show` names.
-    let scratch_end = base.iter().position(|w| w == "--cap-drop").unwrap();
-    let hiding: Vec<String> = base[18..scratch_end].to_vec();
-    let mut want = base[..18].to_vec();
+    // The base's words to the scratch directory, its view with the shown `~/.config/gh` (R16 (j)),
+    // then the named paths, then the words of the home (R14) and the hidden ones, which do not name
+    // `~/.config/gh`.
+    let gh = f.p("home/.config/gh");
+    let (plain, shown) = (f.head(false), f.head(true));
+    assert_eq!(shown[shown.len() - 3..], ["--ro-bind", &gh, &gh]);
+    assert_eq!(shown[..plain.len()], plain[..]);
+    let scratch_end = base.len() - 7;
+    let to_scratch = plain.len() + 13;
+    let rest: Vec<String> = base[to_scratch..scratch_end].to_vec();
+    let mut want = shown.clone();
+    want.extend(base[plain.len()..to_scratch].to_vec());
     want.extend(named);
-    want.extend(hiding.clone());
+    want.extend(rest);
     want.extend(base[scratch_end..].to_vec());
     assert_eq!(after[..want.len()], want[..], "{after:?}");
     assert_eq!(after[want.len()], "claude");
-    let gh = f.p("home/.config/gh");
-    assert!(!after.contains(&gh), "{after:?}");
-    // The record: what the stage writes, the members as given, the hidden list but the one shown.
-    let hidden: Vec<String> = f.hidden().into_iter().map(|(p, _)| p).collect();
+    assert_eq!(after.iter().filter(|w| **w == gh).count(), 2, "{after:?}");
+    // The record: what the stage writes, the members as given, the hidden list but the one shown,
+    // the view with the shown path.
     let s = f.p("scratch");
+    let mut view = f.view_of(&[f.p("cwd")], &s, true, None).sources;
+    assert_eq!(view.last(), Some(&gh));
+    let hidden: Vec<String> = v["limits"]["hidden"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|p| p.as_str().unwrap().to_owned())
+        .collect();
+    assert!(!hidden.contains(&gh), "{v}");
     let want = json!({"scratch": s, "writable": [home_of(&v, 0), s, f.p("w2"), f.p("w1"), f.p("dst"), f.p("src")],
         "bwrap": BWRAP, "hidden": hidden, "over": r["limits"]["over"], "read_only": r["limits"]["read_only"],
-        "show": ["~/.config/gh"]});
+        "show": ["~/.config/gh"], "view": view.clone()});
     assert_eq!(v["limits"], want, "{v}");
     assert_eq!(f.record("x.md"), v);
-    // Without `show` the path is hidden as any other; with `write` alone, only that member's words.
+    // Without `show` the view does not hold the path: no word names it and it is not hidden;
+    // with `write` alone, only that member's words.
     f.clear("a1");
     let mut r = f.limited("y.md");
     r["role"] = json!("fixer");
     r["limits"]["write"] = json!([f.p("w1")]);
     let (v, _) = f.run(&r).unwrap();
     let after = f.after_unit(1);
-    let gh_words = ["--tmpfs", &gh, "--remount-ro", &gh].map(str::to_owned);
-    assert!(after.windows(4).any(|w| w == gh_words), "{after:?}");
+    assert!(!after.contains(&gh), "{after:?}");
+    view.pop();
+    assert_eq!(v["limits"]["view"], json!(view), "{v}");
+    let b = plain.len() + 13;
     assert_eq!(
-        after[18..21],
+        after[b..b + 3],
         ["--bind", &f.p("w1"), &f.p("w1")].map(str::to_owned)
     );
     // Then the words of the home (R14), whose one `--bind` is the home's.
     let home = home_of(&v, 0);
     let words = f.home_words(&[f.p("a1")], &f.p("a1"), &home);
-    assert_eq!(after[21..21 + words.len()], words[..], "{after:?}");
+    assert_eq!(after[b + 3..b + 3 + words.len()], words[..], "{after:?}");
     assert!(
-        !after[21 + words.len()..].iter().any(|w| w == "--bind"),
+        !after[b + 3 + words.len()..].iter().any(|w| w == "--bind"),
         "{after:?}"
     );
-    assert_eq!(v["limits"]["hidden"][0], json!(gh), "{v}");
+    assert!(
+        !v["limits"]["hidden"]
+            .as_array()
+            .unwrap()
+            .contains(&json!(gh)),
+        "{v}"
+    );
     assert_eq!(
         v["limits"]["writable"],
         json!([home, f.p("scratch"), f.p("w1")])
@@ -9555,9 +9782,10 @@ fn limits_r5_the_words_of_the_home_stand_between_the_named_paths_and_the_hidden_
     let (a1, a2, home) = (f.p("a1"), f.p("a2"), home_of(&v, 0));
     let after = f.after_unit(0);
     let base = f.bwrap_base(&a1);
-    assert_eq!(after[..18], base[..], "{after:?}");
+    let b = base.len();
+    assert_eq!(after[..b], base[..], "{after:?}");
     let words = ["--tmpfs", &a1, "--bind", &home, &home, "--remount-ro", &a1].map(str::to_owned);
-    assert_eq!(after[18..25], words, "{after:?}");
+    assert_eq!(after[b..b + 7], words, "{after:?}");
     let want = f.bwrap(&["a1"], "x.md", 0);
     assert_eq!(after[..want.len()], want[..], "{after:?}");
     // Two accounts (the request's `next_accounts` repeats both), each with a sign-in and a
@@ -9579,7 +9807,7 @@ fn limits_r5_the_words_of_the_home_stand_between_the_named_paths_and_the_hidden_
     for (n, account) in [(0, &a1), (1, &a2)] {
         let home = home_of(&v, n);
         let after = f.after_unit(n + 1);
-        assert_eq!(after[..18], f.bwrap_base(account)[..], "{after:?}");
+        assert_eq!(after[..b], f.bwrap_base(account)[..], "{after:?}");
         let words: Vec<String> = [
             "--tmpfs",
             &a1,
@@ -9601,10 +9829,14 @@ fn limits_r5_the_words_of_the_home_stand_between_the_named_paths_and_the_hidden_
         ]
         .map(str::to_owned)
         .to_vec();
-        assert_eq!(after[18..18 + words.len()], words[..], "{after:?}");
+        assert_eq!(after[b..b + words.len()], words[..], "{after:?}");
         let hiding = f.hiding();
-        assert_eq!(after[35..35 + hiding.len()], hiding[..], "{after:?}");
-        assert_eq!(after[35 + hiding.len()], "--cap-drop");
+        let h = b + words.len();
+        assert_eq!(after[h..h + hiding.len()], hiding[..], "{after:?}");
+        assert_eq!(
+            after[h + hiding.len()..h + hiding.len() + 3],
+            ["--remount-ro", "/", "--cap-drop"]
+        );
     }
     // A `CLAUDE.md` that is no regular file is not bound.
     std::fs::remove_file(f.t.join("a1/CLAUDE.md")).unwrap();
@@ -9663,4 +9895,417 @@ fn limits_r1_a_path_equal_to_or_inside_an_account_is_refused() {
     }
     assert!(f.probes.is_empty() && f.launches.is_empty());
     f.untouched("x.md");
+}
+
+// ---- The view of a stage with limits (specs/ap/run-limits.md R16) ------------------------------
+
+impl Fake {
+    /// The words of launch `n` from the first after the three flags up to `--dev /dev`: the view.
+    fn view_words(&self, n: usize) -> Vec<String> {
+        let after = self.after_unit(n);
+        let dev = after.iter().position(|w| w == "--dev").unwrap();
+        after[4..dev].to_vec()
+    }
+    /// A file of mode 0755 at `rel`, its directories made.
+    fn program_at(&self, rel: &str) {
+        let at = self.t.join(rel);
+        std::fs::create_dir_all(at.parent().unwrap()).unwrap();
+        std::fs::write(&at, "#!/bin/sh\n").unwrap();
+        std::fs::set_permissions(&at, std::fs::Permissions::from_mode(0o755)).unwrap();
+    }
+}
+
+// spec: specs/ap/run-limits.md#R16
+// spec: specs/ap/run-limits.md#R5
+// spec: specs/ap/run-limits.md#R7
+#[test]
+fn limits_r16_the_view_in_its_order_with_the_fakes_home() {
+    let mut f = Fake::new();
+    for d in [
+        "home/.rustup/toolchains",
+        "home/.cargo/bin",
+        "home/.cargo/registry",
+        "home/.agents/skills",
+        "home/.config/git",
+        "home/.claude",
+    ] {
+        std::fs::create_dir_all(f.t.join(d)).unwrap();
+    }
+    std::fs::write(f.t.join("home/.gitconfig"), "[user]\n").unwrap();
+    let (v, _) = f.run(&f.limited("x.md")).unwrap();
+    assert_eq!(v["state"], "ok", "{v}");
+    let after = f.after_unit(0);
+    // The three flags, then the view built from nothing: a `/tmp` of its own first.
+    assert_eq!(
+        after[..6],
+        [
+            BWRAP,
+            "--unshare-user",
+            "--disable-userns",
+            "--unshare-pid",
+            "--tmpfs",
+            "/tmp"
+        ]
+    );
+    assert!(!after.windows(3).any(|w| w == ["--ro-bind", "/", "/"]));
+    let head = f.head(false);
+    assert_eq!(after[..head.len()], head[..], "{after:?}");
+    assert_eq!(
+        after[head.len()..head.len() + 2],
+        ["--dev", "/dev"].map(str::to_owned)
+    );
+    // The home's entries in their order, and nothing else of the home.
+    let home: Vec<String> = [
+        ".rustup",
+        ".cargo/bin",
+        ".agents",
+        ".gitconfig",
+        ".config/git",
+    ]
+    .iter()
+    .flat_map(|r| {
+        let p = f.p(&format!("home/{r}"));
+        ["--ro-bind".to_owned(), p.clone(), p]
+    })
+    .collect();
+    let at = after.windows(home.len()).position(|w| w == home);
+    assert!(at.is_some(), "{after:?}");
+    for not in [
+        "home/.cargo",
+        "home/.cargo/registry",
+        "home/.claude",
+        "home",
+    ] {
+        assert!(!after.contains(&f.p(not)), "{not}: {after:?}");
+    }
+    // Of `/etc` only the names of the list (the default policy file aside), and no word of the
+    // view names `/run`.
+    let view = f.view_words(0);
+    for w in view.iter().filter(|w| w.starts_with("/etc/")) {
+        let name = &w["/etc/".len()..];
+        assert!(
+            ETC.contains(&name) || w == "/etc/agent-platform/policy.json",
+            "{w}"
+        );
+    }
+    assert!(!view.iter().any(|w| w == "/run" || w.starts_with("/run/")));
+    // The working directory and the door, read-only.
+    let (cwd, door) = (f.p("cwd"), f.p("scratch.door"));
+    for p in [&cwd, &door] {
+        let bind = ["--ro-bind", p, p].map(str::to_owned);
+        assert!(view.windows(3).any(|w| w == bind), "{p}: {view:?}");
+    }
+    // The root of the view is read-only after the hidden paths, before the last five words.
+    let n = after.iter().position(|w| w == "claude").unwrap();
+    assert_eq!(
+        after[n - 7..n],
+        [
+            "--remount-ro",
+            "/",
+            "--cap-drop",
+            "ALL",
+            "--chdir",
+            &cwd,
+            "--"
+        ]
+        .map(str::to_owned)
+    );
+    // The record's `view`: the source of each read-only bind, in their order.
+    let sources = f
+        .view_of(std::slice::from_ref(&cwd), &f.p("scratch"), false, None)
+        .sources;
+    assert_eq!(v["limits"]["view"], json!(sources), "{v}");
+    assert!(!sources.iter().any(|s| s == "/tmp"));
+    // An entry absent at the launch gets no word.
+    std::fs::remove_dir_all(f.t.join("home/.rustup")).unwrap();
+    std::fs::remove_file(f.t.join("home/.gitconfig")).unwrap();
+    f.clear("a1");
+    let (v, _) = f.run(&f.limited("y.md")).unwrap();
+    let after = f.after_unit(1);
+    for gone in ["home/.rustup", "home/.gitconfig"] {
+        assert!(!after.contains(&f.p(gone)), "{gone}: {after:?}");
+        assert!(
+            !v["limits"]["view"]
+                .as_array()
+                .unwrap()
+                .contains(&json!(f.p(gone)))
+        );
+    }
+    assert_eq!(after[..f.head(false).len()], f.head(false)[..]);
+}
+
+// spec: specs/ap/run-limits.md#R16
+#[test]
+fn limits_r16_a_top_directory_is_a_link_or_a_directory_of_its_own() {
+    let f = Fake::new();
+    std::fs::create_dir_all(f.t.join("usr/bin")).unwrap();
+    std::os::unix::fs::symlink("usr/bin", f.t.join("bin-link")).unwrap();
+    std::fs::create_dir(f.t.join("bin-dir")).unwrap();
+    let (link, dir) = (f.p("bin-link"), f.p("bin-dir"));
+    assert_eq!(ap::run::top_words(&link), ["--symlink", "usr/bin", &link]);
+    assert_eq!(ap::run::top_words(&dir), ["--ro-bind", &dir, &dir]);
+    assert!(ap::run::top_words(&f.p("absent")).is_empty());
+    // This host's own, as the launch places them.
+    let mut f = Fake::new();
+    let (v, _) = f.run(&f.limited("x.md")).unwrap();
+    assert_eq!(v["state"], "ok", "{v}");
+    let view = f.view_words(0);
+    for p in ["/bin", "/lib", "/lib64", "/sbin"] {
+        let words = ap::run::top_words(p);
+        if words.is_empty() {
+            assert!(!view.iter().any(|w| w == p), "{p}");
+        } else {
+            assert!(view.windows(3).any(|w| w == words), "{p}: {view:?}");
+        }
+    }
+}
+
+// spec: specs/ap/run-limits.md#R16
+#[test]
+fn limits_r16_the_program_is_found_on_the_path_through_a_link_or_as_a_file() {
+    let mut f = Fake::new();
+    // The test's directories first, then those of the fake CLI's own programs.
+    let path = |f: &mut Fake, dirs: &[&str]| {
+        let mut joined: Vec<String> = dirs.iter().map(|d| f.p(d)).collect();
+        joined.extend(["/usr/bin", "/bin"].map(str::to_owned));
+        f.env.retain(|(k, _)| k != "PATH");
+        f.env.push(("PATH".into(), joined.join(":")));
+    };
+    // Through a link: the file it resolves to, at the path the search found it; a directory
+    // without the word and a file without an execute bit are passed over.
+    f.program_at("real/claude-2");
+    std::fs::create_dir_all(f.t.join("p2")).unwrap();
+    std::os::unix::fs::symlink(f.p("real/claude-2"), f.p("p2/claude")).unwrap();
+    std::fs::create_dir_all(f.t.join("p0")).unwrap();
+    std::fs::write(f.t.join("p0/claude"), "not a program\n").unwrap();
+    path(&mut f, &["empty", "p0", "p2"]);
+    let (v, _) = f.run(&f.limited("x.md")).unwrap();
+    assert_eq!(v["state"], "ok", "{v}");
+    let (file, found) = (f.p("real/claude-2"), f.p("p2/claude"));
+    let bind = ["--ro-bind", &file, &found].map(str::to_owned);
+    let view = f.view_words(0);
+    assert!(view.windows(3).any(|w| w == bind), "{view:?}");
+    assert!(!view.contains(&f.p("p0/claude")));
+    assert!(
+        v["limits"]["view"]
+            .as_array()
+            .unwrap()
+            .contains(&json!(file))
+    );
+    // As a file, at its own path, the first one on the path.
+    f.program_at("p1/claude");
+    path(&mut f, &["p1", "p2"]);
+    f.clear("a1");
+    let (v, _) = f.run(&f.limited("y.md")).unwrap();
+    assert_eq!(v["state"], "ok", "{v}");
+    let one = f.p("p1/claude");
+    let bind = ["--ro-bind", &one, &one].map(str::to_owned);
+    let view = f.view_words(1);
+    assert!(view.windows(3).any(|w| w == bind), "{view:?}");
+    assert!(!view.contains(&found));
+    // Not found (where this host has no program of the word in `/usr/bin` or `/bin`): no word,
+    // and the launch is made.
+    path(&mut f, &["empty"]);
+    let (v, _) = f.run(&f.limited("z.md")).unwrap();
+    assert_eq!(v["state"], "ok", "{v}");
+    let host = ["/usr/bin/claude", "/bin/claude"].map(|p| Path::new(p).exists());
+    if !host.contains(&true) {
+        assert!(!f.view_words(2).iter().any(|w| w.ends_with("/claude")));
+    }
+    assert_eq!(f.launches.len(), 3);
+}
+
+// spec: specs/ap/run-limits.md#R16
+#[test]
+fn limits_r16_the_policy_file_of_the_request_or_the_default_and_never_a_hidden_one() {
+    let mut f = Fake::new();
+    let named = |f: &Fake, n: usize, p: &str| f.view_words(n).iter().any(|w| w == p);
+    // The default, when it is a regular file on this host.
+    let (v, _) = f.run(&f.limited("d.md")).unwrap();
+    assert_eq!(v["state"], "ok", "{v}");
+    let default = "/etc/agent-platform/policy.json";
+    let is_file = std::fs::metadata(default).is_ok_and(|m| m.is_file());
+    assert_eq!(named(&f, 0, default), is_file);
+    // `AP_POLICY_FILE` of the request's `env`, in place of the default.
+    std::fs::write(f.t.join("policy.json"), "{}").unwrap();
+    let policy = f.p("policy.json");
+    let mut r = f.limited("e.md");
+    r["env"] = json!({"AP_POLICY_FILE": policy});
+    let (v, _) = f.run(&r).unwrap();
+    assert_eq!(v["state"], "ok", "{v}");
+    let bind = ["--ro-bind", &policy, &policy].map(str::to_owned);
+    assert!(f.view_words(1).windows(3).any(|w| w == bind));
+    assert!(!named(&f, 1, default));
+    assert!(
+        v["limits"]["view"]
+            .as_array()
+            .unwrap()
+            .contains(&json!(policy))
+    );
+    // A file inside a hidden path, a link to one, a path inside the store's directory, a
+    // directory, and a file of `/etc` but the default, named and through a link: no word names it,
+    // and the default is not bound in its place.
+    std::fs::write(f.t.join("home/.ssh/policy.json"), "{}").unwrap();
+    let hidden = f.p("home/.ssh/policy.json");
+    std::os::unix::fs::symlink(&hidden, f.p("link.json")).unwrap();
+    std::fs::create_dir(f.t.join("policy-dir")).unwrap();
+    std::os::unix::fs::symlink("/etc/shadow", f.p("etc-link.json")).unwrap();
+    let cases = [
+        hidden.clone(),
+        f.p("link.json"),
+        "/var/lib/ontology-platform/policy.json".to_owned(),
+        f.p("policy-dir"),
+        "/etc/shadow".to_owned(),
+        f.p("etc-link.json"),
+    ];
+    for (i, p) in cases.iter().enumerate() {
+        let mut r = f.limited(&format!("n{i}.md"));
+        r["env"] = json!({"AP_POLICY_FILE": p});
+        let (v, _) = f.run(&r).unwrap();
+        assert_eq!(v["state"], "ok", "{p}: {v}");
+        let n = 2 + i;
+        let view = f.view_words(n);
+        let shown = |w: &String| w == p || w == &hidden || w == default || w == "/etc/shadow";
+        assert!(!view.iter().any(shown), "{p}: {view:?}");
+    }
+}
+
+// spec: specs/ap/run-limits.md#R16
+#[test]
+fn limits_r16_the_git_directories_of_the_working_directory() {
+    let mut f = Fake::new();
+    let mk = |f: &Fake, d: &str| std::fs::create_dir_all(f.t.join(d)).unwrap();
+    // `.git` absent: the working directory alone.
+    let (v, _) = f.run(&f.limited("a.md")).unwrap();
+    assert_eq!(v["state"], "ok", "{v}");
+    let want = f.view_of(&[f.p("cwd")], &f.p("scratch"), false, None).words;
+    assert_eq!(f.view_words(0), want);
+    // `.git` a directory whose object store borrows from two others (one named relative to its
+    // `objects`) and names one that does not exist.
+    for d in ["cwd/.git/objects/info", "alt/objects", "alt2/objects"] {
+        mk(&f, d);
+    }
+    let alternates = format!(
+        "{}\n../../../alt2/objects\n{}\n",
+        f.p("alt/objects"),
+        f.p("none/objects")
+    );
+    std::fs::write(f.t.join("cwd/.git/objects/info/alternates"), alternates).unwrap();
+    f.clear("a1");
+    let (v, _) = f.run(&f.limited("b.md")).unwrap();
+    assert_eq!(v["state"], "ok", "{v}");
+    let dirs = [f.p("cwd"), f.p("alt/objects"), f.p("alt2/objects")];
+    let want = f.view_of(&dirs, &f.p("scratch"), false, None).words;
+    assert_eq!(f.view_words(1), want);
+    // `.git` a file naming, relative to the working directory, a worktree's directory whose
+    // `commondir` names the common directory; that one's alternates too.
+    for d in ["main/.git/worktrees/wt", "main/.git/objects/info", "wt"] {
+        mk(&f, d);
+    }
+    std::fs::write(f.t.join("wt/.git"), "gitdir: ../main/.git/worktrees/wt\n").unwrap();
+    std::fs::write(f.t.join("main/.git/worktrees/wt/commondir"), "../..\n").unwrap();
+    std::fs::write(
+        f.t.join("main/.git/objects/info/alternates"),
+        format!("{}\n", f.p("alt/objects")),
+    )
+    .unwrap();
+    let mut r = f.limited("c.md");
+    r["cwd"] = json!(f.p("wt"));
+    let (v, _) = f.run(&r).unwrap();
+    assert_eq!(v["state"], "ok", "{v}");
+    let dirs = [f.p("wt"), f.p("main/.git"), f.p("alt/objects")];
+    let want = f.view_of(&dirs, &f.p("scratch"), false, None).words;
+    assert_eq!(f.view_words(2), want);
+    assert!(!f.view_words(2).contains(&f.p("main/.git/worktrees/wt")));
+}
+
+// spec: specs/ap/run-limits.md#R16
+// spec: specs/ap/run-limits.md#R10
+#[test]
+fn limits_r16_the_state_of_gh_only_where_show_names_it_and_it_exists() {
+    let mut f = Fake::new();
+    let gh = f.p("home/.config/gh");
+    // `show` without the path: no word.
+    let mut r = f.limited("a.md");
+    r["limits"]["show"] = json!(["~/.config/gh"]);
+    let (v, _) = f.run(&r).unwrap();
+    assert_eq!(v["state"], "ok", "{v}");
+    assert!(!f.after_unit(0).contains(&gh));
+    // `show` with the path: its bind, its entry in `view`, no hiding argument.
+    std::fs::create_dir_all(f.t.join("home/.config/gh")).unwrap();
+    let mut r = f.limited("b.md");
+    r["limits"]["show"] = json!(["~/.config/gh"]);
+    let (v, _) = f.run(&r).unwrap();
+    assert_eq!(v["state"], "ok", "{v}");
+    let after = f.after_unit(1);
+    let bind = ["--ro-bind", &gh, &gh].map(str::to_owned);
+    assert!(f.view_words(1).windows(3).any(|w| w == bind));
+    assert_eq!(after.iter().filter(|w| **w == gh).count(), 2, "{after:?}");
+    assert_eq!(
+        v["limits"]["view"].as_array().unwrap().last(),
+        Some(&json!(gh))
+    );
+    assert!(
+        !v["limits"]["hidden"]
+            .as_array()
+            .unwrap()
+            .contains(&json!(gh))
+    );
+    // Without `show`: neither a bind nor a hiding argument names it.
+    let (v, _) = f.run(&f.limited("c.md")).unwrap();
+    assert!(!f.after_unit(2).contains(&gh));
+    assert!(
+        !v["limits"]["hidden"]
+            .as_array()
+            .unwrap()
+            .contains(&json!(gh))
+    );
+}
+
+// spec: specs/ap/run-limits.md#R16
+// spec: specs/ap/run-limits.md#R10
+#[test]
+fn limits_r16_no_bind_holds_a_path_of_the_audits_must_not_see_list() {
+    let mut f = Fake::new();
+    for rel in [
+        ".config/rclone/rclone.conf",
+        ".config/tailscale-oauth.env",
+        ".config/herdr/herdr.sock",
+        ".codex/auth.json",
+        ".google_authenticator",
+        ".ssh/id_ed25519",
+    ] {
+        let at = f.t.join("home").join(rel);
+        std::fs::create_dir_all(at.parent().unwrap()).unwrap();
+        std::fs::write(&at, "").unwrap();
+    }
+    std::fs::create_dir_all(f.t.join("home/.config/gh")).unwrap();
+    // Every member of `limits`.
+    let r = f.named_request("x.md", "implementer");
+    let (v, _) = f.run(&r).unwrap();
+    assert_eq!(v["state"], "ok", "{v}");
+    let after = f.after_unit(0);
+    let targets = bind_targets(&after);
+    let home = |rel: &str| f.p(&format!("home/{rel}"));
+    let never = [
+        home(".config/rclone/rclone.conf"),
+        home(".config/tailscale-oauth.env"),
+        home(".config/herdr/herdr.sock"),
+        home(".codex/auth.json"),
+        home(".google_authenticator"),
+        home(".ssh/id_ed25519"),
+        "/etc/shadow".to_owned(),
+        "/etc/ssh".to_owned(),
+        "/var/lib/tailscale".to_owned(),
+        "/var/backups".to_owned(),
+        "/docker".to_owned(),
+        "/etc/monarx-agent.conf".to_owned(),
+        "/etc/agent-platform/credentials".to_owned(),
+        "/var/lib/ontology-platform".to_owned(),
+        "/run".to_owned(),
+    ];
+    for p in &never {
+        let held = targets.iter().find(|t| Path::new(p).starts_with(t));
+        assert!(held.is_none(), "{p} in {held:?}: {after:?}");
+    }
 }

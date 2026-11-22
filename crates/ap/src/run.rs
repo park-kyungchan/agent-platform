@@ -305,12 +305,25 @@ struct Limits {
 /// The one path `show` may name (R1, R10).
 const SHOWN: &str = "~/.config/gh";
 impl Limits {
-    /// The paths of the hidden list that exist now, but the one `show` names (R10).
-    fn hidden(&self, work_root: &Path) -> Vec<(String, bool)> {
+    /// The paths of the hidden list that exist now and are equal to, inside or hold the target of
+    /// a bind of the launch (`targets`), but the one `show` names (R10).
+    fn hidden(&self, work_root: &Path, targets: &[String]) -> Vec<(String, bool)> {
         let shown = Path::new(&self.home).join(&SHOWN[2..]);
         let mut hidden = hidden_now(&self.home, work_root);
         hidden.retain(|(p, _)| !self.show || Path::new(p) != shown);
+        hidden.retain(|(p, _)| targets.iter().any(|t| related(p, t)));
         hidden
+    }
+    /// The targets of the binds the request names, beside the scratch directory: the `write`
+    /// paths, the `over` targets and the `read_only` paths (R5, R10).
+    fn targets(&self) -> Vec<String> {
+        let targets = self.over.iter().map(|(_, t)| t.clone());
+        [self.scratch.clone()]
+            .into_iter()
+            .chain(self.write.iter().cloned())
+            .chain(targets)
+            .chain(self.read_only.iter().cloned())
+            .collect()
     }
     /// The `bwrap` words of the paths the request names, after the scratch directory: `write`,
     /// then `over`, then `read_only`, each in its order (R5).
@@ -411,6 +424,238 @@ fn hidden_now(home: &str, work_root: &Path) -> Vec<(String, bool)> {
 pub(crate) fn hidden_words(s: &impl System) -> Option<Vec<String>> {
     let home = s.home()?.to_string_lossy().into_owned();
     Some(hiding(&hidden_now(&home, &s.work_root())))
+}
+/// Whether one path is equal to or inside the other, by components as written (R10).
+fn related(a: &str, b: &str) -> bool {
+    Path::new(a).starts_with(b) || Path::new(b).starts_with(a)
+}
+/// The top directories beside `/usr` that R16 (b) places, each as a link or a directory.
+const VIEW_TOP: [&str; 4] = ["/bin", "/lib", "/lib64", "/sbin"];
+/// The names of `/etc` a stage sees, in this order (R16 (c)); no other name of `/etc`.
+const VIEW_ETC: &[&str] = &[
+    "passwd",
+    "group",
+    "nsswitch.conf",
+    "hosts",
+    "host.conf",
+    "gai.conf",
+    "resolv.conf",
+    "services",
+    "protocols",
+    "networks",
+    "ssl/certs",
+    "ssl/openssl.cnf",
+    "ca-certificates",
+    "ca-certificates.conf",
+    "localtime",
+    "timezone",
+    "ld.so.cache",
+    "ld.so.conf",
+    "ld.so.conf.d",
+    "alternatives",
+    "os-release",
+    "lsb-release",
+    "bash.bashrc",
+    "profile",
+    "inputrc",
+    "shells",
+    "gitconfig",
+    "mime.types",
+    "magic",
+    "magic.mime",
+    "python3",
+    "terminfo",
+    "locale.alias",
+];
+/// The paths under the home a stage sees: the toolchain, the instructions and Git's own
+/// configuration (R16 (d)); nothing else of the home.
+const VIEW_HOME: [&str; 5] = [
+    ".rustup",
+    ".cargo/bin",
+    ".agents",
+    ".gitconfig",
+    ".config/git",
+];
+/// The host's build lock (`specs/ap/check.md` R5's default), which the stage's `ap check` takes
+/// (R16 (f)).
+const BUILD_LOCK: &str = "/var/lib/agent-platform/build.lock";
+/// The policy file without `AP_POLICY_FILE` (`specs/ap/policy.md` R1; R16 (i)).
+const POLICY_DEFAULT: &str = "/etc/agent-platform/policy.json";
+/// The store's directory (`specs/ap/deliver.md` R37): no policy file inside it is shown (R16 (i)).
+const STORE_DIR: &str = "/var/lib/ontology-platform";
+/// The word that starts the CLI of a stage with `limits` (R16 (e)).
+const CLI_WORD: &str = "claude";
+/// What R16 places in place of `--ro-bind / /`: its words, the source of each read-only bind in
+/// the words' order (the record's `view`, R7) and the target of each (R10).
+#[derive(Default)]
+struct View {
+    words: Vec<String>,
+    sources: Vec<String>,
+    targets: Vec<String>,
+}
+impl View {
+    fn bind(&mut self, source: &str, target: &str) {
+        self.words.extend(args(&["--ro-bind", source, target]));
+        self.sources.push(source.to_owned());
+        self.targets.push(target.to_owned());
+    }
+    /// `--ro-bind <p> <p>` when `p` exists now, a link followed.
+    fn bind_present(&mut self, p: &str) {
+        if std::fs::metadata(p).is_ok() {
+            self.bind(p, p);
+        }
+    }
+}
+fn lossy(p: &Path) -> String {
+    p.to_string_lossy().into_owned()
+}
+/// The last value of `name` in an environment list.
+fn variable<'a>(env: &'a [(String, String)], name: &str) -> Option<&'a str> {
+    env.iter()
+        .rev()
+        .find(|(k, _)| k == name)
+        .map(|(_, v)| v.as_str())
+}
+/// The stage's root, built from nothing (R16): a `/tmp` of its own, `/usr` and its links, the
+/// fixed names of `/etc`, the toolchain of the home, the CLI's program, the build lock, the
+/// working directory with its Git directories, the door, the policy file, and the state of `gh`
+/// when `show` names it.
+fn view(q: &Request, l: &Limits, work_root: &Path) -> View {
+    let mut v = View::default();
+    v.words.extend(args(&["--tmpfs", "/tmp"]));
+    v.bind_present("/usr");
+    for p in VIEW_TOP {
+        match top_words(p) {
+            words if words.first().is_some_and(|w| w == "--ro-bind") => v.bind(p, p),
+            words => v.words.extend(words),
+        }
+    }
+    for name in VIEW_ETC {
+        v.bind_present(&format!("/etc/{name}"));
+    }
+    let at_home = |rel: &str| lossy(&Path::new(&l.home).join(rel));
+    for rel in VIEW_HOME {
+        v.bind_present(&at_home(rel));
+    }
+    if let Some((found, file)) = program(variable(&q.base_env, "PATH"), &q.cwd) {
+        v.bind(&file, &found);
+    }
+    v.bind_present(BUILD_LOCK);
+    for p in git_dirs(&q.cwd) {
+        v.bind(&p, &p);
+    }
+    v.bind_present(&crate::door::path_of(&l.scratch));
+    if let Some(p) = policy_shown(&q.base_env, &l.home, work_root) {
+        v.bind(&p, &p);
+    }
+    if l.show {
+        v.bind_present(&at_home(&SHOWN[2..]));
+    }
+    v
+}
+/// The words of one top directory beside `/usr` (`specs/ap/run-limits.md` R16 (b)): `--symlink
+/// <its link text> <p>` when it is a link, else `--ro-bind <p> <p>` when it exists, else none.
+pub fn top_words(p: &str) -> Vec<String> {
+    match std::fs::symlink_metadata(p) {
+        Ok(m) if m.file_type().is_symlink() => std::fs::read_link(p)
+            .map(|to| args(&["--symlink", &lossy(&to), p]))
+            .unwrap_or_default(),
+        _ if std::fs::metadata(p).is_ok() => args(&["--ro-bind", p, p]),
+        _ => vec![],
+    }
+}
+/// Where `execvp` finds the CLI's word on `path` (the default search path without one), and the
+/// file it resolves to through every link: the path found and the file (R16 (e)).
+fn program(path: Option<&str>, cwd: &str) -> Option<(String, String)> {
+    use std::os::unix::fs::PermissionsExt;
+    for dir in path.unwrap_or("/bin:/usr/bin").split(':') {
+        let dir = if dir.is_empty() { cwd } else { dir };
+        let found = Path::new(cwd).join(dir).join(CLI_WORD);
+        let Ok(m) = std::fs::metadata(&found) else {
+            continue;
+        };
+        if !m.is_file() || m.permissions().mode() & 0o111 == 0 {
+            continue;
+        }
+        let file = std::fs::canonicalize(&found).ok()?;
+        return Some((lossy(&found), lossy(&file)));
+    }
+    None
+}
+/// The working directory and its Git directories, each resolved through its links and named once:
+/// the common directory of a worktree whose `.git` is a file, then each directory its object
+/// store borrows from (`objects/info/alternates`) (R16 (g)).
+fn git_dirs(cwd: &str) -> Vec<String> {
+    let mut dirs: Vec<PathBuf> = vec![];
+    let mut add = |p: PathBuf| {
+        if !dirs.contains(&p) {
+            dirs.push(p);
+        }
+    };
+    let Ok(top) = std::fs::canonicalize(cwd) else {
+        return vec![];
+    };
+    add(top);
+    let dot = Path::new(cwd).join(".git");
+    let common = match std::fs::metadata(&dot) {
+        Ok(m) if m.is_dir() => Some(dot),
+        Ok(m) if m.is_file() => gitdir(&dot, cwd).and_then(|a| {
+            let common = match std::fs::read_to_string(a.join("commondir")) {
+                Ok(c) => a.join(c.strip_suffix('\n').unwrap_or(&c)),
+                Err(_) => a,
+            };
+            let common = std::fs::canonicalize(common).ok()?;
+            common.is_dir().then(|| {
+                add(common.clone());
+                common
+            })
+        }),
+        _ => None,
+    };
+    if let Some(common) = common {
+        let objects = common.join("objects");
+        let text = std::fs::read_to_string(objects.join("info/alternates")).unwrap_or_default();
+        for line in text
+            .lines()
+            .filter(|l| !l.is_empty() && !l.starts_with('#'))
+        {
+            if let Ok(p) = std::fs::canonicalize(objects.join(line))
+                && p.is_dir()
+            {
+                add(p);
+            }
+        }
+    }
+    dirs.iter().map(|p| lossy(p)).collect()
+}
+/// The directory a `.git` file names in its one line `gitdir: <A>`, read against `cwd`.
+fn gitdir(dot: &Path, cwd: &str) -> Option<PathBuf> {
+    let text = std::fs::read_to_string(dot).ok()?;
+    let line = text.strip_suffix('\n').unwrap_or(&text);
+    let a = line
+        .strip_prefix("gitdir: ")
+        .filter(|a| !a.contains('\n'))?;
+    Some(Path::new(cwd).join(a))
+}
+/// The policy file the stage's own `ap check` reads (`AP_POLICY_FILE` of the launch's environment
+/// when set and not empty, else the default), when it is a regular file and neither the path as
+/// written nor the file it resolves to is a hidden path or inside one, inside the store's
+/// directory, or under `/etc` but the default (R16 (i)).
+fn policy_shown(env: &[(String, String)], home: &str, work_root: &Path) -> Option<String> {
+    let p = variable(env, "AP_POLICY_FILE")
+        .filter(|p| !p.is_empty())
+        .unwrap_or(POLICY_DEFAULT);
+    let path = Path::new(p);
+    if !path.is_absolute() || !std::fs::metadata(path).ok()?.is_file() {
+        return None;
+    }
+    let resolved = std::fs::canonicalize(path).ok()?;
+    let barred = |x: &Path| {
+        in_hidden(&lossy(x), home, work_root)
+            || x.starts_with(STORE_DIR)
+            || (x.starts_with("/etc") && x != Path::new(POLICY_DEFAULT))
+    };
+    (!barred(path) && !barred(&resolved)).then(|| p.to_owned())
 }
 /// The `bwrap` arguments that hide these paths: a directory becomes an empty one the stage cannot
 /// write, any other path `/dev/null` (R10).
@@ -2336,19 +2581,29 @@ fn attempt(
     if let Some(home) = &stage_home {
         record["home"] = json!(home);
     }
-    // The hidden paths of this launch, as they exist when it is prepared, but the one shown (R7,
-    // R10).
-    let hidden = q
+    // The stage's view of the host (R16), and the hidden paths of this launch as they exist when
+    // it is prepared: those a bind of the launch holds or lies in, but the one shown (R7, R10).
+    let view = q
         .limits
         .as_ref()
-        .map(|l| l.hidden(&s.work_root()))
+        .map(|l| view(q, l, &s.work_root()))
         .unwrap_or_default();
+    let hidden = match (&q.limits, &stage_home) {
+        (Some(l), Some(home)) => {
+            let mut targets = view.targets.clone();
+            targets.push(account.to_owned());
+            targets.extend(l.targets());
+            targets.push(lossy(home));
+            l.hidden(&s.work_root(), &targets)
+        }
+        _ => vec![],
+    };
     if let (Some(l), Some(home)) = (&q.limits, &stage_home) {
         let paths: Vec<&String> = hidden.iter().map(|(p, _)| p).collect();
         let mut writable = vec![home.to_string_lossy().into_owned()];
         writable.extend(l.writable().into_iter().map(str::to_owned));
         let mut limits = json!({"scratch": l.scratch, "writable": writable,
-            "bwrap": BWRAP, "hidden": paths});
+            "bwrap": BWRAP, "hidden": paths, "view": view.sources});
         for (k, v) in &l.given {
             limits[k] = v.clone();
         }
@@ -2456,22 +2711,14 @@ fn attempt(
         }
     }
     if let Some(limits @ Limits { scratch, .. }) = &q.limits {
-        // After `systemd-run … --`, in front of the CLI: its own pid namespace (no other stage
-        // in its `/proc`), everything read-only but the launch's home, the scratch directory
-        // and the paths the request names, no capability (R5); temporary files and builds go to
-        // the scratch directory (R6).
-        let bwrap = [
-            BWRAP,
-            "--unshare-pid",
-            "--ro-bind",
-            "/",
-            "/",
-            "--dev",
-            "/dev",
-            "--proc",
-            "/proc",
-        ];
-        let mut bwrap = args(&bwrap);
+        // After `systemd-run … --`, in front of the CLI: its own user namespace, in which it can
+        // make no other, and its own pid namespace (no other stage in its `/proc`); a root built
+        // from nothing but the view of R16, everything read-only but the launch's home, the
+        // scratch directory and the paths the request names, no capability (R5); temporary files
+        // and builds go to the scratch directory (R6).
+        let mut bwrap = args(&[BWRAP, "--unshare-user", "--disable-userns", "--unshare-pid"]);
+        bwrap.extend(view.words.iter().cloned());
+        bwrap.extend(args(&["--dev", "/dev", "--proc", "/proc"]));
         bwrap.extend(args(&["--ro-bind", "/proc/sys", "/proc/sys"]));
         bwrap.extend(args(&[
             "--bind", account, account, "--bind", scratch, scratch,
@@ -2483,6 +2730,8 @@ fn attempt(
         }
         // After the binds: the host's credentials and sockets, hidden (R10).
         bwrap.extend(hiding(&hidden));
+        // The root of the view itself, read-only after its last mount (R5).
+        bwrap.extend(args(&["--remount-ro", "/"]));
         bwrap.extend(args(&["--cap-drop", "ALL", "--chdir", &q.cwd, "--"]));
         argv.splice(cli + 1..cli + 1, bwrap);
         env.retain(|(k, _)| k != "TMPDIR" && k != "CARGO_TARGET_DIR" && k != "AP_DOOR");

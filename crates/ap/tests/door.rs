@@ -535,20 +535,22 @@ fn r1_r13_a_stage_with_limits_has_its_door_and_ap_door_alone() {
             .lines()
             .any(|l| l == format!("AP_DOOR={door}"))
     );
-    // The words after `systemd-run … --` are the base's: no word names the door.
+    // The words after `systemd-run … --` are the base's but for the view (`specs/ap/run-limits.md`
+    // R16): its one bind of the door, read-only; no other word names the door.
     let launch = &f.launches[0];
     let at = launch.iter().position(|a| a == "--").unwrap();
     let after = &launch[at + 1..];
-    let head: Vec<&str> = after[..18].iter().map(String::as_str).collect();
+    let flags: Vec<&str> = after[..4].iter().map(String::as_str).collect();
+    assert_eq!(
+        flags,
+        [BWRAP, "--unshare-user", "--disable-userns", "--unshare-pid"]
+    );
+    let dev = after.iter().position(|a| a == "--dev").unwrap();
+    let head: Vec<&str> = after[dev..dev + 13].iter().map(String::as_str).collect();
     let (a1, scratch) = (f.s("a1"), f.s("scratch"));
     assert_eq!(
         head,
         [
-            BWRAP,
-            "--unshare-pid",
-            "--ro-bind",
-            "/",
-            "/",
             "--dev",
             "/dev",
             "--proc",
@@ -566,19 +568,29 @@ fn r1_r13_a_stage_with_limits_has_its_door_and_ap_door_alone() {
     );
     let end = after.iter().position(|a| a == "--cap-drop").unwrap();
     let repo = f.s("repo");
+    assert_eq!(after[end - 2..end], ["--remount-ro", "/"]);
     assert_eq!(
         after[end..end + 5],
         ["--cap-drop", "ALL", "--chdir", &repo, "--"]
     );
-    assert!(
-        !launch
-            .iter()
-            .any(|a| a.contains(".door") || a.contains("AP_DOOR")),
-        "{launch:?}"
-    );
-    // The record's `limits` is the base's.
+    let bind = ["--ro-bind", &door, &door].map(str::to_owned);
+    let bound = after[..dev].windows(3).position(|w| w == bind);
+    assert!(bound.is_some(), "{after:?}");
+    let naming: Vec<&String> = launch
+        .iter()
+        .filter(|a| a.contains(".door") || a.contains("AP_DOOR"))
+        .collect();
+    assert_eq!(naming, [&door, &door], "{launch:?}");
+    // The record's `limits` is the base's and the view's, which names the door.
     let keys: Vec<&String> = v["limits"].as_object().unwrap().keys().collect();
-    assert_eq!(keys, ["bwrap", "hidden", "scratch", "writable"]);
+    assert_eq!(keys, ["bwrap", "hidden", "scratch", "view", "writable"]);
+    assert!(
+        v["limits"]["view"]
+            .as_array()
+            .unwrap()
+            .contains(&json!(door)),
+        "{v}"
+    );
     // The first entry is the home of the launch (`specs/ap/run-limits.md` R14).
     assert_eq!(v["limits"]["writable"], json!([v["home"], scratch]));
     // A door that is asked nothing writes nothing.
