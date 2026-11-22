@@ -1,6 +1,6 @@
 ## A second look
 
-You judged this unit before, in this session; this section replaces the words "a fresh session" and "no reasoning of its author" of "How you work" for this look. The head named under "The change" above is the head now; "The round" below names the head you judged and what moved it: the author's repair after your report, or a merge of `origin/main` into the branch. Run no checkout and no fetch. Read the diff between the head you judged and this one. After a repair, read the author's newest comment on the pull request as a CLAIM to check, not as a fact.
+You judged this unit before, in this session; this section replaces the words "a fresh session" and "no reasoning of its author" of "How you work" for this look. The head named under "The change" above is the head now; "The round" below names the head you judged and what moved it: the author's repair after your report, or a merge of `origin/main` into the branch. Run no checkout and no fetch. Read the diff between the head you judged and this one. After a repair, read the author's answer, the file "The round" names, as a CLAIM to check, not as a fact.
 
 Answer by your own runs (scratch files under a directory made with `mktemp -d`, removed at the end; the worktree unchanged):
 1. Each blocking finding of your report: is it closed, by the run that showed it before? For a finding the author did not change: is the author's reason right by the page and by a command?
