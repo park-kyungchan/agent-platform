@@ -1,7 +1,7 @@
 {
   "format": "ontology-schema/v1",
   "domain": "work",
-  "version": 15,
+  "version": 16,
   "namespace": {
     "instance": "vps://palantirkc",
     "account": "root"
@@ -156,7 +156,10 @@
         "/home/palantirkc/work/*/*/*credential*",
         "/home/palantirkc/work/*/*/*/*credential*",
         "/home/palantirkc/work/*/*/*/*private*",
-        "/home/palantirkc/work/*/*/*/*custody*"
+        "/home/palantirkc/work/*/*/*/*custody*",
+        "/home/palantirkc/work/edu-*",
+        "/home/palantirkc/work/*/edu-*",
+        "/home/palantirkc/work/*/*/edu-*"
       ],
       "head_lines": 40,
       "complete_listing": true,
@@ -209,7 +212,10 @@
         "/home/palantirkc/work/*/*/*credential*",
         "/home/palantirkc/work/*/*/*/*credential*",
         "/home/palantirkc/work/*/*/*/*private*",
-        "/home/palantirkc/work/*/*/*/*custody*"
+        "/home/palantirkc/work/*/*/*/*custody*",
+        "/home/palantirkc/work/edu-*",
+        "/home/palantirkc/work/*/edu-*",
+        "/home/palantirkc/work/*/*/edu-*"
       ],
       "head_lines": 40,
       "complete_listing": true,
@@ -262,7 +268,10 @@
         "/home/palantirkc/work/*/*/*credential*",
         "/home/palantirkc/work/*/*/*/*credential*",
         "/home/palantirkc/work/*/*/*/*private*",
-        "/home/palantirkc/work/*/*/*/*custody*"
+        "/home/palantirkc/work/*/*/*/*custody*",
+        "/home/palantirkc/work/edu-*",
+        "/home/palantirkc/work/*/edu-*",
+        "/home/palantirkc/work/*/*/edu-*"
       ],
       "head_lines": 40,
       "complete_listing": true,
@@ -293,7 +302,8 @@
       "fresh_for_s": 86400
     },
     "sections": {"kind": "records", "glob": "/var/lib/agent-platform/route/*.sections.jsonl", "time_member": "observed_at", "type_member": "type", "complete_listing": true, "fresh_for_s": 3600},
-    "components": {"kind": "records", "glob": "/var/lib/agent-platform/route/*.components.jsonl", "time_member": "observed_at", "type_member": "type", "complete_listing": true, "fresh_for_s": 3600}
+    "components": {"kind": "records", "glob": "/var/lib/agent-platform/route/*.components.jsonl", "time_member": "observed_at", "type_member": "type", "complete_listing": true, "fresh_for_s": 3600},
+    "clauses": {"kind": "records", "glob": "/var/lib/agent-platform/clause/*.clauses.jsonl", "time_member": "observed_at", "type_member": "type", "complete_listing": true, "fresh_for_s": 3600}
   },
   "object_types": {
     "task": {
@@ -1213,7 +1223,7 @@
         "invariants": {"type": "string", "required": false, "max_bytes": 3000, "description": "What must stay true while the unit changes things."},
         "acceptance": {"type": {"array": {"struct": {"check": {"value_type": "nonempty_text"}, "kind": {"value_type": "acceptance_kind"}}}}, "required": false, "description": "The checks: a command and its kind, fails_on_base (fails before the change) or invariant (holds before and after)."},
         "not_built": {"type": "string", "required": false, "max_bytes": 1500, "description": "What the unit must not build."},
-        "write_set": {"type": {"array": "string"}, "required": false, "description": "The paths the unit may change (globs)."},
+        "write_set": {"type": {"array": {"value_type": "write_pattern"}}, "required": false, "description": "The paths the unit may change (globs)."},
         "read_first": {"type": {"array": "string"}, "required": false, "description": "The files the worker reads before any effect."},
         "specs": {"type": {"array": "string"}, "required": false, "description": "The design sources the unit implements."},
         "notes": {"type": "string", "required": false, "max_bytes": 3000, "description": "Notes for the worker."},
@@ -1225,6 +1235,9 @@
         "verifier": {"type": {"struct": {"runtime": "string", "model": "string", "effort": "string"}}, "required": false, "description": "Runtime, model and effort of the verifier."},
         "estimate_lines": {"type": "integer", "required": false, "description": "The estimate of changed lines."},
         "depends_on": {"type": {"array": {"ref": "unit"}}, "required": false, "description": "Units that must be merged or done before this one starts."},
+        "clauses": {"type": {"array": {"ref": "clause"}}, "required": false, "description": "The sentences of the specifications the page names."},
+        "wave": {"type": "integer", "required": false, "description": "The Lead's number of the wave the unit belongs to."},
+        "page_digest": {"type": {"value_type": "sha256_hex"}, "required": false, "description": "The digest of the page as add_unit or amend_unit left it."},
         "state": {"type": {"value_type": "unit_state"}, "required": true, "description": "draft, ready, running, accepted, stopped, merged, done (ended without a repository) or dropped."},
         "added_at": {"type": {"value_type": "utc_time"}, "required": true, "description": "When add_unit applied."},
         "amended_at": {"type": {"value_type": "utc_time"}, "required": true, "description": "Time of add_unit or of the last amend_unit: a review of the page or of a head counts only when it started later."},
@@ -1323,6 +1336,22 @@
         "spec": {"type": {"array": "string"}, "required": true, "from": "/spec", "description": "Its specifications."},
         "tests": {"type": {"array": "string"}, "required": true, "from": "/tests", "description": "Its tests."},
         "commit": {"type": "string", "required": true, "from": "/commit", "description": "The last commit at origin/main that changed map.json."}
+      }
+    },
+    "clause": {
+      "description": "One numbered sentence (- R<n>:) of a specs/**/*.md file at origin/main, written by ap clause index (specs/ap/clause.md). Key: <owner>/<name>:<path>#R<n>.",
+      "owner": {"source": "clauses"},
+      "primary_key": {"from": "/key"},
+      "properties": {
+        "repository": {"type": "string", "required": true, "from": "/repository", "description": "owner/name of the repository."},
+        "path": {"type": "string", "required": true, "from": "/path", "description": "The file's path in the repository."},
+        "rule": {"type": "string", "required": true, "from": "/rule", "description": "R and the number of the sentence."},
+        "commit": {"type": "string", "required": true, "from": "/commit", "description": "The last commit at origin/main that changed the file."},
+        "line": {"type": "integer", "required": true, "from": "/line", "description": "The sentence's first line, counted from 1."},
+        "tests_total": {"type": "integer", "required": true, "from": "/tests_total", "description": "How many citations of the sentence the repository holds."},
+        "digest": {"type": {"value_type": "sha256_hex"}, "required": true, "from": "/digest", "description": "SHA-256 of the sentence's lines joined by line feeds."},
+        "text": {"type": "string", "required": true, "from": "/text", "max_bytes": 4000, "description": "The words of the sentence's lines, each run of white space one space."},
+        "tests": {"type": {"array": "string"}, "required": true, "from": "/tests", "description": "The first 100 citations, path:line, by path then line."}
       }
     }
   },
@@ -1541,7 +1570,8 @@
     "request_finding": {"from": "request", "via": "finding", "to": "finding", "cardinality": "many_to_one", "names": {"forward": "request_finding", "reverse": "finding_requests"}},
     "principle_parent": {"from": "principle", "via": "parent", "to": "principle", "cardinality": "many_to_one", "names": {"forward": "principle_parent", "reverse": "principle_children"}},
     "principle_requests": {"from": "principle", "via": "requests", "to": "request", "cardinality": "many_to_many", "names": {"forward": "principle_requests", "reverse": "request_principles"}},
-    "intent_principles": {"from": "intent", "via": "principles", "to": "principle", "cardinality": "many_to_many", "names": {"forward": "intent_principles", "reverse": "principle_intents"}}
+    "intent_principles": {"from": "intent", "via": "principles", "to": "principle", "cardinality": "many_to_many", "names": {"forward": "intent_principles", "reverse": "principle_intents"}},
+    "unit_clauses": {"from": "unit", "via": "clauses", "to": "clause", "cardinality": "many_to_many", "names": {"forward": "unit_clauses", "reverse": "clause_units"}}
   },
   "action_types": {
     "set_hold": {
@@ -3545,7 +3575,7 @@
         "invariants": {"type": "string", "required": false, "max_bytes": 3000, "description": "What must stay true while the unit changes things."},
         "acceptance": {"type": {"array": {"struct": {"check": {"value_type": "nonempty_text"}, "kind": {"value_type": "acceptance_kind"}}}}, "required": false, "description": "The checks: a command and its kind, fails_on_base (fails before the change) or invariant (holds before and after)."},
         "not_built": {"type": "string", "required": false, "max_bytes": 1500, "description": "What the unit must not build."},
-        "write_set": {"type": {"array": "string"}, "required": false, "description": "The paths the unit may change (globs)."},
+        "write_set": {"type": {"array": {"value_type": "write_pattern"}}, "required": false, "description": "The paths the unit may change (globs)."},
         "read_first": {"type": {"array": "string"}, "required": false, "description": "The files the worker reads before any effect."},
         "specs": {"type": {"array": "string"}, "required": false, "description": "The design sources the unit implements."},
         "notes": {"type": "string", "required": false, "max_bytes": 3000, "description": "Notes for the worker."},
@@ -3556,7 +3586,10 @@
         "implementer": {"type": {"struct": {"runtime": "string", "model": "string", "effort": "string"}}, "required": false, "description": "Runtime, model and effort of the implementer."},
         "verifier": {"type": {"struct": {"runtime": "string", "model": "string", "effort": "string"}}, "required": false, "description": "Runtime, model and effort of the verifier."},
         "estimate_lines": {"type": "integer", "required": false, "description": "The estimate of changed lines."},
-        "depends_on": {"type": {"array": {"ref": "unit"}}, "required": false, "description": "Units that must be merged or done before this one starts."}
+        "depends_on": {"type": {"array": {"ref": "unit"}}, "required": false, "description": "Units that must be merged or done before this one starts."},
+        "clauses": {"type": {"array": {"ref": "clause"}}, "required": false, "description": "The sentences of the specifications the page names."},
+        "wave": {"type": "integer", "required": false, "description": "The Lead's number of the wave the unit belongs to."},
+        "page_digest": {"type": {"value_type": "sha256_hex"}, "required": false, "description": "The digest of the page as this action leaves it (ap unit page <key> --digest)."}
       },
       "submission_criteria": [
         {"code": "intent_required", "message": "A unit of the lane objective names its intent.", "none": [{"all": [{"eq": ["$lane", "objective"]}, {"none": [{"present": "$intent"}]}]}]},
@@ -3570,7 +3603,7 @@
         {"code": "depends_on_itself", "message": "Remove the unit itself from depends_on.", "none": [{"all": [{"present": "$depends_on"}, {"in": ["$unit", "$depends_on"]}]}]}
       ],
       "rules": [
-        {"create_object": "unit", "set": {"lane": "$lane", "class": "$class", "intent": "$intent", "origin": "$origin", "objective": "$objective", "interface": "$interface", "invariants": "$invariants", "acceptance": "$acceptance", "not_built": "$not_built", "write_set": "$write_set", "read_first": "$read_first", "specs": "$specs", "notes": "$notes", "verifier_questions": "$verifier_questions", "report": "$report", "repository": "$repository", "branch": "$branch", "implementer": "$implementer", "verifier": "$verifier", "estimate_lines": "$estimate_lines", "depends_on": "$depends_on", "state": "draft", "rounds": 0, "writers": [], "added_at": "$now", "amended_at": "$now"}}
+        {"create_object": "unit", "set": {"lane": "$lane", "class": "$class", "intent": "$intent", "origin": "$origin", "objective": "$objective", "interface": "$interface", "invariants": "$invariants", "acceptance": "$acceptance", "not_built": "$not_built", "write_set": "$write_set", "read_first": "$read_first", "specs": "$specs", "notes": "$notes", "verifier_questions": "$verifier_questions", "report": "$report", "repository": "$repository", "branch": "$branch", "implementer": "$implementer", "verifier": "$verifier", "estimate_lines": "$estimate_lines", "depends_on": "$depends_on", "clauses": "$clauses", "wave": "$wave", "page_digest": "$page_digest", "state": "draft", "rounds": 0, "writers": [], "added_at": "$now", "amended_at": "$now"}}
       ]
     },
     "amend_unit": {
@@ -3583,7 +3616,7 @@
         "invariants": {"type": "string", "required": false, "max_bytes": 3000, "description": "What must stay true while the unit changes things."},
         "acceptance": {"type": {"array": {"struct": {"check": {"value_type": "nonempty_text"}, "kind": {"value_type": "acceptance_kind"}}}}, "required": false, "description": "The checks: a command and its kind, fails_on_base (fails before the change) or invariant (holds before and after)."},
         "not_built": {"type": "string", "required": false, "max_bytes": 1500, "description": "What the unit must not build."},
-        "write_set": {"type": {"array": "string"}, "required": false, "description": "The paths the unit may change (globs)."},
+        "write_set": {"type": {"array": {"value_type": "write_pattern"}}, "required": false, "description": "The paths the unit may change (globs)."},
         "read_first": {"type": {"array": "string"}, "required": false, "description": "The files the worker reads before any effect."},
         "specs": {"type": {"array": "string"}, "required": false, "description": "The design sources the unit implements."},
         "notes": {"type": "string", "required": false, "max_bytes": 3000, "description": "Notes for the worker."},
@@ -3594,7 +3627,10 @@
         "implementer": {"type": {"struct": {"runtime": "string", "model": "string", "effort": "string"}}, "required": false, "description": "Runtime, model and effort of the implementer."},
         "verifier": {"type": {"struct": {"runtime": "string", "model": "string", "effort": "string"}}, "required": false, "description": "Runtime, model and effort of the verifier."},
         "estimate_lines": {"type": "integer", "required": false, "description": "The estimate of changed lines."},
-        "depends_on": {"type": {"array": {"ref": "unit"}}, "required": false, "description": "Units that must be merged or done before this one starts."}
+        "depends_on": {"type": {"array": {"ref": "unit"}}, "required": false, "description": "Units that must be merged or done before this one starts."},
+        "clauses": {"type": {"array": {"ref": "clause"}}, "required": false, "description": "The sentences of the specifications the page names."},
+        "wave": {"type": "integer", "required": false, "description": "The Lead's number of the wave the unit belongs to."},
+        "page_digest": {"type": {"value_type": "sha256_hex"}, "required": true, "description": "The digest of the page as this action leaves it (ap unit page <key> --digest)."}
       },
       "submission_criteria": [
         {"code": "unit_not_amendable", "message": "Only a draft, ready or stopped unit is amended; stop a running one first (stop_unit).", "all": [{"exists": "$unit"}, {"in": ["$unit.state", ["draft", "ready", "stopped"]]}]},
@@ -3603,7 +3639,7 @@
         {"code": "depends_on_itself", "message": "Remove the unit itself from depends_on.", "none": [{"all": [{"present": "$depends_on"}, {"in": ["$unit", "$depends_on"]}]}]}
       ],
       "rules": [
-        {"modify_object": "unit", "set": {"class": "$class", "objective": "$objective", "interface": "$interface", "invariants": "$invariants", "acceptance": "$acceptance", "not_built": "$not_built", "write_set": "$write_set", "read_first": "$read_first", "specs": "$specs", "notes": "$notes", "verifier_questions": "$verifier_questions", "report": "$report", "repository": "$repository", "branch": "$branch", "implementer": "$implementer", "verifier": "$verifier", "estimate_lines": "$estimate_lines", "depends_on": "$depends_on", "state": "draft", "amended_at": "$now"}}
+        {"modify_object": "unit", "set": {"class": "$class", "objective": "$objective", "interface": "$interface", "invariants": "$invariants", "acceptance": "$acceptance", "not_built": "$not_built", "write_set": "$write_set", "read_first": "$read_first", "specs": "$specs", "notes": "$notes", "verifier_questions": "$verifier_questions", "report": "$report", "repository": "$repository", "branch": "$branch", "implementer": "$implementer", "verifier": "$verifier", "estimate_lines": "$estimate_lines", "depends_on": "$depends_on", "clauses": "$clauses", "wave": "$wave", "page_digest": "$page_digest", "state": "draft", "amended_at": "$now"}}
       ]
     },
     "ready_unit": {
@@ -3611,7 +3647,7 @@
       "parameters": {
         "unit": {"type": {"ref": "unit"}, "required": true, "description": "The unit: an Id of type unit whose native_key is the unit's key."},
         "intent": {"type": {"ref": "intent"}, "required": false, "description": "The unit's own intent; required in the lane objective, left out in the lane small."},
-        "page_digest": {"type": {"value_type": "sha256_hex"}, "required": false, "description": "The digest of the unit's page as the caller computed it (ap unit page <key> --digest); a unit of class contract or effect needs a closed accepting page review whose head is this digest."}
+        "page_digest": {"type": {"value_type": "sha256_hex"}, "required": false, "description": "The digest of the unit's page as the caller computed it (ap unit page <key> --digest); refused when the unit stores another one."}
       },
       "submission_criteria": [
         {"code": "unit_not_draft", "message": "Choose a draft unit.", "all": [{"exists": "$unit"}, {"in": ["$unit.state", ["draft"]]}]},
@@ -3622,8 +3658,9 @@
         {"code": "intent_not_open_for_units", "message": "The unit's intent must be confirmed or assumed: confirm it (confirm_intent) or let the Lead assume it (assume_intent).", "none": [{"all": [{"exists": "$unit"}, {"eq": ["$unit.lane", "objective"]}, {"present": "$intent"}, {"none": [{"all": [{"exists": "$intent"}, {"in": ["$intent.status", ["confirmed", "assumed"]]}]}]}]}]},
         {"code": "intent_differs", "message": "Give the unit's own intent, or none in the lane small.", "none": [{"all": [{"present": "$intent"}, {"none": [{"all": [{"exists": "$unit"}, {"present": "$unit.intent"}, {"eq": ["$unit.intent", "$intent"]}]}]}]}]},
         {"code": "intent_parameter_required", "message": "A unit of the lane objective names its intent in the parameter intent.", "none": [{"all": [{"exists": "$unit"}, {"eq": ["$unit.lane", "objective"]}, {"none": [{"present": "$intent"}]}]}]},
-        {"code": "plan_not_reviewed", "message": "Review the intent's plan first: a review of kind plan of the intent, closed accept.", "none": [{"all": [{"exists": "$unit"}, {"eq": ["$unit.lane", "objective"]}, {"present": "$intent"}, {"none": [{"linked": {"from": "$intent", "link": "intent_reviews", "where": {"all": [{"eq": ["kind", "plan"]}, {"eq": ["status", "closed"]}, {"eq": ["verdict", "accept"]}]}}}]}]}]},
-        {"code": "page_not_reviewed", "message": "Review the page first: a review of kind page of the unit, closed accept, whose head is the page_digest given.", "none": [{"all": [{"exists": "$unit"}, {"in": ["$unit.class", ["contract", "effect"]]}, {"none": [{"linked": {"from": "$unit", "link": "unit_reviews", "where": {"all": [{"eq": ["kind", "page"]}, {"eq": ["status", "closed"]}, {"eq": ["verdict", "accept"]}, {"present": "$page_digest"}, {"eq": ["head", "$page_digest"]}]}}}]}]}]}
+        {"code": "plan_not_reviewed", "message": "Review the intent's plan first: a review of kind plan of the intent, started after the unit was added, closed accept.", "none": [{"all": [{"exists": "$unit"}, {"eq": ["$unit.lane", "objective"]}, {"present": "$intent"}, {"none": [{"linked": {"from": "$intent", "link": "intent_reviews", "where": {"all": [{"eq": ["kind", "plan"]}, {"eq": ["status", "closed"]}, {"eq": ["verdict", "accept"]}, {"gt": ["started_at", "$unit.added_at"]}]}}}]}]}]},
+        {"code": "page_digest_differs", "message": "Give the digest the unit stores, or amend the unit (amend_unit stores the digest of its page).", "none": [{"all": [{"present": "$page_digest"}, {"exists": "$unit"}, {"present": "$unit.page_digest"}, {"ne": ["$page_digest", "$unit.page_digest"]}]}]},
+        {"code": "page_not_reviewed", "message": "Review the page first: a review of kind page of the unit, closed accept, whose head is the page_digest the unit stores.", "none": [{"all": [{"exists": "$unit"}, {"in": ["$unit.class", ["contract", "effect"]]}, {"none": [{"linked": {"from": "$unit", "link": "unit_reviews", "where": {"all": [{"eq": ["kind", "page"]}, {"eq": ["status", "closed"]}, {"eq": ["verdict", "accept"]}, {"present": "$unit.page_digest"}, {"eq": ["head", "$unit.page_digest"]}]}}}]}]}]}
       ],
       "rules": [
         {"modify_object": "unit", "set": {"state": "ready", "ready_at": "$now"}}
@@ -4171,6 +4208,15 @@
       "program": "/usr/local/bin/ap",
       "answer_bytes": 65536,
       "timeout_ms": 30000
+    },
+    "clause": {
+      "description": "One sentence of a specification with its tests and the units that name it (specs/ap/clause.md).",
+      "parameters": {
+        "key": {"type": "string", "required": true, "description": "The clause's key, <owner>/<name>:<path>#R<n>."}
+      },
+      "program": "/usr/local/bin/ap",
+      "answer_bytes": 65536,
+      "timeout_ms": 10000
     }
   },
   "grants": [
@@ -4204,7 +4250,8 @@
         "finding",
         "principle",
         "section",
-        "component"
+        "component",
+        "clause"
       ],
       "derive": [
         "hold",
