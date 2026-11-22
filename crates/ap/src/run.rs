@@ -2197,9 +2197,11 @@ fn attempt(
         bwrap.extend(hiding(&hidden));
         bwrap.extend(args(&["--cap-drop", "ALL", "--chdir", &q.cwd, "--"]));
         argv.splice(cli + 1..cli + 1, bwrap);
-        env.retain(|(k, _)| k != "TMPDIR" && k != "CARGO_TARGET_DIR");
+        env.retain(|(k, _)| k != "TMPDIR" && k != "CARGO_TARGET_DIR" && k != "AP_DOOR");
         env.push(("TMPDIR".into(), format!("{scratch}/tmp")));
         env.push(("CARGO_TARGET_DIR".into(), format!("{scratch}/target")));
+        // The stage's door, beside its scratch directory (R13).
+        env.push(("AP_DOOR".into(), crate::door::path_of(scratch)));
     }
     let started = s.now();
     let mut child = match s.launch(&argv, &env, &q.cwd, [prompt, stdout, stderr]) {
@@ -2437,6 +2439,21 @@ fn asked_after(record: &mut Value, asked: &Value) {
         record["answer"] = asked["answer"].clone();
     }
 }
+/// What the door of a stage knows of it (`specs/ap/door.md`): the role and agent the engine gets
+/// from the stage's environment, its record, its `cwd` and its `store`.
+fn door_stage(q: &Request) -> crate::door::Stage {
+    let of = |name: &str| {
+        let found = q.base_env.iter().rev().find(|(k, _)| k == name);
+        found.map(|(_, v)| v.clone()).unwrap_or_default()
+    };
+    crate::door::Stage {
+        role: q.actor_role.clone(),
+        agent: of("ONT_AGENT"),
+        run: record_path(&q.out),
+        cwd: q.cwd.clone(),
+        store: q.store.clone(),
+    }
+}
 /// One `ap run` request. A refusal (exit 2) comes before any effect and writes no file.
 pub fn execute(s: &mut impl System, r: &Value) -> Result<(Value, u8), Failure> {
     let q = request(s, r)?;
@@ -2496,6 +2513,17 @@ pub fn execute(s: &mut impl System, r: &Value) -> Result<(Value, u8), Failure> {
         // The scratch directory: made once, after the claim and before the first launch (R4).
         let scratch = q.limits.as_ref().map(|l| l.scratch.as_str());
         let (made, ready) = scratch.map_or((false, true), make_scratch);
+        // The door: opened after the scratch directory and before the first launch; one that cannot
+        // be opened is a scratch directory that cannot be made (R13, `specs/ap/door.md` R1).
+        let mut door = None;
+        let ready = match scratch {
+            Some(scratch) if ready => {
+                let opened = crate::door::open(s, door_stage(&q), &crate::door::path_of(scratch));
+                door = opened.ok();
+                door.is_some()
+            }
+            _ => ready,
+        };
         // When the last launch began: it and its ask share one `timeout_seconds` (R20).
         let mut began = s.now();
         for (i, account) in accounts.iter().enumerate() {
@@ -2565,6 +2593,10 @@ pub fn execute(s: &mut impl System, r: &Value) -> Result<(Value, u8), Failure> {
             asked_after(&mut record, &last);
             clean &= saved && persist(&q.out, &record);
             last = record;
+        }
+        // The door is closed after the last launch, before the scratch directory goes (R13).
+        if let Some(door) = door {
+            door.close();
         }
         // Only the call whose `mkdir` made it removes it, after its last launch (R8).
         if let Some(scratch) = scratch.filter(|_| made) {

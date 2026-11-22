@@ -2,9 +2,9 @@
 //! and the PC answers and is not busy, else on this host (`specs/ap/check.md`). The PC's side is the
 //! fixed script `check/pc.sh`; what reaches the PC is that script, its arguments and one payload of
 //! the worktree's state.
-use crate::host::{Failure, Host, System, digest, fail, new_session_id};
+use crate::host::{Answer as Reply, Failure, Host, System, digest, fail, new_session_id};
 use crate::run::stamp;
-use crate::work;
+use crate::{door, work};
 use serde_json::{Value, json};
 use std::{
     collections::HashSet,
@@ -18,7 +18,7 @@ use std::{
     },
     path::{Path, PathBuf},
     process::{Child, Command, ExitCode, ExitStatus, Stdio},
-    sync::mpsc,
+    sync::{Arc, mpsc},
     time::{Duration, Instant, SystemTime},
 };
 
@@ -45,6 +45,128 @@ const DEFAULT_LOG: &str = "/var/lib/agent-platform/checks.jsonl";
 /// `hosts.pc.min_available_mb` when the policy does not give it (R16).
 const DEFAULT_MIN_AVAILABLE_MB: u64 = 2_048;
 const MAX_MIN_AVAILABLE_MB: u64 = 1_048_576;
+/// The settings every `git` of a call gets before its command word, as the driver's own Git calls
+/// do (`specs/ap/unit-run.md` R39): no hook and no file-system monitor of the worktree runs.
+const GIT_SETTINGS: [&str; 4] = [
+    "-c",
+    "core.hooksPath=/dev/null",
+    "-c",
+    "core.fsmonitor=false",
+];
+
+/// Where the output of a call goes and who is told of the programs it starts: `ap check`'s own
+/// streams, or the client of a stage's door (`specs/ap/door.md` R4).
+pub(crate) trait Io: Send + Sync {
+    fn out(&self, bytes: &[u8]);
+    fn err(&self, bytes: &[u8]);
+    /// A program of the call was started in a process group of its own.
+    fn started(&self, _pid: u32) {}
+    /// That program has been waited for.
+    fn finished(&self, _pid: u32) {}
+}
+/// `ap check`'s own standard output and standard error.
+struct Own;
+impl Io for Own {
+    fn out(&self, bytes: &[u8]) {
+        let _ = std::io::stdout().write_all(bytes);
+    }
+    fn err(&self, bytes: &[u8]) {
+        let _ = std::io::stderr().write_all(bytes);
+    }
+}
+/// What the programs of one call get: this process's own environment (`ap check`), or the list
+/// the door read of its port, with each program in a process group of its own (`specs/ap/door.md`
+/// R1, R7).
+#[derive(Clone)]
+pub(crate) struct Ctx {
+    vars: Option<Arc<Vec<(String, String)>>>,
+    io: Arc<dyn Io>,
+}
+impl Ctx {
+    fn own() -> Self {
+        Ctx {
+            vars: None,
+            io: Arc::new(Own),
+        }
+    }
+    /// The door's context: exactly these variables, the output to `io`.
+    pub(crate) fn of(vars: Arc<Vec<(String, String)>>, io: Arc<dyn Io>) -> Self {
+        Ctx {
+            vars: Some(vars),
+            io,
+        }
+    }
+    /// A variable as it is set, empty or not.
+    fn raw(&self, name: &str) -> Option<OsString> {
+        match &self.vars {
+            None => std::env::var_os(name),
+            Some(vars) => vars
+                .iter()
+                .find(|(k, _)| k == name)
+                .map(|(_, v)| OsString::from(v)),
+        }
+    }
+    /// A variable when it is set and not empty.
+    fn var(&self, name: &str) -> Option<String> {
+        self.raw(name)
+            .and_then(|v| v.into_string().ok())
+            .filter(|v| !v.is_empty())
+    }
+    /// A program with the call's environment: this process's own, or exactly the door's list in a
+    /// process group of its own.
+    fn command(&self, program: &str) -> Command {
+        let mut c = Command::new(program);
+        if let Some(vars) = &self.vars {
+            c.env_clear()
+                .envs(vars.iter().map(|(k, v)| (k, v)))
+                .process_group(0);
+        }
+        c
+    }
+    fn say(&self, text: &str) {
+        self.io.err(format!("{text}\n").as_bytes());
+    }
+    /// Kills the process group of a program the call started.
+    fn kill_group(&self, pid: u32) {
+        let kill = match self.vars {
+            None => "kill",
+            Some(_) => "/bin/kill",
+        };
+        let mut c = Command::new(kill);
+        if self.vars.is_some() {
+            c.env_clear();
+        }
+        let _ = c
+            .args(["-KILL", "--", &format!("-{pid}")])
+            .stdin(Stdio::null())
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .status();
+    }
+    /// The directory of the call's staging files: `TMPDIR` of its environment, else `/tmp`.
+    fn temp_dir(&self) -> PathBuf {
+        match &self.vars {
+            None => std::env::temp_dir(),
+            Some(_) => self
+                .var("TMPDIR")
+                .map_or_else(|| PathBuf::from("/tmp"), PathBuf::from),
+        }
+    }
+    /// A started program: told to the call's `Io`.
+    fn spawn(&self, c: &mut Command) -> std::io::Result<Child> {
+        let child = c.spawn()?;
+        self.io.started(child.id());
+        Ok(child)
+    }
+    /// The output of a short program, waited for.
+    fn output(&self, c: &mut Command) -> Option<std::process::Output> {
+        let child = self.spawn(c.stdout(Stdio::piped())).ok()?;
+        let pid = child.id();
+        let out = child.wait_with_output();
+        self.io.finished(pid);
+        out.ok()
+    }
+}
 
 /// The policy's member `hosts.pc` (R16).
 #[derive(Debug, Clone, PartialEq)]
@@ -200,15 +322,16 @@ pub struct Tree {
     pub head: String,
     pub repository: String,
 }
-fn git(dir: &str, words: &[&str]) -> Option<Vec<u8>> {
-    let out = Command::new("git")
-        .arg("-C")
-        .arg(dir)
-        .args(words)
-        .stdin(Stdio::null())
-        .stderr(Stdio::null())
-        .output()
-        .ok()?;
+fn git(ctx: &Ctx, dir: &str, words: &[&str]) -> Option<Vec<u8>> {
+    let out = ctx.output(
+        ctx.command("git")
+            .args(GIT_SETTINGS)
+            .arg("-C")
+            .arg(dir)
+            .args(words)
+            .stdin(Stdio::null())
+            .stderr(Stdio::null()),
+    )?;
     out.status.success().then_some(out.stdout)
 }
 fn line(bytes: Vec<u8>) -> Option<String> {
@@ -247,24 +370,28 @@ pub fn github(url: &str) -> Option<String> {
     };
     (ok(owner) && ok(name)).then(|| format!("{owner}/{name}"))
 }
-fn worktree(dir: &str) -> Result<Tree, Failure> {
+fn worktree(ctx: &Ctx, dir: &str) -> Result<Tree, Failure> {
     let not = || fail("not_a_worktree", "dir", Value::Null);
     let real = fs::canonicalize(dir).map_err(|_| not())?;
     if !real.is_dir() {
         return Err(not());
     }
     let real = real.to_str().ok_or_else(not)?.to_owned();
-    let top = git(&real, &["rev-parse", "--show-toplevel"])
+    let top = git(ctx, &real, &["rev-parse", "--show-toplevel"])
         .and_then(line)
         .ok_or_else(not)?;
     if top != real {
         return Err(not());
     }
-    let head = git(&real, &["rev-parse", "-q", "--verify", "HEAD^{commit}"])
-        .and_then(line)
-        .filter(|h| is_hex(h))
-        .ok_or_else(not)?;
-    let repository = git(&real, &["remote", "get-url", "origin"])
+    let head = git(
+        ctx,
+        &real,
+        &["rev-parse", "-q", "--verify", "HEAD^{commit}"],
+    )
+    .and_then(line)
+    .filter(|h| is_hex(h))
+    .ok_or_else(not)?;
+    let repository = git(ctx, &real, &["remote", "get-url", "origin"])
         .and_then(line)
         .and_then(|u| github(&u))
         .ok_or_else(|| fail("origin_not_github", "origin", Value::Null))?;
@@ -278,12 +405,22 @@ fn worktree(dir: &str) -> Result<Tree, Failure> {
 /// Every refusal comes before any effect (R1 to R3): the arguments, the worktree, the policy.
 pub fn prepare(s: &impl System, argv: &[OsString]) -> Result<(Call, Tree, Option<Pc>), Failure> {
     let call = arguments(argv)?;
-    let tree = worktree(&call.dir)?;
+    let tree = worktree(&Ctx::own(), &call.dir)?;
     let pc = match work::policy(s)? {
         Some(v) => hosts(&v)?,
         None => None,
     };
     Ok((call, tree, pc))
+}
+/// The policy file at a path the door read of its port, as a port that knows only that path.
+struct PolicyAt(Option<PathBuf>);
+impl System for PolicyAt {
+    fn call(&mut self, program: &str, _: &[String], _: &Value, _: u64) -> Reply {
+        Err(fail("process_failed", program, Value::Null))
+    }
+    fn policy_file(&self) -> Option<PathBuf> {
+        self.0.clone()
+    }
 }
 
 fn variable(name: &str, default: &str) -> String {
@@ -299,30 +436,27 @@ fn say(text: &str) {
 pub fn quote(word: &str) -> String {
     format!("'{}'", word.replace('\'', r"'\''"))
 }
-fn code(status: ExitStatus) -> i32 {
+pub(crate) fn code(status: ExitStatus) -> i32 {
     status
         .code()
         .unwrap_or_else(|| 128 + status.signal().unwrap_or(0))
 }
 /// Waits for `child` until `deadline`; at it, kills the child's process group and returns None.
-fn wait_until(child: &mut Child, deadline: Instant) -> Option<ExitStatus> {
-    loop {
+fn wait_until(ctx: &Ctx, child: &mut Child, deadline: Instant) -> Option<ExitStatus> {
+    let ended = loop {
         match child.try_wait() {
-            Ok(Some(status)) => return Some(status),
+            Ok(Some(status)) => break Some(status),
             Ok(None) if Instant::now() < deadline => std::thread::sleep(Duration::from_millis(20)),
             _ => {
-                let _ = Command::new("kill")
-                    .args(["-KILL", "--", &format!("-{}", child.id())])
-                    .stdin(Stdio::null())
-                    .stdout(Stdio::null())
-                    .stderr(Stdio::null())
-                    .status();
+                ctx.kill_group(child.id());
                 let _ = child.kill();
                 let _ = child.wait();
-                return None;
+                break None;
             }
         }
-    }
+    };
+    ctx.io.finished(child.id());
+    ended
 }
 
 /// What the probe of R4 read on the PC: its CPUs, its one-minute load (as the PC wrote it), the
@@ -420,24 +554,25 @@ enum Place {
     Here(&'static str, Option<Probe>),
 }
 /// `tailscale` with `words`, in an environment of `TAILSCALE_ENV` alone.
-fn tailscale(words: &[&str]) -> Command {
-    let mut c = Command::new("tailscale");
+fn tailscale(ctx: &Ctx, words: &[&str]) -> Command {
+    let mut c = ctx.command("tailscale");
     c.args(words).env_clear();
     for k in TAILSCALE_ENV {
-        if let Some(v) = std::env::var_os(k) {
+        if let Some(v) = ctx.raw(k) {
             c.env(k, v);
         }
     }
     c
 }
 /// The standard output of a short call that succeeded within `limit`; None otherwise.
-fn answer(mut c: Command, limit: Duration) -> Option<Vec<u8>> {
-    let mut child = c
-        .stdin(Stdio::null())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::null())
-        .process_group(0)
-        .spawn()
+fn answer(ctx: &Ctx, mut c: Command, limit: Duration) -> Option<Vec<u8>> {
+    let mut child = ctx
+        .spawn(
+            c.stdin(Stdio::null())
+                .stdout(Stdio::piped())
+                .stderr(Stdio::null())
+                .process_group(0),
+        )
         .ok()?;
     let out = child.stdout.take()?;
     let (tx, rx) = mpsc::channel();
@@ -446,11 +581,11 @@ fn answer(mut c: Command, limit: Duration) -> Option<Vec<u8>> {
         let _ = out.take(1 << 20).read_to_end(&mut bytes);
         let _ = tx.send(bytes);
     });
-    let status = wait_until(&mut child, Instant::now() + limit)?;
+    let status = wait_until(ctx, &mut child, Instant::now() + limit)?;
     let bytes = rx.recv_timeout(Duration::from_secs(2)).ok()?;
     status.success().then_some(bytes)
 }
-fn place(pc: &Pc, key: &str, pin: Option<&str>) -> Place {
+fn place(ctx: &Ctx, pc: &Pc, key: &str, pin: Option<&str>) -> Place {
     let ping = [
         "ping",
         "--c",
@@ -460,13 +595,14 @@ fn place(pc: &Pc, key: &str, pin: Option<&str>) -> Place {
         "--until-direct=false",
         pc.host(),
     ];
-    if answer(tailscale(&ping), Duration::from_secs(12)).is_none() {
+    if answer(ctx, tailscale(ctx, &ping), Duration::from_secs(12)).is_none() {
         return Place::Here("pc_unreachable", None);
     }
     let repo = format!("{}/repos/{key}", pc.work);
     let probe = format!("bash -c {} ap-check-probe {}", quote(PROBE), quote(&repo));
     let Some(stdout) = answer(
-        tailscale(&["ssh", &pc.ssh, &probe]),
+        ctx,
+        tailscale(ctx, &["ssh", &pc.ssh, &probe]),
         Duration::from_secs(30),
     ) else {
         return Place::Here("pc_unreachable", None);
@@ -524,6 +660,8 @@ fn here(call: &Call, tree: &Tree, deadline: Instant) -> i32 {
         // The marker of the PC is `ap check`'s own, never inherited here; the cargo settings are those
         // `./check` exports under the build lock, so that every cargo command shares its artifacts (R17).
         .env_remove("AP_CHECK_HOST")
+        // No program of a worktree reaches a stage's door (R20).
+        .env_remove("AP_DOOR")
         .env("CARGO_INCREMENTAL", "0")
         .env("CARGO_PROFILE_DEV_DEBUG", "0")
         .env("CARGO_PROFILE_TEST_DEBUG", "0")
@@ -534,7 +672,7 @@ fn here(call: &Call, tree: &Tree, deadline: Instant) -> i32 {
         say("check: the command could not be started");
         return 127;
     };
-    wait_until(&mut child, deadline).map_or(124, code)
+    wait_until(&Ctx::own(), &mut child, deadline).map_or(124, code)
 }
 
 /// Removes the staging directory of one call's payload.
@@ -544,25 +682,35 @@ impl Drop for Stage {
         let _ = fs::remove_dir_all(&self.0);
     }
 }
-fn to_file(dir: &str, words: &[&str], file: &Path) -> Result<(), &'static str> {
+fn to_file(ctx: &Ctx, dir: &str, words: &[&str], file: &Path) -> Result<(), &'static str> {
     let out = File::create(file).map_err(|_| "stage")?;
-    let ok = Command::new("git")
+    let mut c = ctx.command("git");
+    c.args(GIT_SETTINGS)
         .arg("-C")
         .arg(dir)
         .args(words)
         .stdin(Stdio::null())
         .stdout(out)
-        .stderr(Stdio::null())
-        .status()
-        .is_ok_and(|s| s.success());
+        .stderr(Stdio::null());
+    let ok = status_of(ctx, &mut c);
     if ok { Ok(()) } else { Err("git") }
+}
+/// Whether a short program of the call succeeded.
+fn status_of(ctx: &Ctx, c: &mut Command) -> bool {
+    let Ok(mut child) = ctx.spawn(c) else {
+        return false;
+    };
+    let status = child.wait();
+    ctx.io.finished(child.id());
+    status.is_ok_and(|s| s.success())
 }
 fn bytes_of(path: Option<PathBuf>) -> Vec<u8> {
     path.and_then(|p| fs::read(p).ok()).unwrap_or_default()
 }
 /// The exclude files the worktree uses: `info/exclude` and the user's global excludes file.
-fn excludes(dir: &str) -> (Vec<u8>, Vec<u8>) {
+fn excludes(ctx: &Ctx, dir: &str) -> (Vec<u8>, Vec<u8>) {
     let info = git(
+        ctx,
         dir,
         &[
             "rev-parse",
@@ -573,32 +721,42 @@ fn excludes(dir: &str) -> (Vec<u8>, Vec<u8>) {
     )
     .and_then(line)
     .map(PathBuf::from);
-    let global = git(dir, &["config", "--path", "--get", "core.excludesFile"])
-        .and_then(line)
-        .filter(|p| !p.is_empty())
-        .map(|p| Path::new(dir).join(p))
-        .or_else(|| {
-            let xdg = std::env::var_os("XDG_CONFIG_HOME").filter(|v| !v.is_empty());
-            match xdg {
-                Some(x) => Some(PathBuf::from(x).join("git/ignore")),
-                None => std::env::var_os("HOME")
-                    .filter(|v| !v.is_empty())
-                    .map(|h| PathBuf::from(h).join(".config/git/ignore")),
-            }
-        });
+    let global = git(
+        ctx,
+        dir,
+        &["config", "--path", "--get", "core.excludesFile"],
+    )
+    .and_then(line)
+    .filter(|p| !p.is_empty())
+    .map(|p| Path::new(dir).join(p))
+    .or_else(|| {
+        let xdg = ctx.raw("XDG_CONFIG_HOME").filter(|v| !v.is_empty());
+        match xdg {
+            Some(x) => Some(PathBuf::from(x).join("git/ignore")),
+            None => ctx
+                .raw("HOME")
+                .filter(|v| !v.is_empty())
+                .map(|h| PathBuf::from(h).join(".config/git/ignore")),
+        }
+    });
     (bytes_of(info), bytes_of(global))
 }
 /// The payload (R6, R7): the commit (a bundle of what the PC's tree lacks), the index entries, the
 /// two exclude files and a tar of the files Git lists, with their working-tree bytes and modes.
-fn payload(tree: &Tree, pc_head: Option<&str>, stage: &Path) -> Result<PathBuf, &'static str> {
+fn payload(
+    ctx: &Ctx,
+    tree: &Tree,
+    pc_head: Option<&str>,
+    stage: &Path,
+) -> Result<PathBuf, &'static str> {
     let parts = stage.join("p");
     fs::create_dir(&parts).map_err(|_| "stage")?;
     let dir = tree.dir.as_str();
     fs::write(parts.join("head"), &tree.head).map_err(|_| "stage")?;
-    let known =
-        pc_head.filter(|h| git(dir, &["cat-file", "-e", &format!("{h}^{{commit}}")]).is_some());
+    let known = pc_head
+        .filter(|h| git(ctx, dir, &["cat-file", "-e", &format!("{h}^{{commit}}")]).is_some());
     let needed = match known {
-        Some(h) => git(dir, &["merge-base", "--is-ancestor", "HEAD", h]).is_none(),
+        Some(h) => git(ctx, dir, &["merge-base", "--is-ancestor", "HEAD", h]).is_none(),
         None => true,
     };
     let mut members = vec![
@@ -614,14 +772,20 @@ fn payload(tree: &Tree, pc_head: Option<&str>, stage: &Path) -> Result<PathBuf, 
         let not = known.map(|h| format!("^{h}"));
         let mut words = vec!["bundle", "create", "-q", file, "HEAD"];
         words.extend(not.as_deref());
-        git(dir, &words).ok_or("bundle")?;
+        git(ctx, dir, &words).ok_or("bundle")?;
         members.push("head.bundle");
     }
-    to_file(dir, &["ls-files", "-s", "-z"], &parts.join("index-info"))?;
-    let (info, global) = excludes(dir);
+    to_file(
+        ctx,
+        dir,
+        &["ls-files", "-s", "-z"],
+        &parts.join("index-info"),
+    )?;
+    let (info, global) = excludes(ctx, dir);
     fs::write(parts.join("exclude"), info).map_err(|_| "stage")?;
     fs::write(parts.join("global-excludes"), global).map_err(|_| "stage")?;
     let listed = git(
+        ctx,
         dir,
         &[
             "ls-files",
@@ -645,12 +809,9 @@ fn payload(tree: &Tree, pc_head: Option<&str>, stage: &Path) -> Result<PathBuf, 
     let names = stage.join("names");
     fs::write(&names, list).map_err(|_| "stage")?;
     let tar = |words: Vec<&OsStr>| {
-        Command::new("tar")
-            .args(words)
-            .stdin(Stdio::null())
-            .stdout(Stdio::null())
-            .status()
-            .is_ok_and(|s| s.success())
+        let mut c = ctx.command("tar");
+        c.args(words).stdin(Stdio::null()).stdout(Stdio::null());
+        status_of(ctx, &mut c)
     };
     let tree_tar = parts.join("tree.tar");
     let ok = tar(vec![
@@ -751,10 +912,9 @@ impl Filter {
         std::mem::take(&mut self.pending)
     }
 }
-fn relay(mut pipe: impl Read, nonce: &str) -> Option<(i32, Option<u64>)> {
+fn relay(io: &dyn Io, mut pipe: impl Read, nonce: &str) -> Option<(i32, Option<u64>)> {
     let mut filter = Filter::new(nonce);
     let mut buf = [0u8; 8192];
-    let mut err = std::io::stderr();
     loop {
         let n = match pipe.read(&mut buf) {
             Ok(0) => break,
@@ -762,15 +922,16 @@ fn relay(mut pipe: impl Read, nonce: &str) -> Option<(i32, Option<u64>)> {
             Err(e) if e.kind() == std::io::ErrorKind::Interrupted => continue,
             Err(_) => break,
         };
-        let _ = err.write_all(&filter.feed(&buf[..n]));
+        io.err(&filter.feed(&buf[..n]));
     }
-    let _ = err.write_all(&filter.finish());
+    io.err(&filter.finish());
     filter.status.map(|s| (s, filter.min_wsl_available_mb))
 }
 
 /// The command on the PC (R6 to R11): Ok with its exit status and the lowest `MemAvailable` of the
 /// PC's Linux while it ran (None where no command ran), Err when that status never came back.
 fn on_pc(
+    ctx: &Ctx,
     pc: &Pc,
     call: &Call,
     tree: &Tree,
@@ -778,14 +939,15 @@ fn on_pc(
     pc_head: Option<&str>,
     deadline: Instant,
 ) -> Result<(i32, Option<u64>), ()> {
+    let say = |text: &str| ctx.say(text);
     let nonce = new_session_id(&Host).map_err(|_| say("check: pc: no nonce"))?;
-    let stage = std::env::temp_dir().join(format!("ap-check.{nonce}"));
+    let stage = ctx.temp_dir().join(format!("ap-check.{nonce}"));
     fs::DirBuilder::new()
         .mode(0o700)
         .create(&stage)
         .map_err(|_| say("check: pc: no staging directory"))?;
     let stage = Stage(stage);
-    let payload = payload(tree, pc_head, &stage.0)
+    let payload = payload(ctx, tree, pc_head, &stage.0)
         .map_err(|step| say(&format!("check: pc: the payload failed at {step}")))?;
     let left = deadline
         .saturating_duration_since(Instant::now())
@@ -801,24 +963,51 @@ fn on_pc(
         remote.push_str(&quote(w));
     }
     let input = File::open(&payload).map_err(|_| say("check: pc: no payload"))?;
-    let child = tailscale(&["ssh", &pc.ssh, &remote])
-        .stdin(input)
-        .stdout(Stdio::inherit())
-        .stderr(Stdio::piped())
-        .process_group(0)
-        .spawn();
+    // `ap check` passes the PC's standard output on as its own; the door relays it.
+    let stdout = match ctx.vars {
+        None => Stdio::inherit(),
+        Some(_) => Stdio::piped(),
+    };
+    let mut c = tailscale(ctx, &["ssh", &pc.ssh, &remote]);
+    let child = ctx.spawn(
+        c.stdin(input)
+            .stdout(stdout)
+            .stderr(Stdio::piped())
+            .process_group(0),
+    );
     let Ok(mut child) = child else {
         return Err(());
     };
     let (tx, rx) = mpsc::channel();
     if let Some(pipe) = child.stderr.take() {
         let nonce = nonce.clone();
+        let io = ctx.io.clone();
         std::thread::spawn(move || {
-            let _ = tx.send(relay(pipe, &nonce));
+            let _ = tx.send(relay(&*io, pipe, &nonce));
         });
     }
-    let ended = wait_until(&mut child, deadline + GRACE);
+    let relayed = child.stdout.take().map(|mut pipe| {
+        let (out_tx, out_rx) = mpsc::channel();
+        let io = ctx.io.clone();
+        std::thread::spawn(move || {
+            let mut buf = [0u8; 8192];
+            loop {
+                match pipe.read(&mut buf) {
+                    Ok(0) => break,
+                    Ok(n) => io.out(&buf[..n]),
+                    Err(e) if e.kind() == std::io::ErrorKind::Interrupted => continue,
+                    Err(_) => break,
+                }
+            }
+            let _ = out_tx.send(());
+        });
+        out_rx
+    });
+    let ended = wait_until(ctx, &mut child, deadline + GRACE);
     let status = rx.recv_timeout(Duration::from_secs(5)).ok().flatten();
+    if let Some(out_rx) = relayed {
+        let _ = out_rx.recv_timeout(Duration::from_secs(5));
+    }
     drop(stage);
     match (status, ended) {
         (Some(s), _) => Ok(s),
@@ -831,6 +1020,7 @@ fn on_pc(
 /// The record line (R15); a write that fails is said on standard error and changes no exit status.
 #[allow(clippy::too_many_arguments)]
 fn record(
+    ctx: &Ctx,
     start: SystemTime,
     seconds: f64,
     host: &str,
@@ -859,7 +1049,9 @@ fn record(
         "pc_available_mb": probe.map(Probe::available_mb),
         "pc_min_wsl_available_mb": min_wsl_available_mb,
     });
-    let path = variable("AP_CHECKS_LOG", DEFAULT_LOG);
+    let path = ctx
+        .var("AP_CHECKS_LOG")
+        .unwrap_or_else(|| DEFAULT_LOG.to_owned());
     // A file made here is the caller's alone; one that exists keeps its mode and owner.
     let written = OpenOptions::new()
         .append(true)
@@ -868,10 +1060,68 @@ fn record(
         .open(&path)
         .and_then(|mut f| f.write_all(format!("{line}\n").as_bytes()));
     if written.is_err() {
-        say(&format!(
+        ctx.say(&format!(
             "check: the record could not be appended to {path}"
         ));
     }
+}
+
+/// How the door ended a call it was asked for (`specs/ap/door.md` R4): the PC ran the command and
+/// this is its exit status, or the call is the stage's to run here, for this reason.
+pub(crate) enum Ended {
+    Exit(i32),
+    Here(&'static str),
+}
+/// The door's call for its stage's worktree (`specs/ap/door.md` R4): R2 to R4 and R19 of this
+/// file up to the placement, then the command on the PC with its row (R15), bound by `timeout`
+/// from `arrival`. Nothing of the worktree runs on this host. `served` says, once the PC answered,
+/// whether the request is still served: a request the door ended appends no row.
+pub(crate) fn for_door(
+    ctx: &Ctx,
+    call: &Call,
+    policy: Option<PathBuf>,
+    (arrival, start): (Instant, SystemTime),
+    served: &dyn Fn() -> bool,
+) -> Ended {
+    let tree = match worktree(ctx, &call.dir) {
+        Ok(t) => t,
+        Err(f) => return Ended::Here(f.code),
+    };
+    let pc = match work::policy(&PolicyAt(policy)).and_then(|v| v.map_or(Ok(None), |v| hosts(&v))) {
+        Ok(Some(pc)) => pc,
+        Ok(None) => return Ended::Here("no_pc_in_policy"),
+        Err(f) => return Ended::Here(f.code),
+    };
+    let deadline = arrival + Duration::from_secs(call.timeout);
+    let key = digest(tree.dir.as_bytes())[..16].to_owned();
+    match place(ctx, &pc, &key, engine_pin(&tree.dir).as_deref()) {
+        Place::Here(reason, _) => Ended::Here(reason),
+        Place::Pc { probe, head } => {
+            ctx.say(&on_pc_line(&probe));
+            match on_pc(ctx, &pc, call, &tree, &key, head.as_deref(), deadline) {
+                Ok((exit, low)) => {
+                    if served() {
+                        let seconds = (arrival.elapsed().as_millis() as f64) / 1000.0;
+                        let (host, reason) = ("pc", None);
+                        let probe = Some(&probe);
+                        record(
+                            ctx, start, seconds, host, reason, &tree, call, exit, probe, low,
+                        );
+                    }
+                    Ended::Exit(exit)
+                }
+                Err(()) => Ended::Here("pc_lost"),
+            }
+        }
+    }
+}
+fn on_pc_line(probe: &Probe) -> String {
+    format!(
+        "check: on pc ({} CPUs, load {}, {} MB available)",
+        probe.cpus,
+        probe.load,
+        probe.available_mb()
+    )
 }
 
 pub fn cli(argv: &[OsString]) -> ExitCode {
@@ -888,23 +1138,44 @@ pub fn cli(argv: &[OsString]) -> ExitCode {
         }
     };
     let deadline = started + Duration::from_secs(call.timeout);
-    let key = digest(tree.dir.as_bytes())[..16].to_owned();
-    let local = |reason: &'static str| {
+    let local = |reason: &str| {
         say(&format!("check: on this host ({reason})"));
-        ("local", Some(reason), here(&call, &tree, deadline))
+        here(&call, &tree, deadline)
     };
+    // Inside a stage with limits the PC is reached through the stage's door alone, and the row is
+    // the door's (R20).
+    if let Some(at) = std::env::var_os("AP_DOOR").filter(|v| !v.is_empty()) {
+        let exit = match &pc {
+            None => local("no_pc_in_policy"),
+            Some(_) => {
+                let request = json!({"door": 1, "verb": "check", "dir": tree.dir,
+                    "timeout": call.timeout, "command": call.command});
+                let ended = door::ask(Path::new(&at), &request, |stream, bytes| {
+                    let _ = match stream {
+                        door::Stream::Out => std::io::stdout().write_all(bytes),
+                        door::Stream::Err => std::io::stderr().write_all(bytes),
+                    };
+                });
+                match ended {
+                    Some(door::Closing::Exit(exit)) => exit,
+                    Some(door::Closing::Here(reason)) => local(&reason),
+                    Some(door::Closing::Refused(..)) => local("door_refused"),
+                    Some(door::Closing::Ended(_)) | None => local("no_door"),
+                }
+            }
+        };
+        return ExitCode::from(u8::try_from(exit).unwrap_or(1));
+    }
+    let ctx = Ctx::own();
+    let key = digest(tree.dir.as_bytes())[..16].to_owned();
+    let local = |reason: &'static str| ("local", Some(reason), local(reason));
     let (probe, low, (host, reason, exit)) = match &pc {
         None => (None, None, local("no_pc_in_policy")),
-        Some(pc) => match place(pc, &key, engine_pin(&tree.dir).as_deref()) {
+        Some(pc) => match place(&ctx, pc, &key, engine_pin(&tree.dir).as_deref()) {
             Place::Here(reason, probe) => (probe, None, local(reason)),
             Place::Pc { probe, head } => {
-                say(&format!(
-                    "check: on pc ({} CPUs, load {}, {} MB available)",
-                    probe.cpus,
-                    probe.load,
-                    probe.available_mb()
-                ));
-                match on_pc(pc, &call, &tree, &key, head.as_deref(), deadline) {
+                say(&on_pc_line(&probe));
+                match on_pc(&ctx, pc, &call, &tree, &key, head.as_deref(), deadline) {
                     Ok((exit, low)) => (Some(probe), low, ("pc", None, exit)),
                     Err(()) => (Some(probe), None, local("pc_lost")),
                 }
@@ -913,6 +1184,7 @@ pub fn cli(argv: &[OsString]) -> ExitCode {
     };
     let seconds = (started.elapsed().as_millis() as f64) / 1000.0;
     record(
+        &ctx,
         start,
         seconds,
         host,

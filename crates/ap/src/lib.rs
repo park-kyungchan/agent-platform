@@ -38,4 +38,6 @@ pub mod watch;
 
 pub mod check;
 
+pub mod door;
+
 pub mod route;
