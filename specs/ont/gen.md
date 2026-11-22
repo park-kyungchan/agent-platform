@@ -33,14 +33,23 @@ The module holds types and request builders only. It answers nothing by itself: 
   - `call(engine, &function)` sends `Command::Fn(NAME)` with `{"parameters","domain"}`, the domain always given, so that a call is never `function_ambiguous` (R4 and R5 of `specs/ont/fn.md`).
 - R12: `DOMAIN: &str`, `VERSION: u64` and `SHA256: &str` are the pin `CheckedSchema::pin()` gives for the bytes, which is what the envelope of an answer of a read or an action shows under `schema.<domain>` once the bytes are installed, so that a consumer can compare them.
 
+## The command
+
+- R13: `ont schema gen FILE` prints on standard output, with exit 0, exactly the text `ont_gen::generate` gives for the bytes of FILE (R1 to R3): nothing is added, no envelope and no newline, and standard error stays empty.
+  - The form is `schema gen FILE`: exactly one FILE, no option of its own (an option outside the global `--store`, `--now`, `--version`, `--help` and `-h` is refused `invalid_argument` as for every command), no standard input (`stdin_json` false); `ont help` and `ont schema gen --help` list it, and `schema gen` without FILE or with two is refused `invalid_argument`.
+  - A refusal is one JSON line on standard output with exit 2 and no module text, of the form of every refusal (`status` `refused`, `code`, `trust_limit`). A FILE the generator refuses is `schema_gen_refused` with the member `violations`, the array the generator returned, unchanged and in its order (`name_collision` and every schema check fault alike, invalid JSON included). A FILE that cannot be read is `schema_file_unreadable` with `path`, as `schema check` answers it.
+  - The command makes no uid check, because it binds no principal (R24 of `specs/ont/schema-language.md`): it answers alike for any real and effective uid. The checks that `run` makes before the uid check hold for it as for every command other than help and version: `now_requires_store`, and `now_at_default_store` (R104 of `specs/ont/action.md`). It is not a writing command (R15 of `specs/ont/fn.md`), so `ONT_FN_READ_ONLY=1` does not refuse it. It opens, creates and reads no store file, whatever `--store` names, reads no standard input and writes nothing but its answer on standard output.
+
 ## Use
 
 A consumer pins `ont-gen` at the one revision it pins the engine at (R23 of `specs/ont/schema-language.md` names `ont-core`, `ont-store` and `ont`). Its build script reads the schema file, calls `ont_gen::generate` and writes the text to a file under `OUT_DIR`; the crate then writes `include!(concat!(env!("OUT_DIR"), "/<domain>.rs"));` at item position and declares `serde_json` among its dependencies.
+
+The second way has no Git dependency on `ont-gen`: the build script runs the pinned engine's `ont schema gen FILE` (R13) and writes its standard output to `$OUT_DIR/<domain>.rs`; the crate includes that file in the same way.
 
 ## Not included
 
 - Typed answers: no struct is decoded from a head, a row of `search` or `around`, an applied action's edits or a refusal; a call function returns the engine's JSON.
 - Typed filters, and call functions for `aggregate`, `describe`, `action list`, `log` and `render`: a consumer writes those requests itself with `NAME` and `name()`.
 - A check on the client of what the engine checks (patterns, bounds, criteria, grants).
-- An implementation of `Engine`, a command-line form of the generator, a proc macro, and reading a schema out of a store.
+- An implementation of `Engine`, a proc macro, and reading a schema out of a store.
 - One module over several schemas, and a reference to an object type of another domain.

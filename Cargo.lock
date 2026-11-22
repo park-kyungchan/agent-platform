@@ -176,6 +176,7 @@ name = "ont"
 version = "0.1.0"
 dependencies = [
  "ont-core",
+ "ont-gen",
  "ont-store",
  "rusqlite",
  "rustix",

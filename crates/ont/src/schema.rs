@@ -67,7 +67,7 @@ fn valid_slug(s: &str) -> bool {
 fn valid_commit(s: &str) -> bool {
     s.len() == 40 && s.chars().all(|c| c.is_ascii_hexdigit())
 }
-fn read_schema_file(file: &std::path::Path) -> Result<Vec<u8>, Failure> {
+pub(crate) fn read_schema_file(file: &std::path::Path) -> Result<Vec<u8>, Failure> {
     std::fs::read(file).map_err(|_| {
         Refusal::new("schema_file_unreadable")
             .with("path", json!(file.display().to_string()))
@@ -135,6 +135,18 @@ pub fn check(ctx: &Context, req: &CheckRequest) -> Result<Answer, Failure> {
         (BTreeSet::new(), Vec::new())
     };
     check_outcome(&bytes, &others, against, store_exists)
+}
+
+/// The text of the Rust module `ont_gen::generate` gives for a schema file
+/// (`ont schema gen`, R13 of `specs/ont/gen.md`). Reads that one file; opens
+/// no store and writes nothing.
+pub(crate) fn generate_module(file: &std::path::Path) -> Result<String, Failure> {
+    let bytes = read_schema_file(file)?;
+    ont_gen::generate(&bytes).map_err(|violations| {
+        Refusal::new("schema_gen_refused")
+            .with("violations", json!(violations))
+            .into()
+    })
 }
 
 /// Install a schema file. The only operation that may create a store: the

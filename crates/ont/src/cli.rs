@@ -299,17 +299,24 @@ fn writes(cli: &Cli) -> bool {
     }
 }
 
+/// Every option given must be one the command takes.
+fn check_options(cli: &Cli, command: crate::usage::Command) -> Result<(), Refusal> {
+    match cli
+        .given_options
+        .iter()
+        .find(|option| !crate::usage::allows(command, option))
+    {
+        Some(option) => Err(crate::usage::invalid(
+            option,
+            "option must be used with its command listed by ont help",
+        )),
+        None => Ok(()),
+    }
+}
+
 fn dispatch(cli: &Cli, stdin: impl Read, ctx: &Context) -> Result<Answer, Failure> {
     let command = crate::usage::resolve(&cli.command)?;
-    for option in &cli.given_options {
-        if !crate::usage::allows(command, option) {
-            return Err(crate::usage::invalid(
-                option,
-                "option must be used with its command listed by ont help",
-            )
-            .into());
-        }
-    }
+    check_options(cli, command)?;
     let is_file_install = command == crate::usage::Command::SchemaInstall && cli.command.len() == 3;
     let is_commit_install =
         command == crate::usage::Command::SchemaInstall && cli.command.len() == 2;
@@ -465,7 +472,8 @@ fn dispatch(cli: &Cli, stdin: impl Read, ctx: &Context) -> Result<Answer, Failur
             ctx,
             &crate::function::FnRequest::parse_stdin(&cli.command[1], &read_request(stdin)?)?,
         ),
-        Mcp => Err(invalid_argument("command").into()),
+        // `run` answers these two before `dispatch`.
+        SchemaGen | Mcp => Err(invalid_argument("command").into()),
     }
 }
 
@@ -584,6 +592,11 @@ pub fn run(args: &[String], stdin: impl Read, real_uid: u32, effective_uid: u32)
             0,
         );
     }
+    // `schema gen` binds no principal (R24 of `specs/ont/schema-language.md`):
+    // no uid check, no store, no standard input, and nothing but its text out.
+    if crate::usage::resolve(&cli.command).is_ok_and(|c| c == crate::usage::Command::SchemaGen) {
+        return run_gen(&cli);
+    }
     if let Err(code) = check_uid(real_uid, effective_uid) {
         return render(Err(Refusal::new(code).into()), 0);
     }
@@ -614,6 +627,22 @@ pub fn run(args: &[String], stdin: impl Read, real_uid: u32, effective_uid: u32)
     ctx.agent = std::env::var("ONT_AGENT").ok().filter(|s| !s.is_empty());
     ctx.role = std::env::var("ONT_ROLE").ok().filter(|s| !s.is_empty());
     render(dispatch(&cli, stdin, &ctx), now)
+}
+
+/// `ont schema gen FILE`: the text of `ont_gen::generate` for the bytes of
+/// FILE on standard output, byte for byte (R13 of `specs/ont/gen.md`).
+fn run_gen(cli: &Cli) -> Outcome {
+    let result = check_options(cli, crate::usage::Command::SchemaGen)
+        .map_err(Failure::from)
+        .and_then(|()| crate::schema::generate_module(std::path::Path::new(&cli.command[2])));
+    match result {
+        Ok(text) => Outcome {
+            stdout: text,
+            stderr: String::new(),
+            code: 0,
+        },
+        Err(failure) => render(Err(failure), 0),
+    }
 }
 
 /// `ont mcp [--client <name>]`: the server loop of [`crate::mcp`] over `stdin`
