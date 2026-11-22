@@ -34,5 +34,23 @@
     "destination": "deployments/host-cron/docker-image-prune",
     "sha256": "14b4efd4e22f39e53f1660dc81e40835d4ee1adcb41a5cd3f066bcab1c9b5b11",
     "sanitization": "none; existing environment placeholders preserved"
+  },
+  {
+    "source": "/etc/ssh/sshd_config.d/00-01-ssh-only.conf",
+    "destination": "deployments/ssh/00-01-ssh-only.conf",
+    "sha256": "ff5ca36fdeb5c68550960e437944cd7f51b73a9bf825f70fc1fa842e8b1330a2",
+    "sanitization": "none"
+  },
+  {
+    "source": "/etc/host-firewall.nft",
+    "destination": "deployments/host-firewall/host-firewall.nft",
+    "sha256": "01254abef4f73d14af7483118a721a82d0d74f968462bdd85ecebd3431eb2a51",
+    "sanitization": "none"
+  },
+  {
+    "source": "/etc/systemd/system/host-firewall.service",
+    "destination": "deployments/host-firewall/host-firewall.service",
+    "sha256": "e492d2f4ceaf65b207d4744eb4277ce4e0a9a52ae585d9f8ce53d3429380df0d",
+    "sanitization": "none"
   }
 ]
