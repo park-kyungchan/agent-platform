@@ -1033,6 +1033,9 @@ fn the_form_and_the_academy_are_refused_before_any_effect() {
     assert!(!ap::api::academy("/a/evals/lessons/x") && !ap::api::academy("/a/my-edu-x/evals"));
 }
 
+/// A change of the policy's member `api`.
+type Change = Box<dyn Fn(&mut Value)>;
+
 // spec: specs/ap/api.md#R3
 #[test]
 fn the_policy_member_is_read_before_any_effect() {
@@ -1063,7 +1066,7 @@ fn the_policy_member_is_read_before_any_effect() {
     let r = call(&mut f, "nightly", &[]);
     before_any_effect(&f, &r, "unknown_job", "job");
     // Each malformed member is named.
-    let cases: Vec<(Box<dyn Fn(&mut Value)>, &str)> = vec![
+    let cases: Vec<(Change, &str)> = vec![
         (
             Box::new(|a| a["key_file"] = json!("/etc/agent-platform/anthropic-api-key")),
             "api.key_file ",
