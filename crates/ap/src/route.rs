@@ -175,7 +175,12 @@ pub fn stem_of(repository: &str) -> String {
 }
 
 /// One call of `git` in a clone; its standard output when it exits 0.
-pub(crate) fn git(s: &mut impl System, clone: &str, words: &[&str], ms: u64) -> Result<Vec<u8>, ()> {
+pub(crate) fn git(
+    s: &mut impl System,
+    clone: &str,
+    words: &[&str],
+    ms: u64,
+) -> Result<Vec<u8>, ()> {
     let mut a: Vec<String> = vec!["--literal-pathspecs".into(), "-C".into(), clone.into()];
     a.extend(words.iter().map(|w| (*w).to_owned()));
     match s.call("git", &a, &Value::Null, ms) {
@@ -343,7 +348,11 @@ pub(crate) fn fetched_tree(
 }
 
 /// The bytes of one object of the clone (R4).
-pub(crate) fn blob(s: &mut impl System, clone: &str, object: &str) -> Result<Vec<u8>, &'static str> {
+pub(crate) fn blob(
+    s: &mut impl System,
+    clone: &str,
+    object: &str,
+) -> Result<Vec<u8>, &'static str> {
     git(s, clone, &["cat-file", "blob", object], GIT_MS).map_err(|_| "read_failed")
 }
 

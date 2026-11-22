@@ -1152,6 +1152,44 @@ fn r5_fn_asks_the_engine_as_the_stage_for_a_function_of_the_list() {
     );
 }
 
+// spec: specs/ap/clause.md#R10
+#[test]
+fn r10_clause_is_served_as_route_is_and_a_name_off_the_list_is_still_refused() {
+    let f = Fake::new();
+    let door = f.door();
+    let t = f.t.clone();
+    let r = f.request("reviewer");
+    let running = f.start(r, true);
+    let input = json!({"parameters": {"key": "o/r:specs/ap/unit.md#R11"}});
+    let (out, _, closing) = ask(
+        &door,
+        &json!({"door": 1, "verb": "fn", "name": "clause", "input": input}),
+    );
+    assert_eq!(closing, Some(json!({"exit": 0})));
+    assert!(!out.is_empty());
+    let (_, _, closing) = ask(
+        &door,
+        &json!({"door": 1, "verb": "fn", "name": "horizon", "input": {}}),
+    );
+    assert_eq!(closing, refused("not_admitted", "name"));
+    assert_eq!(
+        fs::read_to_string(t.join("ont.args")).unwrap(),
+        "fn clause\n"
+    );
+    assert_eq!(
+        fs::read_to_string(t.join("ont.input")).unwrap(),
+        format!("{input}\n")
+    );
+    let (f, result) = running.finish();
+    assert_eq!(result.unwrap().1, 0);
+    let names: Vec<Value> = f
+        .lines("door.jsonl")
+        .iter()
+        .map(|l| l["name"].clone())
+        .collect();
+    assert_eq!(names, [json!("clause"), json!("horizon")]);
+}
+
 // spec: specs/ap/door.md#R5
 #[test]
 fn r5_the_store_of_the_request_is_named_and_an_engine_that_cannot_start_is_127() {

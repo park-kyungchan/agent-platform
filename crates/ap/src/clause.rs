@@ -36,7 +36,8 @@ pub fn options(argv: &[OsString]) -> Result<Options, Failure> {
 
 /// The source of a file of the directory and its stem: `<stem>.clauses.jsonl`.
 pub fn source_of(name: &str) -> Option<(&'static str, &str)> {
-    name.strip_suffix(".clauses.jsonl").map(|stem| (SOURCE, stem))
+    name.strip_suffix(".clauses.jsonl")
+        .map(|stem| (SOURCE, stem))
 }
 
 /// The rule of a requirement line, `R<digits>`: the line begins with `- R`, digits and `:` (R3).
@@ -91,7 +92,8 @@ pub fn citations(line: &str) -> Vec<(String, String)> {
             .unwrap_or(rest.len());
         let path = &rest[..run];
         // `specs/`, at least one character, `.md`.
-        if !path.starts_with("specs/") || !path.ends_with(".md") || path.len() < "specs/x.md".len() {
+        if !path.starts_with("specs/") || !path.ends_with(".md") || path.len() < "specs/x.md".len()
+        {
             continue;
         }
         let Some(after) = rest[run..].strip_prefix("#R") else {
@@ -118,9 +120,9 @@ pub fn parts(key: &str) -> Option<(&str, &str, &str)> {
     let (path, rule) = rest.rsplit_once('#')?;
     let ok = route::repository_form(repository)
         && !path.is_empty()
-        && rule.strip_prefix('R').is_some_and(|n| {
-            !n.is_empty() && n.bytes().all(|b| b.is_ascii_digit())
-        });
+        && rule
+            .strip_prefix('R')
+            .is_some_and(|n| !n.is_empty() && n.bytes().all(|b| b.is_ascii_digit()));
     ok.then_some((repository, path, rule))
 }
 
@@ -149,7 +151,10 @@ fn repository_records(
         let text = String::from_utf8_lossy(&bytes);
         for (n, line) in text.split('\n').enumerate() {
             for (spec, rule) in citations(line) {
-                cited.entry((spec, rule)).or_default().push((path.clone(), n + 1));
+                cited
+                    .entry((spec, rule))
+                    .or_default()
+                    .push((path.clone(), n + 1));
             }
         }
     }

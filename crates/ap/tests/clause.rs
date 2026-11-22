@@ -278,7 +278,7 @@ fn alpha() -> Repo {
         .file("specs/w.md", SPEC, 1)
         .file(
             "src/w.rs",
-            "// spec: specs/w.md#R1\nfn w() {}\n// spec: specs/w.md#R2 and spec: specs/w.md#R1\n",
+            "// spec:\x20specs/w.md#R1\nfn w() {}\n// spec:\x20specs/w.md#R2 and spec:\x20specs/w.md#R1\n",
             2,
         )
 }
@@ -306,24 +306,52 @@ fn r1_the_arguments_of_index() {
         assert_eq!((e.code, e.field.as_str()), ("usage", "args"), "{bad:?}");
     }
     for (bad, field) in [
-        (&["--directory", "relative", "--store", "/s"][..], "directory"),
+        (
+            &["--directory", "relative", "--store", "/s"][..],
+            "directory",
+        ),
         (&["--store", "/s"], "directory"),
-        (&["--store", "/s", "--directory", "/var/lib/agent-platform/clause/"], "directory"),
+        (
+            &[
+                "--store",
+                "/s",
+                "--directory",
+                "/var/lib/agent-platform/clause/",
+            ],
+            "directory",
+        ),
         (&["--directory", "/d"], "directory"),
         (&["--repository", ""], "repository"),
-        (&["--repository", "park-kyungchan/education-platform"], "repository"),
+        (
+            &["--repository", "park-kyungchan/education-platform"],
+            "repository",
+        ),
         (&["--repository", "not a name"], "repository"),
-        (&["--repository", "a/b", "--repository", "a/b"], "repository"),
+        (
+            &["--repository", "a/b", "--repository", "a/b"],
+            "repository",
+        ),
     ] {
         let e = clause::options(&os(bad)).unwrap_err();
-        assert_eq!((e.code, e.field.as_str()), ("invalid_input", field), "{bad:?}");
+        assert_eq!(
+            (e.code, e.field.as_str()),
+            ("invalid_input", field),
+            "{bad:?}"
+        );
     }
     // The default directory without --store is the host's; a repository the policy does not map is refused
     // before any effect.
     assert!(clause::options(&os(&[])).unwrap().directory.is_none());
     let dir = Scratch::new();
     let mut fake = Fake::new(&dir, &[]);
-    let argv = os(&["--directory", &dir.path("clause"), "--store", "/s", "--repository", "o/none"]);
+    let argv = os(&[
+        "--directory",
+        &dir.path("clause"),
+        "--store",
+        "/s",
+        "--repository",
+        "o/none",
+    ]);
     let e = clause::index(&mut fake, &clause::options(&argv).unwrap()).unwrap_err();
     assert_eq!(e.code, "repository_not_mapped");
     assert!(fake.calls.is_empty() && !dir.at("clause").exists());
@@ -347,7 +375,10 @@ fn r1_the_arguments_of_index() {
     );
     assert_eq!(out.status.code(), Some(2));
     assert_eq!(
-        (error_of(&out)["error"]["code"].clone(), error_of(&out)["error"]["field"].clone()),
+        (
+            error_of(&out)["error"]["code"].clone(),
+            error_of(&out)["error"]["field"].clone()
+        ),
         (json!("invalid_input"), json!("repository"))
     );
     let help = ap(&["clause", "--help"], &[], "");
@@ -362,7 +393,11 @@ fn r2_a_failing_fetch_keeps_the_previous_file() {
     let mut broken = alpha();
     broken.fetch_fails = true;
     let mut fake = Fake::new(&dir, &[("o/alpha", alpha()), ("o/broken", broken.clone())]);
-    let (line, held) = run(&mut fake, &dir, &["--repository", "o/broken", "--repository", "o/alpha"]);
+    let (line, held) = run(
+        &mut fake,
+        &dir,
+        &["--repository", "o/broken", "--repository", "o/alpha"],
+    );
     assert!(held);
     assert_eq!(
         line["kept"],
@@ -433,10 +468,16 @@ fn r3_the_clauses_of_a_file() {
             "text": "- R1: The board lists every widget once.", "tests": ["src/w.rs:1", "src/w.rs:3"],
             "tests_total": 2})
     );
-    assert_eq!(by("o/alpha:specs/w.md#R2")["text"], "- R2: The board is green.");
+    assert_eq!(
+        by("o/alpha:specs/w.md#R2")["text"],
+        "- R2: The board is green."
+    );
     assert_eq!(by("o/alpha:specs/w.md#R2")["line"], 10);
     // The last clause runs to the file's end, without a final line feed.
-    assert_eq!(by("o/alpha:specs/w.md#R3")["digest"], sha("- R3: A last sentence"));
+    assert_eq!(
+        by("o/alpha:specs/w.md#R3")["digest"],
+        sha("- R3: A last sentence")
+    );
     // The first line of a rule is indexed; a later one is not.
     assert_eq!(by("o/alpha:specs/twice.md#R1")["text"], "- R1: First.");
     assert_eq!(by("o/alpha:specs/twice.md#R2")["line"], 5);
@@ -447,12 +488,18 @@ fn r3_the_clauses_of_a_file() {
     assert_eq!(cut["digest"], sha(long.trim_end_matches('\n')));
     // Neither a Markdown file outside specs/ nor a large file is read.
     let reads = fake.git_reads();
-    assert!(!reads.iter().any(|r| r.contains("log") && (r.contains("docs/") || r.contains("big.md"))));
+    assert!(
+        !reads
+            .iter()
+            .any(|r| r.contains("log") && (r.contains("docs/") || r.contains("big.md")))
+    );
     let objects: Vec<&String> = reads.iter().filter(|r| r.starts_with("cat-file")).collect();
     assert_eq!(objects.len(), 5, "{objects:?}");
     // The rule of a line (the rule of ci/check-spec-trace.py).
     assert_eq!(clause::rule_of("- R12: x").as_deref(), Some("R12"));
-    for no in ["- R: x", " - R1: x", "- R1 x", "-R1: x", "- r1: x", "- R1a: x"] {
+    for no in [
+        "- R: x", " - R1: x", "- R1 x", "-R1: x", "- r1: x", "- R1a: x",
+    ] {
         assert_eq!(clause::rule_of(no), None, "{no}");
     }
 }
@@ -462,12 +509,12 @@ fn r3_the_clauses_of_a_file() {
 fn r4_the_tests_that_cite_a_clause() {
     let dir = Scratch::new();
     let many: String = (0..101)
-        .map(|i| format!("# spec: specs/w.md#R2 case {i}\n"))
+        .map(|i| format!("# spec:\x20specs/w.md#R2 case {i}\n"))
         .collect();
     let repo = alpha()
         .file("tests/a.sh", &many, 3)
-        .file("docs/notes.md", "spec: specs/w.md#R1 in Markdown does not count\n", 4)
-        .file("ci/x.py", "x = 'spec: specs/w.md#R10'  # spec: specs/w.md#R3\nspec: specs/w.md#Rx spec: specs/.md#R1\n", 5);
+        .file("docs/notes.md", "spec:\x20specs/w.md#R1 in Markdown does not count\n", 4)
+        .file("ci/x.py", "x = 'spec:\x20specs/w.md#R10'  # spec:\x20specs/w.md#R3\nspec:\x20specs/w.md#Rx spec:\x20specs/.md#R1\n", 5);
     let mut fake = Fake::new(&dir, &[("o/alpha", repo)]);
     run(&mut fake, &dir, &["--repository", "o/alpha"]);
     let all = records(&dir.at("clause/o__alpha.clauses.jsonl"));
@@ -483,7 +530,9 @@ fn r4_the_tests_that_cite_a_clause() {
     assert_eq!(tests[99], "tests/a.sh:99");
     assert_eq!(by("R3")["tests"], json!(["ci/x.py:1"]));
     assert_eq!(
-        clause::citations("a spec: specs/a/b.md#R7, spec: specs/c.md#R8x spec: specs/d.txt#R1"),
+        clause::citations(
+            "a spec:\x20specs/a/b.md#R7, spec:\x20specs/c.md#R8x spec:\x20specs/d.txt#R1"
+        ),
         [
             ("specs/a/b.md".to_owned(), "R7".to_owned()),
             ("specs/c.md".to_owned(), "R8".to_owned())
@@ -496,7 +545,19 @@ fn r4_the_tests_that_cite_a_clause() {
 fn r5_files_their_modes_and_prune() {
     let dir = Scratch::new();
     // An absent directory is made with mode 0700, whatever the umask.
-    let mut fake = Fake::new(&dir, &[("o/alpha", alpha()), ("o/broken", Repo { fetch_fails: true, ..alpha() })]);
+    let mut fake = Fake::new(
+        &dir,
+        &[
+            ("o/alpha", alpha()),
+            (
+                "o/broken",
+                Repo {
+                    fetch_fails: true,
+                    ..alpha()
+                },
+            ),
+        ],
+    );
     run(&mut fake, &dir, &["--repository", "o/alpha"]);
     assert_eq!(mode(&dir.at("clause")), 0o700);
     assert_eq!(mode(&dir.at("clause/o__alpha.clauses.jsonl")), 0o600);
@@ -511,16 +572,32 @@ fn r5_files_their_modes_and_prune() {
     let clause_dir = dir.at("clause");
     std::fs::write(clause_dir.join("o__gone.clauses.jsonl"), "").unwrap();
     std::fs::write(clause_dir.join("notes.txt"), "kept").unwrap();
-    std::fs::set_permissions(clause_dir.join("notes.txt"), std::fs::Permissions::from_mode(0o644)).unwrap();
+    std::fs::set_permissions(
+        clause_dir.join("notes.txt"),
+        std::fs::Permissions::from_mode(0o644),
+    )
+    .unwrap();
     std::fs::create_dir(clause_dir.join("sub.clauses.jsonl")).unwrap();
     std::fs::write(dir.at("elsewhere.jsonl"), "").unwrap();
-    std::fs::set_permissions(dir.at("elsewhere.jsonl"), std::fs::Permissions::from_mode(0o644)).unwrap();
-    std::os::unix::fs::symlink(dir.at("elsewhere.jsonl"), clause_dir.join("link.clauses.jsonl")).unwrap();
+    std::fs::set_permissions(
+        dir.at("elsewhere.jsonl"),
+        std::fs::Permissions::from_mode(0o644),
+    )
+    .unwrap();
+    std::os::unix::fs::symlink(
+        dir.at("elsewhere.jsonl"),
+        clause_dir.join("link.clauses.jsonl"),
+    )
+    .unwrap();
     std::fs::write(clause_dir.join(".ap-route.1.x.sections.jsonl.tmp"), "").unwrap();
     let fresh = clause_dir.join(".ap-clause.1.o__x.clauses.jsonl.tmp");
     std::fs::write(&fresh, "").unwrap();
     // Without --prune nothing is removed.
-    let (line, _) = run(&mut fake, &dir, &["--repository", "o/alpha", "--repository", "o/broken"]);
+    let (line, _) = run(
+        &mut fake,
+        &dir,
+        &["--repository", "o/alpha", "--repository", "o/broken"],
+    );
     assert_eq!(line["removed"], json!([]));
     assert_eq!(line["kept"][0]["previous"], true);
     assert_eq!(mode(&clause_dir), 0o700);
@@ -532,11 +609,20 @@ fn r5_files_their_modes_and_prune() {
     // With --prune: the file of a repository no longer named, and an old temporary file of the command; the
     // unrelated file, the subdirectory, the link and another command's temporary file stay.
     let old = SystemTime::now() - Duration::from_secs(7200);
-    std::fs::File::options().write(true).open(&fresh).unwrap().set_modified(old).unwrap();
+    std::fs::File::options()
+        .write(true)
+        .open(&fresh)
+        .unwrap()
+        .set_modified(old)
+        .unwrap();
     let (line, _) = run(&mut fake, &dir, &["--repository", "o/alpha", "--prune"]);
     assert_eq!(
         line["removed"],
-        json!([".ap-clause.1.o__x.clauses.jsonl.tmp", "o__broken.clauses.jsonl", "o__gone.clauses.jsonl"])
+        json!([
+            ".ap-clause.1.o__x.clauses.jsonl.tmp",
+            "o__broken.clauses.jsonl",
+            "o__gone.clauses.jsonl"
+        ])
     );
     let mut left: Vec<String> = std::fs::read_dir(&clause_dir)
         .unwrap()
@@ -553,7 +639,12 @@ fn r5_files_their_modes_and_prune() {
             "sub.clauses.jsonl"
         ]
     );
-    assert!(std::fs::symlink_metadata(clause_dir.join("link.clauses.jsonl")).unwrap().file_type().is_symlink());
+    assert!(
+        std::fs::symlink_metadata(clause_dir.join("link.clauses.jsonl"))
+            .unwrap()
+            .file_type()
+            .is_symlink()
+    );
     assert_eq!(mode(&dir.at("elsewhere.jsonl")), 0o644);
     // A directory that is a link, or a file, is refused.
     std::os::unix::fs::symlink(&clause_dir, dir.at("linked")).unwrap();
@@ -580,7 +671,13 @@ fn r6_the_index_and_the_answer_line() {
     let index = fake.calls.iter().find(|c| c.0 == "ont").unwrap();
     assert_eq!(
         index.1,
-        ["index", "--source", "clauses", "--store", &dir.path("store.sqlite")]
+        [
+            "index",
+            "--source",
+            "clauses",
+            "--store",
+            &dir.path("store.sqlite")
+        ]
     );
     // A source that did not hold.
     fake.index = json!({"status": "source_failed", "result": {"sources": [{"source": "clauses",
@@ -592,7 +689,14 @@ fn r6_the_index_and_the_answer_line() {
     assert_eq!(line["sources"]["clauses"]["code"], "record_type_mismatch");
     // An engine that does not answer is a failure of the command.
     fake.store_fails = true;
-    let argv = os(&["--directory", &dir.path("clause"), "--store", "/s", "--repository", "o/alpha"]);
+    let argv = os(&[
+        "--directory",
+        &dir.path("clause"),
+        "--store",
+        "/s",
+        "--repository",
+        "o/alpha",
+    ]);
     let e = clause::index(&mut fake, &clause::options(&argv).unwrap()).unwrap_err();
     assert_eq!(e.code, "process_failed");
 }
@@ -610,7 +714,7 @@ fn clause_object(key: &str, tests: &[&str]) -> Value {
 }
 fn unit_object(n: usize) -> Value {
     let mut fields = json!({"state": "draft", "class": "contract", "lane": "objective"});
-    if n % 2 == 0 {
+    if n.is_multiple_of(2) {
         fields["wave"] = json!(n);
     }
     object("unit", &format!("u{n:02}"), &fields)
@@ -627,8 +731,15 @@ fn r7_ap_with_no_argument_is_the_function_clause() {
     let out = ap(&[], &[("ONT_FN_NAME", "clause")], r#"{"key":"x"}"#);
     assert_eq!(out.status.code(), Some(2));
     assert_eq!(error_of(&out)["error"]["field"], "ONT_FN_STORE");
-    let store = [("ONT_FN_NAME", "clause"), ("ONT_FN_STORE", "/invented/store.sqlite")];
-    for (input, field) in [("[", "stdin"), (r#"{"key":7}"#, "key"), (r#"{"other":1}"#, "other")] {
+    let store = [
+        ("ONT_FN_NAME", "clause"),
+        ("ONT_FN_STORE", "/invented/store.sqlite"),
+    ];
+    for (input, field) in [
+        ("[", "stdin"),
+        (r#"{"key":7}"#, "key"),
+        (r#"{"other":1}"#, "other"),
+    ] {
         let out = ap(&[], &store, input);
         assert_eq!(out.status.code(), Some(2), "{input}");
         assert_eq!(error_of(&out)["error"]["code"], "invalid_input");
@@ -642,7 +753,11 @@ fn r7_ap_with_no_argument_is_the_function_clause() {
     let path = format!("{}:/usr/bin:/bin", dir.path("bin"));
     let out = ap(
         &[],
-        &[("ONT_FN_NAME", "clause"), ("ONT_FN_STORE", "/invented/store.sqlite"), ("PATH", &path)],
+        &[
+            ("ONT_FN_NAME", "clause"),
+            ("ONT_FN_STORE", "/invented/store.sqlite"),
+            ("PATH", &path),
+        ],
         &json!({"key": KEY}).to_string(),
     );
     assert_eq!(out.status.code(), Some(3));
@@ -651,7 +766,10 @@ fn r7_ap_with_no_argument_is_the_function_clause() {
     // Through the port, the one read refused the same way.
     let mut fake = Fake::new(&dir, &[]);
     fake.store_fails = true;
-    assert_eq!(answer(&mut fake, json!({"key": KEY})).unwrap_err().code, "process_failed");
+    assert_eq!(
+        answer(&mut fake, json!({"key": KEY})).unwrap_err().code,
+        "process_failed"
+    );
 }
 
 // spec: specs/ap/clause.md#R8
@@ -714,9 +832,18 @@ fn r9_the_sentence_its_tests_and_the_units_that_name_it() {
     assert!(v.get("stale").is_none());
     // A key no current clause has, though units name it, and a key of another form: no read of the units.
     fake.calls.clear();
-    for key in ["o/alpha:specs/w.md#R9", "o/alpha specs/w.md#R1", "o/alpha:specs/w.md#X1", "o/alpha:#R1"] {
+    for key in [
+        "o/alpha:specs/w.md#R9",
+        "o/alpha specs/w.md#R1",
+        "o/alpha:specs/w.md#X1",
+        "o/alpha:#R1",
+    ] {
         let v = answer(&mut fake, json!({"key": key})).unwrap();
-        assert_eq!(v, json!({"clause": null, "units": [], "units_total": 0}), "{key}");
+        assert_eq!(
+            v,
+            json!({"clause": null, "units": [], "units_total": 0}),
+            "{key}"
+        );
     }
     assert_eq!(fake.ont(), ["search"]);
     // A search that is not qualified: the answer is given, with stale.
@@ -737,13 +864,21 @@ fn r11_the_service_and_its_timer() {
     // The lines of the route service, but its description, its comment and its command.
     let rest = |text: &str| -> Vec<String> {
         (text.lines())
-            .filter(|l| !l.starts_with("Description=") && !l.starts_with('#') && !l.starts_with("ExecStart="))
+            .filter(|l| {
+                !l.starts_with("Description=")
+                    && !l.starts_with('#')
+                    && !l.starts_with("ExecStart=")
+            })
             .map(str::to_owned)
             .collect()
     };
     assert_eq!(rest(&service), rest(&route));
     let timer = std::fs::read_to_string(root.join("deploy/ap-clause.timer")).unwrap();
-    for line in ["OnCalendar=*:5/10", "Persistent=true", "WantedBy=timers.target"] {
+    for line in [
+        "OnCalendar=*:5/10",
+        "Persistent=true",
+        "WantedBy=timers.target",
+    ] {
         assert!(timer.lines().any(|l| l == line), "{line}");
     }
 }
@@ -794,8 +929,18 @@ impl Drop for Bed {
 }
 fn git(dir: &Path, args: &[&str]) -> String {
     let out = Command::new("git")
-        .args(["-c", "user.name=fixture", "-c", "user.email=fixture@invalid"])
-        .args(["-c", "commit.gpgsign=false", "-c", "init.defaultBranch=main"])
+        .args([
+            "-c",
+            "user.name=fixture",
+            "-c",
+            "user.email=fixture@invalid",
+        ])
+        .args([
+            "-c",
+            "commit.gpgsign=false",
+            "-c",
+            "init.defaultBranch=main",
+        ])
         .args(["-c", "protocol.file.allow=always"])
         .args(args)
         .current_dir(dir)
@@ -803,7 +948,11 @@ fn git(dir: &Path, args: &[&str]) -> String {
         .env("GIT_CONFIG_GLOBAL", "/dev/null")
         .output()
         .unwrap();
-    assert!(out.status.success(), "git {args:?}: {}", String::from_utf8_lossy(&out.stderr));
+    assert!(
+        out.status.success(),
+        "git {args:?}: {}",
+        String::from_utf8_lossy(&out.stderr)
+    );
     String::from_utf8(out.stdout).unwrap().trim().to_owned()
 }
 impl Bed {
@@ -827,9 +976,15 @@ impl Bed {
         let mut schema: Value =
             serde_json::from_str(include_str!("../../../ontology/work.schema.json")).unwrap();
         let glob = schema["sources"]["clauses"]["glob"].as_str().unwrap();
-        let rest = glob.strip_prefix("/var/lib/agent-platform/clause/").unwrap().to_owned();
+        let rest = glob
+            .strip_prefix("/var/lib/agent-platform/clause/")
+            .unwrap()
+            .to_owned();
         schema["sources"]["clauses"]["glob"] = json!(format!("{}/clause/{rest}", root.display()));
-        assert_eq!(schema["functions"]["clause"]["program"], "/usr/local/bin/ap");
+        assert_eq!(
+            schema["functions"]["clause"]["program"],
+            "/usr/local/bin/ap"
+        );
         schema["functions"]["clause"]["program"] = json!(ap.to_str().unwrap());
         std::fs::write(root.join("schema.json"), schema.to_string()).unwrap();
         let path = format!(
@@ -838,7 +993,10 @@ impl Bed {
             std::env::var("PATH").unwrap_or_default()
         );
         let bed = Self { root, ont, path };
-        let (code, out) = bed.ont(&["schema", "install", bed.at("schema.json").to_str().unwrap()], "");
+        let (code, out) = bed.ont(
+            &["schema", "install", bed.at("schema.json").to_str().unwrap()],
+            "",
+        );
         assert_eq!(code, 0, "{out}");
         bed
     }
@@ -852,9 +1010,15 @@ impl Bed {
     fn repository(&self, name: &str, files: &[(&str, &str)]) {
         let work = self.at(&format!("work/{name}"));
         let origin = self.at(&format!("origins/{name}.git"));
-        git(&self.root, &["init", "--quiet", "--bare", origin.to_str().unwrap()]);
+        git(
+            &self.root,
+            &["init", "--quiet", "--bare", origin.to_str().unwrap()],
+        );
         git(&self.root, &["init", "--quiet", work.to_str().unwrap()]);
-        git(&work, &["remote", "add", "origin", origin.to_str().unwrap()]);
+        git(
+            &work,
+            &["remote", "add", "origin", origin.to_str().unwrap()],
+        );
         for (path, text) in files {
             let p = work.join(path);
             std::fs::create_dir_all(p.parent().unwrap()).unwrap();
@@ -864,7 +1028,15 @@ impl Bed {
         git(&work, &["commit", "--quiet", "-m", "fixture"]);
         git(&work, &["push", "--quiet", "origin", "HEAD:main"]);
         let clone = self.at(&format!("clones/{name}"));
-        git(&self.root, &["clone", "--quiet", origin.to_str().unwrap(), clone.to_str().unwrap()]);
+        git(
+            &self.root,
+            &[
+                "clone",
+                "--quiet",
+                origin.to_str().unwrap(),
+                clone.to_str().unwrap(),
+            ],
+        );
         let policy = json!({"repositories": {format!("fixture/{name}"): {"clone": clone.to_str().unwrap()}}});
         std::fs::write(self.at("policy.json"), policy.to_string()).unwrap();
     }
@@ -880,7 +1052,12 @@ impl Bed {
             .spawn()
             .unwrap();
         use std::io::Write;
-        child.stdin.take().unwrap().write_all(stdin.as_bytes()).unwrap();
+        child
+            .stdin
+            .take()
+            .unwrap()
+            .write_all(stdin.as_bytes())
+            .unwrap();
         let out = child.wait_with_output().unwrap();
         let v = serde_json::from_slice(&out.stdout).unwrap_or_else(|_| {
             panic!(
@@ -913,23 +1090,39 @@ fn an_invented_repository_indexed_and_answered_by_the_engine() {
     bed.repository(
         "alpha",
         &[
-            ("specs/w.md", "# Widgets\n\n- R1: The board lists\n  every widget.\n- R2: The board is green.\n"),
-            ("src/w.rs", "// spec: specs/w.md#R1\nfn w() {}\n"),
+            (
+                "specs/w.md",
+                "# Widgets\n\n- R1: The board lists\n  every widget.\n- R2: The board is green.\n",
+            ),
+            ("src/w.rs", "// spec:\x20specs/w.md#R1\nfn w() {}\n"),
             ("README.md", "- R1: Not a specification.\n"),
         ],
     );
     let out = Command::new(bed.at("bin/ap"))
-        .args(["clause", "index", "--directory", bed.at("clause").to_str().unwrap()])
+        .args([
+            "clause",
+            "index",
+            "--directory",
+            bed.at("clause").to_str().unwrap(),
+        ])
         .args(["--store", &bed.store(), "--repository", "fixture/alpha"])
         .env("PATH", &bed.path)
         .env("AP_POLICY_FILE", bed.at("policy.json"))
         .env_remove("ONT_FN_NAME")
         .output()
         .unwrap();
-    assert_eq!(out.status.code(), Some(0), "{}", String::from_utf8_lossy(&out.stderr));
+    assert_eq!(
+        out.status.code(),
+        Some(0),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
     let line: Value = serde_json::from_slice(&out.stdout).unwrap();
     assert_eq!(line["status"], "ok", "{line}");
-    assert_eq!(line["sources"]["clauses"]["appended"]["initial"], 2, "{line}");
+    assert_eq!(
+        line["sources"]["clauses"]["appended"]["initial"], 2,
+        "{line}"
+    );
     let key = "fixture/alpha:specs/w.md#R1";
     // A unit that names the clause and one that does not exist.
     let request = bed.apply(
@@ -950,11 +1143,17 @@ fn an_invented_repository_indexed_and_answered_by_the_engine() {
             "objective": "The invented board.", "repository": "fixture/alpha", "write_set": ["src/**"],
             "wave": 3, "clauses": [oid("clause", key), oid("clause", "fixture/alpha:specs/w.md#R9")]}),
     );
-    let (code, v) = bed.ont(&["fn", "clause"], &json!({"parameters": {"key": key}}).to_string());
+    let (code, v) = bed.ont(
+        &["fn", "clause"],
+        &json!({"parameters": {"key": key}}).to_string(),
+    );
     assert_eq!(code, 0, "{v}");
     let answer = &v["answer"];
     assert!(answer.get("stale").is_none(), "{answer}");
-    assert_eq!(answer["clause"]["text"], "- R1: The board lists every widget.");
+    assert_eq!(
+        answer["clause"]["text"],
+        "- R1: The board lists every widget."
+    );
     assert_eq!(answer["clause"]["tests"], json!(["src/w.rs:1"]));
     assert_eq!(answer["clause"]["line"], 3);
     assert_eq!(
@@ -967,5 +1166,8 @@ fn an_invented_repository_indexed_and_answered_by_the_engine() {
         &json!({"parameters": {"key": "fixture/alpha:specs/w.md#R9"}}).to_string(),
     );
     assert_eq!(code, 0, "{v}");
-    assert_eq!(v["answer"], json!({"clause": null, "units": [], "units_total": 0}));
+    assert_eq!(
+        v["answer"],
+        json!({"clause": null, "units": [], "units_total": 0})
+    );
 }
