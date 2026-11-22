@@ -521,7 +521,7 @@ fn variable<'a>(env: &'a [(String, String)], name: &str) -> Option<&'a str> {
 /// fixed names of `/etc`, the toolchain of the home, the CLI's program, the build lock, the
 /// working directory with its Git directories, the door, the policy file, and the state of `gh`
 /// when `show` names it.
-fn view(q: &Request, l: &Limits, work_root: &Path) -> View {
+fn view(q: &Request, l: &Limits, work_root: &Path, hooks: Option<&Path>) -> View {
     let mut v = View::default();
     v.words.extend(args(&["--tmpfs", "/tmp"]));
     v.bind_present("/usr");
@@ -551,6 +551,11 @@ fn view(q: &Request, l: &Limits, work_root: &Path) -> View {
     }
     if l.show {
         v.bind_present(&at_home(&SHOWN[2..]));
+    }
+    // (k): the host's hook is the script `ap run` made, which asks the door.
+    if let Some(hooks) = hooks {
+        let script = Path::new(&l.scratch).join("hooks/pre-commit");
+        v.bind(&lossy(&script), &lossy(&hooks.join("pre-commit")));
     }
     v
 }
@@ -872,9 +877,41 @@ fn scratch(
         given,
     })
 }
+/// The script of a stage's `core.hooksPath` in its view (R4): it asks the stage's door.
+const HOOK_SCRIPT: &str = "#!/bin/sh\nexec ap hook pre-commit\n";
+/// The host's Git hooks of a call (R4): the port's directory, when the stage's role, as its door
+/// knows it, is an implementer or a fixer and `<hooks>/pre-commit` is a regular file (a link
+/// followed). Read once in the call.
+fn host_hooks(s: &impl System, q: &Request) -> Option<PathBuf> {
+    q.limits.as_ref()?;
+    if !matches!(q.actor_role.as_str(), "implementer" | "fixer") {
+        return None;
+    }
+    let hooks = s.git_hooks()?;
+    std::fs::metadata(hooks.join("pre-commit"))
+        .is_ok_and(|m| m.is_file())
+        .then_some(hooks)
+}
+/// `hooks/` in the scratch directory (mode 0700) and in it `pre-commit` (mode 0755) of
+/// `HOOK_SCRIPT` (R4).
+fn make_hook(scratch: &str) -> std::io::Result<()> {
+    use std::os::unix::fs::{DirBuilderExt, OpenOptionsExt, PermissionsExt};
+    let dir = Path::new(scratch).join("hooks");
+    std::fs::DirBuilder::new().mode(0o700).create(&dir)?;
+    std::fs::set_permissions(&dir, std::fs::Permissions::from_mode(0o700))?;
+    let file = dir.join("pre-commit");
+    std::fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .mode(0o755)
+        .open(&file)?
+        .write_all(HOOK_SCRIPT.as_bytes())?;
+    std::fs::set_permissions(&file, std::fs::Permissions::from_mode(0o755))
+}
 /// One `mkdir` of the scratch directory that fails when the path exists (mode 0700), then its
-/// `tmp` and `target`: whether this call made it, and whether all three were made (R4).
-fn make_scratch(scratch: &str) -> (bool, bool) {
+/// `tmp` and `target`, and with `hook` its `hooks/pre-commit`: whether this call made it, and
+/// whether everything was made (R4).
+fn make_scratch(scratch: &str, hook: bool) -> (bool, bool) {
     use std::os::unix::fs::DirBuilderExt;
     let mut dirs = std::fs::DirBuilder::new();
     dirs.mode(0o700);
@@ -882,7 +919,8 @@ fn make_scratch(scratch: &str) -> (bool, bool) {
         return (false, false);
     }
     let made = ["tmp", "target"].map(|d| dirs.create(Path::new(scratch).join(d)).is_ok());
-    (true, made == [true, true])
+    let hooked = !hook || make_hook(scratch).is_ok();
+    (true, made == [true, true] && hooked)
 }
 /// Removes the scratch directory this call made: only a directory that is not a link, and
 /// nothing through a link inside it (`remove_dir_all` does not follow one) (R8).
@@ -2489,6 +2527,8 @@ struct Launch<'a> {
     ready: bool,
     /// The proxy of a call with `limits` (`specs/ap/run-limits.md` R17), when it could be opened.
     proxy: Option<&'a egress::Proxy>,
+    /// The host's Git hooks directory when R4 made the stage's `hooks/pre-commit` (R16 (k)).
+    hooks: Option<&'a Path>,
     /// Its time bound.
     bound: Duration,
 }
@@ -2512,6 +2552,7 @@ fn attempt(
         ask,
         ready,
         proxy,
+        hooks,
         bound,
     } = *launch;
     // The continuation is the text of a fresh call; a resumed call's text is a move's; an ask is
@@ -2590,7 +2631,7 @@ fn attempt(
     let view = q
         .limits
         .as_ref()
-        .map(|l| view(q, l, &s.work_root()))
+        .map(|l| view(q, l, &s.work_root(), hooks))
         .unwrap_or_default();
     let hidden = match (&q.limits, &stage_home) {
         (Some(l), Some(home)) => {
@@ -3118,7 +3159,8 @@ pub fn execute(s: &mut impl System, r: &Value) -> Result<(Value, u8), Failure> {
         }
         // The scratch directory: made once, after the claim and before the first launch (R4).
         let scratch = q.limits.as_ref().map(|l| l.scratch.as_str());
-        let (made, ready) = scratch.map_or((false, true), make_scratch);
+        let hooks = host_hooks(s, &q);
+        let (made, ready) = scratch.map_or((false, true), |d| make_scratch(d, hooks.is_some()));
         // Only the call whose `mkdir` made it removes it, after its last launch (R8): the guard is
         // dropped where the removal runs, and on a panic that unwinds out of this block.
         let removal = scratch
@@ -3169,6 +3211,7 @@ pub fn execute(s: &mut impl System, r: &Value) -> Result<(Value, u8), Failure> {
                 ask: false,
                 ready,
                 proxy: proxy.as_ref(),
+                hooks: hooks.as_deref(),
                 bound: Duration::from_secs(q.timeout),
             };
             began = s.now();
@@ -3213,6 +3256,7 @@ pub fn execute(s: &mut impl System, r: &Value) -> Result<(Value, u8), Failure> {
                 ask: true,
                 ready,
                 proxy: proxy.as_ref(),
+                hooks: hooks.as_deref(),
                 bound: left,
             };
             let (mut record, _, saved) =

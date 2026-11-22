@@ -14,6 +14,8 @@ use std::{
 };
 
 pub(crate) const LIMIT: u64 = 1_048_576;
+/// The directory of the host's Git hooks, which the host's Git configuration names.
+const GIT_HOOKS: &str = "/usr/local/lib/agents-git/hooks";
 pub(crate) const ROOT: &str = "/home/palantirkc/work/";
 #[derive(Debug)]
 pub struct Failure {
@@ -209,6 +211,11 @@ pub trait System {
     fn policy_file(&self) -> Option<PathBuf> {
         None
     }
+    /// The directory of the host's Git hooks (`specs/ap/run-limits.md` R4, R16 (k)): none unless
+    /// the real host names one, so a test fake is never subject to the host's hooks.
+    fn git_hooks(&self) -> Option<PathBuf> {
+        None
+    }
     /// This process's environment; `ap run` keeps only a fixed short list of it.
     fn environment(&self) -> Vec<(String, String)> {
         std::env::vars_os()
@@ -363,6 +370,9 @@ impl System for Host {
     }
     fn policy_file(&self) -> Option<PathBuf> {
         Some(policy_path(std::env::var_os("AP_POLICY_FILE")))
+    }
+    fn git_hooks(&self) -> Option<PathBuf> {
+        Some(PathBuf::from(GIT_HOOKS))
     }
     fn call(&mut self, program: &str, args: &[String], input: &Value, ms: u64) -> Answer {
         let error = || fail("process_failed", program, Value::Null);
