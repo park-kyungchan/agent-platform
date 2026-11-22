@@ -126,7 +126,8 @@ const CHECK: &str = "#!/bin/sh\necho \"check ran in $PWD\"\necho \"check err\" >
 fn on_pc() -> bool {
     let pc = std::env::var("AP_CHECK_HOST").is_ok_and(|v| v == "pc");
     if pc {
-        eprintln!("door: skipped (pc)");
+        // Through the handle, not `eprintln!`, which the test harness would hold back.
+        let _ = writeln!(std::io::stderr(), "door: skipped (pc)");
     }
     pc
 }
