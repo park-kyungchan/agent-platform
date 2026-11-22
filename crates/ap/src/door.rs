@@ -37,7 +37,7 @@ use std::{
 };
 
 /// The door's list: the functions of the store a stage may ask for (R5).
-pub(crate) const FUNCTIONS: [&str; 1] = ["route"];
+pub(crate) const FUNCTIONS: [&str; 2] = ["route", "clause"];
 /// The roles whose `check` the door serves (R3).
 const CHECKERS: [&str; 3] = ["implementer", "fixer", "verifier"];
 /// The longest request line, and the time a connection has to send it (R2).

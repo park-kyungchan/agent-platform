@@ -579,7 +579,20 @@ pub fn search_every(
     kind: &str,
     page: u64,
 ) -> Result<(Vec<Found>, bool), Failure> {
+    search_every_where(s, store, kind, None, page)
+}
+/// `search_every` with the filter `filter` (`specs/ap/clause.md` R9).
+pub fn search_every_where(
+    s: &mut impl System,
+    store: Option<&str>,
+    kind: &str,
+    filter: Option<Value>,
+    page: u64,
+) -> Result<(Vec<Found>, bool), Failure> {
     let mut q = json!({"object_type": kind, "limit": page});
+    if let Some(filter) = filter {
+        q["where"] = filter;
+    }
     let mut found = vec![];
     let mut qualified = true;
     loop {
@@ -603,6 +616,46 @@ pub fn search_every(
             c => q["continuation"] = c.clone(),
         }
     }
+}
+/// One `ont around` from the objects of `kind` the filter `filter` matches along `path`, at most `limit` objects
+/// (`specs/ap/clause.md` R9): each object's native key and the fields of its head, and the answer's `matched`. Its
+/// `qualified` is not read. One attempt of three seconds and a `store_busy` answer one more.
+pub fn around(
+    s: &mut impl System,
+    store: Option<&str>,
+    (kind, filter): (&str, Value),
+    path: &[&str],
+    limit: u64,
+) -> Result<(Vec<Found>, u64), Failure> {
+    let q = json!({"from": {"object_type": kind, "where": filter}, "path": path, "limit": limit});
+    let v = call_in(s, store, &["around"], &q, (1, 3_000))?;
+    let r = &v["result"];
+    let unreadable = || error("store_answer_unreadable", "around");
+    let mut found = vec![];
+    for o in r["objects"].as_array().ok_or_else(unreadable)? {
+        let key = o["id"]["native_key"].as_str();
+        let fields = o["head"]["fields"].as_object();
+        let (Some(key), Some(fields)) = (key, fields) else {
+            return Err(unreadable());
+        };
+        found.push((key.to_owned(), values(fields)));
+    }
+    let matched = r["basis"]["matched"].as_u64().ok_or_else(unreadable)?;
+    Ok((found, matched))
+}
+/// `amend_unit` without a role, with the unit's id and the revision it was read at as `expected`
+/// (`specs/ap/unit.md` R42): a unit changed since that read ends `revision_conflict`.
+pub fn amend_unit_at(
+    s: &mut impl System,
+    store: Option<&str>,
+    actor: &Actor,
+    rid: String,
+    p: Value,
+    revision: &str,
+) -> Result<Applied, Failure> {
+    let mut body = body(actor, "amend_unit", rid, p);
+    body["expected"] = json!([{"id": body["parameters"]["unit"], "revision": revision}]);
+    send(s, store, &body)
 }
 /// `ont index` of the named sources (`specs/ap/route.md` R13), bound to `ms`: the engine's answer whether every
 /// source held (`status` `ok`) or one failed (`source_failed`, each source's own `status`, `code` and `cause`);

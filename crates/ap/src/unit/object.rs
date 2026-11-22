@@ -31,7 +31,9 @@ const TEXTS: [(&str, usize); 9] = [
     ("branch", 200),
 ];
 /// The page properties `amend` takes; `add` takes `lane`, `intent` and `origin` too.
-const PAGE: &str = "class objective interface invariants acceptance not_built write_set read_first specs notes verifier_questions report repository branch implementer verifier estimate_lines depends_on";
+const PAGE: &str = "class objective interface invariants acceptance not_built write_set read_first specs notes verifier_questions report repository branch implementer verifier estimate_lines depends_on wave";
+/// The bounds of `wave` (R41).
+const WAVES: std::ops::RangeInclusive<u64> = 1..=99;
 /// Runs the command after the output file with both outputs into that file and standard input from
 /// `/dev/null`, and prints its status as the last line on the standard output it was given. The
 /// command does not hold that output: a background process of a check cannot keep the call open or
@@ -542,6 +544,12 @@ fn page_parameters(b: &mut Breaks, r: &Value, op: &str, key: &str) -> (Value, Ve
             p.insert("estimate_lines".into(), json!(n));
         }
     }
+    if let Some(n) = r.get("wave") {
+        let n = n.as_u64().filter(|n| WAVES.contains(n));
+        if let Some(n) = b.take(n.ok_or_else(|| bad("wave")), FORM) {
+            p.insert("wave".into(), json!(n));
+        }
+    }
     let mut depends = vec![];
     if r.get("depends_on").is_some()
         && let Some(list) = b.list(r, "depends_on", 20)
@@ -556,6 +564,40 @@ fn page_parameters(b: &mut Breaks, r: &Value, op: &str, key: &str) -> (Value, Ve
         p.insert("depends_on".into(), json!(ids));
     }
     (p.into(), depends)
+}
+/// The clauses the entries `<path>#R<n>` of `specs` name in the unit's own `repository`, each once, in the
+/// entries' order, as references of type `clause` (R43); none without a repository.
+fn named_clauses(repository: Option<&str>, specs: Option<&Value>) -> Vec<Value> {
+    let Some(repository) = repository.filter(|r| !r.is_empty()) else {
+        return vec![];
+    };
+    let mut keys: Vec<String> = vec![];
+    let entries = specs.and_then(Value::as_array).into_iter().flatten();
+    for e in entries.filter_map(Value::as_str) {
+        let Some((path, rule)) = e.rsplit_once('#') else {
+            continue;
+        };
+        let numbered = (rule.strip_prefix('R'))
+            .is_some_and(|n| !n.is_empty() && n.bytes().all(|c| c.is_ascii_digit()));
+        let key = crate::clause::key(repository, path, rule);
+        if numbered && path.starts_with("specs/") && path.ends_with(".md") && !keys.contains(&key) {
+            keys.push(key);
+        }
+    }
+    keys.iter().map(|k| id("clause", k)).collect()
+}
+/// The size of the action request as it is sent (R8).
+fn page_size(actor: &Actor, action: &str, rid: &str, p: &Value) -> Result<(), Failure> {
+    let size = serde_json::to_vec(&store::body(actor, action, rid.to_owned(), p.clone()));
+    let size = size.map_or(usize::MAX, |b| b.len());
+    match size > PAGE_LIMIT {
+        true => Err(fail(
+            "page_too_large",
+            "page",
+            json!({"bytes": size, "limit": PAGE_LIMIT}),
+        )),
+        false => Ok(()),
+    }
 }
 /// The engine gives the role of `ONT_ROLE` to a request that carries none (R4).
 pub(crate) fn lead_in_environment(s: &impl System) -> bool {
@@ -601,7 +643,7 @@ fn write(
         _ => b.text(sized(&r["unit"], "unit", 512), r.get("unit"), 512),
     };
     let key = key.unwrap_or_default();
-    let (p, depends) = match op {
+    let (mut p, depends) = match op {
         "add" | "amend" => page_parameters(&mut b, r, op, key),
         "drop" => {
             let reason = bounded(r, "reason", 600, true);
@@ -621,15 +663,19 @@ fn write(
     };
     let rid = format!("{}-{op}", rid.unwrap_or_default());
     let action = format!("{}_unit", if op == "add" { "add" } else { op });
-    let size = serde_json::to_vec(&store::body(&actor, &action, rid.clone(), p.clone()));
-    let size = size.map_or(usize::MAX, |b| b.len());
-    if size > PAGE_LIMIT {
-        return Err(fail(
-            "page_too_large",
-            "page",
-            json!({"bytes": size, "limit": PAGE_LIMIT}),
-        ));
+    // The clauses the page names and the digest of the page as the action leaves it (R42, R43): for `add` from
+    // the request; for `amend` the clauses the request alone names and a digest of its length, until the read.
+    let names_clauses = r.get("specs").is_some() || r.get("repository").is_some();
+    let clauses = named_clauses(p["repository"].as_str(), p.get("specs"));
+    if (op == "add" && !clauses.is_empty()) || (op == "amend" && names_clauses) {
+        p["clauses"] = json!(clauses);
     }
+    match op {
+        "add" => p["page_digest"] = json!(render::page_digest(key, &p)),
+        "amend" => p["page_digest"] = json!("0".repeat(64)),
+        _ => {}
+    }
+    page_size(&actor, &action, &rid, &p)?;
     if lead_in_environment(s) {
         return Err(error("role_in_environment", "ONT_ROLE"));
     }
@@ -640,15 +686,30 @@ fn write(
         plain_writes_protected(p["class"].as_str(), &patterns(p.get("write_set")))?;
     }
     // `amend` and `drop` of a unit the store does not have: the actions would answer another refusal.
+    let mut revision = None;
     if op != "add" {
-        let Some(stored) = at(store::get(s, store, "unit", key), "unit")? else {
+        let Some((read, stored)) = at(store::head(s, store, "unit", key), "unit")? else {
             return Err(error("unknown_unit", "unit"));
         };
+        revision = Some(read);
         // The class and the write set the unit would have: the request's where it gives them (R39).
         if op == "amend" && (r.get("class").is_some() || r.get("write_set").is_some()) {
             let class = p.get("class").unwrap_or(&stored["class"]);
             let set = p.get("write_set").or(stored.get("write_set"));
             plain_writes_protected(class.as_str(), &patterns(set))?;
+        }
+        if op == "amend" {
+            // The page as the amendment leaves it: the unit as read, the request's members in their places.
+            let mut page = stored.clone();
+            for (k, v) in p.as_object().into_iter().flatten() {
+                page[k] = v.clone();
+            }
+            if names_clauses {
+                let named = named_clauses(page["repository"].as_str(), page.get("specs"));
+                p["clauses"] = json!(named);
+            }
+            p["page_digest"] = json!(render::page_digest(key, &page));
+            page_size(&actor, &action, &rid, &p)?;
         }
     }
     for d in &depends {
@@ -656,12 +717,15 @@ fn write(
             return Err(fail("unknown_dependency", "depends_on", json!(d)));
         }
     }
-    let apply = match op {
-        "add" => store::add_unit,
-        "amend" => store::amend_unit,
-        _ => store::drop_unit,
+    let applied = match op {
+        "add" => store::add_unit(s, store, &actor, rid, p),
+        "amend" => {
+            let revision = revision.unwrap_or_default();
+            store::amend_unit_at(s, store, &actor, rid, p, &revision)
+        }
+        _ => store::drop_unit(s, store, &actor, rid, p),
     };
-    let applied = match at(apply(s, store, &actor, rid, p), op) {
+    let applied = match at(applied, op) {
         Err(f) if op == "add" && store::code(&f) == "revision_conflict" => {
             return Err(fail("unit_exists", "unit", f.detail));
         }
@@ -703,6 +767,13 @@ fn ready(
     let (mut base, mut checks) = (Value::Null, vec![]);
     if u["state"] == "draft" {
         write_set_judged(&u)?;
+        // The digest the unit stores is the page's as `add` or `amend` left it (R44).
+        if let Some(stored) = u["page_digest"].as_str()
+            && stored != digest
+        {
+            let detail = json!({"digest": digest, "stored": stored});
+            return Err(fail("page_digest_differs", "unit", detail));
+        }
         if (u["class"] == "contract" || u["class"] == "effect")
             && !accepted_page(s, store, key, &digest)?
         {
