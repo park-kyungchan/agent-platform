@@ -16,7 +16,7 @@ use crate::get::OneObject;
 use crate::principal::Principal;
 use crate::refusal::{open_store, st};
 use crate::{Answer, Context, Failure, Refusal, internal};
-use ont_core::schema::{PropertyType, ScalarType, Schema};
+use ont_core::schema::{InterfaceDef, PropertyType, ScalarType, Schema};
 use ont_core::{Id, Knowledge, Object, Output, Query, Response};
 use ont_store::schema_mode::{CandidateCondition, SchemaHead, SchemaRead};
 use serde::Deserialize;
@@ -33,6 +33,9 @@ const MAX_LEAVES: usize = 64;
 const MAX_DEPTH: usize = 8;
 const MAX_IN_VALUES: usize = 100;
 const CONTINUATION_PREFIX: &str = "c1:";
+/// The continuation of a search over an interface: the interface, the type
+/// and the key of the last row (read.md R105).
+const INTERFACE_CONTINUATION_PREFIX: &str = "i1:";
 
 /// One filter node.
 #[derive(Debug, Clone, Deserialize)]
@@ -140,7 +143,12 @@ fn base_of(schema: &Schema, ty: &PropertyType) -> Option<ScalarType> {
 struct Checker<'a> {
     set: &'a ont_core::schema::SchemaSet,
     schema: &'a Schema,
+    /// The type whose declarations judge a value: the requested type, or for
+    /// an interface one type that implements it (each declares every
+    /// property of the interface with its type).
     object_type: &'a str,
+    /// The interface requested, whose properties alone a filter may name.
+    interface: Option<&'a InterfaceDef>,
     leaves: usize,
     used: BTreeSet<String>,
 }
@@ -200,15 +208,20 @@ impl Checker<'_> {
         }
         Ok(())
     }
-    fn declared(&self, property: &str) -> Result<&ont_core::schema::PropertyDef, Failure> {
-        self.set
-            .properties(self.object_type)
-            .and_then(|props| props.get(property))
-            .ok_or_else(|| refuse_property("undeclared_property", property))
+    fn declared(&self, property: &str) -> Result<&PropertyType, Failure> {
+        let ty = match self.interface {
+            Some(interface) => interface.properties.get(property).map(|p| &p.ty),
+            None => self
+                .set
+                .properties(self.object_type)
+                .and_then(|props| props.get(property))
+                .map(|p| &p.ty),
+        };
+        ty.ok_or_else(|| refuse_property("undeclared_property", property))
     }
     fn comparison(&mut self, property: &str, values: &[Value], op: Op) -> Result<(), Failure> {
-        let def = self.declared(property)?;
-        let base = base_of(self.schema, &def.ty);
+        let def_ty = self.declared(property)?;
+        let base = base_of(self.schema, def_ty);
         let allowed = match op {
             Op::Equality => true,
             Op::Ordering => matches!(
@@ -240,7 +253,7 @@ impl Checker<'_> {
             if let Err(v) = self.set.validate_fields(self.object_type, &fields)
                 && v.code == ont_core::schema::codes::WRONG_VALUE_TYPE
             {
-                if matches!(def.ty, PropertyType::Ref(_)) && value.is_string() {
+                if matches!(def_ty, PropertyType::Ref(_)) && value.is_string() {
                     return Err(Refusal::input("wrong_value_type", "/where",
                         "filter value must satisfy the declared property type; prefix requires a string")
                         .with("hint", json!("A reference filter takes the full Id object with object_type, namespace and native_key; search on the referenced type returns it."))
@@ -347,18 +360,55 @@ pub(crate) fn check_filter(
     object_type: &str,
     filter: Option<&Filter>,
 ) -> Result<BTreeSet<String>, Failure> {
-    let schema = set.schema_of(object_type).ok_or_else(unavailable)?;
-    let mut checker = Checker {
-        set,
-        schema,
-        object_type,
-        leaves: 0,
-        used: BTreeSet::new(),
-    };
+    let mut checker = checker_for(set, object_type).ok_or_else(unavailable)?;
     if let Some(f) = filter {
         checker.walk(f, 0)?;
     }
     Ok(checker.used)
+}
+
+/// The filter checker of an object type or of an interface that one type
+/// implements; `None` for any other name.
+fn checker_for<'a>(set: &'a ont_core::schema::SchemaSet, name: &'a str) -> Option<Checker<'a>> {
+    if let Some(schema) = set.schema_of(name) {
+        return Some(Checker {
+            set,
+            schema,
+            object_type: name,
+            interface: None,
+            leaves: 0,
+            used: BTreeSet::new(),
+        });
+    }
+    let schema = set.schema_of_interface(name)?;
+    let judge = schema.implementers(name).into_iter().next()?;
+    Some(Checker {
+        set,
+        schema,
+        object_type: judge,
+        interface: schema.interfaces.get(name),
+        leaves: 0,
+        used: BTreeSet::new(),
+    })
+}
+
+/// The implementing types of the interface `name` the principal reads, in
+/// byte order; empty for a name that is no interface.
+pub(crate) fn readable_implementers(
+    set: &ont_core::schema::SchemaSet,
+    principal: &Principal,
+    name: &str,
+) -> Vec<String> {
+    let Some(schema) = set.schema_of_interface(name) else {
+        return Vec::new();
+    };
+    let readable = principal.view().read_types(&schema.domain);
+    schema
+        .implementers(name)
+        .into_iter()
+        .filter(|t| readable.contains(*t))
+        .cloned()
+        .collect()
 }
 
 /// Select the first necessary equality leaf; disjunction/negation cannot
@@ -424,6 +474,11 @@ pub(crate) fn read_search(
     let set = tx.schema_set();
     let principal = Principal::bind(set)?;
     let revision = principal.revision()?;
+    if set.schema_of(&req.object_type).is_none()
+        && let Some(schema) = set.schema_of_interface(&req.object_type)
+    {
+        return read_interface_search(ctx, req, limit, scan_limit, tx, &principal, schema);
+    }
     // A type that does not exist and one the principal may not read look the
     // same, before anything else about the request is judged.
     let Some(schema) = set.schema_of(&req.object_type) else {
@@ -440,6 +495,7 @@ pub(crate) fn read_search(
         set,
         schema,
         object_type: &req.object_type,
+        interface: None,
         leaves: 0,
         used: BTreeSet::new(),
     };
@@ -464,138 +520,44 @@ pub(crate) fn read_search(
         .authority()
         .admit(principal.session())
         .map_err(|_| Failure::Internal(internal!("authority_failure")))?;
-    let ty = schema.object_types.get(&req.object_type);
-    let source = ty.and_then(|t| match &t.owner {
-        ont_core::schema::Owner::Source(s) => Some(s.clone()),
-        ont_core::schema::Owner::Ontology => None,
-    });
-    let mut basis = Basis::default();
-    let mut objects: Vec<Value> = Vec::new();
-    let scopes = read_scopes(&principal, &req.object_type);
-    let mut cursor = after;
-    let mut continuation = None;
-    'pages: loop {
-        let page = st!(tx.candidate_access(
-            &req.object_type,
-            condition.as_ref(),
-            ctx.now,
-            256,
-            cursor.as_ref(),
-            &scopes
-        ));
-        if page.is_empty() {
-            break;
-        }
-        for access in page {
-            cursor = Some(access.id.clone());
-            if access.retracted {
-                continue;
-            }
-            // Admit metadata before fetching any observation payload, including
-            // the lookahead used to decide continuation or scan overflow.
-            let metadata = Object {
-                id: access.id.clone(),
-                scope: access.scope.clone(),
-                head: String::new(),
-                observations: vec![],
-            };
-            match admission.query(
-                &OneObject(Some(metadata)),
-                Query::Get {
-                    id: access.id.clone(),
-                },
-                ctx.now,
-            ) {
-                Ok(Response::Ok { .. }) => {}
-                Ok(Response::Refused { .. }) | Err(ont_core::Error::Unavailable) => continue,
-                _ => return Err(Failure::Internal(internal!("authority_failure"))),
-            }
-            if objects.len() == limit {
-                continuation = objects
-                    .last()
-                    .and_then(|o| o["id"]["native_key"].as_str())
-                    .map(encode_continuation);
-                break 'pages;
-            }
-            if basis.scanned == scan_limit as u64 {
-                return Err(Refusal::new("result_too_large").into());
-            }
-            let head = match tx.head_after_access(&access) {
-                Ok(Some(head)) => head,
-                Ok(None) => continue,
-                Err(e) if e.code == ont_core::Error::ObservationTooLarge.code() => {
-                    basis.scanned += 1;
-                    basis.oversized_excluded += 1;
-                    continue;
-                }
-                Err(e) => return Err(crate::refusal::store_err(e)),
-            };
-            let obs = &head.head.observation;
-            let object = Object {
-                id: head.id.clone(),
-                scope: head.scope.clone(),
-                head: obs.revision.clone(),
-                observations: vec![obs.clone()],
-            };
-            let response = admission.query(
-                &OneObject(Some(object)),
-                Query::Get {
-                    id: head.id.clone(),
-                },
-                ctx.now,
-            );
-            let view = match response {
-                Ok(Response::Ok {
-                    authorization_revision,
-                    result: Output::Objects { mut objects },
-                }) if objects.len() == 1 => {
-                    // The same check as `get`: the answer's generation is the
-                    // one the principal was bound under.
-                    if authorization_revision != revision {
-                        return Err(Failure::Internal(internal!("authority_generation_changed")));
-                    }
-                    objects.remove(0)
-                }
-                Ok(Response::Refused { .. }) | Err(ont_core::Error::Unavailable) => continue,
-                _ => return Err(Failure::Internal(internal!("authority_failure"))),
-            };
-            let Some(observed) = view.observations.into_iter().next() else {
-                return Err(Failure::Internal(internal!("authority_failure")));
-            };
-            basis.scanned += 1;
-            let stale = observed.stale;
-            let partial = obs.coverage == ont_core::Coverage::Partial;
-            if stale {
-                basis.stale += 1;
-                if let Some(s) = &source {
-                    basis
-                        .stale_sources
-                        .insert(format!("{s}: ont index --source {s}"));
-                }
-            }
-            if partial {
-                basis.partial += 1;
-            }
-            let used_resolved = used
-                .iter()
-                .all(|p| matches!(obs.fields.get(p), Some(Knowledge::Value(_))));
-            if !used_resolved {
-                basis.used_unresolved = true;
-            }
-            let verdict = match &req.filter {
-                None => Tri::True,
-                Some(f) => eval(f, &obs.fields),
-            };
-            match verdict {
-                Tri::False => {}
-                Tri::Unknown => basis.unresolved_excluded += 1,
-                Tri::True => {
-                    basis.matched += 1;
-                    objects.push(object_json(&head, ty, &observed));
-                }
-            }
-        }
-    }
+    let mut page = Page {
+        ctx,
+        tx,
+        admission: &admission,
+        revision,
+        filter: req.filter.as_ref(),
+        condition: condition.as_ref(),
+        used: &used,
+        limit,
+        scan_limit,
+        basis: Basis::default(),
+        objects: Vec::new(),
+    };
+    let more = page.scan(
+        &req.object_type,
+        after,
+        &read_scopes(&principal, &req.object_type),
+    )?;
+    let continuation = more
+        .then(|| {
+            page.objects
+                .last()
+                .and_then(|o| o["id"]["native_key"].as_str())
+                .map(encode_continuation)
+        })
+        .flatten();
+    let Page { basis, objects, .. } = page;
+    Ok(answer(set, schema, revision, objects, basis, continuation))
+}
+
+fn answer(
+    set: &ont_core::schema::SchemaSet,
+    schema: &Schema,
+    revision: u64,
+    objects: Vec<Value>,
+    basis: Basis,
+    continuation: Option<String>,
+) -> Answer {
     let qualified = basis.stale == 0
         && basis.partial == 0
         && basis.unresolved_excluded == 0
@@ -606,7 +568,7 @@ pub(crate) fn read_search(
         .map(|p| (schema.domain.clone(), p.clone()))
         .into_iter()
         .collect();
-    Ok(Answer::Enveloped {
+    Answer::Enveloped {
         pins,
         revision,
         result: json!({
@@ -624,7 +586,294 @@ pub(crate) fn read_search(
             },
             "continuation":continuation
         }),
-    })
+    }
+}
+
+/// The rows of one search, over one object type or the implementing types
+/// of an interface: the row limit, the scan budget and the basis count across
+/// every type scanned.
+struct Page<'a, 'b, 'c> {
+    ctx: &'a Context,
+    tx: &'a SchemaRead<'b>,
+    admission: &'a ont_core::Admission<'c>,
+    revision: u64,
+    filter: Option<&'a Filter>,
+    condition: Option<&'a CandidateCondition>,
+    used: &'a BTreeSet<String>,
+    limit: usize,
+    scan_limit: usize,
+    basis: Basis,
+    objects: Vec<Value>,
+}
+impl Page<'_, '_, '_> {
+    /// Scan the heads of `object_type` after `after`; `true` when the row
+    /// limit is reached and another admitted candidate exists.
+    fn scan(
+        &mut self,
+        object_type: &str,
+        after: Option<Id>,
+        scopes: &[ont_core::Scope],
+    ) -> Result<bool, Failure> {
+        let (ctx, tx, admission) = (self.ctx, self.tx, self.admission);
+        let ty = tx
+            .schema_set()
+            .schema_of(object_type)
+            .and_then(|s| s.object_types.get(object_type));
+        let source = ty.and_then(|t| match &t.owner {
+            ont_core::schema::Owner::Source(s) => Some(s.clone()),
+            ont_core::schema::Owner::Ontology => None,
+        });
+        let basis = &mut self.basis;
+        let objects = &mut self.objects;
+        let mut cursor = after;
+        loop {
+            let page = st!(tx.candidate_access(
+                object_type,
+                self.condition,
+                ctx.now,
+                256,
+                cursor.as_ref(),
+                scopes
+            ));
+            if page.is_empty() {
+                break;
+            }
+            for access in page {
+                cursor = Some(access.id.clone());
+                if access.retracted {
+                    continue;
+                }
+                // Admit metadata before fetching any observation payload, including
+                // the lookahead used to decide continuation or scan overflow.
+                let metadata = Object {
+                    id: access.id.clone(),
+                    scope: access.scope.clone(),
+                    head: String::new(),
+                    observations: vec![],
+                };
+                match admission.query(
+                    &OneObject(Some(metadata)),
+                    Query::Get {
+                        id: access.id.clone(),
+                    },
+                    ctx.now,
+                ) {
+                    Ok(Response::Ok { .. }) => {}
+                    Ok(Response::Refused { .. }) | Err(ont_core::Error::Unavailable) => continue,
+                    _ => return Err(Failure::Internal(internal!("authority_failure"))),
+                }
+                if objects.len() == self.limit {
+                    return Ok(true);
+                }
+                if basis.scanned == self.scan_limit as u64 {
+                    return Err(Refusal::new("result_too_large").into());
+                }
+                let head = match tx.head_after_access(&access) {
+                    Ok(Some(head)) => head,
+                    Ok(None) => continue,
+                    Err(e) if e.code == ont_core::Error::ObservationTooLarge.code() => {
+                        basis.scanned += 1;
+                        basis.oversized_excluded += 1;
+                        continue;
+                    }
+                    Err(e) => return Err(crate::refusal::store_err(e)),
+                };
+                let obs = &head.head.observation;
+                let object = Object {
+                    id: head.id.clone(),
+                    scope: head.scope.clone(),
+                    head: obs.revision.clone(),
+                    observations: vec![obs.clone()],
+                };
+                let response = admission.query(
+                    &OneObject(Some(object)),
+                    Query::Get {
+                        id: head.id.clone(),
+                    },
+                    ctx.now,
+                );
+                let view = match response {
+                    Ok(Response::Ok {
+                        authorization_revision,
+                        result: Output::Objects { mut objects },
+                    }) if objects.len() == 1 => {
+                        // The same check as `get`: the answer's generation is the
+                        // one the principal was bound under.
+                        if authorization_revision != self.revision {
+                            return Err(Failure::Internal(internal!(
+                                "authority_generation_changed"
+                            )));
+                        }
+                        objects.remove(0)
+                    }
+                    Ok(Response::Refused { .. }) | Err(ont_core::Error::Unavailable) => continue,
+                    _ => return Err(Failure::Internal(internal!("authority_failure"))),
+                };
+                let Some(observed) = view.observations.into_iter().next() else {
+                    return Err(Failure::Internal(internal!("authority_failure")));
+                };
+                basis.scanned += 1;
+                let stale = observed.stale;
+                let partial = obs.coverage == ont_core::Coverage::Partial;
+                if stale {
+                    basis.stale += 1;
+                    if let Some(s) = &source {
+                        basis
+                            .stale_sources
+                            .insert(format!("{s}: ont index --source {s}"));
+                    }
+                }
+                if partial {
+                    basis.partial += 1;
+                }
+                let used_resolved = self
+                    .used
+                    .iter()
+                    .all(|p| matches!(obs.fields.get(p), Some(Knowledge::Value(_))));
+                if !used_resolved {
+                    basis.used_unresolved = true;
+                }
+                let verdict = match self.filter {
+                    None => Tri::True,
+                    Some(f) => eval(f, &obs.fields),
+                };
+                match verdict {
+                    Tri::False => {}
+                    Tri::Unknown => basis.unresolved_excluded += 1,
+                    Tri::True => {
+                        basis.matched += 1;
+                        objects.push(object_json(&head, ty, &observed));
+                    }
+                }
+            }
+        }
+        Ok(false)
+    }
+}
+
+fn hex(text: &str) -> String {
+    text.bytes().map(|b| format!("{b:02x}")).collect()
+}
+fn unhex(hex: &str) -> Option<String> {
+    if hex.is_empty() || !hex.len().is_multiple_of(2) || !hex.is_ascii() {
+        return None;
+    }
+    let bytes: Option<Vec<u8>> = (0..hex.len())
+        .step_by(2)
+        .map(|i| u8::from_str_radix(&hex[i..i + 2], 16).ok())
+        .collect();
+    String::from_utf8(bytes?).ok()
+}
+/// `i1:<interface>:<type>:<key>`, each part in hexadecimal.
+fn encode_interface_continuation(interface: &str, object_type: &str, key: &str) -> String {
+    format!(
+        "{INTERFACE_CONTINUATION_PREFIX}{}:{}:{}",
+        hex(interface),
+        hex(object_type),
+        hex(key)
+    )
+}
+fn decode_interface_continuation(token: &str) -> Option<(String, String, String)> {
+    let mut parts = token
+        .strip_prefix(INTERFACE_CONTINUATION_PREFIX)?
+        .split(':');
+    let (interface, object_type, key) = (parts.next()?, parts.next()?, parts.next()?);
+    if parts.next().is_some() {
+        return None;
+    }
+    Some((unhex(interface)?, unhex(object_type)?, unhex(key)?))
+}
+
+/// A search whose `object_type` names an interface (read.md R105): the heads
+/// of the implementing types the principal reads, type after type in byte
+/// order, under one row limit, one scan budget and one basis.
+fn read_interface_search(
+    ctx: &Context,
+    req: &SearchRequest,
+    limit: usize,
+    scan_limit: usize,
+    tx: &SchemaRead<'_>,
+    principal: &Principal,
+    schema: &Schema,
+) -> Result<Answer, Failure> {
+    let set = tx.schema_set();
+    let revision = principal.revision()?;
+    // An interface none of whose implementing types the principal reads looks
+    // like a type that does not exist.
+    let types = readable_implementers(set, principal, &req.object_type);
+    if types.is_empty() {
+        return Err(unavailable());
+    }
+    let mut checker = checker_for(set, &req.object_type).ok_or_else(unavailable)?;
+    if let Some(f) = &req.filter {
+        checker.walk(f, 0)?;
+    }
+    let used = checker.used;
+    let resume = match &req.continuation {
+        None => None,
+        Some(token) => Some(
+            decode_interface_continuation(token)
+                .filter(|(interface, object_type, _)| {
+                    interface == &req.object_type
+                        && schema.implements(object_type, &req.object_type)
+                })
+                .map(|(_, object_type, key)| (object_type, key))
+                .ok_or_else(|| {
+                    Failure::from(Refusal::input(
+                        "invalid_continuation",
+                        "/continuation",
+                        "the continuation of the previous result of this interface's search",
+                    ))
+                })?,
+        ),
+    };
+    let condition = candidate_condition(req.filter.as_ref(), &used);
+    let admission = principal
+        .authority()
+        .admit(principal.session())
+        .map_err(|_| Failure::Internal(internal!("authority_failure")))?;
+    let mut page = Page {
+        ctx,
+        tx,
+        admission: &admission,
+        revision,
+        filter: req.filter.as_ref(),
+        condition: condition.as_ref(),
+        used: &used,
+        limit,
+        scan_limit,
+        basis: Basis::default(),
+        objects: Vec::new(),
+    };
+    let mut more = false;
+    for object_type in &types {
+        let after = match &resume {
+            Some((t, _)) if object_type < t => continue,
+            Some((t, key)) if object_type == t => Some(Id {
+                object_type: object_type.clone(),
+                namespace: schema.namespace.clone(),
+                native_key: key.clone(),
+            }),
+            _ => None,
+        };
+        if page.scan(object_type, after, &read_scopes(principal, object_type))? {
+            more = true;
+            break;
+        }
+    }
+    let continuation = more
+        .then(|| {
+            page.objects.last().and_then(|o| {
+                Some(encode_interface_continuation(
+                    &req.object_type,
+                    o["id"]["object_type"].as_str()?,
+                    o["id"]["native_key"].as_str()?,
+                ))
+            })
+        })
+        .flatten();
+    let Page { basis, objects, .. } = page;
+    Ok(answer(set, schema, revision, objects, basis, continuation))
 }
 
 #[derive(Default)]

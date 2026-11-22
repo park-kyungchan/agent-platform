@@ -141,6 +141,19 @@ fn negative_fixtures_refuse_with_exact_violations() {
             )],
             &[],
         ),
+        (
+            "unknown_interface.json",
+            &[("unknown_interface", "/object_types/thing/implements/1")],
+            &[],
+        ),
+        (
+            "missing_interface_property.json",
+            &[(
+                "missing_interface_property",
+                "/object_types/thing/implements/0",
+            )],
+            &[],
+        ),
     ];
     for (file, expected, others) in cases {
         let found_vec = violations(file, others);
@@ -863,4 +876,415 @@ fn grant_role_and_functions_are_checked() {
     );
     let checked = Schema::check_bytes(EXAMPLE, &BTreeSet::new()).unwrap();
     assert_eq!(checked.pin().sha256, EXAMPLE_SHA256);
+}
+
+/// A schema with the interface `subject`, implemented by `intent` and `unit`,
+/// a type `host` that does not implement it, and `hold`, whose `subject`
+/// references the interface.
+fn interface_value() -> Value {
+    json!({
+        "format":"ontology-schema/v1","domain":"work","version":1,
+        "namespace":{"instance":"vps://palantirkc","account":"root"},
+        "interfaces":{"subject":{"description":"Something work is about.",
+            "properties":{"title":{"type":"string","required":true},
+                          "size":{"type":"integer"}}}},
+        "object_types":{
+            "intent":{"owner":"ontology","primary_key":{"from":"/native_key"},"implements":["subject"],
+                "properties":{"title":{"type":"string","required":true},"size":{"type":"integer"}}},
+            "unit":{"owner":"ontology","primary_key":{"from":"/native_key"},"implements":["subject"],
+                "properties":{"title":{"type":"string","required":true},"size":{"type":"integer"}}},
+            "host":{"owner":"ontology","primary_key":{"from":"/native_key"},
+                "properties":{"title":{"type":"string","required":true}}},
+            "hold":{"owner":"ontology","primary_key":{"from":"$action_id"},
+                "properties":{"subject":{"type":{"ref":"subject"},"required":true},
+                              "others":{"type":{"array":{"ref":"subject"}}},
+                              "pair":{"type":{"struct":{"one":{"ref":"subject"}}}}}}},
+        "link_types":{"hold_subject":{"from":"hold","via":"subject","to":"subject",
+            "cardinality":"many_to_one","names":{"forward":"subject","reverse":"holds"}}},
+        "grants":[{"principal":"agent","read":["intent","unit","host","hold"]}]
+    })
+}
+fn id_of(object_type: &str) -> Value {
+    json!({"object_type":object_type,"namespace":{"instance":"vps://palantirkc","account":"root"},"native_key":"k1"})
+}
+
+#[test]
+fn interfaces_check_and_a_schema_without_them_is_unchanged() {
+    // spec: specs/ont/schema-language.md#R31
+    // spec: specs/ont/schema-language.md#R32
+    assert!(check_of(interface_value()).is_empty());
+    let schema: Schema = serde_json::from_value(interface_value()).unwrap();
+    assert_eq!(schema.interfaces["subject"].properties.len(), 2);
+    assert_eq!(schema.object_types["unit"].implements, vec!["subject"]);
+    assert_eq!(
+        schema
+            .implementers("subject")
+            .into_iter()
+            .cloned()
+            .collect::<Vec<_>>(),
+        vec!["intent".to_string(), "unit".to_string()]
+    );
+    // Names, types and a name equal to an object type of the same schema.
+    let mut m = interface_value();
+    m["interfaces"]["Bad"] = json!({"properties":{"Title":{"type":"string"},
+        "a":{"type":{"ref":"missing"}},"b":{"type":{"value_type":"missing"}},
+        "c":{"type":{"struct":{"d":{"struct":{"e":"string"}}}}}}});
+    m["interfaces"]["host"] = json!({"properties":{}});
+    assert_eq!(
+        pairs(&check_of(m)),
+        vec![
+            ("invalid_name", "/interfaces/Bad"),
+            ("invalid_name", "/interfaces/Bad/properties/Title"),
+            ("unknown_type", "/interfaces/Bad/properties/a"),
+            ("unknown_value_type", "/interfaces/Bad/properties/b"),
+            ("struct_in_struct", "/interfaces/Bad/properties/c"),
+            ("duplicate_type_name", "/interfaces/host"),
+        ]
+    );
+    // Members: an unknown one, and a missing `properties`.
+    for (patch, code) in [
+        (json!({"properties":{},"bogus":1}), "unknown_field"),
+        (json!({"description":"x"}), "missing_field"),
+        (
+            json!({"properties":{"title":{"type":"string","from":"/x"}}}),
+            "unknown_field",
+        ),
+    ] {
+        let mut m = interface_value();
+        m["interfaces"]["subject"] = patch;
+        let err = Schema::check_bytes(m.to_string().as_bytes(), &BTreeSet::new()).unwrap_err();
+        assert_eq!(err[0].code, code, "{err:?}");
+    }
+    // Implements: an unknown name, and each way a property can be missing.
+    let mut m = interface_value();
+    m["object_types"]["intent"]["implements"] = json!(["subject", "nothing", "host"]);
+    m["object_types"]["unit"]["properties"]["title"]["required"] = json!(false);
+    m["object_types"]["unit"]["properties"]["size"]["type"] = json!("string");
+    let found = check_of(m);
+    assert_eq!(
+        pairs(&found),
+        vec![
+            ("unknown_interface", "/object_types/intent/implements/1"),
+            ("unknown_interface", "/object_types/intent/implements/2"),
+            (
+                "missing_interface_property",
+                "/object_types/unit/implements/0"
+            ),
+            (
+                "missing_interface_property",
+                "/object_types/unit/implements/0"
+            ),
+        ]
+    );
+    assert!(found[2].message.as_deref().unwrap().contains("size"));
+    assert!(found[3].message.as_deref().unwrap().contains("title"));
+    let mut m = interface_value();
+    m["object_types"]["intent"]["properties"] = json!({"title":{"type":"string","required":true}});
+    let found = check_of(m);
+    assert_eq!(
+        pairs(&found),
+        vec![(
+            "missing_interface_property",
+            "/object_types/intent/implements/0"
+        )]
+    );
+    assert!(found[0].message.as_deref().unwrap().contains("size"));
+    for code in [
+        "unknown_interface",
+        "missing_interface_property",
+        "interface_reference_from_source",
+    ] {
+        assert!(ont_core::schema::codes::ALL.contains(&code), "{code}");
+    }
+    // Installed bytes exempt none of them.
+    let mut m = interface_value();
+    m["object_types"]["intent"]["implements"] = json!(["nothing"]);
+    let err =
+        Schema::check_installed_bytes(m.to_string().as_bytes(), &BTreeSet::new()).unwrap_err();
+    assert_eq!(
+        pairs(&err),
+        vec![("unknown_interface", "/object_types/intent/implements/0")]
+    );
+    // A schema without the two members serializes without them.
+    let schema: Schema = serde_json::from_value(base_value()).unwrap();
+    assert!(schema.interfaces.is_empty());
+    let back = serde_json::to_value(&schema).unwrap();
+    assert!(back.get("interfaces").is_none(), "{back}");
+    assert!(
+        back["object_types"]["thing"].get("implements").is_none(),
+        "{back}"
+    );
+    let checked = Schema::check_bytes(EXAMPLE, &BTreeSet::new()).unwrap();
+    assert_eq!(checked.pin().sha256, EXAMPLE_SHA256);
+}
+
+#[test]
+fn a_reference_to_an_interface_admits_the_implementing_types() {
+    // spec: specs/ont/schema-language.md#R33
+    let set = set_of(serde_json::from_value(interface_value()).unwrap());
+    let schema = set.schema("work").unwrap();
+    let field = |ty: &str| schema.object_types["hold"].properties[ty].ty.clone();
+    for ty in ["intent", "unit"] {
+        assert!(
+            schema.validate_value(&field("subject"), &id_of(ty)).is_ok(),
+            "{ty}"
+        );
+        assert!(
+            schema
+                .validate_value(&field("others"), &json!([id_of(ty)]))
+                .is_ok()
+        );
+        assert!(
+            schema
+                .validate_value(&field("pair"), &json!({"one":id_of(ty)}))
+                .is_ok()
+        );
+    }
+    for ty in ["host", "hold", "subject", "missing"] {
+        assert_eq!(
+            schema
+                .validate_value(&field("subject"), &id_of(ty))
+                .unwrap_err()
+                .code,
+            "wrong_value_type",
+            "{ty}"
+        );
+        assert_eq!(
+            schema
+                .validate_value(&field("others"), &json!([id_of("unit"), id_of(ty)]))
+                .unwrap_err()
+                .code,
+            "wrong_value_type"
+        );
+    }
+    assert_eq!(
+        set.implementers("subject"),
+        vec![&"intent".to_string(), &"unit".to_string()]
+    );
+    assert!(set.interface("subject").is_some());
+    assert_eq!(set.schema_of_interface("subject").unwrap().domain, "work");
+    assert!(set.schema_of("subject").is_none());
+    // A link's `from` stays an object type; a grant reads object types only.
+    let mut m = interface_value();
+    m["link_types"]["back"] = json!({"from":"subject","via":"subject","to":"hold",
+        "cardinality":"many_to_one","names":{"forward":"back","reverse":"backs"}});
+    m["grants"][0]["read"] = json!(["intent", "subject"]);
+    m["grants"][0]["derive"] = json!(["subject"]);
+    assert_eq!(
+        pairs(&check_of(m)),
+        vec![
+            ("unknown_type", "/link_types/back/from"),
+            ("unknown_type", "/grants/0/read/1"),
+            ("unknown_type", "/grants/0/derive/0"),
+        ]
+    );
+    // A link into an interface is backed as a link into a type.
+    let mut m = interface_value();
+    m["link_types"]["hold_subject"]["cardinality"] = json!("many_to_many");
+    m["link_types"]["many"] = json!({"from":"hold","via":"others","to":"subject",
+        "cardinality":"many_to_many","names":{"forward":"others","reverse":"other_holds"}});
+    m["link_types"]["wrong"] = json!({"from":"hold","via":"subject","to":"unit",
+        "cardinality":"many_to_one","names":{"forward":"wrong","reverse":"wrongs"}});
+    assert_eq!(
+        pairs(&check_of(m)),
+        vec![
+            (
+                "invalid_link_backing",
+                "/link_types/hold_subject/cardinality"
+            ),
+            ("invalid_link_backing", "/link_types/wrong/via"),
+        ]
+    );
+    // A source-owned reference to an interface cannot be built from a source.
+    let mut m = interface_value();
+    m["sources"] = json!({"src":{"kind":"markdown_fields","glob":"/tmp/*.md","fresh_for_s":1}});
+    m["object_types"]["note"] = json!({"owner":{"source":"src"},"primary_key":{"from":"/path"},
+        "properties":{"about":{"type":{"ref":"subject"},"from":"/stem"},
+                      "near":{"type":{"ref":"subject"},"template":"{stem}"},
+                      "unit":{"type":{"ref":"unit"},"from":"/stem"}}});
+    assert_eq!(
+        pairs(&check_of(m)),
+        vec![
+            (
+                "interface_reference_from_source",
+                "/object_types/note/properties/about/from"
+            ),
+            (
+                "interface_reference_from_source",
+                "/object_types/note/properties/near/template"
+            ),
+        ]
+    );
+    // A view filter compares an interface reference with a literal id only.
+    let mut m = interface_value();
+    m["views"] = json!({
+        "by_arg":{"object_type":"hold","args":["key"],"filter":{"eq":["subject","$key"]},
+            "order":[{"property":"$key","direction":"asc"}],"columns":[{"header":"K","property":"$key"}]},
+        "by_id":{"object_type":"hold","filter":{"eq":["subject",id_of("unit")]},
+            "order":[{"property":"$key","direction":"asc"}],"columns":[{"header":"K","property":"$key"}]},
+        "by_host":{"object_type":"hold","filter":{"eq":["subject",id_of("host")]},
+            "order":[{"property":"$key","direction":"asc"}],"columns":[{"header":"K","property":"$key"}]}
+    });
+    assert_eq!(
+        pairs(&check_of(m)),
+        vec![
+            ("invalid_schema", "/views/by_arg/filter"),
+            ("invalid_schema", "/views/by_host/filter"),
+        ]
+    );
+}
+
+#[test]
+fn one_name_is_one_type_or_one_interface_across_domains() {
+    // spec: specs/ont/schema-language.md#R34
+    let a =
+        Schema::check_bytes(interface_value().to_string().as_bytes(), &BTreeSet::new()).unwrap();
+    // `schema check` with the store: an interface named like an object type
+    // of another domain.
+    let others = BTreeSet::from(["subject".to_string()]);
+    let err = Schema::check_bytes(interface_value().to_string().as_bytes(), &others).unwrap_err();
+    assert_eq!(
+        pairs(&err),
+        vec![("duplicate_type_name", "/interfaces/subject")]
+    );
+    // The composition: an object type named like an interface of another
+    // domain, and an interface named like one.
+    let mut b = base_value();
+    b["domain"] = json!("other");
+    b["object_types"]["subject"] = b["object_types"]["thing"].clone();
+    b["grants"] = json!([]);
+    let b = Schema::check_bytes(b.to_string().as_bytes(), &BTreeSet::new()).unwrap();
+    let err = SchemaSet::new(vec![a.clone(), b]).unwrap_err();
+    assert_eq!(
+        pairs(&err),
+        vec![("duplicate_type_name", "/interfaces/subject")]
+    );
+    let mut c = base_value();
+    c["domain"] = json!("other");
+    c["object_types"] = json!({});
+    c["grants"] = json!([]);
+    c["interfaces"] = json!({"subject":{"properties":{}}});
+    let c = Schema::check_bytes(c.to_string().as_bytes(), &BTreeSet::new()).unwrap();
+    let err = SchemaSet::new(vec![a.clone(), c]).unwrap_err();
+    assert_eq!(
+        pairs(&err),
+        vec![("duplicate_type_name", "/interfaces/subject")]
+    );
+    // Without a collision the two domains compose.
+    let mut d = base_value();
+    d["domain"] = json!("other");
+    d["grants"] = json!([]);
+    let d = Schema::check_bytes(d.to_string().as_bytes(), &BTreeSet::new()).unwrap();
+    assert!(SchemaSet::new(vec![a, d]).is_ok());
+}
+
+#[test]
+fn actions_read_no_property_through_an_interface() {
+    // spec: specs/ont/action.md#R116
+    let with = |parameters: Value, criteria: Value, rules: Value| {
+        let mut m = interface_value();
+        m["action_types"] = json!({"act":{"parameters":parameters,
+            "submission_criteria":criteria,"rules":rules}});
+        m["grants"][0]["actions"] = json!(["act"]);
+        pairs(&check_of(m))
+            .into_iter()
+            .map(|(c, p)| (c.to_string(), p.to_string()))
+            .collect::<Vec<_>>()
+    };
+    let crit = |cond: Value| json!([{"code":"c","message":"m","all":[cond]}]);
+    let s = json!({"type":{"ref":"subject"},"required":true});
+    let u = json!({"type":{"ref":"unit"},"required":true});
+    let p = "/action_types/act/submission_criteria/0/all/0";
+    let own = |v: Vec<(&str, String)>| {
+        v.into_iter()
+            .map(|(c, p)| (c.to_string(), p))
+            .collect::<Vec<_>>()
+    };
+    // `$parameter.property` through an interface, in a comparison, `present`
+    // and a rule value.
+    assert_eq!(
+        with(
+            json!({"s":s}),
+            crit(json!({"eq":["$s.title","x"]})),
+            json!([])
+        ),
+        own(vec![("unknown_property", format!("{p}/eq/0"))])
+    );
+    assert_eq!(
+        with(
+            json!({"s":s}),
+            crit(json!({"present":"$s.title"})),
+            json!([])
+        ),
+        own(vec![("unknown_property", format!("{p}/present"))])
+    );
+    assert_eq!(
+        with(
+            json!({"s":s}),
+            json!([]),
+            json!([{"create_object":"hold","set":{"subject":"$s","others":["$s.title"]}}])
+        ),
+        own(vec![(
+            "unknown_property",
+            "/action_types/act/rules/0/set/others/0".to_string()
+        )])
+    );
+    // A bare name: one interface reference alone, or beside a type reference.
+    assert_eq!(
+        with(json!({"s":s}), crit(json!({"eq":["title","x"]})), json!([])),
+        own(vec![("unknown_property", format!("{p}/eq/0"))])
+    );
+    assert_eq!(
+        with(
+            json!({"s":s,"u":u}),
+            crit(json!({"eq":["title","x"]})),
+            json!([])
+        ),
+        own(vec![("invalid_criterion", format!("{p}/eq/0"))])
+    );
+    // `linked`: the reverse name of a link into an interface the type of the
+    // parameter implements; a bare name after it names a property of `hold`.
+    assert_eq!(
+        with(
+            json!({"u":u}),
+            crit(json!({"linked":{"from":"$u","link":"holds",
+                "where":{"all":[{"eq":["subject",id_of("unit")]}]}}})),
+            json!([])
+        ),
+        own(vec![])
+    );
+    assert_eq!(
+        with(
+            json!({"u":u}),
+            crit(json!({"linked":{"from":"$u","link":"holds",
+                "where":{"all":[{"eq":["title","x"]}]}}})),
+            json!([])
+        ),
+        own(vec![(
+            "unknown_property",
+            format!("{p}/linked/where/all/0/eq/0")
+        )])
+    );
+    // The forward name of a link into an interface: no property after it.
+    let h = json!({"type":{"ref":"hold"},"required":true});
+    assert_eq!(
+        with(
+            json!({"h":h}),
+            crit(json!({"linked":{"from":"$h","link":"subject",
+                "where":{"all":[{"eq":["title","x"]}]}}})),
+            json!([])
+        ),
+        own(vec![(
+            "unknown_property",
+            format!("{p}/linked/where/all/0/eq/0")
+        )])
+    );
+    // Never a create key, never a rule target.
+    let mut m = interface_value();
+    m["action_types"] = json!({"act":{"parameters":{"s":s},
+        "rules":[{"modify_object":"unit","target":"$s","set":{"title":"x"}}]}});
+    assert_eq!(
+        pairs(&check_of(m)),
+        vec![("invalid_rule_target", "/action_types/act/rules/0/target")]
+    );
 }
