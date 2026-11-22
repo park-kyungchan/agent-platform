@@ -49,10 +49,7 @@ fn each_form_matches_its_line_and_not_its_near_misses() {
         (pat(22), "github_token"),
         (format!("x={}", pat(30)), "github_token"),
         (model(32), "model_key"),
-        (
-            format!("k: {}", format!("{}-ant-api03-{}", "sk", run_of(40))),
-            "model_key",
-        ),
+        (format!("k: {}-ant-api03-{}", "sk", run_of(40)), "model_key"),
         (google(35), "model_key"),
         (tailnet(20), "tailnet_key"),
         (format!("{}-auth-{}", "tskey", run_of(24)), "tailnet_key"),
