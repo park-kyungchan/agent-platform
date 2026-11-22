@@ -116,6 +116,8 @@ struct F {
     types: BTreeMap<String, String>,
     /// Paths whose `stat` fails other than by not finding them.
     stat_fails: BTreeSet<String>,
+    /// What `stat -c '%a %F'` prints per path (the key file of R31); an absent path is not found.
+    modes: BTreeMap<String, String>,
     /// `find` output per directory; a directory in `find_fails` cannot be listed.
     finds: BTreeMap<String, String>,
     find_fails: BTreeSet<String>,
@@ -192,6 +194,7 @@ impl F {
             unreadable: BTreeSet::new(),
             types: BTreeMap::new(),
             stat_fails: BTreeSet::new(),
+            modes: BTreeMap::new(),
             finds: BTreeMap::new(),
             find_fails: BTreeSet::new(),
             sshd: "port 22\npasswordauthentication no\nexit 0\n".into(),
@@ -550,6 +553,32 @@ impl F {
                         "objects": objects, "continuation": null}}),
                     )
                 }
+                Some("run") if input["where"]["all"][0]["eq"] == json!(["role", "batch"]) => {
+                    // `batch_runs` of `crates/ap/src/api.rs`: role `batch`, started after a time.
+                    let gt = &input["where"]["all"][1]["gt"];
+                    assert_eq!(gt[0], "started_at");
+                    let after = gt[1].as_str().and_then(epoch).unwrap();
+                    let objects: Vec<Value> = self
+                        .runs
+                        .iter()
+                        .filter(|(_, f)| f["role"] == "batch")
+                        .filter(|(_, f)| {
+                            f["started_at"]
+                                .as_str()
+                                .and_then(epoch)
+                                .is_some_and(|t| t > after)
+                        })
+                        .map(|(k, f)| json!({
+                            "id": {"object_type": "run", "namespace": {"instance": "vps://palantirkc", "account": "root"}, "native_key": k},
+                            "head": {"fields": wrap(f)}
+                        }))
+                        .collect();
+                    json_reply(
+                        true,
+                        &json!({"status": "ok", "result": {"basis": {"qualified": true},
+                        "objects": objects, "continuation": null}}),
+                    )
+                }
                 Some("run") => {
                     let ge = &input["where"]["all"][0]["ge"];
                     assert_eq!(ge[0], "started_at");
@@ -682,6 +711,14 @@ impl System for F {
                 let path = args[2].as_str();
                 if self.stat_fails.contains(path) {
                     return failed(&format!("stat: cannot statx '{path}': Permission denied\n"));
+                }
+                if args[1] == "%a %F" {
+                    return match self.modes.get(path) {
+                        Some(m) => ok(&format!("{m}\n")),
+                        None => failed(&format!(
+                            "stat: cannot statx '{path}': No such file or directory\n"
+                        )),
+                    };
                 }
                 if args[1] == "%Y" {
                     assert_eq!(path, DELIVERY);
@@ -2093,7 +2130,7 @@ fn r17_the_answer_and_the_exits() {
         .keys()
         .map(String::as_str)
         .collect();
-    assert_eq!(names.len(), 9);
+    assert_eq!(names.len(), 10);
     for d in ap::watch::DETECTORS {
         assert_eq!(v["detectors"][d], json!({"state": "ok", "signals": 0}));
     }
@@ -2114,7 +2151,7 @@ fn r17_the_answer_and_the_exits() {
     let (v, exit) = f.run(&[]);
     assert_eq!(exit, 1);
     assert_eq!(v["failed"][0]["key"], "watch:delivery");
-    assert_eq!(v["failed"].as_array().unwrap().len(), 9);
+    assert_eq!(v["failed"].as_array().unwrap().len(), 10);
     assert!(f.dir.join("state.json").exists());
 }
 
@@ -2335,7 +2372,7 @@ fn r20_policy_absence_and_parse_failure_and_detector_order() {
         ap::watch::DETECTORS,
         [
             "delivery", "login", "services", "host", "records", "accounts", "checks", "runtimes",
-            "drift"
+            "drift", "credit"
         ]
     );
     let mut f = F::quiet();
@@ -3918,4 +3955,271 @@ fn r30_a_record_that_exists_and_cannot_be_read_makes_host_unreadable() {
     pc_policy(&mut f);
     let v = f.pass();
     assert_eq!(v["detectors"]["host"]["state"], "ok", "{v}");
+}
+
+// ---- credit (R31).
+
+const KEY_FILE: &str = "/etc/agent-platform/credentials/anthropic-api-key";
+const KEY_BYTES: &str = "sk-ant-fixture-KEY-4b1e9d";
+
+/// A policy whose member `api` has the stops 160 (standard) and 185 (soak), and its key file of mode 600.
+fn credit_policy(f: &mut F) {
+    set_policy(
+        f,
+        json!({"api": {"key_file": KEY_FILE, "stops_usd": {"standard": 160, "soak": 185},
+            "day_cap_usd": 40, "jobs": {"drift": {"cap_usd": 60, "models": ["claude-sonnet-5-5"],
+            "max_tokens": 8000, "max_requests": 100}}}}),
+    );
+    f.files
+        .insert(KEY_FILE.into(), KEY_BYTES.as_bytes().to_vec());
+    f.modes.insert(KEY_FILE.into(), "600 regular file".into());
+}
+/// A run of role `batch` as `ap api batch` starts and closes it.
+fn batch_run(started: u64, status: &str, reserved: i64, settled: Option<i64>) -> Value {
+    let mut v = json!({"role": "batch", "runtime": "api", "model": "claude-sonnet-5-5", "job": "drift",
+        "status": status, "started_at": utc(started), "reserved_usd_micros": reserved});
+    if let Some(s) = settled {
+        v["settled_usd_micros"] = json!(s);
+    }
+    v
+}
+/// Whether the pass searched the runs of role `batch` (`batch_runs`) or stated the key file.
+fn credit_read(f: &F) -> bool {
+    let calls = f.calls.borrow();
+    calls.iter().any(|(p, a, input)| {
+        (p == "ont"
+            && a[0] == "search"
+            && input["where"]["all"][0]["eq"] == json!(["role", "batch"]))
+            || (p == "stat" && a[1] == "%a %F")
+    })
+}
+
+// spec: specs/ap/watch.md#R31
+#[test]
+fn credit_stop_at_80_percent() {
+    let mut f = F::quiet();
+    credit_policy(&mut f);
+    let day = 86_400;
+    // The ledger of November: settled, running at its reservation, closed without a settlement (at its
+    // reservation); a run of October and a run of another role count nothing. One micro-USD under 80 % of 160.
+    let runs = [
+        (
+            "run-settled",
+            batch_run(BASE - 10 * day, "closed", 150_000_000, Some(99_999_999)),
+        ),
+        (
+            "run-running",
+            batch_run(BASE - 3_600, "running", 20_000_000, None),
+        ),
+        (
+            "run-unsettled",
+            batch_run(BASE - 5 * day, "closed", 8_000_000, None),
+        ),
+        (
+            "run-october",
+            batch_run(BASE - 20 * day, "closed", 90_000_000, Some(90_000_000)),
+        ),
+    ];
+    for (key, run) in runs {
+        f.runs.insert(key.into(), run);
+    }
+    let mut other = batch_run(BASE - 2 * day, "running", 50_000_000, None);
+    other["role"] = json!("implementer");
+    f.runs.insert("run-other-role".into(), other);
+    f.at(5);
+    let v = f.pass();
+    assert_eq!(
+        v["detectors"]["credit"],
+        json!({"state": "ok", "signals": 0}),
+        "{v}"
+    );
+    assert_eq!(v["opened"], json!([]), "{v}");
+    // One micro-USD more: exactly 80 % of the standard stop opens `stop standard`, and not `stop soak`.
+    f.runs.get_mut("run-settled").unwrap()["settled_usd_micros"] = json!(100_000_000);
+    f.at(10);
+    let v = f.pass();
+    let ks = k("credit", "stop standard");
+    assert_eq!(v["opened"], json!([ks]), "{v}");
+    let found = f.finding(&ks);
+    assert_eq!(
+        (&found["kind"], &found["detector"], &found["severity"]),
+        (&json!("incident"), &json!("watch:credit"), &json!("act"))
+    );
+    assert!(
+        found["summary"]
+            .as_str()
+            .unwrap()
+            .starts_with("stop standard: ")
+    );
+    assert_eq!(
+        found["evidence"],
+        "month 2026-11, counted_usd_micros 128000000, stop_usd_micros 160000000"
+    );
+    // A pass of the next month counts none of these runs: it closes the finding.
+    f.wall.set(epoch("2026-12-01T00:10:00Z").unwrap());
+    let v = f.pass();
+    assert!(v["closed"].as_array().unwrap().contains(&json!(ks)), "{v}");
+    assert!(!v["opened"].as_array().unwrap().contains(&json!(ks)), "{v}");
+    assert_eq!(f.finding(&ks)["state"], "closed");
+}
+
+// spec: specs/ap/watch.md#R31
+#[test]
+fn credit_unsettled_batch_after_26_hours() {
+    let mut f = F::quiet();
+    credit_policy(&mut f);
+    f.at(5);
+    let now = f.now();
+    let h26 = 26 * 3_600;
+    let runs = [
+        (
+            "run-at-26h",
+            batch_run(now - h26, "running", 3_000_000, None),
+        ),
+        (
+            "run-past-26h",
+            batch_run(now - h26 - 1, "running", 4_000_000, None),
+        ),
+        (
+            "run-settled",
+            batch_run(now - 3 * h26, "closed", 5_000_000, Some(1_000_000)),
+        ),
+        (
+            "run-closed",
+            batch_run(now - 3 * h26, "closed", 6_000_000, None),
+        ),
+    ];
+    for (key, run) in runs {
+        f.runs.insert(key.into(), run);
+    }
+    let v = f.pass();
+    let kp = k("credit", "unsettled run-past-26h");
+    assert_eq!(v["opened"], json!([kp]), "{v}");
+    assert_eq!(f.finding(&kp)["severity"], "act");
+    assert_eq!(
+        f.finding(&kp)["evidence"],
+        format!(
+            "run run-past-26h, job drift, started_at {}, reserved_usd_micros 4000000",
+            utc(now - h26 - 1)
+        )
+    );
+    // One second later the run at 26 hours is past them too; the settled run and the one closed without a
+    // settlement never are.
+    f.wall.set(now + 1);
+    let v = f.pass();
+    assert_eq!(
+        v["opened"],
+        json!([k("credit", "unsettled run-at-26h")]),
+        "{v}"
+    );
+    // A run that is closed is no longer unsettled.
+    f.runs.get_mut("run-past-26h").unwrap()["status"] = json!("closed");
+    f.wall.set(now + 2);
+    let v = f.pass();
+    assert_eq!(v["closed"], json!([kp]), "{v}");
+}
+
+// spec: specs/ap/watch.md#R31
+#[test]
+fn credit_key_mode() {
+    let mut f = F::quiet();
+    credit_policy(&mut f);
+    let km = k("credit", "key mode");
+    f.modes.insert(KEY_FILE.into(), "640 regular file".into());
+    f.at(5);
+    let v = f.pass();
+    assert_eq!(v["opened"], json!([km]), "{v}");
+    assert_eq!(f.finding(&km)["severity"], "urgent");
+    assert_eq!(f.finding(&km)["evidence"], "mode 640, type regular file");
+    // 600: no signal, the finding closes.
+    f.modes.insert(KEY_FILE.into(), "600 regular file".into());
+    f.at(10);
+    let v = f.pass();
+    assert_eq!(v["closed"], json!([km]), "{v}");
+    // A link (never followed): urgent again.
+    f.modes.insert(KEY_FILE.into(), "777 symbolic link".into());
+    f.at(15);
+    let v = f.pass();
+    assert_eq!(v["reopened"], json!([km]), "{v}");
+    assert_eq!(f.finding(&km)["evidence"], "mode 777, type symbolic link");
+    // Not found: no signal.
+    f.modes.remove(KEY_FILE);
+    f.at(20);
+    let v = f.pass();
+    assert_eq!(
+        v["detectors"]["credit"],
+        json!({"state": "ok", "signals": 0}),
+        "{v}"
+    );
+    assert_eq!(v["closed"], json!([km]), "{v}");
+    // A stat that fails other than by not finding the file: unreadable.
+    f.stat_fails.insert(KEY_FILE.into());
+    f.at(25);
+    let v = f.pass();
+    assert_eq!(v["detectors"]["credit"]["state"], "unreadable", "{v}");
+    // The key file is examined by `stat` alone and never read: no byte of it is in a call, a finding or state.json.
+    let stats: Vec<Vec<String>> = f
+        .programs()
+        .into_iter()
+        .filter(|(p, a)| p == "stat" && a.last().is_some_and(|l| l == KEY_FILE))
+        .map(|(_, a)| a)
+        .collect();
+    assert_eq!(stats.len(), 5);
+    assert!(stats.iter().all(|a| a == &["-c", "%a %F", KEY_FILE]));
+    assert!(!f.reads.borrow().iter().any(|r| r == KEY_FILE));
+    for (_, a, input) in f.calls.borrow().iter() {
+        assert!(!a.concat().contains(KEY_BYTES) && !input.to_string().contains(KEY_BYTES));
+    }
+    let all = serde_json::to_string(&f.findings).unwrap();
+    assert!(!all.contains(KEY_BYTES));
+    assert!(!f.state().to_string().contains(KEY_BYTES));
+    assert!(f.state().get("credit").is_none());
+}
+
+// spec: specs/ap/watch.md#R31
+// spec: specs/ap/watch.md#R20
+#[test]
+fn credit_unknown_without_api() {
+    let mut f = F::quiet();
+    let ks = k("credit", "stop standard");
+    f.plant(
+        &ks,
+        stored("credit", "stop standard: x", "act", "open", BASE - 7_200),
+    );
+    // A ledger that would open `stop standard` and `unsettled` if it were read.
+    f.runs.insert(
+        "run-old".into(),
+        batch_run(BASE - 10 * 86_400, "running", 150_000_000, None),
+    );
+    // No policy file, then a policy without `api`: every family unknown, the finding neither seen nor closed.
+    for policy in [
+        None,
+        Some(json!({"models": {"allowed": ["sonnet"], "never": []}})),
+    ] {
+        f.reset();
+        if let Some(p) = policy {
+            set_policy(&mut f, p);
+        }
+        f.at(f.now().saturating_sub(BASE) / 60 + 5);
+        let v = f.pass();
+        assert_eq!(
+            v["detectors"]["credit"],
+            json!({"state": "ok", "signals": 0}),
+            "{v}"
+        );
+        for list in ["opened", "seen", "reopened", "closed"] {
+            assert_eq!(v[list], json!([]), "{list}: {v}");
+        }
+        assert_eq!(f.finding(&ks)["state"], "open");
+        assert!(!credit_read(&f), "credit read a source without api");
+    }
+    // An `api` of another form: unreadable, which closes nothing.
+    set_policy(&mut f, json!({"api": {"key_file": "/invented/key"}}));
+    f.at(f.now().saturating_sub(BASE) / 60 + 5);
+    let v = f.pass();
+    assert_eq!(v["detectors"]["credit"]["state"], "unreadable", "{v}");
+    assert_eq!(v["opened"], json!([k("credit", "unreadable")]), "{v}");
+    assert_eq!(v["closed"], json!([]), "{v}");
+    assert!(!v["seen"].as_array().unwrap().contains(&json!(ks)), "{v}");
+    assert_eq!(f.finding(&ks)["state"], "open");
 }
