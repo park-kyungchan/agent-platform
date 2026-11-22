@@ -1,0 +1,10 @@
+[Unit]
+Description=ap resource every five minutes
+Documentation=https://github.com/park-kyungchan/agent-platform/blob/main/specs/ap/resource.md
+
+[Timer]
+OnCalendar=*:2/5
+AccuracySec=10s
+
+[Install]
+WantedBy=timers.target
