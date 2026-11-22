@@ -585,7 +585,9 @@ fn answer(ctx: &Ctx, mut c: Command, limit: Duration) -> Option<Vec<u8>> {
     let bytes = rx.recv_timeout(Duration::from_secs(2)).ok()?;
     status.success().then_some(bytes)
 }
-fn place(ctx: &Ctx, pc: &Pc, key: &str, pin: Option<&str>) -> Place {
+/// The ping of R4: whether `tailscale ping` reaches the PC's host within 10 seconds (`ap check` and
+/// `ap resource`, `specs/ap/resource.md` R4).
+pub(crate) fn ping(ctx: &Ctx, pc: &Pc) -> bool {
     let ping = [
         "ping",
         "--c",
@@ -595,16 +597,20 @@ fn place(ctx: &Ctx, pc: &Pc, key: &str, pin: Option<&str>) -> Place {
         "--until-direct=false",
         pc.host(),
     ];
-    if answer(ctx, tailscale(ctx, &ping), Duration::from_secs(12)).is_none() {
+    answer(ctx, tailscale(ctx, &ping), Duration::from_secs(12)).is_some()
+}
+/// One `tailscale ssh <ssh> <text>` with the environment of R7, bounded by `limit`: its standard
+/// output when it succeeded (`ap check` and `ap resource`).
+pub(crate) fn ssh(ctx: &Ctx, pc: &Pc, text: &str, limit: Duration) -> Option<Vec<u8>> {
+    answer(ctx, tailscale(ctx, &["ssh", &pc.ssh, text]), limit)
+}
+fn place(ctx: &Ctx, pc: &Pc, key: &str, pin: Option<&str>) -> Place {
+    if !ping(ctx, pc) {
         return Place::Here("pc_unreachable", None);
     }
     let repo = format!("{}/repos/{key}", pc.work);
     let probe = format!("bash -c {} ap-check-probe {}", quote(PROBE), quote(&repo));
-    let Some(stdout) = answer(
-        ctx,
-        tailscale(ctx, &["ssh", &pc.ssh, &probe]),
-        Duration::from_secs(30),
-    ) else {
+    let Some(stdout) = ssh(ctx, pc, &probe, Duration::from_secs(30)) else {
         return Place::Here("pc_unreachable", None);
     };
     let Some(Answer {

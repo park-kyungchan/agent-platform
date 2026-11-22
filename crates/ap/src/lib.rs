@@ -43,3 +43,5 @@ pub mod door;
 pub mod route;
 
 pub mod clause;
+
+pub mod resource;

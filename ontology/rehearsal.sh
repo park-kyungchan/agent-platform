@@ -597,6 +597,10 @@ print(view['markdown'])
 print('gate_row=v8-view-installs expected=admitted')
 assert call(['render'], dict(view='reviews', args=dict(task=task['native_key'])))['rows'] > 0
 print('v8_gate_rows_complete')
+# Version 17 on (the repository's file is installed here): an install names its host, a reference no criterion reads.
+with_host = created(gate('start_install', 'v17-install-host', dict(ip, attempt=3, host=oid('host', 'fixture-host'))), 'install')
+assert fields(with_host)['host'] == oid('host', 'fixture-host') and fields(with_host)['status'] == 'running'
+apply('close_install', 'v17-close-install-host', dict(install=with_host, outcome='installed', to='2' * 40))
 
 # Version 9: the objective, the backlog item, the order of a task and the triage of the user's rows. Each refusal row is before the action it guards.
 def stamp(): return datetime.datetime.fromtimestamp(now, datetime.timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
@@ -841,8 +845,9 @@ python3 -I -B "$repo/ontology/memory-index-walk.py" "$ont_binary" "$rehearsal_ro
 # made under version 10, and the walk of the units, runs and findings. Then version 12, pinned in Git, over the
 # objects made under version 11, and the walk of the page digest. Then version 13, pinned in Git, over the objects
 # made under version 12, and the walk of the principles. Then version 14, pinned in Git, over the objects made under
-# version 13, and the walk of the two record sources of the routes. Then version 15, the repository's file, over the
-# objects made under version 14: the function horizon.
+# version 13, and the walk of the two record sources of the routes. Then version 15, pinned in Git, over the objects
+# made under version 14: the function horizon. Then version 16, pinned in Git, and its walk of the clauses; then
+# version 17, the repository's file, and its walk of the hosts, accounts, samples and checks.
 mkdir -- "$rehearsal_root/v10"
 python3 - "$ont_binary" "$repo" "$rehearsal_root/v10/store.sqlite" "$work_root/" "$rehearsal_root/copies" "$rehearsal_root/lib" <<'PY'
 import datetime, hashlib, json, os, pathlib, subprocess, sys
@@ -943,7 +948,7 @@ apply('triage_decision', 'v9-after-carry', dict(decision=third, triage='none', r
 unchanged = fingerprint()
 assert migrate(9, 10) == dict(carried=0, already=3)
 assert fingerprint() == unchanged and fields(third_request)['route_reason'] == 'carried from version 9'
-for before, after in [(9, 17), (10, 10), (10, 9)]:
+for before, after in [(9, 18), (10, 10), (10, 9)]:
     assert migrate(before, after, 2) == dict(status='unknown_pair')
 assert fingerprint() == unchanged
 assert migrate(9, 10) == dict(carried=0, already=3)
@@ -1803,7 +1808,11 @@ v15_objects = [o['id'] for t in ('task', 'decision', 'request', 'intent', 'crite
                for o in call(['search'], dict(object_type=t, limit=1000))['objects']]
 v15_before = [obj(i) for i in v15_objects]
 v15_views = [(view, args, call(['render'], dict(view=view, args=args))) for view, args, _ in v13_views]
-schema = json.loads(pathlib.Path(repo, 'ontology/work.schema.json').read_text())
+V16_PIN = ('89d2a9f20141f91cfcf8437714e337996b51aa75', 'b96965329a1732168c1451b43240776af9fbaf24978913ad7e82eee03dd96b56')
+v16_bytes = subprocess.check_output(['git', '-C', repo, 'show', V16_PIN[0] + ':ontology/work.schema.json'], timeout=10)
+assert hashlib.sha256(v16_bytes).hexdigest() == V16_PIN[1]
+v16_path = pathlib.Path(store).with_name('pinned-' + V16_PIN[0] + '.json'); v16_path.write_bytes(v16_bytes)
+schema = json.loads(v16_bytes)
 assert schema['version'] == 16
 # The schema differs from version 15 only by points 1 to 6 of ontology/README.md, "Version 16": each is taken off a copy,
 # and what is left reads as version 15.
@@ -1860,7 +1869,7 @@ def clause_copy(path, label, name):
     assert HOST_CLAUSE not in json.dumps(copy['sources'])
     out.write_text(json.dumps(copy))
     return out
-call(['schema', 'install', str(clause_copy(pathlib.Path(repo, 'ontology/work.schema.json'), 'repository.json', 'repository-route.json'))])
+call(['schema', 'install', str(clause_copy(v16_path, 'pinned-v16.json', 'pinned-v16-route.json'))])
 redirect.trace(work, copies)
 assert [obj(i) for i in v15_objects] == v15_before
 for view, args, before in v15_views:
@@ -1879,7 +1888,6 @@ assert listed['domain'] == 'work' and 'program' not in listed and [p['name'] for
 assert sorted(f['name'] for f in described['functions'] if f['domain'] == 'work') == ['clause', 'horizon', 'route']
 unchanged = fingerprint()
 assert migrate(15, 16) == dict(carried=0, already=0)
-assert migrate(16, 17, 2) == dict(status='unknown_pair')
 assert fingerprint() == unchanged and [obj(i) for i in v15_objects] == v15_before
 print('v16_migration_rows_complete')
 phase = 'v16'
@@ -1960,4 +1968,176 @@ tick(); apply('amend_unit', 'g-wave', dict(unit=g16, wave=4, page_digest=digest(
 f = fields(g16); assert f['wave'] == 4 and f['page_digest'] == digest('v16 page g'), f
 print('v16_gate_rows_complete')
 print('v16 clauses: ok')
+# Version 17: the repository's file over the objects made under version 16. The schema differs from version 16 only by
+# points 1 to 9 of ontology/README.md, "Version 17": each is taken off a copy, and what is left reads as version 16.
+v16_schema = schema
+v16_objects = [o['id'] for t in ('task', 'decision', 'request', 'intent', 'criterion', 'unit', 'review', 'run', 'finding', 'hold', 'principle', 'section', 'component', 'clause')
+               for o in call(['search'], dict(object_type=t, limit=1000))['objects']]
+v16_before = [obj(i) for i in v16_objects]
+v16_views = [(view, args, call(['render'], dict(view=view, args=args))) for view, args, _ in v13_views]
+schema = json.loads(pathlib.Path(repo, 'ontology/work.schema.json').read_text())
+assert schema['version'] == 17
+head, old = json.loads(json.dumps(schema)), json.loads(json.dumps(v16_schema))
+UTC, NE = {'value_type': 'utc_time'}, {'value_type': 'nonempty_text'}
+def shapes(properties): return {n: (p['type'], p['required'], p.get('max_bytes'), p.get('from')) for n, p in properties.items()}
+for name in ('host', 'account', 'host_sample', 'check'):
+    assert len(head['object_types'][name]['description'].encode()) <= 200 and all('description' not in p for p in head['object_types'][name]['properties'].values()), name
+host_type, account_type = head['object_types'].pop('host'), head['object_types'].pop('account')
+assert host_type['owner'] == 'ontology' and host_type['primary_key'] == {'from': '/native_key'} and host_type['title'] == 'node'
+assert shapes(host_type['properties']) == dict(node=('string', True, 200, None), machine=('string', True, 100, None), declared_at=(UTC, True, None, None),
+    answers=('boolean', False, None, None), free=('boolean', False, None, None), observed_at=(UTC, False, None, None), seen_at=(UTC, False, None, None),
+    cpus=('integer', False, None, None), load_x100=('integer', False, None, None), available_mb=('integer', False, None, None))
+assert account_type['owner'] == 'ontology' and account_type['primary_key'] == {'from': '/native_key'} and 'title' not in account_type
+assert shapes(account_type['properties']) == dict(runtime=('string', False, 40, None), limit=('string', False, 300, None), limit_at=(UTC, False, None, None),
+    limit_run=({'ref': 'run'}, False, None, None), observed_at=(UTC, False, None, None), allowance=('string', False, 300, None), allowance_at=(UTC, False, None, None),
+    allowance_by=({'ref': 'request'}, False, None, None))
+sample_type, check_type = head['object_types'].pop('host_sample'), head['object_types'].pop('check')
+assert sample_type['owner'] == {'source': 'host_samples'} and check_type['owner'] == {'source': 'checks'} and sample_type['primary_key'] == check_type['primary_key'] == {'from': '/key'}
+assert shapes(sample_type['properties']) == dict(host=({'ref': 'host'}, True, None, '/host'), at=(UTC, True, None, '/at'), answers=('boolean', True, None, '/answers'),
+    free=('boolean', True, None, '/free'), **{k: ('integer', False, None, '/' + k) for k in ('cpus', 'load_x100', 'available_mb', 'slots', 'units_running', 'units_ready', 'cpu_waits')})
+assert shapes(check_type['properties']) == dict(host=({'ref': 'host'}, True, None, '/host'), repository=('string', True, None, '/repository'), head=('string', True, None, '/head'),
+    dir=('string', True, None, '/dir'), command=('string', True, 1000, '/command'), end=(UTC, True, None, '/end'), exit=('integer', True, None, '/exit'),
+    milliseconds=('integer', True, None, '/milliseconds'), reason=('string', False, 40, '/reason'), start=(UTC, False, None, '/start'))
+RESOURCE = '/var/lib/agent-platform/resource/'
+assert head['sources'].pop('host_samples') == dict(kind='records', glob=RESOURCE + '*.samples.jsonl', time_member='observed_at', type_member='type', complete_listing=True, fresh_for_s=1728000)
+assert head['sources'].pop('checks') == dict(kind='records', glob=RESOURCE + '*.checks.jsonl', time_member='observed_at', type_member='type', complete_listing=True, fresh_for_s=5184000)
+for kind, names in (('run', ('host', 'uses')), ('install', ('host',))):
+    for name in names:
+        assert head['object_types'][kind]['properties'].pop(name) == {'type': {'ref': 'host' if name == 'host' else 'account'}, 'required': False}, (kind, name)
+for action, names in (('start_run', ('host', 'uses')), ('start_install', ('host',))):
+    a = head['action_types'][action]
+    for name in names:
+        assert a['parameters'].pop(name) == {'type': {'ref': 'host' if name == 'host' else 'account'}, 'required': False}, (action, name)
+        assert a['rules'][0]['set'].pop(name) == '$' + name, (action, name)
+LINKS = dict(run_host=('run', 'host', 'host', 'host_runs'), run_account=('run', 'uses', 'account', 'account_runs'), install_host=('install', 'host', 'host', 'host_installs'),
+             host_sample_host=('host_sample', 'host', 'host', 'host_samples'), check_host=('check', 'host', 'host', 'host_checks'),
+             account_limit_run=('account', 'limit_run', 'run', 'run_account_limits'), account_allowance_by=('account', 'allowance_by', 'request', 'request_allowances'))
+for name, (a, via, b, reverse) in LINKS.items():
+    assert head['link_types'].pop(name) == {'from': a, 'via': via, 'to': b, 'cardinality': 'many_to_one', 'names': {'forward': name, 'reverse': reverse}}, name
+for name in ('declare_host', 'observe_host', 'observe_account', 'state_allowance'):
+    a = head['action_types'].pop(name)
+    assert len(a['description'].encode()) <= 200 and all('description' not in p for p in a['parameters'].values()), name
+    globals()['act_' + name] = a
+assert shapes(act_declare_host['parameters']) == dict(host=({'ref': 'host'}, True, None, None), node=(NE, True, 200, None), machine=(NE, True, 100, None))
+assert act_declare_host['rules'] == [{'create_or_modify_object': 'host', 'set': {'node': '$node', 'machine': '$machine', 'declared_at': '$now'}}]
+assert [c['code'] for c in act_observe_host['submission_criteria']] == ['unknown_host', 'seen_at_in_future']
+assert act_observe_host['rules'] == [{'modify_object': 'host', 'set': {'answers': '$answers', 'free': '$free', 'seen_at': '$seen_at', 'cpus': '$cpus', 'load_x100': '$load_x100', 'available_mb': '$available_mb', 'observed_at': '$now'}}]
+assert act_observe_account['rules'][0]['create_or_modify_object'] == 'account' and act_observe_account['rules'][0]['set']['observed_at'] == '$now'
+[by_word] = act_state_allowance['submission_criteria']
+waive_word = [c for c in old['action_types']['waive_criterion']['submission_criteria'] if c['code'] == 'by_not_the_users_word'][0]
+assert by_word['code'] == 'by_not_the_users_word' and by_word['all'] == waive_word['all']
+assert act_state_allowance['rules'] == [{'create_or_modify_object': 'account', 'set': {'allowance': '$allowance', 'allowance_by': '$by', 'allowance_at': '$now'}}]
+capacity_fn, gate_fn = head['functions'].pop('capacity'), head['functions'].pop('gate')
+assert capacity_fn['program'] == gate_fn['program'] == '/usr/local/bin/ap' and capacity_fn['answer_bytes'] == gate_fn['answer_bytes'] == 65536
+assert capacity_fn['timeout_ms'] == 10000 and gate_fn['timeout_ms'] == 600000 and capacity_fn['parameters'] == {}
+assert {n: (p['type'], p['required']) for n, p in gate_fn['parameters'].items()} == dict(since=(UTC, True), intent=('string', False))
+[grant], [grant16] = head['grants'], old['grants']
+assert grant['read'] == grant16['read'] + ['host', 'account', 'host_sample', 'check'] and grant['derive'] == grant16['derive'] + ['host', 'account']
+assert grant['actions'] == grant16['actions'] + ['declare_host', 'observe_host', 'observe_account', 'state_allowance']
+head['grants'] = old['grants']
+assert {k: v for k, v in head.items() if k != 'version'} == {k: v for k, v in old.items() if k != 'version'}
+print('gate_row=v17-only-points-1-to-9 expected=admitted object_types=' + str(len(schema['object_types'])) + ' functions=' + str(len(schema['functions'])))
+# The record sources of the samples and the checks read a directory of the rehearsal's own root.
+resource_dir = pathlib.Path(store).parent / 'resource'
+def resource_copy(path, label, name):
+    out = clause_copy(path, label, name)
+    copy = json.loads(out.read_text())
+    for source, suffix in (('host_samples', '*.samples.jsonl'), ('checks', '*.checks.jsonl')):
+        assert copy['sources'][source]['glob'] == RESOURCE + suffix
+        copy['sources'][source]['glob'] = str(resource_dir) + '/' + suffix
+    assert RESOURCE not in json.dumps(copy['sources'])
+    out.write_text(json.dumps(copy))
+    return out
+call(['schema', 'install', str(resource_copy(pathlib.Path(repo, 'ontology/work.schema.json'), 'repository.json', 'repository-route.json'))])
+redirect.trace(work, copies)
+assert [obj(i) for i in v16_objects] == v16_before
+for view, args, before in v16_views:
+    answer = call(['render'], dict(view=view, args=args))
+    assert answer['rows'] == before['rows'] and answer['markdown'] == before['markdown'].replace('schema=work@16', 'schema=work@17'), view
+print('gate_row=v17-v16-objects-and-views-unchanged expected=admitted objects=' + str(len(v16_objects)) + ' views=' + str(len(v16_views)))
+sizes = []
+for name in ('ont_describe', 'ont_action_list'):
+    wire = subprocess.run([binary, '--store', store, 'mcp'], input=json.dumps(dict(jsonrpc='2.0', id=1, method='tools/call', params=dict(name=name, arguments={}))) + '\n', text=True, capture_output=True, timeout=60)
+    answer = json.loads(wire.stdout.splitlines()[0])['result']; assert wire.returncode == 0 and not answer['isError'], answer
+    sizes.append(len(answer['content'][0]['text'].encode())); assert sizes[-1] <= 262144, (name, sizes[-1])
+print('v17_mcp_bytes=' + ','.join(map(str, sizes)), file=sys.stderr)
+described = call(['describe'], {})
+listed = {f['name']: f for f in described['functions'] if f['domain'] == 'work'}
+assert sorted(listed) == ['capacity', 'clause', 'gate', 'horizon', 'route'], sorted(listed)
+assert all('program' not in f for f in listed.values()) and listed['capacity']['parameters'] == [] and sorted(p['name'] for p in listed['gate']['parameters']) == ['intent', 'since'], listed
+unchanged = fingerprint()
+assert migrate(16, 17) == dict(carried=0, already=0)
+assert migrate(17, 18, 2) == dict(status='unknown_pair')
+assert fingerprint() == unchanged and [obj(i) for i in v16_objects] == v16_before
+print('v17_migration_rows_complete')
+phase = 'v17'
+# The walk of version 17. Each refusal row is before the action it guards; a refusal writes nothing.
+pc, pc_user, local = oid('host', 'pc'), oid('host', 'pc-user'), oid('host', 'local')
+READINGS = ('answers', 'free', 'seen_at', 'cpus', 'load_x100', 'available_mb')
+apply('observe_host', 'unknown', dict(host=pc, answers=True, free=True), 'unknown_host')
+tick(); apply('declare_host', 'pc', dict(host=pc, node='fixture-pc', machine='pc'))
+f = fields(pc); assert f['node'] == 'fixture-pc' and f['machine'] == 'pc' and f['declared_at'] == stamp() and all(f.get(k) is None for k in READINGS + ('observed_at',)), f
+apply('declare_host', 'node-empty', dict(host=pc_user, node='', machine='pc'), 'invalid_parameter')
+apply('observe_host', 'future', dict(host=pc, answers=True, free=True, seen_at=stamp(now + 1)), 'seen_at_in_future')
+tick(); seen = stamp(); apply('observe_host', 'pc', dict(host=pc, answers=True, free=True, seen_at=seen, cpus=8, load_x100=150, available_mb=9000))
+f = fields(pc); assert (f['answers'], f['free'], f['seen_at'], f['cpus'], f['load_x100'], f['available_mb'], f['observed_at']) == (True, True, seen, 8, 150, 9000, stamp()), f
+# A host that does not answer: no reading and no seen_at given, so they stay.
+tick(); apply('observe_host', 'pc-silent', dict(host=pc, answers=False, free=False))
+f = fields(pc); assert (f['answers'], f['free'], f['seen_at'], f['cpus'], f['load_x100'], f['available_mb'], f['observed_at']) == (False, False, seen, 8, 150, 9000, stamp()), f
+# A second declare changes node and machine and keeps the readings; a second node of the machine is a host of its own.
+tick(); apply('declare_host', 'pc-again', dict(host=pc, node='fixture-pc-wsl', machine='fixture-pc-machine'))
+f = fields(pc); assert (f['node'], f['machine'], f['declared_at'], f['answers'], f['seen_at'], f['cpus'], f['available_mb']) == ('fixture-pc-wsl', 'fixture-pc-machine', stamp(), False, seen, 8, 9000), f
+apply('declare_host', 'pc-user', dict(host=pc_user, node='fixture-pc-user', machine='fixture-pc-machine'))
+assert fields(pc_user)['machine'] == fields(pc)['machine'] and fields(pc_user).get('answers') is None
+# Accounts: observe_account makes one and changes its limit; state_allowance makes one no run names.
+acct, stated = oid('account', 'fixture-account'), oid('account', 'fixture-stated')
+tick(); apply('observe_account', 'first', dict(account=acct, runtime='claude'))
+f = fields(acct); assert f['runtime'] == 'claude' and f['observed_at'] == stamp() and f.get('limit') is None, f
+# A run names its host and its account; one without them has neither.
+tick(); with_both = created(apply('start_run', 'v17-host-uses', dict(role='lead', runtime='fixture-cli', model='fixture-model', host=pc, uses=acct)), 'run')
+f = fields(with_both); assert f['host'] == pc and f['uses'] == acct and f['status'] == 'running', f
+without_both = created(apply('start_run', 'v17-no-host', dict(role='lead', runtime='fixture-cli', model='fixture-model')), 'run')
+f = fields(without_both); assert f.get('host') is None and f.get('uses') is None, f
+tick(); apply('observe_account', 'limit', dict(account=acct, limit='{"utilization": 0.5}', limit_at=stamp(), limit_run=with_both))
+f = fields(acct); assert (f['limit'], f['limit_at'], f['limit_run'], f['runtime']) == ('{"utilization": 0.5}', stamp(), with_both, 'claude'), f
+tick(); apply('observe_account', 'limit-again', dict(account=acct, limit='{"utilization": 0.9}', limit_at=stamp()))
+f = fields(acct); assert (f['limit'], f['limit_at'], f['limit_run']) == ('{"utilization": 0.9}', stamp(), with_both), f
+tick(); preference = request('v17-preference', 'preference', topic='v17-accounts')
+apply('state_allowance', 'preference', dict(account=stated, allowance='Five hours a day.', by=preference), 'by_not_the_users_word')
+tick(); word = request('v17-allowance', 'decision', topic='v17-accounts')
+apply('state_allowance', 'stated', dict(account=stated, allowance='Five hours a day.', by=word))
+f = fields(stated); assert (f['allowance'], f['allowance_by'], f['allowance_at']) == ('Five hours a day.', word, stamp()) and f.get('runtime') is None and f.get('limit') is None, f
+print('gate_row=v17-hosts-and-accounts expected=admitted')
+# A sample line and a check line: indexed, read with every property, reached from their host, retracted with their file.
+def resource_index(code=0):
+    p = subprocess.run([binary, '--store', store, '--now', str(now), 'index', '--source', 'host_samples', '--source', 'checks'], text=True, capture_output=True, timeout=60)
+    assert p.returncode == code, (p.returncode, p.stdout, p.stderr)
+    return {s['source']: s for s in json.loads(p.stdout)['result']['sources']}
+def resource_lines(name, records): (resource_dir / name).write_text(''.join(json.dumps(r) + '\n' for r in records))
+assert not resource_dir.exists()
+answer = resource_index(2)
+assert {n: s['code'] for n, s in answer.items()} == dict(host_samples='glob_root_missing', checks='glob_root_missing'), answer
+resource_dir.mkdir()
+tick(); seen = now - 1
+sample = dict(type='host_sample', key='pc@' + str(seen), observed_at=seen, at=stamp(seen), host='pc', answers=True, free=False, cpus=4, load_x100=380,
+              available_mb=1800, slots=3, units_running=3, units_ready=1, cpu_waits=1)
+check = dict(type='check', key='0123456789abcdef0123456789abcdef', observed_at=seen, host='pc', repository=REPO, head='5' * 40, dir='/fixture/wt/widgets',
+             command='./check', start=stamp(seen - 60), end=stamp(seen), exit=0, milliseconds=60000, reason='pc_busy')
+resource_lines('20261112.samples.jsonl', [sample]); resource_lines('log.checks.jsonl', [check])
+answer = resource_index()
+assert (answer['host_samples']['appended']['initial'], answer['checks']['appended']['initial']) == (1, 1), answer
+def got(kind, key): return {k: v.get('value') for k, v in call(['get'], dict(id=oid(kind, key)))['objects'][0]['observations'][-1]['fields'].items()}
+def mapped(record): return dict({k: v for k, v in record.items() if k not in ('type', 'key', 'observed_at')}, host=pc)
+assert got('host_sample', sample['key']) == mapped(sample), got('host_sample', sample['key'])
+assert got('check', check['key']) == mapped(check), got('check', check['key'])
+for path, kind, key in ((['host_samples'], 'host_sample', sample['key']), (['host_checks'], 'check', check['key'])):
+    reached = around('host', {'eq': ['node', 'fixture-pc-wsl']}, path)
+    assert [o['id'] for o in reached['objects']] == [oid(kind, key)] and reached['basis']['matched'] == 1, reached
+print('gate_row=v17-records-indexed expected=admitted samples=1 checks=1')
+(resource_dir / '20261112.samples.jsonl').unlink(); (resource_dir / 'log.checks.jsonl').unlink()
+answer = resource_index()
+assert (answer['host_samples']['appended']['retraction'], answer['checks']['appended']['retraction']) == (1, 1) and heads('host_sample') == {} and heads('check') == {}, answer
+print('gate_row=v17-records-retracted expected=admitted')
+print('v17_gate_rows_complete')
+print('v17 resources: ok')
 PY

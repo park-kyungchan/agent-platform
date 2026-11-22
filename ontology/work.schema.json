@@ -1,7 +1,7 @@
 {
   "format": "ontology-schema/v1",
   "domain": "work",
-  "version": 16,
+  "version": 17,
   "namespace": {
     "instance": "vps://palantirkc",
     "account": "root"
@@ -303,7 +303,9 @@
     },
     "sections": {"kind": "records", "glob": "/var/lib/agent-platform/route/*.sections.jsonl", "time_member": "observed_at", "type_member": "type", "complete_listing": true, "fresh_for_s": 3600},
     "components": {"kind": "records", "glob": "/var/lib/agent-platform/route/*.components.jsonl", "time_member": "observed_at", "type_member": "type", "complete_listing": true, "fresh_for_s": 3600},
-    "clauses": {"kind": "records", "glob": "/var/lib/agent-platform/clause/*.clauses.jsonl", "time_member": "observed_at", "type_member": "type", "complete_listing": true, "fresh_for_s": 3600}
+    "clauses": {"kind": "records", "glob": "/var/lib/agent-platform/clause/*.clauses.jsonl", "time_member": "observed_at", "type_member": "type", "complete_listing": true, "fresh_for_s": 3600},
+    "host_samples": {"kind": "records", "glob": "/var/lib/agent-platform/resource/*.samples.jsonl", "time_member": "observed_at", "type_member": "type", "complete_listing": true, "fresh_for_s": 1728000},
+    "checks": {"kind": "records", "glob": "/var/lib/agent-platform/resource/*.checks.jsonl", "time_member": "observed_at", "type_member": "type", "complete_listing": true, "fresh_for_s": 5184000}
   },
   "object_types": {
     "task": {
@@ -1057,7 +1059,8 @@
         "rollback_content": {"type": {"value_type": "file_path"}, "required": false, "max_bytes": 400, "description": "The tarball of the content that the installer kept."},
         "rolls_back": {"type": {"ref": "install"}, "required": false, "description": "For kind rollback: the attempt whose install it undoes."},
         "code": {"type": "string", "required": false, "max_bytes": 100},
-        "closed_at": {"type": {"value_type": "utc_time"}, "required": false, "max_bytes": 40}
+        "closed_at": {"type": {"value_type": "utc_time"}, "required": false, "max_bytes": 40},
+        "host": {"type": {"ref": "host"}, "required": false}
       }
     },
     "objective": {
@@ -1284,7 +1287,9 @@
         "limit": {"type": "string", "required": false, "max_bytes": 300, "description": "The usage-limit reading as the run record holds it."},
         "record": {"type": {"value_type": "file_path"}, "required": false, "description": "The run record."},
         "stream": {"type": {"value_type": "file_path"}, "required": false, "description": "The raw stream of the run."},
-        "running_in": {"type": {"ref": "unit"}, "required": false, "description": "The unit while the run is running; cleared by close_run."}
+        "running_in": {"type": {"ref": "unit"}, "required": false, "description": "The unit while the run is running; cleared by close_run."},
+        "host": {"type": {"ref": "host"}, "required": false},
+        "uses": {"type": {"ref": "account"}, "required": false}
       }
     },
     "finding": {
@@ -1352,6 +1357,74 @@
         "digest": {"type": {"value_type": "sha256_hex"}, "required": true, "from": "/digest", "description": "SHA-256 of the sentence's lines joined by line feeds."},
         "text": {"type": "string", "required": true, "from": "/text", "max_bytes": 4000, "description": "The words of the sentence's lines, each run of white space one space."},
         "tests": {"type": {"array": "string"}, "required": true, "from": "/tests", "description": "The first 100 citations, path:line, by path then line."}
+      }
+    },
+    "host": {
+      "description": "A tailnet node that runs work: local, the host of the store; a key of the policy's hosts; or a node a Lead declares. Its machine groups the nodes of one computer.",
+      "owner": "ontology",
+      "primary_key": {"from": "/native_key"},
+      "title": "node",
+      "properties": {
+        "node": {"type": "string", "required": true, "max_bytes": 200},
+        "machine": {"type": "string", "required": true, "max_bytes": 100},
+        "declared_at": {"type": {"value_type": "utc_time"}, "required": true},
+        "answers": {"type": "boolean", "required": false},
+        "free": {"type": "boolean", "required": false},
+        "observed_at": {"type": {"value_type": "utc_time"}, "required": false},
+        "seen_at": {"type": {"value_type": "utc_time"}, "required": false},
+        "cpus": {"type": "integer", "required": false},
+        "load_x100": {"type": "integer", "required": false},
+        "available_mb": {"type": "integer", "required": false}
+      }
+    },
+    "account": {
+      "description": "An account of a runtime, keyed by the last path component of its directory: the allowance its newest run reports, or one the user states (specs/ap/resource.md).",
+      "owner": "ontology",
+      "primary_key": {"from": "/native_key"},
+      "properties": {
+        "runtime": {"type": "string", "required": false, "max_bytes": 40},
+        "limit": {"type": "string", "required": false, "max_bytes": 300},
+        "limit_at": {"type": {"value_type": "utc_time"}, "required": false},
+        "limit_run": {"type": {"ref": "run"}, "required": false},
+        "observed_at": {"type": {"value_type": "utc_time"}, "required": false},
+        "allowance": {"type": "string", "required": false, "max_bytes": 300},
+        "allowance_at": {"type": {"value_type": "utc_time"}, "required": false},
+        "allowance_by": {"type": {"ref": "request"}, "required": false}
+      }
+    },
+    "host_sample": {
+      "description": "One reading of one host by one pass of ap resource (specs/ap/resource.md R6). Key: <host>@<seconds>.",
+      "owner": {"source": "host_samples"},
+      "primary_key": {"from": "/key"},
+      "properties": {
+        "host": {"type": {"ref": "host"}, "required": true, "from": "/host"},
+        "at": {"type": {"value_type": "utc_time"}, "required": true, "from": "/at"},
+        "answers": {"type": "boolean", "required": true, "from": "/answers"},
+        "free": {"type": "boolean", "required": true, "from": "/free"},
+        "cpus": {"type": "integer", "required": false, "from": "/cpus"},
+        "load_x100": {"type": "integer", "required": false, "from": "/load_x100"},
+        "available_mb": {"type": "integer", "required": false, "from": "/available_mb"},
+        "slots": {"type": "integer", "required": false, "from": "/slots"},
+        "units_running": {"type": "integer", "required": false, "from": "/units_running"},
+        "units_ready": {"type": "integer", "required": false, "from": "/units_ready"},
+        "cpu_waits": {"type": "integer", "required": false, "from": "/cpu_waits"}
+      }
+    },
+    "check": {
+      "description": "One call of ap check as its record line holds it (specs/ap/check.md R15, specs/ap/resource.md R7). Key: the first 32 hex digits of the SHA-256 of the line.",
+      "owner": {"source": "checks"},
+      "primary_key": {"from": "/key"},
+      "properties": {
+        "host": {"type": {"ref": "host"}, "required": true, "from": "/host"},
+        "repository": {"type": "string", "required": true, "from": "/repository"},
+        "head": {"type": "string", "required": true, "from": "/head"},
+        "dir": {"type": "string", "required": true, "from": "/dir"},
+        "command": {"type": "string", "required": true, "from": "/command", "max_bytes": 1000},
+        "end": {"type": {"value_type": "utc_time"}, "required": true, "from": "/end"},
+        "exit": {"type": "integer", "required": true, "from": "/exit"},
+        "milliseconds": {"type": "integer", "required": true, "from": "/milliseconds"},
+        "reason": {"type": "string", "required": false, "from": "/reason", "max_bytes": 40},
+        "start": {"type": {"value_type": "utc_time"}, "required": false, "from": "/start"}
       }
     }
   },
@@ -1571,7 +1644,14 @@
     "principle_parent": {"from": "principle", "via": "parent", "to": "principle", "cardinality": "many_to_one", "names": {"forward": "principle_parent", "reverse": "principle_children"}},
     "principle_requests": {"from": "principle", "via": "requests", "to": "request", "cardinality": "many_to_many", "names": {"forward": "principle_requests", "reverse": "request_principles"}},
     "intent_principles": {"from": "intent", "via": "principles", "to": "principle", "cardinality": "many_to_many", "names": {"forward": "intent_principles", "reverse": "principle_intents"}},
-    "unit_clauses": {"from": "unit", "via": "clauses", "to": "clause", "cardinality": "many_to_many", "names": {"forward": "unit_clauses", "reverse": "clause_units"}}
+    "unit_clauses": {"from": "unit", "via": "clauses", "to": "clause", "cardinality": "many_to_many", "names": {"forward": "unit_clauses", "reverse": "clause_units"}},
+    "run_host": {"from": "run", "via": "host", "to": "host", "cardinality": "many_to_one", "names": {"forward": "run_host", "reverse": "host_runs"}},
+    "run_account": {"from": "run", "via": "uses", "to": "account", "cardinality": "many_to_one", "names": {"forward": "run_account", "reverse": "account_runs"}},
+    "install_host": {"from": "install", "via": "host", "to": "host", "cardinality": "many_to_one", "names": {"forward": "install_host", "reverse": "host_installs"}},
+    "host_sample_host": {"from": "host_sample", "via": "host", "to": "host", "cardinality": "many_to_one", "names": {"forward": "host_sample_host", "reverse": "host_samples"}},
+    "check_host": {"from": "check", "via": "host", "to": "host", "cardinality": "many_to_one", "names": {"forward": "check_host", "reverse": "host_checks"}},
+    "account_limit_run": {"from": "account", "via": "limit_run", "to": "run", "cardinality": "many_to_one", "names": {"forward": "account_limit_run", "reverse": "run_account_limits"}},
+    "account_allowance_by": {"from": "account", "via": "allowance_by", "to": "request", "cardinality": "many_to_one", "names": {"forward": "account_allowance_by", "reverse": "request_allowances"}}
   },
   "action_types": {
     "set_hold": {
@@ -2820,7 +2900,8 @@
         "past": {"type": "string", "required": false, "max_bytes": 2049},
         "reason": {"type": "string", "required": false, "max_bytes": 400},
         "from_sha256": {"type": {"value_type": "sha256_hex"}, "required": false},
-        "rolls_back": {"type": {"ref": "install"}, "required": false}
+        "rolls_back": {"type": {"ref": "install"}, "required": false},
+        "host": {"type": {"ref": "host"}, "required": false}
       },
       "submission_criteria": [
         {"code": "unknown_target", "message": "Choose an existing installed file.", "all": [{"exists": "$target"}]},
@@ -2862,7 +2943,8 @@
             "rolls_back": "$rolls_back",
             "status": "running",
             "started_at": "$now",
-            "running_in": "$target"
+            "running_in": "$target",
+            "host": "$host"
           }
         }
       ]
@@ -3937,14 +4019,16 @@
         "account": {"type": "string", "required": false, "max_bytes": 200, "description": "The account the run used."},
         "session": {"type": "string", "required": false, "max_bytes": 200, "description": "The session of the run."},
         "record": {"type": {"value_type": "file_path"}, "required": false, "description": "The run record."},
-        "stream": {"type": {"value_type": "file_path"}, "required": false, "description": "The raw stream of the run."}
+        "stream": {"type": {"value_type": "file_path"}, "required": false, "description": "The raw stream of the run."},
+        "host": {"type": {"ref": "host"}, "required": false},
+        "uses": {"type": {"ref": "account"}, "required": false}
       },
       "submission_criteria": [
         {"code": "unknown_unit", "message": "Name an existing unit (search unit).", "none": [{"all": [{"present": "$unit"}, {"none": [{"exists": "$unit"}]}]}]},
         {"code": "unknown_intent", "message": "Name an existing intent (search intent).", "none": [{"all": [{"present": "$intent"}, {"none": [{"exists": "$intent"}]}]}]}
       ],
       "rules": [
-        {"create_object": "run", "set": {"unit": "$unit", "intent": "$intent", "role": "$role", "runtime": "$runtime", "model": "$model", "effort": "$effort", "account": "$account", "session": "$session", "record": "$record", "stream": "$stream", "status": "running", "started_at": "$now", "running_in": "$unit"}}
+        {"create_object": "run", "set": {"unit": "$unit", "intent": "$intent", "role": "$role", "runtime": "$runtime", "model": "$model", "effort": "$effort", "account": "$account", "session": "$session", "record": "$record", "stream": "$stream", "status": "running", "started_at": "$now", "running_in": "$unit", "host": "$host", "uses": "$uses"}}
       ]
     },
     "close_run": {
@@ -4187,6 +4271,65 @@
       "rules": [
         {"modify_object": "intent", "set": {"principles": "$principles"}}
       ]
+    },
+    "declare_host": {
+      "description": "Declare a host: its tailnet node and the machine it is a node of. A second declare changes node and machine and keeps the readings.",
+      "parameters": {
+        "host": {"type": {"ref": "host"}, "required": true},
+        "node": {"type": {"value_type": "nonempty_text"}, "required": true, "max_bytes": 200},
+        "machine": {"type": {"value_type": "nonempty_text"}, "required": true, "max_bytes": 100}
+      },
+      "submission_criteria": [],
+      "rules": [
+        {"create_or_modify_object": "host", "set": {"node": "$node", "machine": "$machine", "declared_at": "$now"}}
+      ]
+    },
+    "observe_host": {
+      "description": "Record what one pass of ap resource read of a declared host: whether it answers and is free, and its readings; a reading not given stays.",
+      "parameters": {
+        "host": {"type": {"ref": "host"}, "required": true},
+        "answers": {"type": "boolean", "required": true},
+        "free": {"type": "boolean", "required": true},
+        "seen_at": {"type": {"value_type": "utc_time"}, "required": false},
+        "cpus": {"type": "integer", "required": false},
+        "load_x100": {"type": "integer", "required": false},
+        "available_mb": {"type": "integer", "required": false}
+      },
+      "submission_criteria": [
+        {"code": "unknown_host", "message": "Declare the host first (declare_host).", "all": [{"exists": "$host"}]},
+        {"code": "seen_at_in_future", "message": "seen_at is after now: give the UTC time the host answered.", "none": [{"all": [{"present": "$seen_at"}, {"gt": ["$seen_at", "$now"]}]}]}
+      ],
+      "rules": [
+        {"modify_object": "host", "set": {"answers": "$answers", "free": "$free", "seen_at": "$seen_at", "cpus": "$cpus", "load_x100": "$load_x100", "available_mb": "$available_mb", "observed_at": "$now"}}
+      ]
+    },
+    "observe_account": {
+      "description": "Record an account and the usage-limit reading of the newest run that reports one (ap resource); a member not given stays.",
+      "parameters": {
+        "account": {"type": {"ref": "account"}, "required": true},
+        "runtime": {"type": "string", "required": false, "max_bytes": 40},
+        "limit": {"type": {"value_type": "nonempty_text"}, "required": false, "max_bytes": 300},
+        "limit_at": {"type": {"value_type": "utc_time"}, "required": false},
+        "limit_run": {"type": {"ref": "run"}, "required": false}
+      },
+      "submission_criteria": [],
+      "rules": [
+        {"create_or_modify_object": "account", "set": {"runtime": "$runtime", "limit": "$limit", "limit_at": "$limit_at", "limit_run": "$limit_run", "observed_at": "$now"}}
+      ]
+    },
+    "state_allowance": {
+      "description": "The user states an account's allowance, for an account whose runs report none: name the user's request that says so.",
+      "parameters": {
+        "account": {"type": {"ref": "account"}, "required": true},
+        "allowance": {"type": {"value_type": "nonempty_text"}, "required": true, "max_bytes": 300},
+        "by": {"type": {"ref": "request"}, "required": true}
+      },
+      "submission_criteria": [
+        {"code": "by_not_the_users_word", "message": "by must be a current request of kind decision, order or answer: the user's own word.", "all": [{"exists": "$by"}, {"eq": ["$by.status", "current"]}, {"in": ["$by.kind", ["decision", "order", "answer"]]}]}
+      ],
+      "rules": [
+        {"create_or_modify_object": "account", "set": {"allowance": "$allowance", "allowance_by": "$by", "allowance_at": "$now"}}
+      ]
     }
   },
   "functions": {
@@ -4217,6 +4360,23 @@
       "program": "/usr/local/bin/ap",
       "answer_bytes": 65536,
       "timeout_ms": 10000
+    },
+    "capacity": {
+      "description": "What can start now and where: each host's last observation, each machine counted once, each account's allowance (specs/ap/resource.md R12).",
+      "parameters": {},
+      "program": "/usr/local/bin/ap",
+      "answer_bytes": 65536,
+      "timeout_ms": 10000
+    },
+    "gate": {
+      "description": "The seven gates of the slots procedure since a time, from samples, checks, runs and reviews (specs/ap/resource.md R13 to R16).",
+      "parameters": {
+        "since": {"type": {"value_type": "utc_time"}, "required": true},
+        "intent": {"type": "string", "required": false}
+      },
+      "program": "/usr/local/bin/ap",
+      "answer_bytes": 65536,
+      "timeout_ms": 600000
     }
   },
   "grants": [
@@ -4251,7 +4411,11 @@
         "principle",
         "section",
         "component",
-        "clause"
+        "clause",
+        "host",
+        "account",
+        "host_sample",
+        "check"
       ],
       "derive": [
         "hold",
@@ -4270,7 +4434,9 @@
         "unit",
         "run",
         "finding",
-        "principle"
+        "principle",
+        "host",
+        "account"
       ],
       "actions": [
         "set_hold",
@@ -4360,7 +4526,11 @@
         "record_principle",
         "amend_principle",
         "retire_principle",
-        "set_intent_principles"
+        "set_intent_principles",
+        "declare_host",
+        "observe_host",
+        "observe_account",
+        "state_allowance"
       ]
     }
   ],
