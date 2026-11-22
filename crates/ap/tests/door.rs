@@ -7,6 +7,11 @@
 //! built `ap` with `AP_DOOR`, or a socket of the test that speaks the door's bytes. Nothing here
 //! reaches the host's store, the real `ont`, the tailnet, the host's policy file or a file under
 //! `/var/lib/agent-platform`.
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "a test fails by panicking, so an unwrap or an expect in its helpers is how it reports"
+)]
 #[path = "fixtures/work/forks.rs"]
 mod forks;
 use ap::host::{Answer, Failure, Host, Reply, System};

@@ -1,5 +1,10 @@
 //! `ap --help` lists the verbs the command dispatches, each with its request form and the heading of
 //! the README section that documents it.
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "a test fails by panicking, so an unwrap or an expect in its helpers is how it reports"
+)]
 use std::{collections::BTreeSet, process::Command};
 
 fn ap(args: &[&str]) -> std::process::Output {

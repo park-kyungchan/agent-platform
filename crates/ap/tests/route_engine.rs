@@ -7,6 +7,11 @@
 //! The engine admits only uid 0, so these tests are ignored by the plain `cargo test`: `./check` builds them
 //! with `cargo test --no-run` and runs the test binary with `--ignored`, the engine in `ONT_BIN`, through
 //! `sudo` in CI.
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "a test fails by panicking, so an unwrap or an expect in its helpers is how it reports"
+)]
 use serde_json::{Value, json};
 use std::{
     os::unix::fs::PermissionsExt,

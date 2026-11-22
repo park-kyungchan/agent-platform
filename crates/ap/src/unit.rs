@@ -471,7 +471,10 @@ impl Unit {
     fn end(&mut self, result: &str, detail: Value) {
         let name = std::mem::take(&mut self.rec["step"]);
         let step = json!({"name": name, "result": result, "start": self.started, "end": now(), "detail": detail});
-        self.rec["steps"].as_array_mut().unwrap().push(step);
+        match self.rec["steps"].as_array_mut() {
+            Some(steps) => steps.push(step),
+            None => self.rec["steps"] = json!([step]),
+        }
         self.save();
     }
     fn step(&mut self, name: &str, f: impl FnOnce(&mut Self) -> Step) -> Result<(), Stop> {

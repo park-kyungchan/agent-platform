@@ -321,7 +321,10 @@ fn lead_in_environment(s: &impl System) -> bool {
 }
 /// One apply of a plan with the request id `<request_id>-<name>`, then its object read back: its key,
 /// the outcome and the fields read.
-#[allow(clippy::too_many_arguments)]
+#[allow(
+    clippy::too_many_arguments,
+    reason = "one apply of a plan reads each of its parts as its own argument"
+)]
 fn step<S: System>(
     s: &mut S,
     store: Option<&str>,

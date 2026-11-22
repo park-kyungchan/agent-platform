@@ -3115,6 +3115,11 @@ pub fn execute(s: &mut impl System, r: &Value) -> Result<(Value, u8), Failure> {
         // The scratch directory: made once, after the claim and before the first launch (R4).
         let scratch = q.limits.as_ref().map(|l| l.scratch.as_str());
         let (made, ready) = scratch.map_or((false, true), make_scratch);
+        // Only the call whose `mkdir` made it removes it, after its last launch (R8): the guard is
+        // dropped where the removal runs, and on a panic that unwinds out of this block.
+        let removal = scratch
+            .filter(|_| made)
+            .map(|scratch| std::mem::DropGuard::new(scratch, remove_scratch));
         // The door: opened after the scratch directory and before the first launch; one that cannot
         // be opened is a scratch directory that cannot be made (R13, `specs/ap/door.md` R1).
         let mut door = None;
@@ -3220,10 +3225,7 @@ pub fn execute(s: &mut impl System, r: &Value) -> Result<(Value, u8), Failure> {
         if let Some(door) = door {
             door.close();
         }
-        // Only the call whose `mkdir` made it removes it, after its last launch (R8).
-        if let Some(scratch) = scratch.filter(|_| made) {
-            remove_scratch(scratch);
-        }
+        drop(removal);
     } else {
         last = json!({"state": "failed", "unmet": "launch", "account": accounts[0]});
         let _ = persist(&q.out, &last);

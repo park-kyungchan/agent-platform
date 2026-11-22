@@ -4,6 +4,11 @@
 //! PC), its `/proc/meminfo` and Windows' PowerShell mapped to files of the fake PC; a stand-in `bwrap` on the fake PC's PATH that changes directory, sets the variables and links the tree's `.git`
 //! to its repository, and touches no other path (two tests run the real `bwrap` instead). Every path is under a scratch directory: the policy
 //! file, the record file, the build lock and the PC's work directory.
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "a test fails by panicking, so an unwrap or an expect in its helpers is how it reports"
+)]
 use serde_json::Value;
 use sha2::{Digest, Sha256};
 use std::{

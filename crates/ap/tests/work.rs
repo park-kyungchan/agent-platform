@@ -3,6 +3,11 @@
 //! list-units`, `systemd-run`, `git check-ref-format`, `/proc/stat` and the control group's file itself.
 //! The policy file and the units directory are under a temporary directory: no test starts a unit of
 //! the service manager or reaches the host's store, policy file or units directory.
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "a test fails by panicking, so an unwrap or an expect in its helpers is how it reports"
+)]
 #[path = "fixtures/work/forks.rs"]
 mod forks;
 use ap::host::{Answer, Failure, Reply, System};

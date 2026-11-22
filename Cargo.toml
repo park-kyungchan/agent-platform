@@ -23,4 +23,11 @@ missing_lints_inheritance = "deny"
 unsafe_code = "forbid"
 
 [workspace.lints.clippy]
-all = "warn"
+all = { level = "warn", priority = -1 }
+unwrap_used = "deny"
+expect_used = "deny"
+allow_attributes_without_reason = "deny"
+
+[profile.mutants]
+inherits = "test"
+debug = "none"

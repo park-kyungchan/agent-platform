@@ -2,6 +2,11 @@
 //! from invented repositories and `ont` (`index`, `search`) as the engine answers. The directory each test
 //! writes is a temporary one; no test reaches a clone, the policy file or the store of this host. The tests
 //! that run the real engine are `route_engine.rs`.
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "a test fails by panicking, so an unwrap or an expect in its helpers is how it reports"
+)]
 use ap::host::{Answer, Reply, System};
 use ap::route;
 use serde_json::{Value, json};

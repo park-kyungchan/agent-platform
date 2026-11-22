@@ -7,6 +7,11 @@
 //! `systemctl` and the unit launcher replaced as in tests/run.rs. The policy file and the reviews
 //! directory are under a temporary directory: no test starts a unit of the service manager or reaches
 //! the host's store, policy file or reviews directory.
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "a test fails by panicking, so an unwrap or an expect in its helpers is how it reports"
+)]
 use ap::host::{Answer, Failure, Host, Reply, System};
 use ap::unit::page_review::{Refusal, arguments, execute};
 use ap::unit::render::{Role, page, page_digest, page_part};

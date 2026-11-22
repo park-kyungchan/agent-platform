@@ -1,6 +1,11 @@
 //! The page's block and `ap accept` (README "The page's block"): the binary runs in a scratch Git
 //! repository of its own under a temporary directory, with a page file beside it; `origin/main` is a
 //! ref of that repository. No test reads or writes this repository's Git state.
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "a test fails by panicking, so an unwrap or an expect in its helpers is how it reports"
+)]
 use serde_json::{Value, json};
 use std::{
     path::PathBuf,

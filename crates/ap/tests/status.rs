@@ -2,6 +2,11 @@
 //! repository's own schema: which properties are required (a filter on another is answered as not
 //! qualified, as the engine does), which types grant a derive, the enumerations, pages of 15 objects,
 //! views with escaped cells, and an envelope with the engine's clock. Every object is invented.
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "a test fails by panicking, so an unwrap or an expect in its helpers is how it reports"
+)]
 use ap::{
     host::{Answer, Failure, Reply, System},
     status::{Call, execute, parse, text_of},

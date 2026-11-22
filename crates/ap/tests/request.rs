@@ -1,6 +1,11 @@
 //! `ap request` (README "One request", `specs/ap/request.md`) against a fake of `ont` that answers as
 //! the engine does, and a session record of invented lines (`fixtures/request/session.jsonl`) under the
 //! fake's own home.
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "a test fails by panicking, so an unwrap or an expect in its helpers is how it reports"
+)]
 use ap::{
     host::{Answer, Failure, Reply, System},
     request::{Refusal, execute, hook, is_hook, text},

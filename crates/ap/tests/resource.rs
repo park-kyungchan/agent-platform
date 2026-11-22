@@ -4,6 +4,11 @@
 //! `PATH` its environment gives. Each test writes under a temporary directory of its own; no test reaches the host's
 //! store, policy file, checks log, resource directory or the real `tailscale`. The tests marked `#[ignore]` run the
 //! real engine in a scratch store (`./check` runs them with `--ignored` and `ONT_BIN`).
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "a test fails by panicking, so an unwrap or an expect in its helpers is how it reports"
+)]
 use ap::host::{Answer, Failure, Reply, System};
 use ap::resource::{self, Options};
 use serde_json::{Map, Value, json};

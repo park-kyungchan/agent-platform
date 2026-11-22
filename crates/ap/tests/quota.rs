@@ -1,6 +1,11 @@
 //! `ap quota` against a fake host (`specs/ap/quota.md`): the fake answers `systemctl`, `/proc/stat` and
 //! the control group's file itself, and nothing here starts a unit, sets a property or reads the
 //! host's own load.
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "a test fails by panicking, so an unwrap or an expect in its helpers is how it reports"
+)]
 use ap::host::{Answer, Failure, Reply, System};
 use ap::quota::{execute, exit_status, load};
 use serde_json::{Value, json};

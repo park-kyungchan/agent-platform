@@ -1024,7 +1024,10 @@ fn on_pc(
 }
 
 /// The record line (R15); a write that fails is said on standard error and changes no exit status.
-#[allow(clippy::too_many_arguments)]
+#[allow(
+    clippy::too_many_arguments,
+    reason = "the record line is one value of each part of the run, named at the call"
+)]
 fn record(
     ctx: &Ctx,
     start: SystemTime,

@@ -1,5 +1,10 @@
 //! The items of `ap::host` that the verbs share: the real `Host`, the JSON command line and the
 //! session id that `ap run` takes from the kernel.
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "a test fails by panicking, so an unwrap or an expect in its helpers is how it reports"
+)]
 use ap::host::{Answer, Host, System};
 use serde_json::{Value, json};
 use std::{
