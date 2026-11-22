@@ -1,0 +1,221 @@
+#!/usr/bin/env -S python3 -I -B
+"""The drift job's reader: one result file of the drift job's requests read against the builder's groups.json into at
+most ten new findings of detector `batch:drift` and severity `info`, one per requirement.
+
+  read --groups <groups.json> --results <file> [--store <path>]
+
+The engine is ONT_BIN (default `ont`). Prints one JSON line; writes no file. Calls no model and no network; starts no
+program but the engine. Every refusal is {"status":"<code>"} with exit 2; a store that cannot be searched is
+{"status":"store_failed"} with exit 3. Contract: evals/batch/README.md.
+"""
+import argparse
+import importlib.machinery
+import importlib.util
+import json
+import os
+import re
+import sys
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+
+
+def load_lib():
+    loader = importlib.machinery.SourceFileLoader("batch_lib", os.path.join(HERE, "..", "lib.py"))
+    mod = importlib.util.module_from_spec(importlib.util.spec_from_loader("batch_lib", loader))
+    loader.exec_module(mod)
+    return mod
+
+
+L = load_lib()
+
+DETECTOR = "batch:drift"
+AGENT = "batch-drift"
+PREFIX = "bd-"
+EVIDENCE = 2000
+SUMMARY = 600
+HEX64 = re.compile(r"^[0-9a-f]{64}$")
+COMMIT = re.compile(r"^(?:[0-9a-f]{40}|[0-9a-f]{64})$")
+REPO_NAME = re.compile(r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$")
+RULE = re.compile(r"^R([0-9]+)$")
+TEST = re.compile(r"^(.+):([0-9]+)$")
+SIGNATURE = re.compile(r"^([A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+):(specs/.+\.md)#R([0-9]+)$")
+STATES = ("requested", "settled", "too_large")
+
+
+class Parser(argparse.ArgumentParser):
+    def error(self, message):
+        raise L.Refuse("usage")
+
+
+def parse(argv):
+    p = Parser(add_help=False, allow_abbrev=False)
+    p.add_argument("--groups", required=True)
+    p.add_argument("--results", required=True)
+    p.add_argument("--store")
+    a = p.parse_args(argv)
+    if not a.groups or not a.results or a.store == "":
+        raise L.Refuse("usage")
+    return a
+
+
+def load_groups(path):
+    """groups.json in the form the builder writes; refuses `groups_unreadable`, and `academy_path` for a path of
+    the Academy it names."""
+    try:
+        with open(path, encoding="utf-8") as f:
+            doc = json.load(f)
+    except (OSError, ValueError):
+        raise L.Refuse("groups_unreadable")
+
+    def bad():
+        raise L.Refuse("groups_unreadable")
+
+    if not isinstance(doc, dict) or doc.get("job") != "drift" or not isinstance(doc.get("model"), str):
+        bad()
+    groups = doc.get("groups")
+    if not isinstance(groups, list):
+        bad()
+    keys, commits, rules_of = set(), {}, set()
+    for g in groups:
+        if not isinstance(g, dict) or set(g) != {"key", "repository", "commit", "path", "rules", "state"}:
+            bad()
+        if not (isinstance(g["key"], str) and HEX64.match(g["key"]) and isinstance(g["repository"], str)
+                and REPO_NAME.match(g["repository"]) and isinstance(g["commit"], str) and COMMIT.match(g["commit"])
+                and isinstance(g["path"], str) and g["path"].startswith("specs/") and g["path"].endswith(".md")
+                and g["state"] in STATES and isinstance(g["rules"], list) and 1 <= len(g["rules"]) <= 12):
+            bad()
+        if g["key"] in keys or commits.setdefault(g["repository"], g["commit"]) != g["commit"]:
+            bad()
+        keys.add(g["key"])
+        L.refuse_academy(g["repository"])
+        L.refuse_academy(g["path"])
+        for r in g["rules"]:
+            if not isinstance(r, dict) or set(r) != {"rule", "line", "tests"}:
+                bad()
+            if not (isinstance(r["rule"], str) and RULE.match(r["rule"]) and isinstance(r["line"], int)
+                    and isinstance(r["tests"], list) and all(isinstance(t, str) and TEST.match(t) for t in r["tests"])):
+                bad()
+            sig = signature(g, r["rule"])
+            if sig in rules_of:
+                bad()
+            rules_of.add(sig)
+            for t in r["tests"]:
+                L.refuse_academy(t)
+    return groups, commits, rules_of
+
+
+def signature(group, rule):
+    return f"{group['repository']}:{group['path']}#{rule}"
+
+
+def finding_key(sig):
+    return "batch-drift-" + L.sha256(sig)[:16]
+
+
+def judge(group, verdict):
+    """Per rule of the group: (rule, signal or None, named tests, why, judged)."""
+    entries = {}
+    for e in verdict["rules"]:
+        entries.setdefault(e["rule"], []).append(e)
+    out = []
+    for r in group["rules"]:
+        rule, tests = r["rule"], r["tests"]
+        mine = entries.get(rule, [])
+        why = mine[0]["why"] if len(mine) == 1 else ""
+        named = []
+        if len(mine) == 1:
+            named = [t for t in tests if t in set(mine[0]["tests"])]
+        if not tests:
+            out.append((rule, "untested", named, why or "no citing test names this requirement", True))
+        elif len(mine) != 1:
+            out.append((rule, None, [], "", False))
+        elif mine[0]["verdict"] == "tested":
+            out.append((rule, None, [], "", True))
+        elif mine[0]["verdict"] == "untested":
+            out.append((rule, "untested", named, why, True))
+        elif named:
+            out.append((rule, "miscited", named, why, True))
+        else:
+            out.append((rule, None, [], "", False))
+    return out
+
+
+def run(argv):
+    a = parse(argv)
+    for p in (a.groups, a.results, a.store):
+        if p is not None:
+            L.refuse_academy(p)
+    groups_path, results_path = L.resolve(a.groups), L.resolve(a.results)
+    store = L.resolve(a.store) if a.store is not None else None
+    groups, commits, rules_of = load_groups(groups_path)
+    lines = L.result_lines(results_path)
+    with open(os.path.join(HERE, "verdict.schema.json"), encoding="utf-8") as f:
+        schema = json.load(f)
+
+    counts = {k: 0 for k in ("read", "refused", "errored", "unreadable", "stale", "duplicate", "skipped", "unjudged")}
+    by_key = {g["key"]: g for g in groups}
+    chosen = {}  # key -> index of the counted line
+    for i, parsed in enumerate(lines):
+        if parsed is None:
+            counts["skipped"] += 1
+            continue
+        k, result = parsed
+        if k not in by_key:
+            counts["stale"] += 1
+            continue
+        if k not in chosen or (result["type"] == "succeeded" and lines[chosen[k]][1]["type"] != "succeeded"):
+            chosen[k] = i
+    verdicts = {}
+    for k, i in chosen.items():
+        how, verdict = L.answer(lines[i][1], schema)
+        counts[how] += 1
+        if how == "read":
+            verdicts[k] = verdict
+    counted = len(lines) - counts["skipped"] - counts["stale"]
+    counts["duplicate"] = counted - len(chosen)
+
+    p = L.Pass(L.Engine(store, AGENT), DETECTOR, AGENT, PREFIX)
+    p.load()
+    for g in groups:
+        if g["key"] not in verdicts:
+            continue
+        for rule, sig_kind, named, why, judged in judge(g, verdicts[g["key"]]):
+            sig = signature(g, rule)
+            fk = finding_key(sig)
+            if not judged:
+                counts["unjudged"] += 1
+                continue
+            if sig_kind is None:
+                p.close(fk, g["key"], f"not shown by batch drift, key {g['key']}, commit {g['commit']}")
+                continue
+            if sig_kind == "untested":
+                summary = f"{sig} untested: no citing test tests this requirement"
+            else:
+                m = len(next(r for r in g["rules"] if r["rule"] == rule)["tests"])
+                summary = f"{sig} miscited: {len(named)} of {m} citing tests do not test this requirement"
+            evidence = (f"key {g['key']} commit {g['commit']}; tests {' '.join(named) if named else 'none'}; "
+                        f"why {L.plain(why)}")
+            fields = {"kind": "drift", "severity": "info", "summary": L.cut(summary, SUMMARY),
+                      "evidence": L.cut(evidence, EVIDENCE)}
+            p.signal(fk, g["key"], fields)
+    # A requirement that left the specs: from groups.json alone, at every call.
+    gone = []
+    for fk, f in p.found.items():
+        summary = f.get("summary")
+        if not isinstance(summary, str) or not summary.split():
+            continue
+        m = SIGNATURE.match(summary.split()[0])
+        if m and m.group(1) in commits and summary.split()[0] not in rules_of:
+            gone.append((summary.split()[0], fk, m.group(1)))
+    for sig, fk, repo in sorted(gone):
+        p.close(fk, commits[repo], f"the requirement is not in the specs at {commits[repo]}")
+
+    done = p.answer()
+    answer = {"status": "ok", "lines": len(lines), **counts, **done}
+    order = ["status", "lines", "read", "refused", "errored", "unreadable", "stale", "duplicate", "skipped",
+             "unjudged", "opened", "seen", "reopened", "closed", "dismissed", "over_cap", "already_applied", "failed"]
+    return {k: answer[k] for k in order}, (1 if done["failed"] else 0)
+
+
+if __name__ == "__main__":
+    sys.exit(L.main(run))
