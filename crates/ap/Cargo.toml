@@ -8,7 +8,7 @@ publish = false
 [dependencies]
 serde.workspace = true
 serde_json.workspace = true
-rustix.workspace = true
+rustix = { workspace = true, features = ["thread"] }
 sha2.workspace = true
 
 [lints]

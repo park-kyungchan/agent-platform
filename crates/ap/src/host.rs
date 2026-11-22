@@ -5,8 +5,11 @@ use sha2::{Digest, Sha256};
 use std::{
     ffi::OsString,
     io::{Read, Write},
+    net::{IpAddr, Ipv4Addr, SocketAddr, TcpListener, TcpStream},
+    os::fd::OwnedFd,
     path::{Path, PathBuf},
     process::{Command, ExitCode, Stdio},
+    sync::Arc,
     time::{Duration, Instant},
 };
 
@@ -34,6 +37,104 @@ pub struct Reply {
     pub stdout: Vec<u8>,
 }
 pub type Answer = Result<Reply, Failure>;
+/// The network of a stage with `limits` (`specs/ap/run-limits.md` R17): the proxy's listener and,
+/// when the port made one, a handle of the network namespace the listener lies in, which every
+/// launch of the call enters.
+pub struct Network {
+    pub listener: TcpListener,
+    pub namespace: Option<OwnedFd>,
+}
+/// The proxy's way out (`specs/ap/run-limits.md` R18), shared by its threads: a name resolved to
+/// its addresses, and a TCP connection to one address within a bound, both from the host's
+/// namespace.
+pub trait WayOut: Send + Sync {
+    fn resolve(&self, name: &str) -> std::io::Result<Vec<IpAddr>>;
+    fn connect(&self, address: SocketAddr, within: Duration) -> std::io::Result<TcpStream>;
+}
+/// The host's way out: the system resolver and a connection with a timeout.
+pub struct HostWay;
+impl WayOut for HostWay {
+    fn resolve(&self, name: &str) -> std::io::Result<Vec<IpAddr>> {
+        use std::net::ToSocketAddrs;
+        let mut found: Vec<IpAddr> = vec![];
+        for a in (name, 443).to_socket_addrs()? {
+            if !found.contains(&a.ip()) {
+                found.push(a.ip());
+            }
+        }
+        Ok(found)
+    }
+    fn connect(&self, address: SocketAddr, within: Duration) -> std::io::Result<TcpStream> {
+        TcpStream::connect_timeout(&address, within)
+    }
+}
+/// A listener on 127.0.0.1, on a port the kernel chooses, of the caller's own namespace, and no
+/// handle: what `System::network` answers unless the port makes a namespace.
+pub fn loopback() -> std::io::Result<Network> {
+    Ok(Network {
+        listener: TcpListener::bind((Ipv4Addr::LOCALHOST, 0))?,
+        namespace: None,
+    })
+}
+/// The program that makes the stage's namespace: util-linux `unshare --net` runs a shell there
+/// that brings `lo` up, says so, and waits on its input while the handle is opened.
+const UNSHARE: [&str; 6] = [
+    "/usr/bin/unshare",
+    "--net",
+    "--",
+    "/bin/sh",
+    "-c",
+    "ip link set lo up || exit 1; echo up; exec cat",
+];
+/// The stage's own network (`specs/ap/run-limits.md` R17): a new network namespace with `lo` up,
+/// held by a handle opened from the helper that made it, and the proxy's listener bound in it by
+/// a short thread that enters it and ends; the calling thread never enters it.
+fn stage_network() -> std::io::Result<Network> {
+    let mut helper = Command::new(UNSHARE[0])
+        .args(&UNSHARE[1..])
+        .env_clear()
+        .env("PATH", "/usr/sbin:/usr/bin:/sbin:/bin")
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::null())
+        .spawn()?;
+    let made = (|| {
+        let mut said = [0u8; 3];
+        let out = helper
+            .stdout
+            .as_mut()
+            .ok_or(std::io::ErrorKind::BrokenPipe)?;
+        out.read_exact(&mut said)?;
+        if &said != b"up\n" {
+            return Err(std::io::ErrorKind::InvalidData.into());
+        }
+        let handle = std::fs::File::open(format!("/proc/{}/ns/net", helper.id()))?;
+        let own = std::fs::metadata("/proc/thread-self/ns/net")?;
+        use std::os::unix::fs::MetadataExt;
+        if handle.metadata()?.ino() == own.ino() {
+            return Err(std::io::ErrorKind::InvalidData.into());
+        }
+        let namespace = OwnedFd::from(handle);
+        let listener = std::thread::scope(|scope| {
+            let bind = scope.spawn(|| -> std::io::Result<TcpListener> {
+                use std::os::fd::AsFd;
+                let network = rustix::thread::LinkNameSpaceType::Network;
+                rustix::thread::move_into_link_name_space(namespace.as_fd(), Some(network))?;
+                TcpListener::bind((Ipv4Addr::LOCALHOST, 0))
+            });
+            bind.join()
+        })
+        .map_err(|_| std::io::Error::other("bind"))??;
+        Ok(Network {
+            listener,
+            namespace: Some(namespace),
+        })
+    })();
+    drop(helper.stdin.take());
+    let _ = helper.kill();
+    let _ = helper.wait();
+    made
+}
 /// All subprocesses cross this boundary; tests supply literal replies and record calls.
 pub trait System {
     fn call(&mut self, program: &str, args: &[String], input: &Value, ms: u64) -> Answer;
@@ -113,6 +214,17 @@ pub trait System {
         std::env::vars_os()
             .filter_map(|(k, v)| Some((k.into_string().ok()?, v.into_string().ok()?)))
             .collect()
+    }
+    /// The network of a call with `limits` (`specs/ap/run-limits.md` R17): the proxy's listener
+    /// and, when a namespace was made, its handle. By default a listener on 127.0.0.1 of the
+    /// caller's own namespace and no handle; the host makes the stage's namespace.
+    fn network(&mut self) -> std::io::Result<Network> {
+        loopback()
+    }
+    /// The proxy's way out (`specs/ap/run-limits.md` R18), asked once when the proxy opens: no
+    /// thread of the proxy calls the port itself.
+    fn way_out(&self) -> Arc<dyn WayOut> {
+        Arc::new(HostWay)
     }
 }
 /// The home of the passwd entry whose user id is the effective one of a `/proc/<pid>/status` text
@@ -246,6 +358,9 @@ fn policy_path(value: Option<OsString>) -> PathBuf {
     )
 }
 impl System for Host {
+    fn network(&mut self) -> std::io::Result<Network> {
+        stage_network()
+    }
     fn policy_file(&self) -> Option<PathBuf> {
         Some(policy_path(std::env::var_os("AP_POLICY_FILE")))
     }

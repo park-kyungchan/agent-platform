@@ -7,6 +7,7 @@ use crate::host::{
 };
 use crate::store;
 use serde_json::{Value, json};
+mod egress;
 use std::{
     ffi::OsString,
     fs::File,
@@ -2486,6 +2487,8 @@ struct Launch<'a> {
     ask: bool,
     /// The scratch directory, if the request has one, could be made.
     ready: bool,
+    /// The proxy of a call with `limits` (`specs/ap/run-limits.md` R17), when it could be opened.
+    proxy: Option<&'a egress::Proxy>,
     /// Its time bound.
     bound: Duration,
 }
@@ -2508,6 +2511,7 @@ fn attempt(
         resume,
         ask,
         ready,
+        proxy,
         bound,
     } = *launch;
     // The continuation is the text of a fresh call; a resumed call's text is a move's; an ask is
@@ -2606,6 +2610,10 @@ fn attempt(
             "bwrap": BWRAP, "hidden": paths, "view": view.sources});
         for (k, v) in &l.given {
             limits[k] = v.clone();
+        }
+        // The stage's proxy and the names its role reaches (R7, R17, R18).
+        if let Some(proxy) = proxy {
+            limits["egress"] = proxy.member();
         }
         record["limits"] = limits;
     }
@@ -2739,9 +2747,18 @@ fn attempt(
         env.push(("CARGO_TARGET_DIR".into(), format!("{scratch}/target")));
         // The stage's door, beside its scratch directory (R13).
         env.push(("AP_DOOR".into(), crate::door::path_of(scratch)));
+        // The stage's proxy, in place of any the caller or the request names; no name passes by
+        // it (R17).
+        env.retain(|(k, _)| !PROXY_VARIABLES.contains(&k.as_str()));
+        if let Some(proxy) = proxy {
+            for name in &PROXY_VARIABLES[..4] {
+                env.push(((*name).into(), proxy.url()));
+            }
+        }
     }
     let started = s.now();
-    let mut child = match s.launch(&argv, &env, &q.cwd, [prompt, stdout, stderr]) {
+    let namespace = proxy.and_then(egress::Proxy::namespace);
+    let mut child = match launch_in(s, namespace, &argv, &env, &q.cwd, [prompt, stdout, stderr]) {
         Ok(child) => child,
         Err(_) => return not_launched(record, "launch"),
     };
@@ -2987,6 +3004,43 @@ fn asked_after(record: &mut Value, asked: &Value) {
         record["answer"] = asked["answer"].clone();
     }
 }
+/// The variables that name the stage's proxy (the first four) and those it holds none of
+/// (`specs/ap/run-limits.md` R17).
+const PROXY_VARIABLES: [&str; 8] = [
+    "HTTPS_PROXY",
+    "https_proxy",
+    "HTTP_PROXY",
+    "http_proxy",
+    "NO_PROXY",
+    "no_proxy",
+    "ALL_PROXY",
+    "all_proxy",
+];
+/// The port's launch, from the stage's network namespace when the call has one
+/// (`specs/ap/run-limits.md` R17): the calling thread enters it, launches, and returns to the
+/// namespace it was in before its next step. A thread that cannot return ends `ap run` at once, so
+/// no later step of it runs in the stage's namespace.
+fn launch_in(
+    s: &mut impl System,
+    namespace: Option<std::os::fd::BorrowedFd<'_>>,
+    argv: &[String],
+    env: &[(String, String)],
+    cwd: &str,
+    files: [File; 3],
+) -> std::io::Result<Child> {
+    use rustix::thread::{LinkNameSpaceType, move_into_link_name_space};
+    use std::os::fd::AsFd;
+    let Some(namespace) = namespace else {
+        return s.launch(argv, env, cwd, files);
+    };
+    let own = File::open("/proc/thread-self/ns/net")?;
+    move_into_link_name_space(namespace, Some(LinkNameSpaceType::Network))?;
+    let child = s.launch(argv, env, cwd, files);
+    if move_into_link_name_space(own.as_fd(), Some(LinkNameSpaceType::Network)).is_err() {
+        std::process::abort();
+    }
+    child
+}
 /// What the door of a stage knows of it (`specs/ap/door.md`): the role and agent the engine gets
 /// from the stage's environment, its record, its `cwd` and its `store`.
 fn door_stage(q: &Request) -> crate::door::Stage {
@@ -3072,6 +3126,16 @@ pub fn execute(s: &mut impl System, r: &Value) -> Result<(Value, u8), Failure> {
             }
             _ => ready,
         };
+        // The stage's network and its proxy: after the door and before the first launch; one that
+        // cannot be made is a scratch directory that cannot be made (`specs/ap/run-limits.md` R17).
+        let mut proxy = None;
+        let ready = match scratch {
+            Some(_) if ready => {
+                proxy = egress::open(s, record_path(&q.out), &q.actor_role).ok();
+                proxy.is_some()
+            }
+            _ => ready,
+        };
         // When the last launch began: it and its ask share one `timeout_seconds` (R20).
         let mut began = s.now();
         // The calls of `claude auth status` of this call, by account (`specs/ap/run-limits.md` R15).
@@ -3095,6 +3159,7 @@ pub fn execute(s: &mut impl System, r: &Value) -> Result<(Value, u8), Failure> {
                 resume: resume.map(|(session, _, _)| session.as_str()),
                 ask: false,
                 ready,
+                proxy: proxy.as_ref(),
                 bound: Duration::from_secs(q.timeout),
             };
             began = s.now();
@@ -3138,6 +3203,7 @@ pub fn execute(s: &mut impl System, r: &Value) -> Result<(Value, u8), Failure> {
                 resume: Some(session),
                 ask: true,
                 ready,
+                proxy: proxy.as_ref(),
                 bound: left,
             };
             let (mut record, _, saved) =
@@ -3145,6 +3211,10 @@ pub fn execute(s: &mut impl System, r: &Value) -> Result<(Value, u8), Failure> {
             asked_after(&mut record, &last);
             clean &= saved && persist(&q.out, &record);
             last = record;
+        }
+        // The proxy is closed after the last launch, before the scratch directory goes (R20).
+        if let Some(proxy) = proxy {
+            proxy.close();
         }
         // The door is closed after the last launch, before the scratch directory goes (R13).
         if let Some(door) = door {

@@ -581,9 +581,13 @@ fn r1_r13_a_stage_with_limits_has_its_door_and_ap_door_alone() {
         .filter(|a| a.contains(".door") || a.contains("AP_DOOR"))
         .collect();
     assert_eq!(naming, [&door, &door], "{launch:?}");
-    // The record's `limits` is the base's and the view's, which names the door.
+    // The record's `limits` is the base's, the view's, which names the door, and the proxy's
+    // (`specs/ap/run-limits.md` R7).
     let keys: Vec<&String> = v["limits"].as_object().unwrap().keys().collect();
-    assert_eq!(keys, ["bwrap", "hidden", "scratch", "view", "writable"]);
+    assert_eq!(
+        keys,
+        ["bwrap", "egress", "hidden", "scratch", "view", "writable"]
+    );
     assert!(
         v["limits"]["view"]
             .as_array()
