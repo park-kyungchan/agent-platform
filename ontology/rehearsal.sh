@@ -840,8 +840,9 @@ python3 -I -B "$repo/ontology/memory-index-walk.py" "$ont_binary" "$rehearsal_ro
 # requests, intents and criteria, on version 10 pinned in Git. Then version 11, pinned in Git, over the objects
 # made under version 10, and the walk of the units, runs and findings. Then version 12, pinned in Git, over the
 # objects made under version 11, and the walk of the page digest. Then version 13, pinned in Git, over the objects
-# made under version 12, and the walk of the principles. Then version 14, the repository's file, over the objects made
-# under version 13, and the walk of the two record sources of the routes.
+# made under version 12, and the walk of the principles. Then version 14, pinned in Git, over the objects made under
+# version 13, and the walk of the two record sources of the routes. Then version 15, the repository's file, over the
+# objects made under version 14: the function horizon.
 mkdir -- "$rehearsal_root/v10"
 python3 - "$ont_binary" "$repo" "$rehearsal_root/v10/store.sqlite" "$work_root/" "$rehearsal_root/copies" "$rehearsal_root/lib" <<'PY'
 import datetime, hashlib, json, os, pathlib, subprocess, sys
@@ -942,7 +943,7 @@ apply('triage_decision', 'v9-after-carry', dict(decision=third, triage='none', r
 unchanged = fingerprint()
 assert migrate(9, 10) == dict(carried=0, already=3)
 assert fingerprint() == unchanged and fields(third_request)['route_reason'] == 'carried from version 9'
-for before, after in [(9, 15), (10, 10), (10, 9)]:
+for before, after in [(9, 16), (10, 10), (10, 9)]:
     assert migrate(before, after, 2) == dict(status='unknown_pair')
 assert fingerprint() == unchanged
 assert migrate(9, 10) == dict(carried=0, already=3)
@@ -1634,9 +1635,9 @@ view = call(['render'], dict(view='principles', args={})); assert view['rows'] =
 print('v13_gate_rows_complete')
 print('v13 principles: ok')
 
-# Version 14: the repository's file over the objects made under version 13. Every value type, link type, action, view
-# and source of version 13 reads the same; the two object types and sources of the routes, the function route and
-# two types in the grant's read are added.
+# Version 14, pinned in Git by the commit of main that holds it, over the objects made under version 13. Every value
+# type, link type, action, view and source of version 13 reads the same; the two object types and sources of the
+# routes, the function route and two types in the grant's read are added.
 v13_schema = schema
 v13_objects = [o['id'] for t in ('task', 'decision', 'request', 'intent', 'criterion', 'unit', 'review', 'run', 'finding', 'hold', 'principle')
                for o in call(['search'], dict(object_type=t, limit=1000))['objects']]
@@ -1645,7 +1646,11 @@ v13_views = [(view, args, call(['render'], dict(view=view, args=args))) for view
     ('intents_open', {}), ('criteria_of_intent', dict(intent='gadget-board')), ('requests_unrouted', {}), ('units_of_intent', dict(intent='gadget-board')),
     ('units_live', {}), ('reviews_of_unit', dict(unit='fixture-digest')), ('runs_of_unit', dict(unit='fixture-stopped')), ('findings_open', {}),
     ('holds_on_work', {}), ('principles', {})]]
-schema = json.loads(pathlib.Path(repo, 'ontology/work.schema.json').read_text())
+V14_PIN = ('d0d469fc8b9cfa390c82b27acffbedd26388d342', 'b0af778a40e7bdb87219ea91c41720e5866ddcd0d7f5910f106d2698edae36b7')
+v14_bytes = subprocess.check_output(['git', '-C', repo, 'show', V14_PIN[0] + ':ontology/work.schema.json'], timeout=10)
+assert hashlib.sha256(v14_bytes).hexdigest() == V14_PIN[1]
+v14_path = pathlib.Path(store).with_name('pinned-' + V14_PIN[0] + '.json'); v14_path.write_bytes(v14_bytes)
+schema = json.loads(v14_bytes)
 assert schema['version'] == 14
 for kind in ('object_types', 'link_types', 'action_types', 'views', 'value_types', 'sources'):
     assert all(schema[kind].get(name) == body for name, body in v13_schema[kind].items()), kind
@@ -1668,12 +1673,16 @@ print('gate_row=v14-only-routes-added expected=admitted sources=' + str(len(sche
 # The record sources read a directory of the rehearsal's own root instead of the host's route directory.
 route_dir = pathlib.Path(store).parent / 'route'
 HOST_ROUTE = '/var/lib/agent-platform/route/'
-copy_path, copy = redirect.make(pathlib.Path(repo, 'ontology/work.schema.json'), work, copies, 'repository.json')
-for name in ('sections', 'components'):
-    assert copy['sources'][name]['glob'].startswith(HOST_ROUTE)
-    copy['sources'][name]['glob'] = str(route_dir) + '/' + copy['sources'][name]['glob'][len(HOST_ROUTE):]
-assert HOST_ROUTE not in json.dumps(copy['sources'])
-routed = pathlib.Path(store).with_name('repository-route.json'); routed.write_text(json.dumps(copy))
+def routed_copy(path, label, name):
+    # The copy of a schema file whose record sources read the rehearsal's own route directory.
+    _, copy = redirect.make(path, work, copies, label)
+    for source in ('sections', 'components'):
+        assert copy['sources'][source]['glob'].startswith(HOST_ROUTE)
+        copy['sources'][source]['glob'] = str(route_dir) + '/' + copy['sources'][source]['glob'][len(HOST_ROUTE):]
+    assert HOST_ROUTE not in json.dumps(copy['sources'])
+    out = pathlib.Path(store).with_name(name); out.write_text(json.dumps(copy))
+    return out
+routed = routed_copy(v14_path, 'pinned-v14.json', 'pinned-v14-route.json')
 call(['schema', 'install', str(routed)])
 redirect.trace(work, copies)
 assert [obj(i) for i in v13_objects] == v13_before
@@ -1694,7 +1703,6 @@ unchanged = fingerprint()
 assert migrate(13, 14) == dict(carried=0, already=0)
 assert migrate(12, 14) == dict(carried=0, already=0)
 assert migrate(9, 14) == dict(carried=0, already=3)
-assert migrate(14, 15, 2) == dict(status='unknown_pair')
 assert fingerprint() == unchanged and [obj(i) for i in v13_objects] == v13_before
 print('v14_migration_rows_complete')
 # The walk of the two record sources. A source that fails appends nothing.
@@ -1745,4 +1753,37 @@ assert (answer['sections']['appended']['retraction'], answer['components']['appe
 print('gate_row=v14-records-retracted expected=admitted')
 print('v14_gate_rows_complete')
 print('v14 routes: ok')
+
+# Version 15: the repository's file over the objects made under version 14. Every member of version 14 reads the same
+# in canonical JSON; only the function horizon is added.
+v14_schema = schema
+v14_objects = [o['id'] for t in ('task', 'decision', 'request', 'intent', 'criterion', 'unit', 'review', 'run', 'finding', 'hold', 'principle', 'section', 'component')
+               for o in call(['search'], dict(object_type=t, limit=1000))['objects']]
+v14_before = [obj(i) for i in v14_objects]
+v14_views = [(view, args, call(['render'], dict(view=view, args=args))) for view, args, _ in v13_views]
+schema = json.loads(pathlib.Path(repo, 'ontology/work.schema.json').read_text())
+assert schema['version'] == 15
+head = json.loads(json.dumps(schema))
+horizon_fn = head['functions'].pop('horizon')
+assert {k: v for k, v in head.items() if k != 'version'} == {k: v for k, v in v14_schema.items() if k != 'version'}
+assert horizon_fn['program'] == '/usr/local/bin/ap' and horizon_fn['timeout_ms'] == 30000 and horizon_fn['answer_bytes'] == 65536
+assert {n: (p['type'], p['required']) for n, p in horizon_fn['parameters'].items()} == dict(intent=('string', True))
+print('gate_row=v15-only-horizon-added expected=admitted functions=' + str(len(schema['functions'])))
+call(['schema', 'install', str(routed_copy(pathlib.Path(repo, 'ontology/work.schema.json'), 'repository.json', 'repository-route.json'))])
+redirect.trace(work, copies)
+assert [obj(i) for i in v14_objects] == v14_before
+for view, args, before in v14_views:
+    answer = call(['render'], dict(view=view, args=args))
+    assert answer['rows'] == before['rows'] and answer['markdown'] == before['markdown'].replace('schema=work@14', 'schema=work@15'), view
+print('gate_row=v15-v14-objects-and-views-unchanged expected=admitted objects=' + str(len(v14_objects)) + ' views=' + str(len(v14_views)))
+described = call(['describe'], {})
+[listed] = [f for f in described['functions'] if f['name'] == 'horizon']
+assert listed['domain'] == 'work' and 'program' not in listed and [p['name'] for p in listed['parameters']] == ['intent']
+assert sorted(f['name'] for f in described['functions'] if f['domain'] == 'work') == ['horizon', 'route']
+unchanged = fingerprint()
+assert migrate(14, 15) == dict(carried=0, already=0)
+assert migrate(15, 16, 2) == dict(status='unknown_pair')
+assert fingerprint() == unchanged and [obj(i) for i in v14_objects] == v14_before
+print('v15_migration_rows_complete')
+print('v15 horizon: ok')
 PY

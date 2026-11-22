@@ -68,8 +68,9 @@ fn host() -> Value {
             "park-kyungchan/agent-platform": {"clone": "/srv/agent-platform"},
             "park-kyungchan/other": {"clone": "/srv/other"}
         },
-        "work": {"slots": 3, "slice": "agents.slice", "prefix": "ap-unit"},
-        "hosts": {"pc": {"ssh": "u@pc", "work": "/home/u/work/ap-checks", "busy_load": 0.75}}
+        "work": {"slots": 3, "slice": "agents.slice", "prefix": "ap-unit", "pages": 2, "page_prefix": "ap-page"},
+        "hosts": {"pc": {"ssh": "u@pc", "work": "/home/u/work/ap-checks", "busy_load": 0.75}},
+        "writer": {"model": "opus", "effort": "high", "permission_mode": "auto", "directory": "/var/lib/pages"}
     })
 }
 
@@ -112,13 +113,21 @@ fn r12_the_host_shape_passes_every_reader_after_one_read() {
     assert_eq!(
         answer,
         json!({"status": "ok", "path": PATH, "sha256": digest,
-            "readers": ["models", "quota", "units", "reviews", "repositories", "work", "check"]})
+            "readers": ["models", "quota", "units", "reviews", "repositories", "work", "check", "writer"]})
     );
     assert_eq!(fake.reads.get(), 1);
     assert!(fake.calls.is_empty());
     // A file without the optional members passes as well: only `models` and `accounts` are required.
     let mut p = host();
-    for m in ["quota", "units", "reviews", "repositories", "work", "hosts"] {
+    for m in [
+        "quota",
+        "units",
+        "reviews",
+        "repositories",
+        "work",
+        "hosts",
+        "writer",
+    ] {
         p.as_object_mut().unwrap().remove(m);
     }
     assert_eq!(check(&Fake::json(&p), None).unwrap()["status"], "ok");
@@ -201,6 +210,38 @@ fn r14_one_planted_fault_per_reader_is_refused_by_that_reader() {
             "hosts.pc.min_available_mb is not a whole number from 0 to 1048576"
         )
     );
+    assert_eq!(
+        refused(
+            "writer",
+            json!({"model": "opus", "effort": "high", "permission_mode": "auto", "timeout_seconds": 0})
+        ),
+        policy_invalid(
+            "writer",
+            "writer.timeout_seconds is not 1 to 86,400 seconds"
+        )
+    );
+}
+
+// spec: specs/ap/policy.md#R12
+// spec: specs/ap/policy.md#R13
+#[test]
+fn r12_the_reader_writer_runs_last() {
+    // A writer of a wrong form beside a fault of `hosts`: the reader `check` comes first.
+    let mut p = host();
+    p["writer"] = json!("opus");
+    let Refusal { reader, failure } = check(&Fake::json(&p), None).unwrap_err();
+    assert_eq!(reader, Some("writer"));
+    assert_eq!(failure.detail, json!("writer is not an object"));
+    p["hosts"] = json!({"vps": {}});
+    let Refusal { reader, .. } = check(&Fake::json(&p), None).unwrap_err();
+    assert_eq!(reader, Some("check"));
+    // The prefix of the writers' units is judged by the reader `work`, only with a writer.
+    let mut p = host();
+    p["work"]["page_prefix"] = json!("ap-unit");
+    let Refusal { reader, .. } = check(&Fake::json(&p), None).unwrap_err();
+    assert_eq!(reader, Some("work"));
+    p.as_object_mut().unwrap().remove("writer");
+    assert_eq!(check(&Fake::json(&p), None).unwrap()["status"], "ok");
 }
 
 // spec: specs/ap/policy.md#R12
