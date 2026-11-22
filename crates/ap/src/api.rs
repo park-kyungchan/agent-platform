@@ -540,7 +540,11 @@ impl Tally {
 }
 /// The fields of every run of role `batch` started at `from` or later (seconds since 1970): one search whose
 /// filter names only `role` and `started_at`, every page read through `store::search` (R9).
-fn batch_runs(s: &mut impl System, store: Option<&str>, from: u64) -> Result<Vec<Value>, Failure> {
+pub(crate) fn batch_runs(
+    s: &mut impl System,
+    store: Option<&str>,
+    from: u64,
+) -> Result<Vec<Value>, Failure> {
     let filter = vec![
         json!({"eq": ["role", "batch"]}),
         json!({"gt": ["started_at", utc(from.saturating_sub(1))]}),
@@ -577,11 +581,11 @@ fn month_bounds(year: i64, month: i64) -> Option<(u64, u64)> {
     let end = epoch(&format!("{ny:04}-{nm:02}-01T00:00:00Z"))?;
     Some((start, end))
 }
-fn month_of(secs: u64) -> Option<(u64, u64)> {
+pub(crate) fn month_of(secs: u64) -> Option<(u64, u64)> {
     let t = utc(secs);
     month_bounds(t.get(0..4)?.parse().ok()?, t.get(5..7)?.parse().ok()?)
 }
-fn sum(by_job: &BTreeMap<String, Tally>) -> i64 {
+pub(crate) fn sum(by_job: &BTreeMap<String, Tally>) -> i64 {
     by_job
         .values()
         .map(Tally::counted)
@@ -957,7 +961,8 @@ pub fn batch(s: &mut impl Api, argv: &[OsString]) -> Result<Value, Stop> {
             "reserved_usd_micros": worst, "batch": null, "state": null}),
     };
     let mut params = json!({"role": "batch", "runtime": "api", "model": model,
-        "account": config.account, "uses": id("account", &config.account), "job": a.job,
+        "account": config.account, "uses": id("account", &config.account),
+        "host": id("host", "local"), "job": a.job,
         "reserved_usd_micros": worst});
     let record_text = record_path.to_str().unwrap_or_default();
     if record_text.len() <= 400

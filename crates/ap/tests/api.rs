@@ -715,8 +715,8 @@ fn the_whole_flow_reserves_submits_polls_and_settles() {
     assert_eq!(
         start["parameters"],
         json!({"role": "batch", "runtime": "api", "model": h, "account": "anthropic-api-key",
-            "uses": oid("account", "anthropic-api-key"), "job": "evals", "reserved_usd_micros": worst,
-            "record": f.path("out/batch.json")})
+            "uses": oid("account", "anthropic-api-key"), "host": oid("host", "local"), "job": "evals",
+            "reserved_usd_micros": worst, "record": f.path("out/batch.json")})
     );
     let close = &actions[1].input;
     assert_eq!(close["request_id"], rid.replace("-start", "-close"));
@@ -1441,6 +1441,35 @@ fn a_store_that_fails_or_a_start_that_does_not_apply_makes_no_batch_call() {
     assert_eq!(starts[0].input, starts[1].input);
     assert_eq!(v["run"], "run-1");
     assert_eq!(f.runs.len(), 1);
+}
+
+// spec: specs/ap/api.md#R10
+#[test]
+fn r10_every_start_run_carries_host_local() {
+    // A start that applied: the run of the fake store names the host `local`.
+    let mut f = Fake::new();
+    flow(&mut f);
+    let v = call(&mut f, "evals", &[]).unwrap();
+    let run = v["run"].as_str().unwrap();
+    assert_eq!(f.runs[run]["host"], oid("host", "local"));
+    // A start that gave no answer: both sends carry it, and the run the retry found names it.
+    let mut f = Fake::new();
+    flow(&mut f);
+    f.start_mode = StartMode::SilentOnce;
+    let v = call(&mut f, "evals", &[]).unwrap();
+    let starts: Vec<&Called> = f
+        .actions()
+        .into_iter()
+        .filter(|c| c.input["action_type"] == "start_run")
+        .collect();
+    assert_eq!(starts.len(), 2);
+    for start in starts {
+        assert_eq!(start.input["parameters"]["host"], oid("host", "local"));
+    }
+    assert_eq!(
+        f.runs[v["run"].as_str().unwrap()]["host"],
+        oid("host", "local")
+    );
 }
 
 // spec: specs/ap/api.md#R10
