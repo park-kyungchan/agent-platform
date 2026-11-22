@@ -5,7 +5,7 @@
 use ap::host::{Answer, Failure, Reply, System};
 use ap::watch::RUNTIMES;
 use ap::watch::checks::{GITHUB_APPLY, GITHUB_REPOSITORIES};
-use ap::watch::detect::{APT, BACKUP, DELIVERY, MEMORY_EVENTS};
+use ap::watch::detect::{APT, BACKUP, CHECKS_LOG, DELIVERY, DOOR_LOG, MEMORY_EVENTS};
 use ap::watch::drift::{
     DELIVER_CLONE, ETC_CLONE, INSTALLED_AP, INVENTORY_PATH, UNIT_DIR, VPS_OPS_REPO,
 };
@@ -3506,4 +3506,411 @@ fn r28_r29_the_clones_are_those_of_the_host_s_request() {
     assert_eq!(clone(&request["etc"]["repository"]), ETC_CLONE);
     assert_eq!(INSTALLED_AP, "/usr/local/bin/ap");
     assert_eq!(UNIT_DIR, "/etc/systemd/system");
+}
+
+// ---- pc down (R30).
+
+fn pc_policy(f: &mut F) {
+    set_policy(
+        f,
+        json!({"hosts": {"pc": {"ssh": "agent@ap-checks", "work": "/invented/work", "busy_load": 0.5}}}),
+    );
+}
+/// A line of the checks log ending at `end`, with the members R30 must never repeat planted.
+fn checks_line(end: u64, host: &str, reason: Value) -> String {
+    json!({"start": utc(end - 5), "end": utc(end), "seconds": 5.0, "host": host, "reason": reason,
+        "dir": "/planted/dir-7", "repository": "planted-owner/planted-repo", "head": "c".repeat(40),
+        "command": ["planted-command", "--flag"], "exit": 0, "pc_cpus": 8, "pc_load": 0.1,
+        "pc_available_mb": 4096})
+    .to_string()
+}
+/// A line of the door's record arriving at `at` and closed `ms` milliseconds later.
+fn door_line(at: u64, ms: u64, verb: Value, exit: Value, reason: Value) -> String {
+    json!({"at": utc(at), "run": "/planted/run-9.run.json", "role": "planted-role", "verb": verb,
+        "name": "planted-name", "ms": ms, "exit": exit, "reason": reason})
+    .to_string()
+}
+fn put(f: &mut F, path: &str, lines: &[String]) {
+    f.files
+        .insert(path.into(), format!("{}\n", lines.join("\n")).into_bytes());
+}
+fn pc_key() -> String {
+    k("host", "pc down")
+}
+
+// spec: specs/ap/watch.md#R30
+#[test]
+fn r30_an_unreachable_check_opens_pc_down_and_a_newer_one_on_the_pc_closes_it() {
+    let mut f = F::quiet();
+    pc_policy(&mut f);
+    f.at(15);
+    let now = f.now();
+    put(
+        &mut f,
+        CHECKS_LOG,
+        &[checks_line(now - 600, "local", json!("pc_unreachable"))],
+    );
+    let v = f.pass();
+    assert_eq!(v["opened"], json!([pc_key()]), "{v}");
+    assert_eq!(v["detectors"]["host"], json!({"state": "ok", "signals": 1}));
+    let o = f.finding(&pc_key());
+    assert_eq!(o["severity"], "act");
+    assert_eq!(o["kind"], "incident");
+    assert_eq!(o["detector"], "watch:host");
+    let summary = o["summary"].as_str().unwrap();
+    assert!(summary.starts_with("pc down: "), "{summary}");
+    assert!(summary.contains("`Start-ScheduledTask -TaskName ap-checks-keepalive`"));
+    assert!(summary.contains("`tailscale ping ap-checks`"), "{summary}");
+    assert_eq!(
+        o["evidence"],
+        format!(
+            "checks.jsonl at {}: host local, reason pc_unreachable",
+            utc(now - 600)
+        )
+    );
+    // Nothing of it is kept in state.json.
+    let state = f.state();
+    let host = state["host"].as_object().unwrap();
+    assert!(host.keys().all(|m| !m.contains("pc")), "{host:?}");
+    // The same reading seen again within the hour records nothing.
+    f.at(20);
+    f.reset();
+    let v = f.pass();
+    assert_eq!(v["opened"], json!([]));
+    assert_eq!(f.actions(), vec![]);
+    // A newer line on the PC closes it at the next pass.
+    f.at(25);
+    let now = f.now();
+    let lines = [
+        checks_line(now - 600, "local", json!("pc_unreachable")),
+        checks_line(now - 60, "pc", Value::Null),
+    ];
+    put(&mut f, CHECKS_LOG, &lines);
+    let v = f.pass();
+    assert_eq!(v["closed"], json!([pc_key()]), "{v}");
+    assert_eq!(f.finding(&pc_key())["state"], "closed");
+}
+
+// spec: specs/ap/watch.md#R30
+#[test]
+fn r30_a_door_check_that_fell_back_is_a_reading_and_a_door_fn_is_not() {
+    let mut f = F::quiet();
+    pc_policy(&mut f);
+    f.at(30);
+    let now = f.now();
+    let old_pc = checks_line(now - 1_200, "pc", Value::Null);
+    put(&mut f, CHECKS_LOG, &[old_pc]);
+    // `fn` lines (even with a `pc_lost` reason) and a check that went elsewhere are no reading.
+    let lines = [
+        door_line(now - 300, 1_000, json!("fn"), Value::Null, json!("pc_lost")),
+        door_line(now - 200, 1_000, Value::Null, Value::Null, json!("pc_lost")),
+        door_line(now - 100, 1_000, json!("check"), Value::Null, json!("here")),
+        door_line(
+            now - 90,
+            1_000,
+            json!("check"),
+            Value::Null,
+            json!("client_gone"),
+        ),
+    ];
+    put(&mut f, DOOR_LOG, &lines);
+    let v = f.pass();
+    assert_eq!(v["opened"], json!([]), "{v}");
+    // A `check` line with `pc_lost` newer than the checks-log line on the PC opens it.
+    let mut lines = lines.to_vec();
+    lines.push(door_line(
+        now - 900,
+        60_000,
+        json!("check"),
+        Value::Null,
+        json!("pc_lost"),
+    ));
+    put(&mut f, DOOR_LOG, &lines);
+    f.at(31);
+    let v = f.pass();
+    assert_eq!(v["opened"], json!([pc_key()]), "{v}");
+    // The time of a door line is its arrival plus the whole seconds of `ms`: 900 - 60 = 840 s old.
+    assert_eq!(
+        f.finding(&pc_key())["evidence"],
+        format!("door.jsonl at {}: reason pc_lost", utc(now - 840))
+    );
+    // At an equal time `reached` wins: the checks line on the PC ends at the door line's time.
+    put(
+        &mut f,
+        CHECKS_LOG,
+        &[checks_line(now - 840, "pc", Value::Null)],
+    );
+    f.at(32);
+    let v = f.pass();
+    assert_eq!(v["closed"], json!([pc_key()]), "{v}");
+    // A door line with an integer exit reached the PC; a later one that ran on it closes as well.
+    lines.push(door_line(
+        now + 60,
+        2_999,
+        json!("check"),
+        json!(1),
+        Value::Null,
+    ));
+    put(&mut f, DOOR_LOG, &lines);
+    put(&mut f, CHECKS_LOG, &[]);
+    f.at(33);
+    let v = f.pass();
+    assert_eq!(v["opened"], json!([]), "{v}");
+    assert_eq!(f.finding(&pc_key())["state"], "closed");
+}
+
+// spec: specs/ap/watch.md#R30
+// spec: specs/ap/watch.md#R7
+#[test]
+fn r30_without_a_reading_of_the_last_60_minutes_an_open_pc_down_is_neither_seen_nor_closed() {
+    assert_eq!(family("host", "pc down: x").as_deref(), Some("pc down"));
+    let mut f = F::quiet();
+    pc_policy(&mut f);
+    f.at(70);
+    let now = f.now();
+    let open = stored(
+        "host",
+        "pc down: the local PC took no check",
+        "act",
+        "open",
+        now - 7_200,
+    );
+    f.plant(&pc_key(), open);
+    f.reset();
+    // No record at all.
+    let v = f.pass();
+    assert_eq!(v["detectors"]["host"], json!({"state": "ok", "signals": 0}));
+    assert_eq!(f.actions(), vec![], "{v}");
+    assert_eq!(f.finding(&pc_key())["state"], "open");
+    // Only a reading 61 minutes old, among lines that are no reading (garbage included).
+    let lines = [
+        "not json".to_owned(),
+        "[1,2]".to_owned(),
+        json!({"end": "yesterday", "host": "pc"}).to_string(),
+        checks_line(now - 3_660, "local", json!("pc_unreachable")),
+        door_line(now - 3_700, 0, json!("check"), json!(0), Value::Null),
+    ];
+    put(&mut f, CHECKS_LOG, &lines);
+    f.at(71);
+    let v = f.pass();
+    assert_eq!(f.actions(), vec![], "{v}");
+    assert_eq!(f.finding(&pc_key())["state"], "open");
+    // A reading exactly 60 minutes old counts, and a later one than the pass counts too.
+    f.at(70);
+    put(
+        &mut f,
+        CHECKS_LOG,
+        &[checks_line(now - 3_600, "local", json!("pc_lost"))],
+    );
+    let v = f.pass();
+    assert_eq!(v["seen"], json!([pc_key()]), "{v}");
+    put(
+        &mut f,
+        CHECKS_LOG,
+        &[checks_line(now + 90, "pc", Value::Null)],
+    );
+    f.at(71);
+    let v = f.pass();
+    assert_eq!(v["closed"], json!([pc_key()]), "{v}");
+}
+
+// spec: specs/ap/watch.md#R30
+// spec: specs/ap/watch.md#R7
+#[test]
+fn r30_a_policy_without_the_pc_closes_it_and_no_policy_or_a_malformed_one_leaves_it_open() {
+    let mut f = F::quiet();
+    f.at(10);
+    let now = f.now();
+    put(
+        &mut f,
+        CHECKS_LOG,
+        &[checks_line(now - 60, "local", json!("pc_unreachable"))],
+    );
+    put(
+        &mut f,
+        DOOR_LOG,
+        &[door_line(
+            now - 60,
+            0,
+            json!("check"),
+            Value::Null,
+            json!("pc_lost"),
+        )],
+    );
+    let open = stored(
+        "host",
+        "pc down: the local PC took no check",
+        "act",
+        "open",
+        now - 7_200,
+    );
+    f.plant(&pc_key(), open);
+    f.reset();
+    // No policy file: unknown, `host` reads, nothing is changed and no record is read.
+    let v = f.pass();
+    assert_eq!(v["detectors"]["host"]["state"], "ok", "{v}");
+    assert_eq!(f.actions(), vec![]);
+    // A policy that does not parse: the same.
+    f.policy = Some(PathBuf::from("/invented/policy.json"));
+    f.files
+        .insert("/invented/policy.json".into(), b"{not json".to_vec());
+    f.at(11);
+    let v = f.pass();
+    assert_eq!(v["detectors"]["host"]["state"], "ok", "{v}");
+    assert!(f.actions().iter().all(|(_, key)| key != &pc_key()));
+    assert_eq!(f.finding(&pc_key())["state"], "open");
+    // A policy without `hosts.pc` (or whose `hosts.pc` is no object): known, no signal, closed.
+    for policy in [
+        json!({}),
+        json!({"hosts": {}}),
+        json!({"hosts": {"pc": null}}),
+    ] {
+        set_policy(&mut f, policy);
+        f.plant(
+            &pc_key(),
+            stored(
+                "host",
+                "pc down: the local PC took no check",
+                "act",
+                "open",
+                now - 7_200,
+            ),
+        );
+        f.reset();
+        f.at(12);
+        let v = f.pass();
+        assert!(
+            v["closed"].as_array().unwrap().contains(&json!(pc_key())),
+            "{v}"
+        );
+        let reads = f.reads.borrow();
+        assert!(
+            !reads.iter().any(|p| p == CHECKS_LOG || p == DOOR_LOG),
+            "{reads:?}"
+        );
+    }
+    // The pass reads the policy file once.
+    let reads = f.reads.borrow();
+    assert_eq!(
+        reads
+            .iter()
+            .filter(|p| *p == "/invented/policy.json")
+            .count(),
+        1
+    );
+}
+
+// spec: specs/ap/watch.md#R30
+#[test]
+fn r30_a_busy_pc_that_answered_gives_no_signal_and_closes_an_open_finding() {
+    let mut f = F::quiet();
+    pc_policy(&mut f);
+    f.at(20);
+    let now = f.now();
+    for reason in ["pc_busy", "pc_memory_low", "pc_engine_differs"] {
+        let lines = [
+            checks_line(now - 600, "local", json!("pc_unreachable")),
+            checks_line(now - 300, "local", json!(reason)),
+        ];
+        put(&mut f, CHECKS_LOG, &lines);
+        let v = f.pass();
+        assert_eq!(v["opened"], json!([]), "{reason}: {v}");
+    }
+    let door = [
+        door_line(now - 600, 0, json!("check"), Value::Null, json!("pc_lost")),
+        door_line(now - 300, 0, json!("check"), Value::Null, json!("pc_busy")),
+    ];
+    put(&mut f, CHECKS_LOG, &[]);
+    put(&mut f, DOOR_LOG, &door);
+    let v = f.pass();
+    assert_eq!(v["opened"], json!([]), "{v}");
+    f.plant(
+        &pc_key(),
+        stored(
+            "host",
+            "pc down: the local PC took no check",
+            "act",
+            "open",
+            now - 7_200,
+        ),
+    );
+    let v = f.pass();
+    assert_eq!(v["closed"], json!([pc_key()]), "{v}");
+}
+
+// spec: specs/ap/watch.md#R30
+#[test]
+fn r30_the_evidence_holds_no_byte_of_a_planted_dir_command_or_repository() {
+    let mut f = F::quiet();
+    pc_policy(&mut f);
+    f.at(20);
+    let now = f.now();
+    for (path, lines) in [
+        (
+            CHECKS_LOG,
+            vec![checks_line(now - 60, "local", json!("pc_lost"))],
+        ),
+        (
+            DOOR_LOG,
+            vec![door_line(
+                now - 60,
+                0,
+                json!("check"),
+                Value::Null,
+                json!("pc_lost"),
+            )],
+        ),
+    ] {
+        f.files.remove(CHECKS_LOG);
+        f.files.remove(DOOR_LOG);
+        put(&mut f, path, &lines);
+        let v = f.pass();
+        assert_eq!(f.finding(&pc_key())["state"], "open", "{v}");
+        let o = f.finding(&pc_key());
+        let text = format!("{} {}", o["summary"], o["evidence"]);
+        for planted in [
+            "/planted", "planted-", "run-9", "cccccccc", "--flag", "pc_cpus", "pc_load", "4096",
+        ] {
+            assert!(!text.contains(planted), "{planted} in {text}");
+        }
+        f.findings.clear();
+        f.reset();
+    }
+}
+
+// spec: specs/ap/watch.md#R30
+#[test]
+fn r30_a_record_that_exists_and_cannot_be_read_makes_host_unreadable() {
+    for path in [CHECKS_LOG, DOOR_LOG] {
+        let mut f = F::quiet();
+        pc_policy(&mut f);
+        f.at(20);
+        let now = f.now();
+        put(
+            &mut f,
+            path,
+            &[checks_line(now - 60, "local", json!("pc_unreachable"))],
+        );
+        f.unreadable.insert(path.into());
+        f.plant(
+            &pc_key(),
+            stored(
+                "host",
+                "pc down: the local PC took no check",
+                "act",
+                "open",
+                now - 7_200,
+            ),
+        );
+        let v = f.pass();
+        assert_eq!(v["detectors"]["host"]["state"], "unreadable", "{path}: {v}");
+        assert!(v["closed"].as_array().unwrap().is_empty(), "{v}");
+        assert!(f.finding(&k("host", "unreadable"))["summary"].is_string());
+        assert_eq!(f.finding(&pc_key())["state"], "open");
+    }
+    // A record that does not exist adds nothing and is no cause of `unreadable`.
+    let mut f = F::quiet();
+    pc_policy(&mut f);
+    let v = f.pass();
+    assert_eq!(v["detectors"]["host"]["state"], "ok", "{v}");
 }

@@ -338,7 +338,7 @@ systemctl is-active ap-route.service                  # until it answers inactiv
 - `delivery`: reads `/var/lib/agent-platform/deliver/last.json` for age, end state and checkout forwarding.
 - `login`: compares the SSH and sudoers login path with `login.json` (the TOTP secret file by `stat` alone).
 - `services`: lists failed systemd units and timers that have not fired within three intervals.
-- `host`: checks disk free space, `agents.slice` `memory.events` `high` rises, `apt` history and old CLI processes.
+- `host`: checks disk free space, `agents.slice` `memory.events` `high` rises, `apt` history and old CLI processes; when the policy names `hosts.pc`, it reads the newest check of the PC of the last 60 minutes in `checks.jsonl` and `door.jsonl` and keeps `pc down` open while that check fell back (`pc_unreachable` or `pc_lost`): the finding asks the user to run `Start-ScheduledTask -TaskName ap-checks-keepalive` on Windows, never restarts it by itself.
 - `records`: checks `/var/lib/agent-platform/backup/last.json` and recent store actions for stale local or remote backups.
 - `accounts`: checks Claude account `.credentials.json` expiry (only the expiry timestamp is kept) and recent `run` usage limits (`>= 0.9`).
 - `checks`: checks GitHub `main` workflow conclusions, open Dependabot alerts and `github/apply --check` settings drift for policy repositories.
