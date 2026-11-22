@@ -185,6 +185,8 @@ struct FakeOnt {
     runs: BTreeMap<String, String>,
     /// The fields of the objects `get` reads, by `kind:key` (the engine's shape is made on the read).
     objects: BTreeMap<String, Value>,
+    /// A real engine: its calls go to it unchanged (arguments and input), each still recorded.
+    engine: Option<PathBuf>,
 }
 impl FakeOnt {
     fn with(exist: &[&str]) -> Self {
@@ -474,6 +476,10 @@ impl System for Fake {
             self.events
                 .push(format!("ont {}", name.unwrap_or_default()));
             let ont = self.ont.as_mut().unwrap();
+            if let Some(engine) = ont.engine.clone() {
+                let engine = engine.to_str().unwrap().to_owned();
+                return forks::forking(|| Host.call(&engine, args, input, ms));
+            }
             return match ont.answer(args, input) {
                 Ok((success, v)) => {
                     let bytes = serde_json::to_vec(&v).unwrap();
@@ -7273,7 +7279,8 @@ fn run_object_r7_the_start_comes_after_admission_and_before_the_first_launch() {
         start["parameters"],
         json!({"unit": object_id("unit", "u-1"), "role": "reviewer", "runtime": "claude", "model": "sonnet",
             "effort": "high", "account": "a1", "session": v["attempts"][0]["session"],
-            "record": f.p("a.md.run.json"), "stream": f.p("a.md.stream.jsonl")})
+            "record": f.p("a.md.run.json"), "stream": f.p("a.md.stream.jsonl"),
+            "host": object_id("host", "local"), "uses": object_id("account", "a1")})
     );
     // The finer role is the object's and the actor's; an intent takes the place of a unit.
     let mut r = f.for_unit("b.md");
@@ -7595,6 +7602,152 @@ fn run_object_r11_a_start_without_an_answer_is_repeated_after_the_end_with_the_s
         ),
         (1, json!("unknown_unit"))
     );
+}
+
+// spec: specs/ap/run-object.md#R15
+#[test]
+fn run_object_r15_every_start_run_names_host_local_and_the_account_it_uses() {
+    let host = object_id("host", "local");
+    let uses = object_id("account", "a1");
+    // A unit and an intent: both members, whatever the run is about.
+    let mut f = Fake::new();
+    let r = f.for_unit("a.md");
+    assert_eq!(f.run(&r).unwrap().1, 0);
+    let starts = f.store().bodies("start_run");
+    assert_eq!(starts[0]["parameters"]["host"], host);
+    assert_eq!(starts[0]["parameters"]["uses"], uses);
+    assert_eq!(starts[0]["parameters"]["unit"], object_id("unit", "u-1"));
+    let mut f = Fake::new();
+    let mut r = f.for_unit("b.md");
+    r.as_object_mut().unwrap().remove("unit");
+    r["intent"] = json!("i-1");
+    assert_eq!(f.run(&r).unwrap().1, 0);
+    let starts = f.store().bodies("start_run");
+    assert_eq!(starts[0]["parameters"]["host"], host);
+    assert_eq!(starts[0]["parameters"]["uses"], uses);
+    assert_eq!(
+        starts[0]["parameters"]["intent"],
+        object_id("intent", "i-1")
+    );
+    // A move to another account keeps the first launch's `uses` and applies no second start.
+    let mut f = Fake::new();
+    let mut r = f.for_unit("c.md");
+    r["next_accounts"] = json!([f.p("a2")]);
+    f.mode("a1", "limit1");
+    let (v, status) = f.run(&r).unwrap();
+    assert_eq!(status, 0, "{v}");
+    let starts = f.store().bodies("start_run");
+    assert_eq!(starts.len(), 1);
+    assert_eq!(starts[0]["parameters"]["uses"], uses);
+    assert_eq!(starts[0]["parameters"]["account"], "a1");
+    // A start that gave no answer is repeated after the end with the same parameters.
+    let mut f = Fake::new();
+    let mut r = f.for_unit("d.md");
+    r["next_accounts"] = json!([f.p("a2")]);
+    f.mode("a1", "limit1");
+    f.way("start_run", vec![Way::Lost]);
+    let (v, status) = f.run(&r).unwrap();
+    assert_eq!(status, 0, "{v}");
+    let starts = f.store().bodies("start_run");
+    assert_eq!(starts.len(), 2);
+    assert_eq!(starts[0]["parameters"], starts[1]["parameters"]);
+    assert_eq!(starts[1]["parameters"]["host"], host);
+    assert_eq!(starts[1]["parameters"]["uses"], uses);
+    // A request without `unit` and `intent` calls no store.
+    let mut f = Fake::new();
+    f.store_with(&[]);
+    let r = f.request("e.md");
+    assert_eq!(f.run(&r).unwrap().1, 0);
+    assert!(f.store().calls.is_empty());
+}
+
+// spec: specs/ap/run-object.md#R15
+#[test]
+#[ignore = "runs the real engine: ./check runs it with --ignored and ONT_BIN"]
+fn engine_run_object_r15_the_run_reads_back_with_host_and_uses() {
+    let engine = PathBuf::from(std::env::var("ONT_BIN").expect("ONT_BIN names the engine"));
+    let mut f = Fake::new();
+    let store = f.p("engine-store.sqlite");
+    let ont = |args: &[&str], input: &Value| -> Value {
+        use std::io::Write;
+        let mut child = Command::new(&engine)
+            .arg("--store")
+            .arg(&store)
+            .args(args)
+            .env_remove("ONT_ROLE")
+            .stdin(std::process::Stdio::piped())
+            .stdout(std::process::Stdio::piped())
+            .stderr(std::process::Stdio::piped())
+            .spawn()
+            .unwrap();
+        child
+            .stdin
+            .take()
+            .unwrap()
+            .write_all(input.to_string().as_bytes())
+            .unwrap();
+        let out = child.wait_with_output().unwrap();
+        let v: Value = serde_json::from_slice(&out.stdout).unwrap_or_else(|_| {
+            panic!(
+                "ont {args:?}: {}{}",
+                String::from_utf8_lossy(&out.stdout),
+                String::from_utf8_lossy(&out.stderr)
+            )
+        });
+        assert_eq!(out.status.code(), Some(0), "ont {args:?}: {v}");
+        v
+    };
+    let schema = f.p("work.schema.json");
+    std::fs::write(&schema, include_str!("../../../ontology/work.schema.json")).unwrap();
+    let installed = ont(&["schema", "install", &schema], &Value::Null);
+    assert_eq!(installed["status"], "ok", "{installed}");
+    let apply = |action: &str, rid: &str, parameters: Value| -> Value {
+        let body = json!({"action_type": action, "request_id": rid, "parameters": parameters});
+        let v = ont(&["action", "apply", "--client", "ap"], &body);
+        assert_eq!(v["result"]["outcome"], "applied", "{v}");
+        v
+    };
+    let created = |v: &Value, kind: &str| -> Value {
+        let edits = v["result"]["edits"].as_array().unwrap();
+        let e = edits
+            .iter()
+            .find(|e| e["id"]["object_type"] == kind && e["change"] == "initial");
+        e.unwrap()["id"].clone()
+    };
+    let said = "2026-01-01T00:00:00Z";
+    let request = apply(
+        "record_request",
+        "r15-request",
+        json!({"words": "Build the invented widget board.", "words_verified": true,
+            "record": "fixture/session.jsonl", "reading": "The user orders a widget board.",
+            "kind": "order", "topic": "r15-widget-board", "said_at": said,
+            "session": "fixture-session", "runtime": "fixture-cli"}),
+    );
+    let intent = object_id("intent", "r15-widget-board");
+    apply(
+        "draft_intent",
+        "r15-intent",
+        json!({"intent": intent, "outcome": "The invented widget board lists every widget.",
+            "first_user": "The fixture reader, in its first run.", "origin": created(&request, "request"),
+            "questions": [{"question": "Which colour?", "default": "green", "answer": ""}],
+            "directory": "fixture/widget-board"}),
+    );
+    f.ont = Some(FakeOnt {
+        engine: Some(engine.clone()),
+        ..FakeOnt::default()
+    });
+    let mut r = f.request("engine.md");
+    r["intent"] = json!("r15-widget-board");
+    r["store"] = json!(store);
+    let (v, status) = f.run(&r).unwrap();
+    assert_eq!(status, 0, "{v}");
+    let key = v["run_object"]["key"].as_str().unwrap().to_owned();
+    assert_eq!(v["run_object"]["start"], "applied", "{v}");
+    let got = ont(&["get"], &json!({"id": object_id("run", &key)}));
+    let fields = &got["result"]["objects"][0]["observations"];
+    let fields = &fields[fields.as_array().unwrap().len() - 1]["fields"];
+    assert_eq!(fields["host"]["value"]["native_key"], "local", "{got}");
+    assert_eq!(fields["uses"]["value"]["native_key"], "a1", "{got}");
 }
 
 // spec: specs/ap/run-object.md#R12

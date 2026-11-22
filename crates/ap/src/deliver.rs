@@ -1062,6 +1062,7 @@ fn start(
     mut p: Value,
     attempt: usize,
 ) -> Step<()> {
+    p["host"] = id("host", "local");
     drop_nulls(&mut p);
     let v = apply(s, c, "start_install", request, p)?;
     let edit = &v["result"]["edits"][0];

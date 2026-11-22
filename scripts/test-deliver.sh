@@ -187,6 +187,16 @@ line() { echo "walk pass=$1 k=$2 pair=$3 outcome=$4"; }
 # A call killed after the k-th rename of the content tree.
 killed() { echo 0 > "$W/count"; echo "$2" > "$W/kill_at"; call "$1"; rm -f "$W/count" "$W/kill_at"; [ "$RC" = 137 ] || fail "the call was not killed at rename $2 (exit $RC)"; }
 
+# The native key of the `host` of the one install a search by `commit` (and `kind`, when given) finds, else `none`.
+attempt_host() {
+  python3 -I -c 'import json, sys
+w = [{"eq": ["commit", sys.argv[1]]}] + ([{"eq": ["kind", sys.argv[2]]}] if len(sys.argv) > 2 else [])
+print(json.dumps({"object_type": "install", "where": {"all": w}, "limit": 10}))' "$@" | ont search |
+    python3 -I -c 'import json, sys
+r = json.load(sys.stdin); o = r["result"]["objects"] if r.get("status") == "ok" else []
+f = {k: v.get("value") for k, v in o[0]["head"]["fields"].items()} if len(o) == 1 else {}
+print((f.get("host") or {}).get("native_key", "none"))' 2>/dev/null || echo none
+}
 # The pair at C0, installed by the scripts themselves from a clone of the origin.
 git clone -q "$O" "$W/boot"
 CARGO_TARGET_DIR=$W/boot-target bash "$W/boot/scripts/install-ap.sh" install "$C0" > /dev/null 2> "$W/err" ||
@@ -208,6 +218,7 @@ cmp -s "$AP_UNIT_DIR/walk.service" "$O/deploy/walk.service" && cmp -s "$AP_UNIT_
 [ "$(member '[(u["name"], u["result"], u["enabled"]) for u in r["units"]]')" = "[('walk.service', 'written', None), ('walk.timer', 'written', True)]" ] &&
   [ "$(member 'r["code"]')" = null ] || fail "pass a: the record's units"
 [ "$(stat -c %a "$AP_UNIT_DIR/walk.timer")" = 644 ] || fail "pass a: the mode of a unit file"
+[ "$(attempt_host "$M")" = local ] || fail "pass a: the attempt's host"
 line a 0 "$(pair)" "$(member 'r["outcome"]')"
 
 # spec: specs/ap/deliver.md#R21
@@ -227,6 +238,7 @@ FROM=$(git -C "$O" rev-parse "$M^1")
 echo 0 > "$W/count"; call rollback; NRB=$(cat "$W/count"); rm -f "$W/count"
 p=$(pair)
 [ "$RC" = 0 ] && [ "$(member 'r["end"]')" = installed ] && [ "$p" = "$FROM" ] || fail "pass e: pair $p, exit $RC"
+[ "$(attempt_host "$FROM" rollback)" = local ] || fail "pass e: the attempt's host"
 line e 1 "$p" "$(member 'r["outcome"]')"
 
 # spec: specs/ap/deliver.md#R21
@@ -424,6 +436,7 @@ assert len(o) == 1 and f["target"]["native_key"] == "/usr/local/bin/ont" and f["
 CE=$W/state/engine
 [ "$(git -C "$CE" remote get-url origin)" = "$E" ] || fail "pass i: the clone's remote"
 git -C "$CE" fetch origin +refs/heads/main:refs/remotes/origin/main --refmap= || fail "pass i: the installer's fetch"
+[ "$(attempt_host "$E1")" = local ] || fail "pass i: the attempt's host"
 line i 0 "$(pair)" "$(member 'r["outcome"]')"
 call engine
 [ "$RC" = 0 ] && [ "$(member 'r["target"]')" = /usr/local/bin/ap ] && [ "$(pair)" = "$M" ] || fail "pass i: the pair after the engine (exit $RC)"

@@ -30,7 +30,7 @@ Codes of `ap resource`: `usage`, `invalid_input`, `policy_invalid` (exit 2); `re
 
 ## Not included
 
-- No caller gives a run's `host` or `uses`, or an install's `host`: `ap run` and `ap deliver` keep their requests.
+- `ap run` gives a run's `host` and `uses`, and `ap deliver` an install's `host`, as `specs/ap/run-object.md` R15 and `specs/ap/deliver.md` R19 say; no other caller gives them.
 - No use of `capacity` by the dispatch pass and no admission of `capacity` or `gate` by a stage's door.
 - No change of the policy's `hosts` or of its reader: the user's own node of the PC is a host a Lead declares, and the pass never reaches it.
 - No reader of `ap policy check` for the pass, no change of the task's sampler, no faster read of the indicators for `gate`.
