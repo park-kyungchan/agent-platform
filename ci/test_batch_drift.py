@@ -217,6 +217,11 @@ class Case(unittest.TestCase):
         return Repo(self.path("clone"), files)
 
     def run_prog(self, prog, args, env):
+        if prog == READ:
+            # Every reader call names the fake engine by ONT_BIN, with a PATH that holds no other ont.
+            self.assertTrue(os.path.isabs(env.get("ONT_BIN", "")) and os.path.basename(env["ONT_BIN"]) == "ont", env)
+            self.assertTrue(all(not os.path.exists(os.path.join(d, "ont")) or os.path.samefile(os.path.join(d, "ont"), env["ONT_BIN"])
+                                for d in env.get("PATH", "").split(os.pathsep) if d), env)
         p = subprocess.run([PY, "-I", "-B", str(prog), *map(str, args)], capture_output=True, text=True, env=env)
         self.assertEqual(p.stderr, "")
         lines = p.stdout.splitlines()
@@ -661,7 +666,7 @@ class BatchDriftTest(Case):
         self.assertEqual(self.read(bad, res, code=2), {"status": "groups_unreadable"})
         self.assertEqual(self.read(out / "groups.json", self.tmp / "none.jsonl", code=2),
                          {"status": "results_unreadable"})
-        rc, v = self.run_prog(READ, ["--groups"], {"PATH": str(self.bin), "HOME": HOME})
+        rc, v = self.run_prog(READ, ["--groups"], {"PATH": str(self.bin), "HOME": HOME, "ONT_BIN": str(self.bin / "ont")})
         self.assertEqual((rc, v), (2, {"status": "usage"}))
 
     def test_actions_fit_the_schema(self):
