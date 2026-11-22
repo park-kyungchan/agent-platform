@@ -81,6 +81,17 @@
    "implementer": 14400,
    "verifier": 7200,
    "fixer": 7200
+  },
+  "github": {
+   "lead_app": {
+    "id": 5863852,
+    "key": "/etc/agent-platform/credentials/kc-ap-lead.pem"
+   },
+   "stage_tokens": {
+    "park-kyungchan/agent-platform": "/etc/agent-platform/credentials/stage-token-agent-platform",
+    "park-kyungchan/ontology-platform": "/etc/agent-platform/credentials/stage-token-ontology-platform",
+    "park-kyungchan/agent-vps-operations": "/etc/agent-platform/credentials/stage-token-agent-vps-operations"
+   }
   }
  },
  "quota": {
