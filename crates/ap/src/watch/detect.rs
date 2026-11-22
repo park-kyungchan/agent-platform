@@ -12,6 +12,12 @@ pub const BACKUP: &str = "/var/lib/agent-platform/backup/last.json";
 pub const DISK: &str = "/var/lib/agent-platform";
 pub const MEMORY_EVENTS: &str = "/sys/fs/cgroup/agents.slice/memory.events";
 pub const APT: &str = "/var/log/apt/history.log";
+/// The checks log (`specs/ap/check.md` R15) and the door's record (`specs/ap/door.md` R6) `pc down`
+/// reads (R30), at these default paths only.
+pub const CHECKS_LOG: &str = "/var/lib/agent-platform/checks.jsonl";
+pub const DOOR_LOG: &str = "/var/lib/agent-platform/door.jsonl";
+/// How far back a reading of the PC counts (R30), in seconds.
+const PC_WINDOW: u64 = 3_600;
 /// The units `services` leaves to `delivery` and `records`.
 const COVERED: [&str; 2] = ["ap-deliver.service", "ont-backup.service"];
 /// The timers `services` reads, each with its interval in seconds (R11); `ap-work` only once installed.
@@ -332,7 +338,12 @@ pub(crate) fn services(s: &mut impl System, now: u64) -> Reading {
 }
 
 /// `host` (R12): the disk floor, the slice's `memory.events`, the apt history and old agent CLIs.
-pub(crate) fn host(s: &mut impl System, now: u64, prior: Option<&Value>) -> Reading {
+pub(crate) fn host(
+    s: &mut impl System,
+    now: u64,
+    prior: Option<&Value>,
+    policy: &Result<Option<Value>, String>,
+) -> Reading {
     let mut r = Read::default();
     let mut state = prior.cloned().unwrap_or_else(|| json!({}));
     let df = output(s, "df", &["-BM", "--output=avail", DISK])?;
@@ -441,8 +452,129 @@ pub(crate) fn host(s: &mut impl System, now: u64, prior: Option<&Value>) -> Read
             ));
         }
     }
+    pc_down(s, now, policy, &mut r)?;
     r.state = Some(state);
     Ok(r)
+}
+
+/// One reading of the PC (R30): when it was made, and whether the PC took the call.
+struct PcReading {
+    at: u64,
+    reached: bool,
+    file: &'static str,
+    /// The checks-log line's `host` (`pc` or `local`, else `-`) and the reason, a fixed word.
+    host: &'static str,
+    reason: &'static str,
+}
+/// The reasons of a call the probe of the PC answered (`specs/ap/check.md` R4, R19) and those of a
+/// call it did not take.
+const ANSWERED: [&str; 3] = ["pc_busy", "pc_memory_low", "pc_engine_differs"];
+const DOWN: [&str; 2] = ["pc_unreachable", "pc_lost"];
+fn fixed(set: &[&'static str], v: &Value) -> Option<&'static str> {
+    set.iter().copied().find(|w| v.as_str() == Some(*w))
+}
+/// The reading one line of a record holds, or None (R30).
+fn pc_line(file: &'static str, line: &str) -> Option<PcReading> {
+    let v: Value = serde_json::from_str(line).ok().filter(Value::is_object)?;
+    let door = file == "door.jsonl";
+    let (at, reached) = if door {
+        if v["verb"] != "check" {
+            return None;
+        }
+        let start = epoch(v["at"].as_str()?)?;
+        let at = start.saturating_add(v["ms"].as_u64()? / 1_000);
+        (at, v["exit"].is_i64() || v["exit"].is_u64())
+    } else {
+        (epoch(v["end"].as_str()?)?, v["host"] == "pc")
+    };
+    let answered = fixed(&ANSWERED, &v["reason"]);
+    let down = fixed(&DOWN, &v["reason"]);
+    let reached = reached || answered.is_some();
+    if !reached && down.is_none() {
+        return None;
+    }
+    let host = match v["host"].as_str() {
+        Some("pc") if !door => "pc",
+        Some("local") if !door => "local",
+        _ => "-",
+    };
+    Some(PcReading {
+        at,
+        reached,
+        file,
+        host,
+        reason: answered.or(down).unwrap_or("-"),
+    })
+}
+/// The part of `hosts.pc.ssh` after its `@`, when it is a host name.
+fn pc_host(pc: &Value) -> String {
+    let name = |h: &&str| {
+        !h.is_empty()
+            && h.bytes()
+                .all(|b| b.is_ascii_alphanumeric() || b == b'-' || b == b'.')
+    };
+    pc["ssh"]
+        .as_str()
+        .and_then(|s| s.split_once('@'))
+        .map(|(_, h)| h)
+        .filter(name)
+        .map_or_else(|| "<host of hosts.pc.ssh>".to_owned(), str::to_owned)
+}
+/// `pc down` (R30): the newest reading of the PC of the last 60 minutes in the checks log and the
+/// door's record, when the policy names `hosts.pc`. Nothing of it is kept in `state.json`.
+fn pc_down(
+    s: &impl System,
+    now: u64,
+    policy: &Result<Option<Value>, String>,
+    r: &mut Read,
+) -> Result<(), String> {
+    let Ok(Some(policy)) = policy else {
+        r.unknown.push("pc down".into());
+        return Ok(());
+    };
+    let pc = &policy["hosts"]["pc"];
+    if !pc.is_object() {
+        return Ok(());
+    }
+    let mut newest: Option<PcReading> = None;
+    for (path, file) in [(CHECKS_LOG, "checks.jsonl"), (DOOR_LOG, "door.jsonl")] {
+        let Some(log) = text(s, path)? else {
+            continue;
+        };
+        for reading in log.lines().filter_map(|l| pc_line(file, l)) {
+            let counts = reading.at.saturating_add(PC_WINDOW) >= now;
+            let better = newest
+                .as_ref()
+                .is_none_or(|n| (reading.at, reading.reached) > (n.at, n.reached));
+            if counts && better {
+                newest = Some(reading);
+            }
+        }
+    }
+    match newest {
+        None => r.unknown.push("pc down".into()),
+        Some(n) if n.reached => {}
+        Some(n) => {
+            let host = pc_host(pc);
+            let what = format!(
+                "the local PC took no check; ask the user to run `Start-ScheduledTask -TaskName \
+                 ap-checks-keepalive` in PowerShell on the PC, then read `tailscale ping {host}` \
+                 on this host"
+            );
+            let evidence = match n.file {
+                "checks.jsonl" => format!(
+                    "checks.jsonl at {}: host {}, reason {}",
+                    utc(n.at),
+                    n.host,
+                    n.reason
+                ),
+                file => format!("{file} at {}: reason {}", utc(n.at), n.reason),
+            };
+            r.signals
+                .push(Signal::new("pc down".into(), "act", &what, evidence));
+        }
+    }
+    Ok(())
 }
 
 /// `records` (R13): the store's newest backup and the copy off the host.
