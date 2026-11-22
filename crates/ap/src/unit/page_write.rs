@@ -56,12 +56,16 @@ const LOOK_REPEATS: u32 = 2;
 const BACK: &str = "Your amendment was not taken as it stands: the next line is either the refusal of `ap` as one JSON object or the path of the report of the look at the page it made; read it, then give the whole amendment again as your final message, changed so that it holds.";
 /// The codes of `specs/ap/unit-review.md` R23 by which a look refuses the page it was to look at: they
 /// go back to the writer (R10).
-const PAGE_REFUSED: [&str; 9] = [
+const PAGE_REFUSED: [&str; 13] = [
     "write_set_missing",
     "acceptance_missing",
     "tiers_missing",
     "write_set_form",
     "plain_writes_protected",
+    "read_first_missing",
+    "read_first_range",
+    "clause_missing",
+    "clause_unnamed",
     "acceptance_not_runnable",
     "acceptance_timeout",
     "acceptance_passes_on_base",

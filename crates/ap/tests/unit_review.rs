@@ -2680,6 +2680,98 @@ fn r23_a_look_refuses_a_pattern_outside_the_grammar_and_a_plain_page_of_protecte
 }
 
 // spec: specs/ap/unit-review.md#R23
+// spec: specs/ap/unit.md#R46
+#[test]
+fn r23_a_look_refuses_a_page_whose_citations_fail_on_the_base() {
+    let mut f = F::new();
+    let origin = f.t.join("origin");
+    std::fs::create_dir_all(origin.join("docs")).unwrap();
+    std::fs::write(origin.join("docs/notes.txt"), "one\ntwo\nthree\n").unwrap();
+    git(&origin, &["add", "-A"]);
+    git(&origin, &["commit", "--quiet", "-m", "notes"]);
+    let never = json!([{"check": "exit 99", "kind": "invariant"}]);
+    let refused = |f: &mut F, key: &str, set: Value| {
+        f.modify("unit", key, set);
+        f.git.clear();
+        let calls = f.calls.len();
+        let e = refused_look(f, key, never.clone());
+        // The one fetch of the page and no second; no copy, no check, no unit of a check.
+        let fetches = f.git.iter().filter(|a| a.iter().any(|w| w == "fetch"));
+        assert_eq!(fetches.count(), 1, "{:?}", f.git);
+        assert!(
+            f.git
+                .iter()
+                .all(|a| a[0] != "clone" && !a.iter().any(|w| w == "clone"))
+        );
+        assert!(
+            f.calls[calls..].iter().all(|c| c.0 != "systemctl"),
+            "no check ran"
+        );
+        e
+    };
+    let failed = |e: &Refusal| e.detail["failed"][0]["entry"].clone();
+    // Each code, for a unit in any state.
+    for (key, state) in [("u1", "draft"), ("u1", "ready")] {
+        f.modify("unit", key, json!({"state": state}));
+        let e = refused(&mut f, key, json!({"read_first": ["docs/missing.txt"]}));
+        assert_eq!(
+            code(&e),
+            ("read_first_missing".into(), "read_first.0".into()),
+            "{state}"
+        );
+        assert_eq!(e.detail["count"], 1);
+        assert_eq!(failed(&e), "docs/missing.txt");
+        let e = refused(
+            &mut f,
+            key,
+            json!({"read_first": ["docs/notes.txt:1-9 why"]}),
+        );
+        assert_eq!(
+            code(&e),
+            ("read_first_range".into(), "read_first.0".into()),
+            "{state}"
+        );
+    }
+    f.modify(
+        "unit",
+        "u1",
+        json!({"read_first": ["docs/notes.txt:1-3 what is read"]}),
+    );
+    let c = "invented/widgets:specs/w.md#R1";
+    f.put(
+        "clause",
+        c,
+        json!({"repository": "invented/widgets", "path": "specs/w.md", "rule": "R1",
+            "tests": ["src/widgets.rs:4"]}),
+    );
+    let e = refused(&mut f, "u1", json!({"specs": ["specs/w.md#R2"]}));
+    assert_eq!(code(&e), ("clause_missing".into(), "specs.0".into()));
+    assert_eq!(failed(&e), "specs/w.md#R2");
+    let e = refused(&mut f, "u1", json!({"specs": []}));
+    assert_eq!(code(&e), ("clause_unnamed".into(), "specs".into()));
+    assert_eq!(e.detail["failed"][0]["test"], "src/widgets.rs:4");
+    assert_eq!(failed(&e), c);
+    // R38 comes first when a page has both faults.
+    let e = refused(&mut f, "u1", json!({"write_set": ["src/*.rs"]}));
+    assert_eq!(code(&e).0, "write_set_form");
+    // A page whose citations hold is looked at, whether it names the clause or its file.
+    for specs in [json!(["specs/w.md#R1"]), json!(["specs/w.md"])] {
+        f.modify(
+            "unit",
+            "u1",
+            json!({"write_set": ["src/widgets.rs"], "specs": specs}),
+        );
+        f.modify(
+            "unit",
+            "u1",
+            json!({"acceptance": [{"check": "true", "kind": "invariant"}]}),
+        );
+        let (v, status) = f.ok(&f.req("unit", "u1"));
+        assert_eq!((status, &v["verdict"]), (0, &json!("accept")), "{v}");
+    }
+}
+
+// spec: specs/ap/unit-review.md#R23
 // spec: specs/ap/unit-review.md#R8
 #[test]
 fn r23_a_look_that_resumes_runs_the_same_checks_first() {

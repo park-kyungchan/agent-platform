@@ -1241,6 +1241,31 @@ fn r10_each_way_back_resumes_the_launch_before() {
     assert_eq!(f.prompt(2).lines().nth(1).unwrap(), report);
 }
 
+// spec: specs/ap/unit-write.md#R10
+#[test]
+fn r10_a_look_refused_for_a_citation_goes_back_to_the_writer() {
+    let mut f = F::new();
+    let mut missing = F::good();
+    missing["read_first"] = json!(["docs/missing.txt what it is for"]);
+    let mut held = F::good();
+    held["read_first"] = json!(["AGENTS.md what it is for"]);
+    f.says(&[missing, held]);
+    let (v, status) = f.ok();
+    assert_eq!((v["end"].as_str(), status), (Some("accept"), 0), "{v}");
+    assert_eq!(v["launches"].as_array().unwrap().len(), 2);
+    assert_eq!(v["amendments"], 2);
+    // The next launch's prompt: the fixed sentence, then the look's refusal as one JSON line.
+    let back = f.prompt(2);
+    assert!(
+        back.starts_with("Your amendment was not taken as it stands:"),
+        "{back}"
+    );
+    let line: Value = serde_json::from_str(back.lines().nth(1).unwrap()).unwrap();
+    assert_eq!(line["code"], "read_first_missing");
+    assert_eq!(line["field"], "read_first.0");
+    assert_eq!(line["after"], Value::Null);
+}
+
 // spec: specs/ap/unit-write.md#R11
 #[test]
 fn r11_the_answer_and_each_end() {

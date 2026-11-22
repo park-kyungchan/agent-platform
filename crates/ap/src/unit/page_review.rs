@@ -534,6 +534,9 @@ fn look_at(
         let at = copy
             .as_ref()
             .map(|(clone, commit)| (clone.as_str(), commit.as_str()));
+        if let Some((clone, commit)) = at {
+            object::citations_judged(s, look.store, &subject, clone, commit)?;
+        }
         object::checks_on_base(s, &subject, at.map(|a| a.0), at.map(|a| a.1))?;
     }
     if let Some((_, _, wd)) = &resumed {
