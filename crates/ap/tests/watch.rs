@@ -3599,7 +3599,7 @@ fn r30_a_door_check_that_fell_back_is_a_reading_and_a_door_fn_is_not() {
     f.at(30);
     let now = f.now();
     let old_pc = checks_line(now - 1_200, "pc", Value::Null);
-    put(&mut f, CHECKS_LOG, &[old_pc.clone()]);
+    put(&mut f, CHECKS_LOG, &[old_pc]);
     // `fn` lines (even with a `pc_lost` reason) and a check that went elsewhere are no reading.
     let lines = [
         door_line(now - 300, 1_000, json!("fn"), Value::Null, json!("pc_lost")),
@@ -3644,7 +3644,6 @@ fn r30_a_door_check_that_fell_back_is_a_reading_and_a_door_fn_is_not() {
     let v = f.pass();
     assert_eq!(v["closed"], json!([pc_key()]), "{v}");
     // A door line with an integer exit reached the PC; a later one that ran on it closes as well.
-    let mut lines = lines;
     lines.push(door_line(
         now + 60,
         2_999,
