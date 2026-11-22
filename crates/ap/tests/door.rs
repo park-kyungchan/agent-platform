@@ -120,6 +120,17 @@ exec "$@"
 /// The worktree's check: where it ran, one line of errors, exit 3.
 const CHECK: &str = "#!/bin/sh\necho \"check ran in $PWD\"\necho \"check err\" >&2\nexit 3\n";
 
+/// True on the PC, where `ap check` sets `AP_CHECK_HOST=pc` (`specs/ap/check.md` R17) and no systemd
+/// is reachable: the tests that start the door return at their start, with one line on standard
+/// error. This host and CI run them.
+fn on_pc() -> bool {
+    let pc = std::env::var("AP_CHECK_HOST").is_ok_and(|v| v == "pc");
+    if pc {
+        eprintln!("door: skipped (pc)");
+    }
+    pc
+}
+
 fn write(path: &Path, text: &str, mode: u32) {
     fs::create_dir_all(path.parent().unwrap()).unwrap();
     fs::write(path, text).unwrap();
@@ -496,6 +507,9 @@ fn eight(line: &Value) {
 // spec: specs/ap/run-limits.md#R13
 #[test]
 fn r1_r13_a_stage_with_limits_has_its_door_and_ap_door_alone() {
+    if on_pc() {
+        return;
+    }
     let f = Fake::new();
     let mut r = f.request("reviewer");
     r["env"] = json!({"AP_DOOR": "/elsewhere/door", "FOO": "bar"});
@@ -572,6 +586,9 @@ fn r1_r13_a_stage_with_limits_has_its_door_and_ap_door_alone() {
 // spec: specs/ap/run-limits.md#R13
 #[test]
 fn r13_a_request_without_limits_has_no_door_and_no_variable() {
+    if on_pc() {
+        return;
+    }
     let f = Fake::new();
     let mut r = f.request("reviewer");
     r.as_object_mut().unwrap().remove("limits");
@@ -599,6 +616,9 @@ fn r13_a_request_without_limits_has_no_door_and_no_variable() {
 // spec: specs/ap/door.md#R8
 #[test]
 fn r1_the_door_of_a_long_path_and_of_a_final_slash_is_reached() {
+    if on_pc() {
+        return;
+    }
     let f = Fake::new();
     // A directory that makes the scratch path 200 bytes, a short name and a long one, and a path
     // written with a final `/`.
@@ -658,6 +678,9 @@ fn r1_the_door_of_a_long_path_and_of_a_final_slash_is_reached() {
 // spec: specs/ap/run-limits.md#R13
 #[test]
 fn r1_a_name_in_the_way_of_the_door_fails_the_call_before_any_launch() {
+    if on_pc() {
+        return;
+    }
     let f = Fake::new();
     write(&f.t.join("scratch.door"), "mine", 0o644);
     let r = f.request("reviewer");
@@ -677,6 +700,9 @@ fn r1_a_name_in_the_way_of_the_door_fails_the_call_before_any_launch() {
 // spec: specs/ap/door.md#R6
 #[test]
 fn r2_every_other_request_is_refused_invalid_request_without_effect() {
+    if on_pc() {
+        return;
+    }
     let f = Fake::new().with_policy();
     let r = f.request("verifier");
     let door = f.door();
@@ -778,6 +804,9 @@ fn r2_every_other_request_is_refused_invalid_request_without_effect() {
 // spec: specs/ap/door.md#R2
 #[test]
 fn r2_the_door_serves_four_requests_at_once_and_the_fifth_waits() {
+    if on_pc() {
+        return;
+    }
     let f = Fake::new();
     fs::write(f.t.join("ont.mode"), "wait").unwrap();
     let r = f.request("reviewer");
@@ -815,6 +844,9 @@ fn r2_the_door_serves_four_requests_at_once_and_the_fifth_waits() {
 // spec: specs/ap/door.md#R3
 #[test]
 fn r3_check_is_admitted_for_its_three_roles_and_its_own_cwd_alone() {
+    if on_pc() {
+        return;
+    }
     for role in ["implementer", "fixer", "verifier", "reviewer"] {
         let f = Fake::new().with_policy();
         fs::write(f.t.join("pc/down"), "").unwrap();
@@ -852,6 +884,9 @@ fn r3_check_is_admitted_for_its_three_roles_and_its_own_cwd_alone() {
 // spec: specs/ap/door.md#R6
 #[test]
 fn r4_the_pc_runs_the_check_and_its_streams_status_and_row_come_back() {
+    if on_pc() {
+        return;
+    }
     let f = Fake::new().with_policy();
     let (door, repo) = (f.door(), f.s("repo"));
     let pc = f.s("pc/work/trees");
@@ -937,6 +972,9 @@ fn r4_the_pc_runs_the_check_and_its_streams_status_and_row_come_back() {
 // spec: specs/ap/door.md#R6
 #[test]
 fn r4_a_pc_down_busy_or_lost_closes_here_without_a_row_or_a_command() {
+    if on_pc() {
+        return;
+    }
     let f = Fake::new().with_policy();
     let (door, repo) = (f.door(), f.s("repo"));
     let marker = f.s("ran");
@@ -987,6 +1025,9 @@ fn r4_a_pc_down_busy_or_lost_closes_here_without_a_row_or_a_command() {
 // spec: specs/ap/door.md#R4
 #[test]
 fn r4_a_policy_or_worktree_the_door_refuses_closes_here_with_its_code() {
+    if on_pc() {
+        return;
+    }
     let f = Fake::new().with_policy();
     let (door, repo) = (f.door(), f.s("repo"));
     let t = f.t.clone();
@@ -1015,6 +1056,9 @@ fn r4_a_policy_or_worktree_the_door_refuses_closes_here_with_its_code() {
 // spec: specs/ap/door.md#R6
 #[test]
 fn r4_a_client_gone_mid_call_ends_it_and_leaves_no_process() {
+    if on_pc() {
+        return;
+    }
     let f = Fake::new().with_policy();
     let (door, repo) = (f.door(), f.s("repo"));
     let pid_file = f.s("cmd.pid");
@@ -1058,6 +1102,9 @@ fn r4_a_client_gone_mid_call_ends_it_and_leaves_no_process() {
 // spec: specs/ap/door.md#R6
 #[test]
 fn r5_fn_asks_the_engine_as_the_stage_for_a_function_of_the_list() {
+    if on_pc() {
+        return;
+    }
     let f = Fake::new();
     let door = f.door();
     let t = f.t.clone();
@@ -1155,6 +1202,9 @@ fn r5_fn_asks_the_engine_as_the_stage_for_a_function_of_the_list() {
 // spec: specs/ap/clause.md#R10
 #[test]
 fn r10_clause_is_served_as_route_is_and_a_name_off_the_list_is_still_refused() {
+    if on_pc() {
+        return;
+    }
     let f = Fake::new();
     let door = f.door();
     let t = f.t.clone();
@@ -1193,6 +1243,9 @@ fn r10_clause_is_served_as_route_is_and_a_name_off_the_list_is_still_refused() {
 // spec: specs/ap/door.md#R5
 #[test]
 fn r5_the_store_of_the_request_is_named_and_an_engine_that_cannot_start_is_127() {
+    if on_pc() {
+        return;
+    }
     let f = Fake::new();
     let mut r = f.request("implementer");
     r["unit"] = json!("u1");
@@ -1242,6 +1295,9 @@ fn r6_child_the_record_under_a_umask() {
 // spec: specs/ap/door.md#R6
 #[test]
 fn r6_the_record_is_made_0600_under_any_umask_and_a_file_that_exists_keeps_its_mode() {
+    if on_pc() {
+        return;
+    }
     for umask in ["022", "077"] {
         let exe = std::env::current_exe().unwrap();
         let out = forks::forking(|| {
@@ -1285,6 +1341,9 @@ fn r6_the_record_is_made_0600_under_any_umask_and_a_file_that_exists_keeps_its_m
 // spec: specs/ap/door.md#R7
 #[test]
 fn r7_the_closing_ends_a_call_the_pc_holds_and_nothing_of_it_lives() {
+    if on_pc() {
+        return;
+    }
     let f = Fake::new().with_policy();
     let (door, repo) = (f.door(), f.s("repo"));
     let pid_file = f.s("cmd.pid");
@@ -1405,6 +1464,9 @@ fn r8_ap_fn_refuses_before_any_connection_and_says_no_door() {
 // spec: specs/ap/door.md#R8
 #[test]
 fn r8_ap_fn_answers_the_engine_or_the_door_refusal() {
+    if on_pc() {
+        return;
+    }
     let f = Fake::new();
     let door = f.door();
     let t = f.t.clone();
@@ -1464,6 +1526,9 @@ impl Fake {
 // spec: specs/ap/check.md#R20
 #[test]
 fn r20_ap_check_under_the_door_for_each_of_its_outcomes() {
+    if on_pc() {
+        return;
+    }
     let f = Fake::new().with_policy();
     let (door, repo) = (f.door(), f.s("repo"));
     let t = f.t.clone();

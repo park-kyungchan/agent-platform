@@ -27,3 +27,5 @@ Purpose: a stage with `limits` cannot reach the local PC (its view hides `/run/t
 - A guard against a stage that changes a path of its worktree while the door packs it for the PC: the payload is read outside the view, as when the Lead starts `ap check`.
 - After a killed `ap run`: the door's call on the PC ends at the PC's own bound (`specs/ap/check.md` R10), and `<door>` stays beside the scratch directory.
 - No change of `crates/ap/src/check/pc.sh`, of the policy's members, of the requests `ap unit run` makes, of the help text of `ap check`, or of `content/`.
+
+Tests: on the PC, where `ap check` sets `AP_CHECK_HOST=pc`, the tests of `crates/ap/tests/door.rs` that start the door return at their start with the line `door: skipped (pc)` on standard error, since no systemd is reachable there; this host and CI run them.
