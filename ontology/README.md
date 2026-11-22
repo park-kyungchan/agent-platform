@@ -1499,3 +1499,137 @@ beside `horizon` and `route`; `ont_describe` and `ont_action_list` stay within 2
 - (g) `wave` set by `add_unit` and changed by `amend_unit` reads back.
 
 The last line of standard output of the rehearsal is `v16 clauses: ok`.
+
+Version 16 stays pinned as stated at the head of section "Version 17: hosts, accounts, samples and checks"; the migration and the rehearsal as they stand now are described in section "Version 17: hosts, accounts, samples and checks", "The migration and the rehearsal".
+
+## Version 17: hosts, accounts, samples and checks
+Version 16 remains pinned at
+`89d2a9f20141f91cfcf8437714e337996b51aa75:ontology/work.schema.json`,
+sha256 `b96965329a1732168c1451b43240776af9fbaf24978913ad7e82eee03dd96b56`.
+Version 17 changes what points 8 and 9 below name (`run`, `install`, `start_run`, `start_install` and the grant) and adds
+what points 1 to 7 and 9 name; every other value type, source, object type, link type, action, view and function of
+version 16 reads the same in canonical JSON.
+
+The hosts the work runs on and the accounts it runs under become objects, so that a Lead, and later the dispatch pass,
+asks once what can start now and where. `ap resource` (`specs/ap/resource.md`), on the timer `ap-resource.timer` every
+five minutes, observes each host, writes one sample line per host and pass, writes the checks log of `ap check` as
+records and observes each account's newest usage-limit reading; `ont fn capacity` and `ont fn gate` answer from the
+objects. A host is a tailnet node and names its machine: the two nodes of the PC (the one the checks reach, and the
+user's own, which a Lead declares) are two hosts of one machine, whose CPUs and memory `capacity` counts once.
+
+1. `host`, owned by the Ontology, keyed by the native key of the parameter `host` (`primary_key` `/native_key`), titled
+   by `node`. Its keys: `local` (the host of the store and of `ap`), each key of the policy's `hosts` (`pc`), and any
+   key a Lead declares.
+
+   | Property | Type | Meaning |
+   | --- | --- | --- |
+   | `node` | string, 200 | the tailnet node's name |
+   | `machine` | string, 100 | the computer the node belongs to; two hosts of one machine share its CPUs and memory |
+   | `declared_at` | `utc_time` | the time of the last `declare_host` |
+   | `answers` | boolean, optional | whether the host answered the last observation |
+   | `free` | boolean, optional | whether the host had room for one more unit or check at the last observation |
+   | `observed_at` | `utc_time`, optional | the time of the last `observe_host` |
+   | `seen_at` | `utc_time`, optional | the last time the host answered |
+   | `cpus` | integer, optional | its CPU count as last read |
+   | `load_x100` | integer, optional | its one-minute load times 100, rounded (the engine has no fractional number) |
+   | `available_mb` | integer, optional | its available memory in MB, rounded down |
+2. `declare_host`: `host` (reference, required: its native key is the key), `node` and `machine` (`nonempty_text`,
+   required, at most 200 and 100 bytes). One rule `create_or_modify_object` of `host` sets `node`, `machine` and
+   `declared_at` (`$now`): a second declare changes them and keeps the readings.
+3. `observe_host`: `host` (reference, required), `answers` and `free` (boolean, required), and optional `seen_at`
+   (`utc_time`), `cpus`, `load_x100` and `available_mb` (integer). Criteria: `unknown_host` (the host exists);
+   `seen_at_in_future` (a `seen_at` that is present and later than `$now`). One rule `modify_object` of `host` sets the
+   six and `observed_at` (`$now`); a parameter not given leaves its property as it is, so a host that does not answer
+   keeps its last readings and `seen_at`.
+4. `account`, owned by the Ontology, keyed by the native key of the parameter `account`, with no required property. Its
+   key is the last path component of an account directory (the `account` of a `run`), or the name the user gives an
+   allowance no run reports.
+
+   | Property | Type | Meaning |
+   | --- | --- | --- |
+   | `runtime` | string, 40, optional | the runtime of the account, such as `claude` |
+   | `limit` | string, 300, optional | the usage-limit reading of the newest run that reports one, as the run holds it |
+   | `limit_at` | `utc_time`, optional | that run's `ended_at` |
+   | `limit_run` | reference to `run`, optional | that run |
+   | `observed_at` | `utc_time`, optional | the time of the last `observe_account` |
+   | `allowance` | string, 300, optional | the allowance the user states, in the user's words |
+   | `allowance_at` | `utc_time`, optional | the time of the last `state_allowance` |
+   | `allowance_by` | reference to `request`, optional | the user's request that states it |
+5. `observe_account`: `account` (reference, required) and optional `runtime` (string, 40), `limit` (`nonempty_text`,
+   300), `limit_at` (`utc_time`) and `limit_run` (reference to `run`); one rule `create_or_modify_object` of `account`
+   sets them and `observed_at` (`$now`). `state_allowance`: `account` (reference), `allowance` (`nonempty_text`, 300)
+   and `by` (reference to `request`), all required; the criterion `by_not_the_users_word` with the three conditions
+   `waive_criterion` has under that code (the request exists, is `current` and is of kind `decision`, `order` or
+   `answer`); one rule `create_or_modify_object` of `account` sets `allowance`, `allowance_by` and `allowance_at`
+   (`$now`). `state_allowance` is the Lead's, after the user's word; `ap resource` applies the other three.
+6. `host_sample`, owned by the new source `host_samples`: kind `records`, glob
+   `/var/lib/agent-platform/resource/*.samples.jsonl`, `time_member` `observed_at`, `type_member` `type`,
+   `complete_listing` set, `fresh_for_s` 1728000 (twenty days, above the 14 days a file is kept). Keyed by the record's
+   `key`, `<host>@<seconds>`. Each property is the record's member of its name: `host` (reference to `host`), `at`
+   (`utc_time`, the pass's time), `answers` and `free` (boolean), all required; the optional integers `cpus`,
+   `load_x100`, `available_mb` and, for `local` only, `slots` (the dispatch pass's slots), `units_running` and
+   `units_ready` (the units in those states) and `cpu_waits` (the `ready` units that wait on the CPU).
+7. `check`, owned by the new source `checks`: kind `records`, glob `/var/lib/agent-platform/resource/*.checks.jsonl`,
+   the same two members and listing, `fresh_for_s` 5184000 (sixty days, above its 30). Keyed by the record's `key`, the
+   first 32 hexadecimal digits of the SHA-256 of the line of the checks log. Required, each the member of its name:
+   `host` (reference to `host`: `pc` or `local`), `repository`, `head`, `dir` and `command` (strings; `command` the
+   words joined by a space, at most 1,000 bytes), `end` (`utc_time`), `exit` and `milliseconds` (integers: the
+   command's exit status and the call's duration); optional: `reason` (string, 40, why the call ran here) and `start`
+   (`utc_time`).
+8. `run` gains the optional properties `host` (reference to `host`, where the stage ran) and `uses` (reference to
+   `account`, the account it used), and `start_run` the optional parameters of those names, which its rule sets;
+   `install` gains the optional `host` (where the file was installed), and `start_install` the optional parameter
+   `host`. No criterion reads them. The link types, each `many_to_one`, forward then reverse: `run_host`, `host_runs`;
+   `run_account` (by `uses`), `account_runs`; `install_host`, `host_installs`; `host_sample_host`, `host_samples`;
+   `check_host`, `host_checks`; `account_limit_run`, `run_account_limits`; `account_allowance_by`,
+   `request_allowances`.
+9. The functions `capacity` (no parameter, `timeout_ms` 10000) and `gate` (`since`, `utc_time`, required; `intent`,
+   string, optional; `timeout_ms` 600000, the engine's most: the read of the indicators took 47 seconds on 2026-11-21
+   and grows), each with the program `/usr/local/bin/ap` and `answer_bytes` 65536. Their answers are
+   `specs/ap/resource.md` R12 to R16. The grant's `read` gains `host`, `account`, `host_sample` and `check`, its
+   `derive` `host` and `account`, its `actions` the four new actions. Nothing else of the schema changes.
+
+Each new type, action and function has one description of at most 200 bytes; no property or parameter of version 17
+has one, so that `ont_describe` and `ont_action_list` stay within 262,144 bytes. The engine's codes the walk below
+reads: `declare_host` with an empty `node` is `invalid_parameter`; `observe_host` of a host the store does not have is
+`unknown_host`, and with a `seen_at` after now `seen_at_in_future`; `state_allowance` by a request of kind `preference`
+is `by_not_the_users_word`; an index of the two sources while their directory is absent fails each with
+`glob_root_missing`.
+
+### What the store does not check
+- A reference to a host or an account may dangle: `start_run`, `start_install` and a record of `host_samples` or
+  `checks` may name a host the store does not have, and `observe_account`'s `limit_run` a run it does not have; the
+  reference is stored as it is, and `ont around` from the host reaches the records once it exists.
+- Two account directories with one last path component are one account: the key is that component.
+- That a sample's readings are the host's, that `free` follows from them, or that a check record is a line of the log:
+  the engine reads the records as `ap resource` wrote them.
+- That `limit` is JSON: it is the run's text; `capacity` reads it as JSON where it is.
+- That `machine` names one computer: two hosts are one machine because a Lead declared them so.
+- That the program at `/usr/local/bin/ap` answers the functions: an `ap` older than this change refuses an empty
+  argument list with these names, and the call is `function_failed`.
+
+### The migration and the rehearsal
+`ontology/migrate` knows version 17; its step is empty (no data migration): no stored run or install gains a host and no
+account is made. The line `HIGHEST = 17` names it; `17 18` and `9 18` are pairs it does not know (exit 2). The pairs
+refused on the version 10 part of the rehearsal are (9, 18), (10, 10) and (10, 9). An `ap` of the version before sends
+`start_run` and `start_install` without the new parameters, which apply as on version 16.
+
+The first store of the rehearsal, which runs on the repository's file, starts and closes an install with `host`. The
+second store installs version 16 from Git by its commit and digest (above) instead of the repository's file, with the
+globs of `sections`, `components` and `clauses` rewritten to a directory of the rehearsal's own root, and runs the walk
+of version 16 on it. Then it installs the repository's file over the objects made under version 16, the globs of
+`host_samples` and `checks` rewritten to that root too: every object read under version 16 and the ten views read the
+same; the schema differs from version 16 only by points 1 to 9 (each is taken off a copy and the rest compared);
+`ont describe` lists the functions `capacity` (no parameter) and `gate` (`since`, `intent`) beside `clause`, `horizon`
+and `route`; `ont_describe` and `ont_action_list` stay within 262,144 bytes (the line `v17_mcp_bytes=`);
+`ontology/migrate` runs 16 17 (exit 0, the store unchanged) and 17 18 (exit 2). The walk of version 17, each refusal
+before the action it guards: `observe_host` of an undeclared host, `unknown_host`; `declare_host` of `pc`; one with an
+empty `node`, `invalid_parameter`; `observe_host` with a `seen_at` after now, `seen_at_in_future`; an observation with
+readings, then one with `answers` false and no reading, which keeps the readings and `seen_at`; a second `declare_host`
+that changes `machine` and keeps the readings, and a second host of that machine; `observe_account` that makes an
+account, and a second and a third that change its `limit`; `start_run` with and without `host` and `uses`;
+`state_allowance` by a request of kind `preference`, `by_not_the_users_word`, and by a decision, which makes an account
+no run names; an index of the two sources while their directory is absent (`glob_root_missing`); a sample line and a
+check line indexed (`initial`), read by `ont get` with every property, reached by `ont around` from their host by
+`host_samples` and `host_checks`, and retracted with their files. The last line of standard output of the rehearsal is
+`v17 resources: ok`.

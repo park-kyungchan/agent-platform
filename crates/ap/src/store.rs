@@ -294,6 +294,8 @@ actions!(
     end_delegation,
     close_unit_review
 );
+// Schema version 17 on: the actions of `ap resource` (`specs/ap/resource.md` R5, R8), without a role.
+actions!(declare_host, observe_host, observe_account);
 /// Schema version 11 on: an action of `ap unit run`, `ap unit reject` on a unit (`start_unit`,
 /// `resume_unit`, `record_head`, `stop_unit`, `accept_unit`, `reopen_unit`, `merge_unit`), without a
 /// role.
@@ -612,6 +614,45 @@ pub fn search_every_where(
         }
         match &r["continuation"] {
             Value::Null => return Ok((found, qualified)),
+            c if c == &q["continuation"] => return Err(error("store_answer_unreadable", kind)),
+            c => q["continuation"] = c.clone(),
+        }
+    }
+}
+/// Every head of `kind` the filter `filter` matches, page by page (`page` objects a page, each page one call bound
+/// to `ms` and a `store_busy` answer one more), read whether or not the page is qualified (a head past its
+/// freshness, or one that lacks a property the filter names), with the `now` of the first answer
+/// (`specs/ap/resource.md` R8, R11).
+pub fn search_pages(
+    s: &mut impl System,
+    store: Option<&str>,
+    (kind, filter): (&str, Option<Value>),
+    page: u64,
+    ms: u64,
+) -> Result<(Vec<Found>, Option<u64>), Failure> {
+    let mut q = json!({"object_type": kind, "limit": page});
+    if let Some(filter) = filter {
+        q["where"] = filter;
+    }
+    let mut found = vec![];
+    let mut seen = Seen::default();
+    loop {
+        let v = call_in(s, store, &["search"], &q, (1, ms))?;
+        seen.note(&v);
+        let r = &v["result"];
+        for o in r["objects"]
+            .as_array()
+            .ok_or_else(|| error("store_answer_unreadable", kind))?
+        {
+            let key = o["id"]["native_key"].as_str();
+            let fields = o["head"]["fields"].as_object();
+            let (Some(key), Some(fields)) = (key, fields) else {
+                return Err(error("store_answer_unreadable", kind));
+            };
+            found.push((key.to_owned(), values(fields)));
+        }
+        match &r["continuation"] {
+            Value::Null => return Ok((found, seen.now)),
             c if c == &q["continuation"] => return Err(error("store_answer_unreadable", kind)),
             c => q["continuation"] = c.clone(),
         }
