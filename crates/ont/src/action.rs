@@ -486,7 +486,9 @@ fn value_matches(schema: &Schema, ty: &PropertyType, v: &Value) -> bool {
             let Ok(id) = serde_json::from_value::<Id>(v.clone()) else {
                 return false;
             };
-            id.validate().is_ok() && id.object_type == r.target
+            // A reference to an interface admits an id of any type that
+            // implements it (action.md R116).
+            id.validate().is_ok() && schema.reference_admits(&r.target, &id.object_type)
         }
         PropertyType::Array(a) => v
             .as_array()

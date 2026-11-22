@@ -430,10 +430,20 @@ impl<'a> Plan<'a> {
             }
         }
         let mut links = Scope::default();
-        for name in schema.link_types.keys() {
+        for (name, link) in &schema.link_types {
+            // A link into an interface gives no hop (R14).
+            if schema.interfaces.contains_key(&link.to) {
+                continue;
+            }
             let pointer = format!("/link_types/{}", escape_pointer(name));
             links.add(type_name(name), pointer.clone(), &mut faults);
             links.add(format!("{}Reverse", type_name(name)), pointer, &mut faults);
+        }
+        let mut interfaces = Scope::default();
+        for name in schema.interfaces.keys() {
+            let pointer = format!("/interfaces/{}", escape_pointer(name));
+            interfaces.add(type_name(name), pointer.clone(), &mut faults);
+            interfaces.add(format!("{}Ref", type_name(name)), pointer, &mut faults);
         }
         if faults.is_empty() {
             Ok(Self {
@@ -476,11 +486,17 @@ fn scalar_type(base: ScalarType) -> &'static str {
 }
 
 /// The Rust type of a field, inside a submodule of the module (R7).
-fn rust_type(ty: &PropertyType, struct_name: &str) -> String {
+fn rust_type(schema: &Schema, ty: &PropertyType, struct_name: &str) -> String {
     match ty {
         PropertyType::Scalar(s) => scalar_type(*s).to_string(),
+        PropertyType::Ref(r) if schema.interfaces.contains_key(&r.target) => {
+            format!("super::interfaces::{}Ref", type_name(&r.target))
+        }
         PropertyType::Ref(r) => format!("super::Id<super::objects::{}>", type_name(&r.target)),
-        PropertyType::Array(a) => format!("::std::vec::Vec<{}>", rust_type(&a.array, struct_name)),
+        PropertyType::Array(a) => format!(
+            "::std::vec::Vec<{}>",
+            rust_type(schema, &a.array, struct_name)
+        ),
         PropertyType::ValueType(v) => format!("super::values::{}", type_name(&v.value_type)),
         PropertyType::Struct(_) => struct_name.to_string(),
     }
@@ -560,9 +576,12 @@ fn render(checked: &CheckedSchema, plan: &Plan<'_>) -> String {
     objects(&mut o, schema);
     properties(&mut o, schema);
     values(&mut o, schema, plan);
-    callables(&mut o, "actions", "Action", &plan.actions);
-    callables(&mut o, "functions", "Function", &plan.functions);
+    callables(&mut o, schema, "actions", "Action", &plan.actions);
+    callables(&mut o, schema, "functions", "Function", &plan.functions);
     links(&mut o, schema);
+    if !schema.interfaces.is_empty() {
+        interfaces(&mut o, schema);
+    }
     o.line("}");
     o.text
 }
@@ -698,7 +717,7 @@ fn object_body(o: &mut Out, fields: &[(&str, bool)]) {
     o.line("::serde_json::Value::Object(object)");
 }
 
-fn callables(o: &mut Out, module: &str, trait_name: &str, list: &[Callable<'_>]) {
+fn callables(o: &mut Out, schema: &Schema, module: &str, trait_name: &str, list: &[Callable<'_>]) {
     o.line("");
     o.line(&format!("pub mod {module} {{"));
     for callable in list {
@@ -707,7 +726,7 @@ fn callables(o: &mut Out, module: &str, trait_name: &str, list: &[Callable<'_>])
         o.line("#[derive(Debug, Clone, PartialEq, Eq, Hash)]");
         o.line(&format!("pub struct {t} {{"));
         for (name, p) in &callable.parameters {
-            let ty = rust_type(p.ty, &callable.struct_name(name));
+            let ty = rust_type(schema, p.ty, &callable.struct_name(name));
             let ty = if p.required {
                 ty
             } else {
@@ -740,7 +759,7 @@ fn callables(o: &mut Out, module: &str, trait_name: &str, list: &[Callable<'_>])
                 o.line(&format!(
                     "pub {}: {},",
                     field_name(member),
-                    rust_type(ty, &s)
+                    rust_type(schema, ty, &s)
                 ));
             }
             o.line("}");
@@ -759,6 +778,9 @@ fn links(o: &mut Out, schema: &Schema) {
     o.line("");
     o.line("pub mod links {");
     for (name, link) in &schema.link_types {
+        if schema.interfaces.contains_key(&link.to) {
+            continue;
+        }
         let LinkType {
             from, to, names, ..
         } = link;
@@ -784,6 +806,98 @@ fn links(o: &mut Out, schema: &Schema) {
     }
     o.line("}");
 }
+
+/// The submodule `interfaces` (R14): per interface a trait its implementing
+/// types implement and a reference to an object of any of them.
+fn interfaces(o: &mut Out, schema: &Schema) {
+    o.line("");
+    o.line("pub mod interfaces {");
+    for (name, def) in &schema.interfaces {
+        let t = type_name(name);
+        let r = format!("{t}Ref");
+        let implementers = schema.implementers(name);
+        o.comment(def.description.as_deref());
+        o.line(&format!("pub trait {t}: super::ObjectType {{}}"));
+        for ty in &implementers {
+            o.line(&format!(
+                "impl {t} for super::objects::{} {{}}",
+                type_name(ty)
+            ));
+        }
+        o.line("#[derive(Debug, Clone, PartialEq, Eq, Hash)]");
+        o.line(&format!("pub struct {r} {{"));
+        o.line("object_type: &'static str,");
+        o.line("instance: ::std::string::String,");
+        o.line("account: ::std::string::String,");
+        o.line("native_key: ::std::string::String,");
+        o.line("}");
+        o.line(&format!("impl {r} {{"));
+        let names: Vec<String> = implementers.iter().map(|ty| literal(ty)).collect();
+        o.line(&format!(
+            "const IMPLEMENTED_BY: &'static [&'static str] = &[{}];",
+            names.join(", ")
+        ));
+        for line in INTERFACE_REF.lines() {
+            o.line(line);
+        }
+        o.line("}");
+        for ty in &implementers {
+            let id = format!("super::Id<super::objects::{}>", type_name(ty));
+            o.line(&format!("impl ::std::convert::From<{id}> for {r} {{"));
+            o.line(&format!("fn from(id: {id}) -> Self {{"));
+            o.line("Self {");
+            o.line(&format!("object_type: {},", literal(ty)));
+            o.line("instance: id.instance,");
+            o.line("account: id.account,");
+            o.line("native_key: id.native_key,");
+            o.line("}");
+            o.line("}");
+            o.line("}");
+        }
+        o.line(&format!("impl super::Json for {r} {{"));
+        o.line("fn json(&self) -> ::serde_json::Value {");
+        o.line("self.to_value()");
+        o.line("}");
+        o.line("}");
+    }
+    o.line("}");
+}
+
+/// The methods every `<I>Ref` holds (R14).
+const INTERFACE_REF: &str = r#"pub fn object_type(&self) -> &str {
+self.object_type
+}
+pub fn native_key(&self) -> &str {
+&self.native_key
+}
+pub fn to_value(&self) -> ::serde_json::Value {
+let mut namespace = ::serde_json::Map::new();
+namespace.insert(::std::string::String::from("instance"), ::serde_json::Value::String(self.instance.clone()));
+namespace.insert(::std::string::String::from("account"), ::serde_json::Value::String(self.account.clone()));
+let mut id = ::serde_json::Map::new();
+id.insert(::std::string::String::from("object_type"), ::serde_json::Value::from(self.object_type));
+id.insert(::std::string::String::from("namespace"), ::serde_json::Value::Object(namespace));
+id.insert(::std::string::String::from("native_key"), ::serde_json::Value::String(self.native_key.clone()));
+::serde_json::Value::Object(id)
+}
+pub fn from_value(value: &::serde_json::Value) -> ::std::option::Option<Self> {
+fn text<'a>(object: &'a ::serde_json::Map<::std::string::String, ::serde_json::Value>, key: &str) -> ::std::option::Option<&'a str> {
+object.get(key)?.as_str().filter(|s| !s.is_empty() && s.len() <= 512)
+}
+let id = value.as_object()?;
+let namespace = id.get("namespace")?.as_object()?;
+if id.len() != 3 || namespace.len() != 2 {
+return ::std::option::Option::None;
+}
+let named = text(id, "object_type")?;
+let object_type = *Self::IMPLEMENTED_BY.iter().find(|t| **t == named)?;
+::std::option::Option::Some(Self {
+object_type,
+instance: ::std::string::String::from(text(namespace, "instance")?),
+account: ::std::string::String::from(text(namespace, "account")?),
+native_key: ::std::string::String::from(text(id, "native_key")?),
+})
+}"#;
 
 /// The items every module holds, whatever its schema (R5, R8 to R11).
 const FIXED: &str = r#"

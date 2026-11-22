@@ -51,6 +51,19 @@ struct Hop {
     link: LinkType,
     reverse: bool,
 }
+/// Whether the principal reads the type `name`, or one type that implements
+/// the interface `name`.
+fn endpoint_readable(set: &SchemaSet, readable: &BTreeSet<String>, name: &str) -> bool {
+    readable.contains(name) || set.implementers(name).iter().any(|t| readable.contains(*t))
+}
+/// Whether a reference to `target` (an object type or an interface) admits
+/// an id of the type `object_type`.
+fn admits(set: &SchemaSet, target: &str, object_type: &str) -> bool {
+    match set.schema_of_interface(target) {
+        Some(schema) => schema.implements(object_type, target),
+        None => target == object_type,
+    }
+}
 fn plan(
     set: &SchemaSet,
     readable: &BTreeSet<String>,
@@ -72,10 +85,16 @@ fn plan(
         for domain in set.pins().keys() {
             if let Some(schema) = set.schema(domain) {
                 for link in schema.link_types.values() {
-                    // Match describe: a usable link has two readable endpoints.
-                    if !readable.contains(&link.from) || !readable.contains(&link.to) {
+                    // Match describe: a usable link has two readable endpoints;
+                    // an interface end is readable through one implementing
+                    // type the principal reads (read.md R106).
+                    if !readable.contains(&link.from) || !endpoint_readable(set, readable, &link.to)
+                    {
                         continue;
                     }
+                    // The reverse name of a link into an interface the type
+                    // reached implements.
+                    let into_implemented = schema.implements(&reached, &link.to);
                     if link.from == reached {
                         available.insert(
                             link.names.forward.clone(),
@@ -85,7 +104,7 @@ fn plan(
                             },
                         );
                     }
-                    if link.to == reached {
+                    if link.to == reached || into_implemented {
                         available.insert(
                             link.names.reverse.clone(),
                             Hop {
@@ -356,16 +375,30 @@ fn read_around(
 ) -> Result<Answer, Failure> {
     let set = tx.schema_set();
     let principal = Principal::bind(set)?;
-    let schema = set
-        .schema_of(&req.from.object_type)
-        .ok_or_else(|| Refusal::new("unavailable"))?;
-    if !principal
-        .view()
-        .read_types(&schema.domain)
-        .contains(&req.from.object_type)
-    {
-        return Err(Refusal::new("unavailable").into());
-    }
+    // The starting set: the heads of one object type, or of the implementing
+    // types of an interface the principal reads (read.md R106).
+    let (schema, from_types) = match set.schema_of(&req.from.object_type) {
+        Some(schema) => {
+            if !principal
+                .view()
+                .read_types(&schema.domain)
+                .contains(&req.from.object_type)
+            {
+                return Err(Refusal::new("unavailable").into());
+            }
+            (schema, vec![req.from.object_type.clone()])
+        }
+        None => {
+            let schema = set
+                .schema_of_interface(&req.from.object_type)
+                .ok_or_else(|| Refusal::new("unavailable"))?;
+            let types = search::readable_implementers(set, &principal, &req.from.object_type);
+            if types.is_empty() {
+                return Err(Refusal::new("unavailable").into());
+            }
+            (schema, types)
+        }
+    };
     let hops = plan(
         set,
         &principal.view().all_read_types(),
@@ -401,8 +434,12 @@ fn read_around(
     };
     let mut current = BTreeMap::new();
     let condition = search::candidate_condition(req.from.filter.as_ref(), &used);
-    let scopes = search::read_scopes(&principal, &req.from.object_type);
-    for head in reader.scan(&req.from.object_type, condition.as_ref(), &scopes)? {
+    let mut start = Vec::new();
+    for ty in &from_types {
+        let scopes = search::read_scopes(&principal, ty);
+        start.extend(reader.scan(ty, condition.as_ref(), &scopes)?);
+    }
+    for head in start {
         let fields = &head.head.observation.fields;
         if used
             .iter()
@@ -431,7 +468,10 @@ fn read_around(
         } else {
             &hop.link.to
         };
-        if let Some(s) = set.schema_of(target_type) {
+        if let Some(s) = set
+            .schema_of(target_type)
+            .or_else(|| set.schema_of_interface(target_type))
+        {
             domains.insert(s.domain.clone());
         }
         let mut next = BTreeMap::new();
@@ -446,7 +486,7 @@ fn read_around(
                         Some(ids) => {
                             let mut linked = false;
                             for id in ids {
-                                if id.object_type != hop.link.to {
+                                if !admits(set, &hop.link.to, &id.object_type) {
                                     reader.basis.unresolved_excluded += 1;
                                 } else {
                                     linked |= current.contains_key(&id);
@@ -467,7 +507,7 @@ fn read_around(
                     Some(ids) => {
                         for id in ids {
                             // Old schema pins may have allowed a different target.
-                            if id.object_type != hop.link.to {
+                            if !admits(set, &hop.link.to, &id.object_type) {
                                 reader.basis.unresolved_excluded += 1;
                                 continue;
                             }

@@ -1,7 +1,8 @@
 //! Tests of `ont_gen::generate`: the committed modules equal what it gives
 //! for the committed fixtures, its refusals, and the form of its text. The
 //! hostile module is included below and used nowhere, so that the check
-//! compiles and lints it as a consumer that uses none of it would.
+//! compiles and lints it as a consumer that uses none of it would; the
+//! interface module is included and used by one test.
 #![allow(clippy::unwrap_used)]
 use ont_core::schema::{Schema, Violation};
 use serde_json::{Value, json};
@@ -11,6 +12,11 @@ use std::path::PathBuf;
 include!(concat!(
     env!("CARGO_MANIFEST_DIR"),
     "/tests/generated/hostile.rs"
+));
+
+include!(concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/tests/generated/interface.rs"
 ));
 
 fn dir() -> PathBuf {
@@ -85,10 +91,116 @@ fn committed_hostile_equals_generate() {
     assert!(text.lines().any(|l| l == "pub mod r#type {"));
 }
 
+// spec: specs/ont/gen.md#R14
+#[test]
+fn committed_interface_equals_generate() {
+    let text = committed("interface");
+    let lines: Vec<&str> = text.lines().collect();
+    let at = |item: &str| {
+        lines
+            .iter()
+            .position(|l| l.trim_start() == item)
+            .unwrap_or_else(|| panic!("{item}"))
+    };
+    // After `links`, in byte order of the interfaces and their types.
+    assert!(at("pub mod links {") < at("pub mod interfaces {"));
+    assert!(lines.contains(&"    pub mod interfaces {"));
+    assert!(
+        at("pub trait Subject: super::ObjectType {}")
+            < at("pub trait Tagged: super::ObjectType {}")
+    );
+    assert!(
+        at("impl Subject for super::objects::Intent {}")
+            < at("impl Subject for super::objects::Unit {}")
+    );
+    assert!(!text.contains("impl Subject for super::objects::Host"));
+    assert!(text.contains("pub subject: super::interfaces::SubjectRef,"));
+    assert!(text.contains(
+        "pub others: ::std::option::Option<::std::vec::Vec<super::interfaces::SubjectRef>>,"
+    ));
+    assert!(text.contains("pub first: super::interfaces::SubjectRef,"));
+    // A link into an interface gives no hop; another link keeps its two.
+    assert!(!text.contains("pub struct HoldSubject"));
+    assert!(text.contains("pub struct HoldHostReverse;"));
+    // A schema without interfaces has no submodule `interfaces`.
+    for name in ["example", "hostile"] {
+        let text = ont_gen::generate(&fixture(name)).unwrap();
+        assert!(!text.contains("pub mod interfaces"), "{name}");
+    }
+}
+
+// spec: specs/ont/gen.md#R14
+#[test]
+fn an_interface_reference_is_built_from_the_ids_of_its_types() {
+    use iface::interfaces::{Subject, SubjectRef, TaggedRef};
+    use iface::{Action, Id, actions, objects};
+    fn implements<T: Subject>() -> &'static str {
+        T::NAME
+    }
+    assert_eq!(implements::<objects::Intent>(), "intent");
+    assert_eq!(implements::<objects::Unit>(), "unit");
+    let unit = Id::<objects::Unit>::new("u1");
+    let subject = SubjectRef::from(unit.clone());
+    assert_eq!(subject.object_type(), "unit");
+    assert_eq!(subject.native_key(), "u1");
+    assert_eq!(subject.to_value(), unit.to_value());
+    assert_eq!(
+        SubjectRef::from_value(&unit.to_value()),
+        Some(subject.clone())
+    );
+    let intent = SubjectRef::from(Id::<objects::Intent>::in_namespace("i", "a", "k"));
+    assert_eq!(
+        intent.to_value(),
+        json!({"object_type":"intent","namespace":{"instance":"i","account":"a"},"native_key":"k"})
+    );
+    assert_ne!(intent, subject);
+    let host = Id::<objects::Host>::new("h1").to_value();
+    assert_eq!(SubjectRef::from_value(&host), None);
+    assert_eq!(TaggedRef::from_value(&unit.to_value()), None);
+    let mut extra = unit.to_value();
+    extra["more"] = json!(1);
+    assert_eq!(SubjectRef::from_value(&extra), None);
+    let action = actions::SetHold {
+        subject: subject.clone(),
+        others: Some(vec![intent.clone()]),
+        pair: Some(actions::SetHoldPair { first: intent }),
+    };
+    let sent = action.parameters();
+    assert_eq!(sent["subject"], unit.to_value());
+    assert_eq!(sent["others"][0]["object_type"], "intent");
+    assert_eq!(sent["pair"]["first"]["object_type"], "intent");
+}
+
+// spec: specs/ont/gen.md#R1
+// spec: specs/ont/gen.md#R14
+#[test]
+fn an_interface_and_its_reference_are_items_of_one_submodule() {
+    let mut schema = base();
+    schema["interfaces"] = json!({"a": {"properties": {}}, "a_ref": {"properties": {}}});
+    collision(&schema, "/interfaces/a_ref");
+    // A link into an interface defines no item, so it collides with nothing.
+    let mut schema = base();
+    schema["interfaces"] = json!({"t": {"properties": {}}});
+    schema["object_types"]["thing"]["implements"] = json!(["t"]);
+    schema["object_types"]["thing"]["properties"]["to"] =
+        json!({"type": {"ref": "t"}, "required": false});
+    schema["object_types"]["thing"]["properties"]["back"] =
+        json!({"type": {"ref": "thing"}, "required": false});
+    schema["link_types"] = json!({
+        "step": {"from": "thing", "via": "to", "to": "t", "cardinality": "many_to_one",
+                 "names": {"forward": "to", "reverse": "to_of"}},
+        "step_reverse": {"from": "thing", "via": "back", "to": "thing", "cardinality": "many_to_one",
+                 "names": {"forward": "back", "reverse": "back_of"}}
+    });
+    let text = generate_value(&schema).unwrap();
+    assert!(text.contains("pub struct StepReverse;"));
+    assert!(!text.contains("pub struct Step;"));
+}
+
 // spec: specs/ont/gen.md#R2
 #[test]
 fn same_bytes_give_same_text() {
-    for name in ["example", "hostile"] {
+    for name in ["example", "hostile", "interface"] {
         let bytes = fixture(name);
         let a = ont_gen::generate(&bytes).unwrap();
         let b = ont_gen::generate(&bytes.clone()).unwrap();

@@ -1421,7 +1421,13 @@ fn check_ref_namespaces(
             let id: Id = serde_json::from_value(value.clone()).map_err(|_| {
                 StoreRefusal::schema(violation(codes::WRONG_VALUE_TYPE, pointer.to_string()))
             })?;
-            let Some(target) = schemas.schema_of(&r.target) else {
+            // A reference to an interface is held to the rule of a reference
+            // to its object's type: the implementing types share the
+            // interface's schema (schema-language.md R33).
+            let Some(target) = schemas
+                .schema_of(&r.target)
+                .or_else(|| schemas.schema_of_interface(&r.target))
+            else {
                 return Ok(());
             };
             if id.namespace != target.namespace {

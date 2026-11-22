@@ -76,6 +76,9 @@ pub mod codes {
     pub const AMBIGUOUS_RULE_TARGET: &str = "ambiguous_rule_target";
     pub const INVALID_DOCUMENT: &str = "invalid_document";
     pub const UNKNOWN_FUNCTION: &str = "unknown_function";
+    pub const UNKNOWN_INTERFACE: &str = "unknown_interface";
+    pub const MISSING_INTERFACE_PROPERTY: &str = "missing_interface_property";
+    pub const INTERFACE_REFERENCE_FROM_SOURCE: &str = "interface_reference_from_source";
     pub const ALL: &[&str] = &[
         INVALID_FORMAT,
         INVALID_VERSION,
@@ -141,6 +144,9 @@ pub mod codes {
         AMBIGUOUS_RULE_TARGET,
         INVALID_DOCUMENT,
         UNKNOWN_FUNCTION,
+        UNKNOWN_INTERFACE,
+        MISSING_INTERFACE_PROPERTY,
+        INTERFACE_REFERENCE_FROM_SOURCE,
     ];
 }
 /// The violations a schema installed before the rule that raises them may
@@ -926,6 +932,31 @@ pub struct ObjectType {
     pub title: Option<String>,
     #[serde(default)]
     pub properties: BTreeMap<String, PropertyDef>,
+    /// The interfaces of its own schema the type implements
+    /// (`specs/ont/schema-language.md` R32).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub implements: Vec<String>,
+}
+
+/// An interface: a name and the properties every type that implements it
+/// declares (`specs/ont/schema-language.md` R31).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct InterfaceDef {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+    pub properties: BTreeMap<String, InterfaceProperty>,
+}
+/// A property an interface declares.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct InterfaceProperty {
+    #[serde(rename = "type")]
+    pub ty: PropertyType,
+    #[serde(default)]
+    pub required: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -1775,7 +1806,9 @@ fn check_view_filter(
     let valid = |v: &Value| {
         if has_arg(v) {
             (base == Some(ScalarType::String)
-                || (op == "eq" && matches!(def.ty, PropertyType::Ref(_))))
+                || (op == "eq"
+                    && matches!(&def.ty, PropertyType::Ref(r)
+                        if schema.object_types.contains_key(&r.target))))
                 && v.is_string()
         } else {
             validate_value(schema, &def.ty, v) != Err(codes::WRONG_VALUE_TYPE)
@@ -1955,6 +1988,9 @@ pub struct Schema {
     pub sources: BTreeMap<String, SourceDef>,
     #[serde(default)]
     pub object_types: BTreeMap<String, ObjectType>,
+    /// The interfaces of the schema (`specs/ont/schema-language.md` R31).
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub interfaces: BTreeMap<String, InterfaceDef>,
     #[serde(default)]
     pub link_types: BTreeMap<String, LinkType>,
     #[serde(default)]
@@ -2001,6 +2037,37 @@ impl CheckedSchema {
 }
 
 impl Schema {
+    /// The object types of this schema that implement the interface `name`,
+    /// in byte order (none when `name` is no interface of this schema).
+    pub fn implementers(&self, name: &str) -> Vec<&String> {
+        if !self.interfaces.contains_key(name) {
+            return Vec::new();
+        }
+        self.object_types
+            .iter()
+            .filter(|(_, t)| t.implements.iter().any(|i| i == name))
+            .map(|(n, _)| n)
+            .collect()
+    }
+    /// Whether the object type `object_type` implements the interface
+    /// `interface` of this schema.
+    pub fn implements(&self, object_type: &str, interface: &str) -> bool {
+        self.interfaces.contains_key(interface)
+            && self
+                .object_types
+                .get(object_type)
+                .is_some_and(|t| t.implements.iter().any(|i| i == interface))
+    }
+    /// Whether a reference `{"ref": target}` of this schema admits an id
+    /// whose object type is `object_type`: the target itself, or a type that
+    /// implements the target interface (R33).
+    pub fn reference_admits(&self, target: &str, object_type: &str) -> bool {
+        if self.interfaces.contains_key(target) {
+            self.implements(object_type, target)
+        } else {
+            target == object_type
+        }
+    }
     pub fn parse(bytes: &[u8]) -> Result<Self, Error> {
         serde_json::from_slice(bytes).map_err(|_| Error::SchemaViolation)
     }
@@ -2614,6 +2681,20 @@ pub fn check(schema: &Schema, other_domains_types: &BTreeSet<String>) -> Vec<Vio
                     &mut out,
                 );
             }
+            if matches!(ty.owner, Owner::Source(_))
+                && matches!(&prop.ty, PropertyType::Ref(r) if schema.interfaces.contains_key(&r.target))
+                && (prop.from.is_some() || prop.template.is_some())
+            {
+                v(
+                    codes::INTERFACE_REFERENCE_FROM_SOURCE,
+                    if prop.from.is_some() {
+                        format!("{pp}/from")
+                    } else {
+                        format!("{pp}/template")
+                    },
+                    &mut out,
+                );
+            }
             if prop.from.is_some() && prop.template.is_some() {
                 v(codes::INVALID_TEMPLATE, format!("{pp}/template"), &mut out);
             }
@@ -2675,6 +2756,7 @@ pub fn check(schema: &Schema, other_domains_types: &BTreeSet<String>) -> Vec<Vio
             }
         }
     }
+    check_interfaces(schema, other_domains_types, &mut out);
     for (name, def) in &schema.functions {
         let base = format!("/functions/{}", esc(name));
         if !valid_name(name) {
@@ -2700,10 +2782,12 @@ pub fn check(schema: &Schema, other_domains_types: &BTreeSet<String>) -> Vec<Vio
         if !valid_name(name) {
             v(codes::INVALID_NAME, base.clone(), &mut out);
         }
-        for (field, target) in [("from", &lt.from), ("to", &lt.to)] {
-            if !schema.object_types.contains_key(target) {
-                v(codes::UNKNOWN_TYPE, format!("{base}/{field}"), &mut out);
-            }
+        if !schema.object_types.contains_key(&lt.from) {
+            v(codes::UNKNOWN_TYPE, format!("{base}/from"), &mut out);
+        }
+        // A link's `to` may name an interface (R33).
+        if !schema.object_types.contains_key(&lt.to) && !schema.interfaces.contains_key(&lt.to) {
+            v(codes::UNKNOWN_TYPE, format!("{base}/to"), &mut out);
         }
         for (field, lname) in [
             ("forward", &lt.names.forward),
@@ -2996,6 +3080,73 @@ pub fn check(schema: &Schema, other_domains_types: &BTreeSet<String>) -> Vec<Vio
     out
 }
 
+/// Whether the parameter `name` of `at` is a reference to an interface.
+fn interface_parameter(schema: &Schema, at: &ActionType, name: &str) -> bool {
+    matches!(at.parameters.get(name).map(|p| &p.ty),
+        Some(PropertyType::Ref(r)) if schema.interfaces.contains_key(&r.target))
+}
+
+/// The checks of `interfaces` and of each object type's `implements`
+/// (`specs/ont/schema-language.md` R31, R32, R34).
+fn check_interfaces(
+    schema: &Schema,
+    other_domains_types: &BTreeSet<String>,
+    out: &mut Vec<Violation>,
+) {
+    for (name, def) in &schema.interfaces {
+        let base = format!("/interfaces/{}", esc(name));
+        if !valid_name(name) {
+            out.push(Violation::new(codes::INVALID_NAME, base.clone()));
+        }
+        if schema.object_types.contains_key(name) || other_domains_types.contains(name) {
+            out.push(Violation::new(codes::DUPLICATE_TYPE_NAME, base.clone()));
+        }
+        for (pname, prop) in &def.properties {
+            let pp = format!("{base}/properties/{}", esc(pname));
+            if !valid_name(pname) {
+                out.push(Violation::new(codes::INVALID_NAME, pp.clone()));
+            }
+            // A type at fault is refused at the property, whatever its depth.
+            let mut faults = Vec::new();
+            check_type(schema, &prop.ty, &pp, false, &mut faults);
+            let mut seen = BTreeSet::new();
+            for fault in faults {
+                if seen.insert(fault.code) {
+                    out.push(Violation::new(fault.code, pp.clone()));
+                }
+            }
+        }
+    }
+    for (name, ty) in &schema.object_types {
+        for (i, interface) in ty.implements.iter().enumerate() {
+            let p = format!("/object_types/{}/implements/{i}", esc(name));
+            let Some(def) = schema.interfaces.get(interface) else {
+                out.push(Violation::new(codes::UNKNOWN_INTERFACE, p));
+                continue;
+            };
+            for (pname, want) in &def.properties {
+                let fault = match ty.properties.get(pname) {
+                    None => Some("lacks"),
+                    Some(have) if have.ty != want.ty => Some("declares another type for"),
+                    Some(have) if want.required && !have.required => {
+                        Some("declares as not required")
+                    }
+                    Some(_) => None,
+                };
+                if let Some(fault) = fault {
+                    out.push(
+                        Violation::new(codes::MISSING_INTERFACE_PROPERTY, p.clone()).with_message(
+                            format!(
+                                "the type {fault} the property {pname} of the interface {interface}"
+                            ),
+                        ),
+                    );
+                }
+            }
+        }
+    }
+}
+
 fn check_type(
     schema: &Schema,
     ty: &PropertyType,
@@ -3006,7 +3157,9 @@ fn check_type(
     match ty {
         PropertyType::Scalar(_) => {}
         PropertyType::Ref(r) => {
-            if !schema.object_types.contains_key(&r.target) {
+            if !schema.object_types.contains_key(&r.target)
+                && !schema.interfaces.contains_key(&r.target)
+            {
                 out.push(Violation::new(codes::UNKNOWN_TYPE, pointer.into()));
             }
         }
@@ -3151,6 +3304,7 @@ fn check_action_reads(
                         ty: PropertyType::Ref(r),
                         ..
                     }) = at.parameters.get(param)
+                    && !schema.interfaces.contains_key(&r.target)
                     && schema
                         .grants
                         .iter()
@@ -3428,6 +3582,17 @@ fn check_condition(
         return;
     }
     match cond {
+        Condition::Present(s)
+            if s.strip_prefix('$')
+                .and_then(|p| p.split_once('.'))
+                .is_some_and(|(name, _)| interface_parameter(schema, at, name)) =>
+        {
+            // An action reads no property through an interface (R116).
+            out.push(Violation::new(
+                codes::UNKNOWN_PROPERTY,
+                format!("{pointer}/present"),
+            ));
+        }
         Condition::Present(s) => {
             let valid = s
                 .strip_prefix('$')
@@ -3489,7 +3654,12 @@ fn check_condition(
                 });
             let target = match from_ty {
                 Some(ft) if lt.names.forward == link.link && lt.from == ft => Some(lt.to.as_str()),
-                Some(ft) if lt.names.reverse == link.link && lt.to == ft => Some(lt.from.as_str()),
+                Some(ft)
+                    if lt.names.reverse == link.link
+                        && (lt.to == ft || schema.implements(ft, &lt.to)) =>
+                {
+                    Some(lt.from.as_str())
+                }
                 _ => None,
             };
             if let Some(group) = &link.condition {
@@ -3587,7 +3757,7 @@ fn validate_value(schema: &Schema, ty: &PropertyType, v: &Value) -> Result<(), &
             // schema namespace here; packet O2 sets that rule in the store,
             // which knows the installed namespaces.
             let id: Id = serde_json::from_value(v.clone()).map_err(|_| codes::WRONG_VALUE_TYPE)?;
-            if id.validate().is_err() || id.object_type != r.target {
+            if id.validate().is_err() || !schema.reference_admits(&r.target, &id.object_type) {
                 return Err(codes::WRONG_VALUE_TYPE);
             }
             Ok(())
@@ -3810,6 +3980,19 @@ impl SchemaSet {
                 }
             }
         }
+        // An interface named like an interface of another domain (R34); one
+        // named like an object type of another domain is refused by `check`.
+        let mut interface_domains = BTreeMap::new();
+        for (schema, _) in &entries {
+            for name in schema.interfaces.keys() {
+                if interface_domains.insert(name, &schema.domain).is_some() {
+                    violations.push(Violation::new(
+                        codes::DUPLICATE_TYPE_NAME,
+                        format!("/interfaces/{}", esc(name)),
+                    ));
+                }
+            }
+        }
         let mut domains: BTreeMap<String, Schema> = BTreeMap::new();
         let mut pins = BTreeMap::new();
         for (schema, pin) in entries {
@@ -3865,6 +4048,22 @@ impl SchemaSet {
         self.domains
             .values()
             .find(|s| s.object_types.contains_key(object_type))
+    }
+    /// The schema that declares the interface `name` (R31, R34).
+    pub fn schema_of_interface(&self, name: &str) -> Option<&Schema> {
+        self.domains
+            .values()
+            .find(|s| s.interfaces.contains_key(name))
+    }
+    /// The interface `name` of an installed domain.
+    pub fn interface(&self, name: &str) -> Option<&InterfaceDef> {
+        self.domains.values().find_map(|s| s.interfaces.get(name))
+    }
+    /// The object types that implement the interface `name`, in byte order.
+    pub fn implementers(&self, name: &str) -> Vec<&String> {
+        self.schema_of_interface(name)
+            .map(|s| s.implementers(name))
+            .unwrap_or_default()
     }
     pub fn properties(&self, object_type: &str) -> Option<&BTreeMap<String, PropertyDef>> {
         self.object_type(object_type).map(|t| &t.properties)

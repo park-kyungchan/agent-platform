@@ -1,0 +1,72 @@
+{
+  "format": "ontology-schema/v1",
+  "domain": "iface",
+  "version": 1,
+  "namespace": {"instance": "test", "account": "iface"},
+  "interfaces": {
+    "subject": {
+      "description": "Something work is about.",
+      "properties": {
+        "title": {"type": "string", "required": true, "description": "Its title."}
+      }
+    },
+    "tagged": {
+      "properties": {}
+    }
+  },
+  "object_types": {
+    "intent": {
+      "owner": "ontology",
+      "primary_key": {"from": "/native_key"},
+      "implements": ["subject"],
+      "properties": {"title": {"type": "string", "required": true}}
+    },
+    "unit": {
+      "owner": "ontology",
+      "primary_key": {"from": "/native_key"},
+      "implements": ["subject"],
+      "properties": {
+        "title": {"type": "string", "required": true},
+        "size": {"type": "integer", "required": false}
+      }
+    },
+    "host": {
+      "owner": "ontology",
+      "primary_key": {"from": "/native_key"},
+      "properties": {"title": {"type": "string", "required": true}}
+    },
+    "hold": {
+      "owner": "ontology",
+      "primary_key": {"from": "$action_id"},
+      "properties": {
+        "subject": {"type": {"ref": "subject"}, "required": true},
+        "others": {"type": {"array": {"ref": "subject"}}, "required": false},
+        "host": {"type": {"ref": "host"}, "required": false}
+      }
+    }
+  },
+  "link_types": {
+    "hold_subject": {
+      "from": "hold", "via": "subject", "to": "subject", "cardinality": "many_to_one",
+      "names": {"forward": "subject", "reverse": "holds"}
+    },
+    "hold_host": {
+      "from": "hold", "via": "host", "to": "host", "cardinality": "many_to_one",
+      "names": {"forward": "host", "reverse": "host_holds"}
+    }
+  },
+  "action_types": {
+    "set_hold": {
+      "description": "Holds a subject.",
+      "parameters": {
+        "subject": {"type": {"ref": "subject"}, "required": true},
+        "others": {"type": {"array": {"ref": "subject"}}, "required": false},
+        "pair": {"type": {"struct": {"first": {"ref": "subject"}}}, "required": false}
+      },
+      "rules": [{"create_object": "hold", "set": {"subject": "$subject", "others": "$others"}}]
+    }
+  },
+  "grants": [
+    {"principal": "agent", "scope": {}, "read": ["intent", "unit", "host", "hold"], "derive": [], "actions": ["set_hold"]}
+  ]
+}

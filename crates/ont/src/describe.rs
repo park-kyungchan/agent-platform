@@ -74,6 +74,7 @@ pub fn describe(ctx: &Context, req: &DescribeRequest) -> Result<Answer, Failure>
     let mut functions = Vec::new();
     let mut sources = Vec::new();
     let mut views = Vec::new();
+    let mut interfaces = Vec::new();
     for domain in &domains {
         let Some(schema) = set.schema(domain) else {
             continue;
@@ -91,7 +92,7 @@ pub fn describe(ctx: &Context, req: &DescribeRequest) -> Result<Answer, Failure>
             if req.object_type.as_ref().is_some_and(|w| w != name) {
                 continue;
             }
-            object_types.push(json!({
+            let mut listed = json!({
                 "domain":domain,
                 "name":name,
                 "description":ty.description,
@@ -110,10 +111,50 @@ pub fn describe(ctx: &Context, req: &DescribeRequest) -> Result<Answer, Failure>
                         "max_bytes":p.max_bytes
                     })
                 }).collect::<Vec<_>>()
+            });
+            if !ty.implements.is_empty() {
+                listed["implements"] = json!(ty.implements);
+            }
+            object_types.push(listed);
+        }
+        // An interface is listed with the implementing types the principal
+        // reads, and only when there is one (schema-language.md R35).
+        let implemented_by = |interface: &str| -> Vec<&String> {
+            schema
+                .implementers(interface)
+                .into_iter()
+                .filter(|t| readable.contains(*t))
+                .collect()
+        };
+        for (name, def) in &schema.interfaces {
+            let by = implemented_by(name);
+            if by.is_empty() || req.object_type.as_ref().is_some_and(|w| w != name) {
+                continue;
+            }
+            interfaces.push(json!({
+                "domain":domain,
+                "name":name,
+                "description":def.description,
+                "properties":def.properties.iter().map(|(pname,p)| {
+                    json!({
+                        "name":pname,
+                        "description":p.description,
+                        "type":serde_json::to_value(&p.ty).unwrap_or(Value::Null),
+                        "required":p.required
+                    })
+                }).collect::<Vec<_>>(),
+                "implemented_by":by
             }));
         }
         for (name, lt) in &schema.link_types {
-            if !all_read.contains(&lt.from) || !all_read.contains(&lt.to) {
+            // A link into an interface is usable when one implementing type
+            // is readable.
+            let to_readable = if schema.interfaces.contains_key(&lt.to) {
+                !implemented_by(&lt.to).is_empty()
+            } else {
+                all_read.contains(&lt.to)
+            };
+            if !all_read.contains(&lt.from) || !to_readable {
                 continue;
             }
             if req
@@ -200,32 +241,36 @@ pub fn describe(ctx: &Context, req: &DescribeRequest) -> Result<Answer, Failure>
         .iter()
         .filter_map(|d| set.pin(d).map(|p| (d.clone(), p.clone())))
         .collect();
+    let mut result = json!({
+        "domains":domains.iter().map(|d| {
+            let p = set.pin(d);
+            let mut domain = json!({"domain":d,"version":p.map(|p| p.version),"sha256":p.map(|p| p.sha256.clone())});
+            if let Some(prov) = provenance.get(d) {
+                if let Some(repository) = &prov.repository {
+                    domain["repository"] = json!(repository);
+                }
+                if let Some(commit) = &prov.commit {
+                    domain["commit"] = json!(commit);
+                }
+                if let Some(path) = &prov.path {
+                    domain["path"] = json!(path);
+                }
+            }
+            domain
+        }).collect::<Vec<_>>(),
+        "object_types":object_types,
+        "link_types":link_types,
+        "action_types":action_types,
+        "functions":functions,
+        "sources":sources,
+        "views":views
+    });
+    if !interfaces.is_empty() {
+        result["interfaces"] = json!(interfaces);
+    }
     Ok(Answer::Enveloped {
         revision: principal.revision()?,
-        result: json!({
-            "domains":domains.iter().map(|d| {
-                let p = set.pin(d);
-                let mut domain = json!({"domain":d,"version":p.map(|p| p.version),"sha256":p.map(|p| p.sha256.clone())});
-                if let Some(prov) = provenance.get(d) {
-                    if let Some(repository) = &prov.repository {
-                        domain["repository"] = json!(repository);
-                    }
-                    if let Some(commit) = &prov.commit {
-                        domain["commit"] = json!(commit);
-                    }
-                    if let Some(path) = &prov.path {
-                        domain["path"] = json!(path);
-                    }
-                }
-                domain
-            }).collect::<Vec<_>>(),
-            "object_types":object_types,
-            "link_types":link_types,
-            "action_types":action_types,
-            "functions":functions,
-            "sources":sources,
-            "views":views
-        }),
+        result,
         pins,
     })
 }
