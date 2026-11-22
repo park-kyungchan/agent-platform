@@ -9,18 +9,18 @@ The page is the unit object (`crates/ap/README.md` "The unit object"), written b
 | `objective` | The state after the merge, as sentences that are true or false; who uses the result first and the real run that shows it |
 | `interface` | The exact flags, members, codes and names its acceptance checks test, and what others build on (a command's ends and record; a schema; a port's signature; the shape of an answer), fixed by you after reading the code it constrains |
 | `invariants` | Rules a test can break, worded as rules, never as a list of names |
-| `acceptance` | Executables, each `{check, kind}`: `fails_on_base` (a test or command that fails on the base and passes after) or `invariant` (passes on both); `ap unit ready` runs them on the base first |
+| `acceptance` | Executables, each `{check, kind}`: `fails_on_base` (fails on the base, passes after) or `invariant` (passes on both); `ap unit ready` runs them on the base first |
 | `not_built` | The neighbouring things left out on purpose |
 | `write_set` | The area: crates and directories as patterns (`dir/**`), never lines |
 | `read_first` | First word `path` or `path:a-b`, relative to the repository root, of the base `ap unit ready` and `ap unit review` fetch (`read_first_missing`, `read_first_range`), then what it is for |
-| `specs` | `<path>#R<n>` or `<path>`; a clause whose citing test is in the write set and whose file is not is named (`clause_missing`, `clause_unnamed`) |
+| `specs` | `<path>#R<n>`, `<path>` or a directory (`specs/ap`); a clause whose citing test is in the write set and whose file is not is named (`clause_missing`, `clause_unnamed`) |
 | `notes` | What you run before or after the merge; no claim about the base (section 3) |
 | `verifier_questions` | Things to run with inputs of the verifier's own, never a verdict |
 | `class`, `implementer`, `verifier`, `estimate_lines`, `depends_on` | Section 4 |
 
 When a script can do all of a unit, write the script. A page states the objective, the interface and executable acceptance, and prescribes no implementation: write no types, functions or line numbers; the session that compiles and tests writes the plan. The implementing stage writes the README section and the tests before the code.
 
-## 2. One good page (invented values)
+## 2. One good page
 
 ```text
 Unit status-holds: class plain, lane objective, agent-platform
@@ -44,7 +44,7 @@ Implementer: claude, sonnet, high. Verifier: claude, opus, xhigh. Estimate: 60 l
 
 ## 4. Size, class and tiers
 
-- A unit is one pull request that can merge alone, about 600 changed lines outside tests as the target; a larger change is split into pull requests. When the delivered size passes one and a half times the estimate, stop adding and find the one choice that causes it.
+- A unit is one pull request that can merge alone, about 600 changed lines outside tests as the target; split a larger change. When the delivered size passes one and a half times the estimate, stop adding and find the one choice that causes it.
 - Class: `plain`; `contract` (changes a specification, a schema, a command's members, a store format, a check or a workflow); `effect` (acts on a real target outside a pull request: the host's configuration, GitHub settings, data). The lane `small` takes only `plain`; changing a check is a `contract` unit (`protected_path_changed`).
 - A required check or a branch rule is changed only by you, through `github/apply` (class `effect`), after the job passes on main.
 - Tiers: the verifier is never below the implementer; name the model on every start, and the effort where the CLI has a flag; a subagent of your own session is started with an explicit model. A Claude stage gets a compaction window above the peak of its kind of stage (the account's window, or `compact_window` where the request takes one), so that it never compacts; a stage whose session record holds a `compact_boundary` event is a finding. The cost of a route and the implementer's tier: `evals/readout.py`, run from a checkout at `origin/main`.
@@ -62,9 +62,9 @@ The host's policy file (member `models`) is the authority: `ap run` refuses any 
 | Claude Code | Sonnet | Implementers of pages under the bar: plain code, small contracts |
 | Claude Code | Haiku | Mechanical work; a weak reader in the suites |
 | Muse Code | `muse-wonder-1.0` | Between Opus and Sonnet: large pages (section 4); contributor mode off, set by `ap run` |
-| Muse Code | `muse-ember-1.0` | About Haiku's level: mechanical work, a weak reader |
-| Antigravity | `gemini-4-hydrogen-<effort>` (Hydrogen) | Between Opus and Sonnet; the effort is part of the model's name |
-| Antigravity | `gemini-4-neon-<effort>` (Neon) | A reviewer on the user's word; the effort is part of the name |
+| Muse Code | `muse-ember-1.0` | Haiku's level: mechanical work, a weak reader |
+| Antigravity | `gemini-4-hydrogen-<effort>` (Hydrogen) | Between Opus and Sonnet; effort is in the name |
+| Antigravity | `gemini-4-neon-<effort>` (Neon) | A reviewer on the user's word; effort is in the name |
 | Antigravity | `gemini-4-argon-high` (Argon) | A reviewer of a plan or a design on the user's word |
 | Codex | none | Paused: no model of it is in the policy |
 

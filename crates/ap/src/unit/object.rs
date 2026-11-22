@@ -442,6 +442,7 @@ fn node(s: &mut impl System, clone: &str, base: &str, path: &str) -> Result<Opti
         "--literal-pathspecs",
         "ls-tree",
         "-z",
+        "--full-tree",
         base,
         "--",
         path,
@@ -580,7 +581,16 @@ pub(super) fn citations_judged(
         let written = |t: &&str| t.rsplit_once(':').is_some_and(|(p, _)| inside(p));
         let test = tests.iter().filter_map(Value::as_str).find(written);
         let rule = key.rsplit_once('#').map_or("", |(_, r)| r);
-        let named = names.contains(path) || names.contains(format!("{path}#{rule}").as_str());
+        // `<path>#R<n>` of the clause, or an entry without `#` that is its file or a directory holding it.
+        let holds = |e: &&str| {
+            let dir = e.strip_suffix('/').unwrap_or(e);
+            !e.contains('#')
+                && !dir.is_empty()
+                && path
+                    .strip_prefix(dir)
+                    .is_some_and(|t| t.is_empty() || t.starts_with('/'))
+        };
+        let named = names.contains(format!("{path}#{rule}").as_str()) || names.iter().any(holds);
         if let (false, false, Some(test)) = (inside(path), named, test) {
             let entry = (*key).to_owned();
             let field = "specs".to_owned();

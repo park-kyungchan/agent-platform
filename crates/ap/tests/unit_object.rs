@@ -3930,7 +3930,7 @@ fn gone(f: &F) -> (bool, bool, bool) {
 fn r46_a_read_first_entry_names_a_path_of_the_base_and_its_range_lies_inside_the_file() {
     let r = cited_repo();
     let mut f = F::new();
-    let cases: [(&str, Option<(&str, &str)>); 24] = [
+    let cases: Vec<(&str, Option<(&str, &str)>)> = vec![
         (
             "docs/missing.txt",
             Some(("read_first_missing", "read_first.0")),
@@ -4148,6 +4148,51 @@ fn r46_a_clause_whose_test_is_written_and_whose_file_is_not_is_named() {
     );
     cited(&mut g, &r, "cn-test-outside", json!({}));
     ready(&mut g, "cn-test-outside").unwrap();
+}
+
+// spec: specs/ap/unit.md#R46
+#[test]
+fn r46_a_directory_that_holds_the_file_names_its_clauses() {
+    let r = cited_repo();
+    let mut f = F::new();
+    clause(
+        &mut f,
+        "invented/widgets",
+        "specs/ap/unit.md",
+        "R3",
+        &["src/list/t.rs:2"],
+    );
+    let key = "invented/widgets:specs/ap/unit.md#R3";
+    for (i, (entry, named)) in [
+        ("specs/ap", true),
+        ("specs/ap/", true),
+        ("specs", true),
+        ("specs/ap/unit.md", true),
+        ("specs/ap/unit.md#R3", true),
+        ("specs/a", false),
+        ("spec", false),
+        ("specs/ap/unit", false),
+        ("specs/ap/unit.md#R4", false),
+        ("docs", false),
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        let unit = format!("dir-{i}");
+        // Every entry but the one the clause is judged by is a file or a directory, never judged.
+        cited(&mut f, &r, &unit, json!({"specs": [entry]}));
+        match (ready(&mut f, &unit), named) {
+            (Ok(_), true) => {}
+            (Err(e), false) => {
+                let unnamed = e.detail["failed"].as_array().unwrap().iter();
+                assert!(
+                    unnamed.into_iter().any(|i| i["entry"] == key),
+                    "{entry}: {e:?}"
+                );
+            }
+            (got, _) => panic!("{entry}: {got:?}"),
+        }
+    }
 }
 
 // spec: specs/ap/unit.md#R46
