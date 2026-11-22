@@ -375,4 +375,4 @@ What it does not print: the installed revisions (`deploy/README.md`, "Read the s
 
 ## The door
 
-`ap fn <name> < request.json` and the door of a stage with `limits`: `specs/ap/door.md` R1 to R8. The door's record is the file `AP_DOOR_LOG` names (default `/var/lib/agent-platform/door.jsonl`).
+`ap fn <name> < request.json`, `ap hook pre-commit` (the script that stands for the host's Git hook in the view of an implementer's or a fixer's stage, which asks the door to run the host's hook outside the stage) and the door of a stage with `limits`: `specs/ap/door.md` R1 to R10. The door's record is the file `AP_DOOR_LOG` names (default `/var/lib/agent-platform/door.jsonl`).

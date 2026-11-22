@@ -29,6 +29,7 @@ Purpose: an agent of any CLI learns from `ap` itself which verbs it has, the req
 | `watch` | `specs/ap/watch.md` |
 | `check` | `specs/ap/check.md` |
 | `fn` | `specs/ap/door.md` |
+| `hook` | `specs/ap/door.md` |
 | `route` (and `ap` with no argument as the function `route`) | `specs/ap/route.md` |
 | `clause` (and `ap` with no argument as the function `clause`) | `specs/ap/clause.md` |
 | `resource` (and `ap` with no argument as the functions `capacity` and `gate`) | `specs/ap/resource.md` |

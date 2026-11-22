@@ -1,10 +1,11 @@
 //! The door of a stage with `limits` (`specs/ap/door.md`): one Unix socket that `ap run` binds
 //! beside the stage's scratch directory, at a path the stage's view holds and cannot write, and
-//! serves outside the stage, in its own process, until the stage has ended. It answers two
+//! serves outside the stage, in its own process, until the stage has ended. It answers three
 //! requests and nothing else: `check`, the call of `ap check` for the stage's own worktree on the
-//! local PC (it never runs a command here), and `fn`, a function of the store on its list, asked
-//! as the stage. Every request leaves one line of the door's record. `ap fn <name>` is the client
-//! of `fn`, `ap check` under `AP_DOOR` the client of `check`. The bytes between the two ends are
+//! local PC (it never runs a command of a worktree here), `fn`, a function of the store on its
+//! list, asked as the stage, and `hook`, the host's Git hook `pre-commit` run for the stage's own
+//! worktree. Every request leaves one line of the door's record. `ap fn <name>` is the client of
+//! `fn`, `ap hook pre-commit` of `hook`, `ap check` under `AP_DOOR` the client of `check`. The bytes between the two ends are
 //! this crate's own: the request is one line of JSON; the answer is frames of one tag byte and a
 //! four-byte big-endian length, the two output streams as they are produced, then one closing
 //! message, a JSON object.
@@ -40,6 +41,15 @@ use std::{
 pub(crate) const FUNCTIONS: [&str; 2] = ["route", "clause"];
 /// The roles whose `check` the door serves (R3).
 const CHECKERS: [&str; 3] = ["implementer", "fixer", "verifier"];
+/// The roles whose `hook` the door serves (R9).
+const COMMITTERS: [&str; 2] = ["implementer", "fixer"];
+/// The host's hook of R9, in the hooks directory the port names.
+const HOOK: &str = "pre-commit";
+/// The bounds of a `hook` request: its `git rev-parse`, the whole request from its arrival, and
+/// the bytes of the hook's first line of errors that reach the client (R9).
+const HOOK_PROBE: Duration = Duration::from_secs(10);
+const HOOK_BOUND: Duration = Duration::from_secs(300);
+const HOOK_LINE: usize = 1_024;
 /// The longest request line, and the time a connection has to send it (R2).
 const REQUEST_MAX: usize = 65_536;
 const READ_WITHIN: Duration = Duration::from_secs(10);
@@ -236,6 +246,7 @@ struct Shared {
     /// The port's environment and policy file, read once at the opening (R1).
     vars: Arc<Vec<(String, String)>>,
     policy: Option<PathBuf>,
+    hooks: Option<PathBuf>,
     stop: AtomicBool,
     served: Mutex<Vec<Arc<Req>>>,
     busy: Mutex<usize>,
@@ -311,10 +322,12 @@ fn remove_socket(path: &Path) {
 }
 
 /// Opens the door of a stage at `path` (R1): binds the socket with mode 0600 and serves it on a
-/// thread of this process. The port is read here once: its environment and its policy file.
+/// thread of this process. The port is read here once: its environment, its policy file and its
+/// hooks directory.
 pub(crate) fn open(s: &impl System, stage: Stage, path: &str) -> std::io::Result<Door> {
     let vars = Arc::new(s.environment());
     let policy = s.policy_file();
+    let hooks = s.git_hooks();
     let listener = bind(Path::new(path))?;
     let ready = fs::set_permissions(path, fs::Permissions::from_mode(0o600))
         .and_then(|()| listener.set_nonblocking(true));
@@ -331,6 +344,7 @@ pub(crate) fn open(s: &impl System, stage: Stage, path: &str) -> std::io::Result
         cwd,
         vars,
         policy,
+        hooks,
         stop: AtomicBool::new(false),
         served: Mutex::new(vec![]),
         busy: Mutex::new(0),
@@ -424,6 +438,8 @@ fn read_line(stream: &mut UnixStream) -> Option<Vec<u8>> {
 enum What {
     Check(Call),
     Fn(String, Value),
+    /// The stage's resolved `cwd`, the hook's file and the name of the index (R9).
+    Hook(String, PathBuf, String),
 }
 type Refusal = (&'static str, &'static str);
 fn invalid<T>(field: &'static str) -> Result<T, Refusal> {
@@ -452,6 +468,7 @@ fn asked(
     let verb = match o.get("verb").and_then(Value::as_str) {
         Some("check") => Some("check"),
         Some("fn") => Some("fn"),
+        Some("hook") => Some("hook"),
         _ => None,
     };
     let name = match verb {
@@ -460,6 +477,11 @@ fn asked(
         _ => None,
     };
     let name = name.and_then(Value::as_str).map(cut);
+    let name = if verb == Some("hook") {
+        Some(HOOK.to_owned())
+    } else {
+        name
+    };
     let what = (|| {
         if o.get("door").and_then(Value::as_u64) != Some(1) {
             return invalid("door");
@@ -467,6 +489,7 @@ fn asked(
         let members: &[&'static str] = match verb {
             Some("check") => &["door", "verb", "dir", "timeout", "command"],
             Some("fn") => &["door", "verb", "name", "input"],
+            Some("hook") => &["door", "verb", "dir", "index"],
             _ => return invalid("verb"),
         };
         if o.keys().any(|k| !members.contains(&k.as_str())) {
@@ -477,6 +500,7 @@ fn asked(
         }
         match verb {
             Some("check") => check_of(shared, o),
+            Some("hook") => hook_of(shared, o),
             _ => fn_of(o),
         }
     })();
@@ -514,6 +538,40 @@ fn check_of(shared: &Shared, o: &serde_json::Map<String, Value>) -> Result<What,
         timeout,
         command,
     }))
+}
+/// Whether `index` is a name R9 takes: `index`, `index.lock` or `next-index-<1 to 20 digits>.lock`.
+fn index_ok(index: &str) -> bool {
+    let digits = index
+        .strip_prefix("next-index-")
+        .and_then(|rest| rest.strip_suffix(".lock"));
+    matches!(index, "index" | "index.lock")
+        || digits
+            .is_some_and(|d| (1..=20).contains(&d.len()) && d.bytes().all(|c| c.is_ascii_digit()))
+}
+/// A `hook` request (R9), up to the stage's own worktree: its form, the stage's role, the host's
+/// hook and its `dir`. That the worktree is a Git worktree is read where the hook is run.
+fn hook_of(shared: &Shared, o: &serde_json::Map<String, Value>) -> Result<What, Refusal> {
+    if !o["dir"].as_str().is_some_and(|d| !d.contains('\0')) {
+        return invalid("dir");
+    }
+    let Some(index) = o["index"].as_str().filter(|i| index_ok(i)) else {
+        return invalid("index");
+    };
+    if !COMMITTERS.contains(&shared.stage.role.as_str()) {
+        return not_admitted("role");
+    }
+    let file = shared.hooks.as_ref().map(|h| h.join(HOOK));
+    let Some(file) = file.filter(|f| fs::metadata(f).is_ok_and(|m| m.is_file())) else {
+        return not_admitted("hook");
+    };
+    let Some(cwd) = shared
+        .cwd
+        .as_ref()
+        .filter(|c| Some(c.as_str()) == o["dir"].as_str())
+    else {
+        return not_admitted("dir");
+    };
+    Ok(What::Hook(cwd.clone(), file, index.to_owned()))
 }
 /// A `fn` request (R5).
 fn fn_of(o: &serde_json::Map<String, Value>) -> Result<What, Refusal> {
@@ -572,6 +630,7 @@ fn serve(shared: &Arc<Shared>, mut stream: UnixStream, req: &Arc<Req>) {
                     }
                 }
                 What::Fn(name, input) => call_fn(shared, &client, &name, &input),
+                What::Hook(cwd, file, index) => call_hook(shared, &client, &cwd, &file, &index),
             }
         }
     };
@@ -690,6 +749,173 @@ fn call_fn(shared: &Shared, client: &Arc<Client>, name: &str, input: &Value) -> 
     Closing::Exit(status.map_or(1, check::code))
 }
 
+/// The environment of the programs of a `hook` request: the port's, without every `GIT_` variable
+/// and `AP_DOOR` (R9).
+fn hook_environment(shared: &Shared) -> Vec<(&str, &str)> {
+    let plain = |k: &str| !k.starts_with("GIT_") && k != "AP_DOOR";
+    shared
+        .vars
+        .iter()
+        .filter(|(k, _)| plain(k))
+        .map(|(k, v)| (k.as_str(), v.as_str()))
+        .collect()
+}
+/// Starts `cmd` in a process group of its own, registered with the request, and waits for it until
+/// `deadline`, with what `reader` keeps of its standard error (piped). Past the deadline the
+/// request ends `bound`. None when the program cannot be started.
+fn run_group(
+    req: &Req,
+    mut cmd: Command,
+    deadline: Instant,
+    reader: impl FnOnce(std::process::ChildStderr) -> Vec<u8> + Send + 'static,
+) -> Option<(std::process::ExitStatus, Vec<u8>)> {
+    let mut child = cmd.process_group(0).spawn().ok()?;
+    let pid = child.id();
+    req.started(pid);
+    let (tx, rx) = mpsc::channel();
+    let piped = child.stderr.take();
+    if let Some(pipe) = piped {
+        std::thread::spawn(move || {
+            let _ = tx.send(reader(pipe));
+        });
+    } else {
+        let _ = tx.send(vec![]);
+    }
+    let status = loop {
+        match child.try_wait() {
+            Ok(Some(status)) => break Some(status),
+            Ok(None) if Instant::now() < deadline => std::thread::sleep(Duration::from_millis(20)),
+            _ => {
+                req.end("bound");
+                let _ = child.kill();
+                break child.wait().ok();
+            }
+        }
+    };
+    // The error stream is read to its end: it ends when the group's last holder of the pipe does,
+    // or at the bound, which kills the group.
+    let bytes = loop {
+        let left = deadline.saturating_duration_since(Instant::now());
+        match rx.recv_timeout(left.max(Duration::from_millis(100))) {
+            Ok(bytes) => break bytes,
+            Err(mpsc::RecvTimeoutError::Timeout) => req.end("bound"),
+            Err(mpsc::RecvTimeoutError::Disconnected) => break vec![],
+        }
+    };
+    req.finished(pid);
+    status.map(|s| (s, bytes))
+}
+/// What of a pipe is kept: the bytes before the first newline, at most `HOOK_LINE`; the rest is
+/// read and dropped.
+fn first_line(mut pipe: impl Read) -> Vec<u8> {
+    let (mut line, mut full) = (vec![], false);
+    let mut buf = [0u8; 8192];
+    loop {
+        let n = match pipe.read(&mut buf) {
+            Err(e) if e.kind() == std::io::ErrorKind::Interrupted => continue,
+            Ok(0) | Err(_) => return line,
+            Ok(n) => n,
+        };
+        if full {
+            continue;
+        }
+        let chunk = &buf[..n];
+        let end = chunk.iter().position(|b| *b == b'\n').unwrap_or(n);
+        let take = end.min(HOOK_LINE - line.len());
+        line.extend_from_slice(&chunk[..take]);
+        full = end < n || line.len() >= HOOK_LINE;
+    }
+}
+/// The host's `pre-commit` for the stage's worktree, outside the stage (R9): `git rev-parse
+/// --absolute-git-dir` there, then the hook once, on the index Git is committing.
+fn call_hook(
+    shared: &Shared,
+    client: &Arc<Client>,
+    cwd: &str,
+    file: &Path,
+    index: &str,
+) -> Closing {
+    let req = &client.req;
+    let arrival = lock(&req.line).arrival;
+    let mut probe = Command::new("git");
+    probe
+        .args([
+            "-c",
+            "core.hooksPath=/dev/null",
+            "-c",
+            "core.fsmonitor=false",
+        ])
+        .args(["rev-parse", "--absolute-git-dir"])
+        .current_dir(cwd)
+        .env_clear()
+        .envs(hook_environment(shared))
+        .stdin(Stdio::null())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::null());
+    let (status, out) = match probe_git(req, probe) {
+        Some(answer) => answer,
+        None => return Closing::Refused("not_admitted".into(), "dir".into()),
+    };
+    let a = String::from_utf8(out).ok().and_then(|s| {
+        let line = s.strip_suffix('\n')?.to_owned();
+        (status.success() && !line.is_empty() && !line.contains('\n')).then_some(line)
+    });
+    let Some(a) = a else {
+        return Closing::Refused("not_admitted".into(), "dir".into());
+    };
+    let mut hook = Command::new(file);
+    hook.current_dir(cwd)
+        .env_clear()
+        .envs(hook_environment(shared))
+        .env("GIT_INDEX_FILE", format!("{a}/{index}"))
+        .env("GIT_CONFIG_COUNT", "2")
+        .env("GIT_CONFIG_KEY_0", "core.hooksPath")
+        .env("GIT_CONFIG_VALUE_0", "/dev/null")
+        .env("GIT_CONFIG_KEY_1", "core.fsmonitor")
+        .env("GIT_CONFIG_VALUE_1", "false")
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::piped());
+    let Some((status, line)) = run_group(req, hook, arrival + HOOK_BOUND, first_line) else {
+        return Closing::Exit(127);
+    };
+    if !line.is_empty() {
+        let mut bytes = line;
+        bytes.push(b'\n');
+        client.send(TAG_ERR, &bytes);
+    }
+    Closing::Exit(check::code(status))
+}
+/// `git rev-parse` of R9, bound to 10 seconds, in a process group of the request: its status and
+/// its standard output.
+fn probe_git(req: &Req, mut cmd: Command) -> Option<(std::process::ExitStatus, Vec<u8>)> {
+    let mut child = cmd.process_group(0).spawn().ok()?;
+    let pid = child.id();
+    req.started(pid);
+    let mut pipe = child.stdout.take()?;
+    let reader = std::thread::spawn(move || {
+        let mut bytes = vec![];
+        let _ = (&mut pipe).take(4096).read_to_end(&mut bytes);
+        bytes
+    });
+    let deadline = Instant::now() + HOOK_PROBE;
+    let status = loop {
+        match child.try_wait() {
+            Ok(Some(status)) => break Some(status),
+            Ok(None) if Instant::now() < deadline => std::thread::sleep(Duration::from_millis(10)),
+            _ => {
+                kill_group(pid);
+                let _ = child.kill();
+                break None;
+            }
+        }
+    };
+    let _ = child.wait();
+    let bytes = reader.join().unwrap_or_default();
+    req.finished(pid);
+    status.map(|s| (s, bytes))
+}
+
 /// The request's line of the record (R6), once.
 fn log(shared: &Shared, req: &Req, closing: &Closing) {
     if req.logged.swap(true, Ordering::SeqCst) {
@@ -804,6 +1030,9 @@ pub(crate) fn ask(
 /// `ap fn --help`.
 pub const FN_HELP: &str = "Usage: ap fn <name> < request.json\nInside a stage with limits: asks the stage's door (AP_DOOR) for the function <name> of the store, as the stage's role; the door answers route alone. The standard input is the function's input, one JSON object (empty: {}); the engine's standard output, standard error and exit status are ap fn's. A refusal exits 2, a door that cannot be reached 3 (no_door).\n";
 
+/// `ap hook --help`.
+pub const HOOK_HELP: &str = "Usage: ap hook pre-commit\nInside a stage with limits: the program of the script that stands for the host's Git hook in the stage's view. It asks the stage's door (AP_DOOR) to run the host's pre-commit hook for the worktree it runs in, outside the stage, on the index Git is committing; the hook's first line of errors and its exit status are ap hook's, and any exit but 0 refuses the commit. A refusal exits 2, a door that cannot be reached 3 (no_door).\n";
+
 fn refuse(code: &str, field: &str, status: u8) -> ExitCode {
     let v = json!({"error": {"code": code, "field": field, "detail": null}});
     match writeln!(std::io::stderr(), "{v}") {
@@ -851,6 +1080,42 @@ pub fn cli(argv: &[OsString]) -> ExitCode {
             Stream::Out => std::io::stdout().write_all(bytes),
             Stream::Err => std::io::stderr().write_all(bytes),
         };
+    });
+    match ended {
+        Some(Closing::Exit(n)) => ExitCode::from(u8::try_from(n).unwrap_or(1)),
+        Some(Closing::Refused(code, field)) => refuse(&code, &field, 2),
+        _ => refuse("no_door", "AP_DOOR", 3),
+    }
+}
+/// `ap hook pre-commit` (R10).
+pub fn hook_cli(argv: &[OsString]) -> ExitCode {
+    if !matches!(argv, [word] if word == HOOK) {
+        return refuse("usage", "args", 2);
+    }
+    let Some(at) = std::env::var_os("AP_DOOR").filter(|v| !v.is_empty()) else {
+        return refuse("no_door", "AP_DOOR", 2);
+    };
+    // Git runs the hook at the top of the worktree it commits in.
+    let dir = std::env::current_dir()
+        .and_then(fs::canonicalize)
+        .ok()
+        .and_then(|d| d.to_str().map(str::to_owned));
+    let Some(dir) = dir else {
+        return refuse("not_admitted", "dir", 2);
+    };
+    let index = match std::env::var_os("GIT_INDEX_FILE").filter(|v| !v.is_empty()) {
+        Some(file) => Path::new(&file)
+            .file_name()
+            .and_then(OsStr::to_str)
+            .unwrap_or_default()
+            .to_owned(),
+        None => "index".to_owned(),
+    };
+    let request = json!({"door": 1, "verb": "hook", "dir": dir, "index": index});
+    let ended = ask(Path::new(&at), &request, |stream, bytes| {
+        if stream == Stream::Err {
+            let _ = std::io::stderr().write_all(bytes);
+        }
     });
     match ended {
         Some(Closing::Exit(n)) => ExitCode::from(u8::try_from(n).unwrap_or(1)),

@@ -171,6 +171,8 @@ struct Fake {
     t: PathBuf,
     env: Vec<(String, String)>,
     policy: Option<PathBuf>,
+    /// The directory the port names as the host's Git hooks: none unless a test sets one.
+    hooks: Option<PathBuf>,
     launches: Vec<Vec<String>>,
     launch_envs: Vec<Vec<(String, String)>>,
     groups: BTreeMap<String, u32>,
@@ -256,6 +258,7 @@ impl Fake {
             t,
             env,
             policy: None,
+            hooks: None,
             launches: vec![],
             launch_envs: vec![],
             groups: BTreeMap::new(),
@@ -279,6 +282,33 @@ impl Fake {
     fn with_policy(mut self) -> Self {
         self.policy = Some(self.t.join("policy.json"));
         self
+    }
+    /// The port names `<t>/hosthooks` as the host's hooks directory; its `pre-commit` is the
+    /// script `body`, of mode `mode`.
+    fn with_hook(mut self, body: &str, mode: u32) -> Self {
+        write(&self.t.join("hosthooks/pre-commit"), body, mode);
+        self.hooks = Some(self.t.join("hosthooks"));
+        self
+    }
+    /// One linked worktree `<t>/wt` of `<t>/repo`, whose own config names the identity and
+    /// `core.hooksPath` `<scratch>/hooks` (what the host's configuration does in the view).
+    fn worktree(&self) {
+        let hooks = self.s("scratch/hooks");
+        let script = format!(
+            "git config extensions.worktreeConfig true && git worktree add -q ../wt -b stage \
+             && cd ../wt && git config --worktree user.name t && git config --worktree user.email t@e \
+             && git config --worktree core.hooksPath {hooks}"
+        );
+        let made = forks::forking(|| {
+            Command::new("bash")
+                .args(["-c", &script])
+                .current_dir(self.t.join("repo"))
+                .env("GIT_CONFIG_NOSYSTEM", "1")
+                .env("GIT_CONFIG_GLOBAL", self.t.join("gitconfig"))
+                .output()
+                .unwrap()
+        });
+        assert!(made.status.success(), "{made:?}");
     }
     /// A request of `role` (`verifier`: a reviewer with `ont_role` `verifier`) with `limits`.
     fn request(&self, role: &str) -> Value {
@@ -451,6 +481,9 @@ impl System for Fake {
     }
     fn policy_file(&self) -> Option<PathBuf> {
         self.policy.clone()
+    }
+    fn git_hooks(&self) -> Option<PathBuf> {
+        self.hooks.clone()
     }
     fn environment(&self) -> Vec<(String, String)> {
         self.env.clone()
@@ -1649,4 +1682,466 @@ fn r20_ap_check_under_the_door_for_each_of_its_outcomes() {
     assert!(!f.t.join("client-tailscale").exists());
     assert_eq!(f.lines("client-checks.jsonl").len(), 1);
     assert_eq!(f.lines("checks.jsonl").len(), 1);
+}
+
+/// The host's hook of the tests: it notes its working directory and its environment, and refuses
+/// a staged word, its first line of errors for the stage and a second one that must not reach it.
+const HOST_HOOK: &str = r#"#!/bin/sh
+d=@D@
+n=$(( $(cat "$d/hook.count" 2>/dev/null || echo 0) + 1 )); echo "$n" > "$d/hook.count"
+pwd > "$d/hook.pwd.$n"
+env | sort > "$d/hook.env.$n"
+if git diff --cached | grep -q PLANTED; then
+  echo 'fake_refused: a planted word is staged' >&2
+  echo 'PLANTED second' >&2
+  exit 1
+fi
+exit 0
+"#;
+/// The stage's commits of the first hook test; its notes go to `@D@`, its scratch directory is `@S@`.
+const COMMITS: &str = r#"S=@S@
+cp "$S/hooks/pre-commit" @D@/hookscript
+stat -c %a "$S/hooks/pre-commit" > @D@/mode.file
+stat -c %a "$S/hooks" > @D@/mode.dir
+echo PLANTED > new1.txt; git add new1.txt; git commit -q -m plant-new; echo $? > @D@/rc.1
+git reset -q
+echo clean > clean.txt; git add clean.txt; git commit -q -m clean-file; echo $? > @D@/rc.2
+echo PLANTED >> a.txt; git commit -q -a -m plant-all; echo $? > @D@/rc.3
+git reset -q --hard
+echo PLANTED >> a.txt; git commit -q -m plant-path a.txt; echo $? > @D@/rc.4
+git log --format=%s > @D@/log
+exit 0
+"#;
+fn hook_request(dir: &str, index: &str) -> Value {
+    json!({"door": 1, "verb": "hook", "dir": dir, "index": index})
+}
+/// The hook's line of the record of `lines`: its members and the reasons.
+fn hook_lines(lines: &[Value]) -> Vec<(Value, Value)> {
+    lines
+        .iter()
+        .map(|l| {
+            eight(l);
+            assert_eq!(l["verb"], json!("hook"), "{l}");
+            assert_eq!(l["name"], json!("pre-commit"), "{l}");
+            (l["exit"].clone(), l["reason"].clone())
+        })
+        .collect()
+}
+
+// spec: specs/ap/door.md#R9
+// spec: specs/ap/door.md#R10
+// spec: specs/ap/run-limits.md#R4
+// spec: specs/ap/run-limits.md#R16
+#[test]
+fn r9_a_commit_in_the_stage_asks_the_door_and_the_host_hook_refuses_a_planted_word() {
+    if on_pc() {
+        return;
+    }
+    let f = Fake::new();
+    let body = HOST_HOOK.replace("@D@", f.t.to_str().unwrap());
+    let mut f = f.with_hook(&body, 0o755);
+    f.env.push(("GIT_DIR".into(), f.s("no-such-git-dir")));
+    f.worktree();
+    let scratch = f.s("scratch");
+    f.then(
+        &COMMITS
+            .replace("@D@", f.t.to_str().unwrap())
+            .replace("@S@", &scratch),
+    );
+    let mut r = f.request("implementer");
+    r["cwd"] = json!(f.s("wt"));
+    let (f, result) = f.run(r);
+    let (v, status) = result.unwrap();
+    assert_eq!((status, &v["state"]), (0, &json!("ok")), "{v}");
+    let note = |rel: &str| f.text(rel).trim().to_owned();
+    // (2) is committed and (1), (3), (4) are not.
+    assert_eq!(
+        [note("rc.1"), note("rc.2"), note("rc.3"), note("rc.4")],
+        ["1", "0", "1", "1"].map(str::to_owned)
+    );
+    let log = f.text("log");
+    assert!(log.lines().any(|l| l == "clean-file"), "{log}");
+    for refused in ["plant-new", "plant-all", "plant-path"] {
+        assert!(!log.lines().any(|l| l == refused), "{log}");
+    }
+    // The stage hears the hook's first line and nothing of the rest.
+    let err = f.text("bin/then.err");
+    assert_eq!(
+        err.matches("fake_refused: a planted word is staged")
+            .count(),
+        3,
+        "{err}"
+    );
+    assert!(!err.contains("PLANTED") && !err.contains("second"), "{err}");
+    assert!(!f.text("bin/then.out").contains("PLANTED"));
+    // The hook ran in the resolved worktree, on the index Git was committing, with the door's
+    // environment of R9.
+    let a = f.s("repo/.git/worktrees/wt");
+    let wt = f.s("wt");
+    for n in 1..=4 {
+        assert_eq!(note(&format!("hook.pwd.{n}")), wt, "{n}");
+        let env = f.text(&format!("hook.env.{n}"));
+        let index = env
+            .lines()
+            .find_map(|l| l.strip_prefix("GIT_INDEX_FILE="))
+            .unwrap();
+        match n {
+            1 | 2 => assert_eq!(index, format!("{a}/index")),
+            3 => assert_eq!(index, format!("{a}/index.lock")),
+            _ => {
+                let name = index.strip_prefix(&format!("{a}/next-index-")).unwrap();
+                let digits = name.strip_suffix(".lock").unwrap();
+                assert!(!digits.is_empty() && digits.bytes().all(|c| c.is_ascii_digit()));
+            }
+        }
+        let git: BTreeSet<&str> = env.lines().filter(|l| l.starts_with("GIT_")).collect();
+        let want: BTreeSet<String> = [
+            format!("GIT_INDEX_FILE={index}"),
+            "GIT_CONFIG_COUNT=2".into(),
+            "GIT_CONFIG_KEY_0=core.hooksPath".into(),
+            "GIT_CONFIG_VALUE_0=/dev/null".into(),
+            "GIT_CONFIG_KEY_1=core.fsmonitor".into(),
+            "GIT_CONFIG_VALUE_1=false".into(),
+        ]
+        .into();
+        let want: BTreeSet<&str> = want.iter().map(String::as_str).collect();
+        assert_eq!(git, want, "{n}");
+        assert!(!env.lines().any(|l| l.starts_with("AP_DOOR=")), "{n}");
+    }
+    // R4's script, with its modes.
+    assert_eq!(f.text("hookscript"), "#!/bin/sh\nexec ap hook pre-commit\n");
+    assert_eq!(note("mode.file"), "755");
+    assert_eq!(note("mode.dir"), "700");
+    // R16 (k): one bind, after `/usr`'s, and the record's last entry of the view.
+    let launch = &f.launches[0];
+    let hook = format!("{scratch}/hooks/pre-commit");
+    let host = f.s("hosthooks/pre-commit");
+    let bind = ["--ro-bind", &hook, &host].map(str::to_owned);
+    let places: Vec<usize> = launch
+        .windows(3)
+        .enumerate()
+        .filter(|(_, w)| *w == bind)
+        .map(|(i, _)| i)
+        .collect();
+    let usr = ["--ro-bind", "/usr", "/usr"].map(str::to_owned);
+    let usr = launch.windows(3).position(|w| w == usr).unwrap();
+    assert_eq!(places.len(), 1, "{launch:?}");
+    assert!(usr < places[0], "{launch:?}");
+    assert_eq!(
+        v["limits"]["view"].as_array().unwrap().last(),
+        Some(&json!(hook))
+    );
+    // One line of the record per commit, without a word of the hook's.
+    let lines = f.lines("door.jsonl");
+    assert_eq!(lines.len(), 4);
+    assert_eq!(
+        hook_lines(&lines),
+        [json!(1), json!(0), json!(1), json!(1)].map(|e| (e, Value::Null))
+    );
+    assert!(lines.iter().all(|l| l["role"] == json!("implementer")));
+    let record = f.text("door.jsonl");
+    assert!(!record.contains("PLANTED") && !record.contains("fake_refused"));
+}
+
+/// Runs a stage of `role` in `cwd`, held, asks its door each of `requests` and returns the port
+/// and the closing message of each; the stage's own end is 0.
+fn hook_asks(f: Fake, role: &str, cwd: &str, requests: &[Value]) -> (Fake, Vec<Option<Value>>) {
+    let mut r = f.request(role);
+    r["cwd"] = json!(cwd);
+    let door = f.door();
+    let running = f.start(r, true);
+    let closings = requests.iter().map(|q| ask(&door, q).2).collect();
+    let (f, result) = running.finish();
+    assert_eq!(result.unwrap().1, 0);
+    (f, closings)
+}
+
+// spec: specs/ap/run-limits.md#R4
+// spec: specs/ap/run-limits.md#R16
+#[test]
+fn r4_r16_no_hook_script_and_no_bind_without_the_host_hook_or_for_another_role() {
+    if on_pc() {
+        return;
+    }
+    // (port without a hooks directory, one whose directory holds no pre-commit, one whose
+    // pre-commit is a directory, a role that is neither implementer nor fixer), and a fixer, which
+    // gets the script as an implementer does.
+    let cases: [(&str, &str); 6] = [
+        ("none", "implementer"),
+        ("empty", "implementer"),
+        ("directory", "implementer"),
+        ("hook", "reviewer"),
+        ("hook", "verifier"),
+        ("hook", "fixer"),
+    ];
+    for (hooks, role) in cases {
+        let mut f = Fake::new();
+        match hooks {
+            "empty" => {
+                fs::create_dir_all(f.t.join("hosthooks")).unwrap();
+                f.hooks = Some(f.t.join("hosthooks"));
+            }
+            "directory" => {
+                fs::create_dir_all(f.t.join("hosthooks/pre-commit")).unwrap();
+                f.hooks = Some(f.t.join("hosthooks"));
+            }
+            "hook" => f = f.with_hook("#!/bin/sh\nexit 0\n", 0o755),
+            _ => {}
+        }
+        let t = f.t.to_str().unwrap().to_owned();
+        f.then(&format!(
+            "ls -A {s} > {t}/scratch.ls; ls -A {s}/hooks > {t}/hooks.ls 2>/dev/null; exit 0\n",
+            s = f.s("scratch")
+        ));
+        let r = f.request(role);
+        let (f, result) = f.run(r);
+        let (v, status) = result.unwrap();
+        assert_eq!((status, &v["state"]), (0, &json!("ok")), "{hooks} {role}");
+        let launch = &f.launches[0];
+        let view = v["limits"]["view"].as_array().unwrap();
+        let scripted = role == "fixer";
+        let scratch = f.text("scratch.ls");
+        let what = format!("{hooks} {role}: {launch:?}");
+        if scripted {
+            assert_eq!(scratch, "hooks\ntarget\ntmp\n", "{what}");
+            assert_eq!(f.text("hooks.ls"), "pre-commit\n", "{what}");
+            assert!(
+                launch.iter().any(|a| a.ends_with("/hooks/pre-commit")),
+                "{what}"
+            );
+            assert!(
+                view.iter()
+                    .any(|e| e.as_str().is_some_and(|e| e.ends_with("/hooks/pre-commit")))
+            );
+        } else {
+            assert_eq!(scratch, "target\ntmp\n", "{what}");
+            assert!(!launch.iter().any(|a| a.contains("hooks")), "{what}");
+            assert!(
+                !view.iter().any(|e| e.as_str().unwrap().contains("hooks")),
+                "{what}"
+            );
+        }
+    }
+}
+// spec: specs/ap/door.md#R2
+// spec: specs/ap/door.md#R6
+// spec: specs/ap/door.md#R9
+#[test]
+fn r9_hook_is_admitted_in_its_order_and_each_refusal_starts_nothing() {
+    if on_pc() {
+        return;
+    }
+    let fresh = || {
+        let f = Fake::new();
+        let body = HOST_HOOK.replace("@D@", f.t.to_str().unwrap());
+        let f = f.with_hook(&body, 0o755);
+        f.worktree();
+        f
+    };
+    // The forms, then the stage's own directory.
+    let f = fresh();
+    let (wt, repo) = (f.s("wt"), f.s("repo"));
+    let digits = "1".repeat(21);
+    let mut asks: Vec<(Value, &str, &str)> = vec![];
+    let mut index = |v: Value| {
+        asks.push((
+            json!({"door": 1, "verb": "hook", "dir": wt, "index": v}),
+            "invalid_request",
+            "index",
+        ));
+    };
+    for bad in [
+        json!(7),
+        json!("../index"),
+        json!("/x/index"),
+        json!("index.lock.x"),
+        json!("next-index-.lock"),
+        json!("next-index-1x.lock"),
+        json!(format!("next-index-{digits}.lock")),
+        json!(""),
+        json!("Index"),
+    ] {
+        index(bad);
+    }
+    asks.push((
+        json!({"door": 1, "verb": "hook", "dir": wt}),
+        "invalid_request",
+        "index",
+    ));
+    asks.push((
+        json!({"door": 1, "verb": "hook", "index": "index"}),
+        "invalid_request",
+        "dir",
+    ));
+    asks.push((
+        json!({"door": 1, "verb": "hook", "dir": 3, "index": "index"}),
+        "invalid_request",
+        "dir",
+    ));
+    asks.push((
+        json!({"door": 1, "verb": "hook", "dir": "a\u{0}b", "index": "index"}),
+        "invalid_request",
+        "dir",
+    ));
+    asks.push((
+        json!({"door": 1, "verb": "hook", "dir": wt, "index": "index", "more": 1}),
+        "invalid_request",
+        "request",
+    ));
+    asks.push((hook_request(&repo, "index"), "not_admitted", "dir"));
+    asks.push((
+        hook_request(&format!("{wt}/"), "index"),
+        "not_admitted",
+        "dir",
+    ));
+    let requests: Vec<Value> = asks.iter().map(|(q, _, _)| q.clone()).collect();
+    let (f, closings) = hook_asks(f, "implementer", &wt, &requests);
+    for ((q, code, field), closing) in asks.iter().zip(&closings) {
+        assert_eq!(closing, &refused(code, field), "{q}");
+    }
+    let lines = f.lines("door.jsonl");
+    assert_eq!(lines.len(), asks.len());
+    let reasons: Vec<(Value, Value)> = asks
+        .iter()
+        .map(|(_, c, _)| (Value::Null, json!(c)))
+        .collect();
+    assert_eq!(hook_lines(&lines), reasons);
+    assert!(!f.t.join("hook.count").exists(), "the hook ran");
+    // A role the door does not admit, with the hook present.
+    for role in ["verifier", "reviewer"] {
+        let f = fresh();
+        let wt = f.s("wt");
+        let (f, closings) = hook_asks(f, role, &wt, &[hook_request(&wt, "index")]);
+        assert_eq!(closings, [refused("not_admitted", "role")], "{role}");
+        assert!(!f.t.join("hook.count").exists(), "{role}");
+        assert_eq!(
+            hook_lines(&f.lines("door.jsonl")),
+            [(Value::Null, json!("not_admitted"))]
+        );
+    }
+    // No hooks directory, none holding a pre-commit.
+    for hooks in ["none", "empty"] {
+        let f = Fake::new();
+        let mut f = f;
+        f.worktree();
+        if hooks == "empty" {
+            fs::create_dir_all(f.t.join("hosthooks")).unwrap();
+            f.hooks = Some(f.t.join("hosthooks"));
+        }
+        let wt = f.s("wt");
+        let (f, closings) = hook_asks(f, "implementer", &wt, &[hook_request(&wt, "index")]);
+        assert_eq!(closings, [refused("not_admitted", "hook")], "{hooks}");
+        assert_eq!(
+            hook_lines(&f.lines("door.jsonl")),
+            [(Value::Null, json!("not_admitted"))]
+        );
+    }
+    // A cwd that is no Git worktree.
+    let f = fresh();
+    let plain = f.s("elsewhere");
+    let (f, closings) = hook_asks(f, "implementer", &plain, &[hook_request(&plain, "index")]);
+    assert_eq!(closings, [refused("not_admitted", "dir")]);
+    assert!(!f.t.join("hook.count").exists());
+    assert_eq!(
+        hook_lines(&f.lines("door.jsonl")),
+        [(Value::Null, json!("not_admitted"))]
+    );
+}
+
+// spec: specs/ap/door.md#R9
+#[test]
+fn r9_only_the_first_line_and_the_status_come_back() {
+    if on_pc() {
+        return;
+    }
+    let flood = "#!/bin/sh\nhead -c 3145728 /dev/zero | tr '\\0' x >&2\nhead -c 1048576 /dev/zero | tr '\\0' y\nexit 3\n";
+    let cases: [(&str, u32, usize, i64); 4] = [
+        (flood, 0o755, 1025, 3),
+        ("#!/bin/sh\nexit 0\n", 0o644, 0, 127),
+        ("#!/bin/sh\nkill -TERM $$\nsleep 5\n", 0o755, 0, 143),
+        (
+            "#!/bin/sh\nprintf 'one\\ntwo\\n' >&2\nexit 0\n",
+            0o755,
+            4,
+            0,
+        ),
+    ];
+    for (body, mode, err, exit) in cases {
+        let f = Fake::new().with_hook(body, mode);
+        f.worktree();
+        let wt = f.s("wt");
+        let mut r = f.request("implementer");
+        r["cwd"] = json!(wt);
+        let door = f.door();
+        let running = f.start(r, true);
+        let (out, errs, closing) = ask(&door, &hook_request(&wt, "index"));
+        running.finish().1.unwrap();
+        assert!(out.is_empty(), "{exit}");
+        assert_eq!(errs.len(), err, "{exit}");
+        if err == 1025 {
+            assert_eq!(errs, [vec![b'x'; 1024], b"\n".to_vec()].concat());
+        }
+        if err == 4 {
+            assert_eq!(text(&errs), "one\n");
+        }
+        assert_eq!(closing, Some(json!({"exit": exit})));
+    }
+}
+
+// spec: specs/ap/door.md#R10
+#[test]
+fn r10_ap_hook_refuses_before_any_connection_and_says_no_door() {
+    let f = Fake::new();
+    let refusal = |out: &Output, code: &str, field: &str, status: i32| {
+        assert_eq!(out.status.code(), Some(status), "{out:?}");
+        assert!(out.stdout.is_empty(), "{out:?}");
+        let v: Value = serde_json::from_slice(&out.stderr).unwrap();
+        assert_eq!(v["error"]["code"], json!(code), "{out:?}");
+        assert_eq!(v["error"]["field"], json!(field), "{out:?}");
+    };
+    let door = Some("/nonexistent/door");
+    for args in [
+        vec!["hook"],
+        vec!["hook", "x"],
+        vec!["hook", "pre-commit", "x"],
+        vec!["hook", "pre-push"],
+    ] {
+        refusal(&f.ap(door, &args, b""), "usage", "args", 2);
+    }
+    let help = f.ap(None, &["hook", "--help"], b"");
+    assert_eq!(help.status.code(), Some(0));
+    assert!(text(&help.stdout).starts_with("Usage: ap hook pre-commit\n"));
+    refusal(
+        &f.ap(None, &["hook", "pre-commit"], b""),
+        "no_door",
+        "AP_DOOR",
+        2,
+    );
+    refusal(
+        &f.ap(Some(""), &["hook", "pre-commit"], b""),
+        "no_door",
+        "AP_DOOR",
+        2,
+    );
+    refusal(
+        &f.ap(door, &["hook", "pre-commit"], b""),
+        "no_door",
+        "AP_DOOR",
+        3,
+    );
+    // A socket that closes without a closing message: the door is gone.
+    let quiet = f.s("quiet.sock");
+    let listener = std::os::unix::net::UnixListener::bind(&quiet).unwrap();
+    let server = std::thread::spawn(move || {
+        let (mut s, _) = listener.accept().unwrap();
+        let mut b = [0u8; 256];
+        let _ = s.read(&mut b);
+    });
+    refusal(
+        &f.ap(Some(&quiet), &["hook", "pre-commit"], b""),
+        "no_door",
+        "AP_DOOR",
+        3,
+    );
+    server.join().unwrap();
 }
