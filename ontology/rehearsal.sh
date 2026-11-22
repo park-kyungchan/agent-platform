@@ -948,7 +948,7 @@ apply('triage_decision', 'v9-after-carry', dict(decision=third, triage='none', r
 unchanged = fingerprint()
 assert migrate(9, 10) == dict(carried=0, already=3)
 assert fingerprint() == unchanged and fields(third_request)['route_reason'] == 'carried from version 9'
-for before, after in [(9, 18), (10, 10), (10, 9)]:
+for before, after in [(9, 19), (10, 10), (10, 9)]:
     assert migrate(before, after, 2) == dict(status='unknown_pair')
 assert fingerprint() == unchanged
 assert migrate(9, 10) == dict(carried=0, already=3)
@@ -1968,14 +1968,19 @@ tick(); apply('amend_unit', 'g-wave', dict(unit=g16, wave=4, page_digest=digest(
 f = fields(g16); assert f['wave'] == 4 and f['page_digest'] == digest('v16 page g'), f
 print('v16_gate_rows_complete')
 print('v16 clauses: ok')
-# Version 17: the repository's file over the objects made under version 16. The schema differs from version 16 only by
-# points 1 to 9 of ontology/README.md, "Version 17": each is taken off a copy, and what is left reads as version 16.
+# Version 17, pinned in Git by the commit of main that holds it, over the objects made under version 16. The schema
+# differs from version 16 only by points 1 to 9 of ontology/README.md, "Version 17": each is taken off a copy, and what
+# is left reads as version 16.
 v16_schema = schema
 v16_objects = [o['id'] for t in ('task', 'decision', 'request', 'intent', 'criterion', 'unit', 'review', 'run', 'finding', 'hold', 'principle', 'section', 'component', 'clause')
                for o in call(['search'], dict(object_type=t, limit=1000))['objects']]
 v16_before = [obj(i) for i in v16_objects]
 v16_views = [(view, args, call(['render'], dict(view=view, args=args))) for view, args, _ in v13_views]
-schema = json.loads(pathlib.Path(repo, 'ontology/work.schema.json').read_text())
+V17_PIN = ('9683153aeb4f8ba0e855a78a94a2338d94587680', 'e944d88e686926eb4f1295e89ab6836d5280f004b43d12e154ea1eba0981510d')
+v17_bytes = subprocess.check_output(['git', '-C', repo, 'show', V17_PIN[0] + ':ontology/work.schema.json'], timeout=10)
+assert hashlib.sha256(v17_bytes).hexdigest() == V17_PIN[1]
+v17_path = pathlib.Path(store).with_name('pinned-' + V17_PIN[0] + '.json'); v17_path.write_bytes(v17_bytes)
+schema = json.loads(v17_bytes)
 assert schema['version'] == 17
 head, old = json.loads(json.dumps(schema)), json.loads(json.dumps(v16_schema))
 UTC, NE = {'value_type': 'utc_time'}, {'value_type': 'nonempty_text'}
@@ -2048,7 +2053,7 @@ def resource_copy(path, label, name):
     assert RESOURCE not in json.dumps(copy['sources'])
     out.write_text(json.dumps(copy))
     return out
-call(['schema', 'install', str(resource_copy(pathlib.Path(repo, 'ontology/work.schema.json'), 'repository.json', 'repository-route.json'))])
+call(['schema', 'install', str(resource_copy(v17_path, 'pinned-v17.json', 'pinned-v17-route.json'))])
 redirect.trace(work, copies)
 assert [obj(i) for i in v16_objects] == v16_before
 for view, args, before in v16_views:
@@ -2067,7 +2072,6 @@ assert sorted(listed) == ['capacity', 'clause', 'gate', 'horizon', 'route'], sor
 assert all('program' not in f for f in listed.values()) and listed['capacity']['parameters'] == [] and sorted(p['name'] for p in listed['gate']['parameters']) == ['intent', 'since'], listed
 unchanged = fingerprint()
 assert migrate(16, 17) == dict(carried=0, already=0)
-assert migrate(17, 18, 2) == dict(status='unknown_pair')
 assert fingerprint() == unchanged and [obj(i) for i in v16_objects] == v16_before
 print('v17_migration_rows_complete')
 phase = 'v17'
@@ -2140,4 +2144,76 @@ assert (answer['host_samples']['appended']['retraction'], answer['checks']['appe
 print('gate_row=v17-records-retracted expected=admitted')
 print('v17_gate_rows_complete')
 print('v17 resources: ok')
+# Version 18: the repository's file over the objects made under version 17. The schema differs from version 17 only by
+# points 1 and 2 of ontology/README.md, "Version 18": each is taken off a copy, and what is left reads as version 17.
+v17_schema = schema
+v17_objects = [o['id'] for t in ('task', 'decision', 'request', 'intent', 'criterion', 'unit', 'review', 'run', 'finding', 'hold', 'principle', 'host', 'account')
+               for o in call(['search'], dict(object_type=t, limit=1000))['objects']]
+v17_before = [obj(i) for i in v17_objects]
+v17_views = [(view, args, call(['render'], dict(view=view, args=args))) for view, args, _ in v13_views]
+schema = json.loads(pathlib.Path(repo, 'ontology/work.schema.json').read_text())
+assert schema['version'] == 18
+head, old = json.loads(json.dumps(schema)), json.loads(json.dumps(v17_schema))
+SHAPES18 = dict(job={'type': 'string', 'required': False, 'max_bytes': 40}, reserved_usd_micros={'type': 'integer', 'required': False},
+                settled_usd_micros={'type': 'integer', 'required': False})
+for name, shape in SHAPES18.items():
+    assert head['object_types']['run']['properties'].pop(name) == shape, name
+for action, names in (('start_run', ('job', 'reserved_usd_micros')), ('close_run', ('settled_usd_micros',))):
+    a = head['action_types'][action]
+    for name in names:
+        assert a['parameters'].pop(name) == SHAPES18[name], (action, name)
+        assert a['rules'][0]['set'].pop(name) == '$' + name, (action, name)
+        assert '$' + name not in json.dumps(a['submission_criteria']), (action, name)
+spend_fn = head['functions'].pop('api_spend')
+assert len(spend_fn.pop('description').encode()) <= 200
+assert spend_fn == dict(parameters=dict(month={'type': 'string', 'required': True}), program='/usr/local/bin/ap', answer_bytes=65536, timeout_ms=30000), spend_fn
+assert {k: v for k, v in head.items() if k != 'version'} == {k: v for k, v in old.items() if k != 'version'}
+print('gate_row=v18-only-points-1-and-2 expected=admitted functions=' + str(len(schema['functions'])))
+call(['schema', 'install', str(resource_copy(pathlib.Path(repo, 'ontology/work.schema.json'), 'repository.json', 'repository-route.json'))])
+redirect.trace(work, copies)
+assert [obj(i) for i in v17_objects] == v17_before
+for view, args, before in v17_views:
+    answer = call(['render'], dict(view=view, args=args))
+    assert answer['rows'] == before['rows'] and answer['markdown'] == before['markdown'].replace('schema=work@17', 'schema=work@18'), view
+print('gate_row=v18-v17-objects-and-views-unchanged expected=admitted objects=' + str(len(v17_objects)) + ' views=' + str(len(v17_views)))
+sizes = []
+for name in ('ont_describe', 'ont_action_list'):
+    wire = subprocess.run([binary, '--store', store, 'mcp'], input=json.dumps(dict(jsonrpc='2.0', id=1, method='tools/call', params=dict(name=name, arguments={}))) + '\n', text=True, capture_output=True, timeout=60)
+    answer = json.loads(wire.stdout.splitlines()[0])['result']; assert wire.returncode == 0 and not answer['isError'], answer
+    sizes.append(len(answer['content'][0]['text'].encode())); assert sizes[-1] <= 262144, (name, sizes[-1])
+print('v18_mcp_bytes=' + ','.join(map(str, sizes)), file=sys.stderr)
+described = call(['describe'], {})
+listed = {f['name']: f for f in described['functions'] if f['domain'] == 'work'}
+assert sorted(listed) == ['api_spend', 'capacity', 'clause', 'gate', 'horizon', 'route'], sorted(listed)
+assert 'program' not in listed['api_spend'] and [p['name'] for p in listed['api_spend']['parameters']] == ['month'], listed['api_spend']
+unchanged = fingerprint()
+assert migrate(17, 18) == dict(carried=0, already=0)
+assert migrate(18, 19, 2) == dict(status='unknown_pair')
+assert fingerprint() == unchanged and [obj(i) for i in v17_objects] == v17_before
+print('v18_migration_rows_complete')
+phase = 'v18'
+# The walk of version 18: a batch run reserved and settled, read back; a stage's run without the new parameters.
+credit = oid('account', 'anthropic-api-key')
+def batch_start(rid, job, reserved):
+    return created(apply('start_run', rid, dict(role='batch', runtime='api', model='claude-sonnet-5-5', account='anthropic-api-key', uses=credit, job=job,
+                                               reserved_usd_micros=reserved)), 'run')
+tick(); settled = batch_start('settled', 'drift', 4000000)
+f = fields(settled); assert (f['job'], f['reserved_usd_micros'], f['status'], f['uses'], f.get('settled_usd_micros')) == ('drift', 4000000, 'running', credit, None), f
+tick(); apply('close_run', 'settled', dict(run=settled, state='ended', session='msgbatch_fixture', input_tokens=10, output_tokens=20, settled_usd_micros=1500000))
+f = fields(settled); assert (f['job'], f['reserved_usd_micros'], f['settled_usd_micros'], f['status'], f['state'], f['session']) == ('drift', 4000000, 1500000, 'closed', 'ended', 'msgbatch_fixture'), f
+# A close without a settlement leaves none: the run counts at its reservation.
+tick(); unsettled = batch_start('unsettled', 'mining', 2000000)
+apply('close_run', 'unsettled', dict(run=unsettled, state='close_failed'))
+f = fields(unsettled); assert (f['status'], f['reserved_usd_micros'], f.get('settled_usd_micros')) == ('closed', 2000000, None), f
+# The store does not check the amounts or the job: a negative reservation and a settlement above it are stored.
+tick(); odd = batch_start('odd', 'no-such-job', -5)
+apply('close_run', 'odd', dict(run=odd, state='ended', settled_usd_micros=7))
+f = fields(odd); assert (f['job'], f['reserved_usd_micros'], f['settled_usd_micros']) == ('no-such-job', -5, 7), f
+# A start and a close without the new parameters read as on version 17.
+tick(); plain = created(apply('start_run', 'plain', dict(role='implementer', runtime='fixture-cli', model='fixture-model')), 'run')
+apply('close_run', 'plain', dict(run=plain, state='done', input_tokens=1))
+f = fields(plain); assert f['status'] == 'closed' and f['input_tokens'] == 1 and all(f.get(k) is None for k in SHAPES18), f
+print('gate_row=v18-credit-ledger expected=admitted')
+print('v18_gate_rows_complete')
+print('v18 credit: ok')
 PY

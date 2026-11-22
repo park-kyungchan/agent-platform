@@ -75,7 +75,14 @@ fn host() -> Value {
         },
         "work": {"slots": 3, "slice": "agents.slice", "prefix": "ap-unit", "pages": 2, "page_prefix": "ap-page"},
         "hosts": {"pc": {"ssh": "u@pc", "work": "/home/u/work/ap-checks", "busy_load": 0.75}},
-        "writer": {"model": "opus", "effort": "high", "permission_mode": "auto", "directory": "/var/lib/pages"}
+        "writer": {"model": "opus", "effort": "high", "permission_mode": "auto", "directory": "/var/lib/pages"},
+        "api": {"key_file": "/etc/agent-platform/credentials/anthropic-api-key",
+            "stops_usd": {"standard": 160, "soak": 185}, "day_cap_usd": 40,
+            "jobs": {
+                "drift": {"cap_usd": 60, "models": ["claude-sonnet-5-5", "claude-opus-5-5"], "max_tokens": 8000, "max_requests": 100},
+                "merge-review": {"cap_usd": 45, "models": ["claude-opus-5-5", "claude-fable-5-2"], "max_tokens": 8000, "max_requests": 100},
+                "mining": {"cap_usd": 18, "models": ["claude-sonnet-5-5", "claude-fable-5-2"], "max_tokens": 8000, "max_requests": 400},
+                "evals": {"cap_usd": 39, "models": ["claude-haiku-5-5", "claude-sonnet-5-5", "claude-opus-5-5", "claude-fable-5-2"], "max_tokens": 8000, "max_requests": 300}}}
     })
 }
 
@@ -118,7 +125,7 @@ fn r12_the_host_shape_passes_every_reader_after_one_read() {
     assert_eq!(
         answer,
         json!({"status": "ok", "path": PATH, "sha256": digest,
-            "readers": ["models", "quota", "units", "reviews", "repositories", "work", "check", "writer"]})
+            "readers": ["models", "quota", "units", "reviews", "repositories", "work", "check", "writer", "api"]})
     );
     assert_eq!(fake.reads.get(), 1);
     assert!(fake.calls.is_empty());
@@ -132,6 +139,7 @@ fn r12_the_host_shape_passes_every_reader_after_one_read() {
         "work",
         "hosts",
         "writer",
+        "api",
     ] {
         p.as_object_mut().unwrap().remove(m);
     }
@@ -225,6 +233,33 @@ fn r14_one_planted_fault_per_reader_is_refused_by_that_reader() {
             "writer.timeout_seconds is not 1 to 86,400 seconds"
         )
     );
+    assert_eq!(
+        refused(
+            "api",
+            json!({"key_file": "/etc/agent-platform/credentials/anthropic-api-key",
+                "stops_usd": {"standard": 160, "soak": 185}, "day_cap_usd": 40,
+                "jobs": {"drift": {"cap_usd": 60, "models": ["gpt-6.1-sol"], "max_tokens": 8000, "max_requests": 100}}})
+        ),
+        policy_invalid(
+            "api",
+            "api.jobs.drift.models is not 1 to 8 distinct Claude API model identifiers with an input and an output price"
+        )
+    );
+}
+
+// spec: specs/ap/policy.md#R12
+// spec: specs/ap/policy.md#R13
+#[test]
+fn r12_the_reader_api_runs_after_writer() {
+    // A member api of a wrong form beside a fault of `writer`: the reader `writer` comes first.
+    let mut p = host();
+    p["api"] = json!("on");
+    let Refusal { reader, failure } = check(&Fake::json(&p), None).unwrap_err();
+    assert_eq!(reader, Some("api"));
+    assert_eq!(failure.detail, json!("api is not an object"));
+    p["writer"] = json!("opus");
+    let Refusal { reader, .. } = check(&Fake::json(&p), None).unwrap_err();
+    assert_eq!(reader, Some("writer"));
 }
 
 // spec: specs/ap/policy.md#R12
