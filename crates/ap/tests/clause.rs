@@ -762,7 +762,13 @@ fn r7_ap_with_no_argument_is_the_function_clause() {
     );
     assert_eq!(out.status.code(), Some(3));
     assert!(out.stdout.is_empty());
-    assert_eq!(error_of(&out)["error"]["code"], "store_answer_unreadable");
+    // An engine that answers no JSON is unreadable; one that cannot start (a script just written may be busy
+    // while another test forks) fails as a process: either is a store the function cannot read.
+    let code = error_of(&out)["error"]["code"].clone();
+    assert!(
+        code == "store_answer_unreadable" || code == "process_failed",
+        "{code}"
+    );
     // Through the port, the one read refused the same way.
     let mut fake = Fake::new(&dir, &[]);
     fake.store_fails = true;
