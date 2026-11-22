@@ -65,6 +65,7 @@ pub mod object;
 pub mod page_review;
 pub mod page_write;
 pub mod render;
+pub mod scan;
 use compose::Composed;
 
 fn absolute(p: &str) -> bool {
