@@ -8,6 +8,7 @@ n=$(( $(cat "$here/count" 2>/dev/null || echo 0) + 1 )); echo "$n" > "$here/coun
 printf '%s|%s\n' "$CLAUDE_CONFIG_DIR" "$*" >> "$here/calls.log"
 env > "$here/env.$n"
 cat > "$here/prompt.$n"
+case $CLAUDE_CONFIG_DIR in */homes/*) CLAUDE_CONFIG_DIR=${CLAUDE_CONFIG_DIR%/homes/*} ;; esac
 sid=; prev=; for a in "$@"; do case "$prev" in --session-id|--resume) sid=$a ;; esac; prev=$a; done
 mode=$(cat "$here/mode-$(basename "$CLAUDE_CONFIG_DIR")" 2>/dev/null)
 init() { printf '{"type":"system","subtype":"init","session_id":"%s","mcp_servers":[]}\n' "$sid"; }

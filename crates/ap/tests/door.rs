@@ -579,7 +579,8 @@ fn r1_r13_a_stage_with_limits_has_its_door_and_ap_door_alone() {
     // The record's `limits` is the base's.
     let keys: Vec<&String> = v["limits"].as_object().unwrap().keys().collect();
     assert_eq!(keys, ["bwrap", "hidden", "scratch", "writable"]);
-    assert_eq!(v["limits"]["writable"], json!([a1, scratch]));
+    // The first entry is the home of the launch (`specs/ap/run-limits.md` R14).
+    assert_eq!(v["limits"]["writable"], json!([v["home"], scratch]));
     // A door that is asked nothing writes nothing.
     assert!(!f.t.join("door.jsonl").exists());
 }

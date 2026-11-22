@@ -10,9 +10,14 @@
 # AP_POLICY_FILE by one of this script's directory that allows its model and its account, and a
 # stage on another model is refused; ONT_ROLE and ONT_AGENT (and with git_author the two author
 # variables) are in the stage's environment; a reviewer stage with `limits` under the real `bwrap`
-# cannot write its cwd, nor the scratch directory or the account of another stage with `limits`
-# running at the same time (directly or through that stage's /proc/<pid>/root), but writes its
-# own scratch directory, which is gone after the return; an implementer whose `limits` name a
+# cannot write its cwd, nor the scratch directory, the home or the account of another stage with
+# `limits` running at the same time (directly or through that stage's /proc/<pid>/root), but writes
+# its own scratch directory, which is gone after the return, and its home of the launch
+# `<account>/homes/<session>`, the one thing it sees of its account: not the account's settings.json
+# or skills (directly or through /proc/1/root), and a sign-in without its refreshToken and the
+# account's CLAUDE.md, each read-only; the account's sign-in and settings are unchanged after it, no
+# derived `*.sign-in` is left, and a resume whose home holds a link at `.credentials.json` launches
+# nothing and creates nothing at the link's target; an implementer whose `limits` name a
 # `write` directory, an `over` pair, a `read_only` file and `show` writes that directory and, through
 # the target, the source, but neither its cwd nor the `read_only` file. Skipped, saying so, where `systemctl` is absent or this caller cannot start a
 # transient unit in the system manager.
@@ -32,28 +37,44 @@ trap cleanup EXIT
 mkdir -p "$t/bin" "$t/acct" "$t/acctB" "$t/cwd"
 cat > "$t/bin/claude" <<'FAKE'
 #!/usr/bin/env bash
+# `claude auth status`, which ap run calls outside the limits near the sign-in's end: nothing else.
+[ "${1:-} ${2:-}" = "auth status" ] && exit 0
 here=$(cd "$(dirname "$0")" && pwd)
 env > "$here/env"; cat /proc/self/cgroup > "$here/cgroup"; echo "$PPID" > "$here/parent"; cat > /dev/null
 sid=; prev=; for a in "$@"; do case "$prev" in --session-id|--resume) sid=$a ;; esac; prev=$a; done
 printf '{"type":"system","subtype":"init","session_id":"%s","mcp_servers":[]}\n' "$sid"
 # A shell forked into the background that outlives the answer, as a real session's can.
 /bin/bash -c 'echo $$ > "'"$here"'/sleeper.pid"; sleep 600; :' &
-# Under limits $here is read-only: the fake reports its writes in its answer. On the account
-# `acctB` it is the other stage: it says it is ready in its account and answers when told to.
-if [ "$(cat "$here/mode")" = limits ] && [ "$(basename "$CLAUDE_CONFIG_DIR")" = acctB ]; then
+# Under limits $here is read-only: the fake reports its writes in its answer. Under limits its
+# CLAUDE_CONFIG_DIR is its home `<account>/homes/<session>`; on the account `acctB` it is the other
+# stage: it says it is ready in its home and answers when told to.
+acct=${CLAUDE_CONFIG_DIR%/homes/*}
+if [ "$(cat "$here/mode")" = limits ] && [ "$(basename "$acct")" = acctB ]; then
   : > "$CLAUDE_CONFIG_DIR/ready"
   for _ in $(seq 300); do [ -e "$CLAUDE_CONFIG_DIR/go" ] && break; sleep 0.2; done
   printf '{"type":"result","subtype":"success","is_error":false,"num_turns":1,"result":"peer done","session_id":"%s","usage":{"input_tokens":1,"output_tokens":1},"permission_denials":[]}\n' "$sid"
 elif [ "$(cat "$here/mode")" = limits ]; then
   w() { if e=$( (: > "$1") 2>&1 ); then echo "$2 written"; else echo "$2 refused (${e##*: })"; fi; }
+  c() { if "${@:2}" > /dev/null 2>&1; then echo "$1 done"; else echo "$1 refused"; fi; }
   # The other stage's files, directly and through the root of each of its processes (host pids).
-  top=${here%/bin}; peer=
-  for p in "$top/scratchB/from-a" "$top/acctB/from-a"; do peer="$peer $(w "$p" peer)"; done
+  top=${here%/bin}; peer=; bhome=$(cat "$here/peer.home")
+  for p in "$top/scratchB/from-a" "$top/acctB/from-a" "$bhome/from-a"; do peer="$peer $(w "$p" peer)"; done
   for pid in $(cat "$here/peer.pids"); do
-    for p in "$top/scratchB/from-a" "$top/acctB/from-a"; do peer="$peer $(w "/proc/$pid/root$p" peer)"; done
+    for p in "$top/scratchB/from-a" "$top/acctB/from-a" "$bhome/from-a"; do peer="$peer $(w "/proc/$pid/root$p" peer)"; done
   done
   case "$peer" in *written*) peer="peer written:$peer" ;; *) peer="peer refused" ;; esac
-  said="$(w "$PWD/x" cwd); $(w "$TMPDIR/x" scratch); $(w "/proc/1/root$here/x" root); $peer"
+  # Its home, and what it sees of its account: the files a Lead's session loads, directly and
+  # through /proc/1/root; the sign-in and CLAUDE.md the home holds. No byte of a token is said.
+  case "$CLAUDE_CONFIG_DIR" in "$top/acct/homes/"?*) at=home ;; *) at=elsewhere ;; esac
+  lead=
+  for p in "$acct/settings.json" "$acct/skills/x" "/proc/1/root$acct/settings.json" "/proc/1/root$acct/skills/x"; do lead="$lead $(w "$p" lead)"; done
+  case "$lead" in *written*) lead="lead written:$lead" ;; *) lead="lead refused" ;; esac
+  si=$CLAUDE_CONFIG_DIR/.credentials.json
+  if grep -q accessToken "$si" 2> /dev/null && ! grep -q refreshToken "$si"; then sign="sign-in read"; else sign="sign-in unfit"; fi
+  sign="$sign; $(w "$si" sign-in); $(c sign-in-removal rm -f "$si"); $(c sign-in-rename mv "$si" "$CLAUDE_CONFIG_DIR/moved")"
+  [ "$(cat "$CLAUDE_CONFIG_DIR/CLAUDE.md" 2> /dev/null)" = "invented instructions" ] && md="md read" || md="md unread"
+  own="$(w "$CLAUDE_CONFIG_DIR/x" "$at"); account holds $(ls -A "$acct" | tr '\n' ' '); $lead; $sign; $md; $(w "$CLAUDE_CONFIG_DIR/CLAUDE.md" md)"
+  said="$(w "$PWD/x" cwd); $(w "$TMPDIR/x" scratch); $(w "/proc/1/root$here/x" root); $peer; $own"
   printf '{"type":"result","subtype":"success","is_error":false,"num_turns":1,"result":"%s","session_id":"%s","usage":{"input_tokens":1,"output_tokens":1},"permission_denials":[]}\n' "$said" "$sid"
 elif [ "$(cat "$here/mode")" = named ]; then
   # An implementer with the paths its request names: it reports each write and exits.
@@ -174,39 +195,82 @@ for how in stop kill; do
 done
 
 # 5. limits (specs/ap/run-limits.md): the real bwrap between the scope and the CLI. Stage B (account
-#    acctB) waits while stage A tries to write B's scratch directory and account, directly and
+#    acctB) waits while stage A tries to write B's scratch directory, home and account, directly and
 #    through /proc/<pid>/root of every process of B's scope (each stage has its own pid namespace).
+#    Each account holds what a Lead's session loads (settings.json, skills, CLAUDE.md) and an
+#    invented sign-in with a refreshToken, whose end is a day ahead (so no `claude auth status`).
 #    Under bwrap the CLI is a grandchild of ap run, so the check that it is a child of ap run is not
 #    made here.
 if ! /usr/bin/bwrap --ro-bind / / true 2> /dev/null; then
   echo "host-run-scope: limits skipped (/usr/bin/bwrap --ro-bind / / true fails here)"
 else
+  ends=$(( ($(date +%s) + 86400) * 1000 ))
+  for a in acct acctB; do
+    mkdir -p "$t/$a/skills"; echo '{"env":{}}' > "$t/$a/settings.json"; echo skill > "$t/$a/skills/x"
+    echo "invented instructions" > "$t/$a/CLAUDE.md"
+    printf '{"claudeAiOauth":{"accessToken":"invented-access-%s","refreshToken":"invented-refresh-%s","expiresAt":%s,"refreshTokenExpiresAt":%s,"scopes":["user:inference"]}}' \
+      "$a" "$a" "$ends" "$ends" > "$t/$a/.credentials.json"
+  done
+  digests() { sha256sum "$t/acct/.credentials.json" "$t/acct/settings.json" "$t/acctB/.credentials.json" "$t/acctB/settings.json"; }
+  before=$(digests)
   echo limits > "$t/bin/mode"
   printf '{"role":"reviewer","account":"%s","model":"haiku","effort":"low","permission_mode":"auto","cwd":"%s","prompt":"%s","out":"%s","timeout_seconds":90,"limits":{"scratch":"%s"}}' \
     "$t/acctB" "$t/cwd" "$t/prompt.md" "$t/lb.md" "$t/scratchB" | apr > "$t/lb.out" 2> "$t/lb.err" & bpid=$!
-  for _ in $(seq 100); do [ -e "$t/acctB/ready" ] && break; sleep 0.2; done
+  bhome=
+  for _ in $(seq 100); do
+    [ -s "$t/lb.md.run.json" ] && bhome=$(field "$t/lb.md.run.json" home)
+    [ -n "$bhome" ] && [ "$bhome" != None ] && [ -e "$bhome/ready" ] && break; sleep 0.2
+  done
+  echo "$bhome" > "$t/bin/peer.home"
   bunit=$(field "$t/lb.md.run.json" unit)
   cat "/sys/fs/cgroup$(systemctl show -p ControlGroup --value "$bunit")/cgroup.procs" > "$t/bin/peer.pids" 2> /dev/null
-  [ -e "$t/acctB/ready" ] && [ -s "$t/bin/peer.pids" ] && [ -d "$t/scratchB" ] \
-    && ok "limits: stage B runs in $bunit with $(wc -l < "$t/bin/peer.pids") processes" || bad "limits: stage B did not start: $(tail -c 400 "$t/lb.err")"
+  [ -e "$bhome/ready" ] && [ -s "$t/bin/peer.pids" ] && [ -d "$t/scratchB" ] && [[ "$bhome" == "$t/acctB/homes/"?* ]] \
+    && ok "limits: stage B runs in $bunit with $(wc -l < "$t/bin/peer.pids") processes, in its home below acctB/homes" || bad "limits: stage B did not start: $(tail -c 400 "$t/lb.err")"
   req l.md ",\"limits\":{\"scratch\":\"$t/scratch\"}" | apr > "$t/l.out" 2> "$t/l.err"; rc=$?
-  ans=$(cat "$t/l.md" 2> /dev/null)
+  ans=$(cat "$t/l.md" 2> /dev/null); home=$(field "$t/l.md.run.json" home)
   { [ "$rc" -eq 0 ] && [ "$(field "$t/l.md.run.json" state)" = ok ] && [ ! -e "$t/cwd/x" ] && [ ! -e "$t/bin/x" ] \
-    && [[ "$ans" == "cwd refused (Read-only file system); scratch written; root refused ("*"); peer refused" ]]; } \
-    && ok "limits: the cwd, /proc/1/root and stage B's files refused, the scratch directory written: $ans" \
+    && [[ "$ans" == "cwd refused (Read-only file system); scratch written; root refused ("*"); peer refused; "* ]]; } \
+    && ok "limits: the cwd, /proc/1/root and stage B's files refused, the scratch directory written: ${ans%%; home*}" \
     || bad "limits: rc=$rc $ans $(tail -c 400 "$t/l.err")"
-  { [ ! -e "$t/scratchB/from-a" ] && [ ! -e "$t/acctB/from-a" ] && systemctl is-active --quiet "$bunit"; } \
-    && ok "limits: nothing of stage A reached stage B's scratch directory or account while B ran" \
-    || bad "limits: stage B's files: $(ls -A "$t/scratchB" "$t/acctB" 2> /dev/null | tr '\n' ' ')"
-  python3 -I -c 'import json,sys; t=sys.argv[1]; l=json.load(open(t+"/l.md.run.json"))["limits"]
+  { [[ "$ans" == *"; home written; account holds homes ; lead refused; "* ]] && [ -e "$home/x" ] && [[ "$home" == "$t/acct/homes/"?* ]]; } \
+    && ok "limits: the stage wrote its home $home, its account holds homes alone, settings.json and skills refused (also through /proc/1/root)" \
+    || bad "limits: home and account: ${ans#*peer refused; }"
+  { [[ "$ans" == *"; sign-in read; sign-in refused ("*"); sign-in-removal refused; sign-in-rename refused; md read; md refused ("*")" ]]; } \
+    && ok "limits: the home's sign-in read without refreshToken and CLAUDE.md read, neither written, removed nor renamed" \
+    || bad "limits: sign-in and CLAUDE.md: ${ans#*lead refused; }"
+  { [ ! -e "$t/scratchB/from-a" ] && [ ! -e "$t/acctB/from-a" ] && [ ! -e "$bhome/from-a" ] && systemctl is-active --quiet "$bunit"; } \
+    && ok "limits: nothing of stage A reached stage B's scratch directory, home or account while B ran" \
+    || bad "limits: stage B's files: $(ls -A "$t/scratchB" "$t/acctB" "$bhome" 2> /dev/null | tr '\n' ' ')"
+  python3 -I -c 'import json,sys; t=sys.argv[1]; r=json.load(open(t+"/l.md.run.json")); l=r["limits"]
 hidden = l.pop("hidden", None)
-sys.exit(l != {"scratch": t+"/scratch", "writable": [t+"/acct", t+"/scratch"], "bwrap": "/usr/bin/bwrap"}
+sys.exit(r.get("home") != t+"/acct/homes/"+r["session"]
+         or l != {"scratch": t+"/scratch", "writable": [r["home"], t+"/scratch"], "bwrap": "/usr/bin/bwrap"}
          or not isinstance(hidden, list))' "$t" \
-    && ok "limits: the record names the scratch directory, the two writable paths and the hidden list" || bad "limits member: $(field "$t/l.md.run.json" limits)"
+    && ok "limits: the record names its home, the scratch directory, the two writable paths and the hidden list" || bad "limits member: $(field "$t/l.md.run.json" home) $(field "$t/l.md.run.json" limits)"
   [ ! -e "$t/scratch" ] && ok "limits: the scratch directory is gone after the return" || bad "limits: $t/scratch remains"
-  : > "$t/acctB/go"; wait "$bpid"; rc=$?
+  : > "$bhome/go"; wait "$bpid"; rc=$?
   { [ "$rc" -eq 0 ] && [ "$(field "$t/lb.md.run.json" state)" = ok ] && [ ! -e "$t/scratchB" ] && ! systemctl is-active --quiet "$bunit"; } \
     && ok "limits: stage B answered, its scope ended and its scratch directory is gone" || bad "limits: stage B: rc=$rc $(tail -c 400 "$t/lb.err")"
+  python3 -I -c 'import json,sys; t=sys.argv[1]; r=json.load(open(t+"/lb.md.run.json"))
+sys.exit(r.get("home") != t+"/acctB/homes/"+r["session"] or r["limits"]["writable"][:2] != [r["home"], t+"/scratchB"])' "$t" \
+    && ok "limits: stage B's record names its home, first of its writable paths" || bad "limits: stage B's record: $(field "$t/lb.md.run.json" home)"
+  { [ "$(digests)" = "$before" ] && [ -z "$(find "$t/acct/homes" "$t/acctB/homes" -name '*.sign-in')" ]; } \
+    && ok "limits: each account's sign-in and settings.json unchanged, no derived sign-in left" \
+    || bad "limits: accounts after the stages: $(find "$t/acct/homes" "$t/acctB/homes" -name '*.sign-in' | tr '\n' ' ')"
+  # A link left in a home: in place of the empty file bwrap left at `.credentials.json`, a link to a
+  # path below /oldroot (bwrap's old root) of a file that does not exist; its resume launches nothing.
+  echo answer > "$t/bin/mode"
+  req k.md ",\"limits\":{\"scratch\":\"$t/scratchK\"}" | apr > "$t/k.out" 2> "$t/k.err"; rc=$?
+  khome=$(field "$t/k.md.run.json" home)
+  { [ "$rc" -eq 0 ] && [ -d "$khome" ] && [ -f "$khome/.credentials.json" ] && [ ! -s "$khome/.credentials.json" ]; } \
+    && ok "limits: a first launch left an empty .credentials.json in its home" || bad "limits: first launch: rc=$rc $(tail -c 400 "$t/k.err")"
+  rm -f "$khome/.credentials.json"; ln -s "/oldroot$t/no-such-file" "$khome/.credentials.json"
+  printf '{"role":"reviewer","account":"%s","model":"haiku","effort":"low","permission_mode":"auto","cwd":"%s","prompt":"%s","out":"%s","resume":{"record":"%s"},"limits":{"scratch":"%s"}}' \
+    "$t/acct" "$t/cwd" "$t/prompt.md" "$t/k2.md" "$t/k.md.run.json" "$t/scratchK2" | apr > "$t/k2.out" 2> "$t/k2.err"; rc=$?
+  { [ "$rc" -eq 3 ] && [ "$(field "$t/k2.md.run.json" state)" = failed ] && [ "$(field "$t/k2.md.run.json" unmet)" = launch ] \
+    && [ ! -e "$t/no-such-file" ] && [ -L "$khome/.credentials.json" ]; } \
+    && ok "limits: a resume whose home holds a link at .credentials.json launched nothing, and nothing was made at its target" \
+    || bad "limits: link in the home: rc=$rc $(field "$t/k2.md.run.json" state) $(field "$t/k2.md.run.json" unmet) $(ls -d "$t/no-such-file" 2> /dev/null)"
   # An implementer with the four members of limits (specs/ap/run-limits.md R1, R5, R7, R11).
   mkdir -p "$t/wdir" "$t/src" "$t/dst"; echo kept > "$t/wdir/keep"; echo named > "$t/bin/mode"
   req n.md ",\"limits\":{\"scratch\":\"$t/scratch2\",\"write\":[\"$t/wdir\"],\"over\":[[\"$t/src\",\"$t/dst\"]],\"read_only\":[\"$t/wdir/keep\"],\"show\":[\"~/.config/gh\"]}" \
@@ -219,7 +283,8 @@ sys.exit(l != {"scratch": t+"/scratch", "writable": [t+"/acct", t+"/scratch"], "
     || bad "limits: named paths: rc=$rc $ans $(tail -c 400 "$t/n.err")"
   python3 -I -c 'import json,sys; t=sys.argv[1]; l=json.load(open(t+"/n.md.run.json"))["limits"]
 hidden = l.pop("hidden", None)
-sys.exit(l != {"scratch": t+"/scratch2", "writable": [t+"/acct", t+"/scratch2", t+"/wdir", t+"/dst"], "bwrap": "/usr/bin/bwrap",
+r = json.load(open(t+"/n.md.run.json"))
+sys.exit(l != {"scratch": t+"/scratch2", "writable": [r["home"], t+"/scratch2", t+"/wdir", t+"/dst"], "bwrap": "/usr/bin/bwrap",
                "over": [[t+"/src", t+"/dst"]], "read_only": [t+"/wdir/keep"], "show": ["~/.config/gh"]}
          or not isinstance(hidden, list) or any(p.endswith("/.config/gh") for p in hidden))' "$t" \
     && ok "limits: the implementer's record names what it writes, the members as given, and ~/.config/gh shown" || bad "limits member of the implementer: $(field "$t/n.md.run.json" limits)"

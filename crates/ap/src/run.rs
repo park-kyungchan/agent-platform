@@ -17,7 +17,7 @@ use std::{
     },
     path::{Component, Path, PathBuf},
     process::{Child, ExitCode},
-    time::{Duration, SystemTime, UNIX_EPOCH},
+    time::{Duration, Instant, SystemTime, UNIX_EPOCH},
 };
 
 const SLICE: &str = "agents.slice";
@@ -590,11 +590,17 @@ fn scratch(
     let held = [out, prompt]
         .iter()
         .any(|h| writes.iter().any(|w| Path::new(h).starts_with(w)));
+    // The view hides every account of the request but the home of the launch (R5, R14): no path
+    // the stage works in or names may lie in one.
+    let in_account = ([cwd].into_iter())
+        .chain(writes.iter().copied())
+        .chain(read_only.iter().map(String::as_str))
+        .any(|p| accounts.iter().any(|a| Path::new(p).starts_with(a)));
     let roles = ["reviewer", "implementer", "fixer", "writer"];
     // A writer's `limits` names no path but its scratch directory (`specs/ap/run.md` R53).
     let only_scratch = role != "writer" || o.len() == 1;
     let stage = roles.contains(&role) && runtime == Runtime::Claude && !expect_file && only_scratch;
-    require!(stage && !up && !inside && !holds && !held => "invalid_input", "limits");
+    require!(stage && !up && !inside && !holds && !held && !in_account => "invalid_input", "limits");
     // The hidden list's `~`: without a passwd entry for this user there is no list to hide (R10).
     let home = s.home().map(|h| h.to_string_lossy().into_owned());
     let home = home.ok_or_else(|| error("limits_unavailable", "limits"))?;
@@ -1117,6 +1123,16 @@ fn request_at(s: &mut impl System, r: &Value, at_cwd: bool) -> Result<Request, F
             if let Some(unit) = rec["unit"].as_str() {
                 require!(ended(s, unit) => "run_still_active", "resume");
             }
+            // Under `limits` a session continues in its home, which a session that ran without
+            // them has not; a session that ran in a home continues only there (`specs/ap/run-limits.md`
+            // R14).
+            if runtime == Runtime::Claude {
+                let fits = match &limits {
+                    Some(_) => session_home(account, session).is_some(),
+                    None => rec.get("home").is_none(),
+                };
+                require!(fits => "invalid_input", "resume");
+            }
             if runtime == Runtime::Agy {
                 home = Some(
                     resumed_home(&rec, account).ok_or_else(|| error("invalid_input", "resume"))?,
@@ -1259,6 +1275,220 @@ fn resumed_home(record: &Value, account: &str) -> Option<String> {
     let home = std::fs::canonicalize(named).ok()?;
     let homes = std::fs::canonicalize(Path::new(account).join("homes")).ok()?;
     (home.is_dir() && home.starts_with(&homes) && home != homes).then(|| named.to_owned())
+}
+/// The home of a session of a stage with `limits`, `<account>/homes/<session>`, when it is an existing
+/// directory below `<account>/homes` (links and `..` resolved), `homes` itself excluded
+/// (`specs/ap/run-limits.md` R14). None otherwise.
+fn session_home(account: &str, session: &str) -> Option<PathBuf> {
+    let homes = Path::new(account).join("homes");
+    let named = homes.join(session);
+    let home = std::fs::canonicalize(&named).ok()?;
+    let homes = std::fs::canonicalize(homes).ok()?;
+    (home.is_dir() && home.starts_with(&homes) && home != homes).then_some(named)
+}
+/// A new session's home under `limits`: `<account>/homes` when it is absent, then the home by one
+/// `mkdir` that fails when the name exists, each with mode 0700 (`specs/ap/run-limits.md` R14).
+fn make_stage_home(home: &Path) -> std::io::Result<()> {
+    use std::os::unix::fs::DirBuilderExt;
+    let mut dirs = std::fs::DirBuilder::new();
+    dirs.mode(0o700);
+    if let Some(homes) = home.parent() {
+        match dirs.create(homes) {
+            Err(e) if e.kind() != std::io::ErrorKind::AlreadyExists => return Err(e),
+            _ => (),
+        }
+    }
+    dirs.create(home)
+}
+/// The two names of a home that the binds of R5 cover: each must be absent or a regular file that is
+/// no link, read without following one (`specs/ap/run-limits.md` R15).
+fn plain_names(home: &Path) -> bool {
+    [CREDENTIALS, "CLAUDE.md"]
+        .iter()
+        .all(|name| match std::fs::symlink_metadata(home.join(name)) {
+            Ok(m) => m.file_type().is_file(),
+            Err(e) => e.kind() == std::io::ErrorKind::NotFound,
+        })
+}
+/// The `bwrap` words of the home of a launch on `account` (`specs/ap/run-limits.md` R5): each
+/// account of the request hidden by an empty directory, the home bound, with a sign-in the derived
+/// file over its `.credentials.json`, the account's `CLAUDE.md` when it is a regular file (a link
+/// followed), and each account read-only.
+fn home_words(accounts: &[String], account: &str, home: &Path, signed: bool) -> Vec<String> {
+    let mut once: Vec<&str> = vec![];
+    for a in accounts {
+        if !once.contains(&a.as_str()) {
+            once.push(a);
+        }
+    }
+    let at = |name: &str| home.join(name).to_string_lossy().into_owned();
+    let home_text = home.to_string_lossy();
+    let mut words = vec![];
+    for a in &once {
+        words.extend(args(&["--tmpfs", a]));
+    }
+    words.extend(args(&["--bind", &home_text, &home_text]));
+    if signed {
+        let derived = sign_in_path(home);
+        words.extend(args(&["--ro-bind", &derived, &at(CREDENTIALS)]));
+    }
+    let md = Path::new(account).join("CLAUDE.md");
+    if std::fs::metadata(&md).is_ok_and(|m| m.is_file()) {
+        words.extend(args(&[
+            "--ro-bind",
+            &md.to_string_lossy(),
+            &at("CLAUDE.md"),
+        ]));
+    }
+    for a in &once {
+        words.extend(args(&["--remount-ro", a]));
+    }
+    words
+}
+/// The name of an account's sign-in, and of the derived file in a home.
+const CREDENTIALS: &str = ".credentials.json";
+/// The largest sign-in `ap run` derives from (`specs/ap/run-limits.md` R15).
+const SIGN_IN_MAX: usize = 65_536;
+/// A derived sign-in is padded with spaces to a multiple of this.
+const SIGN_IN_BLOCK: usize = 4_096;
+/// A reading of the sign-in while a launch runs is due this long after the last one.
+const READING: Duration = Duration::from_secs(30);
+/// At most one call of `claude auth status` for one account in this long.
+const RENEWAL_GAP: Duration = Duration::from_secs(60);
+/// An end this near (in milliseconds), or past, has the CLI outside `limits` renew the sign-in.
+const NEAR_END_MS: f64 = 210_000.0;
+/// The derived sign-in of a home: `<account>/homes/<session>.sign-in`.
+fn sign_in_path(home: &Path) -> String {
+    format!("{}.sign-in", home.to_string_lossy())
+}
+/// The derived text of a sign-in: one JSON object of at most 65,536 bytes whose `claudeAiOauth` is
+/// an object with a nonempty string `accessToken`, without `refreshToken` and
+/// `refreshTokenExpiresAt`, padded with spaces to the least multiple of 4,096 bytes that holds it.
+/// None for any other content (`specs/ap/run-limits.md` R15).
+fn derive(bytes: &[u8]) -> Option<Vec<u8>> {
+    if bytes.len() > SIGN_IN_MAX {
+        return None;
+    }
+    let mut v: Value = serde_json::from_slice(bytes).ok()?;
+    let oauth = v
+        .as_object_mut()?
+        .get_mut("claudeAiOauth")?
+        .as_object_mut()?;
+    let token = oauth.get("accessToken").and_then(Value::as_str);
+    if token.is_none_or(str::is_empty) {
+        return None;
+    }
+    oauth.remove("refreshToken");
+    oauth.remove("refreshTokenExpiresAt");
+    let mut text = serde_json::to_vec(&v).ok()?;
+    text.resize(text.len().div_ceil(SIGN_IN_BLOCK) * SIGN_IN_BLOCK, b' ');
+    Some(text)
+}
+/// What one reading of an account's sign-in gives.
+enum Reading {
+    /// The account has no sign-in.
+    Absent,
+    /// The derived text.
+    Derived(Vec<u8>),
+    /// A sign-in of another form, or one that cannot be read.
+    Unfit,
+}
+/// When `claude auth status` ran last for each account in this call of `ap run`.
+#[derive(Default)]
+struct Renewed(Vec<(String, Instant)>);
+/// One reading of the account's sign-in through the port (`specs/ap/run-limits.md` R15): when its
+/// `expiresAt` is near or past, and no call ran for the account in the last 60 seconds, first the
+/// CLI outside `limits` is asked for its status, which renews it; its answer is not read.
+fn reading(s: &mut impl System, account: &str, renewed: &mut Renewed) -> Reading {
+    let path = Path::new(account).join(CREDENTIALS);
+    let path = path.to_string_lossy().into_owned();
+    let mut bytes = read_sign_in(s, &path);
+    let near = |b: &[u8], wall: SystemTime| {
+        let v: Option<Value> = (b.len() <= SIGN_IN_MAX)
+            .then(|| serde_json::from_slice(b).ok())
+            .flatten();
+        let end = v.and_then(|v| v["claudeAiOauth"]["expiresAt"].as_f64());
+        let now = wall.duration_since(UNIX_EPOCH).unwrap_or_default();
+        end.is_some_and(|end| end - now.as_millis() as f64 <= NEAR_END_MS)
+    };
+    let due = matches!(&bytes, Ok(Some(b)) if near(b, s.wall()));
+    let last = renewed
+        .0
+        .iter()
+        .find(|(a, _)| a == account)
+        .map(|(_, t)| *t);
+    if due && last.is_none_or(|t| s.now().duration_since(t) >= RENEWAL_GAP) {
+        renewed.0.retain(|(a, _)| a != account);
+        renewed.0.push((account.to_owned(), s.now()));
+        let mut words = vec!["-i".to_owned()];
+        let kept = base_env(s, &[])
+            .into_iter()
+            .map(|(k, v)| format!("{k}={v}"));
+        words.extend(kept);
+        words.push(format!("CLAUDE_CONFIG_DIR={account}"));
+        words.extend(args(&["claude", "auth", "status"]));
+        let _ = s.call("env", &words, &Value::Null, 30_000);
+        bytes = read_sign_in(s, &path);
+    }
+    match bytes {
+        Ok(None) => Reading::Absent,
+        Ok(Some(b)) => derive(&b).map_or(Reading::Unfit, Reading::Derived),
+        Err(()) => Reading::Unfit,
+    }
+}
+/// The account's sign-in as it is now, through the port: None when there is none, Err when it
+/// cannot be read.
+fn read_sign_in(s: &impl System, path: &str) -> Result<Option<Vec<u8>>, ()> {
+    match s.read(path) {
+        Ok(b) => Ok(Some(b)),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(None),
+        Err(_) => Err(()),
+    }
+}
+/// The derived sign-in of a running launch: its path, the open file, the text it holds and when it
+/// was last read. Dropped, it is removed (`specs/ap/run-limits.md` R15).
+struct SignIn {
+    path: String,
+    file: File,
+    text: Vec<u8>,
+    last: Instant,
+}
+impl SignIn {
+    /// Creates the file anew, mode 0600, after removing a file a killed call left at its name.
+    fn create(path: String, text: Vec<u8>, last: Instant) -> std::io::Result<Self> {
+        use std::os::unix::fs::OpenOptionsExt;
+        let _ = std::fs::remove_file(&path);
+        let file = std::fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .mode(OWNER_ONLY)
+            .open(&path)?;
+        let mut sign = Self {
+            path,
+            file,
+            text: vec![],
+            last,
+        };
+        sign.file.write_all(&text)?;
+        sign.text = text;
+        Ok(sign)
+    }
+    /// Rewrites the file in place when `text` differs: the same inode, one write of the whole text
+    /// from the first byte, the length set only when it differs.
+    fn rewrite(&mut self, text: Vec<u8>) {
+        if text == self.text || self.file.write_all_at(&text, 0).is_err() {
+            return;
+        }
+        if text.len() != self.text.len() {
+            let _ = self.file.set_len(text.len() as u64);
+        }
+        self.text = text;
+    }
+}
+impl Drop for SignIn {
+    fn drop(&mut self) {
+        let _ = std::fs::remove_file(&self.path);
+    }
 }
 /// A fresh `agy` stage's home: a new directory (mode 0700) under `<account>/homes` that holds three
 /// links and the directories that hold them: the account's token, `AGENTS.md` and `GEMINI.md`.
@@ -2025,6 +2255,7 @@ fn attempt(
     (output, errs): &(File, File),
     launch: &Launch,
     object: &Object,
+    renewed: &mut Renewed,
 ) -> (Value, bool, bool) {
     let Launch {
         earlier,
@@ -2058,24 +2289,6 @@ fn attempt(
     mirror(&mut record, false);
     if let Some((path, _, sha256)) = &q.schema {
         record["answer_schema"] = json!({"path": path, "sha256": sha256});
-    }
-    // The hidden paths of this launch, as they exist when it is prepared, but the one shown (R7,
-    // R10).
-    let hidden = q
-        .limits
-        .as_ref()
-        .map(|l| l.hidden(&s.work_root()))
-        .unwrap_or_default();
-    if let Some(l) = &q.limits {
-        let paths: Vec<&String> = hidden.iter().map(|(p, _)| p).collect();
-        let mut writable = vec![account];
-        writable.extend(l.writable());
-        let mut limits = json!({"scratch": l.scratch, "writable": writable,
-            "bwrap": BWRAP, "hidden": paths});
-        for (k, v) in &l.given {
-            limits[k] = v.clone();
-        }
-        record["limits"] = limits;
     }
     let not_launched = |mut record: Value, unmet: &str| {
         record["state"] = json!("failed");
@@ -2114,6 +2327,33 @@ fn attempt(
     if let Some(home) = &home {
         record["home"] = json!(home);
     }
+    // A stage with `limits` runs in its home of the launch, `<account>/homes/<session>`: a new
+    // session's, or the one of the session it continues (`specs/ap/run-limits.md` R14).
+    let stage_home = q
+        .limits
+        .as_ref()
+        .map(|_| Path::new(account).join("homes").join(&session));
+    if let Some(home) = &stage_home {
+        record["home"] = json!(home);
+    }
+    // The hidden paths of this launch, as they exist when it is prepared, but the one shown (R7,
+    // R10).
+    let hidden = q
+        .limits
+        .as_ref()
+        .map(|l| l.hidden(&s.work_root()))
+        .unwrap_or_default();
+    if let (Some(l), Some(home)) = (&q.limits, &stage_home) {
+        let paths: Vec<&String> = hidden.iter().map(|(p, _)| p).collect();
+        let mut writable = vec![home.to_string_lossy().into_owned()];
+        writable.extend(l.writable().into_iter().map(str::to_owned));
+        let mut limits = json!({"scratch": l.scratch, "writable": writable,
+            "bwrap": BWRAP, "hidden": paths});
+        for (k, v) in &l.given {
+            limits[k] = v.clone();
+        }
+        record["limits"] = limits;
+    }
     record["unit"] = json!(unit);
     mirror(&mut record, false);
     // The run's own stream and error files, emptied for a next account's attempt.
@@ -2138,6 +2378,25 @@ fn attempt(
     }
     if !ready {
         return not_launched(record, "launch");
+    }
+    // The home: made for a new session; the two names its binds cover hold no link and no
+    // directory; then the derived sign-in, when the account has one (R14, R15).
+    let mut sign = None;
+    if let Some(home) = &stage_home {
+        if resume.is_none() && make_stage_home(home).is_err() {
+            return not_launched(record, "launch");
+        }
+        if !plain_names(home) {
+            return not_launched(record, "launch");
+        }
+        match reading(s, account, renewed) {
+            Reading::Absent => (),
+            Reading::Unfit => return not_launched(record, "launch"),
+            Reading::Derived(text) => match SignIn::create(sign_in_path(home), text, s.now()) {
+                Ok(made) => sign = Some(made),
+                Err(_) => return not_launched(record, "launch"),
+            },
+        }
     }
     let mut argv = args(&[
         "systemd-run",
@@ -2165,7 +2424,11 @@ fn attempt(
     match q.runtime {
         Runtime::Claude => {
             claude_args(q, &mut argv, resume, &session);
-            env.push(("CLAUDE_CONFIG_DIR".into(), account.into()));
+            let dir = stage_home.as_deref().unwrap_or(Path::new(account));
+            env.push((
+                "CLAUDE_CONFIG_DIR".into(),
+                dir.to_string_lossy().into_owned(),
+            ));
         }
         Runtime::Codex => {
             argv.extend(codex_args(q, resume));
@@ -2194,7 +2457,7 @@ fn attempt(
     }
     if let Some(limits @ Limits { scratch, .. }) = &q.limits {
         // After `systemd-run … --`, in front of the CLI: its own pid namespace (no other stage
-        // in its `/proc`), everything read-only but the launch's account, the scratch directory
+        // in its `/proc`), everything read-only but the launch's home, the scratch directory
         // and the paths the request names, no capability (R5); temporary files and builds go to
         // the scratch directory (R6).
         let bwrap = [
@@ -2214,6 +2477,10 @@ fn attempt(
             "--bind", account, account, "--bind", scratch, scratch,
         ]));
         bwrap.extend(limits.named());
+        // Each account of the request hidden but the home of the launch (R5, R14, R15).
+        if let Some(home) = &stage_home {
+            bwrap.extend(home_words(&q.accounts, account, home, sign.is_some()));
+        }
         // After the binds: the host's credentials and sockets, hidden (R10).
         bwrap.extend(hiding(&hidden));
         bwrap.extend(args(&["--cap-drop", "ALL", "--chdir", &q.cwd, "--"]));
@@ -2257,9 +2524,20 @@ fn attempt(
         if s.now().duration_since(started) >= bound {
             break End::Timeout;
         }
+        // The derived sign-in follows the account's, read again every 30 seconds (R15).
+        if let Some(sign) = &mut sign
+            && s.now().duration_since(sign.last) >= READING
+        {
+            if let Reading::Derived(text) = reading(s, account, renewed) {
+                sign.rewrite(text);
+            }
+            sign.last = s.now();
+        }
         s.pause(Duration::from_millis(100));
     };
     let stopped = stop(s, &unit, &mut child);
+    // The launch has ended: its derived sign-in goes (R15).
+    drop(sign);
     // The writer is stopped: the stream is read to its end, a last line without newline included.
     loop {
         let read = offset;
@@ -2547,6 +2825,8 @@ pub fn execute(s: &mut impl System, r: &Value) -> Result<(Value, u8), Failure> {
         };
         // When the last launch began: it and its ask share one `timeout_seconds` (R20).
         let mut began = s.now();
+        // The calls of `claude auth status` of this call, by account (`specs/ap/run-limits.md` R15).
+        let mut renewed = Renewed::default();
         for (i, account) in accounts.iter().enumerate() {
             // Once a launch of an implementer or a fixer has worked, every later one gets the text;
             // a launch of a resumed call after the first is a move and gets its own.
@@ -2569,7 +2849,8 @@ pub fn execute(s: &mut impl System, r: &Value) -> Result<(Value, u8), Failure> {
                 bound: Duration::from_secs(q.timeout),
             };
             began = s.now();
-            let (record, worked, saved) = attempt(s, &q, account, &files, &launch, &object);
+            let (record, worked, saved) =
+                attempt(s, &q, account, &files, &launch, &object, &mut renewed);
             clean &= saved;
             worked_before |= worked;
             // A run cut at any point goes on at the next account: before any tool ran, and after
@@ -2610,7 +2891,8 @@ pub fn execute(s: &mut impl System, r: &Value) -> Result<(Value, u8), Failure> {
                 ready,
                 bound: left,
             };
-            let (mut record, _, saved) = attempt(s, &q, account, &files, &launch, &object);
+            let (mut record, _, saved) =
+                attempt(s, &q, account, &files, &launch, &object, &mut renewed);
             asked_after(&mut record, &last);
             clean &= saved && persist(&q.out, &record);
             last = record;
