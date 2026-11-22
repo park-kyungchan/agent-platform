@@ -1,8 +1,8 @@
 # Host configuration records
 
-Recorded copies of host configuration files, the Herdr network's files, and the
-source of the host's policy file with the script that installs it
-(`scripts/install-etc.sh`), and the system Git configuration. No program is
+Recorded copies of host configuration files (the login path and the public-interface
+firewall among them), the source of the host's policy file with the script that
+installs it (`scripts/install-etc.sh`), and the system Git configuration. No program is
 built here. Agents follow [`AGENTS.md`](AGENTS.md).
 
 ## Contents
@@ -10,7 +10,7 @@ built here. Agents follow [`AGENTS.md`](AGENTS.md).
 | Path | What it is |
 | --- | --- |
 | `deployments/host-artifacts.json` | The inventory: for each recorded copy, the host file (`source`), the copy (`destination`) and the SHA-256 of the copy's bytes (`sha256`) |
-| `deployments/ssh/` | The Tailscale-only sshd drop-in and the `ssh.socket` override |
+| `deployments/ssh/` | The Tailscale-only sshd drop-in, the plain-ssh drop-in `00-01-ssh-only.conf` and the `ssh.socket` override |
 | `deployments/hindsight/compose.yaml` | The Hindsight compose file |
 | `deployments/tsidp/compose.yaml` | The tsidp compose file |
 | `deployments/host-cron/` | The Docker prune cron files |
@@ -19,16 +19,20 @@ built here. Agents follow [`AGENTS.md`](AGENTS.md).
 | `scripts/test-install-etc.sh` | The tests of `install-etc.sh`, run by `./check` |
 | `git/` | The system Git configuration for the engineering scopes: the roster check (`git/hooks/pre-commit`), the configuration files and the alias `git task-new` (section "Git configuration") |
 | `scripts/test-git-config.sh` | The tests of `git/`, run by `./check` |
-| `deployments/herdr-network/` | The Herdr network's sshd drop-in, its installer, the firewall helper, its unit and contract; its `README.md` maps each file to its host path |
+| `deployments/host-firewall/` | The nftables table of the public interface `eth0` and the unit that loads it at boot; its `README.md` maps each file to its host path |
 
-The copies the inventory names are byte copies of the host files as captured on
-2026-11-04. Each directory's `README.md` maps its files to their host paths.
+The copies the inventory names are byte copies of the host files: `deployments/ssh/00-01-ssh-only.conf`
+and `deployments/host-firewall/` as captured on 2026-11-22, the others on 2026-11-04. Each
+directory's `README.md` maps its files to their host paths.
 
 ## Who uses it
 
-The Lead reads these records and runs `scripts/install-etc.sh`. A merge here
-changes nothing on the host until the Lead runs `install-etc.sh install <merge>`;
-no timer reads this repository.
+The Lead reads these records. `ap deliver` runs `scripts/install-etc.sh` (`check`,
+then `install` of a merged commit), because the host's `/etc/agent-platform/deliver.json`
+has the member `etc` since 2026-11-21 22:39Z; the Lead runs it by hand only for a
+rollback or a fast-path order. The watch's drift detector compares the host's policy
+file with `etc/`. The recorded copies under `deployments/` change on the host only by
+the Lead's hand under the procedure in `AGENTS.md`.
 
 ## Check
 
@@ -40,7 +44,7 @@ A healthy run ends with `check: ok`. The check needs no network, no root and no
 host path. It parses every tracked JSON file, runs `bash -n` on every tracked shell
 script, verifies that every inventory row's copy exists and matches its recorded
 SHA-256, and fails on a file under `deployments/` that is not the inventory, a row's
-copy, a `README.md`, or under `deployments/herdr-network/`, and runs
+copy or a `README.md`, and runs
 `scripts/test-git-config.sh` and `scripts/test-install-etc.sh`. The GitHub Actions job
 `rust` runs the same command and is the required check of `main`.
 
@@ -51,8 +55,11 @@ into the inventory in the same commit.
 ## The policy file
 
 `etc/agent-platform/policy.json` is the source of `/etc/agent-platform/policy.json`.
-A change is a pull request; after the merge the Lead runs
-`scripts/install-etc.sh install <merge>`. The script installs only that one file:
+A change is a pull request; after the merge `ap deliver` runs
+`scripts/install-etc.sh` (`check`, then `install <merge>`), because the host's
+`/etc/agent-platform/deliver.json` has the member `etc` since 2026-11-21 22:39Z; the
+Lead runs it by hand only for a rollback or a fast-path order. The script installs
+only that one file:
 
 | Form | What it does |
 | --- | --- |
@@ -65,16 +72,16 @@ The script works in its own clone, `/var/lib/agent-platform/clones/agent-vps-ope
 refuses with a code on stderr and exit 2 before any write (`busy`, `not_forward`,
 `not_accepted`, `tree_differs`, `verify_failed`, `target_changed`,
 `target_not_regular` and others). `AP_ETC_ROOT` prefixes every host path for the
-tests. Only the Lead runs it; `deliver.json` is not installed from here (its source
+tests. `ap deliver` and the Lead run it; `deliver.json` is not installed from here (its source
 is `agent-platform` `deploy/deliver.json`). `AGENTS.md` states the rules, including
 the fast path for a change that must take effect at once.
 
 ## Not changed here
 
-The login path (the sshd drop-ins, the `ssh.socket` override,
-`00-herdr-runtime-key-only.conf` and `deployments/herdr-network/sshd-policy.sh`,
-installed as `/usr/local/sbin/herdr-network-sshd`, which writes that drop-in and
-reloads `ssh`) is changed only by the user's procedure described in `AGENTS.md`.
+The login path as it is now (`deployments/ssh/90-tailscale-only.conf`,
+`deployments/ssh/00-01-ssh-only.conf`, the `ssh.socket` override and
+`deployments/host-firewall/`) is changed only by the user's procedure described in
+`AGENTS.md`.
 Environment files, credentials and host keys are never tracked.
 
 ## Git configuration

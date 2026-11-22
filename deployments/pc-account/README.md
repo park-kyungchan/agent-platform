@@ -212,7 +212,24 @@ Each step names who acts, its readback and its undo.
    6. E1 to E7 are read (Lead: L3 for the rows that start at the VPS; user: E4's policy read, E5, E6, and E7's flows that start elsewhere), and `tailscale ping ap-checks` on the VPS answers (Lead, L2).
    7. The node stays up. With every window of `ap-checks` closed for ten minutes, and again after a restart of Windows, `wsl -l --running` (the user) lists `ap-checks`, and `tailscale ping ap-checks` (Lead, L2) answers.
 
-   Systemd services do not keep a WSL instance alive. An idle distribution is shut down after `instanceIdleTimeout`, which is set in `.wslconfig`, section `[general]`: 15000 ms by default, `-1` for never, and it applies to every distribution, the user's own included (`https://learn.microsoft.com/en-us/windows/wsl/wsl-config`, `https://learn.microsoft.com/en-us/windows/wsl/systemd`). That setting is one way to keep the node up, and its reach is that whole list of distributions. What keeps `ap-checks` running, and what starts it after a restart, is the user's choice. No agent sets either. Where this readback differs, nothing breaks: every `ap check` runs on the VPS with `pc_unreachable`, without an error.
+   Systemd services do not keep a WSL instance alive. An idle distribution is shut down after `instanceIdleTimeout`, which is set in `.wslconfig`, section `[general]`: 15000 ms by default, `-1` for never, and it applies to every distribution, the user's own included (`https://learn.microsoft.com/en-us/windows/wsl/wsl-config`, `https://learn.microsoft.com/en-us/windows/wsl/systemd`). That setting is one way to keep the node up, and its reach is that whole list of distributions.
+   What keeps `ap-checks` running: on 2026-11-22 the user chose a scheduled task of the user's own Windows account, started at logon, which keeps only `ap-checks` running and leaves the user's other distributions to `instanceIdleTimeout`, and chose no automatic restart of it. No agent sets either: no agent registers or changes the task. The user runs in PowerShell:
+
+   ```powershell
+   $a = New-ScheduledTaskAction -Execute "powershell.exe" -Argument "-WindowStyle Hidden -Command wsl.exe -d ap-checks --exec sleep infinity"
+   $t = New-ScheduledTaskTrigger -AtLogOn -User $env:USERNAME
+   $s = New-ScheduledTaskSettingsSet -ExecutionTimeLimit ([TimeSpan]::Zero) -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries
+   Register-ScheduledTask -TaskName "ap-checks-keepalive" -Action $a -Trigger $t -Settings $s
+   Start-ScheduledTask -TaskName "ap-checks-keepalive"
+   ```
+
+   Readbacks (the user): `(Get-ScheduledTask -TaskName ap-checks-keepalive).Triggers.Count` prints 1, and `wsl -l --running` lists `ap-checks`. (Lead) `tailscale ping ap-checks` answers.
+
+   Undo: `Unregister-ScheduledTask -TaskName ap-checks-keepalive -Confirm:$false`.
+
+   When the instance stops anyway (a `wsl --shutdown`, a closed session): every `ap check` already tests the PC at each call (ping and probe, `specs/ap/check.md` R4 of agent-platform) and runs on the VPS with `pc_unreachable` meanwhile. The Lead, when it hands out work or reads such a line while `tailscale status` shows the user's PC online, asks the user at once to run `Start-ScheduledTask -TaskName ap-checks-keepalive`, then reads `tailscale ping ap-checks`.
+
+   Why it works: a running process keeps the instance from the idle shutdown.
 4. **The install** (the Lead, L1). The Lead approves this unit, and so merges it, only after the user has done steps 1 to 3; the user works from the pull request's branch. No other policy merge is installed between this merge and this step, because `install` writes the whole file and would put the new account live before its time. Then at once:
    - `scripts/install-etc.sh install <merge commit>`;
    - `ap policy check /etc/agent-platform/policy.json` prints `"status":"ok"`, and `scripts/install-etc.sh check` prints `same`.
