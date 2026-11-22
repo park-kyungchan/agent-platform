@@ -363,7 +363,11 @@ What it does not print: the installed revisions (`deploy/README.md`, "Read the s
 
 ## The policy check
 
-`ap policy check [<file>]`: `specs/ap/policy.md` R12 to R16. Its last reader, `writer`, reads the member `writer` of the page writer (`specs/ap/unit-write.md` R2).
+`ap policy check [<file>]`: `specs/ap/policy.md` R12 to R16. Its reader `writer` reads the member `writer` of the page writer (`specs/ap/unit-write.md` R2); its last reader, `api`, reads the member `api` of the API credit (`specs/ap/api.md` R3).
+
+## The API credit
+
+`ap api batch <job> --requests <file> --out <dir> [--queue standard|soak] [--store <path>]`, and `ap` with no argument and `ONT_FN_NAME=api_spend`, the program of the store's function `api_spend` (`ont fn api_spend`): `specs/ap/api.md`. A batch is a `run` of role `batch` with its `job`, `reserved_usd_micros` and `settled_usd_micros`, and the function is that of schema version 18 (`ontology/README.md`, "Version 18: the credit's ledger"). The policy's member `api` names the key file, the stops of the two queues, the day's cap and the jobs with their caps, models and bounds; the prices are the rows of `evals/prices.tsv` of the commit `ap` was built from, at half (the batch price). The key file holds the bare key on one line, owned by root with mode 0600; `ap` reads it only after it has examined it, and the key reaches `curl` only through a header file in a directory of its own, mode 0700, under the run directory (`/run/agent-platform`, or `AP_API_RUN`), removed when the call ends. The run directory also holds `api.lock`, which one call holds from its read of the spend to its reservation. A run left `running` (an uncertain submit, a poll that timed out, a failed close) counts at its reservation until it is closed by hand.
 
 ## One check
 

@@ -6,7 +6,7 @@ use serde::Serialize;
 const HELP: &str = "Usage: ap <verb> [< request.json]\n";
 /// Every verb the dispatch below knows: the verb, its request form, the heading of the section of
 /// `crates/ap/README.md` that documents it. `ap --help` prints one line of this table per verb.
-const VERBS: [(&str, &str, &str); 22] = [
+const VERBS: [(&str, &str, &str); 23] = [
     ("version", "version | --version", "The older verbs"),
     ("run", "run < request.json", "One stage"),
     ("gate", "gate < request.json", "The gate"),
@@ -76,6 +76,11 @@ const VERBS: [(&str, &str, &str); 22] = [
         "resource",
         "resource [--directory <dir>] [--store <path>]",
         "Resources",
+    ),
+    (
+        "api",
+        "api batch <job> --requests <file> --out <dir> [--queue standard|soak] [--store <path>]",
+        "The API credit",
     ),
 ];
 fn verb_line(verb: &str, form: &str, heading: &str) -> String {
@@ -323,6 +328,15 @@ fn main() -> ExitCode {
         }
         return ap::resource::cli(&args[1..]);
     }
+    if args.first().is_some_and(|arg| arg == "api") {
+        if args.len() == 2 && args[1] == "--help" {
+            return match io::stdout().lock().write_all(ap::api::HELP.as_bytes()) {
+                Ok(()) => ExitCode::SUCCESS,
+                Err(_) => fail("io_error", "stdout", 4),
+            };
+        }
+        return ap::api::cli(&args[1..]);
+    }
     if args.first().is_some_and(|arg| arg == "clause") {
         if args.len() == 2 && args[1] == "--help" {
             return match io::stdout().lock().write_all(CLAUSE_HELP.as_bytes()) {
@@ -336,6 +350,9 @@ fn main() -> ExitCode {
     // answers it; else the usage refusal below.
     if args.is_empty() && std::env::var_os("ONT_FN_NAME").is_some_and(|name| name == "route") {
         return ap::route::function();
+    }
+    if args.is_empty() && std::env::var_os("ONT_FN_NAME").is_some_and(|name| name == "api_spend") {
+        return ap::api::function();
     }
     if args.is_empty() && std::env::var_os("ONT_FN_NAME").is_some_and(|name| name == "horizon") {
         return ap::work::function();
