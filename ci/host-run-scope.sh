@@ -12,7 +12,9 @@
 # variables) are in the stage's environment; a reviewer stage with `limits` under the real `bwrap`
 # cannot write its cwd, nor the scratch directory or the account of another stage with `limits`
 # running at the same time (directly or through that stage's /proc/<pid>/root), but writes its
-# own scratch directory, which is gone after the return. Skipped, saying so, where `systemctl` is absent or this caller cannot start a
+# own scratch directory, which is gone after the return; an implementer whose `limits` name a
+# `write` directory, an `over` pair, a `read_only` file and `show` writes that directory and, through
+# the target, the source, but neither its cwd nor the `read_only` file. Skipped, saying so, where `systemctl` is absent or this caller cannot start a
 # transient unit in the system manager.
 set -uo pipefail
 ap=$(realpath -- "${1:-${CARGO_TARGET_DIR:-$(cd "$(dirname "$0")/.." && pwd -P)/target}/debug/ap}")
@@ -53,6 +55,14 @@ elif [ "$(cat "$here/mode")" = limits ]; then
   case "$peer" in *written*) peer="peer written:$peer" ;; *) peer="peer refused" ;; esac
   said="$(w "$PWD/x" cwd); $(w "$TMPDIR/x" scratch); $(w "/proc/1/root$here/x" root); $peer"
   printf '{"type":"result","subtype":"success","is_error":false,"num_turns":1,"result":"%s","session_id":"%s","usage":{"input_tokens":1,"output_tokens":1},"permission_denials":[]}\n' "$said" "$sid"
+elif [ "$(cat "$here/mode")" = named ]; then
+  # An implementer with the paths its request names: it reports each write and exits.
+  w() { if e=$( (: > "$1") 2>&1 ); then echo "$2 written"; else echo "$2 refused (${e##*: })"; fi; }
+  c() { if e=$("$@" 2>&1); then echo "written"; else echo "refused (${e##*: })"; fi; }
+  top=${here%/bin}
+  said="$(w "$top/wdir/x" write); $(w "$top/dst/y" over); $(w "$top/wdir/keep" keep); keep removal $(c rm -f "$top/wdir/keep"); keep rename $(c mv "$top/wdir/keep" "$top/wdir/moved"); $(w "$PWD/n" cwd); $(w "/proc/1/root$PWD/m" root)"
+  printf '{"type":"result","subtype":"success","is_error":false,"num_turns":1,"result":"%s","session_id":"%s","usage":{"input_tokens":1,"output_tokens":1},"permission_denials":[]}\n' "$said" "$sid"
+  exit 0
 fi
 if [ "$(cat "$here/mode")" = answer ]; then
   printf '{"type":"result","subtype":"success","is_error":false,"num_turns":1,"result":"ready","session_id":"%s","usage":{"input_tokens":1,"output_tokens":1},"permission_denials":[]}\n' "$sid"
@@ -197,6 +207,22 @@ sys.exit(l != {"scratch": t+"/scratch", "writable": [t+"/acct", t+"/scratch"], "
   : > "$t/acctB/go"; wait "$bpid"; rc=$?
   { [ "$rc" -eq 0 ] && [ "$(field "$t/lb.md.run.json" state)" = ok ] && [ ! -e "$t/scratchB" ] && ! systemctl is-active --quiet "$bunit"; } \
     && ok "limits: stage B answered, its scope ended and its scratch directory is gone" || bad "limits: stage B: rc=$rc $(tail -c 400 "$t/lb.err")"
+  # An implementer with the four members of limits (specs/ap/run-limits.md R1, R5, R7, R11).
+  mkdir -p "$t/wdir" "$t/src" "$t/dst"; echo kept > "$t/wdir/keep"; echo named > "$t/bin/mode"
+  req n.md ",\"limits\":{\"scratch\":\"$t/scratch2\",\"write\":[\"$t/wdir\"],\"over\":[[\"$t/src\",\"$t/dst\"]],\"read_only\":[\"$t/wdir/keep\"],\"show\":[\"~/.config/gh\"]}" \
+    | sed 's/"role":"reviewer"/"role":"implementer"/' | apr > "$t/n.out" 2> "$t/n.err"; rc=$?
+  ans=$(cat "$t/n.md" 2> /dev/null)
+  { [ "$rc" -eq 0 ] && [ "$(field "$t/n.md.run.json" state)" = ok ] && [ -e "$t/wdir/x" ] && [ -e "$t/src/y" ] && [ ! -e "$t/dst/y" ] \
+    && [ "$(cat "$t/wdir/keep")" = kept ] && [ ! -e "$t/wdir/moved" ] && [ ! -e "$t/cwd/n" ] && [ ! -e "$t/cwd/m" ] \
+    && [[ "$ans" == "write written; over written; keep refused ("*"); keep removal refused ("*"); keep rename refused ("*"); cwd refused (Read-only file system); root refused ("*")" ]]; } \
+    && ok "limits: an implementer wrote its write directory and the over source, not the read_only file, its cwd or /proc/1/root: $ans" \
+    || bad "limits: named paths: rc=$rc $ans $(tail -c 400 "$t/n.err")"
+  python3 -I -c 'import json,sys; t=sys.argv[1]; l=json.load(open(t+"/n.md.run.json"))["limits"]
+hidden = l.pop("hidden", None)
+sys.exit(l != {"scratch": t+"/scratch2", "writable": [t+"/acct", t+"/scratch2", t+"/wdir", t+"/dst"], "bwrap": "/usr/bin/bwrap",
+               "over": [[t+"/src", t+"/dst"]], "read_only": [t+"/wdir/keep"], "show": ["~/.config/gh"]}
+         or not isinstance(hidden, list) or any(p.endswith("/.config/gh") for p in hidden))' "$t" \
+    && ok "limits: the implementer's record names what it writes, the members as given, and ~/.config/gh shown" || bad "limits member of the implementer: $(field "$t/n.md.run.json" limits)"
 fi
 
 [ "$fails" -eq 0 ] && echo "host-run-scope: PASS" || { echo "host-run-scope: $fails FAILED"; exit 1; }

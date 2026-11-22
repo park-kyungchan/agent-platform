@@ -995,6 +995,40 @@ pub fn check_command(
     ];
     words.iter().map(|w| (*w).to_owned()).collect()
 }
+/// The `bwrap` words of a check's view (`specs/ap/run-limits.md` R12): the root read-only, a `/tmp`
+/// of its own, its directory written but the `.git` in it, the hidden paths, no capability.
+fn view(dir: &str, hidden: Vec<String>) -> Vec<String> {
+    let git = format!("{dir}/.git");
+    let mut words: Vec<String> = [
+        crate::run::BWRAP,
+        "--unshare-pid",
+        "--ro-bind",
+        "/",
+        "/",
+        "--dev",
+        "/dev",
+        "--proc",
+        "/proc",
+        "--ro-bind",
+        "/proc/sys",
+        "/proc/sys",
+        "--tmpfs",
+        "/tmp",
+        "--bind",
+        dir,
+        dir,
+    ]
+    .iter()
+    .map(|w| (*w).to_owned())
+    .collect();
+    if Path::new(&git).symlink_metadata().is_ok() {
+        words.extend(["--ro-bind".to_owned(), git.clone(), git]);
+    }
+    words.extend(hidden);
+    let tail = ["--cap-drop", "ALL", "--chdir", dir, "--"];
+    words.extend(tail.iter().map(|w| (*w).to_owned()));
+    words
+}
 /// One check through the port, inside a transient unit where units are used (R24, R25); its status,
 /// when the wrapper printed one. `ap unit run` gives the merge base and the head (`AP_BASE`, `AP_HEAD`).
 pub(super) fn run_check(
@@ -1004,8 +1038,14 @@ pub(super) fn run_check(
     output: &str,
     check: &str,
 ) -> Result<Option<i64>, Failure> {
-    let command = check_command(s, dir, commits, output, check);
+    let mut command = check_command(s, dir, commits, output, check);
     let (reply, unit) = if s.units() {
+        // The view of the check: its directory and its own `/tmp` written, nothing else (R25,
+        // `specs/ap/run-limits.md` R12).
+        let hidden = crate::run::hidden_words(s);
+        let hidden = hidden.ok_or_else(|| error("limits_unavailable", "acceptance"))?;
+        let at = command.len() - 7;
+        command.splice(at..at, view(dir, hidden));
         let id = new_session_id(s).map_err(|_| error("io_error", "unit"))?;
         let unit = format!("ap-check-{id}");
         let mut argv: Vec<String> = [

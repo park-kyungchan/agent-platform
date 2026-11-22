@@ -8,7 +8,7 @@ use super::object::{self, branch_ok, clone_of};
 use super::page_review::{self, key_ok, stage_unit, unit_ended};
 use super::render::{self, Role};
 use crate::host::{Failure, Host, System, args, digest, error, fail, id, new_session_id};
-use crate::review::{self, DIFF_OPTIONS};
+use crate::review::{self, DIFF_OPTIONS, GIT_SAFE};
 use crate::store::{self, Actor, Applied, Lead, at};
 use serde_json::{Map, Value, json};
 use std::{
@@ -793,6 +793,18 @@ impl Run {
             let session = rec.as_ref().and_then(session);
             self.close(s, k, json!({"verdict": "abandoned", "session": session}))?;
         }
+        // No stage of the unit lives now: every scratch directory goes, the one a killed `ap run`
+        // left (its record still `running`) among them; no link is followed (R7).
+        let scratch = self.home.join("scratch");
+        if real_dir(&scratch) {
+            for e in std::fs::read_dir(&scratch).into_iter().flatten().flatten() {
+                let p = e.path();
+                let _ = match p.symlink_metadata().is_ok_and(|m| m.is_dir()) {
+                    true => std::fs::remove_dir_all(&p),
+                    false => std::fs::remove_file(&p),
+                };
+            }
+        }
         Ok(())
     }
     /// A stage of a cut run: its unit stopped and read as ended, its run closed (R7).
@@ -836,17 +848,11 @@ impl Run {
     fn git_ok(&self, s: &mut impl System, dir: &str, words: &[&str]) -> bool {
         review::git(s, dir, words).is_ok()
     }
-    /// `git fetch origin <what>` in the clone within 120 seconds (R8, R12).
+    /// `git fetch origin <what>` in the clone within 120 seconds (R8, R12), no hook run (R39).
     fn fetch(&self, s: &mut impl System, what: &str) -> Step {
-        let words = [
-            "--no-replace-objects",
-            "-C",
-            &self.clone,
-            "fetch",
-            "--quiet",
-            "origin",
-            what,
-        ];
+        let mut words = vec!["--no-replace-objects", "-C", &self.clone];
+        words.extend(GIT_SAFE);
+        words.extend(["fetch", "--quiet", "origin", what]);
         let mut fetched = s.call("git", &args(&words), &Value::Null, 120_000);
         // A fetch of `main` that raced another one on the same clone is tried once more (R8).
         if what == "main"
@@ -1009,6 +1015,7 @@ impl Run {
         let Some(entry) = self.entry(s)? else {
             return stop("worktree_failed", "no worktree of the clone at this path");
         };
+        self.git_dirs(s)?;
         let on_branch = entry
             .lines()
             .any(|l| l == format!("branch refs/heads/{}", self.branch));
@@ -1016,7 +1023,12 @@ impl Run {
         let status = self.git(
             s,
             wt,
-            &["status", "--porcelain", "--untracked-files=normal"],
+            &[
+                "status",
+                "--porcelain",
+                "--untracked-files=normal",
+                "--ignore-submodules=all",
+            ],
         )?;
         let head = self.git(s, wt, &["rev-parse", "HEAD"])?;
         let ahead = self.git(
@@ -1034,6 +1046,128 @@ impl Run {
         })
     }
 
+    /// The clone's Git directory `<G>` and the worktree's administrative directory `<A>`, after the
+    /// guard that the worktree names its own Git directory and nothing else (R8).
+    fn git_dirs(&self, s: &mut impl System) -> Step<(String, String)> {
+        let words = ["rev-parse", "--path-format=absolute", "--git-common-dir"];
+        let g = self.git(s, &self.clone, &words)?;
+        // The one line of a regular file that is not a link.
+        let line = |p: &Path| -> Option<String> {
+            p.symlink_metadata()
+                .ok()
+                .filter(|m| m.file_type().is_file())?;
+            let text = std::fs::read_to_string(p).ok()?;
+            let text = text.strip_suffix('\n').unwrap_or(&text);
+            (!text.contains('\n')).then(|| text.to_owned())
+        };
+        let dotgit = Path::new(&self.wt).join(".git");
+        let admin = line(&dotgit).and_then(|l| l.strip_prefix("gitdir: ").map(str::to_owned));
+        let Some(admin) = admin else {
+            return stop("worktree_failed", "git directory");
+        };
+        let name = admin.strip_prefix(&format!("{g}/worktrees/"));
+        let one = name.is_some_and(|n| !n.is_empty() && !n.contains('/') && n != "." && n != "..");
+        let at = Path::new(&admin);
+        let back = dotgit.to_string_lossy();
+        let named = one
+            && at.symlink_metadata().is_ok_and(|m| m.is_dir())
+            && line(&at.join("gitdir")).as_deref() == Some(&*back)
+            && line(&at.join("commondir")).as_deref() == Some("../..");
+        match named {
+            true => Ok((g, admin)),
+            false => stop("worktree_failed", "git directory"),
+        }
+    }
+    /// The `limits` and the `env` of the stage `<n>` (R38): a scratch directory of its own, the state
+    /// of `gh` shown, a Cargo home in the scratch directory; for an author also the worktree and what
+    /// a commit, a merge, a fetch and a push write of the clone's Git directory, after the run made
+    /// those paths and set the `origin/main` of the stage's own view to the base.
+    fn limits(&self, s: &mut impl System, n: u64, author: bool) -> Step<(Value, Value)> {
+        let mut dirs = std::fs::DirBuilder::new();
+        dirs.mode(0o700);
+        let made = |dirs: &std::fs::DirBuilder, p: &Path| match dirs.create(p) {
+            Err(e) if e.kind() != std::io::ErrorKind::AlreadyExists => Err(e),
+            _ => Ok(()),
+        };
+        let scratch = self.home.join("scratch");
+        made(&dirs, &scratch).map_err(|_| Halt::Stop("io_error".into(), "scratch".into()))?;
+        let at = scratch.join(n.to_string()).to_string_lossy().into_owned();
+        let env = json!({"CARGO_HOME": format!("{at}/cargo")});
+        let mut limits = json!({"scratch": at, "show": ["~/.config/gh"]});
+        if !author {
+            return Ok((limits, env));
+        }
+        let (g, admin) = self.git_dirs(s)?;
+        let text = |p: &Path| p.to_string_lossy().into_owned();
+        let (gp, branch) = (Path::new(&g), Path::new(&self.branch));
+        let holder = |p: PathBuf| p.parent().map(Path::to_path_buf).unwrap_or(p);
+        let refs = holder(gp.join("refs/heads").join(branch));
+        let logs = holder(gp.join("logs/refs/heads").join(branch));
+        let targets = [
+            gp.join("refs/remotes/origin"),
+            gp.join("logs/refs/remotes/origin"),
+            gp.join("refs/tags"),
+        ];
+        let failed = |what: &str| Halt::Stop("worktree_failed".into(), what.into());
+        for d in [&refs, &logs].into_iter().chain(&targets) {
+            std::fs::create_dir_all(d).map_err(|_| failed("git directory"))?;
+        }
+        let remotes = self.home.join("remotes");
+        let sources = ["refs", "logs", "tags"].map(|d| remotes.join(d));
+        made(&dirs, &remotes).map_err(|_| failed("remotes"))?;
+        if !real_dir(&remotes) {
+            return stop("worktree_failed", "remotes");
+        }
+        for d in &sources {
+            made(&dirs, d).map_err(|_| failed("remotes"))?;
+        }
+        let worktree_config = Path::new(&admin).join("config.worktree");
+        let mut options = std::fs::OpenOptions::new();
+        options.write(true).create_new(true).mode(0o644);
+        options.custom_flags(rustix::fs::OFlags::NOFOLLOW.bits() as i32);
+        match options.open(&worktree_config) {
+            Err(e) if e.kind() != std::io::ErrorKind::AlreadyExists => {
+                return stop("worktree_failed", "git directory");
+            }
+            _ => {}
+        }
+        // `origin/main` of the stage's view is the base: a new file of the run's own, renamed over
+        // the name a stage could have made a link or a directory (R38).
+        let main = sources[0].join("main");
+        if main.symlink_metadata().is_ok_and(|m| m.is_dir()) {
+            std::fs::remove_dir_all(&main).map_err(|_| failed("remotes"))?;
+        }
+        let new = remotes.join("main.new");
+        let _ = std::fs::remove_file(&new);
+        let mut options = std::fs::OpenOptions::new();
+        options.write(true).create_new(true).mode(0o600);
+        options.custom_flags(rustix::fs::OFlags::NOFOLLOW.bits() as i32);
+        let written = options
+            .open(&new)
+            .and_then(|mut f| f.write_all(format!("{}\n", self.base).as_bytes()));
+        written.map_err(|_| failed("remotes"))?;
+        std::fs::rename(&new, &main).map_err(|_| failed("remotes"))?;
+        let wt = Path::new(&self.wt);
+        let a = Path::new(&admin);
+        limits["write"] = json!([
+            self.wt,
+            text(&gp.join("objects")),
+            admin,
+            text(&refs),
+            text(&logs)
+        ]);
+        let pairs: Vec<Value> = (sources.iter().zip(&targets))
+            .map(|(from, to)| json!([text(from), text(to)]))
+            .collect();
+        limits["over"] = json!(pairs);
+        limits["read_only"] = json!([
+            text(&wt.join(".git")),
+            text(&a.join("commondir")),
+            text(&a.join("gitdir")),
+            text(&worktree_config)
+        ]);
+        Ok((limits, env))
+    }
     fn page(&mut self, s: &mut impl System, role: Role) -> Step<String> {
         let u = self.u.clone();
         Ok(render::page_text(s, self.store(), &self.key, &u, Some(role))?.0)
@@ -1048,6 +1182,7 @@ impl Run {
         text: &str,
     ) -> Step<(Value, String)> {
         let n = self.next();
+        let (limits, env) = self.limits(s, n, true)?;
         let prompt = self.prompt(&format!("{n}.{role}.prompt.md"), text)?;
         let out = self
             .home
@@ -1056,6 +1191,7 @@ impl Run {
             .into_owned();
         let mut req = self.stage(&self.implementer, role, role, (&prompt, &out));
         req["git_author"] = json!(true);
+        (req["limits"], req["env"]) = (limits, env);
         if let Some(a) = from {
             for k in ["model", "effort", "runtime"]
                 .iter()
@@ -1346,6 +1482,7 @@ impl Run {
         );
         let mut req = self.stage(&self.verifier, "reviewer", "verifier", (&prompt, ""));
         (req["ont_role"], req["expect"]) = (json!("verifier"), json!({"first_line": "Verdict: *"}));
+        (req["limits"], req["env"]) = self.limits(s, n, false)?;
         if let Some((record, ..)) = &resumed {
             req["resume"] = json!({"record": record});
         }
@@ -1545,6 +1682,10 @@ impl Run {
             "--no-replace-objects",
             "-C",
             &self.wt,
+            GIT_SAFE[0],
+            GIT_SAFE[1],
+            GIT_SAFE[2],
+            GIT_SAFE[3],
             "diff",
             "--no-ext-diff",
             "--no-textconv",
@@ -1717,6 +1858,10 @@ impl Run {
             "--no-replace-objects",
             "-C",
             &self.wt,
+            GIT_SAFE[0],
+            GIT_SAFE[1],
+            GIT_SAFE[2],
+            GIT_SAFE[3],
             "push",
             "--quiet",
             "origin",
@@ -1734,20 +1879,20 @@ impl Run {
     fn merge_base(&self, s: &mut impl System) -> Step<String> {
         let message = self.merge_message();
         let mut words = MERGER.to_vec();
-        words.extend([
-            "git",
-            "--no-replace-objects",
-            "-C",
-            &self.wt,
-            "merge",
-            "--no-ff",
-        ]);
+        words.extend(["git", "--no-replace-objects", "-C", &self.wt]);
+        words.extend(GIT_SAFE);
+        words.extend(["merge", "--no-ff"]);
         words.extend(["--no-edit", "--quiet", "-m", &message, &self.base]);
         let merged = s.call("env", &args(&words), &Value::Null, 120_000);
         if merged.is_ok_and(|r| r.success) {
             return self.git(s, &self.wt, &["rev-parse", "HEAD"]);
         }
-        let paths = ["diff", "--name-only", "--diff-filter=U"];
+        let paths = [
+            "diff",
+            "--ignore-submodules=all",
+            "--name-only",
+            "--diff-filter=U",
+        ];
         let paths = review::git(s, &self.wt, &paths).unwrap_or_default();
         self.git(s, &self.wt, &["merge", "--abort"])?;
         let paths: Vec<&str> = paths.lines().take(10).collect();
@@ -1900,6 +2045,8 @@ impl Run {
             Err("not a directory")
         } else {
             match self.entry(s) {
+                // A worktree that does not name its own Git directory is not removed (R8).
+                Ok(Some(_)) if self.git_dirs(s).is_err() => Err("git directory"),
                 Ok(Some(_)) => {
                     let mut words = vec!["worktree", "remove"];
                     words.extend(dropped.then_some("--force"));
@@ -1933,6 +2080,13 @@ impl Run {
             && self.view(s, n).is_ok_and(|(state, _)| state == "OPEN")
         {
             c["pull_request_open"] = json!(n);
+        }
+        // The stages' scratch directories and the remote-tracking refs of their views: only a
+        // directory that is not a link, and no link inside it followed (R32).
+        for d in ["scratch", "remotes"].map(|d| self.home.join(d)) {
+            if real_dir(&d) {
+                let _ = std::fs::remove_dir_all(&d);
+            }
         }
         c
     }
