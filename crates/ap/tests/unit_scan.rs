@@ -137,6 +137,26 @@ fn the_added_lines_of_a_reply_are_read_from_its_first_hunk_header() {
     assert_eq!(lines, want);
     assert_eq!(added(b"Binary files a/x and b/x differ\n").unwrap(), vec![]);
     assert!(added(b"@@ nonsense @@\n+x\n").is_none());
+    // A type change is two sections of one reply: the second one's header lines are no lines.
+    let name = github(36);
+    let change = format!(
+        "diff --git a/{name} b/{name}\ndeleted file mode 100644\n--- a/{name}\n+++ /dev/null\n@@ -1,2 +0,0 @@\n-a\n-b\ndiff --git a/{name} b/{name}\nnew file mode 120000\n--- /dev/null\n+++ b/{name}\n@@ -0,0 +1 @@\n+none\n\\ No newline at end of file\n"
+    );
+    assert_eq!(added(change.as_bytes()).unwrap(), vec![(1, &b"none"[..])]);
+    // A hunk that holds fewer lines than its header counts is not read.
+    assert!(added(b"@@ -0,0 +1,2 @@\n+one\n").is_none());
+}
+
+#[test]
+fn a_type_change_reads_no_header_line_of_the_diff() {
+    let r = Repo::new();
+    let name = github(36);
+    r.lines(&name, &["plain", "text"]);
+    let base = r.commit();
+    std::fs::remove_file(r.0.join(&name)).unwrap();
+    std::os::unix::fs::symlink("none", r.0.join(&name)).unwrap();
+    let head = r.commit();
+    assert!(r.scan(&base, &head, "").is_ok());
 }
 
 #[test]

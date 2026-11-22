@@ -223,32 +223,52 @@ pub fn admissions(notes: &str) -> HashSet<(String, String)> {
 }
 
 /// The added lines of one path's `-U0` diff: their line numbers and bytes, from the first hunk
-/// header on. `None` when a hunk header is not of the form `@@ -a[,b] +c[,d] @@`.
+/// header on. A hunk ends when the counts of its header are used up, so the header lines of a
+/// second section of the reply (a type change shows a deletion and an addition) are never read as
+/// lines. `None` when a header is not of the form `@@ -a[,b] +c[,d] @@` or a hunk does not hold
+/// the lines its header counts.
 pub fn added(reply: &[u8]) -> Option<Vec<(u64, &[u8])>> {
     let mut lines = vec![];
-    let mut next: Option<u64> = None;
+    // The line number of the next added line and the old and new lines the hunk still counts.
+    let (mut next, mut old, mut new) = (0u64, 0u64, 0u64);
     for line in reply.split(|b| *b == b'\n') {
-        if line.starts_with(b"@@ ") {
-            next = Some(start(line)?);
-        } else if let (Some(n), Some(text)) = (next, line.strip_prefix(b"+")) {
-            lines.push((n, text));
-            next = Some(n + 1);
+        if old == 0 && new == 0 {
+            if line.starts_with(b"@@ ") {
+                (next, old, new) = hunk(line)?;
+            }
+        } else if line.starts_with(b"\\") {
+            continue;
+        } else if let Some(text) = line.strip_prefix(b"+") {
+            new = new.checked_sub(1)?;
+            lines.push((next, text));
+            next += 1;
+        } else if line.starts_with(b"-") {
+            old = old.checked_sub(1)?;
+        } else {
+            return None;
         }
     }
-    Some(lines)
+    (old == 0 && new == 0).then_some(lines)
 }
-/// The first line number `c` of the new side of a hunk header `@@ -a[,b] +c[,d] @@`; the text
-/// after the second `@@` is not read (it need not be UTF-8).
-fn start(header: &[u8]) -> Option<u64> {
+/// The first new line number `c` and the counts of the old and new lines of a hunk header
+/// `@@ -a[,b] +c[,d] @@` (a count that is left out is 1); the text after the second `@@` is not
+/// read (it need not be UTF-8).
+fn hunk(header: &[u8]) -> Option<(u64, u64, u64)> {
     let mut words = header.strip_prefix(b"@@ -")?.splitn(3, |b| *b == b' ');
     let (old, new, tail) = (words.next()?, words.next()?, words.next()?);
-    let number = |t: &[u8]| t.iter().all(u8::is_ascii_digit) && !t.is_empty();
-    let old_ok = old.split(|b| *b == b',').all(number);
-    let mut new = new.strip_prefix(b"+")?.split(|b| *b == b',');
-    let c = new.next()?;
-    let rest_ok = new.all(number);
-    (old_ok && rest_ok && number(c) && tail.starts_with(b"@@"))
-        .then(|| std::str::from_utf8(c).ok()?.parse().ok())?
+    let number = |t: &[u8]| {
+        let digits = !t.is_empty() && t.iter().all(u8::is_ascii_digit);
+        digits.then(|| std::str::from_utf8(t).ok()?.parse::<u64>().ok())?
+    };
+    let pair = |t: &[u8]| {
+        let mut parts = t.split(|b| *b == b',');
+        let first = number(parts.next()?)?;
+        let count = parts.next().map_or(Some(1), number)?;
+        parts.next().is_none().then_some((first, count))
+    };
+    let (_, removed) = pair(old)?;
+    let (start, added) = pair(new.strip_prefix(b"+")?)?;
+    tail.starts_with(b"@@").then_some((start, removed, added))
 }
 
 /// The detail of a stop on `hits`: the first of them that keep the JSON text within 1,000 bytes.
