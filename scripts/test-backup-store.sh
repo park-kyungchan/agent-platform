@@ -259,9 +259,13 @@ AP_BACKUP_CONFIG= bash "$script" > /dev/null 2>&1; [ "$?" -eq 2 ] && ok "an empt
 if [ -z "$realgpg" ]; then
   echo "skip round trip: gpg is not on PATH"
 else
-  gh=$(mktemp -d /tmp/bkgpg.XXXXXX); chmod 700 "$gh"
+  # /tmp when it is writable; else the scratch TMPDIR (a stage's view), where the path may be too long for the socket.
+  gh=$(mktemp -d /tmp/bkgpg.XXXXXX 2> /dev/null || mktemp -d "${TMPDIR:-/tmp}/g.XXXXXX"); chmod 700 "$gh"
   g() { "$realgpg" --homedir "$gh" --batch --pinentry-mode loopback --passphrase '' "$@"; }
-  if g --quick-generate-key backup-test@example.invalid default default never > /dev/null 2>&1 \
+  # the longest socket gpg-agent makes in its home is S.gpg-agent.browser; sun_path holds 108 bytes with the NUL, and gpg-agent refuses a path of 107.
+  if [ "$((${#gh} + 1 + 19))" -gt 106 ]; then
+    bad "round trip: the GnuPG home path is too long for gpg-agent's socket ($((${#gh} + 20)) > 106 bytes): $gh; set a shorter TMPDIR"
+  elif g --quick-generate-key backup-test@example.invalid default default never > /dev/null 2>&1 \
       && g --export > "$t/rt.pub" 2> /dev/null && g --armor --export > "$t/rt.asc" 2> /dev/null && [ -s "$t/rt.pub" ] && [ -s "$t/rt.asc" ]; then
     rm -rf "$state" "$t/remote/r/dir"; mkdir -p "$t/remote/r/dir"; : > "$t/calls.log"; good=1
     for kind in pub asc; do
