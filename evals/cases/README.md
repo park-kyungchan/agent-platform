@@ -63,7 +63,7 @@ Before any effect, one line and exit 2: `usage` (an unknown flag, a missing or e
 2. Start the readers of each suite with the `--case` arguments it printed (an empty selection starts none). In `full` mode, the whole suite.
 3. After a full gate with a failure, `reproduce --record <task key>` on that change and gate: it measures whether the rule would have named the failing cases. A `reproduced` value for the current `map_digest` is what makes `select` print `subset`.
 
-The real run: `reproduce --record` on the routing gate of the change 5317582..5732af6 of agent-platform (`/var/lib/agent-platform/evals/routing/gate-c3-pre/gate.json`) or on the next full gate that failed; then `select` for the next content unit prints `subset` with fewer cases than the suites hold.
+The real run is `reproduce --record` on the next full gate that failed; after it, `select` for a content unit prints `subset` with fewer cases than the suites hold.
 
 ## The undo
 
