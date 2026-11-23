@@ -44,6 +44,8 @@ clean() { find "$@" -type d ! -perm -u=rwx -exec chmod u+rwx {} + 2>/dev/null; r
 # At the end: the proxy's outside part ends (it removes its socket), then the call's directories go; the
 # lines file stays for the fetch of the caller, which removes it.
 finish() {
+  # A hang-up or a stop during the cleanup does not cut it short.
+  trap '' HUP TERM INT
   if [ -n "$outside_pid" ]; then
     kill -TERM "$outside_pid" 2>/dev/null
     for _ in $(seq 1 150); do kill -0 "$outside_pid" 2>/dev/null || break; sleep 0.1; done
@@ -54,6 +56,9 @@ finish() {
   clean "$tmp"
 }
 trap finish EXIT
+trap 'exit 129' HUP
+trap 'exit 143' TERM
+trap 'exit 130' INT
 mkdir -p -- "$work/trees" "$work/repos" "$work/locks" "$work/used" "$work/homes" "$work/tmp" || bad "work directory"
 mkdir -p -m 0700 -- "$work/egress" && chmod 0700 -- "$work/egress" || bad "work directory"
 mkdir -- "$tmp" "$in" "$in/extra" || bad "work directory"

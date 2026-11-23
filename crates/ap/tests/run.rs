@@ -12453,10 +12453,9 @@ fn pc_r59_the_sides_view_is_an_allow_list_and_the_proxy_comes_before_the_cli() {
     // At its end: the proxy ended, `tmp/<nonce>` and `tmp/<id>` gone, the home kept (mode 0700).
     let pid = f.ts("outside.pid");
     assert!(
-        std::fs::metadata(format!("/proc/{}", pid.trim())).is_err()
-            || std::fs::read_to_string(format!("/proc/{}/stat", pid.trim()))
-                .unwrap()
-                .contains(" Z ")
+        std::fs::read_to_string(format!("/proc/{}/stat", pid.trim()))
+            .map_or(true, |s| s.contains(" Z ")),
+        "the proxy still runs"
     );
     let mut left: Vec<_> = vec![];
     for _ in 0..100 {
