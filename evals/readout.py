@@ -26,6 +26,7 @@ import bisect
 import collections
 import datetime
 import json
+import os
 import re
 import statistics
 import subprocess
@@ -94,7 +95,14 @@ def jsonl(path, lines):
                 lines["unreadable"] += 1
 
 
-def projects_dirs(accounts):
+def academy_name(name, project=False):
+    """With --without-academy, a walk does not open a directory of this name (specs/ap/measure.md R3): a name that
+    begins with `edu-`, and for a project directory (one directly in a `projects` directory) a name that holds `-edu-`
+    or `-education-platform`."""
+    return name.startswith("edu-") or (project and ("-edu-" in name or "-education-platform" in name))
+
+
+def projects_dirs(accounts, without_academy=False):
     """The directories of Claude session records, for each account in the order given: <account>/projects when it is
     a directory, then <account>/homes/<name>/projects of each home of a stage with limits that has one, by <name>."""
     found = []
@@ -102,18 +110,34 @@ def projects_dirs(accounts):
         found += [Path(account) / "projects"] if (Path(account) / "projects").is_dir() else []
         homes = Path(account) / "homes"
         names = sorted(h.name for h in homes.iterdir()) if homes.is_dir() else []
+        names = [n for n in names if not (without_academy and academy_name(n))]
         found += [homes / n / "projects" for n in names if (homes / n / "projects").is_dir()]
     return found
 
 
-def read_claude(projects_dirs, since_epoch):
+def pruned(top, suffix, project_level, deepest=None):
+    """The files under `top` whose name ends with `suffix`, opening no directory of the Academy (`academy_name`; a
+    directory directly in `top` is a project directory when `project_level`), nothing below `deepest` levels, and
+    following no link to a directory."""
+    out = []
+    for root, dirs, files in os.walk(top):
+        depth = len(Path(root).relative_to(top).parts)
+        dirs[:] = [d for d in dirs if not academy_name(d, project_level and depth == 0) and (deepest is None or depth < deepest)]
+        out += [Path(root) / f for f in files if f.endswith(suffix)]
+    return out
+
+
+def read_claude(projects_dirs, since_epoch, without_academy=False):
     """One message per message id (a message spans several lines, and a forked session's file repeats earlier ones).
     A message belongs to the earliest-started session that holds it, and a session has one cwd, its earliest line's:
     neither depends on the order of the files. Files older than the window give only that and the branches of
     their sessions (the K2 join needs them), no message."""
     msgs, branches, lines = {}, collections.defaultdict(set), collections.Counter()
     first_cwd, start = {}, {}
-    files = sorted({f.resolve() for d in projects_dirs for f in Path(d).resolve().rglob("*.jsonl")})
+    if without_academy:
+        files = sorted({f.resolve() for d in projects_dirs for f in pruned(Path(d).resolve(), ".jsonl", True)})
+    else:
+        files = sorted({f.resolve() for d in projects_dirs for f in Path(d).resolve().rglob("*.jsonl")})
     for f in files:
         old = f.stat().st_mtime < since_epoch
         lines["files_older_than_window" if old else "files"] += 1
@@ -204,14 +228,22 @@ def review_kind(path):
     return "packet" if len(p) >= 3 and p[-3] == "units" and re.fullmatch(r"\d+\.verifier\.prompt\.md", p[-1]) else "other"
 
 
-def read_stages(work_root, stage_dirs=()):
+def read_stages(work_root, stage_dirs=(), without_academy=False):
     """A record read from a stage directory is marked `store`; a file reached by both ways is read once."""
     stages, lines, found = [], collections.Counter(), {}
-    for f in Path(work_root).glob("*/**/*.run.json"):
+    if without_academy:
+        work = [f for f in pruned(Path(work_root), ".run.json", False) if f.parent != Path(work_root)] if Path(work_root).is_dir() else []
+    else:
+        work = Path(work_root).glob("*/**/*.run.json")
+    for f in work:
         found[f.resolve()] = (f, False)
     for d in stage_dirs:
         d = Path(d)
-        for f in (*d.glob("*.run.json"), *d.glob("*/*.run.json")) if d.is_dir() else ():
+        if without_academy:
+            records = pruned(d, ".run.json", False, deepest=1) if d.is_dir() else ()
+        else:
+            records = (*d.glob("*.run.json"), *d.glob("*/*.run.json")) if d.is_dir() else ()
+        for f in records:
             found[f.resolve()] = (f, True)
     for f, store in sorted(found.values(), key=lambda v: str(v[0])):
         try:
@@ -529,16 +561,18 @@ def main(argv=None):
     ap.add_argument("--list-no-reviewer", action="store_true", help="list the numbers of merged pull requests without a reviewer stage")
     ap.add_argument("--detail", action="store_true", help="one K2 line per merged pull request; after it, the stages of a unit/<key> pull request, and a closing `lead share=` line")
     ap.add_argument("--calibrate", action="store_true", help="also compare the cost of first-run stages with the CLI's own figure")
+    ap.add_argument("--without-academy", action="store_true", help="open no directory of the Academy: a name beginning edu-, and a project "
+                    "directory whose name holds -edu- or -education-platform (specs/ap/measure.md R3)")
     a = ap.parse_args(argv)
     for d in (a.since, a.until):
         datetime.date.fromisoformat(d)
     a.lesson_dir = a.lesson_dir or a.work_root.rstrip("/") + "/edu-lessons"
     a.stage_dir = a.stage_dir or list(STAGE_DIRS)
     a.rates = load_prices(a.prices)
-    a.stages, st_lines = read_stages(a.work_root, a.stage_dir)
+    a.stages, st_lines = read_stages(a.work_root, a.stage_dir, a.without_academy)
     accounts = a.accounts if a.accounts is not None else [str(p.parent) for p in sorted(Path.home().glob(".claude*/projects"))]
     since_epoch = datetime.datetime.fromisoformat(a.since).replace(tzinfo=datetime.timezone.utc).timestamp()
-    c_msgs, branches, session_cwd, c_lines = read_claude(projects_dirs(accounts), since_epoch)
+    c_msgs, branches, session_cwd, c_lines = read_claude(projects_dirs(accounts, a.without_academy), since_epoch, a.without_academy)
     x_msgs, x_lines = read_codex(a.codex_dir, since_epoch)
     totals, rows, leads, outside, session_usd, lesson_files, kinds = aggregate(c_msgs + x_msgs, a)
     prs = [(r, p) for r in (a.repo or REPOS) for p in run_gh(r, a.since, a.until) if a.since <= str(p.get("mergedAt"))[:10] <= a.until]
