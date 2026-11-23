@@ -4,6 +4,7 @@
 //! relays the bytes both ways, writes one line per request to `AP_EGRESS_LOG` and is closed after
 //! the call's last launch.
 use super::stamp;
+pub(super) mod pc;
 use crate::host::{Network, System, WayOut};
 use serde_json::json;
 use std::{
@@ -30,6 +31,23 @@ const BUILD: [&str; 5] = [
     "api.github.com",
     "index.crates.io",
     "static.crates.io",
+];
+/// The ranges no stage reaches, in CIDR form, in the order of R18: what `forbidden` judges by, and
+/// what the proxy of a look on the PC is given (`specs/ap/pc-egress.md` R6).
+pub(crate) const RANGES: [&str; 13] = [
+    "0.0.0.0/8",
+    "10.0.0.0/8",
+    "100.64.0.0/10",
+    "127.0.0.0/8",
+    "169.254.0.0/16",
+    "172.16.0.0/12",
+    "192.168.0.0/16",
+    "224.0.0.0/3",
+    "::/128",
+    "::1/128",
+    "fc00::/7",
+    "fe80::/10",
+    "ff00::/8",
 ];
 /// The longest request: its request line and header lines with the empty line (R18).
 const REQUEST_MAX: usize = 8_192;
@@ -357,7 +375,7 @@ fn literal(host: &str) -> bool {
 }
 
 /// An address no stage reaches: of this host, of the tailnet, of a private, link-local or
-/// multicast network, or unspecified (R18).
+/// multicast network, or unspecified (R18): one in a range of `RANGES`.
 fn forbidden(address: IpAddr) -> bool {
     match address {
         IpAddr::V4(v) => forbidden_v4(v),
@@ -365,25 +383,32 @@ fn forbidden(address: IpAddr) -> bool {
             if let Some(mapped) = v.to_ipv4_mapped() {
                 return forbidden_v4(mapped);
             }
-            let first = v.segments()[0];
-            v.is_unspecified()
-                || v.is_loopback()
-                || first & 0xfe00 == 0xfc00
-                || first & 0xffc0 == 0xfe80
-                || first & 0xff00 == 0xff00
+            RANGES.iter().any(|range| {
+                let parsed = range.split_once('/').and_then(|(net, len)| {
+                    Some((net.parse::<Ipv6Addr>().ok()?, len.parse::<u32>().ok()?))
+                });
+                let Some((net, len)) = parsed else {
+                    return false;
+                };
+                let mask = u128::MAX
+                    .checked_shl(128u32.saturating_sub(len))
+                    .unwrap_or(0);
+                u128::from(v) & mask == u128::from(net) & mask
+            })
         }
     }
 }
 fn forbidden_v4(v: Ipv4Addr) -> bool {
-    let [a, b, _, _] = v.octets();
-    a == 0
-        || a == 10
-        || (a == 100 && b & 0xc0 == 64)
-        || a == 127
-        || (a == 169 && b == 254)
-        || (a == 172 && b & 0xf0 == 16)
-        || (a == 192 && b == 168)
-        || a >= 224
+    RANGES.iter().any(|range| {
+        let parsed = range
+            .split_once('/')
+            .and_then(|(net, len)| Some((net.parse::<Ipv4Addr>().ok()?, len.parse::<u32>().ok()?)));
+        let Some((net, len)) = parsed else {
+            return false;
+        };
+        let mask = u32::MAX.checked_shl(32u32.saturating_sub(len)).unwrap_or(0);
+        u32::from(v) & mask == u32::from(net) & mask
+    })
 }
 
 /// The judgement of a `CONNECT` of the form, in the order of R18; a connection is opened only to
