@@ -14,6 +14,10 @@ use std::{
 };
 
 pub(crate) const LIMIT: u64 = 1_048_576;
+/// The bound of the standard output of a call of the store engine `ont` (8 MiB): an `ont get` answer holds up to 100
+/// observations of an object, each at most 65,536 canonical bytes plus about 1.1 KB of wrappers, so about 6.7 MB
+/// with the envelope. Every other program's standard output, every standard error and every input keep `LIMIT`.
+pub const ANSWER_LIMIT: u64 = 8_388_608;
 /// The directory of the host's Git hooks, which the host's Git configuration names.
 const GIT_HOOKS: &str = "/usr/local/lib/agents-git/hooks";
 pub(crate) const ROOT: &str = "/home/palantirkc/work/";
@@ -402,18 +406,24 @@ impl System for Host {
         });
         let (out_tx, out_rx) = std::sync::mpsc::channel();
         let stdout = child.stdout.take().ok_or_else(error)?;
+        let out_limit =
+            if std::path::Path::new(program).file_name() == Some(std::ffi::OsStr::new("ont")) {
+                ANSWER_LIMIT
+            } else {
+                LIMIT
+            };
         let stderr = child.stderr.take().ok_or_else(error)?;
-        for (which, pipe) in [
-            (true, Box::new(stdout) as Box<dyn Read + Send>),
-            (false, Box::new(stderr) as Box<dyn Read + Send>),
+        for (which, pipe, limit) in [
+            (true, Box::new(stdout) as Box<dyn Read + Send>, out_limit),
+            (false, Box::new(stderr) as Box<dyn Read + Send>, LIMIT),
         ] {
             let tx = out_tx.clone();
             std::thread::spawn(move || {
                 let mut bytes = vec![];
                 let result = pipe
-                    .take(LIMIT + 1)
+                    .take(limit + 1)
                     .read_to_end(&mut bytes)
-                    .map(|_| (which, bytes));
+                    .map(|_| (which, bytes, limit));
                 let _ = tx.send(result);
             });
         }
@@ -437,11 +447,11 @@ impl System for Host {
         let mut out = vec![];
         let mut err = vec![];
         for _ in 0..2 {
-            let (which, bytes) = out_rx
+            let (which, bytes, limit) = out_rx
                 .recv_timeout(deadline.saturating_duration_since(Instant::now()))
                 .map_err(|_| error())?
                 .map_err(|_| error())?;
-            if bytes.len() as u64 > LIMIT {
+            if bytes.len() as u64 > limit {
                 return Err(error());
             }
             if which {
