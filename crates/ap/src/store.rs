@@ -9,7 +9,7 @@ use std::{ffi::OsString, io::Read, time::Duration};
 pub const REFUSED: &str = "store_refused";
 const RETRIES: usize = 5;
 const WAIT: Duration = Duration::from_millis(200);
-/// Objects asked per search page. Every answer of `ont` must fit `host::LIMIT` (1 MiB): one head is
+/// Objects asked per search page. Every answer of `ont` must fit `host::ANSWER_LIMIT` (8 MiB): one head is
 /// at most the engine's 65,536 canonical bytes plus about 1.1 KB of field wrappers and metadata, so
 /// 15 heads (about 1,000,000 bytes) fit with the envelope; a larger page fails once requests are long.
 pub const PAGE: u64 = 15;

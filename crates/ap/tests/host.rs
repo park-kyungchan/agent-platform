@@ -128,3 +128,60 @@ fn a_session_id_that_is_not_a_uuid_fails_the_launch() {
         let _ = std::fs::remove_dir_all(&t);
     }
 }
+
+/// A fake program written to a temporary directory: the file `name` runs `body` under `sh`.
+fn fake(name: &str, body: &str) -> (PathBuf, PathBuf) {
+    use std::os::unix::fs::PermissionsExt;
+    let dir = std::env::temp_dir().join(format!("ap-host-limit-{}-{name}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).unwrap();
+    let path = dir.join(name);
+    std::fs::write(&path, format!("#!/bin/sh\n{body}\n")).unwrap();
+    std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o755)).unwrap();
+    (dir, path)
+}
+
+/// Shell text that prints one JSON string of `n` bytes in all.
+fn json_of(n: usize) -> String {
+    format!(
+        "printf '\"'; head -c {} /dev/zero | tr '\\0' a; printf '\"'",
+        n - 2
+    )
+}
+
+#[test]
+fn answer_over_one_mib_is_read() {
+    let n = 2 * 1_048_576;
+    let (dir, path) = fake("ont", &json_of(n));
+    let out = Host
+        .call(path.to_str().unwrap(), &[], &Value::Null, 20_000)
+        .unwrap();
+    assert!(out.success);
+    assert_eq!(out.stdout.len(), n);
+    assert!(serde_json::from_slice::<Value>(&out.stdout).is_ok());
+    let _ = std::fs::remove_dir_all(dir);
+}
+
+#[test]
+fn answer_over_eight_mib_is_process_failed() {
+    let (dir, path) = fake("ont", &json_of(9 * 1_048_576));
+    let out = Host.call(path.to_str().unwrap(), &[], &Value::Null, 20_000);
+    assert_eq!(out.err().unwrap().code, "process_failed");
+    let _ = std::fs::remove_dir_all(dir);
+}
+
+#[test]
+fn error_over_one_mib_is_process_failed() {
+    let (dir, path) = fake("ont", "head -c 2097152 /dev/zero | tr '\\0' a >&2; exit 1");
+    let out = Host.call(path.to_str().unwrap(), &[], &Value::Null, 20_000);
+    assert_eq!(out.err().unwrap().code, "process_failed");
+    let _ = std::fs::remove_dir_all(dir);
+}
+
+#[test]
+fn other_program_keeps_one_mib() {
+    let (dir, path) = fake("other", &json_of(2 * 1_048_576));
+    let out = Host.call(path.to_str().unwrap(), &[], &Value::Null, 20_000);
+    assert_eq!(out.err().unwrap().code, "process_failed");
+    let _ = std::fs::remove_dir_all(dir);
+}
