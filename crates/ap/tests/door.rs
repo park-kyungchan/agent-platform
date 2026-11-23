@@ -53,12 +53,15 @@ printf '{"type":"result","subtype":"success","is_error":false,"num_turns":1,"res
 
 /// The fake engine: appends its arguments to `ont.args`, keeps its input and its whole environment,
 /// and answers by the file `ont.mode`: `refuse` (exit 2), `wait` (notes its start and end around a
-/// second), `flood` (3 MiB of output), else one answer line and one line of errors.
+/// second), `flood` (3 MiB of output), else one answer line and one line of errors; a function whose name
+/// the file `ont.deny` holds is refused `not_granted` with exit 2, as the engine refuses a role whose grant
+/// lacks it.
 const ONT: &str = r#"#!/bin/sh
 d=@D@
 printf '%s\n' "$*" >> "$d/ont.args"
 cat > "$d/ont.input"
 tr '\0' '\n' < /proc/$$/environ > "$d/ont.env"
+if [ "$2" = "$(cat "$d/ont.deny" 2>/dev/null)" ]; then echo '{"status":"refused","code":"not_granted"}'; exit 2; fi
 case $(cat "$d/ont.mode" 2>/dev/null) in
 refuse) echo '{"status":"refused","code":"invalid_parameter"}'; echo 'refused here' >&2; exit 2 ;;
 wait) echo "start" >> "$d/ont.times"; sleep 1; echo "end" >> "$d/ont.times"; echo '{"answers":[]}' ;;
@@ -1212,18 +1215,20 @@ fn r5_fn_asks_the_engine_as_the_stage_for_a_function_of_the_list() {
     assert_eq!(closing, Some(json!({"exit": 2})));
     assert!(text(&out).contains("invalid_parameter"));
     assert_eq!(text(&err), "refused here\n");
-    // A function off the list: refused, no call.
-    let (_, _, closing) = ask(
+    // A function the stage role's grant lacks: the engine refuses it `not_granted` (door.md R5).
+    fs::write(t.join("ont.deny"), "other").unwrap();
+    let (out, _, closing) = ask(
         &door,
         &json!({"door": 1, "verb": "fn", "name": "other", "input": {}}),
     );
-    assert_eq!(closing, refused("not_admitted", "name"));
+    assert_eq!(closing, Some(json!({"exit": 2})));
+    assert!(text(&out).contains("not_granted"));
     assert_eq!(
         fs::read_to_string(t.join("ont.args"))
             .unwrap()
             .lines()
             .count(),
-        2
+        3
     );
     // The door's bound: 2 MiB of a stream.
     fs::write(t.join("ont.mode"), "flood").unwrap();
@@ -1249,7 +1254,7 @@ fn r5_fn_asks_the_engine_as_the_stage_for_a_function_of_the_list() {
         [
             (&json!("route"), &json!(0), &Value::Null),
             (&json!("route"), &json!(2), &Value::Null),
-            (&json!("other"), &Value::Null, &json!("not_admitted")),
+            (&json!("other"), &json!(2), &Value::Null),
             (&json!("route"), &Value::Null, &json!("bound")),
         ]
     );
@@ -1273,27 +1278,25 @@ fn r10_clause_is_served_as_route_is_and_a_name_off_the_list_is_still_refused() {
     );
     assert_eq!(closing, Some(json!({"exit": 0})));
     assert!(!out.is_empty());
+    // `horizon` is in no stage role's grant: the engine refuses it, the door has no list of its own.
+    fs::write(t.join("ont.deny"), "horizon").unwrap();
     let (_, _, closing) = ask(
         &door,
         &json!({"door": 1, "verb": "fn", "name": "horizon", "input": {}}),
     );
-    assert_eq!(closing, refused("not_admitted", "name"));
+    assert_eq!(closing, Some(json!({"exit": 2})));
     assert_eq!(
         fs::read_to_string(t.join("ont.args")).unwrap(),
-        "fn clause\n"
+        "fn clause\nfn horizon\n"
     );
-    assert_eq!(
-        fs::read_to_string(t.join("ont.input")).unwrap(),
-        format!("{input}\n")
-    );
+    assert_eq!(fs::read_to_string(t.join("ont.input")).unwrap(), "{}\n");
     let (f, result) = running.finish();
     assert_eq!(result.unwrap().1, 0);
-    let names: Vec<Value> = f
-        .lines("door.jsonl")
-        .iter()
-        .map(|l| l["name"].clone())
-        .collect();
+    let lines = f.lines("door.jsonl");
+    let names: Vec<Value> = lines.iter().map(|l| l["name"].clone()).collect();
     assert_eq!(names, [json!("clause"), json!("horizon")]);
+    let ends: Vec<(&Value, &Value)> = lines.iter().map(|l| (&l["exit"], &l["reason"])).collect();
+    assert_eq!(ends, [(&json!(0), &Value::Null), (&json!(2), &Value::Null)]);
 }
 
 // spec: specs/ap/door.md#R5
@@ -1548,13 +1551,51 @@ fn r8_ap_fn_answers_the_engine_or_the_door_refusal() {
     let out = client(&door, &["fn", "route"], b"");
     assert_eq!(out.status.code(), Some(2));
     assert_eq!(text(&out.stderr), "refused here\n");
+    // A name off the door's old list reaches the engine, whose refusal is `ap fn`'s: exit 2 (door.md R5, R8).
     let out = client(&door, &["fn", "other"], b"");
     assert_eq!(out.status.code(), Some(2));
-    assert!(out.stdout.is_empty());
-    let v: Value = serde_json::from_slice(&out.stderr).unwrap();
-    assert_eq!(v["error"]["code"], json!("not_admitted"));
-    assert_eq!(v["error"]["field"], json!("name"));
+    assert_eq!(text(&out.stderr), "refused here\n");
     let _ = running.finish();
+}
+
+// spec: specs/ap/door.md#R5
+// spec: specs/ap/roles.md#R6
+#[test]
+fn door_asks_the_engine_in_the_stage_role() {
+    if on_pc() {
+        return;
+    }
+    let f = Fake::new();
+    let door = f.door();
+    let t = f.t.clone();
+    let r = f.request("verifier");
+    let running = f.start(r, true);
+    let client = Fake::client_of(&t);
+    // The fake engine's grant: `route` and `clause` answer, `cost` is refused `not_granted`.
+    fs::write(t.join("ont.deny"), "cost").unwrap();
+    let out = client(&door, &["fn", "cost"], b"{\"parameters\": {}}");
+    assert_eq!(out.status.code(), Some(2), "{out:?}");
+    assert_eq!(
+        text(&out.stdout),
+        "{\"status\":\"refused\",\"code\":\"not_granted\"}\n"
+    );
+    assert_eq!(fs::read_to_string(t.join("ont.args")).unwrap(), "fn cost\n");
+    // The engine was asked as the stage: its own `ONT_ROLE` and no other role.
+    let env = fs::read_to_string(t.join("ont.env")).unwrap();
+    let roles: Vec<&str> = env.lines().filter(|l| l.starts_with("ONT_ROLE=")).collect();
+    assert_eq!(roles, ["ONT_ROLE=verifier"]);
+    // A name of another form is the door's own refusal, with no call of the engine.
+    let (_, _, closing) = ask(
+        &door,
+        &json!({"door": 1, "verb": "fn", "name": "Cost", "input": {}}),
+    );
+    assert_eq!(closing, refused("invalid_request", "name"));
+    assert_eq!(fs::read_to_string(t.join("ont.args")).unwrap(), "fn cost\n");
+    let (f, result) = running.finish();
+    assert_eq!(result.unwrap().1, 0);
+    let lines = f.lines("door.jsonl");
+    assert_eq!(lines[0]["exit"], json!(2));
+    assert_eq!(lines[0]["reason"], Value::Null);
 }
 impl Fake {
     /// The built `ap fn` with `AP_DOOR`, from a directory alone.

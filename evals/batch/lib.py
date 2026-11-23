@@ -260,13 +260,17 @@ def finding_id(native_key):
 class Engine:
     """`ont` (ONT_BIN), with `--store` when given; each call one JSON request on standard input."""
 
-    def __init__(self, store, client):
+    def __init__(self, store, client, role=None):
         self.bin = os.environ.get("ONT_BIN", "ont")
-        self.store, self.client = store, client
+        # `role` is the one a caller of this program names in the body of each apply (specs/ap/roles.md R3): a fixed
+        # member, since the environment's ONT_ROLE is dropped below.
+        self.store, self.client, self.role = store, client, role
         # The action id of a request id depends on the client and the agent: neither is taken from the environment.
         self.env = {k: v for k, v in os.environ.items() if k not in ("ONT_AGENT", "ONT_ROLE")}
 
     def call(self, args, body):
+        if self.role and args[:2] == ["action", "apply"] and "role" not in body:
+            body = {**body, "role": self.role}
         command = [self.bin] + (["--store", self.store] if self.store else []) + args
         for attempt in range(BUSY_RETRIES + 1):
             try:

@@ -14,6 +14,7 @@ TimeoutStartSec=300
 # stage or an acceptance check calls (see deploy/README.md, "The dispatch pass", for a drop-in).
 Environment=HOME=/root
 Environment=PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin
+Environment=ONT_ROLE=dispatch
 NoNewPrivileges=yes
 ProtectKernelModules=yes
 ProtectKernelLogs=yes

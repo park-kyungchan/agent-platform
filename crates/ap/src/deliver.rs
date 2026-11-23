@@ -357,7 +357,7 @@ fn store_code(v: &Value) -> Value {
 }
 /// One action of the client and agent `ap-deliver`; only the answer `applied` is Ok.
 fn apply(s: &mut impl System, c: &Call, action: &str, request: String, p: Value) -> Step<Value> {
-    let body = json!({"action_type": action, "request_id": request, "agent": "ap-deliver", "parameters": p});
+    let body = json!({"action_type": action, "request_id": request, "agent": "ap-deliver", "role": "deliver", "parameters": p});
     let answer = ont(s, c.r, &CLIENT, &body).ok();
     let v: Value = answer
         .and_then(|reply| serde_json::from_slice(&reply.bytes).ok())
@@ -922,6 +922,7 @@ fn deliver(s: &mut impl System, c: &mut Call) -> Step<()> {
     judged(s, c, &tip)?;
     if c.engine.is_some() {
         marker(s, c, &tip)?;
+        roles_step(s, c, &tip)?;
     }
     if engine_moves {
         return engine_install(s, c, &pin, &engine.unwrap_or_default());
@@ -1438,6 +1439,64 @@ fn marker(s: &mut impl System, c: &mut Call, tip: &str) -> Step<()> {
             }
         }
         _ => Err(failed),
+    }
+}
+/// The roles file (R58): `deploy/roles.json` of T, from the clone's objects, against `roles.json` in the
+/// directory of the store's path, the file the engine reads. Absent at T: nothing is written; equal bytes:
+/// `same`; else the host's regular file is kept beside it as `roles.json.before-<12 hex>` and T's bytes are
+/// written through a temporary name and read back. A host entry that is no regular file, or any failure, ends
+/// the call `roles_install_failed` and leaves that entry as it was.
+fn roles_step(s: &mut impl System, c: &mut Call, tip: &str) -> Step<()> {
+    let dir = format!("{}/ont", c.engine.as_ref().map_or("", |e| e.2.as_str()));
+    let path = format!("{dir}/roles.json");
+    let before = file_digest(&path);
+    let result = roles_result(s, c, tip, &dir);
+    c.rec["roles"] = json!({"before": before, "after": file_digest(&path), "result": result});
+    match result {
+        "failed" => Err(No("roles_install_failed", json!({ "path": path }))),
+        _ => Ok(()),
+    }
+}
+fn roles_result(s: &mut impl System, c: &Call, tip: &str, dir: &str) -> &'static str {
+    const BLOB: &str = "deploy/roles.json";
+    let path = format!("{dir}/roles.json");
+    let Some(listed) = git(s, c, &["ls-tree", tip, "--", BLOB]) else {
+        return "failed";
+    };
+    let listed = listed.trim_end();
+    let wanted = if listed.is_empty() {
+        None
+    } else if listed.starts_with("100644 blob ") && listed.ends_with(&format!("\t{BLOB}")) {
+        Some(())
+    } else {
+        return "failed";
+    };
+    let host = entry(&path);
+    if matches!(host, Entry::Other) {
+        return "failed";
+    }
+    if wanted.is_none() {
+        return "absent";
+    }
+    let Some(text) = git(s, c, &["show", &format!("{tip}:{BLOB}")]) else {
+        return "failed";
+    };
+    let bytes = text.into_bytes();
+    if let Entry::File(old) = &host {
+        if *old == bytes {
+            return "same";
+        }
+        let kept = format!("roles.json.before-{}", &digest(old)[..12]);
+        if !put(dir, &kept, old) {
+            return "failed";
+        }
+    }
+    if put(dir, "roles.json", &bytes)
+        && matches!(entry(&path), Entry::File(b) if digest(&b) == digest(&bytes))
+    {
+        "written"
+    } else {
+        "failed"
     }
 }
 /// The schema from `from` up to T's `to`: the marker when T holds `ontology/migrate`, the backup,
@@ -1982,6 +2041,7 @@ pub fn execute(s: &mut impl System, r: &Value) -> (Value, u8) {
             ),
         ));
         c.rec["schema"] = Value::Null;
+        c.rec["roles"] = Value::Null;
     }
     if let Some(e) = r.get("etc") {
         let name = e["repository"].as_str().and_then(|v| v.split_once('/'));
@@ -2000,7 +2060,12 @@ pub fn execute(s: &mut impl System, r: &Value) -> (Value, u8) {
     };
     if let Err(No(code, detail)) = result {
         // The two ends of the schema step come after an effect: a person acts.
-        let after = ["schema_install_failed", "migrate_failed"].contains(&code);
+        let after = [
+            "schema_install_failed",
+            "migrate_failed",
+            "roles_install_failed",
+        ]
+        .contains(&code);
         let end = if after { "failed" } else { "refused" };
         (c.rec["end"], c.rec["code"], c.rec["detail"]) = (json!(end), json!(code), detail);
     }

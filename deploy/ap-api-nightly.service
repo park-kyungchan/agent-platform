@@ -16,6 +16,7 @@ Nice=10
 Environment=HOME=/root
 Environment=TZ=UTC
 Environment=PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin
+Environment=ONT_ROLE=api
 NoNewPrivileges=yes
 ProtectKernelModules=yes
 ProtectKernelLogs=yes

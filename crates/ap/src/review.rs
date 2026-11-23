@@ -124,7 +124,8 @@ pub(crate) fn apply(
     request: String,
     parameters: Value,
 ) -> Result<Value, Failure> {
-    let body = json!({"action_type":action,"request_id":request,"parameters":parameters});
+    let body =
+        json!({"action_type":action,"request_id":request,"role":"lead","parameters":parameters});
     let v = apply_answer(
         ont(s, r, &["action", "apply", "--client", "lead"], &body)?,
         "store_answer_unreadable",

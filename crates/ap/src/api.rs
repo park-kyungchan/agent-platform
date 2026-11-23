@@ -803,7 +803,7 @@ impl Record {
 /// One `close_run` with its one repeat when it has no answer (R12, R14).
 fn close(s: &mut impl System, store: Option<&str>, rid: &str, p: &Value) -> bool {
     for _ in 0..2 {
-        match store::close_run(s, store, (rid, "batch", p)) {
+        match store::close_run_api(s, store, (rid, "batch", p)) {
             Ok(_) => return true,
             Err(f) if f.code == store::REFUSED => return false,
             Err(_) => {}
@@ -818,11 +818,11 @@ fn start(s: &mut impl System, store: Option<&str>, rid: &str, p: &Value) -> Opti
             .and_then(|i| i["native_key"].as_str())
             .map(str::to_owned)
     };
-    match store::start_run(s, store, (rid, "batch", p)) {
+    match store::start_run_api(s, store, (rid, "batch", p)) {
         Ok(a) if a.outcome == "applied" => key(a),
         Ok(_) => None,
         Err(f) if f.code == store::REFUSED => None,
-        Err(_) => store::start_run(s, store, (rid, "batch", p))
+        Err(_) => store::start_run_api(s, store, (rid, "batch", p))
             .ok()
             .and_then(key),
     }

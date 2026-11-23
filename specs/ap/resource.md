@@ -26,7 +26,7 @@ Purpose: a Lead, and later the dispatch pass, asks once what can start now and w
 
 `ap resource [--directory <dir>] [--store <path>]`; `ont fn capacity` with `{"parameters": {}}`; `ont fn gate` with `{"parameters": {"since": <UTC time>, "intent"?: <key>}}`. The schema's part (`ontology/work.schema.json`, version 17): the object types `host`, `account`, `host_sample` and `check`, the sources `host_samples` (`/var/lib/agent-platform/resource/*.samples.jsonl`) and `checks` (`/var/lib/agent-platform/resource/*.checks.jsonl`), the actions `declare_host`, `observe_host`, `observe_account` and `state_allowance`, and the functions `capacity` (`timeout_ms` 10000) and `gate` (`timeout_ms` 600000), each `answer_bytes` 65536.
 
-Codes of `ap resource`: `usage`, `invalid_input`, `policy_invalid` (exit 2); `reading_failed`, `io_error` (exit 3). The pass's actions carry the client `ap`, the agent `ap-resource`, the session `resource-<the pass's seconds>` and no role.
+Codes of `ap resource`: `usage`, `invalid_input`, `policy_invalid` (exit 2); `reading_failed`, `io_error` (exit 3). The pass's actions carry the client `ap`, the agent `ap-resource`, the session `resource-<the pass's seconds>` and the role `measure` (`specs/ap/roles.md` R3).
 
 ## Not included
 

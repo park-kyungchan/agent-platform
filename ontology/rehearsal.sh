@@ -92,13 +92,17 @@ def trace(root, copies):
     print("rehearsal_sources=" + str(total) + " redirected, 0 under the host's work directory", file=sys.stderr)
 PY
 python3 - "$ont_binary" "$repo" "$rehearsal_root/store.sqlite" "$work_root/" "$rehearsal_root/copies" "$rehearsal_root/lib" <<'PY'
-import datetime, hashlib, json, pathlib, subprocess, sys
+import datetime, hashlib, json, os, pathlib, subprocess, sys
 binary, repo, store, work, copies, lib = sys.argv[1:]
 sys.path.insert(0, lib)
 import redirect
 def redirected(path, label=None): return redirect.make(path, work, copies, label)[0]
 now = int(datetime.datetime(2026, 11, 11, 2, tzinfo=datetime.timezone.utc).timestamp())
+# From the install of the repository's file (version 22) on, every apply and validate of this store claims `lead`, and the
+# roles file beside the store lets this process act as every role of the file's grants (engine action.md R113).
+CLAIM = None
 def call(args, request=None, code=0):
+    if CLAIM and args[:2] in (['action', 'apply'], ['action', 'validate']) and request is not None and 'role' not in request: request = dict(request, role=CLAIM)
     p = subprocess.run([binary, '--store', store, '--now', str(now), *args], input=json.dumps(request) if request is not None else None, text=True, capture_output=True, timeout=60)
     assert p.returncode == code, (args, p.returncode, p.stdout, p.stderr)
     if args == ['describe']: print('ont_describe_stdout_bytes=' + str(len(p.stdout.encode())), file=sys.stderr)
@@ -546,6 +550,10 @@ v9_objects = v8_objects + [after_v9]
 v9_before = [obj(i) for i in v9_objects]
 v9_views = {view: call(['render'], dict(view=view, args={} if view in ('current_memory_records', 'installs') else dict(task=task['native_key']))) for view in json.loads(v9.read_text())['views']}
 call(['schema', 'install', str(fixture)])
+repository_roles = sorted(g['role'] for g in copy['grants'] if 'role' in g)
+pathlib.Path(store).with_name('roles.json').write_text(json.dumps({'principals': {'uid:' + str(os.getuid()): repository_roles}}) + '\n')
+pathlib.Path(store).with_name('roles.json').chmod(0o644)
+CLAIM = 'lead'
 assert [obj(i) for i in v9_objects] == v9_before
 for view, before in v9_views.items():
     answer = call(['render'], dict(view=view, args={} if view in ('current_memory_records', 'installs') else dict(task=task['native_key'])))
@@ -971,7 +979,7 @@ apply('triage_decision', 'v9-after-carry', dict(decision=third, triage='none', r
 unchanged = fingerprint()
 assert migrate(9, 10) == dict(carried=0, already=3)
 assert fingerprint() == unchanged and fields(third_request)['route_reason'] == 'carried from version 9'
-for before, after in [(9, 22), (10, 10), (10, 9)]:
+for before, after in [(9, 23), (10, 10), (10, 9)]:
     assert migrate(before, after, 2) == dict(status='unknown_pair')
 assert fingerprint() == unchanged
 assert migrate(9, 10) == dict(carried=0, already=3)
@@ -2472,8 +2480,10 @@ assert answer['appended']['retraction'] == 1 and sorted(cases_heads()) == sorted
 print('gate_row=v20-records-retracted expected=admitted')
 print('v20_gate_rows_complete')
 print('v20 cases: ok')
-# Version 21: the repository's file over the objects made under version 20. The schema differs from version 20 only by
-# point 1 of ontology/README.md, "Version 21": each part is taken off a copy, and what is left reads as version 20.
+# Version 21, pinned in Git by the commit of main that holds it, over the objects made under version 20. The schema
+# differs from version 20 only by point 1 of ontology/README.md, "Version 21": each part is taken off a copy, and what
+# is left reads as version 20. The repository's file is version 22, whose walk comes after this one.
+V21_PIN = ('72fb5e499221d3dc030404ddfa308c673ba7096e', '1812ef2baac76e4c78fc3208c69926d73fb6b5bab7f2ee3361cfa6723499cb35')
 v20_schema = schema
 v20_objects = [o['id'] for t in ('task', 'decision', 'request', 'intent', 'criterion', 'unit', 'review', 'run', 'finding', 'hold', 'principle', 'host', 'account', 'kpi', 'case')
                for o in call(['search'], dict(object_type=t, limit=1000))['objects']]
@@ -2482,7 +2492,10 @@ ARGS21 = dict(task=task['native_key'], intent='gadget-board', unit='fixture-stop
 v20_views = [(view, args, call(['render'], dict(view=view, args=args)))
              for view, args in [(name, {a: ARGS21[a] for a in body['args']}) for name, body in v20_schema['views'].items()]]
 assert len(v20_views) == 20
-schema = json.loads(pathlib.Path(repo, 'ontology/work.schema.json').read_text())
+v21_bytes = subprocess.check_output(['git', '-C', repo, 'show', V21_PIN[0] + ':ontology/work.schema.json'], timeout=10)
+assert hashlib.sha256(v21_bytes).hexdigest() == V21_PIN[1]
+v21_path = pathlib.Path(store).with_name('pinned-' + V21_PIN[0] + '.json'); v21_path.write_bytes(v21_bytes)
+schema = json.loads(v21_bytes)
 assert schema['version'] == 21
 head, old = json.loads(json.dumps(schema)), json.loads(json.dumps(v20_schema))
 # 1 (a): the value type finding_kind gains bottleneck, after note, and two descriptions name it.
@@ -2507,7 +2520,7 @@ assert handover_view['args'] == ['directory', 'intent', 'task'] and blocks(hando
 assert 'args' not in bottlenecks_view and blocks(bottlenecks_view) == [('Open', 'table', 'finding', 200), ('Closed', 'list', 'finding', 200)]
 assert {k: v for k, v in head.items() if k != 'version'} == {k: v for k, v in old.items() if k != 'version'}
 print('gate_row=v21-only-point-1 expected=admitted views=' + str(len(schema['views'])) + ' targets=' + str(len(redirect.TARGETS)))
-call(['schema', 'install', str(cases_copy(pathlib.Path(repo, 'ontology/work.schema.json'), 'repository.json', 'repository-cases.json'))])
+call(['schema', 'install', str(cases_copy(v21_path, 'pinned-v21.json', 'pinned-v21-route.json'))])
 redirect.trace(work, copies)
 assert [obj(i) for i in v20_objects] == v20_before
 for view, args, before in v20_views:
@@ -2527,7 +2540,6 @@ assert sorted(listed) == sorted(v20_schema['views']), sorted(listed)
 unchanged = fingerprint()
 assert migrate(20, 21) == dict(carried=0, already=0)
 assert migrate(19, 21) == dict(carried=0, already=0)
-assert migrate(21, 22, 2) == dict(status='unknown_pair')
 assert fingerprint() == unchanged and [obj(i) for i in v20_objects] == v20_before
 print('v21_migration_rows_complete')
 phase = 'v21'
@@ -2676,4 +2688,112 @@ assert len(item_lines(full, 'Lessons')) == 9 and item_lines(full, 'Lessons')[-1]
 print('gate_row=v21-lead-state-within-25-lines expected=admitted lines=25')
 print('v21_gate_rows_complete')
 print('v21 documents: ok')
+# Version 22: the repository's file over the objects made under version 21. The schema differs from version 21 only by
+# its version and its grants (ontology/README.md, "Version 22: roles"): the grant without a role keeps the reads and the
+# derivations of version 21 and holds the one function route, and each of twelve roles has a grant of its own.
+v21_schema = schema
+v21_objects = [o['id'] for t in ('task', 'decision', 'request', 'intent', 'criterion', 'unit', 'review', 'run', 'finding', 'hold', 'principle', 'host', 'account', 'kpi', 'case')
+               for o in call(['search'], dict(object_type=t, limit=1000))['objects']]
+v21_before = [obj(i) for i in v21_objects]
+ARGS22 = dict(ARGS21, directory=DIR, intent='v21-lead')
+v21_views = [(view, args, call(['render'], dict(view=view, args=args)))
+             for view, args in [(name, {a: ARGS22[a] for a in body.get('args', [])}) for name, body in v21_schema['views'].items()]]
+assert len(v21_views) == 23
+schema = json.loads(pathlib.Path(repo, 'ontology/work.schema.json').read_text())
+assert schema['version'] == 22
+head, old = json.loads(json.dumps(schema)), json.loads(json.dumps(v21_schema))
+ROLES22 = ['lead', 'dispatch', 'deliver', 'watch', 'route', 'measure', 'api', 'implementer', 'fixer', 'verifier', 'reviewer', 'writer']
+STAGES22 = ['implementer', 'fixer', 'verifier', 'reviewer', 'writer']
+[base_grant] = old['grants']
+no_role, *by_role = head['grants']
+assert 'role' not in no_role and no_role == dict(principal='agent', scope={}, read=base_grant['read'], derive=base_grant['derive'], actions=[], functions=['route']), no_role
+assert [g['role'] for g in by_role] == ROLES22 and all(g['principal'] == 'agent' and g['scope'] == {} for g in by_role)
+held = {g['role']: g for g in by_role}
+for role, g in held.items():
+    assert g['actions'] == sorted(g['actions']) and g.get('functions', []) == sorted(g.get('functions', [])) and g['derive'] == [], role
+    assert g['read'] == (base_grant['read'] if g['actions'] else []), role
+assert held['lead']['actions'] == sorted(old['action_types']) and held['lead']['functions'] == sorted(old['functions'])
+assert [r for r, g in held.items() if {'approve_unit', 'record_principle'} & set(g['actions'])] == ['lead']
+assert all(held[r]['actions'] == [] and held[r]['functions'] == ['clause'] for r in STAGES22)
+assert held['route']['actions'] == [] and 'functions' not in held['route']
+assert held['deliver']['actions'] == ['close_install', 'start_install'] and {'start_run', 'close_run'} <= set(held['api']['actions']) & set(held['dispatch']['actions'])
+head['grants'] = old['grants']
+assert {k: v for k, v in head.items() if k != 'version'} == {k: v for k, v in old.items() if k != 'version'}
+print('gate_row=v22-only-version-and-grants expected=admitted grants=' + str(len(schema['grants'])))
+# The functions of this copy run a program of the rehearsal's own: the rows below ask whether a role's grant lets the call through.
+fake_fn = pathlib.Path(store).with_name('fake-fn'); fake_fn.write_text('#!/bin/sh\ncat > /dev/null\necho \'{"ok":true}\'\n'); fake_fn.chmod(0o755)
+copy22 = cases_copy(pathlib.Path(repo, 'ontology/work.schema.json'), 'repository.json', 'repository-cases.json')
+copy22_schema = json.loads(copy22.read_text())
+for fn in copy22_schema['functions'].values(): fn['program'] = str(fake_fn)
+copy22.write_text(json.dumps(copy22_schema))
+call(['schema', 'install', str(copy22)])
+redirect.trace(work, copies)
+assert [obj(i) for i in v21_objects] == v21_before
+for view, args, before in v21_views:
+    answer = call(['render'], dict(view=view, args=args))
+    assert answer['rows'] == before['rows'] and answer['markdown'] == before['markdown'].replace('schema=work@21', 'schema=work@22'), view
+print('gate_row=v22-v21-objects-and-views-unchanged expected=admitted objects=' + str(len(v21_objects)) + ' views=' + str(len(v21_views)))
+unchanged = fingerprint()
+assert migrate(21, 22) == dict(carried=0, already=0)
+assert migrate(20, 22) == dict(carried=0, already=0)
+assert migrate(22, 23, 2) == dict(status='unknown_pair')
+assert fingerprint() == unchanged and [obj(i) for i in v21_objects] == v21_before
+print('v22_migration_rows_complete')
+phase = 'v22'
+roles_file = pathlib.Path(store).with_name('roles.json')
+assert not roles_file.exists()
+def claim(action, rid, parameters, role, failure=None, field=None, **member):
+    # One apply claiming `role` in its body, the form `ap` sends (engine action.md R12); a refusal writes nothing.
+    before = fingerprint()
+    body = dict(action_type=action, request_id=phase + '-' + action + '-' + rid, parameters=parameters, **member)
+    if role: body['role'] = role
+    r = call(['action', 'apply'], body, 2 if failure else 0)
+    if failure:
+        actual = set(r['failed']) if r['code'] == 'submission_criteria' else {r['code']}
+        assert actual == ({failure} if isinstance(failure, str) else set(failure)), (action, rid, failure, r)
+        if field: assert r.get('detail') == field or r.get('field') == field, r
+        assert fingerprint() == before
+    else: assert r['outcome'] == 'applied', r
+    print('gate_row=v22-' + action + '-' + rid + ' expected=' + (failure if isinstance(failure, str) else ','.join(sorted(failure))) if failure else 'gate_row=v22-' + action + '-' + rid + ' expected=admitted')
+    return r
+# A role is a claim the engine checks against the roles file beside the store; with no file no role is admitted.
+claim('note_intent', 'no-roles-file', dict(intent=lead_intent, notes='v22 note'), 'lead', 'role_not_admitted', 'roles_file_absent')
+claim('note_intent', 'no-role', dict(intent=lead_intent, notes='v22 note'), None, 'not_granted')
+roles_file.write_text(json.dumps({'principals': {'uid:' + str(os.getuid()): sorted(ROLES22)}}) + '\n'); roles_file.chmod(0o644)
+claim('note_intent', 'no-role-with-file', dict(intent=lead_intent, notes='v22 note'), None, 'not_granted')
+claim('note_intent', 'unlisted-role', dict(intent=lead_intent, notes='v22 note'), 'nosuch', 'role_not_admitted', 'role_not_listed')
+claim('note_intent', 'lead', dict(intent=lead_intent, notes='v22 note by lead'), 'lead')
+tick()
+# The gates of the Lead are in its grant alone.
+for role in ROLES22[1:]:
+    claim('approve_unit', role, dict(unit=unit_a, head='1' * 40, reason='v22'), role, 'not_granted')
+    claim('record_principle', role, dict(text='v22', requests=[said], reason='v22'), role, 'not_granted')
+# A stage role applies nothing; a service role applies what its programs apply.
+for role in STAGES22: claim('open_finding', 'stage-' + role, dict(finding=oid('finding', 'v22-' + role), kind='note', detector='fixture-timer', summary='v22', evidence='v22', severity='act'), role, 'not_granted')
+claim('open_finding', 'dispatch', dict(finding=oid('finding', 'v22-dispatch'), kind='note', detector='fixture-timer', summary='v22', evidence='v22', severity='act'), 'dispatch', 'not_granted')
+claim('open_finding', 'watch', dict(finding=oid('finding', 'v22-watch'), kind='note', detector='fixture-timer', summary='v22', evidence='v22', severity='act'), 'watch')
+claim('open_finding', 'api', dict(finding=oid('finding', 'v22-api'), kind='note', detector='fixture-timer', summary='v22', evidence='v22', severity='act'), 'api')
+claim('declare_host', 'measure', dict(host=oid('host', 'v22-host'), node='v22-node', machine='v22-machine'), 'measure')
+claim('declare_host', 'watch', dict(host=oid('host', 'v22-host-b'), node='v22-node-b', machine='v22-machine-b'), 'watch', 'not_granted')
+claim('start_install', 'lead-only-deliver', dict(target=oid('installed_artifact', '/usr/local/bin/absent-rehearsal'), kind='forward', repository='o/r', commit='2' * 40, attempt=1, **{'from': '4' * 40}, by='v22'), 'deliver', ('unknown_target', 'review_not_accepting'))
+# The role of the environment is a claim too, when the body carries none (engine action.md R12).
+r = call(['action', 'apply'], dict(action_type='note_intent', request_id='v22-note_intent-env', parameters=dict(intent=lead_intent, notes='v22 note by env')), 0, role='lead')
+assert r['outcome'] == 'applied'
+print('gate_row=v22-note_intent-env-lead expected=admitted')
+# A function call claims ONT_ROLE alone: route answers with no role and under every role, any other function only where the grant holds it.
+def fn(name, role, parameters, code=0):
+    p = subprocess.run([binary, '--store', store, '--now', str(now), 'fn', name], input=json.dumps(dict(parameters=parameters)), text=True, capture_output=True, timeout=60, env=dict(env, ONT_ROLE=role) if role else env)
+    assert p.returncode == code, (name, role, p.returncode, p.stdout, p.stderr)
+    r = json.loads(p.stdout); assert (r.get('status') == 'refused') == bool(code), r
+    print('gate_row=v22-fn-' + name + '-' + (role or 'none') + ' expected=' + (r['code'] if code else 'answers'))
+    return r
+for role in (None, 'verifier', 'deliver'): assert fn('route', role, dict(words='the door'))['answer'] == dict(ok=True)
+assert fn('clause', 'verifier', dict(key='o/r:specs/ap/unit.md#R11'))['answer'] == dict(ok=True)
+assert fn('clause', None, dict(key='o/r:specs/ap/unit.md#R11'), 2)['code'] == 'not_granted'
+for role in (None, 'verifier'): assert fn('capacity', role, {}, 2)['code'] == 'not_granted'
+assert fn('capacity', 'measure', {})['answer'] == dict(ok=True) and fn('capacity', 'lead', {})['answer'] == dict(ok=True)
+assert fn('cost', 'verifier', dict(since='2026-11-01', until='2026-11-02'), 2)['code'] == 'not_granted'
+assert fn('clause', 'nosuch', dict(key='o/r:specs/ap/unit.md#R11'), 2)['code'] == 'role_not_admitted'
+print('v22_gate_rows_complete')
+print('v22 roles: ok')
 PY

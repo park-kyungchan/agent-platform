@@ -78,7 +78,7 @@ printf '%s\n' '{"object_type":"worker_run","where":{"eq":["status","running"]},"
 
 ## 5. Lead writes
 
-Send JSON on standard input to `ont action apply`: `action_type`, `parameters`, a stable `request_id`, and optionally `agent` and `session`; the client is the option `--client NAME`. `ont action validate` takes the same body. Take every parameter name, limit and criterion from `ont action list`, not from memory.
+Send JSON on standard input to `ont action apply`: `action_type`, `parameters`, a stable `request_id`, `role`, and optionally `agent` and `session`; the client is the option `--client NAME`. `role` is the role the caller acts in: `lead` for a Lead and for a session that works for it (a worker, a subagent, a session of another CLI), while a stage applies nothing; the work domain refuses an apply without one `not_granted`. `ont fn route` needs no role; any other function takes its role from `ONT_ROLE` alone (`ONT_ROLE=lead ont fn <name>`), and so does the MCP tool `ont_fn`, from the MCP server's `ONT_ROLE`: a session calls such a function in a shell. `ont action validate` takes the same body. Take every parameter name, limit and criterion from `ont action list`, not from memory.
 
 The table below covers only the actions with a rule that is easy to miss; it is not the list of actions (`ont action list < /dev/null` is).
 

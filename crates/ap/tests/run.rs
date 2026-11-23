@@ -30,6 +30,7 @@ use std::{
     time::Instant,
 };
 
+mod roles_file;
 static NEXT: AtomicU32 = AtomicU32::new(0);
 const FAKE: &str = include_str!("fixtures/fake-claude.sh");
 const FAKE_CODEX: &str = include_str!("fixtures/fake-codex.sh");
@@ -7311,7 +7312,8 @@ fn run_object_r7_the_start_comes_after_admission_and_before_the_first_launch() {
         (Some("start_run"), Some("ap-run"))
     );
     assert_eq!(start["request_id"], f.rid("a.md", "start"));
-    assert_eq!(start["role"], "reviewer");
+    // The start claims `dispatch`; the stage's role is the run's parameter (roles.md R3).
+    assert_eq!(start["role"], "dispatch");
     assert_eq!(
         start["parameters"],
         json!({"unit": object_id("unit", "u-1"), "role": "reviewer", "runtime": "claude", "model": "sonnet",
@@ -7328,7 +7330,7 @@ fn run_object_r7_the_start_comes_after_admission_and_before_the_first_launch() {
     let start = &f.store().bodies("start_run")[0];
     assert_eq!(
         (start["role"].clone(), start["parameters"]["role"].clone()),
-        (json!("verifier"), json!("verifier"))
+        (json!("dispatch"), json!("verifier"))
     );
     assert!(start["parameters"].get("unit").is_none());
     assert_eq!(start["parameters"]["intent"], object_id("intent", "i-1"));
@@ -7429,7 +7431,7 @@ fn run_object_r9_the_close_takes_the_end_state_the_tokens_and_the_last_session()
             close.1["agent"].as_str(),
             close.1["role"].as_str()
         ),
-        (Some("close_run"), Some("ap-run"), Some("reviewer"))
+        (Some("close_run"), Some("ap-run"), Some("dispatch"))
     );
     assert_eq!(
         close.1["parameters"],
@@ -7738,8 +7740,13 @@ fn engine_run_object_r15_the_run_reads_back_with_host_and_uses() {
     std::fs::write(&schema, include_str!("../../../ontology/work.schema.json")).unwrap();
     let installed = ont(&["schema", "install", &schema], &Value::Null);
     assert_eq!(installed["status"], "ok", "{installed}");
+    // The roles file beside the store; this test's own applies claim `lead`.
+    roles_file::put(
+        Path::new(&store).parent().unwrap(),
+        &serde_json::from_str(include_str!("../../../ontology/work.schema.json")).unwrap(),
+    );
     let apply = |action: &str, rid: &str, parameters: Value| -> Value {
-        let body = json!({"action_type": action, "request_id": rid, "parameters": parameters});
+        let body = json!({"action_type": action, "request_id": rid, "role": "lead", "parameters": parameters});
         let v = ont(&["action", "apply", "--client", "ap"], &body);
         assert_eq!(v["result"]["outcome"], "applied", "{v}");
         v
@@ -8625,7 +8632,7 @@ fn run_object_r14_an_orphan_is_closed_with_its_record_state() {
         assert_eq!(b["request_id"], f.rid("o.md", "close"));
         assert_eq!(
             (&b["agent"], &b["role"]),
-            (&json!("ap-run"), &json!("implementer"))
+            (&json!("ap-run"), &json!("dispatch"))
         );
         assert_eq!(
             b["parameters"],

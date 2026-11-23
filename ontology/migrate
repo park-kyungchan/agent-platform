@@ -12,8 +12,8 @@ exits 2; it carries no row twice, so a second run with the same arguments change
 rows the old actions added in between.
 
 The engine is $ONT_BIN (default `ont`), always with --store; every `action apply` runs with the
-fixed --client migrate and without ONT_AGENT and ONT_ROLE, so the action id derived from a request
-id is the same whoever runs it. It prints one line of JSON, {"carried": n, "already": m}, and exits
+fixed --client migrate and the fixed member role `deliver` in each request, and without ONT_AGENT and ONT_ROLE,
+so the action id derived from a request id is the same whoever runs it. It prints one line of JSON, {"carried": n, "already": m}, and exits
 0 only when every row ended applied or already done.
 """
 import json
@@ -21,7 +21,7 @@ import os
 import subprocess
 import sys
 
-HIGHEST = 21
+HIGHEST = 22
 ONT = os.environ.get('ONT_BIN', 'ont')
 ENV = {k: v for k, v in os.environ.items() if k not in ('ONT_AGENT', 'ONT_ROLE')}
 
@@ -34,6 +34,7 @@ def ont(store, args, request):
     command = [ONT, '--store', store, *args]
     if args[0] == 'action':
         command[3:3] = ['--client', 'migrate']
+        request = dict(request, role='deliver')
     done = subprocess.run(command, input=json.dumps(request), text=True, capture_output=True, env=ENV, timeout=300)
     try:
         answer = json.loads(done.stdout)
@@ -114,7 +115,7 @@ def empty_step(store):
 # One step per version: the step of version v carries a store from v - 1 to v.
 STEPS = {1: empty_step, 2: empty_step, 3: empty_step, 4: empty_step, 5: empty_step, 6: empty_step, 7: empty_step,
          8: empty_step, 9: empty_step, 10: step_10, 11: empty_step, 12: empty_step, 13: empty_step, 14: empty_step,
-         15: empty_step, 16: empty_step, 17: empty_step, 18: empty_step, 19: empty_step, 20: empty_step, 21: empty_step}
+         15: empty_step, 16: empty_step, 17: empty_step, 18: empty_step, 19: empty_step, 20: empty_step, 21: empty_step, 22: empty_step}
 assert sorted(STEPS) == list(range(1, HIGHEST + 1))
 
 

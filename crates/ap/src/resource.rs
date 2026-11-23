@@ -600,6 +600,7 @@ pub fn pass(s: &mut impl System, o: &Options) -> Result<(Value, bool), Failure> 
     let actor = Actor {
         agent: "ap-resource",
         session: &session,
+        role: "measure",
     };
     let mut declared = vec![];
     for h in &hosts {

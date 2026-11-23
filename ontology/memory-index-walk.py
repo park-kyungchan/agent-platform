@@ -10,6 +10,7 @@ import argparse
 from collections import Counter, deque
 import hashlib
 import json
+import os
 from pathlib import Path
 import shutil
 import subprocess
@@ -227,7 +228,7 @@ class Walk:
         shutil.copytree(self.root / "states" / f"{node:06}", trial)
         before = self.fingerprint(trial)
         self.attempts += 1
-        request = dict(action, request_id=f"walk-edge-{self.attempts}")
+        request = dict(action, request_id=f"walk-edge-{self.attempts}", role="lead")
         sequence = self.sequence(node) + [action]
         self.current_sequence = sequence
         expected_codes, wanted = self.contract(self.states[node], action)
@@ -346,6 +347,11 @@ class Walk:
         initial.mkdir(mode=0o700)
         schema = Path(__file__).resolve().with_name("work.schema.json")
         definitions = json.loads(schema.read_text())
+        # The engine reads the roles file beside the store (engine action.md R113); the walk's own uid may act as every
+        # role of the schema's grants, and every apply of the walk claims `lead`.
+        roles = sorted(g["role"] for g in definitions["grants"] if "role" in g)
+        (initial / "roles.json").write_text(json.dumps({"principals": {f"uid:{os.getuid()}": roles}}) + "\n")
+        (initial / "roles.json").chmod(0o644)
         criteria = json.dumps([value["submission_criteria"] for name, value in definitions["action_types"].items()
                                if name in {a["action_type"] for a in self.actions()}])
         if "body_hash" in criteria or "document_id" in criteria:

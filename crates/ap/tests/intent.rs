@@ -1074,7 +1074,7 @@ fn r9_the_role_goes_only_with_assume_and_a_delegated_confirm_from_the_lead() {
     run(&mut f, &delegated("s-lead"));
     assert_eq!(f.applies()[1]["role"], "lead");
     assert_eq!(f.o("widget-report")["confirmed_delegated"], true);
-    // Every other apply carries no role.
+    // Every other apply carries the role `lead` too (roles.md R3), with no `expected`.
     let mut f = led();
     f.route("q-yes", "widget-report");
     run(
@@ -1119,9 +1119,11 @@ fn r9_the_role_goes_only_with_assume_and_a_delegated_confirm_from_the_lead() {
             json!({"request": "q-deleg", "stopped_by": "q-stop"}),
         ),
     );
-    assert!(f.applies().iter().all(|b| b.get("role").is_none()));
+    assert!(f.applies().iter().all(|b| b["role"] == "lead"));
     assert!(
-        f.log.iter().all(|(_, _, role)| role.is_none()),
+        f.log
+            .iter()
+            .all(|(_, _, role)| role.as_deref() == Some("lead")),
         "{:?}",
         f.log
     );
@@ -1229,17 +1231,13 @@ fn r11_ont_role_lead_in_the_environment_refuses_every_writing_call_without_the_r
         run(&mut f, &json!({"op": "show", "intent": "widget-report"}))["status"],
         "assumed"
     );
-    // Another value rides along as the caller's own claim.
+    // Another value of the environment does not change the claim of the body: `lead` (roles.md R3).
     let mut f = led();
     f.env = vec![("ONT_ROLE".into(), "verifier".into())];
     run(&mut f, &ops[2]);
     assert_eq!(
         f.log,
-        [(
-            "note_intent".into(),
-            "s-lead".into(),
-            Some("verifier".into())
-        )]
+        [("note_intent".into(), "s-lead".into(), Some("lead".into()))]
     );
 }
 
@@ -1530,12 +1528,12 @@ fn r16_confirm_has_exactly_one_of_by_and_delegation() {
         );
         assert!(f.calls.is_empty());
     }
-    // `by` applies confirm_intent without the role and without reading the Lead.
+    // `by` applies confirm_intent without `expected` and without reading the Lead.
     let mut f = led();
     f.route("q-yes", "widget-report");
     run(&mut f, &with(base.clone(), json!({"by": "q-yes"})));
     assert_eq!(f.names(), ["apply confirm_intent", "get intent"]);
-    assert!(f.applies()[0].get("role").is_none());
+    assert!(f.applies()[0].get("expected").is_none());
     assert_eq!(f.o("widget-report")["confirmed_delegated"], false);
     // An order said before the last amendment does not confirm.
     let mut f = led();

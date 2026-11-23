@@ -128,7 +128,7 @@ def fill(v):
         return made[v[1:]]
     return {k: fill(x) for k, x in v.items()} if isinstance(v, dict) else v
 for act in beh.get("actions", []):
-    body = {"action_type": act["type"], "request_id": act["id"], "agent": "t", "session": "t", "parameters": fill(act["params"])}
+    body = {"action_type": act["type"], "request_id": act["id"], "agent": "t", "session": "t", "role": "lead", "parameters": fill(act["params"])}
     if act.get("role"):
         body["role"] = act["role"]
     p = subprocess.run(["ont", "--store", store + "/ontology.sqlite", "action", "apply"], input=json.dumps(body),
@@ -426,6 +426,7 @@ class ScoreRecord(unittest.TestCase):
         self.assertFalse((w.t / "trap.log").exists(), "no call reached the engine ONT_BIN names")
         actions = [c["body"] for c in calls if c["argv"][0] == "action"]
         self.assertEqual(sorted(a["action_type"] for a in actions), ["define_kpi"] * 2 + ["record_measurement"] * 2)
+        self.assertEqual({a["role"] for a in actions}, {"lead"})  # the score's record is the Lead's (roles.md R3)
         self.assertEqual({a["parameters"]["name"] for a in actions if a["action_type"] == "define_kpi"},
                          {"suite intake claude-haiku", "suite intake muse-ember"})
         for a in actions:
@@ -570,7 +571,7 @@ class Session(unittest.TestCase):
         store = str(self.w.sample("two")) + ".store/ontology.sqlite"
         rows = json.loads(subprocess.run([ONT, "--store", store, "log"], input="{}", capture_output=True, text=True).stdout)["result"]["rows"]
         self.assertEqual(len(rows), 6)
-        self.assertEqual({(x["actor"]["agent"], x["actor"].get("role")) for x in rows}, {("seed", None)})
+        self.assertEqual({(x["actor"]["agent"], x["actor"].get("role")) for x in rows}, {("seed", "lead")})
         self.assertEqual(self.w.answers("--samples", "1", "--case", "two", env=self.w.env())[0], 0)
 
     def test_the_seeds_are_none_drafted_and_confirmed(self):

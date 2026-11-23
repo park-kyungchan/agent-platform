@@ -13,6 +13,7 @@ Nice=10
 Environment=HOME=/root
 # sshd is in /usr/sbin.
 Environment=PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+Environment=ONT_ROLE=measure
 NoNewPrivileges=yes
 ProtectKernelModules=yes
 ProtectKernelLogs=yes

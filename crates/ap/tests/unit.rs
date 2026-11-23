@@ -569,6 +569,8 @@ impl U {
             );
         }
         assert_eq!(&a[..4], ["action", "apply", "--client", "lead"], "{a:?}");
+        // `ap backlog` and `ap review` claim `lead` (specs/ap/roles.md R3).
+        assert_eq!(body["role"], "lead", "{body}");
         let p = &body["parameters"];
         if matches!(
             body["action_type"].as_str(),

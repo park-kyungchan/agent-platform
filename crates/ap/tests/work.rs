@@ -1201,11 +1201,13 @@ fn r14_the_start_clears_waits_on_writes_started_and_runs_the_unit() {
         "LANG=C.UTF-8",
         "--setenv",
         &format!("AP_POLICY_FILE={policy}"),
+        "--setenv",
+        "ONT_ROLE=dispatch",
         "--",
     ];
-    assert_eq!(run[7..16], env);
-    assert!(Path::new(&run[16]).is_absolute() && !run[16].ends_with(" (deleted)"));
-    assert_eq!(run[17..], ["unit", "run", "a", "--store", STORE]);
+    assert_eq!(run[7..18], env);
+    assert!(Path::new(&run[18]).is_absolute() && !run[18].ends_with(" (deleted)"));
+    assert_eq!(run[19..], ["unit", "run", "a", "--store", STORE]);
     assert!(
         !run.iter()
             .any(|a| a.contains("FOO") || a.contains("RuntimeMax"))
@@ -1297,7 +1299,7 @@ fn r17_the_actor_and_the_request_ids() {
             (b["agent"].as_str(), b["session"].as_str()),
             (Some("ap-work"), Some("w-0123abcd456789ef"))
         );
-        assert!(b.get("role").is_none(), "{b}");
+        assert_eq!(b["role"], "dispatch", "{b}");
         ids.insert(b["request_id"].as_str().unwrap().to_owned());
     }
     let want: BTreeSet<String> = (1..=3)

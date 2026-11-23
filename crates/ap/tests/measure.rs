@@ -22,6 +22,7 @@ use std::{
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
 
+mod roles_file;
 static NEXT: AtomicU32 = AtomicU32::new(0);
 const OPUS: &str = "claude-opus-5-5";
 
@@ -179,6 +180,8 @@ impl Fake {
             b["parameters"].clone(),
         );
         assert_eq!(b["agent"], "ap-measure");
+        // `ap measure sessions` and `kpis` claim `measure` (specs/ap/roles.md R3).
+        assert_eq!(b["role"], "measure", "{b}");
         assert!(rid.len() <= 64, "{rid}");
         if let Some((before, edits)) = self.requests.get(&rid) {
             if *before != p {
@@ -2522,9 +2525,14 @@ fn r16_the_timer_runs_the_sessions_pass_and_then_the_kpi_pass_each_night() {
     ] {
         assert_eq!(lines.iter().filter(|x| **x == l).count(), 1, "{l}");
     }
-    for l in route.lines().filter(|l| l.starts_with("Environment=")) {
+    // The environment is the route service's but for the role line, which is this service's own (roles.md R4).
+    for l in route
+        .lines()
+        .filter(|l| l.starts_with("Environment=") && !l.starts_with("Environment=ONT_ROLE="))
+    {
         assert!(lines.contains(&l), "{l}");
     }
+    assert!(lines.contains(&"Environment=ONT_ROLE=measure"));
     let timer: Vec<&str> = timer.lines().collect();
     for l in [
         "OnCalendar=*-*-* 00:20:00 UTC",
@@ -2607,6 +2615,7 @@ fn engine_a_pass_measures_a_stage_run_and_cost_answers_from_it() {
             .args(args)
             .env("PATH", &path)
             .env_remove("ONT_ROLE")
+            .envs(roles_file::fn_role(args))
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
@@ -2629,6 +2638,7 @@ fn engine_a_pass_measures_a_stage_run_and_cost_answers_from_it() {
         "",
     );
     assert_eq!(installed["status"], "ok", "{installed}");
+    roles_file::put(root, &schema);
     let record = bed.stage(
         "units/u1/1.implementer.md.run.json",
         "implementer",
@@ -2638,7 +2648,8 @@ fn engine_a_pass_measures_a_stage_run_and_cost_answers_from_it() {
     let apply = |action: &str, rid: &str, p: Value| -> Value {
         let v = ont_call(
             &["action", "apply"],
-            &json!({"action_type": action, "request_id": rid, "parameters": p}).to_string(),
+            &json!({"action_type": action, "request_id": rid, "role": "lead", "parameters": p})
+                .to_string(),
         );
         assert_eq!(v["status"], "ok", "{v}");
         v["result"].clone()
@@ -2824,6 +2835,7 @@ fn engine_the_kpi_pass_records_once_a_day_and_flow_and_share_answer() {
             .args(args)
             .env("PATH", &path)
             .env_remove("ONT_ROLE")
+            .envs(roles_file::fn_role(args))
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
@@ -2846,6 +2858,7 @@ fn engine_the_kpi_pass_records_once_a_day_and_flow_and_share_answer() {
         "",
     );
     assert_eq!(installed["status"], "ok", "{installed}");
+    roles_file::put(root, &schema);
     let indexed = Command::new(&ont)
         .args(["--store", &store, "index", "--source", "task_states"])
         .env("PATH", &path)
@@ -2859,7 +2872,8 @@ fn engine_the_kpi_pass_records_once_a_day_and_flow_and_share_answer() {
     let apply = |action: &str, rid: &str, p: Value| -> Value {
         let v = ont_call(
             &["action", "apply"],
-            &json!({"action_type": action, "request_id": rid, "parameters": p}).to_string(),
+            &json!({"action_type": action, "request_id": rid, "role": "lead", "parameters": p})
+                .to_string(),
         );
         assert_eq!(v["status"], "ok", "{action}: {v}");
         v["result"].clone()

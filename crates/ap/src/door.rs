@@ -37,8 +37,6 @@ use std::{
     time::{Duration, Instant, SystemTime},
 };
 
-/// The door's list: the functions of the store a stage may ask for (R5).
-pub(crate) const FUNCTIONS: [&str; 2] = ["route", "clause"];
 /// The roles whose `check` the door serves (R3).
 const CHECKERS: [&str; 3] = ["implementer", "fixer", "verifier"];
 /// The roles whose `hook` the door serves (R9).
@@ -581,8 +579,8 @@ fn fn_of(o: &serde_json::Map<String, Value>) -> Result<What, Refusal> {
     if !o["input"].is_object() {
         return invalid("input");
     }
-    if !FUNCTIONS.contains(&name) {
-        return not_admitted("name");
+    if !name_ok(name) {
+        return invalid("name");
     }
     Ok(What::Fn(name.to_owned(), o["input"].clone()))
 }

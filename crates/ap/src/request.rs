@@ -254,7 +254,11 @@ fn apply_route(
 fn actor(r: &Value) -> Result<Actor<'_>, Failure> {
     let agent = shaped(r, "agent", 64, "._:-")?;
     let session = shaped(r, "session", 64, "._:-")?;
-    Ok(Actor { agent, session })
+    Ok(Actor {
+        agent,
+        session,
+        role: "lead",
+    })
 }
 /// The route a request had: to its intent, aside with its reason, or none.
 fn inherited(
@@ -539,6 +543,7 @@ fn prompt_recorded(
     let actor = Actor {
         agent: "hook",
         session,
+        role: "lead",
     };
     let failed = |f: Failure| store::code(&f);
     let applied =

@@ -96,12 +96,20 @@ export PATH=$W/bin:$PATH
 O=$W/origin
 mkdir -p "$O/scripts" "$O/ontology"
 printf '# walk\n\nOwner: walk\n' > "$W/work/walk/STATE.md"
-python3 -I - "$REPO/ontology/work.schema.json" "$O/ontology/work.schema.json" "$W/work" <<'PY'
-import json, sys
+# The roles file the engine reads beside the store (engine action.md R113), mode 0644, this user's uid to every role of
+# the schema's grants; the origin carries the same bytes as deploy/roles.json, so the roles step of a call with `engine`
+# finds the host's file the same (specs/ap/deliver.md R58).
+python3 -I - "$REPO/ontology/work.schema.json" "$O/ontology/work.schema.json" "$W/work" "$ONT_INSTALL_STATE_DIR/ont/roles.json" "$O/deploy/roles.json" <<'PY'
+import json, os, sys
 d = json.load(open(sys.argv[1]))
 d['sources']['task_states']['glob'] = sys.argv[3] + '/*/STATE.md'
 d['sources']['task_states']['exclude'] = []
 open(sys.argv[2], 'w').write(json.dumps(d, indent=1) + '\n')
+roles = json.dumps({'principals': {'uid:%d' % os.getuid(): sorted(g['role'] for g in d['grants'] if 'role' in g)}}) + '\n'
+os.makedirs(os.path.dirname(sys.argv[5]), exist_ok=True)
+for path in sys.argv[4:]:
+    open(path, 'w').write(roles)
+    os.chmod(path, 0o644)
 PY
 ont schema install "$O/ontology/work.schema.json" > /dev/null
 ont index --source task_states --source installed_binaries > /dev/null
@@ -151,7 +159,7 @@ accept() {
 import hashlib, json, subprocess, sys
 head, w, repository = sys.argv[1:]
 def apply(action, rid, p):
-    body = dict(action_type=action, request_id=rid, agent='walk', parameters=p)
+    body = dict(action_type=action, request_id=rid, agent='walk', role='lead', parameters=p)
     out = subprocess.run(['ont', 'action', 'apply', '--client', 'walk'], input=json.dumps(body), capture_output=True, text=True, check=True).stdout
     v = json.loads(out); assert v['result']['outcome'] == 'applied', v
     return v['result']['edits'][0]['id']
@@ -437,6 +445,7 @@ CE=$W/state/engine
 [ "$(git -C "$CE" remote get-url origin)" = "$E" ] || fail "pass i: the clone's remote"
 git -C "$CE" fetch origin +refs/heads/main:refs/remotes/origin/main --refmap= || fail "pass i: the installer's fetch"
 [ "$(attempt_host "$E1")" = local ] || fail "pass i: the attempt's host"
+[ "$(member 'r["roles"]["result"]')" = same ] || fail "pass i: the roles step"
 line i 0 "$(pair)" "$(member 'r["outcome"]')"
 call engine
 [ "$RC" = 0 ] && [ "$(member 'r["target"]')" = /usr/local/bin/ap ] && [ "$(pair)" = "$M" ] || fail "pass i: the pair after the engine (exit $RC)"

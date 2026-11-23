@@ -960,6 +960,7 @@ pub(super) fn pass(s: &mut impl System, argv: &[OsString]) -> Result<(Value, u8)
     let actor = Actor {
         agent: "ap-measure",
         session: &actor_session,
+        role: "measure",
     };
     let mut t = Tally::default();
     // The runs found that an action changed; every other one is `unchanged`.

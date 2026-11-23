@@ -157,8 +157,17 @@ pub fn execute(
     store: Option<&str>,
     r: &Value,
 ) -> Result<(Value, u8), Box<Refusal>> {
+    execute_as(s, store, r, "lead")
+}
+/// One call whose applies claim `claim`: `lead` for `ap unit review`, `dispatch` for the look of `ap unit write`.
+pub fn execute_as(
+    s: &mut impl System,
+    store: Option<&str>,
+    r: &Value,
+    claim: &str,
+) -> Result<(Value, u8), Box<Refusal>> {
     let mut trace = Trace::default();
-    let result = call(s, store, r, &mut trace);
+    let result = call(s, store, r, claim, &mut trace);
     result.map_err(|f| {
         // A call refused before its start removes the prompt it wrote (R5).
         if let (None, false, Some(p)) = (trace.after, trace.sent, &trace.prompt) {
@@ -180,6 +189,7 @@ fn call(
     s: &mut impl System,
     store: Option<&str>,
     r: &Value,
+    claim: &str,
     trace: &mut Trace,
 ) -> Result<(Value, u8), Failure> {
     if !r.is_object() {
@@ -201,6 +211,7 @@ fn call(
     let actor = Actor {
         agent: shaped(r, "agent", 64, "._:-")?,
         session: shaped(r, "session", 64, "._:-")?,
+        role: claim,
     };
     let (page, subject) = match (r.get("unit"), r.get("intent")) {
         (Some(u), None) => (true, key(u, "unit")?),

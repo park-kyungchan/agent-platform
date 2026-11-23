@@ -78,6 +78,10 @@ class EngineTests(unittest.TestCase):
         self.env = {k: v for k, v in os.environ.items() if not k.startswith("ONT_")}
         self.env["ONT_BIN"] = ONT
         self.ont(["schema", "install", str(self.tmp / "schema.json")])
+        # The roles file beside the store: this uid may act as every role of the grants (engine action.md R113).
+        roles = sorted(g["role"] for g in schema["grants"] if "role" in g)
+        (self.tmp / "roles.json").write_text(json.dumps({"principals": {f"uid:{os.getuid()}": roles}}) + "\n")
+        (self.tmp / "roles.json").chmod(0o644)
         self.ont(["index", "--source", "task_states"])
         self.repo = self.tmp / "repo"
         self.repo.mkdir()

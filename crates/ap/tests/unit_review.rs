@@ -616,9 +616,10 @@ impl F {
                 json!([{"change": "update", "id": oid("review", &key)}])
             }
             "start_run" => {
+                // The run claims `dispatch`; its `role` parameter is the stage's (roles.md R3).
                 assert_eq!(
-                    (&body["agent"], &body["role"]),
-                    (&json!("ap-run"), &json!("reviewer"))
+                    (&body["agent"], &body["role"], &p["role"]),
+                    (&json!("ap-run"), &json!("dispatch"), &json!("reviewer"))
                 );
                 let key = format!(
                     "run-{}",
@@ -630,9 +631,10 @@ impl F {
                 json!([{"change": "initial", "id": oid("run", &key)}])
             }
             "close_run" => {
+                // The run claims `dispatch` (roles.md R3).
                 assert_eq!(
                     (&body["agent"], &body["role"]),
-                    (&json!("ap-run"), &json!("reviewer"))
+                    (&json!("ap-run"), &json!("dispatch"))
                 );
                 let key = p["run"]["native_key"].as_str().unwrap().to_owned();
                 let run = self.objects.get(&k("run", &key)).cloned();
@@ -1578,7 +1580,7 @@ fn r11_the_start_names_the_page_it_read_and_makes_no_pause() {
                 .trim_end_matches("-start")
         ))
     );
-    assert!(body.get("role").is_none());
+    assert_eq!(body["role"], "lead");
     let keys: BTreeSet<&str> = p.as_object().unwrap().keys().map(String::as_str).collect();
     assert_eq!(
         keys,

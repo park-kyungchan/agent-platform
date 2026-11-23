@@ -363,6 +363,7 @@ impl Pass {
         let actor = Actor {
             agent: "ap-watch",
             session: &self.session,
+            role: "watch",
         };
         match store::unit_action(s, None, &actor, action, rid, p) {
             Ok(_) => match done {

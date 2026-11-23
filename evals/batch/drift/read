@@ -174,7 +174,7 @@ def run(argv):
     counted = len(lines) - counts["skipped"] - counts["stale"]
     counts["duplicate"] = counted - len(chosen)
 
-    p = L.Pass(L.Engine(store, AGENT), DETECTOR, AGENT, PREFIX)
+    p = L.Pass(L.Engine(store, AGENT, "api"), DETECTOR, AGENT, PREFIX)
     p.load()
     for g in groups:
         if g["key"] not in verdicts:

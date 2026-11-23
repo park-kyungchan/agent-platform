@@ -170,7 +170,7 @@ fn run(
     } else {
         (p["reason"], p["undo"]) = (json!(g("reason")), json!(g("undo")));
     }
-    let body = |action: &str, suffix: &str, p: &Value| json!({"action_type": action, "request_id": format!("{}-{suffix}", g("request_id")), "agent": g("agent"), "session": g("session"), "parameters": p});
+    let body = |action: &str, suffix: &str, p: &Value| json!({"action_type": action, "request_id": format!("{}-{suffix}", g("request_id")), "agent": g("agent"), "session": g("session"), "role": "lead", "parameters": p});
     let applied = put(s, &ctx, &body("record_decision", "record", &p), "record")?;
     *after = Some("record");
     let rows = of(s, &ctx, "decision", &task)?;

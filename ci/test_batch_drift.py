@@ -684,7 +684,8 @@ class BatchDriftTest(Case):
         self.assertTrue(applies)
         for e in applies:
             body = e["body"]
-            self.assertEqual(set(body), {"action_type", "parameters", "agent", "request_id"})
+            self.assertEqual(set(body), {"action_type", "parameters", "agent", "request_id", "role"})
+            self.assertEqual(body["role"], "api")
             self.assertEqual(body["agent"], "batch-drift")
             self.assertRegex(body["request_id"], r"^bd-[0-9a-f]{40}$")
             action = schema["action_types"][body["action_type"]]

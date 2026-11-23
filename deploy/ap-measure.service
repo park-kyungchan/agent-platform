@@ -13,6 +13,7 @@ Slice=agents.slice
 Nice=10
 Environment=HOME=/root
 Environment=PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin
+Environment=ONT_ROLE=measure
 NoNewPrivileges=yes
 ProtectKernelModules=yes
 ProtectKernelLogs=yes
