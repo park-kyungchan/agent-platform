@@ -231,7 +231,7 @@ pub fn config(policy: &Value) -> Result<Option<Config>, Failure> {
     )?;
     let key_file = o["key_file"].as_str().unwrap_or_default();
     let name = key_file.strip_prefix(CREDENTIALS).unwrap_or_default();
-    if name.is_empty() || name.contains('/') || name == "." || name == ".." || name.contains('\0') {
+    if !credentials_file(key_file) {
         return Err(invalid_policy(
             "api.key_file",
             "is not a path directly under /etc/agent-platform/credentials/",
@@ -383,8 +383,24 @@ pub fn academy(path: &str) -> bool {
 fn key_unusable(why: &str) -> Failure {
     fail("key_unusable", "key_file", json!(why))
 }
+/// Whether `path` has the form of a key file (R3): an absolute path directly under
+/// `/etc/agent-platform/credentials/`, exactly one component more, not `.` or `..`, no NUL byte.
+pub fn credentials_file(path: &str) -> bool {
+    let name = path.strip_prefix(CREDENTIALS).unwrap_or_default();
+    !(name.is_empty() || name.contains('/') || name == "." || name == ".." || name.contains('\0'))
+}
 fn key(s: &impl Api, path: &str) -> Result<String, Failure> {
-    let e = match s.examine(path) {
+    key_by(s, path, |p| s.examine(p))
+}
+/// The one rule of R4 for a key file, with the examination the caller's port gives: `ap api batch`
+/// reads its key with `Api::examine`, a key launch of `ap run` (`specs/ap/run.md` R54) with
+/// `System::examine_key`. The read is the port's `read`.
+pub fn key_by(
+    s: &impl System,
+    path: &str,
+    examine: impl FnOnce(&str) -> std::io::Result<Examined>,
+) -> Result<String, Failure> {
+    let e = match examine(path) {
         Ok(e) => e,
         Err(e) if e.kind() == ErrorKind::NotFound => return Err(key_unusable("not_found")),
         Err(_) => return Err(key_unusable("not_regular_file")),

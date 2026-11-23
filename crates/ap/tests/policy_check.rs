@@ -247,6 +247,100 @@ fn r14_one_planted_fault_per_reader_is_refused_by_that_reader() {
     );
 }
 
+// spec: specs/ap/policy.md#R17
+// spec: specs/ap/policy.md#R18
+// spec: specs/ap/policy.md#R12
+#[test]
+fn api_key_accounts_of_each_form() {
+    let stage = "/etc/agent-platform/credentials/anthropic-stage-key";
+    let batch = "/etc/agent-platform/credentials/anthropic-api-key";
+    let plain = check(&Fake::json(&host()), None).unwrap();
+    // A valid member, five entries at most, answers as the same file without it: the same readers.
+    let mut p = host();
+    p["api_key_accounts"] = json!({"/root/.claude-api": stage});
+    let with = check(&Fake::json(&p), None).unwrap();
+    assert_eq!(with["readers"], plain["readers"]);
+    assert_eq!(with["status"], "ok");
+    // A key of the member need not be listed in `accounts`; a key under another name is no fault.
+    p["api_key_accounts"] = json!({
+        "/root/.claude": stage, "/a": stage, "/b": stage, "/c": "/etc/agent-platform/credentials/x", "/d": stage});
+    assert_eq!(
+        check(&Fake::json(&p), None).unwrap()["readers"],
+        plain["readers"]
+    );
+    // Without the member `api`, the batch key's name is any other.
+    let mut q = host();
+    q.as_object_mut().unwrap().remove("api");
+    q["api_key_accounts"] = json!({"/root/.claude-api": batch});
+    assert_eq!(check(&Fake::json(&q), None).unwrap()["status"], "ok");
+    // Each other form is `policy_invalid` of the reader `models`, its detail beginning with the member
+    // or the entry.
+    let first = |v: Value| {
+        let (reader, code, field, detail) = refused("api_key_accounts", v);
+        assert_eq!(
+            (reader, code.as_str(), field.as_str()),
+            (Some("models"), "policy_invalid", "policy")
+        );
+        detail
+            .as_str()
+            .unwrap()
+            .split(' ')
+            .next()
+            .unwrap()
+            .to_owned()
+    };
+    let member = "api_key_accounts";
+    let entry = |k: &str| format!("api_key_accounts.{k}");
+    for value in [
+        json!("on"),
+        json!([stage]),
+        json!(null),
+        json!({}),
+        json!(7),
+    ] {
+        assert_eq!(first(value.clone()), member, "{value}");
+    }
+    let six: serde_json::Map<String, Value> =
+        (1..=6).map(|n| (format!("/k{n}"), json!(stage))).collect();
+    assert_eq!(first(Value::Object(six)), member);
+    for key in [
+        "relative/dir",
+        "",
+        "/root/.claude-api/",
+        "/",
+        "/a/../b",
+        "/a\u{0}b",
+    ] {
+        assert_eq!(first(json!({ (key): stage })), entry(key), "{key}");
+    }
+    for value in [
+        json!("anthropic-stage-key"),
+        json!("/etc/agent-platform/credentials/"),
+        json!("/etc/agent-platform/credentials/a/b"),
+        json!("/etc/agent-platform/credentials/."),
+        json!("/etc/agent-platform/credentials/.."),
+        json!("/etc/other/anthropic-stage-key"),
+        json!("/etc/agent-platform/credentials-x/key"),
+        json!(7),
+        json!(null),
+        json!(["x"]),
+        json!({"a": 1}),
+    ] {
+        assert_eq!(
+            first(json!({"/root/.claude-api": value.clone()})),
+            entry("/root/.claude-api"),
+            "{value}"
+        );
+    }
+    // A value equal to `api.key_file` (the host's `api` member) is refused under its entry, and the
+    // member's other entries pass.
+    assert_eq!(
+        first(json!({"/root/.claude-api": batch})),
+        entry("/root/.claude-api")
+    );
+    assert_eq!(first(json!({"/ok": stage, "/bad": batch})), entry("/bad"));
+}
+
 // spec: specs/ap/policy.md#R12
 // spec: specs/ap/policy.md#R13
 #[test]
