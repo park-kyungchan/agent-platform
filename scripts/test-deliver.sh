@@ -287,7 +287,7 @@ def ont(args, body):
     return json.loads(subprocess.run(['ont', *args], input=json.dumps(body), capture_output=True, text=True).stdout)
 f = {k: v['value'] for k, v in ont(['get'], dict(id=install))['result']['objects'][0]['observations'][-1]['fields'].items()}
 assert f['kind'] == 'rollback' and f['status'] == 'running' and f['commit'] == to, f
-body = dict(action_type='close_install', request_id='ap.%s.rb%s.close' % (f['commit'], f['attempt']), agent='ap-deliver',
+body = dict(action_type='close_install', request_id='ap.%s.rb%s.close' % (f['commit'], f['attempt']), agent='ap-deliver', role='deliver',
             parameters=dict(install=install, outcome='installed', to=to))
 v = ont(['action', 'apply', '--client', 'ap-deliver'], body)
 assert v['status'] == 'ok' and v['result']['outcome'] == 'applied', v
