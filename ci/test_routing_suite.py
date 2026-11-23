@@ -203,10 +203,10 @@ sys.exit(98)
 '''
 
 PACK = [{"kind": "section", "repository": "owner/repo-a", "path": "docs/guide.md", "first_line": 4, "last_line": 19,
-         "heading": "PACK-HEADING-ONE", "commit": "c", "matched": ["x"], "score": 1.5},
+         "heading": "PACK-HEADING-ONE", "commit": "COMMIT", "matched": ["x"], "score": 1.5},
         {"kind": "component", "repository": "owner/repo-a", "path": "map.json", "first_line": None, "last_line": None,
          "heading": "PACK-COMPONENT", "commit": "c", "matched": ["x"], "score": 1.0},
-        {"kind": "section", "repository": None, "path": "/instr/AGENTS.md", "first_line": 1, "last_line": 3,
+        {"kind": "section", "repository": None, "path": "/root/.agents/AGENTS.md", "first_line": 1, "last_line": 3,
          "heading": "PACK-INSTR", "commit": None, "matched": ["x"], "score": 0.5}]
 MUSE_ARGV = ["muse", "exec", "--json", "--model", "muse-ember-1.0", "--contributor-mode", "off", "--disable-reminders",
              "--disable-web-tools", "--disable-request-user-input", "--session-id", "SID", "--disable-approval",
@@ -260,7 +260,12 @@ class World:
         (t / "pids").mkdir()
         self.root = t / "root"
         self.root.mkdir()
-        (self.root / "AGENTS.md").write_text("agents\n")
+        (self.root / "AGENTS.md").write_text("INSTR-LINE-ONE\nINSTR-LINE-TWO\nINSTR-LINE-THREE\nINSTR-LINE-FOUR\n")
+        git = shutil.which("git")
+        if git:
+            (self.bin / "git").symlink_to(git)
+        self.clones = t / "clones"
+        self.clones.mkdir()
         self.tmpdir = t / "tmp"  # the runner's TMPDIR: its work directories are made, and swept, here only
         self.tmpdir.mkdir()
         self.home = t / "home"
@@ -273,6 +278,20 @@ class World:
         self.out = t / "out"
         self.plan({})
         self.ont_state({})
+
+    def make_clone(self, name, files):
+        """A clone under the tests' clones directory with the files committed; the commit's hash."""
+        d = self.clones / name
+        d.mkdir(parents=True)
+        g = lambda *a: subprocess.run(["git", "-C", str(d), "-c", "user.name=t", "-c", "user.email=t@t", *a],
+                                      check=True, capture_output=True, text=True).stdout.strip()
+        g("init", "-q")
+        for path, text in files.items():
+            (d / path).parent.mkdir(parents=True, exist_ok=True)
+            (d / path).write_text(text)
+        g("add", "-A")
+        g("commit", "-q", "-m", "x")
+        return g("rev-parse", "HEAD")
 
     def close(self):
         for f in (self.t / "pids").iterdir() if (self.t / "pids").exists() else []:
@@ -296,7 +315,7 @@ class World:
 
     def env(self, **extra):
         env = {"PATH": str(self.bin), "HOME": str(self.home), "CLAUDE_CONFIG_DIR": str(self.acct),
-               "TMPDIR": str(self.tmpdir)}
+               "TMPDIR": str(self.tmpdir), "ROUTING_CLONES_BASE": str(self.clones)}
         env.update(extra)
         return {k: v for k, v in env.items() if v is not None}
 
@@ -492,7 +511,7 @@ class Unit(unittest.TestCase):
 
 class Ember(unittest.TestCase):
     """The three Muse readers: one answer, usage and session branch; the command lines; the route pack; the MCP rule."""
-    MUSE = ("muse-ember", "ember-yolo", "ember-route")
+    MUSE = ("muse-ember", "ember-yolo", "ember-route", "ember-pack")
 
     def setUp(self):
         self.w = World(self)
@@ -510,6 +529,8 @@ class Ember(unittest.TestCase):
         self.assertEqual(m.yolo_argv("PROMPT", "ROOT", "WORK", "SID"), MUSE_ARGV[:-1] + ["--yolo", "PROMPT"])
         self.assertEqual(m.READERS["muse-ember"]["argv"], m.muse_argv)
         self.assertEqual(m.READERS["ember-route"]["argv"], m.muse_argv)
+        self.assertEqual(m.READERS["ember-pack"]["argv"], m.muse_argv)
+        self.assertEqual((m.READERS["ember-route"]["pack"], m.READERS["ember-pack"]["pack"]), (8, 4))
 
     def test_every_muse_reader_answers_counts_tokens_and_writes_the_same_state(self):
         w = self.w
@@ -520,13 +541,15 @@ class Ember(unittest.TestCase):
             self.assertEqual((meta["state"], meta["input_tokens"], meta["output_tokens"]), ("ok", 42, 5))
             self.assertEqual(w.sample("c1", 1, reader).with_suffix(".md").read_text(), GOOD)
         calls, h = w.unit_calls(), str(w.home)
-        self.assertEqual(len(calls), 3)
+        self.assertEqual(len(calls), 4)
         for call in calls:
             self.assertEqual(sorted(props(call, "ReadWritePaths")), sorted(
                 ["-/tmp", "-%s/.config/muse" % h, "-%s/.local/share/muse" % h, "-%s/.local/state/muse" % h, "-%s/.cache" % h]))
-        plain, yolo, route = [r["argv"] for r in w.cli_runs()]
+        plain, yolo, route, pack = [r["argv"] for r in w.cli_runs()]
         self.assertNotIn("--yolo", plain)
         self.assertNotIn("--yolo", route)
+        self.assertNotIn("--yolo", pack)
+        self.assertEqual(pack[:-1][:pack.index("--session-id")], plain[:plain.index("--session-id")])
         self.assertEqual(yolo.index("--yolo"), len(yolo) - 2)
         self.assertEqual(yolo[-1], plain[-1], "the prompt of ember-yolo is the plain one")
         self.assertEqual(len(yolo), len(plain) + 1)
@@ -536,36 +559,119 @@ class Ember(unittest.TestCase):
         self.assertEqual(yolo[:yolo.index("--session-id")], plain[:plain.index("--session-id")])
         self.assertEqual(route[:-1][:route.index("--session-id")], plain[:plain.index("--session-id")])
 
-    def test_route_pack_is_asked_on_the_host_and_goes_into_the_prompt_of_ember_route_only(self):
+    def pack_state(self):
+        """A clone that holds the guide of PACK, and the pack with that commit; (commit, pack)."""
+        guide = "".join("GUIDE-LINE-%d\n" % i for i in range(1, 25))
+        commit = self.w.make_clone("repo-a", {"docs/guide.md": guide})
+        pack = [dict(x, commit=commit) if x["commit"] else x for x in PACK]
+        self.w.ont_state({"route": pack})
+        return commit, pack
+
+    def test_route_pack_is_asked_on_the_host_and_goes_into_the_prompt_with_excerpts_of_both_pack_readers_only(self):
         w = self.w
-        self.assertEqual(w.answers("--case", "c1", "--samples", "1", reader="ember-route")[0], 0)
-        self.assertEqual(w.answers("--case", "c1", "--samples", "1", reader="muse-ember")[0], 0)
-        [asked] = w.lines("ont.jsonl")
-        self.assertEqual(asked["argv"], ["fn", "route"])
-        self.assertEqual(asked["body"], {"parameters": {"words": "CASEID c1 SITUATION-SECRET-ONE", "limit": 8}})
-        route, plain = [r["argv"][-1] for r in w.cli_runs()]
-        for text in ("owner/repo-a: docs/guide.md lines 4-19 (PACK-HEADING-ONE)", "2. owner/repo-a: map.json (PACK-COMPONENT)",
-                     "3. /instr/AGENTS.md lines 1-3 (PACK-INSTR)", "Open at most 3 files in all", "SITUATION-SECRET-ONE",
-                     "Do not do the assignment."):
-            self.assertIn(text, route)
+        self.pack_state()
+        for reader in ("ember-route", "ember-pack", "muse-ember"):
+            self.assertEqual(w.answers("--case", "c1", "--samples", "1", reader=reader)[0], 0)
+        route_ask, pack_ask = w.lines("ont.jsonl")
+        for asked, limit in ((route_ask, 8), (pack_ask, 4)):
+            self.assertEqual(asked["argv"], ["fn", "route"])
+            self.assertEqual(asked["body"], {"parameters": {"words": "CASEID c1 SITUATION-SECRET-ONE", "limit": limit}})
+        route, pack, plain = [r["argv"][-1] for r in w.cli_runs()]
+        for prompt in (route, pack):
+            for text in ("1. owner/repo-a: docs/guide.md lines 4-19 (PACK-HEADING-ONE)", "2. owner/repo-a: map.json (PACK-COMPONENT)",
+                         "3. /root/.agents/AGENTS.md lines 1-3 (PACK-INSTR)", "Open at most 1 further file", "SITUATION-SECRET-ONE",
+                         "Do not do the assignment.", "   | GUIDE-LINE-4\n", "   | GUIDE-LINE-19\n",
+                         "   | INSTR-LINE-ONE\n   | INSTR-LINE-TWO\n   | INSTR-LINE-THREE\n"):
+                self.assertIn(text, prompt)
+            for text in ("GUIDE-LINE-3\n", "GUIDE-LINE-20", "INSTR-LINE-FOUR"):
+                self.assertNotIn(text, prompt)
+            self.assertTrue(prompt.startswith(plain), "the pack follows the prompt of the other readers")
         self.assertNotIn("PACK-", plain)
         self.assertNotIn("Open at most", plain)
-        self.assertTrue(route.startswith(plain), "the pack follows the prompt of the other readers")
+        meta = json.loads(w.sample("c1", 1, "ember-pack").with_suffix(".json").read_text())
+        self.assertEqual((meta["pack"], meta["excerpts"]), (3, 2))
         unit = [c for c in w.unit_calls() if "routing-ember-route-c1-s1" in " ".join(c)][0]
-        self.assertFalse([o for o in unit[:unit.index("--")] if "PACK-" in o])
+        self.assertFalse([o for o in unit[:unit.index("--")] if "PACK-" in o or "GUIDE-" in o])
 
-    def test_a_pack_that_cannot_be_had_leaves_no_session(self):
+    def test_an_excerpt_is_at_most_3000_characters_and_a_missing_one_is_the_pointer_alone(self):
+        w = self.w
+        commit = w.make_clone("repo-a", {"docs/guide.md": "".join("%04d %s\n" % (i, "x" * 90) for i in range(1, 400))})
+        m = load_module()
+        x = {"repository": "owner/repo-a", "path": "docs/guide.md", "first_line": 1, "last_line": 399, "commit": commit}
+        os.environ["ROUTING_CLONES_BASE"] = str(w.clones)
+        self.addCleanup(lambda: os.environ.pop("ROUTING_CLONES_BASE", None))
+        text = m.excerpt(x, str(w.root))
+        self.assertEqual(len(text), 3000)
+        self.assertTrue(text.startswith("0001 x"))
+        for bad in (dict(x, commit="0" * 40), dict(x, commit="--output=x"), dict(x, commit=None), dict(x, repository="owner/none"),
+                    dict(x, first_line=None), dict(x, first_line=5, last_line=4), dict(x, first_line=0), dict(x, first_line=True),
+                    dict(x, path="docs/absent.md"), dict(x, first_line=900, last_line=901), dict(x, path="-x"),
+                    dict(x, repository="owner/..")):
+            self.assertIsNone(m.excerpt(bad, str(w.root)), bad)
+        i = {"repository": None, "path": "/root/.agents/AGENTS.md", "first_line": 2, "last_line": 3}
+        self.assertEqual(m.excerpt(i, str(w.root)), "INSTR-LINE-TWO\nINSTR-LINE-THREE")
+        for bad in (dict(i, path="/etc/passwd"), dict(i, path="/root/.agents/../x"), dict(i, path="/root/.agents/none.md"),
+                    dict(i, path="AGENTS.md")):
+            self.assertIsNone(m.excerpt(bad, str(w.root)), bad)
+        (w.root / "link.md").symlink_to(w.root / "AGENTS.md")
+        self.assertIsNone(m.excerpt(dict(i, path="/root/.agents/link.md"), str(w.root)))
+
+    def test_an_unreadable_excerpt_never_fails_the_sample_and_the_academy_is_names_only(self):
+        w = self.w
+        edu = [{"kind": "section", "repository": "owner/education-platform", "path": "context/a.md", "first_line": 1,
+                "last_line": 2, "heading": "EDU-SECRET-HEADING", "commit": "abcdef1", "matched": [], "score": 1.0},
+               {"kind": "section", "repository": None, "path": "/root/.agents/edu-x/b.md", "first_line": 1, "last_line": 2,
+                "heading": "EDU-SECRET-TWO", "commit": None, "matched": [], "score": 1.0},
+               {"kind": "section", "repository": "owner/repo-a", "path": "docs/none.md", "first_line": 1, "last_line": 2,
+                "heading": "LOST-ONE", "commit": "abcdef1", "matched": [], "score": 1.0}]
+        (w.root / "edu-x").mkdir()
+        (w.root / "edu-x" / "b.md").write_text("EDU-BODY\nEDU-BODY\n")
+        w.make_clone("education-platform", {"context/a.md": "EDU-BODY\nEDU-BODY\n"})
+        w.ont_state({"route": edu})
+        for reader in ("ember-route", "ember-pack"):
+            code, out, r = w.answers("--case", "c1", "--samples", "1", reader=reader)
+            self.assertEqual((code, out["samples"]), (0, {"c1__s1": "ok"}), r.stdout)
+        for run in w.cli_runs():
+            prompt = run["argv"][-1]
+            self.assertIn("1. owner/education-platform: context/a.md\n", prompt)
+            self.assertIn("2. /root/.agents/edu-x/b.md\n", prompt)
+            self.assertIn("3. owner/repo-a: docs/none.md lines 1-2 (LOST-ONE)\n", prompt)
+            self.assertNotIn("EDU-SECRET", prompt)
+            self.assertNotIn("EDU-BODY", prompt)
+            self.assertNotIn("   | ", prompt)
+
+    def test_a_pack_that_cannot_be_had_leaves_no_session_after_three_tries(self):
         w = self.w
         for route in ("fail", []):
             w.ont_state({"route": route})
-            code, out, r = w.answers("--case", "c1", "--samples", "1", reader="ember-route")
+            code, out, r = w.answers("--case", "c1", "--samples", "1", reader="ember-pack")
             self.assertEqual((code, out["samples"]), (0, {"c1__s1": "route_failed"}), r.stdout)
-            self.assertFalse(w.sample("c1", 1, "ember-route").with_suffix(".md").exists())
-            self.assertFalse(json.loads(w.sample("c1", 1, "ember-route").with_suffix(".json").read_text())["answered"])
+            self.assertEqual(len(w.lines("ont.jsonl")), 3, "three tries, an empty list included")
+            self.assertFalse(w.sample("c1", 1, "ember-pack").with_suffix(".md").exists())
+            self.assertFalse(json.loads(w.sample("c1", 1, "ember-pack").with_suffix(".json").read_text())["answered"])
+            (w.t / "ont.jsonl").unlink()
         self.assertEqual(w.cli_runs(), [])
         (w.bin / "ont").unlink()
-        self.assertEqual(w.answers("--case", "c1", reader="ember-route")[:2], (2, {"status": "route_unavailable"}))
+        for reader in ("ember-route", "ember-pack"):
+            self.assertEqual(w.answers("--case", "c1", reader=reader)[:2], (2, {"status": "route_unavailable"}))
         self.assertEqual(w.answers("--case", "c1", reader="muse-ember")[0], 0, "no other reader needs ont")
+
+    def test_the_retry_backs_off_two_then_four_seconds_and_stops_at_the_first_answer(self):
+        m = load_module()
+        sleeps, calls = [], []
+        real = m.time.sleep
+        self.addCleanup(lambda: setattr(m.time, "sleep", real))
+        m.time.sleep = sleeps.append
+        for plan, want, slept, n in (([None, [], [{"path": "p"}]], [{"path": "p"}], [2, 4], 3), ([[{"path": "a"}]], [{"path": "a"}], [], 1),
+                                     ([None, None, None], None, [2, 4], 3), ([[], [{"path": "q"}]], [{"path": "q"}], [2], 2)):
+            sleeps.clear()
+            calls.clear()
+            queue = list(plan)
+            m.route_once = lambda situation, limit: (calls.append(limit), queue.pop(0))[1]
+            self.assertEqual(m.route_pack("s", 4), want)
+            self.assertEqual((sleeps, len(calls)), (slept, n))
+            self.assertEqual(set(calls), {4})
+        self.assertEqual(m.PACK_TIMEOUT * m.PACK_TRIES + sum(m.PACK_BACKOFF), 186)
 
     def test_yolo_is_exempt_from_the_mcp_watch_and_refused_when_a_server_is_registered(self):
         w = self.w
@@ -600,7 +706,7 @@ class Ember(unittest.TestCase):
             code, out, _ = w.answers("--case", "c1", "--samples", "1", reader=reader)
             self.assertEqual(code, 2, "a new session has a new id and no record")
 
-    def test_intake_has_neither_new_reader(self):
+    def test_intake_has_none_of_the_new_readers(self):
         loader = importlib.machinery.SourceFileLoader("intake_run", str(RUN.parent.parent / "intake" / "run"))
         spec = importlib.util.spec_from_loader("intake_run", loader)
         mod = importlib.util.module_from_spec(spec)
@@ -1401,6 +1507,37 @@ class Bars(unittest.TestCase):
         self.assertEqual(list(out["information"]), ["ember-route"])
         for bad in ("claude-sonnet", "claude-opus"):
             self.assertEqual(self.bars(readers, "--reader", bad)[:2], (2, {"status": "usage"}))
+
+    def test_ember_pack_is_judged_like_ember_route(self):
+        readers = {"claude-sonnet": self.sonnet(), "ember-route": reader_score(tokens=SONNET_TOKENS * 2),
+                   "ember-pack": reader_score(tokens=SONNET_TOKENS // 2)}
+        code, out, r = self.bars(readers, "--reader", "ember-pack")
+        self.assertEqual((code, out["status"], out["reader"], out["missed"]), (0, "pass", "ember-pack", []), r.stdout)
+        self.assertEqual(out["bars"]["G3"]["value"], 0.5)
+        self.assertEqual(out["information"], {"ember-route": {"parity": 1.0, "unanswered_rate": 0.0, "tokens_ratio": 2.0}})
+        code, out, _ = self.bars(readers)
+        self.assertEqual((code, out["reader"], out["missed"]), (1, "ember-route", ["G3"]))
+
+    def test_a_case_subset_is_judged_as_a_rate_of_its_own_samples(self):
+        ids = ["s04", "s05", "s13"]
+
+        def sub(unanswered=0):
+            x = reader_score(cases=3, unanswered=unanswered, tokens=SONNET_TOKENS)
+            x["passes"], x["majority"] = {c: 3 for c in ids}, ids
+            return x
+        code, out, r = self.bars({"claude-sonnet": sub(), "ember-pack": sub()}, "--reader", "ember-pack")
+        self.assertEqual((code, out["bars"]["G2"]), (0, {"bar": "unanswered rate <= 2/24", "value": 0.0, "ok": True}), r.stdout)
+        code, out, r = self.bars({"claude-sonnet": sub(), "ember-pack": sub(1)}, "--reader", "ember-pack")
+        self.assertEqual((code, out["bars"]["G2"]["value"], out["missed"]), (1, 0.1111, ["G2"]), "1 of 9 samples, not of 48")
+
+    def test_judged_and_sonnet_case_sets_that_differ_are_refused(self):
+        son, other = self.sonnet(), reader_score(cases=3, tokens=SONNET_TOKENS)
+        for readers in ({"claude-sonnet": son, "ember-route": other},
+                        {"claude-sonnet": other, "ember-route": reader_score(tokens=SONNET_TOKENS)},
+                        {"claude-sonnet": son, "ember-route": dict(son, passes={"k00": 3, **{"z%d" % i: 3 for i in range(15)}})}):
+            self.assertEqual(self.bars(readers)[:2], (2, {"status": "case_sets_differ"}))
+        code, out, _ = self.bars({"claude-sonnet": son, "ember-route": reader_score(tokens=SONNET_TOKENS), "muse-ember": other})
+        self.assertEqual(code, 0, "an information reader is compared with nothing")
 
     def test_score_parity_is_the_one_bars_reads(self):
         m = load_module()
