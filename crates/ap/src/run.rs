@@ -281,6 +281,10 @@ struct Request {
     home: Option<String>,
     /// The policy file as read: its path and digest (`specs/ap/policy.md`), None without one.
     policy: Option<(String, String)>,
+    /// The policy's `api_key_accounts` (account directory, key file) and the `api.key_file` it
+    /// names, if any (`specs/ap/run.md` R54); empty and None without a policy or the members.
+    key_accounts: Vec<(String, String)>,
+    batch_key_file: Option<String>,
     /// `unit` or `intent` and its key (`specs/ap/run-object.md`); the store its calls name.
     target: Option<(&'static str, String)>,
     store: Option<String>,
@@ -968,6 +972,10 @@ pub(crate) struct Policy {
     allowed: Vec<String>,
     never: Vec<String>,
     accounts: Vec<(String, Vec<String>)>,
+    /// `api_key_accounts` (R17): account directory and key file, in the file's order.
+    key_accounts: Vec<(String, String)>,
+    /// The string `api.key_file`, when the policy has one.
+    batch_key_file: Option<String>,
 }
 fn invalid(member: &str, why: &str) -> Failure {
     fail("policy_invalid", "policy", json!(format!("{member} {why}")))
@@ -1056,13 +1064,66 @@ pub(crate) fn policy(s: &impl System) -> Result<Option<Policy>, Failure> {
         })?;
         accounts.push((key.clone(), list));
     }
+    let batch_key_file = object
+        .get("api")
+        .and_then(|a| a.get("key_file"))
+        .and_then(Value::as_str)
+        .map(str::to_owned);
+    let key_accounts = key_accounts(object.get("api_key_accounts"), batch_key_file.as_deref())?;
     Ok(Some(Policy {
         path,
         sha256,
         allowed,
         never,
         accounts,
+        key_accounts,
+        batch_key_file,
     }))
+}
+/// An account directory as `api_key_accounts` names it (`specs/ap/policy.md` R17): absolute, no NUL
+/// byte, no `..` component and no final `/`.
+fn account_dir(p: &str) -> bool {
+    p.starts_with('/') && !p.contains('\0') && !p.ends_with('/') && !p.split('/').any(|c| c == "..")
+}
+/// The member `api_key_accounts` (`specs/ap/policy.md` R17, R18): 1 to 5 entries, each an account
+/// directory and a key file of the form of `api.key_file`, never that file itself.
+fn key_accounts(
+    member: Option<&Value>,
+    batch: Option<&str>,
+) -> Result<Vec<(String, String)>, Failure> {
+    let Some(member) = member else {
+        return Ok(vec![]);
+    };
+    let name = "api_key_accounts";
+    let all = member
+        .as_object()
+        .filter(|m| (1..=5).contains(&m.len()))
+        .ok_or_else(|| invalid(name, "is not an object of 1 to 5 entries"))?;
+    let mut found = vec![];
+    for (key, value) in all {
+        let at = format!("{name}.{key}");
+        if !account_dir(key) {
+            return Err(invalid(
+                &at,
+                "is not an account directory (absolute, no `..`, no final `/`)",
+            ));
+        }
+        let file = value.as_str().filter(|f| crate::api::credentials_file(f));
+        let file = file.ok_or_else(|| {
+            invalid(
+                &at,
+                "is not a path directly under /etc/agent-platform/credentials/",
+            )
+        })?;
+        if Some(file) == batch {
+            return Err(invalid(
+                &at,
+                "is the key file of api, which no stage may hold",
+            ));
+        }
+        found.push((key.clone(), file.to_owned()));
+    }
+    Ok(found)
 }
 impl Policy {
     /// The model rule and the account rule for every account the stage may start on.
@@ -1545,6 +1606,11 @@ fn request_at(s: &mut impl System, r: &Value, at_cwd: bool) -> Result<Request, F
             .filter(|_| runtime.prompt_argument())
             .unwrap_or_default(),
         home,
+        key_accounts: policy
+            .as_ref()
+            .map(|p| p.key_accounts.clone())
+            .unwrap_or_default(),
+        batch_key_file: policy.as_ref().and_then(|p| p.batch_key_file.clone()),
         policy: policy.map(|p| (p.path, p.sha256)),
         target,
         store,
@@ -2485,6 +2551,12 @@ fn mirror(record: &mut Value, worked: bool) {
     for k in ["account", "session", "start", "end", "state", "limit"] {
         entry[k] = record[k].clone();
     }
+    // A Claude stage's `auth` and `auth_fault` (R56); no other runtime has them.
+    for k in ["auth", "auth_fault"] {
+        if let Some(v) = record.get(k) {
+            entry[k] = v.clone();
+        }
+    }
     if let Some(last) = record["attempts"].as_array_mut().and_then(|a| a.last_mut()) {
         for (k, v) in entry.as_object().into_iter().flatten() {
             last[k] = v.clone();
@@ -2514,6 +2586,41 @@ fn input(q: &Request, lead: Option<&str>, ask: bool) -> std::io::Result<File> {
     Ok(File::from(std::os::fd::OwnedFd::from(reader)))
 }
 /// What one launch of a call is given besides the request.
+/// An account compared as `specs/ap/policy.md` R8 compares: without a final `/`.
+fn bare_path(p: &str) -> &str {
+    if p.len() > 1 {
+        p.trim_end_matches('/')
+    } else {
+        p
+    }
+}
+impl Request {
+    /// The key file of `account` when it is a key account of the policy the call was admitted
+    /// with (`specs/ap/run.md` R54).
+    fn key_file(&self, account: &str) -> Option<&str> {
+        self.key_accounts
+            .iter()
+            .find(|(a, _)| bare_path(a) == bare_path(account))
+            .map(|(_, file)| file.as_str())
+    }
+}
+/// The checks before a key launch (`specs/ap/run.md` R54): the key file read with every check of
+/// `specs/ap/api.md` R4, not the bytes of `api.key_file`, and no sign-in in the account. The key,
+/// or the word of `auth_fault` that names the fault.
+fn key_of(s: &impl System, q: &Request, file: &str, account: &str) -> Result<String, String> {
+    let read = |path: &str| crate::api::key_by(s, path, |p| s.examine_key(p));
+    let key = read(file).map_err(|f| f.detail.as_str().unwrap_or("not_found").to_owned())?;
+    if let Some(batch) = &q.batch_key_file
+        && read(batch).is_ok_and(|b| b == key)
+    {
+        return Err("batch_key".into());
+    }
+    let sign_in = Path::new(account).join(".credentials.json");
+    match s.examine_key(&lossy(&sign_in)) {
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(key),
+        _ => Err("sign_in_present".into()),
+    }
+}
 struct Launch<'a> {
     /// The entries of `attempts` of the launches before it.
     earlier: &'a [Value],
@@ -2573,6 +2680,18 @@ fn attempt(
         "policy": policy_member(q),
         "run_object": object.member(),
     });
+    // A key launch (R54) runs on the API credit; a Claude stage's every launch says which it is (R56).
+    let key_file = Some(q.runtime)
+        .filter(|r| *r == Runtime::Claude)
+        .and_then(|_| q.key_file(account));
+    if q.runtime == Runtime::Claude {
+        record["auth"] = json!(if key_file.is_some() {
+            "api_key"
+        } else {
+            "account"
+        });
+        record["auth_fault"] = Value::Null;
+    }
     let mut attempts = earlier.to_vec();
     attempts.push(json!({"continued": continued, "asked": ask}));
     record["attempts"] = json!(attempts);
@@ -2683,6 +2802,17 @@ fn attempt(
     if !ready {
         return not_launched(record, "launch");
     }
+    // A key launch: its key, read and examined before any home is made for it (R54).
+    let mut key = None;
+    if let Some(file) = key_file {
+        match key_of(s, q, file, account) {
+            Ok(found) => key = Some(found),
+            Err(fault) => {
+                record["auth_fault"] = json!(fault);
+                return not_launched(record, "launch");
+            }
+        }
+    }
     // The home: made for a new session; the two names its binds cover hold no link and no
     // directory; then the derived sign-in, when the account has one (R14, R15).
     let mut sign = None;
@@ -2693,7 +2823,13 @@ fn attempt(
         if !plain_names(home) {
             return not_launched(record, "launch");
         }
-        match reading(s, account, renewed) {
+        // A key launch derives no sign-in and calls no `claude auth status` (R55).
+        let read = if key.is_some() {
+            Reading::Absent
+        } else {
+            reading(s, account, renewed)
+        };
+        match read {
             Reading::Absent => (),
             Reading::Unfit => return not_launched(record, "launch"),
             Reading::Derived(text) => match SignIn::create(sign_in_path(home), text, s.now()) {
@@ -2733,6 +2869,10 @@ fn attempt(
                 "CLAUDE_CONFIG_DIR".into(),
                 dir.to_string_lossy().into_owned(),
             ));
+            // The key is in the process's environment and nowhere else (R55).
+            if let Some(key) = key.take() {
+                env.push(("ANTHROPIC_API_KEY".into(), key));
+            }
         }
         Runtime::Codex => {
             argv.extend(codex_args(q, resume));

@@ -95,7 +95,12 @@ struct Fake {
     network_fails: bool,
     /// The proxy's way out (R18).
     way: Arc<FakeWay>,
+    /// The key files (as written, under `/etc/agent-platform/credentials/`) whose examination
+    /// answers an owner that is neither root nor this process (`specs/ap/run.md` R54).
+    foreign: Vec<String>,
 }
+/// The credentials directory of the host, which the fake maps to `<t>/credentials`.
+const CREDENTIALS: &str = "/etc/agent-platform/credentials/";
 /// The proxy's way out in these tests (`specs/ap/run-limits.md` R18): a name maps to the addresses
 /// a test gives it; a connection to any address reaches the test's own listener, which answers a
 /// marker line and echoes, unless the test makes every connection fail. Every name it resolved and
@@ -360,6 +365,7 @@ impl Fake {
             inode: None,
             network_fails: false,
             way: Arc::new(FakeWay::default()),
+            foreign: vec![],
         }
     }
     /// How far the fake's clocks (`now` and `wall`) stand ahead of the real ones: the seconds the
@@ -370,6 +376,14 @@ impl Fake {
     }
     fn p(&self, rel: &str) -> String {
         self.t.join(rel).to_str().unwrap().to_owned()
+    }
+    /// The path the fake reads for `path`: under `<t>/credentials` for a name of the host's
+    /// credentials directory, else the path itself.
+    fn mapped(&self, path: &str) -> String {
+        match path.strip_prefix(CREDENTIALS) {
+            Some(name) => self.p(&format!("credentials/{name}")),
+            None => path.to_owned(),
+        }
     }
     fn mode(&self, account: &str, mode: &str) {
         std::fs::write(self.t.join(format!("bin/mode-{account}")), mode).unwrap();
@@ -603,6 +617,25 @@ impl System for Fake {
     fn policy_file(&self) -> Option<PathBuf> {
         self.policy.clone()
     }
+    /// A path under the host's credentials directory reads from `<t>/credentials`; any other path
+    /// as the default reads it (a test writes no `/etc`).
+    fn read(&self, path: &str) -> std::io::Result<Vec<u8>> {
+        let path = self.mapped(path);
+        if !std::fs::metadata(&path)?.is_file() {
+            return Err(std::io::ErrorKind::InvalidInput.into());
+        }
+        std::fs::read(path)
+    }
+    /// The examination of a key file or a sign-in (`specs/ap/run.md` R54): the real one of the
+    /// mapped path, and an owner of no trust for a path in `foreign`, so that no test needs root
+    /// or a `chown`.
+    fn examine_key(&self, path: &str) -> std::io::Result<ap::api::Examined> {
+        let mut e = ap::api::examine_path(&self.mapped(path))?;
+        if self.foreign.iter().any(|p| p == path) {
+            e.uid = if e.euid == Some(4242) { 4243 } else { 4242 };
+        }
+        Ok(e)
+    }
     fn home(&self) -> Option<PathBuf> {
         self.home.clone()
     }
@@ -705,6 +738,8 @@ fn a1_answer_is_saved_byte_for_byte_and_the_record_has_every_member() {
         "compact_window",
         "policy",
         "run_object",
+        "auth",
+        "auth_fault",
     ];
     want.sort_unstable();
     assert_eq!(keys, want);
@@ -3578,6 +3613,8 @@ fn cut1_a_stream_without_the_event_has_no_limit_and_attempts_has_one_entry() {
         "continued",
         "asked",
         "limit",
+        "auth",
+        "auth_fault",
     ];
     let mut keys: Vec<&str> = attempts[0]
         .as_object()
@@ -10975,4 +11012,557 @@ fn limits_r9_a_request_without_limits_has_no_proxy() {
         "the request's env as before"
     );
     assert!(!f.t.join("egress.jsonl").exists());
+}
+
+// ---- A key launch (specs/ap/run.md R54 to R56) ---------------------------------------------------
+
+/// An invented stage key and an invented batch key: printable ASCII of the form of `api.md` R4.
+const STAGE_KEY: &str = "invented-stage-key-0123456789abcdef";
+const BATCH_KEY: &str = "invented-batch-key-fedcba9876543210";
+const STAGE_FILE: &str = "/etc/agent-platform/credentials/anthropic-stage-key";
+const BATCH_FILE: &str = "/etc/agent-platform/credentials/anthropic-api-key";
+impl Fake {
+    /// Writes the key file `name` (a name under the credentials directory) with mode 0600.
+    fn key_file(&self, name: &str, bytes: &str) {
+        std::fs::create_dir_all(self.t.join("credentials")).unwrap();
+        let path = self.t.join("credentials").join(name);
+        let _ = std::fs::remove_dir_all(&path);
+        let _ = std::fs::remove_file(&path);
+        std::fs::write(&path, bytes).unwrap();
+        std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600)).unwrap();
+    }
+    /// The policy that allows both accounts and names `<t>/a1` a key account with `STAGE_FILE`;
+    /// `api` adds a member `api` whose `key_file` is that path. The stage key is written.
+    fn key_policy(&mut self, api: Option<&str>) {
+        self.key_file("anthropic-stage-key", &format!("{STAGE_KEY}\n"));
+        let mut v = self.open_policy();
+        v["api_key_accounts"] = json!({ self.p("a1"): STAGE_FILE });
+        if let Some(file) = api {
+            v["api"] = json!({ "key_file": file });
+        }
+        self.policy_is(&v);
+    }
+    /// Every file below `<t>` but the key files, the fake CLI's own directory and the policy that
+    /// names them, as (path, bytes), recursively and without following a link.
+    fn written(&self) -> Vec<(PathBuf, Vec<u8>)> {
+        fn walk(dir: &Path, skip: &[PathBuf], found: &mut Vec<(PathBuf, Vec<u8>)>) {
+            for entry in std::fs::read_dir(dir).unwrap().flatten() {
+                let path = entry.path();
+                let kind = entry.file_type().unwrap();
+                if skip.contains(&path) {
+                    continue;
+                }
+                if kind.is_dir() {
+                    walk(&path, skip, found);
+                } else if kind.is_file() {
+                    found.push((path.clone(), std::fs::read(&path).unwrap_or_default()));
+                }
+            }
+        }
+        let skip = [self.t.join("credentials"), self.t.join("bin")];
+        let mut found = vec![];
+        walk(&self.t, &skip, &mut found);
+        found
+    }
+    /// The `--settings` argument of launch `n`.
+    fn settings(&self, n: usize) -> String {
+        let words = &self.launches[n];
+        let at = words.iter().position(|w| w == "--settings").unwrap();
+        words[at + 1].clone()
+    }
+}
+/// A text with every UUID (8-4-4-4-12 hexadecimal digits) replaced by `<id>` and the port of the
+/// proxy by `<port>`: the session, the unit and the port of a launch differ between two runs of the
+/// same request.
+fn without_ids(text: &str) -> String {
+    let bytes = text.as_bytes();
+    let (mut out, mut i) = (String::new(), 0);
+    let shaped = |w: &[u8]| {
+        w.len() == 36
+            && w.iter().enumerate().all(|(k, b)| match k {
+                8 | 13 | 18 | 23 => *b == b'-',
+                _ => b.is_ascii_hexdigit(),
+            })
+    };
+    while i < bytes.len() {
+        // The stage's proxy listens on a port the kernel chooses.
+        if let Some(rest) = text[i..].strip_prefix("127.0.0.1:") {
+            let digits = rest.bytes().take_while(u8::is_ascii_digit).count();
+            out.push_str("127.0.0.1:<port>");
+            i += "127.0.0.1:".len() + digits;
+        } else if i + 36 <= bytes.len() && shaped(&bytes[i..i + 36]) {
+            out.push_str("<id>");
+            i += 36;
+        } else {
+            out.push(char::from(bytes[i]));
+            i += 1;
+        }
+    }
+    out
+}
+
+// spec: specs/ap/run.md#R54
+// spec: specs/ap/run.md#R55
+// spec: specs/ap/run.md#R56
+// spec: specs/ap/run.md#R3
+// spec: specs/ap/run-limits.md#R15
+#[test]
+fn key_account_launch_has_the_key_in_its_environment_only() {
+    let mut f = Fake::new();
+    f.key_policy(Some(BATCH_FILE));
+    f.key_file("anthropic-api-key", &format!("{BATCH_KEY}\n"));
+    // A sign-in on the other account, near its end: a launch there reads it and renews it by
+    // `claude auth status`, which the key account's launch never does.
+    f.signed_in("a2", &sign_in("other", json!(wall_ms() + 100_000)));
+    let (v, status) = f.run(&f.limited("x.md")).unwrap();
+    assert_eq!((status, &v["state"]), (0, &json!("ok")), "{v}");
+    assert_eq!(
+        f.variable(1, "ANTHROPIC_API_KEY").as_deref(),
+        Some(STAGE_KEY)
+    );
+    assert_eq!(
+        f.launch_envs[0]
+            .iter()
+            .filter(|(k, _)| k == "ANTHROPIC_API_KEY")
+            .count(),
+        1
+    );
+    // The key is in no argument of the launch, no call the port made and no word of a sign-in.
+    for word in f.launches.iter().flatten() {
+        assert!(!word.contains(STAGE_KEY), "{word}");
+        assert!(
+            !word.contains(".sign-in") && !word.contains(".credentials.json"),
+            "{word}"
+        );
+    }
+    assert!(f.calls().iter().all(|c| !c.contains(STAGE_KEY)));
+    assert!(f.auth.is_empty());
+    let home = home_of(&v, 0);
+    assert!(!Path::new(&format!("{home}.sign-in")).exists());
+    assert!(!Path::new(&format!("{home}/.credentials.json")).exists());
+    // The record and its attempt say it, the key is in neither.
+    assert_eq!(
+        (&v["auth"], &v["auth_fault"]),
+        (&json!("api_key"), &Value::Null),
+        "{v}"
+    );
+    assert_eq!(v["attempts"][0]["auth"], "api_key");
+    assert_eq!(v["attempts"][0]["auth_fault"], Value::Null);
+    assert_eq!(f.record("x.md"), v);
+    assert!(!v.to_string().contains(STAGE_KEY));
+    // No file the call wrote holds the key's bytes.
+    let files = f.written();
+    assert!(files.iter().any(|(p, _)| p.ends_with("x.md.run.json")));
+    for (path, bytes) in &files {
+        let text = String::from_utf8_lossy(bytes);
+        assert!(!text.contains(STAGE_KEY), "{}", path.display());
+    }
+    // The settings are the ones a launch on another account gets, and the other account's
+    // launch has no key and does call `claude auth status`.
+    let mut r = f.limited("y.md");
+    r["account"] = json!(f.p("a2"));
+    let (w, _) = f.run(&r).unwrap();
+    assert_eq!(
+        (&w["state"], &w["auth"]),
+        (&json!("ok"), &json!("account")),
+        "{w}"
+    );
+    assert_eq!(f.settings(0), f.settings(1));
+    assert_eq!(f.variable(2, "ANTHROPIC_API_KEY"), None);
+    assert!(!f.auth.is_empty());
+    // A request without `limits` on the key account has the key in its environment alone too, and
+    // reads no key file's bytes into an argument.
+    let (p, _) = f.run(&f.request("p.md")).unwrap();
+    assert_eq!(
+        (&p["state"], &p["auth"]),
+        (&json!("ok"), &json!("api_key")),
+        "{p}"
+    );
+    assert_eq!(
+        f.variable(3, "ANTHROPIC_API_KEY").as_deref(),
+        Some(STAGE_KEY)
+    );
+    assert!(f.launches[2].iter().all(|w| !w.contains(STAGE_KEY)));
+    assert_eq!(f.settings(2), f.settings(0));
+    assert!(p.get("home").is_none());
+    // A request still cannot name an `ANTHROPIC_*` or `CLAUDE_*` variable.
+    for name in ["ANTHROPIC_API_KEY", "CLAUDE_CONFIG_DIR"] {
+        let mut r = f.request("z.md");
+        r["env"] = json!({ name: "x" });
+        assert_eq!(code(f.run(&r)), "env_forbidden@env", "{name}");
+    }
+}
+
+// spec: specs/ap/run.md#R54
+// spec: specs/ap/run.md#R56
+#[test]
+fn key_account_with_an_unusable_key_launches_nothing() {
+    use std::os::unix::fs::symlink;
+    let mut f = Fake::new();
+    f.key_policy(None);
+    let key = f.t.join("credentials/anthropic-stage-key");
+    let long = "k".repeat(257);
+    // Each fault, as a change to the key file's place or bytes, with the word it ends the launch with.
+    type Make = Box<dyn Fn(&mut Fake)>;
+    let remove: Make =
+        Box::new(|f| std::fs::remove_file(f.t.join("credentials/anthropic-stage-key")).unwrap());
+    let cases: Vec<(&str, Make)> = vec![
+        ("not_found", remove),
+        (
+            "not_regular_file",
+            Box::new(|f| {
+                let k = f.t.join("credentials/anthropic-stage-key");
+                std::fs::remove_file(&k).unwrap();
+                std::fs::create_dir(&k).unwrap();
+            }),
+        ),
+        (
+            "not_regular_file",
+            Box::new(|f| {
+                f.key_file("elsewhere", "invented-key-elsewhere\n");
+                let k = f.t.join("credentials/anthropic-stage-key");
+                std::fs::remove_file(&k).unwrap();
+                symlink(f.t.join("credentials/elsewhere"), &k).unwrap();
+            }),
+        ),
+        (
+            "owner_not_trusted",
+            Box::new(|f| f.foreign.push(STAGE_FILE.to_owned())),
+        ),
+        (
+            "group_or_other_access",
+            Box::new(|f| {
+                let k = f.t.join("credentials/anthropic-stage-key");
+                std::fs::set_permissions(k, std::fs::Permissions::from_mode(0o640)).unwrap();
+            }),
+        ),
+        (
+            "group_or_other_access",
+            Box::new(|f| {
+                let k = f.t.join("credentials/anthropic-stage-key");
+                std::fs::set_permissions(k, std::fs::Permissions::from_mode(0o604)).unwrap();
+            }),
+        ),
+        (
+            "not_one_line",
+            Box::new(|f| f.key_file("anthropic-stage-key", "")),
+        ),
+        (
+            "not_one_line",
+            Box::new(|f| f.key_file("anthropic-stage-key", "\n")),
+        ),
+        (
+            "not_one_line",
+            Box::new(|f| f.key_file("anthropic-stage-key", "two words\n")),
+        ),
+        (
+            "not_one_line",
+            Box::new(|f| f.key_file("anthropic-stage-key", "one\ntwo\n")),
+        ),
+        (
+            "not_one_line",
+            Box::new(|f| f.key_file("anthropic-stage-key", "one\n\n")),
+        ),
+        (
+            "not_one_line",
+            Box::new(|f| f.key_file("anthropic-stage-key", "k\u{e9}y\n")),
+        ),
+        (
+            "not_one_line",
+            Box::new(move |f| f.key_file("anthropic-stage-key", &format!("{long}\n"))),
+        ),
+    ];
+    for (n, (word, make)) in cases.iter().enumerate() {
+        f.foreign.clear();
+        f.key_file("anthropic-stage-key", &format!("{STAGE_KEY}\n"));
+        let _ = &key;
+        make(&mut f);
+        // With `limits` and without: the same end.
+        for limited in [true, false] {
+            let out = format!("x{n}{limited}.md");
+            let r = if limited {
+                f.limited(&out)
+            } else {
+                f.request(&out)
+            };
+            let (v, status) = f.run(&r).unwrap();
+            let what = format!("{n} {word} {limited}: {v}");
+            assert_eq!(
+                (status, &v["state"], &v["unmet"]),
+                (3, &json!("failed"), &json!("launch")),
+                "{what}"
+            );
+            assert_eq!(
+                (&v["auth"], &v["auth_fault"]),
+                (&json!("api_key"), &json!(word)),
+                "{what}"
+            );
+            assert_eq!(v["attempts"][0]["auth"], "api_key", "{what}");
+            assert_eq!(v["attempts"][0]["auth_fault"], json!(word), "{what}");
+            assert_eq!(v["attempts"][0]["state"], "failed", "{what}");
+            assert_eq!(f.record(&out), v, "{what}");
+            // Nothing launched, no home made, the fake CLI never called.
+            assert!(f.launches.is_empty() && f.calls().is_empty(), "{what}");
+            assert!(!Path::new(&f.p("a1/homes")).exists(), "{what}");
+            assert!(f.auth.is_empty(), "{what}");
+            // No refusal names a byte of the file.
+            assert!(!v.to_string().contains(STAGE_KEY), "{what}");
+        }
+    }
+    // The record of a launch the key refused moves to no account: only a cut does.
+    f.key_file("anthropic-stage-key", "two words\n");
+    let mut r = f.request("n.md");
+    r["next_accounts"] = json!([f.p("a2")]);
+    let (v, _) = f.run(&r).unwrap();
+    assert_eq!(v["attempts"].as_array().unwrap().len(), 1, "{v}");
+    assert!(f.launches.is_empty());
+}
+
+// spec: specs/ap/run.md#R54
+// spec: specs/ap/run.md#R56
+// spec: specs/ap/run-limits.md#R15
+#[test]
+fn key_account_with_a_sign_in_launches_nothing() {
+    use std::os::unix::fs::symlink;
+    let mut f = Fake::new();
+    f.key_policy(Some(BATCH_FILE));
+    f.key_file("anthropic-api-key", &format!("{BATCH_KEY}\n"));
+    let refused = |f: &mut Fake, out: &str, word: &str| {
+        for limited in [true, false] {
+            let out = format!("{out}{limited}.md");
+            let r = if limited {
+                f.limited(&out)
+            } else {
+                f.request(&out)
+            };
+            let (v, status) = f.run(&r).unwrap();
+            assert_eq!(
+                (
+                    status,
+                    &v["state"],
+                    &v["unmet"],
+                    &v["auth"],
+                    &v["auth_fault"]
+                ),
+                (
+                    3,
+                    &json!("failed"),
+                    &json!("launch"),
+                    &json!("api_key"),
+                    &json!(word)
+                ),
+                "{out}: {v}"
+            );
+            assert_eq!(v["attempts"][0]["auth_fault"], json!(word), "{v}");
+            assert!(f.launches.is_empty() && f.calls().is_empty() && f.auth.is_empty());
+            assert!(!Path::new(&f.p("a1/homes")).exists());
+        }
+    };
+    // A sign-in of any content, a link (dangling too), a directory: anything at that path.
+    for (n, make) in [
+        Box::new(|f: &Fake| f.signed_in("a1", &sign_in("here", a_day_ahead())))
+            as Box<dyn Fn(&Fake)>,
+        Box::new(|f: &Fake| f.signed_in("a1", "")),
+        Box::new(|f: &Fake| symlink(f.p("absent"), f.p("a1/.credentials.json")).unwrap()),
+        Box::new(|f: &Fake| std::fs::create_dir(f.p("a1/.credentials.json")).unwrap()),
+    ]
+    .iter()
+    .enumerate()
+    {
+        let _ = std::fs::remove_dir_all(f.p("a1/.credentials.json"));
+        let _ = std::fs::remove_file(f.p("a1/.credentials.json"));
+        make(&f);
+        refused(&mut f, &format!("s{n}"), "sign_in_present");
+    }
+    let _ = std::fs::remove_dir_all(f.p("a1/.credentials.json"));
+    // A key file that holds the bytes of `api.key_file` under another name: one of the two
+    // ending in a line feed and the other not, either way.
+    for (n, (stage, batch)) in [
+        (format!("{BATCH_KEY}\n"), BATCH_KEY.to_owned()),
+        (BATCH_KEY.to_owned(), format!("{BATCH_KEY}\n")),
+        (format!("{BATCH_KEY}\n"), format!("{BATCH_KEY}\n")),
+        (BATCH_KEY.to_owned(), BATCH_KEY.to_owned()),
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        f.key_file("anthropic-stage-key", &stage);
+        f.key_file("anthropic-api-key", &batch);
+        refused(&mut f, &format!("b{n}"), "batch_key");
+        assert!(!Path::new(&f.p("a1/.credentials.json")).exists());
+    }
+    // A batch key the port cannot read, or another key, is no bar; the stage key is the stage's.
+    f.key_file("anthropic-stage-key", &format!("{STAGE_KEY}\n"));
+    f.key_file("anthropic-api-key", &format!("{BATCH_KEY}\n"));
+    let (v, _) = f.run(&f.limited("ok1.md")).unwrap();
+    assert_eq!(
+        (&v["state"], &v["auth"], &v["auth_fault"]),
+        (&json!("ok"), &json!("api_key"), &Value::Null),
+        "{v}"
+    );
+    std::fs::remove_file(f.t.join("credentials/anthropic-api-key")).unwrap();
+    let (v, _) = f.run(&f.limited("ok2.md")).unwrap();
+    assert_eq!(
+        (&v["state"], &v["auth_fault"]),
+        (&json!("ok"), &Value::Null),
+        "{v}"
+    );
+}
+
+// spec: specs/ap/run.md#R54
+// spec: specs/ap/run.md#R55
+// spec: specs/ap/run.md#R56
+// spec: specs/ap/run.md#R28
+#[test]
+fn key_account_and_account_in_next_accounts_each_get_their_own_auth() {
+    let mut f = Fake::new();
+    f.key_policy(None);
+    // The key account is cut: the move to the other account has no key and its own `auth`.
+    f.mode("a1", "limit1");
+    let mut r = f.limited("x.md");
+    r["next_accounts"] = json!([f.p("a2")]);
+    let (v, _) = f.run(&r).unwrap();
+    assert_eq!(
+        (&v["state"], &v["account"], &v["auth"], &v["auth_fault"]),
+        (
+            &json!("ok"),
+            &json!(f.p("a2")),
+            &json!("account"),
+            &Value::Null
+        ),
+        "{v}"
+    );
+    let attempts = v["attempts"].as_array().unwrap();
+    assert_eq!(attempts.len(), 2, "{v}");
+    assert_eq!(
+        (&attempts[0]["auth"], &attempts[0]["state"]),
+        (&json!("api_key"), &json!("cut"))
+    );
+    assert_eq!(attempts[1]["auth"], "account");
+    assert!(attempts.iter().all(|a| a["auth_fault"].is_null()));
+    assert_eq!(
+        f.variable(1, "ANTHROPIC_API_KEY").as_deref(),
+        Some(STAGE_KEY)
+    );
+    assert_eq!(f.variable(2, "ANTHROPIC_API_KEY"), None);
+    for word in f.launches[1].iter() {
+        assert!(!word.contains(STAGE_KEY));
+    }
+    // The other way: a cut on the account moves to the key account, which has the key and
+    // `auth` `api_key`; the record's `auth` is the last launch's.
+    f.clear("a1");
+    f.mode("a2", "limit1");
+    let mut r = f.limited("y.md");
+    r["account"] = json!(f.p("a2"));
+    r["next_accounts"] = json!([f.p("a1")]);
+    let (v, _) = f.run(&r).unwrap();
+    assert_eq!(
+        (&v["state"], &v["account"], &v["auth"]),
+        (&json!("ok"), &json!(f.p("a1")), &json!("api_key")),
+        "{v}"
+    );
+    assert_eq!(v["attempts"][0]["auth"], "account");
+    assert_eq!(v["attempts"][1]["auth"], "api_key");
+    assert_eq!(f.variable(3, "ANTHROPIC_API_KEY"), None);
+    assert_eq!(
+        f.variable(4, "ANTHROPIC_API_KEY").as_deref(),
+        Some(STAGE_KEY)
+    );
+    // An ask is a launch of its own: on the key account it has the key and `auth` `api_key`.
+    f.clear("a2");
+    let mut r = f.request("a.md");
+    r["expect"] = json!({"first_line": "Report:*"});
+    let (v, _) = f.run(&r).unwrap();
+    let attempts = v["attempts"].as_array().unwrap();
+    assert_eq!(attempts.len(), 2, "{v}");
+    assert_eq!(attempts[1]["asked"], true);
+    assert!(attempts.iter().all(|a| a["auth"] == "api_key"), "{v}");
+    assert_eq!(
+        f.variable(5, "ANTHROPIC_API_KEY").as_deref(),
+        Some(STAGE_KEY)
+    );
+    assert_eq!(
+        f.variable(6, "ANTHROPIC_API_KEY").as_deref(),
+        Some(STAGE_KEY)
+    );
+    // A stage on another runtime holds neither member, in the record or in an attempt.
+    f.policy = None;
+    std::fs::write(f.t.join("bin/answer"), "Verdict: accept\n").unwrap();
+    f.mode("a1", "answer");
+    let (v, _) = f.run(&f.codex("c.md")).unwrap();
+    assert!(
+        v.get("auth").is_none() && v.get("auth_fault").is_none(),
+        "{v}"
+    );
+    assert!(v["attempts"][0].get("auth").is_none(), "{v}");
+}
+
+// spec: specs/ap/run.md#R54
+// spec: specs/ap/run.md#R55
+// spec: specs/ap/run.md#R56
+// spec: specs/ap/policy.md#R17
+#[test]
+fn a_policy_without_api_key_accounts_launches_as_the_base() {
+    let mut f = Fake::new();
+    // The launches of one request: on no policy, on a policy without the member, and on one with
+    // the member that names another account than the request's.
+    type Launched = (String, Vec<String>, Vec<(String, String)>, String);
+    let mut seen: Vec<Launched> = vec![];
+    for (n, (limited, setup)) in [
+        (true, 0),
+        (true, 1),
+        (true, 2),
+        (false, 0),
+        (false, 1),
+        (false, 2),
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        match setup {
+            0 => f.policy = None,
+            1 => {
+                let v = f.open_policy();
+                f.policy_is(&v);
+            }
+            _ => {
+                f.key_file("anthropic-stage-key", &format!("{STAGE_KEY}\n"));
+                let mut v = f.open_policy();
+                v["api_key_accounts"] = json!({ f.p("a2"): STAGE_FILE });
+                f.policy_is(&v);
+            }
+        }
+        let out = format!("x{n}.md");
+        let r = if limited {
+            f.limited(&out)
+        } else {
+            f.request(&out)
+        };
+        let (v, status) = f.run(&r).unwrap();
+        assert_eq!((status, &v["state"]), (0, &json!("ok")), "{v}");
+        assert_eq!(
+            (&v["auth"], &v["auth_fault"]),
+            (&json!("account"), &Value::Null),
+            "{v}"
+        );
+        assert_eq!(v["attempts"][0]["auth"], "account");
+        assert_eq!(v["attempts"][0]["auth_fault"], Value::Null);
+        let scrub = |s: &str| without_ids(&s.replace(&out, "<out>"));
+        let argv: Vec<String> = f.launches[n].iter().map(|w| scrub(w)).collect();
+        let env: Vec<(String, String)> = f.launch_envs[n]
+            .iter()
+            .map(|(k, v)| (k.clone(), scrub(v)))
+            .collect();
+        assert!(env.iter().all(|(k, _)| k != "ANTHROPIC_API_KEY"));
+        assert!(f.variable(n + 1, "ANTHROPIC_API_KEY").is_none());
+        seen.push((format!("{limited}"), argv, env, scrub(&f.settings(n))));
+        if setup != 0 {
+            let (limited_before, argv_before, env_before, settings_before) = &seen[n - 1];
+            let now = &seen[n];
+            assert_eq!(limited_before, &now.0);
+            assert_eq!(argv_before, &now.1, "argv of {n}");
+            assert_eq!(env_before, &now.2, "environment of {n}");
+            assert_eq!(settings_before, &now.3, "settings of {n}");
+        }
+    }
 }

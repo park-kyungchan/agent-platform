@@ -216,6 +216,13 @@ pub trait System {
     fn git_hooks(&self) -> Option<PathBuf> {
         None
     }
+    /// The examination of a key file or of an account's sign-in without following a link
+    /// (`specs/ap/api.md` R4, `specs/ap/run.md` R54): the one `ap run` makes before a key launch.
+    /// Its name is not `examine`, which `Api` has for `ap api batch`; a test replaces the paths
+    /// under `/etc/agent-platform/credentials/` and the owner it finds.
+    fn examine_key(&self, path: &str) -> std::io::Result<crate::api::Examined> {
+        crate::api::examine_path(path)
+    }
     /// This process's environment; `ap run` keeps only a fixed short list of it.
     fn environment(&self) -> Vec<(String, String)> {
         std::env::vars_os()
