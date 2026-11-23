@@ -979,7 +979,7 @@ apply('triage_decision', 'v9-after-carry', dict(decision=third, triage='none', r
 unchanged = fingerprint()
 assert migrate(9, 10) == dict(carried=0, already=3)
 assert fingerprint() == unchanged and fields(third_request)['route_reason'] == 'carried from version 9'
-for before, after in [(9, 23), (10, 10), (10, 9)]:
+for before, after in [(9, 24), (10, 10), (10, 9)]:
     assert migrate(before, after, 2) == dict(status='unknown_pair')
 assert fingerprint() == unchanged
 assert migrate(9, 10) == dict(carried=0, already=3)
@@ -2482,7 +2482,7 @@ print('v20_gate_rows_complete')
 print('v20 cases: ok')
 # Version 21, pinned in Git by the commit of main that holds it, over the objects made under version 20. The schema
 # differs from version 20 only by point 1 of ontology/README.md, "Version 21": each part is taken off a copy, and what
-# is left reads as version 20. The repository's file is version 22, whose walk comes after this one.
+# is left reads as version 20. The repository's file is version 23, whose walk (version 22's, then 23's) comes after this one.
 V21_PIN = ('72fb5e499221d3dc030404ddfa308c673ba7096e', '1812ef2baac76e4c78fc3208c69926d73fb6b5bab7f2ee3361cfa6723499cb35')
 v20_schema = schema
 v20_objects = [o['id'] for t in ('task', 'decision', 'request', 'intent', 'criterion', 'unit', 'review', 'run', 'finding', 'hold', 'principle', 'host', 'account', 'kpi', 'case')
@@ -2688,8 +2688,8 @@ assert len(item_lines(full, 'Lessons')) == 9 and item_lines(full, 'Lessons')[-1]
 print('gate_row=v21-lead-state-within-25-lines expected=admitted lines=25')
 print('v21_gate_rows_complete')
 print('v21 documents: ok')
-# Version 22: the repository's file over the objects made under version 21. The schema differs from version 21 only by
-# its version and its grants (ontology/README.md, "Version 22: roles"): the grant without a role keeps the reads and the
+# Version 22 and 23: the repository's file over the objects made under version 21. The schema differs from version 21 only by
+# its version and its grants (ontology/README.md, "Version 22: roles", "Version 23: capacity for dispatch"): the grant without a role keeps the reads and the
 # derivations of version 21 and holds the one function route, and each of twelve roles has a grant of its own.
 v21_schema = schema
 v21_objects = [o['id'] for t in ('task', 'decision', 'request', 'intent', 'criterion', 'unit', 'review', 'run', 'finding', 'hold', 'principle', 'host', 'account', 'kpi', 'case')
@@ -2700,7 +2700,7 @@ v21_views = [(view, args, call(['render'], dict(view=view, args=args)))
              for view, args in [(name, {a: ARGS22[a] for a in body.get('args', [])}) for name, body in v21_schema['views'].items()]]
 assert len(v21_views) == 23
 schema = json.loads(pathlib.Path(repo, 'ontology/work.schema.json').read_text())
-assert schema['version'] == 22
+assert schema['version'] == 23
 head, old = json.loads(json.dumps(schema)), json.loads(json.dumps(v21_schema))
 ROLES22 = ['lead', 'dispatch', 'deliver', 'watch', 'route', 'measure', 'api', 'implementer', 'fixer', 'verifier', 'reviewer', 'writer']
 STAGES22 = ['implementer', 'fixer', 'verifier', 'reviewer', 'writer']
@@ -2709,6 +2709,8 @@ no_role, *by_role = head['grants']
 assert 'role' not in no_role and no_role == dict(principal='agent', scope={}, read=base_grant['read'], derive=base_grant['derive'], actions=[], functions=['route']), no_role
 assert [g['role'] for g in by_role] == ROLES22 and all(g['principal'] == 'agent' and g['scope'] == {} for g in by_role)
 held = {g['role']: g for g in by_role}
+# Version 23: the one function `capacity` is in the grant of `dispatch` (`ap unit run` reads it for the placement of a look).
+assert held['dispatch']['functions'] == ['capacity'], held['dispatch']
 for role, g in held.items():
     assert g['actions'] == sorted(g['actions']) and g.get('functions', []) == sorted(g.get('functions', [])) and g['derive'] == [], role
     assert g['read'] == (base_grant['read'] if g['actions'] else []), role
@@ -2731,12 +2733,13 @@ redirect.trace(work, copies)
 assert [obj(i) for i in v21_objects] == v21_before
 for view, args, before in v21_views:
     answer = call(['render'], dict(view=view, args=args))
-    assert answer['rows'] == before['rows'] and answer['markdown'] == before['markdown'].replace('schema=work@21', 'schema=work@22'), view
+    assert answer['rows'] == before['rows'] and answer['markdown'] == before['markdown'].replace('schema=work@21', 'schema=work@23'), view
 print('gate_row=v22-v21-objects-and-views-unchanged expected=admitted objects=' + str(len(v21_objects)) + ' views=' + str(len(v21_views)))
 unchanged = fingerprint()
-assert migrate(21, 22) == dict(carried=0, already=0)
-assert migrate(20, 22) == dict(carried=0, already=0)
-assert migrate(22, 23, 2) == dict(status='unknown_pair')
+assert migrate(21, 23) == dict(carried=0, already=0)
+assert migrate(20, 23) == dict(carried=0, already=0)
+assert migrate(22, 23) == dict(carried=0, already=0)
+assert migrate(23, 24, 2) == dict(status='unknown_pair')
 assert fingerprint() == unchanged and [obj(i) for i in v21_objects] == v21_before
 print('v22_migration_rows_complete')
 phase = 'v22'
@@ -2792,6 +2795,7 @@ assert fn('clause', 'verifier', dict(key='o/r:specs/ap/unit.md#R11'))['answer'] 
 assert fn('clause', None, dict(key='o/r:specs/ap/unit.md#R11'), 2)['code'] == 'not_granted'
 for role in (None, 'verifier'): assert fn('capacity', role, {}, 2)['code'] == 'not_granted'
 assert fn('capacity', 'measure', {})['answer'] == dict(ok=True) and fn('capacity', 'lead', {})['answer'] == dict(ok=True)
+assert fn('capacity', 'dispatch', {})['answer'] == dict(ok=True)
 assert fn('cost', 'verifier', dict(since='2026-11-01', until='2026-11-02'), 2)['code'] == 'not_granted'
 assert fn('clause', 'nosuch', dict(key='o/r:specs/ap/unit.md#R11'), 2)['code'] == 'role_not_admitted'
 print('v22_gate_rows_complete')

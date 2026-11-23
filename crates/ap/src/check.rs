@@ -35,7 +35,7 @@ const PC_SCRIPT: &str = include_str!("check/pc.sh");
 const PROBE: &str = r#"w=$(timeout 10 /mnt/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe -NoProfile -NonInteractive -Command '(Get-CimInstance Win32_OperatingSystem).FreePhysicalMemory' </dev/null 2>/dev/null) || w=; e=$(if [ -r "$HOME/.profile" ]; then . "$HOME/.profile" >/dev/null 2>&1 </dev/null; fi; timeout 10 ont --version </dev/null 2>/dev/null) || e=; printf '%s %s %s %s\n%s\n' "$(nproc)" "$(cut -d ' ' -f 1 /proc/loadavg)" "$(sed -n 's/^MemAvailable: *\([0-9][0-9]*\) kB$/\1/p' /proc/meminfo 2>/dev/null)" "${w//[[:space:]]/ }" "${e%%$'\n'*}"; [ -L "$1/HEAD" ] || head -c 80 -- "$1/HEAD" 2>/dev/null; exit 0"#;
 /// The only variables of this process that a `tailscale` child gets (R7): not `LANG` or `LC_*`, which
 /// the ssh client's default `SendEnv` would send to the PC, nor an agent socket.
-const TAILSCALE_ENV: [&str; 4] = ["PATH", "HOME", "USER", "LOGNAME"];
+pub(crate) const TAILSCALE_ENV: [&str; 4] = ["PATH", "HOME", "USER", "LOGNAME"];
 const DEFAULT_TIMEOUT: u64 = 2_700;
 const MAX_TIMEOUT: u64 = 14_400;
 /// How long after the deadline this host waits for the PC's own end before it cuts the connection.
@@ -83,7 +83,7 @@ pub(crate) struct Ctx {
     io: Arc<dyn Io>,
 }
 impl Ctx {
-    fn own() -> Self {
+    pub(crate) fn own() -> Self {
         Ctx {
             vars: None,
             io: Arc::new(Own),
@@ -114,7 +114,7 @@ impl Ctx {
     }
     /// A program with the call's environment: this process's own, or exactly the door's list in a
     /// process group of its own.
-    fn command(&self, program: &str) -> Command {
+    pub(crate) fn command(&self, program: &str) -> Command {
         let mut c = Command::new(program);
         if let Some(vars) = &self.vars {
             c.env_clear()
@@ -144,7 +144,7 @@ impl Ctx {
             .status();
     }
     /// The directory of the call's staging files: `TMPDIR` of its environment, else `/tmp`.
-    fn temp_dir(&self) -> PathBuf {
+    pub(crate) fn temp_dir(&self) -> PathBuf {
         match &self.vars {
             None => std::env::temp_dir(),
             Some(_) => self
@@ -153,7 +153,7 @@ impl Ctx {
         }
     }
     /// A started program: told to the call's `Io`.
-    fn spawn(&self, c: &mut Command) -> std::io::Result<Child> {
+    pub(crate) fn spawn(&self, c: &mut Command) -> std::io::Result<Child> {
         let child = c.spawn()?;
         self.io.started(child.id());
         Ok(child)
@@ -175,6 +175,15 @@ pub struct Pc {
     pub work: String,
     pub busy_load: f64,
     pub min_available_mb: u64,
+    /// The stage account of `hosts.pc.stages` (R16): where a look of `ap run` runs; `ap check`
+    /// reads it and ignores it.
+    pub stages: Option<Stages>,
+}
+/// The stage account of the PC: its login for `tailscale ssh` and its work directory.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Stages {
+    pub ssh: String,
+    pub work: String,
 }
 impl Pc {
     fn host(&self) -> &str {
@@ -225,13 +234,13 @@ pub fn hosts(policy: &Value) -> Result<Option<Pc>, Failure> {
                 .iter()
                 .all(|k| m.contains_key(*k))
                 && m.keys().all(|k| {
-                    ["ssh", "work", "busy_load", "min_available_mb"].contains(&k.as_str())
+                    ["ssh", "work", "busy_load", "min_available_mb", "stages"].contains(&k.as_str())
                 })
         })
         .ok_or_else(|| {
             invalid(
                 "hosts.pc",
-                "is not an object with exactly ssh, work and busy_load, and at most min_available_mb besides",
+                "is not an object with exactly ssh, work and busy_load, and at most min_available_mb and stages besides",
             )
         })?;
     let ssh = (m["ssh"].as_str())
@@ -258,11 +267,39 @@ pub fn hosts(policy: &Value) -> Result<Option<Pc>, Failure> {
                 )
             })?,
     };
+    let stages = match m.get("stages") {
+        None => None,
+        Some(v) => {
+            let s = v
+                .as_object()
+                .filter(|s| s.len() == 2 && s.contains_key("ssh") && s.contains_key("work"))
+                .ok_or_else(|| {
+                    invalid(
+                        "hosts.pc.stages",
+                        "is not an object with exactly ssh and work",
+                    )
+                })?;
+            let ssh = (s["ssh"].as_str())
+                .filter(|s| ssh_ok(s))
+                .ok_or_else(|| invalid("hosts.pc.stages.ssh", "is not user@host"))?;
+            let work = (s["work"].as_str()).filter(|s| work_ok(s)).ok_or_else(|| {
+                invalid(
+                    "hosts.pc.stages.work",
+                    "is not an absolute path of letters, digits and ._-/",
+                )
+            })?;
+            Some(Stages {
+                ssh: ssh.to_owned(),
+                work: work.to_owned(),
+            })
+        }
+    };
     Ok(Some(Pc {
         ssh: ssh.to_owned(),
         work: work.to_owned(),
         busy_load,
         min_available_mb,
+        stages,
     }))
 }
 
@@ -322,7 +359,7 @@ pub struct Tree {
     pub head: String,
     pub repository: String,
 }
-fn git(ctx: &Ctx, dir: &str, words: &[&str]) -> Option<Vec<u8>> {
+pub(crate) fn git(ctx: &Ctx, dir: &str, words: &[&str]) -> Option<Vec<u8>> {
     let out = ctx.output(
         ctx.command("git")
             .args(GIT_SETTINGS)
@@ -334,11 +371,11 @@ fn git(ctx: &Ctx, dir: &str, words: &[&str]) -> Option<Vec<u8>> {
     )?;
     out.status.success().then_some(out.stdout)
 }
-fn line(bytes: Vec<u8>) -> Option<String> {
+pub(crate) fn line(bytes: Vec<u8>) -> Option<String> {
     let s = String::from_utf8(bytes).ok()?;
     Some(s.strip_suffix('\n').unwrap_or(&s).to_owned())
 }
-fn is_hex(s: &str) -> bool {
+pub(crate) fn is_hex(s: &str) -> bool {
     matches!(s.len(), 40 | 64) && s.bytes().all(|c| c.is_ascii_hexdigit())
 }
 /// A revision of the engine as `ap deliver` reads one: 40 lowercase hexadecimal digits.
@@ -370,7 +407,7 @@ pub fn github(url: &str) -> Option<String> {
     };
     (ok(owner) && ok(name)).then(|| format!("{owner}/{name}"))
 }
-fn worktree(ctx: &Ctx, dir: &str) -> Result<Tree, Failure> {
+pub(crate) fn worktree(ctx: &Ctx, dir: &str) -> Result<Tree, Failure> {
     let not = || fail("not_a_worktree", "dir", Value::Null);
     let real = fs::canonicalize(dir).map_err(|_| not())?;
     if !real.is_dir() {
@@ -682,13 +719,18 @@ fn here(call: &Call, tree: &Tree, deadline: Instant) -> i32 {
 }
 
 /// Removes the staging directory of one call's payload.
-struct Stage(PathBuf);
+pub(crate) struct Stage(pub(crate) PathBuf);
 impl Drop for Stage {
     fn drop(&mut self) {
         let _ = fs::remove_dir_all(&self.0);
     }
 }
-fn to_file(ctx: &Ctx, dir: &str, words: &[&str], file: &Path) -> Result<(), &'static str> {
+pub(crate) fn to_file(
+    ctx: &Ctx,
+    dir: &str,
+    words: &[&str],
+    file: &Path,
+) -> Result<(), &'static str> {
     let out = File::create(file).map_err(|_| "stage")?;
     let mut c = ctx.command("git");
     c.args(GIT_SETTINGS)
@@ -702,7 +744,7 @@ fn to_file(ctx: &Ctx, dir: &str, words: &[&str], file: &Path) -> Result<(), &'st
     if ok { Ok(()) } else { Err("git") }
 }
 /// Whether a short program of the call succeeded.
-fn status_of(ctx: &Ctx, c: &mut Command) -> bool {
+pub(crate) fn status_of(ctx: &Ctx, c: &mut Command) -> bool {
     let Ok(mut child) = ctx.spawn(c) else {
         return false;
     };
@@ -749,7 +791,7 @@ fn excludes(ctx: &Ctx, dir: &str) -> (Vec<u8>, Vec<u8>) {
 }
 /// The payload (R6, R7): the commit (a bundle of what the PC's tree lacks), the index entries, the
 /// two exclude files and a tar of the files Git lists, with their working-tree bytes and modes.
-fn payload(
+pub(crate) fn payload(
     ctx: &Ctx,
     tree: &Tree,
     pc_head: Option<&str>,
@@ -1282,6 +1324,7 @@ mod tests {
                 work: "/home/u/work/ap-checks".into(),
                 busy_load: 0.75,
                 min_available_mb: 2048,
+                stages: None,
             })
         );
         let refused = |v: Value| hosts(&json!({"hosts": v})).unwrap_err().detail;
@@ -1332,6 +1375,59 @@ mod tests {
         }
         // Any other new member is refused as before.
         starts(with("max_jobs", json!(4)), "hosts.pc");
+    }
+
+    // spec: specs/ap/check.md#R16
+    #[test]
+    fn the_member_stages_is_the_stage_account_or_refused_by_its_member() {
+        let pc = json!({"ssh": "u@pc-1", "work": "/w", "busy_load": 0.5});
+        let with = |v: Value| {
+            let mut p = pc.clone();
+            p["stages"] = v;
+            json!({"hosts": {"pc": p}})
+        };
+        let read = hosts(&with(json!({"ssh": "stage@pc-1", "work": "/w/stages"})));
+        assert_eq!(
+            read.unwrap().unwrap().stages,
+            Some(Stages {
+                ssh: "stage@pc-1".into(),
+                work: "/w/stages".into()
+            })
+        );
+        assert_eq!(
+            hosts(&json!({"hosts": {"pc": pc}}))
+                .unwrap()
+                .unwrap()
+                .stages,
+            None
+        );
+        let starts = |v: Value, member: &str| {
+            let d = hosts(&with(v)).unwrap_err().detail;
+            assert!(
+                d.as_str().unwrap().starts_with(&format!("{member} ")),
+                "{d}"
+            );
+        };
+        let good = json!({"ssh": "stage@pc-1", "work": "/w/stages"});
+        for bad in [
+            json!([]),
+            json!(null),
+            json!({"ssh": "stage@pc-1"}),
+            json!({"work": "/w/stages"}),
+            json!({"ssh": "stage@pc-1", "work": "/w/stages", "x": 1}),
+        ] {
+            starts(bad, "hosts.pc.stages");
+        }
+        for bad in ["u", "U@h", "u@", "u@h h"] {
+            let mut g = good.clone();
+            g["ssh"] = json!(bad);
+            starts(g, "hosts.pc.stages.ssh");
+        }
+        for bad in ["w", "/a/../b", "/a b", "/"] {
+            let mut g = good.clone();
+            g["work"] = json!(bad);
+            starts(g, "hosts.pc.stages.work");
+        }
     }
 
     // spec: specs/ap/check.md#R4
@@ -1385,6 +1481,7 @@ mod tests {
             work: "/w".into(),
             busy_load: 0.75,
             min_available_mb: 2048,
+            stages: None,
         };
         let probe = |load: &str, wsl: u64, windows: Option<u64>| Probe {
             cpus: 4,

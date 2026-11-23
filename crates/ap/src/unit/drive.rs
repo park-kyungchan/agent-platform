@@ -1721,7 +1721,8 @@ impl Run {
         };
         let record = format!("{}.run.json", self.report(k)?);
         let fit = own.is_some() && !self.done.moved && !abandoned && !writer;
-        let fit = fit && json_file(&record).is_some();
+        // A session that ran on the PC lives there: a second look starts fresh (`specs/ap/unit-run.md` R45).
+        let fit = fit && json_file(&record).is_some_and(|r| r["host"] != "pc");
         let repaired = own.is_some_and(|o| o.repair);
         fit.then(|| (record, judged.to_owned(), what, repaired))
     }
@@ -1770,6 +1771,42 @@ impl Run {
             return failed("request_id_reused", "start", json!(review));
         }
         Ok(review)
+    }
+    /// Whether the look of a fresh session asks for the PC (`specs/ap/unit-run.md` R45): the policy
+    /// has `hosts.pc.stages`, the look is a Claude one, the files it reads are each a regular file of at most 1 MiB, and
+    /// `capacity` (read through `store::function`, as the role `dispatch` that `ap work` sets) names the machine of the host `pc` free while the
+    /// host `local` carries a one-minute load of at least its CPUs. A read that fails, answers no
+    /// object or lacks a member gives no `host`: no stop, wait or write of the store comes of it.
+    fn pc_free(&self, s: &mut impl System, req: &Value, files: &[String]) -> bool {
+        let stages = crate::work::policy(s)
+            .ok()
+            .flatten()
+            .and_then(|v| crate::check::hosts(&v).ok().flatten())
+            .and_then(|pc| pc.stages);
+        let small =
+            |p: &String| std::fs::metadata(p).is_ok_and(|m| m.is_file() && m.len() <= 1 << 20);
+        let claude = req["runtime"].is_null() || req["runtime"] == "claude";
+        if stages.is_none() || !claude || !files.iter().all(small) {
+            return false;
+        }
+        let Ok(a) = store::function(s, self.store(), "capacity", &json!({})) else {
+            return false;
+        };
+        let row = |name: &str| {
+            a["hosts"]
+                .as_array()?
+                .iter()
+                .find(|h| h["host"] == name)
+                .cloned()
+        };
+        let free = (|| {
+            let machine = row("pc")?["machine"].as_str()?.to_owned();
+            let named = a["can_start"].as_array()?.iter().any(|m| *m == machine);
+            let local = row("local")?;
+            let (load, cpus) = (local["load_x100"].as_u64()?, local["cpus"].as_u64()?);
+            Some(named && load >= cpus.checked_mul(100)?)
+        })();
+        free == Some(true)
     }
     /// A verifier round on `head`: its verdict and its review (R19, R20).
     fn verify(
@@ -1823,6 +1860,8 @@ impl Run {
         (req["limits"], req["env"]) = self.limits(s, n, false, false, &files)?;
         if let Some((record, ..)) = &resumed {
             req["resume"] = json!({"record": record});
+        } else if self.pc_free(s, &req, &files) {
+            req["host"] = json!("pc");
         }
         let review = self.start_review(s, &body, &mut req)?;
         let out = req["out"].as_str().unwrap_or_default().to_owned();

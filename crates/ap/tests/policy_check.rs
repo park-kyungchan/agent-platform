@@ -148,6 +148,26 @@ fn r12_the_host_shape_passes_every_reader_after_one_read() {
     let mut p = host();
     p["hosts"]["pc"]["min_available_mb"] = json!(4096);
     assert_eq!(check(&Fake::json(&p), None).unwrap()["status"], "ok");
+    // The stage account of a look on the PC: `stages` with `ssh` and `work` passes every reader.
+    let mut p = host();
+    p["hosts"]["pc"]["stages"] = json!({"ssh": "stage@pc", "work": "/home/stage/work"});
+    assert_eq!(check(&Fake::json(&p), None).unwrap()["status"], "ok");
+}
+
+// spec: specs/ap/policy.md#R12
+// spec: specs/ap/check.md#R16
+#[test]
+fn a_stages_member_that_lacks_work_is_refused_by_the_reader_check() {
+    let pc = json!({"ssh": "u@pc", "work": "/w", "busy_load": 0.5, "stages": {"ssh": "stage@pc"}});
+    let (reader, code, field, detail) = refused("hosts", json!({ "pc": pc }));
+    assert_eq!(
+        (reader, code.as_str(), field.as_str()),
+        (Some("check"), "policy_invalid", "policy")
+    );
+    assert!(
+        detail.as_str().unwrap().starts_with("hosts.pc.stages"),
+        "{detail}"
+    );
 }
 
 // spec: specs/ap/policy.md#R14

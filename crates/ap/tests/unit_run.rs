@@ -135,6 +135,9 @@ struct F {
     groups: BTreeMap<String, u32>,
     alive: BTreeSet<String>,
     env: Vec<(String, String)>,
+    /// The answer of the function `capacity` (`None`: the call fails), and the number of its calls.
+    capacity: Option<Value>,
+    capacity_calls: usize,
     clock: Duration,
     launches: usize,
     /// At this launch the store dies: every later call of `ont` fails and no stage launches.
@@ -247,6 +250,8 @@ impl F {
                 ("HOME".into(), "/root".into()),
                 ("LANG".into(), "C.UTF-8".into()),
             ],
+            capacity: None,
+            capacity_calls: 0,
             clock: Duration::ZERO,
             launches: 0,
             die_at_launch: None,
@@ -700,6 +705,16 @@ impl F {
             .unwrap()
             .as_secs();
         match args[0].as_str() {
+            "fn" if args[1] == "capacity" => {
+                self.capacity_calls += 1;
+                match self.capacity.clone() {
+                    Some(answer) => reply(
+                        true,
+                        &json!({"function": "capacity", "domain": "work", "answer": answer, "elapsed_ms": 1}),
+                    ),
+                    None => reply(false, &json!({"status": "refused", "code": "not_granted"})),
+                }
+            }
             "get" => {
                 let id = &input["id"];
                 let key = k(
@@ -5999,4 +6014,149 @@ fn r44_a_line_of_a_token_form_stops_the_unit_before_its_verifier_and_an_admissio
     f.set_unit(json!({"notes": format!("Admitted line: docs/fixture.txt {digest}")}));
     let (a, status) = f.edit("plain", json!(["docs/**"]), &[], &edit);
     assert_eq!((a["state"].as_str(), status), (Some("merged"), 0), "{a}");
+}
+
+// ---- A look on the PC (specs/ap/unit-run.md R45) ----------------------------------------------
+
+/// The policy with `hosts.pc.stages`, and a `tailscale` that never answers: a look that asks for the
+/// PC runs here with `pc_unreachable`, so its record's `host_reason` shows the request had `host`.
+fn pc_world(f: &mut F, capacity: Option<Value>) {
+    f.policy(
+        json!({"hosts": {"pc": {"ssh": "u@pc-1", "work": f.p("pcchecks"), "busy_load": 0.5,
+        "stages": {"ssh": "stage@pc-1", "work": f.p("pcwork")}}}}),
+    );
+    let stand_in = f.t.join("bin/tailscale");
+    std::fs::write(&stand_in, "#!/bin/sh\nexit 1\n").unwrap();
+    std::fs::set_permissions(&stand_in, std::fs::Permissions::from_mode(0o755)).unwrap();
+    forks::settled();
+    let path = format!(
+        "{}:{}",
+        f.p("bin"),
+        std::env::var("PATH").unwrap_or_default()
+    );
+    f.env.retain(|(k, _)| k != "PATH");
+    f.env.push(("PATH".into(), path));
+    f.capacity = capacity;
+}
+fn capacity_of(pc_free: bool, local_load_x100: u64) -> Value {
+    json!({"hosts": [
+        {"host": "local", "machine": "vps", "cpus": 2, "load_x100": local_load_x100, "available_mb": 1000, "free": true},
+        {"host": "pc", "machine": "desk", "cpus": 8, "load_x100": 10, "available_mb": 9000, "free": pc_free}],
+        "machines": [], "accounts": [], "can_start": if pc_free { json!(["desk"]) } else { json!([]) }})
+}
+fn look_records(f: &F) -> Vec<Value> {
+    let mut packets = f.packets();
+    packets.sort_by_key(|(_, v)| v["round"].as_u64());
+    packets
+        .iter()
+        .map(|(key, _)| {
+            serde_json::from_slice(
+                &std::fs::read(f.p(&format!("reviews/{key}.md.run.json"))).unwrap(),
+            )
+            .unwrap()
+        })
+        .collect()
+}
+
+// spec: specs/ap/unit-run.md#R45
+#[test]
+fn r45_a_free_pc_with_a_loaded_vps_gives_the_look_host_pc_and_the_description_to_read() {
+    let mut f = F::new();
+    pc_world(&mut f, Some(capacity_of(true, 200)));
+    f.steps(&["implement", "accept"]);
+    let (a, _) = f.ok();
+    assert_eq!(a["state"], "merged", "{a}");
+    let records = look_records(&f);
+    assert_eq!(
+        records[0]["host_reason"], "pc_unreachable",
+        "{}",
+        records[0]
+    );
+    assert_eq!(f.capacity_calls, 1);
+    let wanted = f.home().join("2.description.md");
+    assert_eq!(
+        records[0]["limits"]["read_only"],
+        json!([wanted.to_str().unwrap()])
+    );
+}
+
+// spec: specs/ap/unit-run.md#R45
+#[test]
+fn r45_either_condition_alone_gives_no_host() {
+    for (free, load) in [(false, 400), (true, 199), (true, 0)] {
+        let mut f = F::new();
+        pc_world(&mut f, Some(capacity_of(free, load)));
+        f.steps(&["implement", "accept"]);
+        let (a, _) = f.ok();
+        assert_eq!(a["state"], "merged", "{free} {load} {a}");
+        assert!(look_records(&f)[0].get("host").is_none(), "{free} {load}");
+    }
+}
+
+// spec: specs/ap/unit-run.md#R45
+#[test]
+fn r45_a_capacity_that_fails_or_is_not_an_object_gives_no_host_and_no_stop() {
+    for answer in [
+        None,
+        Some(json!("free")),
+        Some(json!({})),
+        Some(json!({"can_start": ["desk"]})),
+        Some(json!({"can_start": ["desk"], "hosts": [{"host": "pc"}]})),
+    ] {
+        let mut f = F::new();
+        pc_world(&mut f, answer.clone());
+        f.steps(&["implement", "accept"]);
+        let (a, _) = f.ok();
+        assert_eq!(a["state"], "merged", "{answer:?} {a}");
+        assert!(look_records(&f)[0].get("host").is_none(), "{answer:?}");
+        assert_eq!(f.capacity_calls, 1);
+        // No write of the store comes of it.
+        assert!(f.bodies("capacity").is_empty());
+    }
+    // No `hosts.pc.stages`: `capacity` is not read at all.
+    let mut f = F::new();
+    f.capacity = Some(capacity_of(true, 400));
+    f.steps(&["implement", "accept"]);
+    f.ok();
+    assert_eq!(f.capacity_calls, 0);
+}
+
+// spec: specs/ap/unit-run.md#R45
+#[test]
+fn r45_a_second_look_after_one_on_the_pc_starts_a_fresh_session() {
+    let two_calls = |f: &mut F, pc: bool| {
+        f.set_unit(json!({"class": "contract"}));
+        f.steps(&["implement", "acceptmain", "accept"]);
+        f.ok();
+        if pc {
+            // The earlier look ran on the PC: its record says so (its session lives there).
+            for e in std::fs::read_dir(f.t.join("reviews")).unwrap().flatten() {
+                if e.file_name().to_string_lossy().ends_with(".run.json") {
+                    let mut record: Value =
+                        serde_json::from_slice(&std::fs::read(e.path()).unwrap()).unwrap();
+                    assert_eq!(record["host"], "local", "{record}");
+                    record["host"] = json!("pc");
+                    std::fs::write(e.path(), record.to_string()).unwrap();
+                }
+            }
+        }
+        f.ok();
+    };
+    // Baseline: the earlier look ran here, so the second look resumes its session.
+    let mut f = F::new();
+    pc_world(&mut f, None);
+    two_calls(&mut f, false);
+    let (_, prompt) = f.launch(3);
+    assert!(prompt.contains("## The round"), "{prompt}");
+    assert!(!look_records(&f)[1]["resumes"].is_null());
+    // On the PC the second look starts a fresh session as a first round does, placed by the rule.
+    let mut f = F::new();
+    pc_world(&mut f, Some(capacity_of(true, 300)));
+    two_calls(&mut f, true);
+    let (_, prompt) = f.launch(3);
+    assert!(!prompt.contains("## The round"), "{prompt}");
+    let records = look_records(&f);
+    assert!(records[1]["resumes"].is_null(), "{}", records[1]);
+    assert_eq!(records[1]["host_reason"], "pc_unreachable");
+    assert_eq!(f.capacity_calls, 2);
 }

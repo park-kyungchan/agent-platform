@@ -41,7 +41,7 @@ fn sorted(mut v: Vec<String>) -> Vec<String> {
 #[test]
 fn grants_hold_the_roles_of_the_table() {
     let s = schema();
-    assert_eq!(s["version"], 22);
+    assert_eq!(s["version"], 23);
     let grants = s["grants"].as_array().unwrap();
     assert_eq!(grants.len(), 13);
     // The grant without a role: the reads and the derivations of the one grant of version 21, the function route.
@@ -131,6 +131,8 @@ fn grants_hold_the_roles_of_the_table() {
     );
     assert_eq!(held["route"]["actions"], json!([]));
     assert!(held["route"].get("functions").is_none());
+    // `ap unit run` reads `capacity` as `dispatch` for the placement of a look (`unit-run.md` R45).
+    assert_eq!(held["dispatch"]["functions"], json!(["capacity"]));
     for role in ["dispatch", "api"] {
         let a = strings(&held[role]["actions"]);
         assert!(

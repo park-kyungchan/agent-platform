@@ -2052,3 +2052,25 @@ and under `dispatch` is `not_granted`, under `watch` and `api` applied; `declare
 `capacity` is `not_granted` with no role and under `verifier` and answers under `measure` and `lead`; `cost` under
 `verifier` is `not_granted`; `ont fn clause` under a role the file does not list is `role_not_admitted`. A row whose
 refusal changed from the base's answer is named in the pull request.
+
+## Version 23: capacity for dispatch
+Version 22 remains the schema of the commit before this one. Version 23 changes version 22 in one place only: the grant
+of the role `dispatch` gains `capacity` in `functions` (the list was absent; it is `["capacity"]`), and the number
+`version` becomes 23; every action type, object type, value type, link type, view, source and function, and every other
+grant, reads as on version 22 in canonical JSON. The point of the version: `ap unit run` is the driver of a unit and
+reads the store's function `capacity` once before a verifier round, to place the look on the local PC when the PC is
+free and this host is loaded (`specs/ap/unit-run.md` R45). The function call claims the role of the driver,
+`dispatch` (`specs/ap/roles.md` R2, R3): `ap work` sets `ONT_ROLE=dispatch` on every run it starts, and a function call
+takes its role from `ONT_ROLE` alone.
+
+1. The grant. `dispatch` keeps its fourteen actions and now holds the function `capacity`; the grants of the other roles
+   are as on version 22 (`measure` holds `api_spend`, `capacity` and `cost`; `lead` every function).
+2. The engine. `ENGINE-PIN` is unchanged: a grant with `functions` is the engine's since version 22.
+
+### The migration and the rehearsal
+`ontology/migrate` knows version 23; its step is empty. `HIGHEST = 23`; `23 24` and `21 21` are pairs it does not know
+(exit 2); the pairs refused on the version 10 part of the rehearsal are (9, 24), (10, 10) and (10, 9). The walk of
+version 22 runs on the repository's file (now version 23): the schema differs from version 21 only by `version` and
+`grants`, `ontology/migrate` runs 21 23, 20 23 and 22 23 (exit 0, the store unchanged) and 23 24 (exit 2). One row is
+new: `ont fn capacity` with `ONT_ROLE=dispatch` answers (it was `not_granted` under that role on version 22). The
+assertions of the rehearsal that named version 22 follow the file's version (23).
