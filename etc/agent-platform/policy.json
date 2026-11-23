@@ -110,7 +110,11 @@
   "pc": {
    "ssh": "apcheck@ap-checks",
    "work": "/home/apcheck/work/ap-checks",
-   "busy_load": 1.0
+   "busy_load": 1.0,
+   "stages": {
+    "ssh": "apstage@ap-stages",
+    "work": "/home/apstage/work/ap-stages"
+   }
   }
  },
  "api": {
