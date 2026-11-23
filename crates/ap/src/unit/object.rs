@@ -2,8 +2,9 @@
 //! its acceptance checks ended on the base as their kinds require (`specs/ap/unit.md`).
 use super::drive::{protected, protected_tree};
 use super::render::{self, Role};
-use crate::host::{Failure, Host, LIMIT, System, error, fail, id, new_session_id};
+use crate::host::{Failure, Host, LIMIT, System, error, fail, new_session_id};
 use crate::review::{Reading, WRITE_SET_FORMS, outside, write_set_pattern};
+use crate::store::work::{self, Id, ObjectType, actions, objects, properties, values};
 use crate::store::{self, Actor, at, bad, shaped, sized};
 use serde_json::{Map, Value, json};
 use std::{
@@ -517,8 +518,12 @@ pub(super) fn citations_judged(
         .map(|p| (*p).to_owned())
         .collect();
     let inside = |path: &str| outside(&set, &[path]).is_empty();
-    let filter = vec![json!({"eq": ["repository", repository]})];
-    let found = at(store::search(s, store, "clause", filter), "clause")?;
+    let property = properties::Clause::Repository.name();
+    let filter = vec![json!({"eq": [property, repository]})];
+    let found = at(
+        store::search_of::<objects::Clause>(s, store, filter),
+        "clause",
+    )?;
     let clauses: BTreeMap<&str, &Value> = found.iter().map(|(k, f)| (k.as_str(), f)).collect();
     let mut failed: Vec<Cited> = vec![];
     let listed = |name: &str| -> Vec<(usize, &str)> {
@@ -683,21 +688,187 @@ fn tier(b: &mut Breaks, r: &Value, k: &str) -> Option<Value> {
     }
     Some(t.clone())
 }
+/// The name of the action `ready` applies.
+const NAME_READY: &str = <actions::ReadyUnit as work::Action>::NAME;
+/// The id of the object of type `T` with the native key `key`, as the request holds it.
+fn id<T: ObjectType>(key: &str) -> Value {
+    Id::<T>::new(key).to_value()
+}
+/// A text member of the checked parameters.
+fn text_of(p: &Value, k: &str) -> Option<String> {
+    p.get(k).and_then(Value::as_str).map(str::to_owned)
+}
+/// A list of texts of the checked parameters.
+fn texts_of(p: &Value, k: &str) -> Option<Vec<String>> {
+    let list = p.get(k).and_then(Value::as_array)?;
+    Some(
+        (list.iter())
+            .filter_map(|e| e.as_str().map(str::to_owned))
+            .collect(),
+    )
+}
+/// A list of ids of type `T` of the checked parameters, each made by `id` above.
+fn ids_of<T: ObjectType>(p: &Value, k: &str) -> Option<Vec<Id<T>>> {
+    let list = p.get(k).and_then(Value::as_array)?;
+    let key = |e: &Value| e["native_key"].as_str().map(Id::<T>::new);
+    Some(list.iter().filter_map(key).collect())
+}
+/// The id of type `T` of a member of the checked parameters.
+fn id_member<T: ObjectType>(p: &Value, k: &str) -> Option<Id<T>> {
+    p.get(k)?["native_key"].as_str().map(Id::<T>::new)
+}
+/// A number of the checked parameters, at most `i64::MAX` (`estimate_lines`) or among `WAVES`.
+fn number_of(p: &Value, k: &str) -> Option<i64> {
+    p.get(k).and_then(Value::as_i64)
+}
+/// A tier of the checked parameters: its `effort`, `model` and `runtime`.
+fn tier_of(p: &Value, k: &str) -> Option<[String; 3]> {
+    let t = p.get(k)?;
+    let word = |m: &str| t[m].as_str().map(str::to_owned);
+    Some([word("effort")?, word("model")?, word("runtime")?])
+}
+/// The acceptance checks of the checked parameters: each `check` of 1 to 600 bytes and each `kind` among the
+/// choices, as `acceptance` checked them.
+fn checks_of<A>(
+    p: &Value,
+    make: fn(values::NonemptyText, values::AcceptanceKind) -> A,
+) -> Result<Option<Vec<A>>, Failure> {
+    let Some(list) = p.get("acceptance").and_then(Value::as_array) else {
+        return Ok(None);
+    };
+    let mut checks = vec![];
+    for c in list {
+        let check = c["check"].as_str().map(str::to_owned);
+        let kind = c["kind"].as_str().and_then(values::AcceptanceKind::parse);
+        let (Some(check), Some(kind)) = (check, kind) else {
+            return Err(bad("acceptance"));
+        };
+        checks.push(make(values::NonemptyText(check), kind));
+    }
+    Ok(Some(checks))
+}
+/// A member the module requires, of the parameters `page_parameters` checked.
+fn required<T>(member: Option<T>, k: &str) -> Result<T, Failure> {
+    member.ok_or_else(|| bad(k))
+}
+/// The request of `add_unit` from the parameters `page_parameters` checked and `write` completed: each member the
+/// module types took the value that check left, so this conversion refuses nothing a check let through.
+fn add_action(p: &Value) -> Result<actions::AddUnit, Failure> {
+    let unit = id_member(p, "unit");
+    let lane = text_of(p, "lane").and_then(|t| values::UnitLane::parse(&t));
+    let class = text_of(p, "class").and_then(|t| values::UnitClass::parse(&t));
+    let tier = |k: &str| tier_of(p, k);
+    Ok(actions::AddUnit {
+        acceptance: checks_of(p, |check, kind| actions::AddUnitAcceptance { check, kind })?,
+        branch: text_of(p, "branch"),
+        class: required(class, "class")?,
+        clauses: ids_of(p, "clauses"),
+        depends_on: ids_of(p, "depends_on"),
+        estimate_lines: number_of(p, "estimate_lines"),
+        implementer: tier("implementer").map(|[effort, model, runtime]| {
+            actions::AddUnitImplementer {
+                effort,
+                model,
+                runtime,
+            }
+        }),
+        intent: id_member(p, "intent"),
+        interface: text_of(p, "interface"),
+        invariants: text_of(p, "invariants"),
+        lane: required(lane, "lane")?,
+        not_built: text_of(p, "not_built"),
+        notes: text_of(p, "notes"),
+        objective: required(text_of(p, "objective"), "objective")?,
+        origin: id_member(p, "origin"),
+        page_digest: text_of(p, "page_digest").map(values::Sha256Hex),
+        read_first: texts_of(p, "read_first"),
+        report: text_of(p, "report"),
+        repository: text_of(p, "repository"),
+        specs: texts_of(p, "specs"),
+        unit: required(unit, "unit")?,
+        verifier: tier("verifier").map(|[effort, model, runtime]| actions::AddUnitVerifier {
+            effort,
+            model,
+            runtime,
+        }),
+        verifier_questions: text_of(p, "verifier_questions"),
+        wave: number_of(p, "wave"),
+        write_set: texts_of(p, "write_set")
+            .map(|l| l.into_iter().map(values::WritePattern).collect()),
+    })
+}
+/// The request of `amend_unit` from the parameters as `add_action` takes them.
+fn amend_action(p: &Value) -> Result<actions::AmendUnit, Failure> {
+    let unit = id_member(p, "unit");
+    let class = text_of(p, "class").and_then(|t| values::UnitClass::parse(&t));
+    let tier = |k: &str| tier_of(p, k);
+    Ok(actions::AmendUnit {
+        acceptance: checks_of(p, |check, kind| actions::AmendUnitAcceptance {
+            check,
+            kind,
+        })?,
+        branch: text_of(p, "branch"),
+        class: p
+            .get("class")
+            .map(|_| required(class, "class"))
+            .transpose()?,
+        clauses: ids_of(p, "clauses"),
+        depends_on: ids_of(p, "depends_on"),
+        estimate_lines: number_of(p, "estimate_lines"),
+        implementer: tier("implementer").map(|[effort, model, runtime]| {
+            actions::AmendUnitImplementer {
+                effort,
+                model,
+                runtime,
+            }
+        }),
+        interface: text_of(p, "interface"),
+        invariants: text_of(p, "invariants"),
+        not_built: text_of(p, "not_built"),
+        notes: text_of(p, "notes"),
+        objective: text_of(p, "objective"),
+        page_digest: values::Sha256Hex(required(text_of(p, "page_digest"), "page_digest")?),
+        read_first: texts_of(p, "read_first"),
+        report: text_of(p, "report"),
+        repository: text_of(p, "repository"),
+        specs: texts_of(p, "specs"),
+        unit: required(unit, "unit")?,
+        verifier: tier("verifier").map(|[effort, model, runtime]| actions::AmendUnitVerifier {
+            effort,
+            model,
+            runtime,
+        }),
+        verifier_questions: text_of(p, "verifier_questions"),
+        wave: number_of(p, "wave"),
+        write_set: texts_of(p, "write_set")
+            .map(|l| l.into_iter().map(values::WritePattern).collect()),
+    })
+}
+/// The request of `drop_unit` from its parameters.
+fn drop_action(p: &Value) -> Result<actions::DropUnit, Failure> {
+    Ok(actions::DropUnit {
+        reason: required(text_of(p, "reason"), "reason")?,
+        unit: required(id_member(p, "unit"), "unit")?,
+    })
+}
 /// The parameters of `add_unit` or `amend_unit` from the request, every rule but the dependencies'
 /// existence checked, each member that breaks one noted in `b`; the keys of `depends_on`.
 fn page_parameters(b: &mut Breaks, r: &Value, op: &str, key: &str) -> (Value, Vec<String>) {
-    let mut p = Map::from_iter([("unit".to_owned(), id("unit", key))]);
+    let mut p = Map::from_iter([("unit".to_owned(), id::<objects::Unit>(key))]);
     let add = op == "add";
     if add {
         if let Some(lane) = b.choice(r, "lane", "lane", &["small", "objective"]) {
             p.insert("lane".into(), lane);
         }
-        for (k, kind) in [("intent", "intent"), ("origin", "request")] {
-            if r.get(k).is_some()
-                && let Some(t) = b.text(sized(&r[k], k, 512), r.get(k), 512)
-            {
-                p.insert(k.into(), id(kind, t));
-            }
+        if r.get("intent").is_some()
+            && let Some(t) = b.text(sized(&r["intent"], "intent", 512), r.get("intent"), 512)
+        {
+            p.insert("intent".into(), id::<objects::Intent>(t));
+        }
+        if r.get("origin").is_some()
+            && let Some(t) = b.text(sized(&r["origin"], "origin", 512), r.get("origin"), 512)
+        {
+            p.insert("origin".into(), id::<objects::Request>(t));
         }
     }
     if (add || r.get("class").is_some())
@@ -770,7 +941,7 @@ fn page_parameters(b: &mut Breaks, r: &Value, op: &str, key: &str) -> (Value, Ve
                 depends.push(d.to_owned());
             }
         }
-        let ids: Vec<Value> = depends.iter().map(|d| id("unit", d)).collect();
+        let ids: Vec<Value> = depends.iter().map(|d| id::<objects::Unit>(d)).collect();
         p.insert("depends_on".into(), json!(ids));
     }
     (p.into(), depends)
@@ -794,12 +965,24 @@ fn named_clauses(repository: Option<&str>, specs: Option<&Value>) -> Vec<Value> 
             keys.push(key);
         }
     }
-    keys.iter().map(|k| id("clause", k)).collect()
+    keys.iter().map(|k| id::<objects::Clause>(k)).collect()
 }
-/// The size of the action request as it is sent (R8).
-fn page_size(actor: &Actor, action: &str, rid: &str, p: &Value) -> Result<(), Failure> {
-    let size = serde_json::to_vec(&store::body(actor, action, rid.to_owned(), p.clone()));
-    let size = size.map_or(usize::MAX, |b| b.len());
+/// The size of the action request as it is sent (R8): the request of the op `op` for the checked parameters `p`.
+fn page_size(call: &work::Call, op: &str, p: &Value) -> Result<(), Failure> {
+    let size = match op {
+        "add" => store::request_bytes(call, &add_action(p)?),
+        "amend" => store::request_bytes(call, &amend_action(p)?),
+        "drop" => store::request_bytes(call, &drop_action(p)?),
+        _ => {
+            let unit = id_member(p, "unit");
+            let ready = actions::ReadyUnit {
+                intent: None,
+                page_digest: None,
+                unit: required(unit, "unit")?,
+            };
+            store::request_bytes(call, &ready)
+        }
+    };
     match size > PAGE_LIMIT {
         true => Err(fail(
             "page_too_large",
@@ -859,9 +1042,12 @@ fn write(
             let reason = bounded(r, "reason", 600, true);
             let reason = b.text(reason, r.get("reason"), 600).flatten();
             let reason = reason.unwrap_or_default();
-            (json!({"unit": id("unit", key), "reason": reason}), vec![])
+            (
+                json!({"unit": id::<objects::Unit>(key), "reason": reason}),
+                vec![],
+            )
         }
-        _ => (json!({"unit": id("unit", key)}), vec![]),
+        _ => (json!({"unit": id::<objects::Unit>(key)}), vec![]),
     };
     if let Some((first, all)) = b.refusal() {
         *fields = Some(all);
@@ -873,7 +1059,7 @@ fn write(
         role: claim,
     };
     let rid = format!("{}-{op}", rid.unwrap_or_default());
-    let action = format!("{}_unit", if op == "add" { "add" } else { op });
+    let call = actor.call(rid.clone());
     // The clauses the page names and the digest of the page as the action leaves it (R42, R43): for `add` from
     // the request; for `amend` the clauses the request alone names and a digest of its length, until the read.
     let names_clauses = r.get("specs").is_some() || r.get("repository").is_some();
@@ -886,7 +1072,7 @@ fn write(
         "amend" => p["page_digest"] = json!("0".repeat(64)),
         _ => {}
     }
-    page_size(&actor, &action, &rid, &p)?;
+    page_size(&call, op, &p)?;
     if lead_in_environment(s) {
         return Err(error("role_in_environment", "ONT_ROLE"));
     }
@@ -899,7 +1085,8 @@ fn write(
     // `amend` and `drop` of a unit the store does not have: the actions would answer another refusal.
     let mut revision = None;
     if op != "add" {
-        let Some((read, stored)) = at(store::head(s, store, "unit", key), "unit")? else {
+        let Some((read, stored)) = at(store::head_of::<objects::Unit>(s, store, key), "unit")?
+        else {
             return Err(error("unknown_unit", "unit"));
         };
         revision = Some(read);
@@ -920,21 +1107,22 @@ fn write(
                 p["clauses"] = json!(named);
             }
             p["page_digest"] = json!(render::page_digest(key, &page));
-            page_size(&actor, &action, &rid, &p)?;
+            page_size(&call, op, &p)?;
         }
     }
     for d in &depends {
-        if at(store::get(s, store, "unit", d), "depends_on")?.is_none() {
+        if at(store::get_of::<objects::Unit>(s, store, d), "depends_on")?.is_none() {
             return Err(fail("unknown_dependency", "depends_on", json!(d)));
         }
     }
     let applied = match op {
-        "add" => store::add_unit(s, store, &actor, rid, p),
+        "add" => (add_action(&p)).and_then(|a| store::apply_action(s, store, &call, &a)),
         "amend" => {
-            let revision = revision.unwrap_or_default();
-            store::amend_unit_at(s, store, &actor, rid, p, &revision)
+            let expected = vec![(id::<objects::Unit>(key), revision.unwrap_or_default())];
+            let call = work::Call { expected, ..call };
+            (amend_action(&p)).and_then(|a| store::apply_action(s, store, &call, &a))
         }
-        _ => store::drop_unit(s, store, &actor, rid, p),
+        _ => (drop_action(&p)).and_then(|a| store::apply_action(s, store, &call, &a)),
     };
     let applied = match at(applied, op) {
         Err(f) if op == "add" && store::code(&f) == "revision_conflict" => {
@@ -955,7 +1143,7 @@ fn write(
     Ok(answer)
 }
 fn read_back(s: &mut impl System, store: Option<&str>, key: &str) -> Result<Value, Failure> {
-    let back = at(store::get(s, store, "unit", key), "unit")?;
+    let back = at(store::get_of::<objects::Unit>(s, store, key), "unit")?;
     back.ok_or_else(|| error("store_answer_unreadable", "unit"))
 }
 /// `ready` (R20 to R28): the unit read once, its page review, its checks on the base, the apply.
@@ -967,14 +1155,10 @@ fn ready(
     key: &str,
     after: &mut Option<String>,
 ) -> Result<Value, Failure> {
-    let read = at(store::head(s, store, "unit", key), "unit")?;
+    let read = at(store::head_of::<objects::Unit>(s, store, key), "unit")?;
     let (revision, u) = read.ok_or_else(|| error("unknown_unit", "unit"))?;
     // The digest goes with every unit, so that the store names its first failed criterion (R21).
     let digest = render::page_digest(key, &u);
-    let mut p = json!({"unit": id("unit", key), "page_digest": digest});
-    if u["lane"] == "objective" {
-        p["intent"] = u["intent"].clone();
-    }
     let (mut base, mut checks) = (Value::Null, vec![]);
     if u["state"] == "draft" {
         write_set_judged(&u)?;
@@ -992,10 +1176,23 @@ fn ready(
         }
         (base, checks) = on_base(s, store, &u)?;
     }
-    let applied = at(
-        store::ready_unit(s, store, actor, rid, p, &revision),
-        "ready",
-    )?;
+    // The intent is copied from the unit's head, which the store may have written unreadable: the form ends
+    // here, nothing applied.
+    let intent = match u["lane"] == "objective" {
+        true => store::id_of::<objects::Intent>(&u["intent"], NAME_READY)?,
+        false => None,
+    };
+    let action = actions::ReadyUnit {
+        intent,
+        page_digest: Some(values::Sha256Hex(digest)),
+        unit: Id::new(key),
+    };
+    let expected = vec![(id::<objects::Unit>(key), revision)];
+    let call = work::Call {
+        expected,
+        ..actor.call(rid)
+    };
+    let applied = at(store::apply_action(s, store, &call, &action), "ready")?;
     *after = Some("ready".into());
     let back = read_back(s, store, key)?;
     Ok(
@@ -1016,7 +1213,7 @@ fn accepted_page(
         "reviews",
     )?;
     for k in keys {
-        let review = at(store::get(s, store, "review", &k), "reviews")?;
+        let review = at(store::get_of::<objects::Review>(s, store, &k), "reviews")?;
         let Some(v) = review else { continue };
         if v["kind"] == "page"
             && v["status"] == "closed"

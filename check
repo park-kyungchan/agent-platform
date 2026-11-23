@@ -45,6 +45,9 @@ fi
 pin=$(tr -d '[:space:]' < ontology/ENGINE-PIN)
 [[ "$pin" =~ ^[0-9a-f]{40}$ ]] || { echo "engine_pin_invalid@ontology/ENGINE-PIN" >&2; exit 2; }
 ont_bin=$(bash ci/engine-pin.sh "$pin")
+# The build of `ap` (clippy, test, the engine tests) generates its module of the schema with this engine
+# (crates/ap/build.rs), so every step of the check uses the one.
+export ONT_BIN="$ont_bin"
 
 bash scripts/test-install-ap.sh
 cargo fmt --all -- --check

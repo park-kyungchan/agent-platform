@@ -2,6 +2,7 @@
 //! unit's object (`specs/ap/unit.md` R29 to R34).
 use super::object::clone_of;
 use crate::host::{Failure, System, digest, error};
+use crate::store::work::objects;
 use crate::store::{self, at};
 use serde_json::Value;
 
@@ -40,7 +41,7 @@ pub fn page(
     role: Option<Role>,
     digest_only: bool,
 ) -> Result<String, Failure> {
-    let unit = at(store::get(s, store, "unit", key), "unit")?;
+    let unit = at(store::get_of::<objects::Unit>(s, store, key), "unit")?;
     let u = unit.ok_or_else(|| error("unknown_unit", "unit"))?;
     if digest_only {
         return Ok(format!("{}\n", page_digest(key, &u)));
@@ -175,7 +176,7 @@ fn for_part(s: &mut impl System, store: Option<&str>, u: &Value) -> Result<Strin
     let mut out = "## For\n\n".to_owned();
     if u["lane"] == "objective" {
         let key = u["intent"]["native_key"].as_str().unwrap_or_default();
-        let intent = at(store::get(s, store, "intent", key), "intent")?;
+        let intent = at(store::get_of::<objects::Intent>(s, store, key), "intent")?;
         let intent = intent.ok_or_else(|| error("unknown_intent", "intent"))?;
         let field = |k: &str| lines(intent[k].as_str().unwrap_or_default());
         out.push_str(&format!("Intent: {key}\nOutcome: {}", field("outcome")));
@@ -183,7 +184,7 @@ fn for_part(s: &mut impl System, store: Option<&str>, u: &Value) -> Result<Strin
         return Ok(out);
     }
     let key = u["origin"]["native_key"].as_str().unwrap_or_default();
-    let request = at(store::get(s, store, "request", key), "origin")?;
+    let request = at(store::get_of::<objects::Request>(s, store, key), "origin")?;
     let request = request.ok_or_else(|| error("unknown_request", "origin"))?;
     let words = request["words"].as_str().unwrap_or_default();
     let shown = cut(words, WORDS_BOUND);
