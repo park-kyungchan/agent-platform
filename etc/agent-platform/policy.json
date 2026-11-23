@@ -26,16 +26,16 @@
  },
  "accounts": {
   "claude": [
-   "/root/.claude"
+   "/root/.claude-api"
   ],
   "claude/reviewer": [
-   "/root/.claude"
+   "/root/.claude-api"
   ],
   "claude/sonnet": [
-   "/root/.claude"
+   "/root/.claude-api"
   ],
   "claude/haiku": [
-   "/root/.claude"
+   "/root/.claude-api"
   ],
   "muse": [
    "/root/.config/muse"
@@ -65,7 +65,7 @@
   "runtime": "claude",
   "model": "opus",
   "effort": "high",
-  "account": "/root/.claude",
+  "account": "/root/.claude-api",
   "permission_mode": "auto",
   "models": [
    "opus",
@@ -160,5 +160,8 @@
     "max_requests": 300
    }
   }
+ },
+ "api_key_accounts": {
+  "/root/.claude-api": "/etc/agent-platform/credentials/anthropic-stage-key"
  }
 }
