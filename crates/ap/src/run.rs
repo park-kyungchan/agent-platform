@@ -3355,8 +3355,10 @@ struct Here<'a> {
     ready: bool,
     proxy: Option<egress::Proxy>,
     door: Option<crate::door::Door>,
-    removal: Option<std::mem::DropGuard<&'a str, fn(&str)>>,
+    removal: Option<Removal<'a>>,
 }
+/// The guard that removes the scratch directory this call made (R8).
+type Removal<'a> = std::mem::DropGuard<&'a str, fn(&str)>;
 /// The scratch directory, after the claim and before the first launch here; the door; then the
 /// stage's network and its proxy (a failure of any is a call that launches nothing).
 fn make_here<'a>(s: &mut impl System, q: &'a Request, hooks: Option<&Path>) -> Here<'a> {
