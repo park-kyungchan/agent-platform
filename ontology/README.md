@@ -1686,3 +1686,92 @@ under version 17: every object read under version 17 and the ten views read the 
 negative reservation and a settlement above it, and a job no policy names, stored as given; a `start_run` and a
 `close_run` without the new parameters, which read as on version 17. The last line of standard output of the rehearsal
 is `v18 credit: ok`.
+
+## Version 19: sessions as runs, KPIs of an intent, measures
+Version 18 remains pinned at
+`682ec9d9d3c6c3917860990b10b6a595f92b9c6b:ontology/work.schema.json`,
+sha256 `233aab1431aea0385c5333fdd01d20eb966c4c941fa462c85dbc506e7771f5e0`.
+Version 19 changes what points 1, 5 and 6 below name (`run`, `kpi` and the grant) and adds what points 2 to 6 name; every
+other value type, source, object type, link type, action, view and function of version 18 reads the same in canonical
+JSON.
+
+What the work cost is read from the store: every Claude Code session of this platform's agents and stages on this host
+is a `run` with its list-price spend by UTC day and its refusals. `ap measure sessions` (`specs/ap/measure.md`) measures
+the run `ap run` made for a stage and records a session no `ap run` started (a Lead's, its subagents', a page writer's)
+from the session records and the stage records; `ont fn cost` answers from these runs and the merged units. A KPI may
+belong to an intent, whose KPIs unit m-kpi measures with `flow` and `share`.
+
+1. `run` gains the optional properties `days` (an array of `{"day", "messages", "usd_micros", "refusals", "file_reads",
+   "file_writes", "store_reads", "store_writes"}`, `day` a string and the others integers: for each UTC day
+   `YYYY-MM-DD` of the run's messages, their count, their cost at list price in millionths of a USD, and that day's
+   refusals and reads and writes of `specs/ap/measure.md` R7), `refusals` (integer: the sum of the days') and
+   `measured_at` (`utc_time`). No criterion of an earlier action reads them.
+2. `record_session` makes one closed run of a session no `ap run` started. Required: `session` (`nonempty_text`, 200),
+   `role` (40), `runtime` (40), `model` (80), each `nonempty_text`, `started_at` and `ended_at` (`utc_time`); optional:
+   `account` (string, 200), `record` (`file_path`), `intent` (reference to `intent`), `host` (reference to `host`),
+   `uses` (reference to `account`), `input_tokens`, `cache_read_tokens`, `cache_write_tokens`, `output_tokens`
+   (integers). Criteria: `ended_before_started` (`started_at` later than `ended_at`); `ended_in_future` (`ended_at` later
+   than `$now`). One rule `create_object` of `run` with them, `status` `closed`, `state` `session` and `measured_at`
+   `$now`.
+3. `extend_session`: `run` (reference, required), `ended_at` (`utc_time`, required), optional `model` (`nonempty_text`,
+   80) and the four token counts. Criteria: `not_a_session_run` (the run does not exist, or its `state` is absent or not
+   `session`), `ended_in_future`, `ended_before_started` (earlier than the run's `started_at`). One rule `modify_object`
+   of `run` sets `ended_at` and the parameters given; one not given leaves its property as it is.
+4. `measure_run`: `run` (reference), `days` (the type of point 1) and `refusals` (integer), all required. Criterion
+   `unknown_run`. One rule `modify_object` of `run` that sets them and `measured_at` (`$now`) and nothing else, so the
+   role, status, times and token counts `start_run` and `close_run` wrote stay.
+5. `kpi` gains the optional `intent` (reference to `intent`), with the link `kpi_intent` (forward), `intent_kpis`
+   (reverse), `many_to_one`. `set_kpi_intent`: `kpi` and `intent` (references, required); criteria `unknown_kpi`,
+   `unknown_intent`, `duplicate_kpi_in_intent` (a KPI of that intent other than the KPI itself has its `name`; the
+   criterion reads it as a KPI of the intent with that name and another `task`, since `define_kpi` keeps a name unique
+   within a task, so setting a KPI to its own intent again is no refusal); one rule `modify_object` of `kpi`.
+6. The functions, each `program` `/usr/local/bin/ap`, `answer_bytes` 65536, `timeout_ms` 600000 (the engine's most: `cost`
+   reads the indicators of the merged units, as `gate` does): `cost` (`since`, `until`: string, required; `by`,
+   `intent`: string, optional), `flow` (`intent`, `since`, `until`: string, required), `share` (`since`, `until`: string,
+   required; `intent`: string, optional). Their answers are `specs/ap/measure.md` R9 to R11 (`flow` and `share` refused
+   `function_not_built` until unit m-kpi). The grant's `actions` gain the four actions. Nothing else of the schema
+   changes.
+
+Each new action and function has one description of at most 200 bytes; no new property or parameter has one, so that
+`ont_describe` and `ont_action_list` stay within 262,144 bytes. The engine's codes the walk below reads: `record_session`
+with `ended_at` before `started_at` is `ended_before_started`, with `ended_at` after now `ended_in_future`;
+`extend_session` of a run of `start_run` is `not_a_session_run` (with `ended_before_started` when its `ended_at` is
+before that run's start), with an `ended_at` after now `ended_in_future`; `measure_run` of a run the store does not have
+is `unknown_run`; `set_kpi_intent` of a KPI and an intent the store does not have is `unknown_kpi` and `unknown_intent`,
+and of a second KPI of one name in an intent `duplicate_kpi_in_intent`.
+
+### What the store does not check
+- That `days` holds a day once, that its entries sum the session records, or that `refusals` is the sum of its days':
+  the engine stores the array and the integer it is given; `ap measure sessions` computes them.
+- That a session is recorded once: two `record_session` of one session under two request ids make two runs; the pass
+  keeps it so, by one request id per session and record and by matching the runs it found before it records one.
+- That `role` holds the read-out's words (`lead`, `worker, no record`, `interactive`, or a stage record's role): it is a
+  string of at most 40 bytes.
+- That a run's `days` are current: a run whose session file is gone keeps the `days` last measured (a pass leaves a run
+  it reads nothing of unchanged, `specs/ap/measure.md` R6).
+- That `record` is a stage record's path, or `session` a session of the account: the pass sets them from what it read.
+- That a KPI's intent is the intent of its task's work: `set_kpi_intent` is the Lead's or m-kpi's.
+- That the program at `/usr/local/bin/ap` answers the functions: an `ap` older than this change refuses an empty
+  argument list with these names, and the call is `function_failed`.
+
+### The migration and the rehearsal
+`ontology/migrate` knows version 19; its step is empty (no data migration): no stored run gains days and no KPI an
+intent. The line `HIGHEST = 19` names it; `19 20` and `9 20` are pairs it does not know (exit 2). The pairs refused on
+the version 10 part of the rehearsal are (9, 20), (10, 10) and (10, 9). An `ap` of the version before sends every action
+as on version 18, and they apply as on version 18; `ap run` sends `start_run` and `close_run` so in this version too.
+
+The second store of the rehearsal now installs version 18 from Git by its commit and digest (above) instead of the
+repository's file, and runs the walk of version 18 on it. Then it installs the repository's file over the objects made
+under version 18: every object read under version 18 and the ten views read the same; the schema differs from version
+18 only by points 1 to 6 (each is taken off a copy and the rest compared); `ont describe` lists `cost` (`since`,
+`until`, `by`, `intent`), `flow` (`intent`, `since`, `until`) and `share` (`since`, `until`, `intent`) beside
+`api_spend`, `capacity`, `clause`, `gate`, `horizon` and `route`; `ont_describe` and `ont_action_list` stay within
+262,144 bytes (the line `v19_mcp_bytes=`); `ontology/migrate` runs 18 19 (exit 0, the store unchanged) and 19 20 (exit
+2). The walk of version 19, each refusal before the action it guards: `record_session` with `ended_at` before
+`started_at` (`ended_before_started`) and after now (`ended_in_future`), then one with every parameter, read back by
+`ont get` with every property; `extend_session` of a run of `start_run` (`not_a_session_run`), then of the session's run,
+read back; `measure_run` of a run the store does not have (`unknown_run`), then of the session's run, read back;
+`measure_run` on a run of `start_run` and `close_run`, which keeps its `ended_at` and token counts; `set_kpi_intent` of
+an absent KPI and intent (`unknown_kpi`, `unknown_intent`), of a KPI to an intent, reached by `ont around` from the
+intent by `intent_kpis`, of that KPI and intent again under another request id (applied), and of a second KPI of that
+name to the intent (`duplicate_kpi_in_intent`). The last line of standard output of the rehearsal is `v19 measures: ok`.
