@@ -114,7 +114,7 @@ def run(argv):
     opened, seen, failed = [], [], []
     left = already = 0
     if verdict is not None:
-        engine = L.Engine(store, M.AGENT)
+        engine = L.Engine(store, M.AGENT, "api")
         found = engine.search("finding", [{"eq": ["detector", M.DETECTOR]}])
         if found is None:
             raise L.Refuse("store_failed", exit_code=3)

@@ -817,7 +817,8 @@ class BatchMiningTest(Case):
         self.assertEqual(len(applies), 3)
         for e in applies:
             body = e["body"]
-            self.assertEqual(set(body), {"action_type", "parameters", "agent", "request_id"})
+            self.assertEqual(set(body), {"action_type", "parameters", "agent", "request_id", "role"})
+            self.assertEqual(body["role"], "api")
             self.assertEqual(body["agent"], "batch-mining")
             self.assertRegex(body["request_id"], r"^bm-[0-9a-f]{40}$")
             self.assertEqual(e["argv"][-4:], ["action", "apply", "--client", "batch-mining"])

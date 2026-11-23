@@ -139,7 +139,7 @@ fn apply(action: &str, request: String, parameters: Value) -> Step {
     step(
         "ont",
         "action apply --client lead",
-        json!({"action_type":action,"request_id":request,"parameters":parameters}),
+        json!({"action_type":action,"request_id":request,"role":"lead","parameters":parameters}),
         json!({"status":"ok","result":{"outcome":"applied","edits":if action == "start_review" {
             json!([{"change":"initial","id":id("review")}])
         } else {

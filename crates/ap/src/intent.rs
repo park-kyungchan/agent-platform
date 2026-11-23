@@ -369,6 +369,7 @@ fn write<S: System>(
     let actor = Actor {
         agent: shaped(r, "agent", 64, "._:-")?,
         session: shaped(r, "session", 64, "._:-")?,
+        role: "lead",
     };
     let plan: Plan<S> = plan(op, r)?;
     let added = match op {

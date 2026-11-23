@@ -192,6 +192,7 @@ pub(super) fn pass(s: &mut impl System, argv: &[OsString]) -> Result<(Value, u8)
     let actor = Actor {
         agent: "ap-measure",
         session: &session,
+        role: "measure",
     };
     // Each function runs once for an intent in a pass.
     let mut answers: BTreeMap<(&str, String), Result<Value, String>> = BTreeMap::new();

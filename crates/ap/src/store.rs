@@ -14,10 +14,12 @@ const WAIT: Duration = Duration::from_millis(200);
 /// 15 heads (about 1,000,000 bytes) fit with the envelope; a larger page fails once requests are long.
 pub const PAGE: u64 = 15;
 
-/// Who applies: the request's `agent` and `session`, with the client `ap`.
+/// Who applies: the request's `agent` and `session`, with the client `ap`, and the `role` the verb claims
+/// (`specs/ap/roles.md` R3).
 pub struct Actor<'a> {
     pub agent: &'a str,
     pub session: &'a str,
+    pub role: &'a str,
 }
 /// The role `lead` of an apply, with the revision of the intent it was decided on: the apply passes it
 /// as `expected`, so an intent changed since (a Lead renamed) ends `revision_conflict`.
@@ -120,7 +122,7 @@ fn apply(
 ) -> Result<Applied, Failure> {
     apply_as(s, store, actor, action, request_id, parameters, None)
 }
-/// An apply; with `lead`, the role `lead` and the intent's revision as `expected`.
+/// An apply; with `lead`, the intent's revision as `expected`.
 fn apply_as(
     s: &mut impl System,
     store: Option<&str>,
@@ -132,15 +134,14 @@ fn apply_as(
 ) -> Result<Applied, Failure> {
     let mut body = body(actor, action, request_id, parameters);
     if let Some(lead) = lead {
-        body["role"] = json!("lead");
         body["expected"] = json!([{"id": lead.intent, "revision": lead.revision}]);
     }
     send(s, store, &body)
 }
-/// The action request as it is sent, without a role and without `expected`.
+/// The action request as it is sent, with the actor's role and without `expected`.
 pub fn body(actor: &Actor, action: &str, request_id: String, parameters: Value) -> Value {
     json!({"action_type": action, "request_id": request_id, "agent": actor.agent,
-        "session": actor.session, "parameters": parameters})
+        "session": actor.session, "role": actor.role, "parameters": parameters})
 }
 /// One apply of a whole action request.
 fn send(s: &mut impl System, store: Option<&str>, body: &Value) -> Result<Applied, Failure> {
@@ -159,14 +160,15 @@ fn applied(v: &Value) -> Result<Applied, Failure> {
     }
 }
 /// The stage runner's own action (`specs/ap/run-object.md`): one attempt bound to 15 seconds, as the
-/// agent `ap-run` with the stage's `role`.
+/// agent `ap-run` claiming `claim` (`dispatch`, or `api` for `ap api batch`), with the stage's `role` as
+/// the parameter of the run.
 fn once(
     s: &mut impl System,
     store: Option<&str>,
-    action: &str,
-    (rid, role, parameters): (&str, &str, &Value),
+    (action, claim): (&str, &str),
+    (rid, _role, parameters): (&str, &str, &Value),
 ) -> Result<Applied, Failure> {
-    let body = json!({"action_type": action, "request_id": rid, "agent": "ap-run", "role": role,
+    let body = json!({"action_type": action, "request_id": rid, "agent": "ap-run", "role": claim,
         "parameters": parameters});
     let v = call_in(
         s,
@@ -177,21 +179,37 @@ fn once(
     )?;
     applied(&v)
 }
-/// Schema version 11 on: a `running` run of a stage.
+/// Schema version 11 on: a `running` run of a stage, claimed as `dispatch` (`specs/ap/roles.md` R3).
 pub fn start_run(
     s: &mut impl System,
     store: Option<&str>,
     call: (&str, &str, &Value),
 ) -> Result<Applied, Failure> {
-    once(s, store, "start_run", call)
+    once(s, store, ("start_run", "dispatch"), call)
 }
-/// Schema version 11 on: the run closed with the stage's end.
+/// Schema version 11 on: the run closed with the stage's end, claimed as `dispatch`.
 pub fn close_run(
     s: &mut impl System,
     store: Option<&str>,
     call: (&str, &str, &Value),
 ) -> Result<Applied, Failure> {
-    once(s, store, "close_run", call)
+    once(s, store, ("close_run", "dispatch"), call)
+}
+/// The `start_run` of `ap api batch`, claimed as `api`.
+pub fn start_run_api(
+    s: &mut impl System,
+    store: Option<&str>,
+    call: (&str, &str, &Value),
+) -> Result<Applied, Failure> {
+    once(s, store, ("start_run", "api"), call)
+}
+/// The `close_run` of `ap api batch`, claimed as `api`.
+pub fn close_run_api(
+    s: &mut impl System,
+    store: Option<&str>,
+    call: (&str, &str, &Value),
+) -> Result<Applied, Failure> {
+    once(s, store, ("close_run", "api"), call)
 }
 /// True only when one `ont get` of the object answers `unavailable`; any other answer or failure of
 /// that read (one attempt of 15 seconds) is not an absence.
@@ -263,7 +281,7 @@ pub fn route_request_to_finding(
 ) -> Result<Applied, Failure> {
     apply(s, store, actor, "route_request_to_finding", rid, p)
 }
-/// The actions of `ap intent` that carry no role.
+/// The actions of the verbs of the Lead and of the services: each claims the role of its actor.
 macro_rules! actions {
     ($($action:ident),*) => {$(
         pub fn $action(
@@ -294,11 +312,11 @@ actions!(
     end_delegation,
     close_unit_review
 );
-// Schema version 17 on: the actions of `ap resource` (`specs/ap/resource.md` R5, R8), without a role.
+// Schema version 17 on: the actions of `ap resource` (`specs/ap/resource.md` R5, R8).
 actions!(declare_host, observe_host, observe_account);
 /// Schema version 11 on: an action of `ap unit run`, `ap unit reject` on a unit (`start_unit`,
-/// `resume_unit`, `record_head`, `stop_unit`, `accept_unit`, `reopen_unit`, `merge_unit`), without a
-/// role.
+/// `resume_unit`, `record_head`, `stop_unit`, `accept_unit`, `reopen_unit`, `merge_unit`), with the
+/// actor's role.
 pub fn unit_action(
     s: &mut impl System,
     store: Option<&str>,
@@ -320,7 +338,7 @@ pub fn approve_unit(
 ) -> Result<Applied, Failure> {
     apply_as(s, store, actor, "approve_unit", rid, p, Some(lead))
 }
-/// The Lead proceeds on a draft: with `approve_unit`, the only actions that carry the role `lead`.
+/// The Lead proceeds on a draft: with `approve_unit`, the actions that also carry the intent's revision as `expected`.
 pub fn assume_intent(
     s: &mut impl System,
     store: Option<&str>,
@@ -363,7 +381,7 @@ pub fn start_unit_review(
 ) -> Result<Applied, Failure> {
     send(s, store, body)
 }
-/// `ready_unit` without a role, with the unit's id and the revision it was read at as `expected`: a
+/// `ready_unit` with the actor's role, with the unit's id and the revision it was read at as `expected`: a
 /// unit changed since that read ends `revision_conflict`.
 pub fn ready_unit(
     s: &mut impl System,
@@ -684,7 +702,7 @@ pub fn around(
     let matched = r["basis"]["matched"].as_u64().ok_or_else(unreadable)?;
     Ok((found, matched))
 }
-/// `amend_unit` without a role, with the unit's id and the revision it was read at as `expected`
+/// `amend_unit` with the actor's role, with the unit's id and the revision it was read at as `expected`
 /// (`specs/ap/unit.md` R42): a unit changed since that read ends `revision_conflict`.
 pub fn amend_unit_at(
     s: &mut impl System,

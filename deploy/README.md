@@ -78,6 +78,29 @@ ont --version                                                      # the engine'
 
 Undo: remove the member `engine` from `/etc/agent-platform/deliver.json`; delivery then stops on a difference of the engine or the schema as before (`engine_differs`, `schema_differs`) and reads no marker. An installed engine goes back with the engine's own rollback, with the timer stopped: `bash /var/lib/agent-platform/deliver/ontology-platform/scripts/install-ont.sh rollback`. A schema is repaired by a higher version, installed forward; delivery never restores the store from a backup.
 
+## Roles
+
+Each service that runs `ap` or applies to the store has one line `Environment=ONT_ROLE=<role>` (`specs/ap/roles.md` R4): `ap-work` `dispatch`; `ap-deliver` `deliver`; `ap-watch` `watch`; `ap-route` and `ap-clause` `route`; `ap-resource`, `ap-quota`, `ap-status-page` and `ap-measure` `measure`; `ap-api-nightly` and `ap-api-weekly` `api`; `ont-backup.service` has none. It is the role of the service's function calls and of a program it runs that is not `ap`; `ap` names its own role in each apply (R3). The roles of the grants are those of `deploy/roles.json`, `{"principals":{"uid:0":[...]}}`, the file the engine reads beside the store (`/var/lib/ontology-platform/ont/roles.json`, mode 0644): without it every claimed role is refused `role_not_admitted` (`roles_file_absent`) and every apply with no role `not_granted`.
+
+A call of `ap deliver` with `engine` compares the blob `deploy/roles.json` of the tip with that file after the marker and before the engine and the schema (`specs/ap/deliver.md` R58): equal bytes are `same`, a differing regular file is kept beside it as `roles.json.before-<12 hex>` and the tip's bytes are written (`written`), no blob at the tip is `absent`, and an entry that is not a regular file, or any failure, ends the call `roles_install_failed` (exit 4, `detail` `{"path"}`) with nothing else installed. The record's member `roles` is `{"before", "after", "result"}`. A change of the host's roles file by hand is put back only by the next merge's delivery (deliver.md R39, R58): the call that ends `current` does not look at it. No rollback of it is built: from the kept copy by hand (`install -m 0644 roles.json.before-<12 hex> roles.json` in that directory, read back by `sha256sum`).
+
+Read the state of a delivery's roles step:
+
+```sh
+python3 -I -c 'import json; r = json.load(open("/var/lib/agent-platform/deliver/last.json")); print(r["end"], r["code"], r.get("roles"))'
+```
+
+## The first delivery of roles
+
+The `ap` installed before this merge sends no role and puts no roles file, and the schema of this merge refuses an apply with no role, so the first delivery is the Lead's, by hand, in this order:
+
+1. Stop every timer of `deploy/` but `ont-backup.timer` (`systemctl stop ap-work.timer ap-deliver.timer ap-watch.timer ap-route.timer ap-clause.timer ap-resource.timer ap-quota.timer ap-status-page.timer ap-measure.timer ap-api-nightly.timer ap-api-weekly.timer`), and read that no service of them runs.
+2. Install `deploy/roles.json` of the merge at `/var/lib/ontology-platform/ont/roles.json` (owner root, mode 0644: `git -C <clone> show <merge>:deploy/roles.json` into a temporary name of that directory, then `mv`), and read it back by `sha256sum` against the blob.
+3. Run `ONT_ROLE=deliver ap deliver < /etc/agent-platform/deliver.json` twice back to back, as the delivery of the schema 21 did (deliver.md R42 to R44): the first call installs the engine of the pin (its record's `target` is `/usr/local/bin/ont`), the second, at once after it, the schema and the pair; its record names the pair at the merge, `schema` `{"from": 21, "to": 22, ...}` with `migrate` `ok` and `roles` `same`. The `ap` before the merge sends no role in its applies; the engine takes the role of the environment when the body has none (engine action.md R12), so `ONT_ROLE=deliver` makes the applies of the second call after the schema step (`start_install`, `close_install`) claim `deliver`, which the grant holds. If the second call ends `store_refused` with `not_granted` or `role_not_admitted`, read the record and put the file back (point 2) before the call is run again.
+4. Start the timers stopped in point 1, and read `systemctl list-timers` and the next pass of each.
+
+The undo: the schema is not lowered (deliver.md R40). A role refused for want of the file (`role_not_admitted`, `roles_file_absent`) comes back when the file is put back: point 2 again.
+
 ## The engine of a pin
 
 A stage of `ap run` holds no credential for `park-kyungchan/ontology-platform` (`specs/ap/unit-run.md` R38) and sees `/usr` read-only (`specs/ap/run-limits.md` R16), so `./check` in a stage cannot build the engine of a pin.

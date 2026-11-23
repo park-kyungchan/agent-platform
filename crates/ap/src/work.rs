@@ -460,6 +460,7 @@ impl Pass {
         let actor = Actor {
             agent: "ap-work",
             session: &self.session,
+            role: "dispatch",
         };
         store::body(&actor, action, rid, p)
     }
@@ -473,6 +474,7 @@ impl Pass {
         let actor = Actor {
             agent: "ap-work",
             session: &self.session,
+            role: "dispatch",
         };
         store::unit_action(s, self.store.as_deref(), &actor, action, rid, p)
     }
@@ -865,6 +867,9 @@ impl Pass {
                 argv.push(format!("{k}={v}"));
             }
         }
+        // A run's function calls claim `dispatch`, whatever this process's own environment holds
+        // (`specs/ap/roles.md` R3).
+        argv.extend(["--setenv".into(), "ONT_ROLE=dispatch".into()]);
         argv.extend([
             "--".into(),
             this_ap(),

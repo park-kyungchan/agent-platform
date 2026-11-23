@@ -167,10 +167,19 @@ def build_store(store, seed):
     """The schema of this tree installed into an empty store, and the seed: none, an intent drafted, or confirmed."""
     if ont(store, ["schema", "install", SCHEMA]) is None:
         return False
+    # The roles file beside the store (engine action.md R113): this process's uid may act as every role of the grants;
+    # the seed applies as `lead` (specs/ap/roles.md R3).
+    with open(SCHEMA, encoding="utf-8") as f:
+        roles = sorted(g["role"] for g in json.load(f)["grants"] if "role" in g)
+    roles_file = os.path.join(store, "roles.json")
+    with open(roles_file, "w", encoding="utf-8") as f:
+        json.dump({"principals": {"uid:%d" % os.getuid(): roles}}, f)
+        f.write("\n")
+    os.chmod(roles_file, 0o644)
 
     def act(kind, params, at):
         r = ont(store, ["action", "apply"], {"action_type": kind, "request_id": "seed-%d" % at, "agent": "seed",
-                                             "session": "seed", "parameters": params}, SEED_NOW + at)
+                                             "session": "seed", "role": "lead", "parameters": params}, SEED_NOW + at)
         return r["edits"][0]["id"] if r else None
     if seed == "none":
         return True

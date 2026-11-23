@@ -1976,3 +1976,79 @@ store makes `--check` refuse `render_drift`, and `--expect-blocks 2` refuses `re
 of a lesson the next render of `lead_state` lacks it; a second open intent of the directory, ten active holds and ten
 more live lessons make `lead_state` exactly 25 lines, with a note of several lines among them. The last line of standard
 output of the rehearsal is `v21 documents: ok`.
+
+## Version 22: roles
+Version 21 remains pinned at
+`72fb5e499221d3dc030404ddfa308c673ba7096e:ontology/work.schema.json`, sha256
+`1812ef2baac76e4c78fc3208c69926d73fb6b5bab7f2ee3361cfa6723499cb35`. Version 22 changes version 21 in one place only,
+`grants` (and the number `version`); every action type, object type, value type, link type, view, source and function reads
+as on version 21 in canonical JSON. The point of the version: one grant of every action to every caller becomes a grant
+per role, so that a service that drives units can no longer approve one, a stage applies nothing, and a Lead's every
+write logs its role. The contract is `specs/ap/roles.md`.
+
+1. The grants. `grants[0]` is a grant of principal `agent` without `role`: `read` and `derive` those of the one grant of
+   version 21, `actions` `[]` and `functions` `["route"]` (a caller with no role calls `route` and applies nothing). Then
+   one grant per role, in this order, each with `scope` `{}`, `derive` `[]`, its actions and functions sorted, and `read`
+   the grant without a role's when it lists an action (the engine refuses a grant that applies an action without reading
+   the types its parameters dereference, `reference_read_forbidden`), else `[]`:
+
+   | Role | Actions | Functions |
+   | --- | --- | --- |
+   | `lead` | every action type (96) | every function (9) |
+   | `dispatch` | `accept_unit`, `amend_unit`, `carry_review`, `close_run`, `close_unit_review`, `merge_unit`, `note_unit_wait`, `record_head`, `reopen_unit`, `resume_unit`, `start_run`, `start_unit`, `start_unit_review`, `stop_unit` | none |
+   | `deliver` | `close_install`, `start_install` | none |
+   | `watch` | `close_finding`, `open_finding`, `reopen_finding`, `see_finding_again` | none |
+   | `route` | none | none |
+   | `measure` | `declare_host`, `extend_session`, `measure_run`, `observe_account`, `observe_host`, `record_measurement`, `record_session` | `api_spend`, `capacity`, `cost` |
+   | `api` | `close_finding`, `close_run`, `open_finding`, `reopen_finding`, `see_finding_again`, `start_run` | none |
+   | `implementer`, `fixer`, `verifier`, `reviewer`, `writer` | none | `clause` |
+
+   `approve_unit` and `record_principle` are in `lead`'s grant alone. A unit that adds an action or a function adds it to
+   `lead`'s grant and to each role that applies or calls it.
+
+2. The engine. `ENGINE-PIN` holds `1553ad19d8dc2d642cdeb4a93187e01f864a22c0`, the ontology-platform merge of the unit
+   sec-grant, whose history holds the pin of version 21 and no other commit is the pin. Under it the request member
+   `role` of `ont action apply` and `ont action validate` is checked: with no role the grant without a role answers
+   (`not_granted` for every action), a role the roles file does not list is `role_not_admitted` (`detail`
+   `role_not_listed`; `roles_file_absent` without the file), and a function call takes its role from `ONT_ROLE` alone.
+   The roles file is `roles.json` in the store's directory, `{"principals":{"uid:<n>":[roles]}}` (`deploy/roles.json`,
+   installed by delivery, `specs/ap/deliver.md` R58). The engine that answers `ont` on a host older than the pin takes
+   neither `functions` of a grant nor `role` of a body: delivery installs the engine first (`specs/ap/deliver.md` R37).
+
+3. Every apply of `ap` names its role (`specs/ap/roles.md` R3); a stage's run is applied by its driver as `dispatch` with
+   the stage's role as the run's parameter, and `ap api batch`'s as `api` with `batch`. The programs outside `ap` that
+   apply send a fixed role in the body and keep dropping `ONT_ROLE`: the batch readers `api`, `evals/cases/reproduce` and
+   `score --record` `lead`, `ontology/migrate` `deliver`. A migration step that applies an action needs that action in
+   `deliver`'s grant. The services carry `Environment=ONT_ROLE=<role>`.
+
+### What the store does not check
+- That each request `record_principle` names exists: a criterion tests no element of an array (engine `specs/ont/action.md`
+  R68). No existence check is built; a later unit needs the engine or a verb.
+- That a root caller claims the role it is: any role the roles file lists may be claimed by any caller of that uid. The
+  role is a guard against error; the boundary against a stage is the operating system and the door.
+- That a stage applies nothing: the grants say so, the stage's view holds no store.
+- That a role's grant keeps up with its programs: a unit that adds an action adds it to the grants itself, and the
+  rehearsal asserts the table, not the programs.
+
+### The migration and the rehearsal
+`ontology/migrate` knows version 22; its step is empty. `HIGHEST = 22`; `22 23` and `21 21` are pairs it does not know
+(exit 2); the pairs refused on the version 10 part of the rehearsal are (9, 23), (10, 10) and (10, 9). Its applies carry
+the role `deliver`. An `ap` of the version before sends no role: it is refused `not_granted` until delivery has installed
+the roles file and the schema (`deploy/README.md`, "The first delivery of roles").
+
+The first store of the rehearsal installs the repository's file over version 9 and, from then on, claims `lead` on each
+apply with a roles file beside the store. The second store installs version 21 from Git by its commit and digest (above)
+instead of the repository's file, runs the walk of version 21 on it, then installs the repository's file: every object
+read under version 21 and the views read the same, the schema differs from version 21 only by `version` and `grants`,
+`ontology/migrate` runs 21 22 and 20 22 (exit 0, the store unchanged) and 22 23 (exit 2). The functions of that copy run a
+program of the rehearsal's own, so that the rows ask only whether a grant lets a call through. The rows of version 22:
+an apply of `note_intent` with no role is `not_granted` (before and after the roles file is written; the
+`env -u ONT_ROLE` of the rehearsal keeps the caller's role out), with the role `lead` and no file `role_not_admitted`,
+with a role the file does not list `role_not_admitted`, with `lead` and with `ONT_ROLE=lead` in the environment applied;
+`approve_unit` and `record_principle` under each role but `lead` are `not_granted`; an `open_finding` under a stage role
+and under `dispatch` is `not_granted`, under `watch` and `api` applied; `declare_host` under `measure` applied and under
+`watch` `not_granted`; `start_install` under `deliver` reaches its criteria; `ont fn route` with no role, under
+`verifier` and under `deliver` answers; `ont fn clause` under `verifier` answers and with no role is `not_granted`;
+`capacity` is `not_granted` with no role and under `verifier` and answers under `measure` and `lead`; `cost` under
+`verifier` is `not_granted`; `ont fn clause` under a role the file does not list is `role_not_admitted`. A row whose
+refusal changed from the base's answer is named in the pull request.

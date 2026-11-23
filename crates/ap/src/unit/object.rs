@@ -74,6 +74,8 @@ pub struct Call {
     pub key: Option<String>,
     pub role: Option<Role>,
     pub digest: bool,
+    /// The role its applies claim: `lead` for the verb, `dispatch` for the amendment of `ap unit write`.
+    pub claim: &'static str,
 }
 /// The arguments after `unit` (R1): any other form is `usage`.
 pub fn arguments(argv: &[OsString]) -> Result<Call, Failure> {
@@ -88,6 +90,7 @@ pub fn arguments(argv: &[OsString]) -> Result<Call, Failure> {
         key: None,
         role: None,
         digest: false,
+        claim: "lead",
     };
     let mut rest = rest.iter();
     if op == "page" {
@@ -123,7 +126,8 @@ pub fn execute(s: &mut impl System, call: &Call, r: &Value) -> Result<String, Bo
             (page, call.key.clone())
         }
         op => {
-            let answer = write(s, store, op, r, &mut after, &mut fields).map(|v| format!("{v}\n"));
+            let answer = write(s, (store, call.claim), op, r, &mut after, &mut fields)
+                .map(|v| format!("{v}\n"));
             (answer, r["unit"].as_str().map(str::to_owned))
         }
     };
@@ -823,7 +827,7 @@ fn members(op: &str) -> String {
 /// A writing op (R2 to R28); `fields` every member that breaks a rule of R2 to R16 (R37).
 fn write(
     s: &mut impl System,
-    store: Option<&str>,
+    (store, claim): (Option<&str>, &str),
     op: &str,
     r: &Value,
     after: &mut Option<String>,
@@ -866,6 +870,7 @@ fn write(
     let actor = Actor {
         agent: agent.unwrap_or_default(),
         session: session.unwrap_or_default(),
+        role: claim,
     };
     let rid = format!("{}-{op}", rid.unwrap_or_default());
     let action = format!("{}_unit", if op == "add" { "add" } else { op });

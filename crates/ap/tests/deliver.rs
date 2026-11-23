@@ -171,6 +171,9 @@ struct W {
     /// The mode of `ontology/migrate` at the tip (None: absent), its exit, and each run: its
     /// arguments and the marker as it was then.
     migrate_mode: Option<&'static str>,
+    /// `deploy/roles.json` at the tip, and whether the clone answers for it.
+    roles_blob: Option<&'static str>,
+    roles_git_fails: bool,
     migrate_exit: i32,
     migrates: Vec<(Vec<String>, Option<String>)>,
     backup_fails: bool,
@@ -292,6 +295,8 @@ impl W {
             ont_install: (None, 0),
             ont_rollback: (None, 0),
             migrate_mode: None,
+            roles_blob: None,
+            roles_git_fails: false,
             migrate_exit: 0,
             migrates: vec![],
             backup_fails: false,
@@ -627,6 +632,13 @@ impl W {
                 }
                 Self::text(true, &lines)
             }
+            ["ls-tree", tip, "--", "deploy/roles.json"] => {
+                assert_eq!(*tip, self.tip());
+                let entry = self.roles_blob.map_or(String::new(), |_| {
+                    format!("100644 blob {}\tdeploy/roles.json\n", "b".repeat(40))
+                });
+                Self::text(!self.roles_git_fails, &entry)
+            }
             ["ls-tree", tip, "--", "ontology/migrate"] => {
                 assert_eq!(*tip, self.tip());
                 let entry = self.migrate_mode.map_or(String::new(), |m| {
@@ -639,6 +651,9 @@ impl W {
                 match path {
                     "content/SHA256SUMS" => Self::text(true, &self.sums(commit)),
                     "ontology/ENGINE-PIN" => Self::text(true, &format!("{}\n", self.pin)),
+                    "deploy/roles.json" => {
+                        Self::text(self.roles_blob.is_some(), self.roles_blob.unwrap_or(""))
+                    }
                     "ontology/work.schema.json" => Self::text(
                         true,
                         &json!({"format": 1, "version": self.tip_schema}).to_string(),
@@ -758,6 +773,7 @@ impl W {
             "action" => {
                 assert_eq!(a, args(&["action", "apply", "--client", "ap-deliver"]));
                 assert_eq!(body["agent"], "ap-deliver");
+                assert_eq!(body["role"], "deliver");
                 let rid = body["request_id"].as_str().unwrap().to_owned();
                 let p = body["parameters"].clone();
                 if body["action_type"] == "start_install" {
@@ -2205,7 +2221,7 @@ fn d12_rollback_exact_calls() {
             eq("kind", json!("rollback")),
         ]),
         apply(
-            json!({"action_type": "start_install", "request_id": format!("ap.{back}.rb1"), "agent": "ap-deliver",
+            json!({"action_type": "start_install", "request_id": format!("ap.{back}.rb1"), "agent": "ap-deliver", "role": "deliver",
             "parameters": {"target": target(), "kind": "rollback", "repository": "o/r", "commit": back, "attempt": 1,
                 "from": here, "from_sha256": sha(&binary(&here)), "rolls_back": a, "by": "session-1",
                 "reason": "after a merge", "host": oid("host", "local")}}),
@@ -2217,7 +2233,7 @@ fn d12_rollback_exact_calls() {
         git(&["ls-tree", &back, "deploy/"]),
         git(&["ls-tree", &here, "deploy/"]),
         apply(
-            json!({"action_type": "close_install", "request_id": format!("ap.{back}.rb1.close"), "agent": "ap-deliver",
+            json!({"action_type": "close_install", "request_id": format!("ap.{back}.rb1.close"), "agent": "ap-deliver", "role": "deliver",
             "parameters": {"install": id, "outcome": "installed", "to": back}}),
         ),
         index,
@@ -3101,7 +3117,7 @@ fn d10_exact_calls_of_an_install() {
             vec![eq("target", target()), eq("commit", json!(tip))],
         ),
         apply(
-            json!({"action_type": "start_install", "request_id": format!("ap.{tip}.1"), "agent": "ap-deliver",
+            json!({"action_type": "start_install", "request_id": format!("ap.{tip}.1"), "agent": "ap-deliver", "role": "deliver",
             "parameters": {"target": target(), "kind": "forward", "repository": "o/r", "commit": tip, "attempt": 1,
                 "from": from, "from_sha256": sha(&binary(&from)), "by": "session-1", "reason": "after a merge",
                 "head": h(2), "review": w.accepting(2), "reviews": [w.accepting(1), w.accepting(2)],
@@ -3114,7 +3130,7 @@ fn d10_exact_calls_of_an_install() {
         // The unit files of T (R48): `deploy/` of the fake holds none.
         git(&["ls-tree", &tip, "deploy/"]),
         apply(
-            json!({"action_type": "close_install", "request_id": format!("ap.{tip}.1.close"), "agent": "ap-deliver",
+            json!({"action_type": "close_install", "request_id": format!("ap.{tip}.1.close"), "agent": "ap-deliver", "role": "deliver",
             "parameters": {"install": oid("install", &format!("act-ap.{tip}.1")), "outcome": "installed", "to": tip,
                 "rollback_binary": kept, "rollback_content": w.tarball()}}),
         ),
@@ -3376,7 +3392,7 @@ impl W {
     fn engine() -> Self {
         let mut w = W::new();
         w.engine = true;
-        for d in ["ont-bin", "ont-state/install"] {
+        for d in ["ont-bin", "ont-state/install", "ont-state/ont"] {
             std::fs::create_dir_all(w.t.join(d)).unwrap();
         }
         (w.ont, w.pin) = (ec(0), ec(2));
@@ -4194,11 +4210,11 @@ fn e_without_engine_the_marker_is_not_read_and_the_record_is_unchanged() {
     assert_eq!((end(&v), exit), (("installed", ""), 0), "{v}");
     assert!(w.migrates.is_empty() && w.marker_present());
     assert_eq!(members(&v), sorted());
-    // With `engine` the record has one more member, `schema`.
+    // With `engine` the record has two more members, `schema` and `roles` (R46, R59).
     let mut w = W::at_pin();
     let (v, _) = w.run();
     let mut want = sorted();
-    want.push("schema".into());
+    want.extend(["schema".into(), "roles".into()]);
     want.sort();
     assert_eq!(members(&v), want);
     assert_eq!(w.last(), Some(v));
@@ -6356,4 +6372,186 @@ fn x_the_step_runs_after_current_and_before_the_checkouts() {
         .position(|(_, a, _)| a.first().is_some_and(|x| x == "--no-optional-locks"));
     assert!(first_co.is_some_and(|n| n > last_etc));
     assert!(w.applies("start_install").is_empty() && w.applies("close_install").is_empty());
+}
+
+/// The roles file the engine reads, in the directory of the scratch store's path.
+fn roles_path(w: &W) -> PathBuf {
+    w.t.join("ont-state/ont/roles.json")
+}
+const ROLES_NEW: &str = "{\"principals\":{\"uid:0\":[\"lead\"]}}\n";
+const ROLES_OLD: &str = "{\"principals\":{\"uid:0\":[]}}\n";
+fn no_store_write(w: &W) -> bool {
+    !w.calls.iter().any(|c| {
+        c.0 == "ont"
+            && matches!(
+                c.1.first().map(String::as_str),
+                Some("backup" | "schema" | "action")
+            )
+    })
+}
+
+// spec: specs/ap/deliver.md#R58
+// spec: specs/ap/deliver.md#R59
+#[test]
+fn r58_roles_file_equal_is_same_and_the_record_names_both_digests() {
+    let mut w = W::at_pin();
+    w.roles_blob = Some(ROLES_NEW);
+    std::fs::write(roles_path(&w), ROLES_NEW).unwrap();
+    let (v, exit) = w.run();
+    assert_eq!((end(&v), exit), (("installed", ""), 0), "{v}");
+    let d = sha(ROLES_NEW.as_bytes());
+    assert_eq!(
+        v["roles"],
+        json!({"before": d, "after": d, "result": "same"})
+    );
+    assert_eq!(std::fs::read_to_string(roles_path(&w)).unwrap(), ROLES_NEW);
+    assert_eq!(w.last(), Some(v));
+}
+
+// spec: specs/ap/deliver.md#R58
+// spec: specs/ap/deliver.md#R59
+#[test]
+fn r58_roles_file_that_differs_is_kept_and_written_through_a_temporary_name() {
+    use std::os::unix::fs::PermissionsExt;
+    let mut w = W::at_pin();
+    w.roles_blob = Some(ROLES_NEW);
+    std::fs::write(roles_path(&w), ROLES_OLD).unwrap();
+    let (v, exit) = w.run();
+    assert_eq!((end(&v), exit), (("installed", ""), 0), "{v}");
+    let old = sha(ROLES_OLD.as_bytes());
+    assert_eq!(
+        v["roles"],
+        json!({"before": old, "after": sha(ROLES_NEW.as_bytes()), "result": "written"})
+    );
+    assert_eq!(std::fs::read_to_string(roles_path(&w)).unwrap(), ROLES_NEW);
+    let kept =
+        w.t.join(format!("ont-state/ont/roles.json.before-{}", &old[..12]));
+    assert_eq!(std::fs::read_to_string(&kept).unwrap(), ROLES_OLD);
+    for p in [kept, roles_path(&w)] {
+        assert_eq!(
+            std::fs::metadata(p).unwrap().permissions().mode() & 0o777,
+            0o644
+        );
+    }
+    let names: Vec<String> = std::fs::read_dir(w.t.join("ont-state/ont"))
+        .unwrap()
+        .map(|e| e.unwrap().file_name().to_string_lossy().into_owned())
+        .collect();
+    assert_eq!(names.len(), 2, "{names:?}");
+    // No host file: written, nothing kept.
+    let mut w = W::at_pin();
+    w.roles_blob = Some(ROLES_NEW);
+    let (v, _) = w.run();
+    assert_eq!(
+        v["roles"],
+        json!({"before": null, "after": sha(ROLES_NEW.as_bytes()), "result": "written"})
+    );
+    assert_eq!(
+        std::fs::read_dir(w.t.join("ont-state/ont"))
+            .unwrap()
+            .count(),
+        1
+    );
+}
+
+// spec: specs/ap/deliver.md#R58
+// spec: specs/ap/deliver.md#R59
+#[test]
+fn r58_no_blob_at_the_tip_is_absent_and_writes_nothing() {
+    let mut w = W::at_pin();
+    std::fs::write(roles_path(&w), ROLES_OLD).unwrap();
+    let (v, exit) = w.run();
+    assert_eq!((end(&v), exit), (("installed", ""), 0), "{v}");
+    let d = sha(ROLES_OLD.as_bytes());
+    assert_eq!(
+        v["roles"],
+        json!({"before": d, "after": d, "result": "absent"})
+    );
+    assert_eq!(std::fs::read_to_string(roles_path(&w)).unwrap(), ROLES_OLD);
+    assert_eq!(
+        std::fs::read_dir(w.t.join("ont-state/ont"))
+            .unwrap()
+            .count(),
+        1
+    );
+}
+
+// spec: specs/ap/deliver.md#R58
+// spec: specs/ap/deliver.md#R59
+#[test]
+fn r58_a_host_entry_that_is_no_regular_file_fails_before_the_engine_and_the_schema() {
+    for kind in ["directory", "link"] {
+        // The engine moves and the schema is higher: neither may happen.
+        let mut w = W::engine();
+        (w.schema, w.tip_schema) = (8, 9);
+        w.roles_blob = Some(ROLES_NEW);
+        let path = roles_path(&w);
+        match kind {
+            "directory" => std::fs::create_dir(&path).unwrap(),
+            _ => {
+                let target = w.t.join("elsewhere");
+                std::fs::write(&target, ROLES_OLD).unwrap();
+                std::os::unix::fs::symlink(&target, &path).unwrap();
+            }
+        }
+        let (v, exit) = w.run();
+        assert_eq!(
+            (end(&v), exit, &v["outcome"]),
+            (("failed", "roles_install_failed"), 4, &Value::Null),
+            "{kind}: {v}"
+        );
+        assert_eq!(v["detail"], json!({"path": path.to_string_lossy()}));
+        assert_eq!(v["roles"]["result"], "failed");
+        assert!(w.launched().is_empty() && no_store_write(&w), "{kind}: {v}");
+        // The entry is as it was.
+        match kind {
+            "directory" => assert!(std::fs::symlink_metadata(&path).unwrap().is_dir()),
+            _ => {
+                assert!(
+                    std::fs::symlink_metadata(&path)
+                        .unwrap()
+                        .file_type()
+                        .is_symlink()
+                );
+                assert_eq!(
+                    std::fs::read_to_string(w.t.join("elsewhere")).unwrap(),
+                    ROLES_OLD
+                );
+            }
+        }
+        assert_eq!(w.last(), Some(v));
+    }
+    // A clone that cannot answer is no "absent" either.
+    let mut w = W::at_pin();
+    (w.roles_blob, w.roles_git_fails) = (Some(ROLES_NEW), true);
+    let (v, exit) = w.run();
+    assert_eq!(
+        (end(&v), exit),
+        (("failed", "roles_install_failed"), 4),
+        "{v}"
+    );
+    assert!(w.launched().is_empty() && no_store_write(&w));
+}
+
+// spec: specs/ap/deliver.md#R59
+#[test]
+fn r59_a_call_without_engine_has_no_roles_member_and_reads_no_file() {
+    let mut w = W::new();
+    w.roles_blob = Some(ROLES_NEW);
+    // A directory at the path would fail a call with `engine`; this one never looks.
+    std::fs::create_dir_all(w.t.join("ont-state/ont/roles.json")).unwrap();
+    let (v, exit) = w.run();
+    assert_eq!((end(&v), exit), (("installed", ""), 0), "{v}");
+    assert!(v.get("roles").is_none());
+    assert!(
+        !w.calls
+            .iter()
+            .any(|c| c.1.iter().any(|a| a.contains("roles.json")))
+    );
+    // The step did not run on a refusal before it, nor on an end `current`: the member is null.
+    let mut w = W::at_pin();
+    w.build_busy = true;
+    let (v, _) = w.run();
+    assert_eq!(v["end"], "refused");
+    assert_eq!(v["roles"], Value::Null);
 }

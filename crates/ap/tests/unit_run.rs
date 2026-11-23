@@ -29,6 +29,7 @@ use std::{
     time::{Duration, Instant, SystemTime, UNIX_EPOCH},
 };
 
+mod roles_file;
 static NEXT: AtomicU32 = AtomicU32::new(0);
 const FAKE: &str = include_str!("fixtures/fake-claude.sh");
 const STAGE: &str = include_str!("fixtures/unit_run/stage.sh");
@@ -592,6 +593,11 @@ impl F {
         for name in ["store.sqlite", "edits.jsonl"] {
             std::fs::copy(template.join(name), f.t.join("store").join(name)).unwrap();
         }
+        // The roles file beside the copied store: this uid may act as every role of the grants.
+        roles_file::put(
+            &f.t.join("store"),
+            &serde_json::from_str(include_str!("../../../ontology/work.schema.json")).unwrap(),
+        );
         f.engine = Some(f.p("store/store.sqlite"));
         f.policy(
             json!({"reviews": {"task": "ontology-operational-base", "directory": f.p("reviews")}}),
@@ -605,6 +611,7 @@ impl F {
                 .arg("--store")
                 .arg(store)
                 .args(args)
+                .env_remove("ONT_ROLE")
                 .stdin(std::process::Stdio::piped())
                 .stdout(std::process::Stdio::piped())
                 .spawn()
@@ -644,7 +651,7 @@ impl F {
             }
         }
         let rid = format!("walk-{}", NEXT.fetch_add(1, Ordering::SeqCst));
-        let body = json!({"action_type": action, "request_id": rid, "agent": "walk", "session": "walk-1", "parameters": p});
+        let body = json!({"action_type": action, "request_id": rid, "agent": "walk", "session": "walk-1", "role": "lead", "parameters": p});
         let v = self.engine_call(&["action", "apply", "--client", "walk"], &body);
         assert_eq!(v["outcome"], "applied", "{action}: {v}");
         v
@@ -1064,7 +1071,7 @@ impl F {
                 );
                 let mut r = p.clone();
                 (r["status"], r["started_at"], r["role"]) =
-                    (json!("running"), json!(now), body["role"].clone());
+                    (json!("running"), json!(now), p["role"].clone());
                 self.put("run", &key, r);
                 json!([{"change": "initial", "id": oid("run", &key)}])
             }
@@ -1548,7 +1555,7 @@ fn r1_the_form_the_role_and_the_actor_of_every_apply() {
     for b in &ours {
         assert_eq!(
             (&b["session"], b.get("role")),
-            (&json!(format!("u-{KEY}")), None),
+            (&json!(format!("u-{KEY}")), Some(&json!("dispatch"))),
             "{b}"
         );
         let rid = b["request_id"].as_str().unwrap();
@@ -1876,7 +1883,7 @@ fn r7_a_call_killed_during_the_implementer_before_its_pull_request() {
     let run = &f.objects[&k("run", "run-1")];
     assert_eq!(
         (&run["status"], &run["state"], &run["closed_by"]),
-        (&json!("closed"), &json!("killed"), &json!("implementer"))
+        (&json!("closed"), &json!("killed"), &json!("dispatch"))
     );
     // The implementer's session resumed with `continue.md`.
     let (line, prompt) = f.launch(2);
@@ -3424,7 +3431,7 @@ fn r34_reject_reopens_and_stops_the_unit_and_revokes_the_status() {
         ),
         (&json!("rj-stop"), &json!("lead_rejected"), &json!(reason))
     );
-    assert!(stop.get("role").is_none());
+    assert_eq!(stop["role"], "lead");
     let last = f.statuses.last().unwrap();
     assert_eq!(
         (json!(last.0), last.1.as_str()),

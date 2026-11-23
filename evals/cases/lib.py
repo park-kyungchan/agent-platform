@@ -525,7 +525,7 @@ def write_files(directory, by_suite):
 
 # ---------------------------------------------------------------- the store
 def engine(store):
-    return B.Engine(store, "cases")
+    return B.Engine(store, "cases", "lead")
 
 
 def index_source(eng):

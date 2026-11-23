@@ -764,6 +764,7 @@ fn launches(
                     key: None,
                     role: None,
                     digest: false,
+                    claim: "dispatch",
                 };
                 match object::execute(s, &amend, &r) {
                     Err(e) => match amend_back(&e) {
@@ -852,7 +853,7 @@ fn look(s: &mut impl System, work: &mut Work, resume: Option<&str>) -> Result<Lo
         if let Some(k) = resume {
             r["resume"] = json!(k);
         }
-        let e = match page_review::execute(s, work.store, &r) {
+        let e = match page_review::execute_as(s, work.store, &r, "dispatch") {
             Ok((v, _)) => {
                 let k = v["review"].as_str().unwrap_or_default().to_owned();
                 return Ok(match v["verdict"].as_str() {

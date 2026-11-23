@@ -909,6 +909,8 @@ def ont_call(args, body):
     """The answer object of one `ont` call on the host's store (the `ont` of PATH, no `--store`), or None."""
     cmd = [shutil.which("ont") or "ont"] + args
     env = {k: v for k, v in os.environ.items() if k not in ("ONT_AGENT", "ONT_ROLE")}  # the request id is the caller's
+    if args[:2] == ["action", "apply"] and isinstance(body, dict) and "role" not in body:
+        body = {**body, "role": "lead"}  # the score's record is the Lead's (specs/ap/roles.md R3)
     for attempt in range(4):
         try:
             p = subprocess.run(cmd, input=json.dumps(body), capture_output=True, text=True, timeout=120, env=env)

@@ -831,6 +831,7 @@ impl Run {
         let actor = Actor {
             agent: "ap-unit",
             session: &self.session,
+            role: "dispatch",
         };
         let applied = store::unit_action(s, self.store.as_deref(), &actor, action, rid, p);
         self.applied |= applied.is_ok();
@@ -1811,6 +1812,7 @@ impl Run {
             &Actor {
                 agent: "ap-unit",
                 session: &self.session,
+                role: "dispatch",
             },
             "start_unit_review",
             rid,
@@ -2316,6 +2318,7 @@ impl Run {
         let actor = Actor {
             agent: "ap-unit",
             session: &self.session,
+            role: "dispatch",
         };
         let body = store::body(&actor, "merge_unit", rid.clone(), p);
         let checked = at(store::validate(s, self.store(), &body), "merge_unit")?;
@@ -2587,6 +2590,7 @@ pub fn decide(
     let actor = Actor {
         agent: store::shaped(r, "agent", 64, "._:-")?,
         session: store::shaped(r, "session", 64, "._:-")?,
+        role: "lead",
     };
     let key = r["unit"].as_str().filter(|k| key_form(k));
     let key = key.ok_or_else(|| store::bad("unit"))?;

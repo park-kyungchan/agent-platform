@@ -408,7 +408,7 @@ impl F {
     fn apply(&mut self, body: &Value) -> Answer {
         let (action, p) = (body["action_type"].as_str().unwrap(), &body["parameters"]);
         assert!(ACTIONS.contains(&action), "{action}");
-        assert!(body.get("role").is_none(), "no role is sent");
+        assert_eq!(body["role"], "lead", "every apply of `ap unit` claims lead");
         let derived = format!("{}/{}", body["agent"], body["request_id"]);
         let content = json!([action, p]);
         // As on the engine: a request id replayed is answered by its first outcome, `expected` aside.
@@ -921,7 +921,7 @@ fn r3_one_action_with_the_suffix_of_its_op_the_client_ap_and_no_role() {
         // `expected` only on the amendment, with the revision its read gave (R42).
         let amend = b["action_type"] == "amend_unit";
         assert!(
-            b.get("role").is_none() && b.get("expected").is_some() == amend,
+            b["role"] == "lead" && b.get("expected").is_some() == amend,
             "{b}"
         );
     }

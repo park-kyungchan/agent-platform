@@ -25,6 +25,7 @@ use std::{
 };
 
 /// 2027-01-15T08:00:00Z.
+mod roles_file;
 const NOW: u64 = 1_800_000_000;
 const DAY: u64 = 86_400;
 static NEXT: AtomicU32 = AtomicU32::new(0);
@@ -354,7 +355,7 @@ impl System for Fake {
             "action" => {
                 assert_eq!(&args[..4], ["action", "apply", "--client", "ap"]);
                 assert_eq!(input["agent"], "ap-resource");
-                assert!(input.get("role").is_none());
+                assert_eq!(input["role"], "measure");
                 self.apply(input)
             }
             "index" => {
@@ -2217,6 +2218,7 @@ impl Bed {
             "",
         );
         assert_eq!(code, 0, "{out}");
+        roles_file::put(&bed.root, &schema);
         bed
     }
     fn at(&self, name: &str) -> PathBuf {
@@ -2233,6 +2235,7 @@ impl Bed {
             .args(args)
             .env("PATH", &self.path)
             .env_remove("ONT_ROLE")
+            .envs(roles_file::fn_role(args))
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
@@ -2255,7 +2258,7 @@ impl Bed {
         (out.status.code().unwrap_or(-1), v)
     }
     fn apply(&self, action: &str, rid: &str, parameters: Value) -> Value {
-        let body = json!({"action_type": action, "request_id": rid, "parameters": parameters});
+        let body = json!({"action_type": action, "request_id": rid, "role": "lead", "parameters": parameters});
         let (code, v) = self.ont(&["action", "apply"], &body.to_string());
         assert_eq!(code, 0, "{v}");
         v

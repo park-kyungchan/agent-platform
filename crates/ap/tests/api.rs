@@ -22,6 +22,7 @@ use std::{
     time::{Duration, Instant, SystemTime, UNIX_EPOCH},
 };
 
+mod roles_file;
 const KEY_FILE: &str = "/etc/agent-platform/credentials/anthropic-api-key";
 const MARKER: &str = "sk-ant-fixture-MARKER-7f3a9c";
 const BASE: &str = "https://api.anthropic.com/v1/messages/";
@@ -239,7 +240,7 @@ impl Fake {
             );
         }
         assert_eq!(&args[..2], ["action", "apply"]);
-        assert_eq!(input["role"], "batch");
+        assert_eq!(input["role"], "api");
         let rid = input["request_id"].as_str().unwrap().to_owned();
         let p = input["parameters"].clone();
         let action = input["action_type"].as_str().unwrap().to_owned();
@@ -1734,6 +1735,7 @@ impl Bed {
             "",
         );
         assert_eq!(code, 0, "{out}");
+        roles_file::put(&bed.root, &schema);
         bed
     }
     fn ont(&self, args: &[&str], stdin: &str) -> (i32, Value) {
@@ -1743,6 +1745,18 @@ impl Bed {
             .arg(self.root.join("store.sqlite"))
             .args(args)
             .env_remove("ONT_ROLE")
+            // The function's program `ap` finds the engine of this test first on its PATH, as the other beds do.
+            .env(
+                "PATH",
+                format!(
+                    "{}:{}",
+                    self.ont.parent().unwrap().display(),
+                    std::env::var("PATH").unwrap_or_default()
+                ),
+            )
+            .env_remove("ONT_AGENT")
+            .env_remove("ONT_ROLE")
+            .envs(roles_file::fn_role(args))
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
@@ -1766,7 +1780,7 @@ impl Bed {
     }
     /// An apply as `ap api batch` sends it through `store::start_run` and `store::close_run`.
     fn apply(&self, action: &str, rid: &str, parameters: Value) -> Value {
-        let body = json!({"action_type": action, "request_id": rid, "agent": "ap-run", "role": "batch",
+        let body = json!({"action_type": action, "request_id": rid, "agent": "ap-run", "role": "api",
             "parameters": parameters});
         let (code, v) = self.ont(&["action", "apply", "--client", "ap"], &body.to_string());
         assert_eq!(code, 0, "{v}");
@@ -1813,7 +1827,7 @@ fn engine_api_spend_answers_a_settled_and_a_running_batch_run() {
     );
     // A stage's run, without the new parameters, is no batch run.
     let body = json!({"action_type": "start_run", "request_id": "run-fixture-start", "agent": "ap-run",
-        "role": "implementer", "parameters": {"role": "implementer", "runtime": "claude", "model": "m"}});
+        "role": "dispatch", "parameters": {"role": "implementer", "runtime": "claude", "model": "m"}});
     assert_eq!(
         bed.ont(&["action", "apply", "--client", "ap"], &body.to_string())
             .0,

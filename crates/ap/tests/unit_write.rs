@@ -533,11 +533,8 @@ impl F {
             }
             "start_run" => {
                 assert_eq!(body["agent"], "ap-run");
-                assert!(
-                    body["role"] == "writer" || body["role"] == "reviewer",
-                    "{body}"
-                );
-                assert_eq!(body["role"], p["role"]);
+                assert_eq!(body["role"], "dispatch");
+                assert!(p["role"] == "writer" || p["role"] == "reviewer", "{body}");
                 let key = format!(
                     "run-{}",
                     self.objects.keys().filter(|(t, _)| t == "run").count() + 1
@@ -917,7 +914,7 @@ fn r4_the_lock_and_a_record_left_running() {
     let first = &closed[0];
     assert_eq!(first["parameters"]["run"]["native_key"], "run-9");
     assert_eq!(first["parameters"]["state"], "killed");
-    assert_eq!(first["role"], "writer");
+    assert_eq!(first["role"], "dispatch");
     let out = path_text.strip_suffix(".run.json").unwrap();
     assert_eq!(
         first["request_id"],
@@ -1036,9 +1033,10 @@ fn r6_the_stage_and_its_working_directory() {
             .contains(&format!("PWD={}", home.join("work/1").display()))
     );
     assert!(!home.join("work/1").exists());
-    // The run object of the stage: role writer.
+    // The run object of the stage: role writer, its start claimed as `dispatch`.
     let run = f.bodies("start_run");
-    assert_eq!(run[0]["role"], "writer");
+    assert_eq!(run[0]["role"], "dispatch");
+    assert_eq!(run[0]["parameters"]["role"], "writer");
     assert_eq!(run[0]["parameters"]["unit"]["native_key"], "u1");
     // A refusal of `ap run` ends the call with its code and field.
     let mut f = F::new();

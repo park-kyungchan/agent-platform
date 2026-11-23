@@ -9,6 +9,7 @@ TimeoutStartSec=1290
 StateDirectory=agent-platform/status-page
 StateDirectoryMode=0755
 Environment=HOME=/root
+Environment=ONT_ROLE=measure
 ExecStart=/bin/sh -c '/usr/local/bin/ap status --page > /var/lib/agent-platform/status-page/status.txt.new || { rm -f /var/lib/agent-platform/status-page/status.txt.new; exit 1; }; mv -f /var/lib/agent-platform/status-page/status.txt.new /var/lib/agent-platform/status-page/status.txt'
 NoNewPrivileges=yes
 ProtectKernelModules=yes

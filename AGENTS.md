@@ -22,7 +22,7 @@ This repository holds the command `ap`, the shared instructions every coding CLI
 | The rulesets and settings under `github/` | `github/repositories.json`, `github/ruleset-main.json`, `github/ruleset-tags.json`; compared and applied by `github/apply` | The repositories the files name; `./check` |
 | The map, `map.json` | `map.json`; `ci/check-map.py` checks it | `ap unit page`, which prints one line per entry that meets a unit's write set, and `./check` |
 
-A new action or value type of the work schema follows the latest version section of `ontology/README.md` (`## Version 11`) and adds a rehearsal row for each new refusal.
+A new action or value type of the work schema follows the latest version section of `ontology/README.md` (`## Version 11`) and adds a rehearsal row for each new refusal; it also adds the action or function to the grants (`specs/ap/roles.md` R2).
 
 A pull request that adds, removes or renames a file under the coverage roots (`crates/`, `ci/`, `content/`, `deploy/`, `evals/`, `github/`, `ontology/`, `scripts/`, `specs/`, `.github/`, `check`, `rust-toolchain.toml`, `Cargo.toml`, `Cargo.lock`), or shortens a file below an entry's range, changes `map.json` in the same pull request; a removed root also changes the root list in `check`. A file added to or removed from `content/` is added to or removed from `content/SHA256SUMS`; every changed file gets its new checksum. Never edit the installed copy of the content.
 

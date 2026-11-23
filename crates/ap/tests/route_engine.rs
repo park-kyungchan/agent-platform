@@ -20,6 +20,7 @@ use std::{
     sync::atomic::{AtomicU32, Ordering},
 };
 
+mod roles_file;
 static NEXT: AtomicU32 = AtomicU32::new(0);
 const HOST_ROUTE: &str = "/var/lib/agent-platform/route/";
 
@@ -101,6 +102,7 @@ impl Bed {
             "",
         );
         assert_eq!(code, 0, "{out}");
+        roles_file::put(&bed.root, &schema);
         bed
     }
     fn at(&self, name: &str) -> PathBuf {
@@ -168,6 +170,9 @@ impl Bed {
             .arg("--store")
             .arg(self.store())
             .args(args)
+            .env_remove("ONT_ROLE")
+            .env_remove("ONT_AGENT")
+            .envs(roles_file::fn_role(args))
             .env("PATH", &self.path)
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())

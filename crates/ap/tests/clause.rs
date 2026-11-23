@@ -21,6 +21,7 @@ use std::{
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
 
+mod roles_file;
 const NOW: u64 = 1_800_000_000;
 static NEXT: AtomicU32 = AtomicU32::new(0);
 
@@ -1009,6 +1010,7 @@ impl Bed {
             "",
         );
         assert_eq!(code, 0, "{out}");
+        roles_file::put(&bed.root, &schema);
         bed
     }
     fn at(&self, name: &str) -> PathBuf {
@@ -1056,6 +1058,9 @@ impl Bed {
             .arg("--store")
             .arg(self.store())
             .args(args)
+            .env_remove("ONT_ROLE")
+            .env_remove("ONT_AGENT")
+            .envs(roles_file::fn_role(args))
             .env("PATH", &self.path)
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
@@ -1081,7 +1086,7 @@ impl Bed {
     }
     fn apply(&self, action: &str, parameters: Value) -> Value {
         let body = json!({"action_type": action, "request_id": format!("bed-{action}"), "agent": "bed",
-            "session": "bed-1", "parameters": parameters});
+            "session": "bed-1", "role": "lead", "parameters": parameters});
         let (code, v) = self.ont(&["action", "apply"], &body.to_string());
         assert_eq!(code, 0, "{v}");
         v["result"].clone()

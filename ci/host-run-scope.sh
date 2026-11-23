@@ -362,7 +362,15 @@ sys.exit(oct(os.stat(f).st_mode & 0o777) != "0o600" or len(lines) != 2
   git -C "$t/dcwd" init -q -b main && git -C "$t/dcwd" remote add origin https://github.com/example/door.git \
     && git -C "$t/dcwd" add -A && git -C "$t/dcwd" -c user.name=t -c user.email=t@e commit -q -m one
   ln -s "$ap" "$t/bin/ap"
-  printf '#!/bin/sh\nprintf "%%s ONT_ROLE=%%s\\n" "$*" "$ONT_ROLE" >> "$(dirname "$0")/ont.calls"\ncat > /dev/null\necho route-answer\n' > "$t/bin/ont"
+  # The fake engine notes its arguments and role, answers `route`, and refuses any other function as the engine
+  # refuses a role whose grant lacks it (the door has no list of its own: specs/ap/door.md R5).
+  cat > "$t/bin/ont" <<'FAKEONT'
+#!/bin/sh
+printf '%s ONT_ROLE=%s\n' "$*" "$ONT_ROLE" >> "$(dirname "$0")/ont.calls"
+cat > /dev/null
+[ "$2" = route ] || { echo '{"status":"refused","code":"not_granted"}'; exit 2; }
+echo route-answer
+FAKEONT
   printf '#!/bin/sh\necho "$*" >> "$(dirname "$0")/tailscale.calls"\nexit 1\n' > "$t/bin/tailscale"
   cat > "$t/bin/claude" <<'DOOR'
 #!/usr/bin/env bash
@@ -370,8 +378,8 @@ cat > /dev/null
 sid=; prev=; for a in "$@"; do case "$prev" in --session-id|--resume) sid=$a ;; esac; prev=$a; done
 printf '{"type":"system","subtype":"init","session_id":"%s","mcp_servers":[]}\n' "$sid"
 r=$(ap fn route < /dev/null 2> /dev/null); rc1=$?
-ap fn other < /dev/null > /dev/null 2> "$TMPDIR/other.err"; rc2=$?
-grep -q '"not_admitted"' "$TMPDIR/other.err" && code=not_admitted || code=other
+ap fn other < /dev/null > "$TMPDIR/other.out" 2> "$TMPDIR/other.err"; rc2=$?
+grep -q 'not_granted' "$TMPDIR/other.err" "$TMPDIR/other.out" && code=not_granted || code=other
 c=$(ap check "$PWD" 2>&1 | tr '\n' '|'); rc3=${PIPESTATUS[0]}
 said="route $rc1 $r; other $rc2 $code; check $rc3 $c"
 printf '{"type":"result","subtype":"success","is_error":false,"num_turns":1,"result":"%s","session_id":"%s","usage":{"input_tokens":1,"output_tokens":1},"permission_denials":[]}\n' "$said" "$sid"
@@ -382,11 +390,11 @@ DOOR
     | env -i PATH="$t/bin:$PATH" HOME="${HOME:-/root}" LANG=C.UTF-8 AP_POLICY_FILE="$t/policy-door.json" \
       AP_DOOR_LOG="$t/door.jsonl" AP_CHECKS_LOG="$t/checks.jsonl" "$ap" run > "$t/door.out" 2> "$t/door.err"; rc=$?
   ans=$(cat "$t/door.md" 2> /dev/null)
-  { [ "$rc" -eq 0 ] && [ "$ans" = "route 0 route-answer; other 2 not_admitted; check 0 check: on this host (pc_unreachable)|checked|" ]; } \
-    && ok "door: ap fn route answered, ap fn other was refused not_admitted, ap check ran here after pc_unreachable: $ans" \
+  { [ "$rc" -eq 0 ] && [ "$ans" = "route 0 route-answer; other 2 not_granted; check 0 check: on this host (pc_unreachable)|checked|" ]; } \
+    && ok "door: ap fn route answered, ap fn other was refused not_granted by the engine, ap check ran here after pc_unreachable: $ans" \
     || bad "door: rc=$rc $ans $(tail -c 400 "$t/door.err")"
-  { [ "$(cat "$t/bin/ont.calls" 2> /dev/null)" = "fn route ONT_ROLE=verifier" ] && grep -q '^ping ' "$t/bin/tailscale.calls" 2> /dev/null; } \
-    && ok "door: the engine was asked as the verifier and the ping ran, both outside the view" \
+  { [ "$(cat "$t/bin/ont.calls" 2> /dev/null)" = "$(printf 'fn route ONT_ROLE=verifier\nfn other ONT_ROLE=verifier')" ] && grep -q '^ping ' "$t/bin/tailscale.calls" 2> /dev/null; } \
+    && ok "door: the engine was asked as the verifier for both names and the ping ran, both outside the view" \
     || bad "door: ont $(cat "$t/bin/ont.calls" 2> /dev/null) tailscale $(cat "$t/bin/tailscale.calls" 2> /dev/null)"
   python3 -I -c 'import json,os,sys; t=sys.argv[1]; f=t+"/door.jsonl"
 lines=[json.loads(l) for l in open(f)]
