@@ -1,0 +1,152 @@
+#!/usr/bin/env -S python3 -I -B
+"""The mining job's reader: the synthesis result read against the synthesizer's synthesis.json into at most three
+findings of detector `batch:mining`, kind `lesson` and severity `info`, one per cause.
+
+  read --synthesis <synthesis.json> --results <file> [--store <path>]
+
+The engine is ONT_BIN (default `ont`). Prints one JSON line; writes no file. Calls no model and no network; starts no
+program but the engine. Every refusal is {"status":"<code>"} with exit 2; a store that cannot be searched is
+{"status":"store_failed"} with exit 3. Contract: evals/batch/mining/README.md.
+"""
+import importlib.machinery
+import importlib.util
+import json
+import os
+import sys
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+
+
+def load(name, path):
+    loader = importlib.machinery.SourceFileLoader(name, path)
+    mod = importlib.util.module_from_spec(importlib.util.spec_from_loader(name, loader))
+    loader.exec_module(mod)
+    return mod
+
+
+L = load("batch_lib", os.path.join(HERE, "..", "lib.py"))
+M = load("mining_common", os.path.join(HERE, "common.py"))
+M.L = L
+
+EVIDENCE = 2000
+SUMMARY = 600
+COUNT_WORDS = ("read", "refused", "errored", "unreadable", "stale", "duplicate", "skipped")
+
+
+def parse(argv):
+    p = M.Parser(add_help=False, allow_abbrev=False)
+    p.add_argument("--synthesis", required=True)
+    p.add_argument("--results", required=True)
+    p.add_argument("--store")
+    a = p.parse_args(argv)
+    if not a.synthesis or not a.results or a.store == "":
+        raise L.Refuse("usage")
+    return a
+
+
+def whole(v):
+    return isinstance(v, int) and not isinstance(v, bool) and v >= 0
+
+
+def load_synthesis(path):
+    """synthesis.json in the form the synthesizer writes; refuses `synthesis_unreadable`."""
+    def bad():
+        raise L.Refuse("synthesis_unreadable")
+
+    try:
+        with open(path, encoding="utf-8") as f:
+            doc = json.load(f)
+    except (OSError, ValueError):
+        bad()
+    keys = {"job", "since", "until", "model", "key", "classified", "unclassified", "counts", "causes"}
+    if not isinstance(doc, dict) or set(doc) != keys or doc["job"] != "mining" or not isinstance(doc["model"], str):
+        bad()
+    try:
+        M.window(doc["since"], doc["until"])
+    except L.Refuse:
+        bad()
+    if not (whole(doc["classified"]) and whole(doc["unclassified"]) and isinstance(doc["counts"], dict)
+            and set(doc["counts"]) == set(COUNT_WORDS) and all(whole(v) for v in doc["counts"].values())):
+        bad()
+    names = [c["cause"] for c in M.causes()]
+    cs = doc["causes"]
+    if not isinstance(cs, list) or len(cs) > 3 or (doc["key"] is None) != (not cs):
+        bad()
+    if doc["key"] is not None and not (isinstance(doc["key"], str) and M.HEX64.match(doc["key"])):
+        bad()
+    seen = set()
+    for c in cs:
+        if not isinstance(c, dict) or set(c) != {"cause", "count", "machine", "remedy", "items"}:
+            bad()
+        if not (c["cause"] in names and c["cause"] not in seen and whole(c["count"]) and c["count"] >= 1
+                and whole(c["machine"]) and c["machine"] <= c["count"] and c["remedy"] in ("check", "sentence")
+                and isinstance(c["items"], list) and len(c["items"]) == c["count"]
+                and all(isinstance(i, str) and i for i in c["items"])):
+            bad()
+        seen.add(c["cause"])
+    return doc
+
+
+def finding_fields(doc, cause, verdict):
+    sig = f"mining:{doc['since']}..{doc['until']}:{cause['cause']}"
+    summary = (f"{doc['since']}..{doc['until']} {cause['cause']}: {cause['count']} of {doc['classified']} "
+               f"classified items, {cause['machine']} of them a machine could have refused ({cause['remedy']})")
+    entry = next((e for e in verdict["causes"] if e["cause"] == cause["cause"]), None)
+    change, why = (entry["change"], entry["why"]) if entry else ("none", "none")
+    evidence = f"items {','.join(cause['items'][:10])}; change: {change}; why: {why}"
+    return M.finding_key(sig), {"kind": "lesson", "severity": "info", "summary": L.cut(summary, SUMMARY),
+                                "evidence": L.cut(L.plain(evidence), EVIDENCE)}
+
+
+def run(argv):
+    a = parse(argv)
+    for p in (a.synthesis, a.results, a.store):
+        if p is not None:
+            L.refuse_academy(p)
+    synthesis_path, results_path = L.resolve(a.synthesis), L.resolve(a.results)
+    store = L.resolve(a.store) if a.store is not None else None
+    doc = load_synthesis(synthesis_path)
+    lines = L.result_lines(results_path)
+    schema = M.load_json("synthesis.schema.json")
+
+    counts, answers = M.count_lines(lines, {doc["key"]} if doc["key"] else set(), schema)
+    verdict = answers.get(doc["key"])
+    opened, seen, failed = [], [], []
+    left = already = 0
+    if verdict is not None:
+        engine = L.Engine(store, M.AGENT)
+        found = engine.search("finding", [{"eq": ["detector", M.DETECTOR]}])
+        if found is None:
+            raise L.Refuse("store_failed", exit_code=3)
+        stored = {k: f for k, f in found if f.get("detector") == M.DETECTOR}
+        for cause in doc["causes"]:
+            native_key, fields = finding_fields(doc, cause, verdict)
+            f = stored.get(native_key)
+            fid = L.finding_id(native_key)
+            if f is None:
+                action, done = "open_finding", opened
+                parameters = {"finding": fid, "kind": fields["kind"], "detector": M.DETECTOR,
+                              "summary": fields["summary"], "evidence": fields["evidence"],
+                              "severity": fields["severity"]}
+            elif f.get("state") in ("open", "planned"):
+                if f.get("evidence") == fields["evidence"]:
+                    continue
+                action, done = "see_finding_again", seen
+                parameters = {"finding": fid, "evidence": fields["evidence"]}
+            else:
+                left += 1
+                continue
+            outcome, code = M.apply(engine, action, native_key, doc["key"], parameters)
+            if outcome == "applied":
+                done.append(native_key)
+            elif outcome == "already_applied":
+                already += 1
+            else:
+                failed.append({"key": native_key, "code": code})
+    answer = {"status": "ok", "lines": len(lines), **{w: counts[w] for w in COUNT_WORDS}, "opened": opened,
+              "seen": seen, "left": left, "already_applied": already, "failed": failed}
+    return answer, (1 if failed else 0)
+
+
+if __name__ == "__main__":
+    sys.exit(L.main(run))

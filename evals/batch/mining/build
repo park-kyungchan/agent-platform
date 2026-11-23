@@ -1,0 +1,106 @@
+#!/usr/bin/env -S python3 -I -B
+"""The mining job's builder: one Message Batch request per item of a UTC date window, each blocking line of a closed
+page or plan review, each repair verdict without one, each stop of a unit, read from the store and from the reviews'
+report files.
+
+  build --since <YYYY-MM-DD> --until <YYYY-MM-DD> --model <id> --out <dir> [--results <file>]...
+        [--max-tokens <n>] [--max-requests <n>] [--store <path>]
+
+Writes requests.jsonl and items.json into --out and prints one JSON line. Calls no model and no network; starts no
+program but the engine (ONT_BIN, default `ont`). The report of an Academy item is never opened. Every refusal is
+{"status":"<code>"} with exit 2; a store that cannot be read is {"status":"store_failed"} with exit 3.
+Contract: evals/batch/mining/README.md.
+"""
+import importlib.machinery
+import importlib.util
+import json
+import os
+import sys
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+
+
+def load(name, path):
+    loader = importlib.machinery.SourceFileLoader(name, path)
+    mod = importlib.util.module_from_spec(importlib.util.spec_from_loader(name, loader))
+    loader.exec_module(mod)
+    return mod
+
+
+L = load("batch_lib", os.path.join(HERE, "..", "lib.py"))
+M = load("mining_common", os.path.join(HERE, "common.py"))
+M.L = L
+
+
+def parse(argv):
+    p = M.Parser(add_help=False, allow_abbrev=False)
+    p.add_argument("--since", required=True)
+    p.add_argument("--until", required=True)
+    p.add_argument("--model", required=True)
+    p.add_argument("--out", required=True)
+    p.add_argument("--results", action="append", default=[])
+    p.add_argument("--max-tokens", default="1024")
+    p.add_argument("--max-requests", default="400")
+    p.add_argument("--store")
+    a = p.parse_args(argv)
+    if not a.model or not a.out or any(not r for r in a.results) or a.store == "":
+        raise L.Refuse("usage")
+    a.max_tokens = M.integer(a.max_tokens, 256, 8000)
+    a.max_requests = M.integer(a.max_requests, 1, 100_000)
+    a.since, a.until, a.after = M.window(a.since, a.until)
+    return a
+
+
+def run(argv):
+    a = parse(argv)
+    # The Academy rule before any read, call or write: the strings as given, then each path resolved.
+    for p in (a.out, *a.results, a.store):
+        if p is not None:
+            L.refuse_academy(p)
+    out = L.resolve(a.out)
+    results = [L.resolve(r) for r in a.results]
+    store = L.resolve(a.store) if a.store is not None else None
+
+    counts = {"academy_skipped": 0, "report_unreadable": 0, "result_lines_skipped": 0}
+    settled = M.settled_keys(results, counts)
+    engine = L.Engine(store, M.AGENT)
+    reviews = M.search_closed_reviews(engine)
+    units = M.search_units(engine)
+    intents = M.search_intents(engine)
+    rows, withheld = M.stop_rows(engine, a.since, a.after)
+    items = M.make_items(reviews, units, intents, rows, a.since, a.until, counts)
+
+    system = M.system_of_classify()
+    schema = M.load_json("classify.schema.json")
+    state_of, lines = {}, []
+    requested = 0
+    for item in items:
+        params = M.request_params(a.model, a.max_tokens, system, M.classify_text(item), schema)
+        k = L.key(params)
+        item["key"] = k
+        if k not in state_of:
+            if k in settled:
+                state_of[k] = "settled"
+            elif requested < a.max_requests:
+                state_of[k] = "requested"
+                requested += 1
+                lines.append(L.request_line(params))
+            else:
+                state_of[k] = "over_max"
+        item["state"] = state_of[k]
+    keys = ("item", "kind", "name", "review", "unit", "intent", "at", "text", "key", "state")
+    doc = {"job": "mining", "since": a.since, "until": a.until, "model": a.model,
+           "items": [{k: item[k] for k in keys} for item in items]}
+    L.write_files(out, [("requests.jsonl", "".join(x + "\n" for x in lines).encode("utf-8")),
+                        ("items.json", (json.dumps(doc, indent=1, ensure_ascii=False) + "\n").encode("utf-8"))])
+    states = list(state_of.values())
+    kinds = [i["kind"] for i in items]
+    return {"status": "ok", "out": out, "items": len(items), "requested": states.count("requested"),
+            "settled": states.count("settled"), "over_max": states.count("over_max"),
+            "blocking": kinds.count("blocking"), "repair": kinds.count("repair"), "stop": kinds.count("stop"),
+            "academy_skipped": counts["academy_skipped"], "report_unreadable": counts["report_unreadable"],
+            "stops_withheld": withheld, "result_lines_skipped": counts["result_lines_skipped"]}, 0
+
+
+if __name__ == "__main__":
+    sys.exit(L.main(run))
