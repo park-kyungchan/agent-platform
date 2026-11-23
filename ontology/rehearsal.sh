@@ -48,22 +48,39 @@ def strings(schema, begin):
         for holder in [kind.get('primary_key', {}), *kind.get('properties', {}).values()]:
             if isinstance(holder.get('transform'), dict): convert(holder['transform'], count('transforms'))
     return len(found['sources']), len(found['transforms'])
+# Under the engine of the pin a new install takes the strict check, which refuses a rule that edits one of several
+# references of its type without `target` (ambiguous_rule_target). The versions in Git hold three such rules; the
+# copy of each version that has the action gains the `target` of version 21 on it, and on no other rule.
+TARGETS = {'amend_principle': '$principle', 'end_delegation': '$request', 'mark_memory_record_superseded': '$record'}
+def targeted(schema):
+    # Returns a copy of the schema and the number of rules that gained their target.
+    out, added = _copy.deepcopy(schema), 0
+    for name, target in TARGETS.items():
+        if name in out['action_types']:
+            [rule] = out['action_types'][name]['rules']
+            assert next(k for k in rule if k.endswith('_object')) == 'modify_object' and rule['modify_object'] in ('principle', 'request', 'memory_record'), (name, rule)
+            if 'target' not in rule:
+                rule['target'] = target
+                added += 1
+            assert rule['target'] == target and target[1:] in out['action_types'][name]['parameters'], (name, rule)
+    return out, added
 def make(path, root, copies, label=None, binaries=None):
     # Writes the copy of one schema file, whose strings of both groups under the host's work directory begin with
-    # `root` (ending in a slash) instead; `binaries` replaces the paths of installed_binaries. Returns (path, copy).
+    # `root` (ending in a slash) instead, and whose rules of TARGETS have their target; `binaries` replaces the paths
+    # of installed_binaries. Returns (path, copy).
     original = json.loads(pathlib.Path(path).read_text())
     assert root.endswith('/') and not root.startswith(HOST)
     expected = strings(original, HOST)
-    copy = groups(original, lambda s: root + s[len(HOST):] if s.startswith(HOST) else s)
+    copy, targets = targeted(groups(original, lambda s: root + s[len(HOST):] if s.startswith(HOST) else s))
     assert strings(copy, HOST) == (0, 0) and strings(copy, root) == expected, (path, expected)
     restored = groups(copy, lambda s: HOST + s[len(root):] if s.startswith(root) else s)
     if binaries is not None:
         copy['sources']['installed_binaries']['paths'] = binaries
         restored['sources']['installed_binaries']['paths'] = original['sources']['installed_binaries']['paths']
-    assert restored == original, path
+    assert restored == targeted(original)[0], path
     out = pathlib.Path(copies, '%02d-%s' % (len(list(pathlib.Path(copies).iterdir())), label or pathlib.Path(path).name))
     out.write_text(json.dumps(copy))
-    print('redirect_copy=' + out.name + ' version=' + str(copy['version']) + ' source_paths=' + str(expected[0]) + ' transform_arguments=' + str(expected[1]), file=sys.stderr)
+    print('redirect_copy=' + out.name + ' version=' + str(copy['version']) + ' source_paths=' + str(expected[0]) + ' transform_arguments=' + str(expected[1]) + ' targets=' + str(targets), file=sys.stderr)
     return out, copy
 def trace(root, copies):
     total = 0
@@ -129,13 +146,17 @@ assert 'user_words' not in fields(early_user) and fields(early_user)['decided_by
 probe_revision = obj(probe)['head']
 # Preserve a real v5 flag-only review across the upgrade to v6.
 legacy = pathlib.Path(store).with_name('v5.json')
-legacy.write_bytes(subprocess.check_output(['git', '-C', repo, 'show', 'f46cdf49ba74e117ddaaf387416a0eac1d53f2af:ontology/work.schema.json'], timeout=10))
+legacy_bytes = subprocess.check_output(['git', '-C', repo, 'show', 'f46cdf49ba74e117ddaaf387416a0eac1d53f2af:ontology/work.schema.json'], timeout=10)
+assert hashlib.sha256(legacy_bytes).hexdigest() == 'f1573b514c1bb2591e525b502dfb1c37e22cea0f4588c67281afdc41df10adc5'
+legacy.write_bytes(legacy_bytes)
 call(['schema', 'install', str(redirected(legacy))])
 legacy_thread = created(apply('open_thread', 'legacy-thread', dict(task=task, key='legacy-v5', consumer='fixture', consumer_kind='harness', first_use='upgrade')), 'thread')
 legacy_plan = created(apply('open_plan', 'legacy-plan', dict(thread=legacy_thread, first_lines=100, limit_lines=150, current_lines=151, amended_by_family='family-a')), 'plan')
 apply('record_scope_review', 'legacy-review', dict(plan=legacy_plan, reviewer_family='family-b', review_report='fixture/v5.md'))
 v6 = pathlib.Path(store).with_name('v6.json')
-v6.write_bytes(subprocess.check_output(['git', '-C', repo, 'show', '8ad36bf3cf10e19659965cc2d458a921533cdfae:ontology/work.schema.json'], timeout=10))
+v6_bytes = subprocess.check_output(['git', '-C', repo, 'show', '8ad36bf3cf10e19659965cc2d458a921533cdfae:ontology/work.schema.json'], timeout=10)
+assert hashlib.sha256(v6_bytes).hexdigest() == '8467bd2984f77e5d81fe4efeca5d583a98cf754e100f7829aac2645a146bb414'
+v6.write_bytes(v6_bytes)
 call(['schema', 'install', str(redirected(v6))])
 assert obj(probe)['head'] == probe_revision
 assert obj(task)['observations'][-1]['revision'] == revision
@@ -950,7 +971,7 @@ apply('triage_decision', 'v9-after-carry', dict(decision=third, triage='none', r
 unchanged = fingerprint()
 assert migrate(9, 10) == dict(carried=0, already=3)
 assert fingerprint() == unchanged and fields(third_request)['route_reason'] == 'carried from version 9'
-for before, after in [(9, 21), (10, 10), (10, 9)]:
+for before, after in [(9, 22), (10, 10), (10, 9)]:
     assert migrate(before, after, 2) == dict(status='unknown_pair')
 assert fingerprint() == unchanged
 assert migrate(9, 10) == dict(carried=0, already=3)
@@ -2346,14 +2367,19 @@ assert every(kpi_b).get('intent') is None
 print('gate_row=v19-kpi-of-an-intent expected=admitted')
 print('v19_gate_rows_complete')
 print('v19 measures: ok')
-# Version 20: the repository's file over the objects made under version 19. The schema differs from version 19 only by
-# points 1 and 2 of ontology/README.md, "Version 20": each is taken off a copy, and what is left reads as version 19.
+# Version 20, pinned in Git by the commit of main that holds it, over the objects made under version 19. The schema
+# differs from version 19 only by points 1 and 2 of ontology/README.md, "Version 20": each is taken off a copy, and what
+# is left reads as version 19.
 v19_schema = schema
 v19_objects = [o['id'] for t in ('task', 'decision', 'request', 'intent', 'criterion', 'unit', 'review', 'run', 'finding', 'hold', 'principle', 'host', 'account', 'kpi')
                for o in call(['search'], dict(object_type=t, limit=1000))['objects']]
 v19_before = [obj(i) for i in v19_objects]
 v19_views = [(view, args, call(['render'], dict(view=view, args=args))) for view, args, _ in v13_views]
-schema = json.loads(pathlib.Path(repo, 'ontology/work.schema.json').read_text())
+V20_PIN = ('949478b56c00cd64d559e01b29e7dbb35d26b7b3', '916a9f502ca956644330632efa14963455b16e445a511b2633715189bf19b4c2')
+v20_bytes = subprocess.check_output(['git', '-C', repo, 'show', V20_PIN[0] + ':ontology/work.schema.json'], timeout=10)
+assert hashlib.sha256(v20_bytes).hexdigest() == V20_PIN[1]
+v20_path = pathlib.Path(store).with_name('pinned-' + V20_PIN[0] + '.json'); v20_path.write_bytes(v20_bytes)
+schema = json.loads(v20_bytes)
 assert schema['version'] == 20
 head, old = json.loads(json.dumps(schema)), json.loads(json.dumps(v19_schema))
 case_type = head['object_types'].pop('case')
@@ -2380,7 +2406,7 @@ def cases_copy(path, label, name):
     assert CASES not in json.dumps(copy['sources'])
     out.write_text(json.dumps(copy))
     return out
-call(['schema', 'install', str(cases_copy(pathlib.Path(repo, 'ontology/work.schema.json'), 'repository.json', 'repository-cases.json'))])
+call(['schema', 'install', str(cases_copy(v20_path, 'pinned-v20.json', 'pinned-v20-route.json'))])
 redirect.trace(work, copies)
 assert [obj(i) for i in v19_objects] == v19_before
 for view, args, before in v19_views:
@@ -2398,7 +2424,6 @@ listed = {f['name']: f for f in described['functions'] if f['domain'] == 'work'}
 assert sorted(listed) == ['api_spend', 'capacity', 'clause', 'cost', 'flow', 'gate', 'horizon', 'route', 'share'], sorted(listed)
 unchanged = fingerprint()
 assert migrate(19, 20) == dict(carried=0, already=0)
-assert migrate(20, 21, 2) == dict(status='unknown_pair')
 assert fingerprint() == unchanged and [obj(i) for i in v19_objects] == v19_before
 print('v20_migration_rows_complete')
 phase = 'v20'
@@ -2447,4 +2472,208 @@ assert answer['appended']['retraction'] == 1 and sorted(cases_heads()) == sorted
 print('gate_row=v20-records-retracted expected=admitted')
 print('v20_gate_rows_complete')
 print('v20 cases: ok')
+# Version 21: the repository's file over the objects made under version 20. The schema differs from version 20 only by
+# point 1 of ontology/README.md, "Version 21": each part is taken off a copy, and what is left reads as version 20.
+v20_schema = schema
+v20_objects = [o['id'] for t in ('task', 'decision', 'request', 'intent', 'criterion', 'unit', 'review', 'run', 'finding', 'hold', 'principle', 'host', 'account', 'kpi', 'case')
+               for o in call(['search'], dict(object_type=t, limit=1000))['objects']]
+v20_before = [obj(i) for i in v20_objects]
+ARGS21 = dict(task=task['native_key'], intent='gadget-board', unit='fixture-stopped', topic='v10-widget-board')
+v20_views = [(view, args, call(['render'], dict(view=view, args=args)))
+             for view, args in [(name, {a: ARGS21[a] for a in body['args']}) for name, body in v20_schema['views'].items()]]
+assert len(v20_views) == 20
+schema = json.loads(pathlib.Path(repo, 'ontology/work.schema.json').read_text())
+assert schema['version'] == 21
+head, old = json.loads(json.dumps(schema)), json.loads(json.dumps(v20_schema))
+# 1 (a): the value type finding_kind gains bottleneck, after note, and two descriptions name it.
+assert head['value_types']['finding_kind']['enum'][-2:] == ['note', 'bottleneck']
+head['value_types']['finding_kind']['enum'].pop()
+for kind_member, old_member in [(head['object_types']['finding']['properties']['kind'], old['object_types']['finding']['properties']['kind']),
+                                (head['action_types']['open_finding']['parameters']['kind'], old['action_types']['open_finding']['parameters']['kind'])]:
+    assert 'bottleneck' in kind_member['description'] and 'bottleneck' not in old_member['description']
+    kind_member['description'] = old_member['description']
+# 1 (b): the rules of three actions name the parameter whose object they edit, and no other rule has a target.
+assert {n for n, a in head['action_types'].items() if any('target' in r for r in a['rules'])} == set(redirect.TARGETS)
+for name, target in redirect.TARGETS.items():
+    [rule] = head['action_types'][name]['rules']
+    assert rule.pop('target') == target and name in old['action_types']
+# 1 (c): three documents, in the blocks the page fixes.
+def blocks(view): return [(b['heading'], 'table' if 'table' in b else 'list', (b.get('table') or b['list'])['object_type'], (b.get('table') or b['list']).get('limit')) for b in view['blocks']]
+assert sorted(head['views']) == sorted(list(old['views']) + ['lead_state', 'lead_handover', 'bottlenecks'])
+state_view, handover_view, bottlenecks_view = (head['views'].pop(n) for n in ('lead_state', 'lead_handover', 'bottlenecks'))
+assert state_view['args'] == ['directory'] and blocks(state_view) == [('Intent', 'list', 'intent', 1), ('Holds', 'list', 'hold', 6), ('Lessons', 'list', 'finding', 8)]
+assert handover_view['args'] == ['directory', 'intent', 'task'] and blocks(handover_view) == [
+    ('Mandate', 'table', 'intent', 1), ('Criteria', 'table', 'criterion', 40), ('Units', 'table', 'unit', 100), ('Baseline', 'table', 'kpi', 60), ('Lessons', 'list', 'finding', 40)]
+assert 'args' not in bottlenecks_view and blocks(bottlenecks_view) == [('Open', 'table', 'finding', 200), ('Closed', 'list', 'finding', 200)]
+assert {k: v for k, v in head.items() if k != 'version'} == {k: v for k, v in old.items() if k != 'version'}
+print('gate_row=v21-only-point-1 expected=admitted views=' + str(len(schema['views'])) + ' targets=' + str(len(redirect.TARGETS)))
+call(['schema', 'install', str(cases_copy(pathlib.Path(repo, 'ontology/work.schema.json'), 'repository.json', 'repository-cases.json'))])
+redirect.trace(work, copies)
+assert [obj(i) for i in v20_objects] == v20_before
+for view, args, before in v20_views:
+    answer = call(['render'], dict(view=view, args=args))
+    assert answer['rows'] == before['rows'] and answer['markdown'] == before['markdown'].replace('schema=work@20', 'schema=work@21'), view
+print('gate_row=v21-v20-objects-and-views-unchanged expected=admitted objects=' + str(len(v20_objects)) + ' views=' + str(len(v20_views)))
+sizes = []
+for name in ('ont_describe', 'ont_action_list'):
+    wire = subprocess.run([binary, '--store', store, 'mcp'], input=json.dumps(dict(jsonrpc='2.0', id=1, method='tools/call', params=dict(name=name, arguments={}))) + '\n', text=True, capture_output=True, timeout=60)
+    answer = json.loads(wire.stdout.splitlines()[0])['result']; assert wire.returncode == 0 and not answer['isError'], answer
+    sizes.append(len(answer['content'][0]['text'].encode())); assert sizes[-1] <= 262144, (name, sizes[-1])
+print('v21_mcp_bytes=' + ','.join(map(str, sizes)), file=sys.stderr)
+described = call(['describe'], {})
+listed = {v['name']: v for v in described['views'] if v.get('domain', 'work') == 'work'}
+# The engine of the pin describes the table views only: a document is read by render.
+assert sorted(listed) == sorted(v20_schema['views']), sorted(listed)
+unchanged = fingerprint()
+assert migrate(20, 21) == dict(carried=0, already=0)
+assert migrate(19, 21) == dict(carried=0, already=0)
+assert migrate(21, 22, 2) == dict(status='unknown_pair')
+assert fingerprint() == unchanged and [obj(i) for i in v20_objects] == v20_before
+print('v21_migration_rows_complete')
+phase = 'v21'
+def word21(rid, kind): return created(apply('record_request', rid, dict(words='Invented words of ' + rid + '.', words_verified=True, record='fixture/session.jsonl', reading='The user says ' + rid + '.',
+                                                                     kind=kind, topic='v21-documents', said_at=stamp(), session='fixture-session', runtime='fixture-cli')), 'request')
+def one(view, **args): return call(['render'], dict(view=view, args=args))
+def item_lines(markdown, heading):
+    body = markdown.split('## ' + heading + '\n', 1)[1].split('\n\n', 1)[0].split('\n<!-- /ont:render -->')[0]
+    return [line for line in body.split('\n') if line]
+# The new kind of a finding: a bottleneck opens, any other word is refused, and the key is its row.
+tick(); bottleneck = lambda n: oid('finding', 'v21-bottleneck-' + n)
+bp = dict(kind='bottleneck', detector='fixture-timer', summary='The invented widget board takes 9 minutes to build.', evidence='9 min: fixture-timer --board', severity='act')
+apply('open_finding', 'kind-unknown', dict(bp, finding=bottleneck('x'), kind='bottlenecks'), 'invalid_parameter')
+apply('open_finding', 'bottleneck-a', dict(bp, finding=bottleneck('a')))
+f = fields(bottleneck('a')); assert f['kind'] == 'bottleneck' and f['state'] == 'open' and f['first_seen_at'] == f['last_seen_at'] == stamp() and f['evidence'] == bp['evidence'], f
+print('gate_row=v21-bottleneck-opens expected=admitted')
+# amend_principle edits the principle it names: the parent given is set as its parent and is left as it was.
+tick(); said_a, said_b = word21('principle-said-a', 'order'), word21('principle-said-b', 'decision')
+root21, under_a, under_b = oid('principle', 'v21-root'), oid('principle', 'v21-under-a'), oid('principle', 'v21-under-b')
+apply('record_principle', 'root', dict(principle=root21, order_key='21', statement='The invented boards stay fast.', requests=[said_a]))
+apply('record_principle', 'under-a', dict(principle=under_a, order_key='21.01', statement='The invented widget board builds in two minutes.', requests=[said_a], parent=root21))
+apply('record_principle', 'under-b', dict(principle=under_b, order_key='21.02', statement='The invented gadget board builds in one minute.', requests=[said_b], parent=root21))
+parent_before, root_before, child_before = obj(under_b), obj(root21), fields(under_a)
+tick(); apply('amend_principle', 'child-and-parent', dict(principle=under_a, parent=under_b, statement='The invented widget board builds in three minutes.'))
+f = fields(under_a)
+assert f['parent'] == under_b and f['statement'] == 'The invented widget board builds in three minutes.' and f['amended_at'] == stamp() and f['order_key'] == '21.01' and f['requests'] == [said_a], f
+assert obj(under_b) == parent_before and obj(root21) == root_before, 'the parent given is left as it was'
+assert fields(under_b)['parent'] == root21 and fields(under_b)['amended_at'] != stamp() and fields(under_b)['statement'] == 'The invented gadget board builds in one minute.'
+tick(); apply('amend_principle', 'parent-only', dict(principle=under_a, parent=root21))
+assert fields(under_a)['parent'] == root21 and fields(under_a)['amended_at'] == stamp() and obj(under_b) == parent_before
+print('gate_row=v21-amend-principle-edits-the-principle expected=admitted')
+# end_delegation supersedes the delegation and leaves the user's later word current.
+tick(); delegation21 = word21('delegation', 'delegation')
+tick(); stop21 = word21('stop', 'stop')
+ended = apply('end_delegation', 'ended', dict(request=delegation21, stopped_by=stop21))
+assert [(e['id'], e['change']) for e in ended['edits']] == [(delegation21, 'update')], ended
+assert fields(delegation21)['status'] == 'superseded' and fields(stop21)['status'] == 'current'
+print('gate_row=v21-end-delegation-edits-the-request expected=admitted')
+# mark_memory_record_superseded marks the record and leaves its successor as it was.
+BODY = '0' * 63 + '1'
+old_record, new_record = oid('memory_record', 'v21-record'), oid('memory_record', 'v21-successor')
+apply('mark_memory_record_pending', 'record', dict(record=old_record, document_id='v21-record', body_hash=BODY))
+apply('mark_memory_record_pending', 'successor', dict(record=new_record, document_id='v21-successor', body_hash=BODY, supersedes=old_record))
+apply('mark_memory_record_ready', 'successor', dict(record=new_record))
+successor_before = obj(new_record)
+marked = apply('mark_memory_record_superseded', 'record', dict(record=old_record, successor=new_record))
+assert [(e['id'], e['change']) for e in marked['edits']] == [(old_record, 'update')], marked
+assert fields(old_record)['status'] == 'superseded' and obj(new_record) == successor_before and fields(new_record)['status'] == 'ready'
+print('gate_row=v21-mark-superseded-edits-the-record expected=admitted')
+# The three documents over objects in every block.
+DIR = 'v21-task-dir'
+intent_op = dict(first_user='The fixture reader, in its first run.', constraints='none')
+def draft(key, directory, outcome):
+    tick(); origin = word21(key + '-origin', 'order'); i = oid('intent', key)
+    apply('draft_intent', key, dict(intent=i, outcome=outcome, origin=origin, directory=directory, **intent_op))
+    return i
+lead_intent = draft('v21-lead', DIR, 'The invented widget board is delivered.')
+other_intent = draft('v21-other', 'v21-other-dir', 'The invented gadget board is delivered.')
+retired_intent = draft('v21-retired', DIR, 'The invented retired board.')
+apply('retire_intent', 'retired', dict(intent=retired_intent, reason='replaced by v21-lead'))
+crit_a = created(apply('add_criterion', 'a', dict(intent=lead_intent, statement='The board lists 3 widgets.', check='fixture-check --count 3', baseline='0 widgets')), 'criterion')
+crit_b = created(apply('add_criterion', 'b', dict(intent=lead_intent, statement='The board builds in 2 minutes.', check='fixture-timer --board')), 'criterion')
+tick(); said = word21('lead-yes', 'decision'); apply('route_request', 'lead-yes', dict(request=said, intent=lead_intent)); apply('confirm_intent', 'lead-yes', dict(intent=lead_intent, by=said))
+apply('name_lead', 'lead', dict(intent=lead_intent, session='fixture-lead', by=said))
+apply('note_intent', 'first', dict(intent=lead_intent, notes='Next: read the hand-over, then make the unit ready.'))
+apply('check_criterion', 'a', dict(criterion=crit_a, state='pass', evidence='fixture-check: 3 widgets'))
+unit_a, unit_b = oid('unit', 'v21-unit-a'), oid('unit', 'v21-unit-b')
+for u in (unit_a, unit_b): apply('add_unit', u['native_key'], dict(unit=u, lane='objective', intent=lead_intent, objective='The invented unit ' + u['native_key'] + '.', **{'class': 'plain'}))
+apply('drop_unit', 'b', dict(unit=unit_b, reason='not needed'))
+kpi21 = created(apply('define_kpi', 'v21', dict(task=task, name='v21-board-minutes', definition='Minutes the invented board takes to build.', target='2')), 'kpi')
+apply('record_measurement', 'v21', dict(kpi=kpi21, value='9', observed_at='2026-11-11T00:00:00Z', evidence='fixture-timer --board'))
+def active_holds(): return len(call(['search'], dict(object_type='hold', where={'eq': ['status', 'active']}, limit=1000))['objects'])
+holds21 = [created(apply('set_hold', 'h' + str(n), dict(task=task, effect='v21 effect ' + str(n), until='v21 until ' + str(n))), 'hold') for n in range(2)]
+lifted = created(apply('set_hold', 'lifted', dict(task=task, effect='v21 effect lifted', until='v21 until lifted')), 'hold'); apply('lift_hold', 'lifted', dict(hold=lifted, reason='done'))
+def lesson(n, state=None):
+    tick(); i = oid('finding', 'v21-lesson-' + n)
+    apply('open_finding', 'lesson-' + n, dict(finding=i, kind='lesson', detector='fixture-lead', summary='The invented lesson ' + n + ' must not repeat.', severity='info'))
+    return i
+lesson_a, lesson_b, lesson_c, lesson_d = (lesson(n) for n in 'abcd')
+apply('plan_finding_as_unit', 'b', dict(finding=lesson_b, unit=unit_a))
+apply('close_finding', 'c', dict(finding=lesson_c, reason='The refusal is delivered.'))
+apply('dismiss_finding', 'd', dict(finding=lesson_d, reason='Not a lesson.'))
+bottleneck_b, bottleneck_c = bottleneck('b'), bottleneck('c')
+apply('open_finding', 'bottleneck-b', dict(bp, finding=bottleneck_b, summary='The invented gadget board takes 7 minutes.'))
+apply('open_finding', 'bottleneck-c', dict(bp, finding=bottleneck_c, summary='The invented flaky board.'))
+apply('close_finding', 'bottleneck-b', dict(finding=bottleneck_b, reason='fixed: 2 minutes at the next build'))
+apply('dismiss_finding', 'bottleneck-c', dict(finding=bottleneck_c, reason='noise'))
+DOCS = [('lead_state', dict(directory=DIR)), ('lead_handover', dict(directory=DIR, intent='v21-lead', task=task['native_key'])), ('bottlenecks', {})]
+first = {}
+for view, args in DOCS:
+    a, b = one(view, **args), one(view, **args)
+    assert a == b and a['markdown'].encode() == b['markdown'].encode() and a['status'] == 'ok' and a['truncated'] is False, view
+    assert a['markdown'].startswith('<!-- ont:render ' + view) and a['markdown'].endswith('\n<!-- /ont:render -->') and 'schema=work@21' in a['markdown'].split('\n')[0], a['markdown']
+    first[view] = a['markdown']
+state = first['lead_state']
+assert item_lines(state, 'Intent') == [l for l in item_lines(state, 'Intent') if l.startswith('- v21-lead: fixture-lead: ')] and len(item_lines(state, 'Intent')) == 1, state
+assert 'Next: read the hand-over' in state and 'v21-other' not in state and 'v21-retired' not in state, state
+assert len(item_lines(state, 'Holds')) == min(active_holds(), 6) + (1 if active_holds() > 6 else 0)
+assert all(('v21 effect ' + str(n)) in state for n in range(2)) or active_holds() > 6
+assert 'v21 effect lifted' not in state
+lessons_now = item_lines(state, 'Lessons')
+assert [l for l in lessons_now if 'v21-lesson' in l] == ['- v21-lesson-a: The invented lesson a must not repeat.', '- v21-lesson-b: The invented lesson b must not repeat.'], lessons_now
+assert len(state.split('\n')) <= 25
+handover = first['lead_handover']
+assert '| v21-lead | The invented widget board is delivered. |' in handover and '| fixture-lead |' in handover, handover
+assert '| v21-criterion' not in handover and 'fixture-check: 3 widgets' in handover and '| The board builds' not in handover
+assert 'v21-unit-a' in handover and 'v21-unit-b' not in handover and '| v21-board-minutes | 9 | 2026-11-11T00:00:00Z | fixture-timer --board |' in handover, handover
+assert 'v21-lesson-a' in handover and 'v21-lesson-c' not in handover
+bottlenecks_md = first['bottlenecks']
+assert 'v21-bottleneck-a | The invented widget board takes 9 minutes to build. | 9 min: fixture-timer --board |' in bottlenecks_md, bottlenecks_md
+assert '- v21-bottleneck-b: The invented gadget board takes 7 minutes.: fixture-timer' not in bottlenecks_md and 'fixture-timer --board' in bottlenecks_md
+closed = item_lines(bottlenecks_md, 'Closed')
+assert closed == ['- v21-bottleneck-b: The invented gadget board takes 7 minutes.: fixed: 2 minutes at the next build', '- v21-bottleneck-c: The invented flaky board.: noise'], closed
+assert 'v21-bottleneck-b |' not in bottlenecks_md.split('## Closed')[0]
+print('gate_row=v21-documents-render-twice-with-the-same-bytes expected=admitted documents=3')
+# render --write replaces the one block of a file with text around it, and --check reads it back.
+documents = pathlib.Path(store).parent / 'documents'; documents.mkdir(); preimages = documents / 'preimages'; preimages.mkdir()
+state_file = documents / 'STATE.md'
+state_file.write_text('Text before the block.\n\n' + state + '\n\nText after the block.\n')
+call(['render', '--check', str(state_file), '--expect-blocks', '1'])
+apply('note_intent', 'second', dict(intent=lead_intent, notes='Next: deliver with the engine.'))
+refused = call(['render', '--check', str(state_file), '--expect-blocks', '1'], None, 2); assert refused['code'] == 'render_drift', refused
+call(['render', '--write', str(state_file), '--section', 'lead_state', '--arg', 'directory=' + DIR, '--preimage-dir', str(preimages)])
+written = state_file.read_text()
+assert written == 'Text before the block.\n\n' + one('lead_state', directory=DIR)['markdown'] + '\n\nText after the block.\n' and 'Next: deliver with the engine.' in written, written
+call(['render', '--check', str(state_file), '--expect-blocks', '1'])
+assert call(['render', '--check', str(state_file), '--expect-blocks', '2'], None, 2)['code'] == 'render_block_count'
+print('gate_row=v21-render-write-and-check expected=admitted')
+# A lesson closed when its refusal is delivered leaves the next render.
+apply('close_finding', 'a', dict(finding=lesson_a, reason='The refusal is delivered.'))
+after_close = one('lead_state', directory=DIR)['markdown']
+assert 'v21-lesson-a' not in after_close and 'v21-lesson-b' in after_close and after_close != written.split('\n\n', 1)[1].rsplit('\n\n', 1)[0]
+call(['render', '--check', str(state_file), '--expect-blocks', '1'], None, 2)
+print('gate_row=v21-closed-lesson-leaves-the-block expected=admitted')
+# More objects than each limit: lead_state is still at most 25 lines, and says what it left out.
+second_open = draft('v21-second', DIR, 'The invented second open board.')
+# A note with line breaks and a block marker is one line of the item, the marker escaped.
+apply('note_intent', 'lines', dict(intent=second_open, notes='a\nb\n\n## Fake\n<!-- /ont:render -->\nc'))
+for n in range(2, 10): created(apply('set_hold', 'h' + str(n), dict(task=task, effect='v21 effect ' + str(n), until='v21 until ' + str(n))), 'hold')
+for n in range(10): lesson('more-' + str(n))
+full = one('lead_state', directory=DIR)['markdown']
+assert len(full.split('\n')) == 25, full
+assert '\n## Fake' not in full and full.count('<!-- /ont:render -->') == 1 and 'a b  ## Fake' in full, full
+assert item_lines(full, 'Intent')[1] == '- (+1 more; limit 1)' and item_lines(full, 'Holds')[-1] == '- (+' + str(active_holds() - 6) + ' more; limit 6)' and len(item_lines(full, 'Holds')) == 7, full
+assert len(item_lines(full, 'Lessons')) == 9 and item_lines(full, 'Lessons')[-1].startswith('- (+') and item_lines(full, 'Lessons')[-1].endswith(' more; limit 8)'), full
+print('gate_row=v21-lead-state-within-25-lines expected=admitted lines=25')
+print('v21_gate_rows_complete')
+print('v21 documents: ok')
 PY

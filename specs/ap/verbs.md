@@ -35,7 +35,8 @@ Purpose: an agent of any CLI learns from `ap` itself which verbs it has, the req
 | `resource` (and `ap` with no argument as the functions `capacity` and `gate`) | `specs/ap/resource.md` |
 | `api` (and `ap` with no argument as the function `api_spend`) | `specs/ap/api.md` |
 | `measure` (and `ap` with no argument as the functions `cost`, `flow` and `share`) | `specs/ap/measure.md` |
-| `gate`, `review`, `accept`, `backlog`, `state`, `row`, and `unit` with a page or a request on standard input | their sections of `crates/ap/README.md` (verbs to be removed; no specification) |
+| `state` | `specs/ap/state.md` |
+| `gate`, `review`, `accept`, `backlog`, `row`, and `unit` with a page or a request on standard input | their sections of `crates/ap/README.md` (verbs to be removed; no specification) |
 
 Each verb's own refusals and exits are in its contract; this file holds only the argument lists above that reach no verb.
 

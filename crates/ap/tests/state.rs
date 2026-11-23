@@ -168,6 +168,7 @@ fn limit(status: &str) -> Value {
 
 #[test]
 fn sr1_task_head_and_uncommitted_lines() {
+    // spec: specs/ap/state.md#R4
     let d = Dir::new();
     let mut f = Fake::new();
     let v = state(&mut f, &d);
@@ -207,6 +208,7 @@ fn sr1_task_head_and_uncommitted_lines() {
 
 #[test]
 fn sr1_units_are_chains_of_calls_newest_first() {
+    // spec: specs/ap/state.md#R5
     let d = Dir::new();
     // One pull request with a call and its come-back; a call without a pull request; another
     // repository's pull request of the same number.
@@ -314,6 +316,7 @@ fn sr1_units_are_chains_of_calls_newest_first() {
 
 #[test]
 fn sr1_stages_are_the_running_ones_and_the_newest_twenty_of_no_call() {
+    // spec: specs/ap/state.md#R6
     let d = Dir::new();
     d.json(
         "U-A.unit.json",
@@ -427,6 +430,7 @@ fn sr1_stages_are_the_running_ones_and_the_newest_twenty_of_no_call() {
 
 #[test]
 fn sr1_stale_of_each_kind_of_record() {
+    // spec: specs/ap/state.md#R7
     let d = Dir::new();
     d.json(
         "live.run.json",
@@ -555,6 +559,7 @@ fn sr1_stale_of_each_kind_of_record() {
 
 #[test]
 fn sr1_streams_without_record() {
+    // spec: specs/ap/state.md#R8
     let d = Dir::new();
     d.put("a.stream.jsonl", "{}\n");
     d.put("a.run.json", "{}");
@@ -583,6 +588,7 @@ fn sr1_streams_without_record() {
 
 #[test]
 fn sr1_limits_are_the_newest_present_limit_of_each_account() {
+    // spec: specs/ap/state.md#R9
     let d = Dir::new();
     let with = |mut v: Value, l: Option<Value>| {
         if let Some(l) = l {
@@ -702,6 +708,8 @@ fn sr1_limits_are_the_newest_present_limit_of_each_account() {
 
 #[test]
 fn sr1_an_unreadable_record_is_listed_and_the_rest_is_printed() {
+    // spec: specs/ap/state.md#R3
+    // spec: specs/ap/state.md#R10
     let d = Dir::new();
     d.put("cut.run.json", "{\"role\": \"implementer\", ");
     d.put("list.unit.json", "[]");
@@ -743,6 +751,7 @@ fn sr1_an_unreadable_record_is_listed_and_the_rest_is_printed() {
 
 #[test]
 fn sr1_text_form_is_bounded_and_ordered() {
+    // spec: specs/ap/state.md#R11
     let d = Dir::new();
     // Twelve chains, a running stage, a running call and two accounts with limits.
     for n in 0..12 {
@@ -781,19 +790,23 @@ fn sr1_text_form_is_bounded_and_ordered() {
     let mut f = Fake::new();
     let text = run(&mut f, &[&d.arg(), "--text"]).unwrap();
     let lines: Vec<_> = text.lines().collect();
-    assert_eq!(lines.len(), 1 + 1 + 10 + 1, "{text}");
-    // First what runs or is stale, then the newest ten chains, then the limits.
+    assert_eq!(lines.len(), 1 + 1 + 1 + 10 + 1, "{text}");
+    // The form line, then what runs or is stale, then the newest ten chains, then the limits.
     assert!(
-        lines[0].contains("runs/run.run.json") && lines[0].contains("stale"),
+        lines[0].starts_with("form: STATE.md absent, runs/ present"),
         "{text}"
     );
     assert!(
-        lines[1].contains("runs/U-run.unit.json") && lines[1].contains("running"),
+        lines[1].contains("runs/run.run.json") && lines[1].contains("stale"),
+        "{text}"
+    );
+    assert!(
+        lines[2].contains("runs/U-run.unit.json") && lines[2].contains("running"),
         "{text}"
     );
     // The newest chain is the call that runs (no item, no pull request), then item-11 downwards.
-    assert!(lines[2].contains("running"), "{text}");
-    let chains: Vec<_> = lines[2..12].to_vec();
+    assert!(lines[3].contains("running"), "{text}");
+    let chains: Vec<_> = lines[3..13].to_vec();
     assert!(
         chains[1].contains("item-11")
             && chains[1].contains("merged")
@@ -805,7 +818,7 @@ fn sr1_text_form_is_bounded_and_ordered() {
         "{text}"
     );
     assert!(
-        lines[12].contains("/acc") && lines[12].contains("rejected"),
+        lines[13].contains("/acc") && lines[13].contains("rejected"),
         "{text}"
     );
     assert!(!text.contains("more"), "no line is cut: {text}");
@@ -820,10 +833,12 @@ fn sr1_text_form_is_bounded_and_ordered() {
     let text = run(&mut f, &[&d.arg(), "--text"]).unwrap();
     let lines: Vec<_> = text.lines().collect();
     assert_eq!(lines.len(), 60, "{text}");
-    assert!(lines[0].contains("runs/") && lines[0].contains("stale"));
+    assert!(
+        lines[0].starts_with("form: ") && lines[1].contains("runs/") && lines[1].contains("stale")
+    );
     let total = 71 + 1 + 10 + 1;
     assert!(
-        lines[59].contains(&format!("{} more", total - 59)),
+        lines[59].contains(&format!("{} more", total - 58)),
         "{}",
         lines[59]
     );
@@ -834,12 +849,12 @@ fn sr1_text_form_is_bounded_and_ordered() {
 
 #[test]
 fn sr1_arguments_are_refused_with_a_usage_error() {
+    // spec: specs/ap/state.md#R1
     let d = Dir::new();
-    let bare = std::env::temp_dir().join(format!("ap-state-bare-{}", std::process::id()));
-    std::fs::create_dir_all(&bare).unwrap();
     let (dir, missing) = (d.arg(), format!("{}/missing", d.arg()));
-    let bare_dir = bare.to_str().unwrap().to_owned();
-    let (dir, missing, bare_dir) = (dir.as_str(), missing.as_str(), bare_dir.as_str());
+    let file = d.0.join("runs").join("a-file");
+    std::fs::write(&file, "x").unwrap();
+    let (dir, missing, file) = (dir.as_str(), missing.as_str(), file.to_str().unwrap());
     let refused: [&[&str]; 9] = [
         &[],
         &["--text"],
@@ -848,14 +863,13 @@ fn sr1_arguments_are_refused_with_a_usage_error() {
         &[dir, "--json"],
         &[dir, "--store"],
         &["relative-dir"],
-        &[bare_dir],
+        &[file],
         &[missing],
     ];
     for args in refused {
         let e = run(&mut Fake::new(), args).unwrap_err();
         assert_eq!((e.code, e.field.as_str()), ("usage", "args"), "{args:?}");
     }
-    let _ = std::fs::remove_dir_all(&bare);
     // The binary: exit 2 and the error on stderr; a readable directory exits 0.
     let ap = |args: &[&str]| {
         Command::new(env!("CARGO_BIN_EXE_ap"))
@@ -916,6 +930,7 @@ fn tree(root: &Path) -> BTreeMap<PathBuf, Vec<u8>> {
 
 #[test]
 fn sr1_a_run_writes_nothing_and_calls_only_git_systemctl_and_ps() {
+    // spec: specs/ap/state.md#R2
     let d = Dir::new();
     d.git(&["init", "-q"]);
     d.json(
@@ -968,6 +983,7 @@ fn sr1_a_run_writes_nothing_and_calls_only_git_systemctl_and_ps() {
 
 #[test]
 fn sr1_stale_of_a_stage_is_null_when_systemctl_cannot_be_read() {
+    // spec: specs/ap/state.md#R7
     let d = Dir::new();
     d.json(
         "live.run.json",
@@ -1049,6 +1065,7 @@ fn call_with_stage(d: &Dir, name: &str, start: &str) {
 
 #[test]
 fn sr1_stale_follows_the_word_of_systemctl_and_not_its_exit() {
+    // spec: specs/ap/state.md#R7
     let d = Dir::new();
     let words = [
         ("active", true, "active"),
@@ -1131,6 +1148,7 @@ fn sr1_stale_follows_the_word_of_systemctl_and_not_its_exit() {
 
 #[test]
 fn sr1_a_record_under_ten_seconds_old_is_never_stale() {
+    // spec: specs/ap/state.md#R7
     let d = Dir::new();
     call_with_stage(&d, "young", &stamp_ago(3));
     call_with_stage(&d, "old", &stamp_ago(60));
@@ -1152,6 +1170,7 @@ fn sr1_a_record_under_ten_seconds_old_is_never_stale() {
 
 #[test]
 fn sr1_stale_of_a_call_is_null_when_ps_was_not_read() {
+    // spec: specs/ap/state.md#R7
     let d = Dir::new();
     d.json(
         "U-gone.unit.json",
@@ -1191,6 +1210,7 @@ fn sr1_stale_of_a_call_is_null_when_ps_was_not_read() {
 
 #[test]
 fn sr1_git_runs_no_hook_of_the_repository_and_a_failed_status_is_null() {
+    // spec: specs/ap/state.md#R2
     let d = Dir::new();
     d.git(&["init", "-q"]);
     d.json(
@@ -1236,4 +1256,213 @@ fn sr1_git_runs_no_hook_of_the_repository_and_a_failed_status_is_null() {
     let v = state(&mut f, &d);
     assert_eq!(v["task"]["uncommitted"], Value::Null);
     assert_eq!(v["task"]["head"], d.git(&["rev-parse", "HEAD"]));
+}
+
+/// `n` lines of text, each ended by a line feed.
+fn lines_of(n: usize) -> String {
+    (0..n).map(|i| format!("line {i}\n")).collect()
+}
+fn form(f: &mut Fake, d: &Dir) -> Value {
+    state(f, d)["form"].clone()
+}
+
+#[test]
+fn sr_form_counts_state_lines_and_blocks() {
+    // spec: specs/ap/state.md#R13
+    let d = Dir::new();
+    let mut f = Fake::new();
+    let state_md = d.0.join("STATE.md");
+    let at = |lines: u64, blocks: u64| json!({"state_md": {"lines": lines, "limit": 30, "blocks": blocks}, "run_tree": true});
+    // Absent: null, and `runs/` is a directory.
+    assert_eq!(
+        form(&mut f, &d),
+        json!({"state_md": null, "run_tree": true})
+    );
+    // A symbolic link, also to a regular file, is not read; nor is a directory.
+    std::fs::write(d.0.join("target.md"), lines_of(5)).unwrap();
+    std::os::unix::fs::symlink(d.0.join("target.md"), &state_md).unwrap();
+    assert_eq!(form(&mut f, &d)["state_md"], Value::Null);
+    std::fs::remove_file(&state_md).unwrap();
+    std::fs::create_dir(&state_md).unwrap();
+    assert_eq!(form(&mut f, &d)["state_md"], Value::Null);
+    std::fs::remove_dir(&state_md).unwrap();
+    // Empty: no line. Thirty and thirty-one lines are counted, and the limit stays 30.
+    for (text, lines) in [
+        (String::new(), 0),
+        (lines_of(30), 30),
+        (lines_of(31), 31),
+        // A last line without a line feed counts; so does a lone line feed.
+        ("one\ntwo".to_owned(), 2),
+        ("one\n\n".to_owned(), 2),
+        ("\n".to_owned(), 1),
+    ] {
+        std::fs::write(&state_md, &text).unwrap();
+        assert_eq!(form(&mut f, &d), at(lines, 0), "{text:?}");
+    }
+    // Two generated blocks: the lines that begin with the opening marker, and no other.
+    let marker = "<!-- ont:render lead_state directory=d schema=work@21 -->";
+    let text = format!(
+        "head\n{marker}\n## Intent\n- (none)\n<!-- /ont:render -->\n\n {marker}\n<!-- ont:render\n{marker}\n- x\n<!-- /ont:render -->"
+    );
+    std::fs::write(&state_md, &text).unwrap();
+    assert_eq!(form(&mut f, &d), at(11, 2), "{text}");
+    // `run_tree` is true only for a directory named `runs`.
+    std::fs::remove_dir_all(d.0.join("runs")).unwrap();
+    assert_eq!(form(&mut f, &d)["run_tree"], false);
+    std::fs::write(d.0.join("runs"), "x").unwrap();
+    assert_eq!(form(&mut f, &d)["run_tree"], false);
+    // The answer holds the base's members beside `form`.
+    let v = state(&mut f, &d);
+    let mut keys: Vec<_> = v.as_object().unwrap().keys().map(String::as_str).collect();
+    keys.sort_unstable();
+    assert_eq!(
+        keys,
+        [
+            "at",
+            "form",
+            "limits",
+            "stages",
+            "streams_without_record",
+            "task",
+            "units",
+            "unreadable"
+        ]
+    );
+}
+
+#[test]
+fn sr_a_directory_without_runs_is_answered() {
+    // spec: specs/ap/state.md#R12
+    let d = Dir::new();
+    std::fs::remove_dir(d.0.join("runs")).unwrap();
+    d.git(&["init", "-q"]);
+    std::fs::write(d.0.join("STATE.md"), lines_of(3)).unwrap();
+    d.git(&["add", "-A"]);
+    d.git(&["commit", "-qm", "a"]);
+    std::fs::write(d.0.join("loose"), "x").unwrap();
+    let mut f = Fake::new();
+    let v = state(&mut f, &d);
+    for member in [
+        "units",
+        "stages",
+        "streams_without_record",
+        "limits",
+        "unreadable",
+    ] {
+        assert_eq!(v[member], json!([]), "{member}");
+    }
+    // Git is read as for any directory; neither `systemctl` nor `ps` is called.
+    assert_eq!(v["task"]["head"], d.git(&["rev-parse", "HEAD"]));
+    assert_eq!(v["task"]["uncommitted"], 1);
+    assert_eq!(
+        v["form"],
+        json!({"state_md": {"lines": 3, "limit": 30, "blocks": 0}, "run_tree": false})
+    );
+    let programs: BTreeSet<_> = f.programs.iter().map(|(p, _)| p.as_str()).collect();
+    assert_eq!(programs, BTreeSet::from(["git"]));
+    // An entry named `runs` that is not a directory is the same answer; nothing is written.
+    std::fs::write(d.0.join("runs"), "{}").unwrap();
+    let before = tree(&d.0);
+    let mut f = Fake::new();
+    let v = state(&mut f, &d);
+    assert_eq!(v["units"], json!([]));
+    assert_eq!(v["form"]["run_tree"], false);
+    assert!(f.programs.iter().all(|(p, _)| p == "git"));
+    run(&mut f, &[&d.arg(), "--text"]).unwrap();
+    assert_eq!(tree(&d.0), before, "the tree changed");
+    // The binary exits 0 with the same members.
+    let out = Command::new(env!("CARGO_BIN_EXE_ap"))
+        .args(["state", &d.arg()])
+        .stdin(std::process::Stdio::null())
+        .output()
+        .unwrap();
+    assert_eq!(out.status.code(), Some(0));
+    let v: Value = serde_json::from_slice(&out.stdout).unwrap();
+    assert_eq!(v["stages"], json!([]));
+}
+
+#[test]
+fn sr_text_form_begins_with_the_form_line() {
+    // spec: specs/ap/state.md#R14
+    let d = Dir::new();
+    let mut f = Fake::new();
+    let state_md = d.0.join("STATE.md");
+    let text = |f: &mut Fake| run(f, &[&d.arg(), "--text"]).unwrap();
+    // No line of the base: the form line alone, with its line feed.
+    assert_eq!(text(&mut f), "form: STATE.md absent, runs/ present\n");
+    std::fs::remove_dir(d.0.join("runs")).unwrap();
+    assert_eq!(text(&mut f), "form: STATE.md absent, runs/ absent\n");
+    // A file of 12 lines and two blocks; then 30 and 31 lines, with and without `runs/`.
+    let marker = "<!-- ont:render lead_state directory=d schema=work@21 -->";
+    std::fs::write(&state_md, format!("{}{marker}\nx\n{marker}\n", lines_of(9))).unwrap();
+    assert_eq!(
+        text(&mut f),
+        "form: STATE.md 12 of 30 lines, 2 rendered blocks, runs/ absent\n"
+    );
+    std::fs::create_dir(d.0.join("runs")).unwrap();
+    assert_eq!(
+        text(&mut f),
+        "form: STATE.md 12 of 30 lines, 2 rendered blocks, runs/ present\n"
+    );
+    std::fs::write(&state_md, lines_of(30)).unwrap();
+    assert_eq!(
+        text(&mut f),
+        "form: STATE.md 30 of 30 lines, 0 rendered blocks, runs/ present\n"
+    );
+    std::fs::write(&state_md, lines_of(31)).unwrap();
+    assert_eq!(
+        text(&mut f),
+        "form: STATE.md 31 of 30 lines, 0 rendered blocks, runs/ present over\n"
+    );
+    std::fs::remove_dir(d.0.join("runs")).unwrap();
+    assert_eq!(
+        text(&mut f),
+        "form: STATE.md 31 of 30 lines, 0 rendered blocks, runs/ absent over\n"
+    );
+    // The base's lines come after it, and at most 60 lines are printed in all: with 59 lines of
+    // the base none is cut, with 60 the first 58 and the line that counts the two left out.
+    std::fs::remove_file(&state_md).unwrap();
+    std::fs::create_dir(d.0.join("runs")).unwrap();
+    let stages = |from: usize, to: usize| {
+        for n in from..to {
+            let start = format!("2026-11-14T10:{:02}:{:02}Z", n / 60, n % 60);
+            d.json(
+                &format!("r{n:02}.run.json"),
+                &stage("implementer", "/a", &start, None, "ap-run-y.scope"),
+            );
+        }
+    };
+    stages(0, 59);
+    let out = text(&mut f);
+    let lines: Vec<_> = out.lines().collect();
+    assert_eq!(lines.len(), 60, "{out}");
+    assert_eq!(lines[0], "form: STATE.md absent, runs/ present");
+    assert!(
+        lines[1..].iter().all(|l| l.starts_with("runs: stage ")),
+        "{out}"
+    );
+    assert!(!out.contains("more lines"), "no line is cut: {out}");
+    stages(59, 60);
+    let out = text(&mut f);
+    let lines: Vec<_> = out.lines().collect();
+    assert_eq!(lines.len(), 60, "{out}");
+    assert_eq!(lines[0], "form: STATE.md absent, runs/ present");
+    assert!(
+        lines[1..59].iter().all(|l| l.starts_with("runs: stage ")),
+        "{out}"
+    );
+    assert_eq!(
+        lines[59],
+        "... 2 more lines: ap state without --text prints them all"
+    );
+    stages(60, 90);
+    let out = text(&mut f);
+    let lines: Vec<_> = out.lines().collect();
+    assert_eq!(lines.len(), 60, "{out}");
+    assert_eq!(
+        lines[59],
+        "... 32 more lines: ap state without --text prints them all"
+    );
+    // The JSON form still holds every stage that runs.
+    assert_eq!(state(&mut f, &d)["stages"].as_array().unwrap().len(), 90);
 }
