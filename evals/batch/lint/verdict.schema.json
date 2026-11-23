@@ -1,0 +1,21 @@
+{
+ "type": "object",
+ "properties": {
+  "items": {
+   "type": "array",
+   "items": {
+    "type": "object",
+    "properties": {
+     "kind": {"type": "string", "enum": ["ambiguity", "contradiction", "gap"]},
+     "rules": {"type": "array", "items": {"type": "string"}},
+     "quote": {"type": "string"},
+     "why": {"type": "string"}
+    },
+    "required": ["kind", "rules", "quote", "why"],
+    "additionalProperties": false
+   }
+  }
+ },
+ "required": ["items"],
+ "additionalProperties": false
+}
