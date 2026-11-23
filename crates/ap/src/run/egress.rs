@@ -375,7 +375,7 @@ fn literal(host: &str) -> bool {
 }
 
 /// An address no stage reaches: of this host, of the tailnet, of a private, link-local or
-/// multicast network, or unspecified (R18): one in a range of `RANGES`.
+/// multicast network, or unspecified (R18).
 fn forbidden(address: IpAddr) -> bool {
     match address {
         IpAddr::V4(v) => forbidden_v4(v),
