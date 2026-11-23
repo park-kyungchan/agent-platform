@@ -131,15 +131,28 @@ fn a_session_id_that_is_not_a_uuid_fails_the_launch() {
 
 /// A fake program written to a temporary directory: the file `name` runs `body` under `sh`, in a directory of its own per call, since the tests run in parallel.
 fn fake(name: &str, body: &str) -> (PathBuf, PathBuf) {
-    use std::os::unix::fs::PermissionsExt;
     static NEXT: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
     let n = NEXT.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
     let dir = std::env::temp_dir().join(format!("ap-host-limit-{}-{n}", std::process::id()));
     let _ = std::fs::remove_dir_all(&dir);
     std::fs::create_dir_all(&dir).unwrap();
     let path = dir.join(name);
-    std::fs::write(&path, format!("#!/bin/sh\n{body}\n")).unwrap();
-    std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o755)).unwrap();
+    // A child process writes the file, so that this process never holds a write descriptor of it: another
+    // test thread that forks meanwhile would copy the descriptor, and the exec of the fake would fail
+    // with "text file busy" until that child execs.
+    let mut writer = Command::new("sh")
+        .args(["-c", "cat > \"$1\" && chmod 755 \"$1\"", "sh"])
+        .arg(&path)
+        .stdin(Stdio::piped())
+        .spawn()
+        .unwrap();
+    writer
+        .stdin
+        .take()
+        .unwrap()
+        .write_all(format!("#!/bin/sh\n{body}\n").as_bytes())
+        .unwrap();
+    assert!(writer.wait().unwrap().success());
     (dir, path)
 }
 
