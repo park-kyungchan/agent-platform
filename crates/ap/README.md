@@ -312,7 +312,7 @@ The answer is one JSON line on stdout, exit 0: `topic`, `decision` (the row's id
 
 ## The status
 
-`ap status [<key> [--requests] | --term <word>] [--text] [--store <path>]`, `ap status --brief <intent> [--store <path>]`, `ap status --wait <intent> [--timeout <seconds>] [--store <path>]` and `ap status --indicators [<intent>] [--text] [--store <path>]`: `specs/ap/status.md`.
+`ap status [<key> [--requests] | --term <word>] [--text] [--store <path>]`, `ap status --brief <intent> [--store <path>]`, `ap status --wait <intent> [--timeout <seconds>] [--store <path>]` and `ap status --indicators [<intent>] [--text] [--store <path>]` and `ap status --page [--store <path>]` (the status page the service `ap-status-page.service` writes: the lines of `ap status --text`, each open intent's brief, flow and week's cost by role, the flow, cost and month's API spend of all, and the capacity of the hosts, machines and accounts; plain lines, a section that cannot be read as one line with its code): `specs/ap/status.md`.
 
 ## The task's state
 
