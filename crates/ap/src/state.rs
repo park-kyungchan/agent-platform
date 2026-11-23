@@ -176,12 +176,12 @@ pub fn execute(s: &mut impl System, argv: &[String]) -> Result<String, Failure> 
     let uncommitted = git(s, &root_text, &["status", "--porcelain"]).map(|o| o.lines().count());
 
     let mut unreadable = vec![];
-    let calls = run_tree
-        .then(|| records(&runs, ".unit.json", &mut unreadable))
-        .unwrap_or_default();
-    let stage_records = run_tree
-        .then(|| records(&runs, ".run.json", &mut unreadable))
-        .unwrap_or_default();
+    let (calls, stage_records) = if run_tree {
+        let calls = records(&runs, ".unit.json", &mut unreadable);
+        (calls, records(&runs, ".run.json", &mut unreadable))
+    } else {
+        (vec![], vec![])
+    };
     unreadable.sort();
 
     // The state of each stage record: live or not, for the ones that say they run. `ap run` writes
