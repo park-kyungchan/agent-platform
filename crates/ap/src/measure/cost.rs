@@ -21,9 +21,7 @@ struct Window {
 
 /// The window of the parameters `o`: `since` and `until`, UTC days of the calendar, `since` not after `until`, at most
 /// 92 days (R9). `flow` and `share` read their window as `cost` does.
-pub(super) fn window(
-    o: &serde_json::Map<String, Value>,
-) -> Result<(String, String), Failure> {
+pub(super) fn window(o: &serde_json::Map<String, Value>) -> Result<(String, String), Failure> {
     let invalid = |f: &str| error("invalid_input", f);
     let day = |name: &str| -> Result<(String, u64), Failure> {
         let d = o

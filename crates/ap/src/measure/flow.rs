@@ -98,16 +98,19 @@ pub(super) fn flow(s: &mut impl System, st: Option<&str>, p: &Value) -> Result<V
     let mut looks: BTreeMap<String, Vec<Look>> = BTreeMap::new();
     if merged > 0 {
         for (key, r) in store::search_every(s, st, "review", store::PAGE)?.0 {
-            let unit = r["unit"]["native_key"].as_str().filter(|u| mine.contains(u));
+            let unit = r["unit"]["native_key"]
+                .as_str()
+                .filter(|u| mine.contains(u));
             if let Some(unit) = unit
                 && r["kind"] == "page"
                 && r["status"] == "closed"
             {
                 let text = |m: &str| r[m].as_str().unwrap_or_default().to_owned();
-                looks
-                    .entry(unit.to_owned())
-                    .or_default()
-                    .push((text("closed_at"), key, text("verdict")));
+                looks.entry(unit.to_owned()).or_default().push((
+                    text("closed_at"),
+                    key,
+                    text("verdict"),
+                ));
             }
         }
     }
@@ -120,7 +123,8 @@ pub(super) fn flow(s: &mut impl System, st: Option<&str>, p: &Value) -> Result<V
             after += l.len() - n - 1;
         }
     }
-    Ok(json!({"intent": intent, "since": since, "until": until, "merged": merged,
+    Ok(
+        json!({"intent": intent, "since": since, "until": until, "merged": merged,
         "merged_a_day": (merged as f64 / days as f64 * 100.0).round() / 100.0,
         "median_minutes": median(numbers),
         "packet_first_accept": ratio(accepted, verdicts.len(), 1000.0),
@@ -128,5 +132,6 @@ pub(super) fn flow(s: &mut impl System, st: Option<&str>, p: &Value) -> Result<V
         "page_looks": ratio(total, merged, 100.0),
         "looks_after_accept": ratio(after, merged, 100.0),
         "first_accept": ratio(first, merged, 1000.0),
-        "log_cut": rows.iter().any(|r| r["log_cut"] == true)}))
+        "log_cut": rows.iter().any(|r| r["log_cut"] == true)}),
+    )
 }

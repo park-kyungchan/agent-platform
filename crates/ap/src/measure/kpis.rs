@@ -7,11 +7,7 @@ use crate::host::{Failure, System, error, id};
 use crate::store::{self, Actor};
 use crate::watch::utc;
 use serde_json::{Value, json};
-use std::{
-    collections::BTreeMap,
-    ffi::OsString,
-    time::UNIX_EPOCH,
-};
+use std::{collections::BTreeMap, ffi::OsString, time::UNIX_EPOCH};
 
 /// The KPIs a pass measures (R14): the name, the function it asks and the member of the answer it takes.
 pub const TABLE: [(&str, &str, &str); 13] = [
@@ -94,7 +90,11 @@ pub fn value_text(
                     .find(|g| g["group"] == group);
                 number(found.map_or(&Value::Null, |g| &g[member]))
             };
-            format!("sessions {} % stages {} % ({window})", of("sessions"), of("stages"))
+            format!(
+                "sessions {} % stages {} % ({window})",
+                of("sessions"),
+                of("stages")
+            )
         }
         _ => format!(
             "{} ({window}, {} merged)",
@@ -201,8 +201,7 @@ pub(super) fn pass(s: &mut impl System, argv: &[OsString]) -> Result<(Value, u8)
         let answer = answers
             .entry((function, intent.clone()))
             .or_insert_with(|| {
-                super::answer_in(s, function, st, &parameters)
-                    .map_err(|f| store::code_of(&f))
+                super::answer_in(s, function, st, &parameters).map_err(|f| store::code_of(&f))
             })
             .clone();
         let made = answer.and_then(|a| {
