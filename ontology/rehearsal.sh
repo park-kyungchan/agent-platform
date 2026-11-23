@@ -5,7 +5,9 @@ ont_binary=$(realpath -- "$1")
 # ontology/migrate runs the engine that $ONT_BIN names.
 export ONT_BIN="$ont_binary"
 repo=$(git -C "$(dirname -- "${BASH_SOURCE[0]}")" rev-parse --show-toplevel)
-rehearsal_root=$(mktemp -d)
+# The root is made under /tmp, not under the caller's TMPDIR: every redirected path of the schema begins with it, and
+# the size of the engine's description (the lines `v<n>_mcp_bytes=`) grows with the length of that root.
+rehearsal_root=$(mktemp -d /tmp/ap-rehearsal.XXXXXXXX)
 # The engine refuses a root reached through a symbolic link: the one root of every copy is a real path.
 rehearsal_root=$(realpath -- "$rehearsal_root")
 trap 'python3 -c '\''import shutil,sys; shutil.rmtree(sys.argv[1])'\'' "$rehearsal_root"' EXIT
@@ -948,7 +950,7 @@ apply('triage_decision', 'v9-after-carry', dict(decision=third, triage='none', r
 unchanged = fingerprint()
 assert migrate(9, 10) == dict(carried=0, already=3)
 assert fingerprint() == unchanged and fields(third_request)['route_reason'] == 'carried from version 9'
-for before, after in [(9, 20), (10, 10), (10, 9)]:
+for before, after in [(9, 21), (10, 10), (10, 9)]:
     assert migrate(before, after, 2) == dict(status='unknown_pair')
 assert fingerprint() == unchanged
 assert migrate(9, 10) == dict(carried=0, already=3)
@@ -2220,14 +2222,19 @@ f = fields(plain); assert f['status'] == 'closed' and f['input_tokens'] == 1 and
 print('gate_row=v18-credit-ledger expected=admitted')
 print('v18_gate_rows_complete')
 print('v18 credit: ok')
-# Version 19: the repository's file over the objects made under version 18. The schema differs from version 18 only by
-# points 1 to 6 of ontology/README.md, "Version 19": each is taken off a copy, and what is left reads as version 18.
+# Version 19, pinned in Git by the commit of main that holds it, over the objects made under version 18. The schema
+# differs from version 18 only by points 1 to 6 of ontology/README.md, "Version 19": each is taken off a copy, and what
+# is left reads as version 18.
 v18_schema = schema
 v18_objects = [o['id'] for t in ('task', 'decision', 'request', 'intent', 'criterion', 'unit', 'review', 'run', 'finding', 'hold', 'principle', 'host', 'account', 'kpi')
                for o in call(['search'], dict(object_type=t, limit=1000))['objects']]
 v18_before = [obj(i) for i in v18_objects]
 v18_views = [(view, args, call(['render'], dict(view=view, args=args))) for view, args, _ in v13_views]
-schema = json.loads(pathlib.Path(repo, 'ontology/work.schema.json').read_text())
+V19_PIN = ('95783e743d47121aeba19fad870ef2ab52ea4a91', '5c3310941b8d6866a64d8b5d8e7ce8249b27159bfde45bc6b4e5ca4674ccbfa8')
+v19_bytes = subprocess.check_output(['git', '-C', repo, 'show', V19_PIN[0] + ':ontology/work.schema.json'], timeout=10)
+assert hashlib.sha256(v19_bytes).hexdigest() == V19_PIN[1]
+v19_path = pathlib.Path(store).with_name('pinned-' + V19_PIN[0] + '.json'); v19_path.write_bytes(v19_bytes)
+schema = json.loads(v19_bytes)
 assert schema['version'] == 19
 head, old = json.loads(json.dumps(schema)), json.loads(json.dumps(v18_schema))
 DAYS = {'array': {'struct': dict(day='string', **{k: 'integer' for k in ('messages', 'usd_micros', 'refusals', 'file_reads', 'file_writes', 'store_reads', 'store_writes')})}}
@@ -2269,7 +2276,7 @@ assert grant['actions'] == grant18['actions'] + list(NEW19)
 head['grants'] = old['grants']
 assert {k: v for k, v in head.items() if k != 'version'} == {k: v for k, v in old.items() if k != 'version'}
 print('gate_row=v19-only-points-1-to-6 expected=admitted functions=' + str(len(schema['functions'])))
-call(['schema', 'install', str(resource_copy(pathlib.Path(repo, 'ontology/work.schema.json'), 'repository.json', 'repository-route.json'))])
+call(['schema', 'install', str(resource_copy(v19_path, 'pinned-v19.json', 'pinned-v19-route.json'))])
 redirect.trace(work, copies)
 assert [obj(i) for i in v18_objects] == v18_before
 for view, args, before in v18_views:
@@ -2289,7 +2296,6 @@ for name, params in FN19.items():
     assert 'program' not in listed[name] and sorted(p['name'] for p in listed[name]['parameters']) == sorted(params), listed[name]
 unchanged = fingerprint()
 assert migrate(18, 19) == dict(carried=0, already=0)
-assert migrate(19, 20, 2) == dict(status='unknown_pair')
 assert fingerprint() == unchanged and [obj(i) for i in v18_objects] == v18_before
 print('v19_migration_rows_complete')
 phase = 'v19'
@@ -2340,4 +2346,105 @@ assert every(kpi_b).get('intent') is None
 print('gate_row=v19-kpi-of-an-intent expected=admitted')
 print('v19_gate_rows_complete')
 print('v19 measures: ok')
+# Version 20: the repository's file over the objects made under version 19. The schema differs from version 19 only by
+# points 1 and 2 of ontology/README.md, "Version 20": each is taken off a copy, and what is left reads as version 19.
+v19_schema = schema
+v19_objects = [o['id'] for t in ('task', 'decision', 'request', 'intent', 'criterion', 'unit', 'review', 'run', 'finding', 'hold', 'principle', 'host', 'account', 'kpi')
+               for o in call(['search'], dict(object_type=t, limit=1000))['objects']]
+v19_before = [obj(i) for i in v19_objects]
+v19_views = [(view, args, call(['render'], dict(view=view, args=args))) for view, args, _ in v13_views]
+schema = json.loads(pathlib.Path(repo, 'ontology/work.schema.json').read_text())
+assert schema['version'] == 20
+head, old = json.loads(json.dumps(schema)), json.loads(json.dumps(v19_schema))
+case_type = head['object_types'].pop('case')
+assert len(case_type['description'].encode()) <= 300 and all(len(p.get('description', '').encode()) <= 300 for p in case_type['properties'].values()), case_type
+assert case_type['owner'] == {'source': 'cases'} and case_type['primary_key'] == {'from': '/key'} and case_type['title'] == 'case_id'
+STRINGS = {'array': 'string'}
+assert shapes(case_type['properties']) == dict(suite=('string', True, None, '/suite'), case_id=('string', True, None, '/case_id'), file=('string', True, None, '/file'),
+    file_digest=('string', True, None, '/file_digest'), facts=('integer', True, None, '/facts'), unhomed=('integer', True, None, '/unhomed'), all=('boolean', True, None, '/all'),
+    serves=(STRINGS, True, None, '/serves'), commits=(STRINGS, True, None, '/commits'), map_digest=('string', True, None, '/map_digest'))
+CASES = '/var/lib/agent-platform/cases/'
+assert head['sources'].pop('cases') == dict(kind='records', glob=CASES + '*.cases.jsonl', time_member='observed_at', type_member='type', complete_listing=True, fresh_for_s=86400)
+[grant], [grant19] = head['grants'], old['grants']
+assert grant['read'] == grant19['read'] + ['case'] and grant['derive'] == grant19['derive'] and grant['actions'] == grant19['actions']
+head['grants'] = old['grants']
+assert {k: v for k, v in head.items() if k != 'version'} == {k: v for k, v in old.items() if k != 'version'}
+print('gate_row=v20-only-points-1-and-2 expected=admitted object_types=' + str(len(schema['object_types'])) + ' sources=' + str(len(schema['sources'])))
+# The record source of the cases reads a directory of the rehearsal's own root.
+cases_dir = pathlib.Path(store).parent / 'cases'
+def cases_copy(path, label, name):
+    out = resource_copy(path, label, name)
+    copy = json.loads(out.read_text())
+    assert copy['sources']['cases']['glob'] == CASES + '*.cases.jsonl'
+    copy['sources']['cases']['glob'] = str(cases_dir) + '/*.cases.jsonl'
+    assert CASES not in json.dumps(copy['sources'])
+    out.write_text(json.dumps(copy))
+    return out
+call(['schema', 'install', str(cases_copy(pathlib.Path(repo, 'ontology/work.schema.json'), 'repository.json', 'repository-cases.json'))])
+redirect.trace(work, copies)
+assert [obj(i) for i in v19_objects] == v19_before
+for view, args, before in v19_views:
+    answer = call(['render'], dict(view=view, args=args))
+    assert answer['rows'] == before['rows'] and answer['markdown'] == before['markdown'].replace('schema=work@19', 'schema=work@20'), view
+print('gate_row=v20-v19-objects-and-views-unchanged expected=admitted objects=' + str(len(v19_objects)) + ' views=' + str(len(v19_views)))
+sizes = []
+for name in ('ont_describe', 'ont_action_list'):
+    wire = subprocess.run([binary, '--store', store, 'mcp'], input=json.dumps(dict(jsonrpc='2.0', id=1, method='tools/call', params=dict(name=name, arguments={}))) + '\n', text=True, capture_output=True, timeout=60)
+    answer = json.loads(wire.stdout.splitlines()[0])['result']; assert wire.returncode == 0 and not answer['isError'], answer
+    sizes.append(len(answer['content'][0]['text'].encode())); assert sizes[-1] <= 262144, (name, sizes[-1])
+print('v20_mcp_bytes=' + ','.join(map(str, sizes)), file=sys.stderr)
+described = call(['describe'], {})
+listed = {f['name']: f for f in described['functions'] if f['domain'] == 'work'}
+assert sorted(listed) == ['api_spend', 'capacity', 'clause', 'cost', 'flow', 'gate', 'horizon', 'route', 'share'], sorted(listed)
+unchanged = fingerprint()
+assert migrate(19, 20) == dict(carried=0, already=0)
+assert migrate(20, 21, 2) == dict(status='unknown_pair')
+assert fingerprint() == unchanged and [obj(i) for i in v19_objects] == v19_before
+print('v20_migration_rows_complete')
+phase = 'v20'
+# The walk of version 20: the records of the cases, indexed, read back with every property, changed, refused, retracted.
+def cases_index(code=0):
+    p = subprocess.run([binary, '--store', store, '--now', str(now), 'index', '--source', 'cases'], text=True, capture_output=True, timeout=60)
+    assert p.returncode == code, (p.returncode, p.stdout, p.stderr)
+    [one] = json.loads(p.stdout)['result']['sources']
+    return one
+def cases_lines(name, records): (cases_dir / name).write_text(''.join(json.dumps(r) + '\n' for r in records))
+def cases_heads(): return {o['id']['native_key']: {k: v.get('value') for k, v in o['head']['fields'].items()} for o in call(['search'], dict(object_type='case', limit=1000))['objects']}
+def cdigest(text): return hashlib.sha256(text.encode()).hexdigest()
+assert not cases_dir.exists()
+answer = cases_index(2)
+assert (answer['status'], answer['code']) == ('source_failed', 'glob_root_missing'), answer
+cases_dir.mkdir()
+tick(); seen = now - 1
+COMMITS = ['fixture/repo@' + '1' * 40, 'fixture/other@' + '2' * 40]
+def case_record(suite, case_id, file, facts, unhomed, every, serves):
+    return dict(type='case', key=cdigest(suite + ':' + case_id), observed_at=seen, suite=suite, case_id=case_id, file=file, file_digest=cdigest(file), facts=facts,
+                unhomed=unhomed, all=every, serves=serves, commits=COMMITS, map_digest=cdigest('rule'))
+case_a = case_record('routing', 'fixture-a', 'evals/routing/cases.json', 2, 0, False, ['fixture/other:docs/a.md', 'fixture/repo:README.md'])
+case_c = case_record('routing', 'fixture-c', 'evals/routing/cases.json', 1, 1, True, [])
+case_b = case_record('intake', 'fixture-b', 'host-intake-7', 0, 0, True, [])
+cases_lines('routing.cases.jsonl', [case_a, case_c]); cases_lines('intake.cases.jsonl', [case_b])
+answer = cases_index()
+assert answer['appended']['initial'] == 3 and answer['status'] == 'ok', answer
+def member(record): return {k: v for k, v in record.items() if k not in ('type', 'key', 'observed_at')}
+found = cases_heads()
+assert found == {r['key']: member(r) for r in (case_a, case_b, case_c)}, found
+assert found[case_c['key']]['serves'] == [] and found[case_c['key']]['all'] is True and found[case_a['key']]['unhomed'] == 0
+print('gate_row=v20-records-indexed expected=admitted cases=3')
+answer = cases_index()
+assert sum(answer['appended'].values()) == 0 and answer['unchanged'] == 3, answer
+# A line of another type fails the source and changes no head.
+before = cases_heads()
+cases_lines('wrong.cases.jsonl', [dict(case_a, type='section', key=cdigest('w'))])
+assert cases_index(2)['code'] == 'record_type_mismatch'
+(cases_dir / 'wrong.cases.jsonl').unlink()
+assert cases_heads() == before
+print('gate_row=v20-records-refused expected=record_type_mismatch')
+# The complete listing: a file written again without a case retracts it.
+cases_lines('routing.cases.jsonl', [case_a])
+answer = cases_index()
+assert answer['appended']['retraction'] == 1 and sorted(cases_heads()) == sorted([case_a['key'], case_b['key']]), answer
+print('gate_row=v20-records-retracted expected=admitted')
+print('v20_gate_rows_complete')
+print('v20 cases: ok')
 PY

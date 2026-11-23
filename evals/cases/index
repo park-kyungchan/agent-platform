@@ -1,0 +1,76 @@
+#!/usr/bin/env -S python3 -I -B
+"""index: every case of the routing and intake suites as a `case` object of the store, with the Markdown files that hold
+its facts. It writes `<dir>/<suite>.cases.jsonl` and runs `ont index --source cases`.
+
+  index --repository <owner/name>=<clone>... [--at <owner/name>=<rev>]... --cases <suite>=<file>...
+        [--directory <dir>] [--store <path>]
+
+Each repository is read at its `--at` revision, else `origin/main`, from Git's objects. One JSON line, exit 0, or 3 when
+the source did not hold; every refusal is one line `{"status":"<code>"}` with exit 2. Rules and codes:
+evals/cases/README.md.
+"""
+import importlib.machinery
+import importlib.util
+import os
+import sys
+import time
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+
+
+def _load(name, path):
+    loader = importlib.machinery.SourceFileLoader(name, path)
+    mod = importlib.util.module_from_spec(importlib.util.spec_from_loader(name, loader))
+    loader.exec_module(mod)
+    return mod
+
+
+L = _load("cases_lib", os.path.join(HERE, "lib.py"))
+B = L.B
+FLAGS = {"--repository": True, "--at": True, "--cases": True, "--directory": False, "--store": False}
+
+
+def scope(a):
+    """(directory, store) of `--directory` and `--store`: a scratch store never feeds the host's directory and the
+    host store never reads a scratch one."""
+    directory = a.get("--directory", [None])[0]
+    store = a.get("--store", [None])[0]
+    host = bool(directory) and os.path.normpath(os.path.abspath(directory)) == L.HOST_DIRECTORY
+    if (store and (not directory or host)) or (directory and not store and not host):
+        raise L.Refuse("usage")
+    return directory or L.HOST_DIRECTORY, store
+
+
+def write_and_index(sources, cases, directory, store, readback=None):
+    """The records of `sources`, written and indexed under the lock of the directory. Returns (the answer line, the exit
+    status, what `readback(engine)` gave while the lock was held and the source held)."""
+    by_suite = L.records(sources, cases, int(time.time()))
+    extra = None
+    with L.Lock(directory):
+        L.write_files(directory, by_suite)
+        eng = L.engine(store)
+        held, shown = L.index_source(eng)
+        if held and readback:
+            extra = readback(eng)
+    line = {"status": "ok" if held else "index_failed", "directory": directory,
+            "suites": {s: L.summary(r) for s, r in by_suite.items()}, "index": shown}
+    return line, (0 if held else 3), extra
+
+
+def run(argv):
+    a = L.parse(argv, FLAGS)
+    repos = L.repositories(a.get("--repository", []))
+    if not repos or "--cases" not in a:
+        raise L.Refuse("usage")
+    at = L.revisions(a.get("--at", []), {n for n, _ in repos})
+    pairs = L.case_args(a["--cases"])
+    directory, store = scope(a)
+    L.academy([n for n, _ in repos], [c for _, c in repos] + [f for _, f in pairs] + ([directory] if "--directory" in a else []))
+    sources = [L.Source(n, c, at.get(n, "origin/main")) for n, c in repos]
+    cases = L.load_cases(pairs)
+    line, code, _ = write_and_index(sources, cases, directory, store)
+    return [line], code
+
+
+if __name__ == "__main__":
+    sys.exit(L.main(run))

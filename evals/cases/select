@@ -1,0 +1,96 @@
+#!/usr/bin/env -S python3 -I -B
+"""select: the cases of the routing and intake suites a change reaches, for the readers of a gate to run.
+
+  select --repository <owner/name>=<clone> --base <rev> --head <rev> --cases <suite>=<file>...
+         [--also <owner/name>=<clone>]... [--accepted <file>] [--directory <dir>] [--store <path>]
+
+First the check of `lost`: while a removed line is lost and not accepted it prints those lines and
+`{"status":"lost_facts","lost":<n>}`, exit 1, and indexes and selects nothing. Then it indexes the cases (the changed
+repository at `--base`, each `--also` clone at origin/main), reads the objects back, and names per suite the cases the
+change serves; in `full` mode, every case. Every refusal is one line `{"status":"<code>"}` with exit 2. Rules and codes:
+evals/cases/README.md.
+"""
+import importlib.machinery
+import importlib.util
+import os
+import sys
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+
+
+def _load(name, path):
+    loader = importlib.machinery.SourceFileLoader(name, path)
+    mod = importlib.util.module_from_spec(importlib.util.spec_from_loader(name, loader))
+    loader.exec_module(mod)
+    return mod
+
+
+INDEX = _load("cases_index", os.path.join(HERE, "index"))
+L = INDEX.L
+FLAGS = {"--repository": True, "--base": False, "--head": False, "--cases": True, "--also": True, "--accepted": False,
+         "--directory": False, "--store": False}
+
+
+def readback(suites):
+    """What the store holds now: ({suite: [members of each case object]}, the value of the KPI `case_map`), or None."""
+    def read(eng):
+        found = L.stored_cases(eng, suites)
+        return None if found is None else (found, L.case_map_value(eng))
+    return read
+
+
+def run(argv):
+    a = L.parse(argv, FLAGS)
+    repos = L.repositories(a.get("--repository", []))
+    also = L.repositories(a.get("--also", []))
+    if len(repos) != 1 or "--base" not in a or "--head" not in a or "--cases" not in a:
+        raise L.Refuse("usage")
+    if len({n for n, _ in repos + also}) != 1 + len(also):
+        raise L.Refuse("usage")
+    base, head = L.rev_value(a["--base"][0]), L.rev_value(a["--head"][0])
+    pairs = L.case_args(a["--cases"])
+    directory, store = INDEX.scope(a)
+    accepted_path = a.get("--accepted", [None])[0]
+    clones = [c for _, c in repos + also]
+    L.academy([n for n, _ in repos + also], clones + [f for _, f in pairs] + ([accepted_path] if accepted_path else [])
+              + ([directory] if "--directory" in a else []))
+    name, clone = repos[0]
+    changed = L.Source(name, clone, head)
+    base_commit = L.commit_of(clone, base)
+    others = [L.Source(n, c, "origin/main") for n, c in also]
+    cases = L.load_cases(pairs)
+    accepted = L.digests_of(accepted_path) if accepted_path else set()
+    lost, totals = L.lost_lines(changed, base_commit, changed.commit, others, accepted)
+    unaccepted = [x for x in lost if not x["accepted"]]
+    if unaccepted:
+        return lost + [totals, {"status": "lost_facts", "lost": len(unaccepted)}], 1
+    sources = [L.Source(name, clone, base_commit)] + others
+    line, code, got = INDEX.write_and_index(sources, cases, directory, store, readback(list(cases)))
+    if code != 0:
+        return [line], code
+    ids = {s: [c["id"] for c in items] for s, items in cases.items()}
+    digest, subset, rows = L.map_digest(), False, {}
+    if got is not None:
+        stored, value = got
+        digests = {r.get("map_digest") for items in stored.values() for r in items}
+        by_id = {s: {r.get("case_id"): r for r in items} for s, items in stored.items()}
+        if (len(digests) == 1 and all(sorted(by_id[s]) == sorted(ids[s]) and len(by_id[s]) == len(stored[s])
+                                      for s in ids)):
+            digest = digests.pop()
+            subset = isinstance(value, str) and (value == f"reproduced {digest}"
+                                                 or value.startswith(f"reproduced {digest} "))
+            rows = {s: [by_id[s][i] for i in ids[s]] for s in ids}
+    out, chosen = [], 0
+    if subset:
+        paths, body = L.changed_names(changed, base_commit, changed.commit)
+    for suite in ids:
+        picked = L.select(rows[suite], paths, body) if subset else ids[suite]
+        chosen += len(picked)
+        out.append({"suite": suite, "mode": "subset" if subset else "full", "cases": picked, "args": L.args_of(picked)})
+    out.append({"mode": "subset" if subset else "full", "map_digest": digest, "selected": chosen,
+                "of": sum(len(v) for v in ids.values())})
+    return out, 0
+
+
+if __name__ == "__main__":
+    sys.exit(L.main(run))

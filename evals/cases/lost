@@ -1,0 +1,48 @@
+#!/usr/bin/env -S python3 -I -B
+"""lost: the removed lines of a change's Markdown files that no kept text keeps.
+
+  lost --repository <owner/name>=<clone> --base <rev> --head <rev> [--also <owner/name>=<clone>]... [--accepted <file>]
+
+One JSON line per lost line, then one line of totals; exit 0 when no lost line is unaccepted, else 1. Every refusal is
+one line `{"status":"<code>"}` with exit 2. Rules and codes: evals/cases/README.md.
+"""
+import importlib.machinery
+import importlib.util
+import os
+import sys
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+
+
+def _load(name, path):
+    loader = importlib.machinery.SourceFileLoader(name, path)
+    mod = importlib.util.module_from_spec(importlib.util.spec_from_loader(name, loader))
+    loader.exec_module(mod)
+    return mod
+
+
+L = _load("cases_lib", os.path.join(HERE, "lib.py"))
+FLAGS = {"--repository": True, "--base": False, "--head": False, "--also": True, "--accepted": False}
+
+
+def run(argv):
+    a = L.parse(argv, FLAGS)
+    repos = L.repositories(a.get("--repository", []))
+    also = L.repositories(a.get("--also", []))
+    if len(repos) != 1 or "--base" not in a or "--head" not in a or {n for n, _ in repos} & {n for n, _ in also}:
+        raise L.Refuse("usage")
+    if len({n for n, _ in also}) != len(also):
+        raise L.Refuse("usage")
+    base, head = L.rev_value(a["--base"][0]), L.rev_value(a["--head"][0])
+    accepted_path = a.get("--accepted", [None])[0]
+    L.academy([n for n, _ in repos + also], [c for _, c in repos + also] + ([accepted_path] if accepted_path else []))
+    changed = L.Source(repos[0][0], repos[0][1], head)
+    base_commit = L.commit_of(repos[0][1], base)
+    others = [L.Source(n, c, "origin/main") for n, c in also]
+    accepted = L.digests_of(accepted_path) if accepted_path else set()
+    lost, totals = L.lost_lines(changed, base_commit, changed.commit, others, accepted)
+    return lost + [totals], (0 if all(x["accepted"] for x in lost) else 1)
+
+
+if __name__ == "__main__":
+    sys.exit(L.main(run))
