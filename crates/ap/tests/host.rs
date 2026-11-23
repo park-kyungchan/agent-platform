@@ -129,10 +129,12 @@ fn a_session_id_that_is_not_a_uuid_fails_the_launch() {
     }
 }
 
-/// A fake program written to a temporary directory: the file `name` runs `body` under `sh`.
+/// A fake program written to a temporary directory: the file `name` runs `body` under `sh`, in a directory of its own per call, since the tests run in parallel.
 fn fake(name: &str, body: &str) -> (PathBuf, PathBuf) {
     use std::os::unix::fs::PermissionsExt;
-    let dir = std::env::temp_dir().join(format!("ap-host-limit-{}-{name}", std::process::id()));
+    static NEXT: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+    let n = NEXT.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+    let dir = std::env::temp_dir().join(format!("ap-host-limit-{}-{n}", std::process::id()));
     let _ = std::fs::remove_dir_all(&dir);
     std::fs::create_dir_all(&dir).unwrap();
     let path = dir.join(name);
