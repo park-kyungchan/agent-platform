@@ -121,10 +121,15 @@ if mode == "mcp_orphan":
     time.sleep(1.5)
 if name == "claude":
     sid = args[args.index("--session-id") + 1]
-    events = [{"type": "system", "subtype": "init", "session_id": sid},
-              {"type": "result", "result": answer, "num_turns": 2,
-               "usage": {"input_tokens": 10, "cache_read_input_tokens": 100, "cache_creation_input_tokens": 5,
-                         "output_tokens": 7}}]
+    events = [{"type": "system", "subtype": "init", "session_id": sid}]
+    for blocks in beh.get("tool_use", []):
+        events.append({"type": "assistant", "message": {"content": blocks}})
+    result = {"type": "result", "result": answer, "num_turns": 2,
+              "usage": {"input_tokens": 10, "cache_read_input_tokens": 100, "cache_creation_input_tokens": 5,
+                        "output_tokens": 7}}
+    if "usd" in beh:
+        result["total_cost_usd"] = beh["usd"]
+    events.append(result)
 elif name == "muse":
     events = [{"payload": {"kind": "run_usage", "models": [{"input_tokens": 40, "output_tokens": 4},
                                                            {"input_tokens": 2, "output_tokens": 1}]}},
@@ -135,6 +140,62 @@ else:
                                              "usage": {"input_tokens": 30, "cache_read_tokens": 3, "output_tokens": 9}}}]
 for e in events:
     print(json.dumps(e), flush=True)
+'''
+
+# A fake `ont` of the host's store: it logs every call and answers from the state file of the test (tasks, kpis,
+# measurements, the request ids it has applied), as the engine does for the actions the suite applies.
+FAKE_ONT = r'''#!@PY@
+import json, os, sys
+state = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+path = os.path.join(state, "ont-state.json")
+st = json.load(open(path))
+argv = sys.argv[1:]
+body = json.loads(sys.stdin.read() or "null")
+with open(os.path.join(state, "ont.jsonl"), "a") as f:
+    f.write(json.dumps({"argv": argv, "body": body}) + "\n")
+def out(v):
+    json.dump(st, open(path, "w"))
+    print(json.dumps(v))
+    sys.exit(0)
+def obj(kind, key, fields):
+    return {"id": {"object_type": kind, "namespace": {"instance": "vps://x", "account": "root"}, "native_key": key},
+            "head": {"fields": {k: {"kind": "value", "value": v} for k, v in fields.items()}}}
+def kid(k):
+    return {"object_type": "kpi", "namespace": {"instance": "vps://x", "account": "root"}, "native_key": k["key"]}
+if "--store" in argv:
+    sys.exit(97)
+if argv == ["search"]:
+    kind, where = body["object_type"], body.get("where")
+    if st.get("search_fails"):
+        out({"status": "failed", "code": "store_unreadable"})
+    if kind == "task":
+        objs = [obj("task", t, {"title": "x"}) for t in st["tasks"]]
+    else:
+        objs = [dict(obj("kpi", k["key"], {"name": k["name"], "task": k["task"], "value": k.get("value")}))
+                for k in st["kpis"] if where is None or k["name"] == where["eq"][1]]
+    out({"status": "ok", "result": {"objects": objs, "basis": {"qualified": st.get("qualified", True)}}})
+if argv[:2] == ["action", "apply"] and "--client" in argv:
+    kind, rid, par = body["action_type"], body["request_id"], body["parameters"]
+    if rid in st["requests"]:
+        out({"status": "ok", "result": {"outcome": "already_applied", "edits": st["requests"][rid]}})
+    if st.get("refuse") == kind:
+        out({"status": "refused", "code": "submission_criteria_failed", "failed": [st.get("refuse_code", "x")]})
+    if kind == "define_kpi":
+        k = {"key": "kpi-%d" % (len(st["kpis"]) + 1), "name": par["name"], "task": par["task"], "definition": par["definition"]}
+        st["kpis"].append(k)
+        edits = [{"id": kid(k), "change": "initial"}]
+    else:
+        k = next(x for x in st["kpis"] if x["key"] == par["kpi"]["native_key"])
+        if any(m["kpi"] == k["key"] and m["observed_at"] > par["observed_at"] for m in st["measurements"]):
+            out({"status": "refused", "code": "submission_criteria_failed", "failed": ["older_measurement"]})
+        st["measurements"].append({"kpi": k["key"], "value": par["value"], "observed_at": par["observed_at"],
+                                   "evidence": par["evidence"], "request_id": rid, "agent": body.get("agent")})
+        k["value"] = par["value"]
+        edits = [{"id": {"object_type": "measurement", "native_key": "m%d" % len(st["measurements"])}, "change": "initial"}]
+    st["requests"][rid] = edits
+    st.setdefault("applied", []).append({"kind": kind, "rid": rid, "parameters": par})
+    out({"status": "ok", "result": {"outcome": "applied", "edits": edits}})
+sys.exit(98)
 '''
 
 GOOD = "Load `FACT-ALPHA   one` and FACT-GAMMA with FACT-DELTA."
@@ -178,7 +239,7 @@ class World:
         self.bin = t / "bin"
         self.bin.mkdir()
         for name, text in (("systemd-run", FAKE_SYSTEMD_RUN), ("systemctl", FAKE_SYSTEMCTL), ("claude", FAKE_CLI),
-                           ("muse", FAKE_CLI), ("agy", FAKE_CLI)):
+                           ("muse", FAKE_CLI), ("agy", FAKE_CLI), ("ont", FAKE_ONT)):
             (self.bin / name).write_text(text.replace("@PY@", PY))
             (self.bin / name).chmod(0o755)
         (t / "count").mkdir()
@@ -197,6 +258,7 @@ class World:
         self.secret.mkdir()
         self.out = t / "out"
         self.plan({})
+        self.ont_state({})
 
     def close(self):
         for f in (self.t / "pids").iterdir() if (self.t / "pids").exists() else []:
@@ -208,6 +270,15 @@ class World:
 
     def plan(self, plan):
         (self.t / "plan.json").write_text(json.dumps(plan))
+
+    def ont_state(self, state):
+        """The host store of the fake `ont`: the keys of its tasks, and what the test asks it to do."""
+        full = {"tasks": [], "kpis": [], "measurements": [], "requests": {}}
+        full.update(state)
+        (self.t / "ont-state.json").write_text(json.dumps(full))
+
+    def ont_now(self):
+        return json.loads((self.t / "ont-state.json").read_text())
 
     def env(self, **extra):
         env = {"PATH": str(self.bin), "HOME": str(self.home), "CLAUDE_CONFIG_DIR": str(self.acct),
@@ -724,8 +795,9 @@ class Refusals(unittest.TestCase):
         self.refused(w.call("score", "--out", w.out, "--cases", w.host), "run_differs")
 
 
-def fake_reader(d, n, table, tokens=None):
-    """A reader directory by hand: table is case -> list of n answers (None: unanswered)."""
+def fake_reader(d, n, table, tokens=None, extra=None):
+    """A reader directory by hand: table is case -> list of n answers (None: unanswered); extra gives the members of
+    a sample's usage record beyond the answered flag and the tokens, as (case, sample) -> dict."""
     d.mkdir(parents=True)
     (d / "run.json").write_text(json.dumps({"samples": n, "cases": sorted(table), "case_files": "@FILES@", "suite": "s" * 64}))
     for cid, answers in table.items():
@@ -733,7 +805,20 @@ def fake_reader(d, n, table, tokens=None):
             if ans is None:
                 continue
             (d / ("%s__s%d.md" % (cid, i))).write_text(ans)
-            (d / ("%s__s%d.json" % (cid, i))).write_text(json.dumps({"answered": True, "input_tokens": (tokens or {}).get((cid, i), 100)}))
+            (d / ("%s__s%d.json" % (cid, i))).write_text(json.dumps(
+                dict({"answered": True, "input_tokens": (tokens or {}).get((cid, i), 100)}, **(extra or {}).get((cid, i), {}))))
+
+
+def case_files(w, d):
+    """The digests of the case files put into each hand-made reader's run record."""
+    m = load_module()
+    m.REPO_CASES = str(w.run_path.parent / "cases.json")
+    m.HOST_DIGESTS = str(w.run_path.parent / "host-cases.sha256")
+    _, digests = m.load_cases([str(w.host)])
+    for r in d.iterdir():
+        if r.is_dir():
+            rec = r / "run.json"
+            rec.write_text(rec.read_text().replace('"@FILES@"', json.dumps(digests)))
 
 
 class Score(unittest.TestCase):
@@ -741,15 +826,7 @@ class Score(unittest.TestCase):
         self.w = World(self)
 
     def files(self, d):
-        m = load_module()
-        m.REPO_CASES = str(self.w.run_path.parent / "cases.json")
-        m.HOST_DIGESTS = str(self.w.run_path.parent / "host-cases.sha256")
-        _, digests = m.load_cases([str(self.w.host)])
-        for r in d.iterdir():
-            if not r.is_dir():
-                continue
-            rec = r / "run.json"
-            rec.write_text(rec.read_text().replace('"@FILES@"', json.dumps(digests)))
+        case_files(self.w, d)
 
     def test_majority_parity_and_sheet(self):
         w = self.w
@@ -793,6 +870,308 @@ class Score(unittest.TestCase):
         self.files(w.out)
         _, s, _ = w.call("score", "--out", w.out, "--cases", w.host)
         self.assertEqual(s["parity"], {"claude-haiku": None})
+
+
+def tool_use(tid, command):
+    return {"type": "tool_use", "id": tid, "name": "Bash", "input": {"command": command, "description": "d"}}
+
+
+ROUTE_CMD = """echo '{"parameters":{"words":"where"}}' | ont fn route"""
+
+
+class SampleRecord(unittest.TestCase):
+    """The members of a sample's usage record: its start and end, its calls of the functions, its cost."""
+    def setUp(self):
+        self.w = World(self)
+
+    def usage(self, cid, n=1, reader="claude-haiku"):
+        return json.loads(self.w.sample(cid, n, reader).with_suffix(".json").read_text())
+
+    def test_fn_calls_count_each_tool_use_once_by_its_id_and_are_null_for_the_other_readers(self):
+        w = self.w
+        stream = [[tool_use("t1", ROUTE_CMD)],
+                  [tool_use("t1", ROUTE_CMD), tool_use("t2", "ap status --brief nightly-backup")],  # t1 again
+                  [tool_use("t3", "ls /tmp"), {"type": "text", "text": "ont fn route"}],
+                  [tool_use("t4", "cd / && ap fn route < /dev/null"), tool_use("t5", "ap status --brief x | head")],
+                  [{"type": "tool_use", "name": "Bash", "input": {"command": ROUTE_CMD}}]]  # no id: not counted
+        w.plan({"cli": {"c1": [{"answer": GOOD, "tool_use": stream}], "c2": [{"answer": GOOD}]}})
+        for reader in ("claude-haiku", "claude-sonnet", "muse-ember", "agy-hydrogen"):
+            self.assertEqual(w.answers("--samples", "1", reader=reader)[0], 0, reader)
+        self.assertEqual(self.usage("c1")["fn_calls"], {"route": 2, "brief": 2})
+        self.assertEqual(self.usage("c1", reader="claude-sonnet")["fn_calls"], {"route": 2, "brief": 2})
+        self.assertEqual(self.usage("c2")["fn_calls"], {"route": 0, "brief": 0}, "a Claude reader that called none")
+        for reader in ("muse-ember", "agy-hydrogen"):
+            for cid in ("c1", "c2"):
+                self.assertIsNone(self.usage(cid, reader=reader)["fn_calls"], reader)
+
+    def test_fn_calls_read_the_stream_by_the_function(self):
+        m = load_module()
+        stream = "\n".join(json.dumps(e) for e in [
+            {"type": "assistant", "message": {"content": [tool_use("a", ROUTE_CMD)]}},
+            {"type": "assistant", "message": {"content": [tool_use("a", ROUTE_CMD)]}},
+            {"type": "user", "message": {"content": [{"type": "tool_result", "tool_use_id": "a", "content": "ont fn route"}]}},
+            {"type": "assistant", "message": {"content": "ap status --brief"}}]) + "\nnot json\n"
+        self.assertEqual(m.fn_calls_of("claude-haiku", stream), {"route": 1, "brief": 0})
+        self.assertIsNone(m.fn_calls_of("muse-ember", stream))
+        self.assertIsNone(m.fn_calls_of("agy-hydrogen", stream))
+
+    def test_started_at_and_ended_at_are_utc_seconds_of_the_unit_that_started(self):
+        w = self.w
+        w.plan({"cli": {"c1": [{"answer": GOOD}], "c2": [{"answer": GOOD}]}})
+        before = int(time.time())
+        self.assertEqual(w.answers("--samples", "1", "--case", "c1")[0], 0)
+        after = int(time.time()) + 1
+        u = self.usage("c1")
+        for k in ("started_at", "ended_at"):
+            self.assertRegex(u[k], r"^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ$")
+        at = lambda t: int(time.mktime(time.strptime(t, "%Y-%m-%dT%H:%M:%SZ"))) - time.timezone
+        self.assertTrue(before - 1 <= at(u["started_at"]) <= at(u["ended_at"]) <= after, u)
+
+    def test_started_at_is_null_for_a_unit_that_did_not_start(self):
+        w = self.w
+        w.plan({"systemd_run": "fail_sessions"})
+        code, out, _ = w.answers("--jobs", "1", "--case", "c1", "--samples", "1")
+        self.assertEqual((code, out), (2, {"status": "sandbox_unavailable"}))
+        u = self.usage("c1")
+        self.assertEqual((u["state"], u["started_at"], u["ended_at"], u["fn_calls"], u["usd"]),
+                         ("sandbox_unavailable", None, None, None, None))
+
+    def test_usd_is_the_total_cost_of_the_last_result_of_a_claude_stream(self):
+        w = self.w
+        w.plan({"cli": {"c1": [{"answer": GOOD, "usd": 0.0123}], "c2": [{"answer": GOOD}]}})
+        for reader in ("claude-haiku", "muse-ember", "agy-hydrogen"):
+            self.assertEqual(w.answers("--samples", "1", reader=reader)[0], 0, reader)
+        self.assertEqual(self.usage("c1")["usd"], 0.0123)
+        self.assertIsNone(self.usage("c2")["usd"], "absent in the stream")
+        for reader in ("muse-ember", "agy-hydrogen"):
+            self.assertIsNone(self.usage("c1", reader=reader)["usd"], reader)
+
+    def test_usd_of_takes_the_last_result_and_nothing_that_is_not_a_number(self):
+        m = load_module()
+        line = lambda **kw: json.dumps(dict({"type": "result", "result": "x"}, **kw))
+        self.assertEqual(m.usd_of("claude-haiku", line(total_cost_usd=1) + "\n" + line(total_cost_usd=0.5)), 0.5)
+        self.assertIsNone(m.usd_of("claude-haiku", line(total_cost_usd=1) + "\n" + line()))
+        self.assertIsNone(m.usd_of("claude-haiku", line(total_cost_usd="1.0")))
+        self.assertIsNone(m.usd_of("claude-haiku", line(total_cost_usd=True)))
+        self.assertIsNone(m.usd_of("muse-ember", line(total_cost_usd=1)))
+
+    def test_the_prompt_names_the_functions_in_a_sentence_after_its_first_paragraph(self):
+        w = self.w
+        w.plan({"cli": {"c1": [{"answer": GOOD}]}})
+        self.assertEqual(w.answers("--samples", "1", "--case", "c1")[0], 0)
+        prompt = w.cli_runs()[0]["argv"][-1]
+        first, second, third = prompt.split("\n\n", 2)
+        self.assertEqual(first, "You are an agent on this host. Your assignment: CASEID c1 SITUATION-SECRET-ONE")
+        for word in ("ont fn route", '{"parameters":{"words":"<what you look for>"}}', "ap status --brief <intent>"):
+            self.assertIn(word, second)
+        self.assertTrue(third.startswith("Before you act, find the context"), third)
+        self.assertEqual(second.count(". "), 0, "one sentence")
+
+
+class ScoreMembers(unittest.TestCase):
+    def setUp(self):
+        self.w = World(self)
+
+    def test_score_usd_and_fn_samples_per_reader(self):
+        w = self.w
+        both = {"input_tokens": 100}
+        table = {"c1": [GOOD] * 3, "c2": [GOOD] * 3, "h1": ["FACT-HOST"] * 3}
+        extra = {}
+        for cid in table:
+            for i in (1, 2, 3):
+                extra[(cid, i)] = {"fn_calls": {"route": 1 if i == 1 else 0, "brief": 0}, "usd": 0.25}
+        extra[("c1", 3)] = {"fn_calls": None, "usd": None}  # no count, no cost: not in either figure
+        extra[("c2", 3)] = {"fn_calls": {"route": 0, "brief": 2}, "usd": 0.1}
+        fake_reader(w.out / "claude-sonnet", 3, table, extra=extra)
+        fake_reader(w.out / "muse-ember", 3, table)
+        fake_reader(w.out / "claude-haiku", 3, {"c1": [GOOD, None, GOOD], "c2": [GOOD] * 3, "h1": [GOOD] * 3},
+                    extra={("c1", 1): {"fn_calls": {"route": 0, "brief": 0}, "usd": 1.234}})
+        # a sample that is not answered holds no figure of the score, whatever its record says
+        (w.out / "claude-haiku" / "c1__s2.json").write_text(json.dumps(
+            {"answered": False, "usd": 50.0, "fn_calls": {"route": 3, "brief": 3}}))
+        case_files(w, w.out)
+        code, s, r = w.call("score", "--out", w.out, "--cases", w.host)
+        self.assertEqual(code, 0, r.stdout)
+        son, mus, hai = (s["readers"][k] for k in ("claude-sonnet", "muse-ember", "claude-haiku"))
+        self.assertEqual((son["fn_samples"], son["usd"]), (0.5, 1.85))  # 8 counts, 4 with a call; 7 x 0.25 and 0.1
+        self.assertEqual((mus["fn_samples"], mus["usd"]), (None, None))
+        self.assertEqual((hai["fn_samples"], hai["usd"]), (0.0, 1.23))
+        self.assertEqual(json.loads((w.out / "score.json").read_text()), s)
+        for k in ("n", "passes", "samples", "mean", "majority", "unanswered", "tokens_median"):
+            self.assertIn(k, son)
+        self.assertEqual(set(s), {"suite", "case_files", "readers", "parity"})
+        self.assertEqual(set(son), {"n", "passes", "samples", "mean", "majority", "unanswered", "tokens_median",
+                                    "fn_samples", "usd"})
+
+    def test_equal_answers_give_an_equal_score_file(self):
+        w = self.w
+        fake_reader(w.out / "claude-haiku", 3, {"c1": [GOOD] * 3, "c2": [GOOD] * 3, "h1": ["x"] * 3},
+                    extra={(c, 1): {"started_at": "2026-11-20T10:00:00Z", "ended_at": "2026-11-20T10:01:00Z",
+                                    "usd": 0.5, "fn_calls": {"route": 1, "brief": 0}} for c in ("c1", "c2", "h1")})
+        case_files(w, w.out)
+        self.assertEqual(w.call("score", "--out", w.out, "--cases", w.host)[0], 0)
+        first = (w.out / "score.json").read_bytes()
+        self.assertEqual(w.call("score", "--out", w.out, "--cases", w.host)[0], 0)
+        self.assertEqual((w.out / "score.json").read_bytes(), first)
+        self.assertNotIn(b"2026-11-20", first)
+
+    def test_latest_end_is_of_the_scored_samples_only(self):
+        w = self.w
+        fake_reader(w.out / "claude-haiku", 3, {"c1": [GOOD] * 3},
+                    extra={("c1", 1): {"ended_at": "2026-11-20T10:00:00Z"}, ("c1", 2): {"ended_at": "2026-11-20T10:05:00Z"},
+                           ("c1", 3): {"ended_at": None}})
+        (w.out / "claude-haiku" / "c1__s3.json").write_text(json.dumps({"answered": False, "ended_at": "2026-12-01T00:00:00Z"}))
+        m = load_module()
+        rec = json.loads((w.out / "claude-haiku" / "run.json").read_text())
+        self.assertEqual(m.latest_end(str(w.out / "claude-haiku"), rec), "2026-11-20T10:05:00Z")
+        rec["cases"] = []
+        self.assertIsNone(m.latest_end(str(w.out / "claude-haiku"), rec))
+
+
+KEY = "task-suite"
+
+
+class ScoreRecord(unittest.TestCase):
+    """`score --record <task key>`: one measurement per reader of the KPI of that reader, through the `ont` of PATH."""
+    def setUp(self):
+        self.w = w = World(self)
+        w.ont_state({"tasks": [KEY, "other-task"]})
+        ends = {(c, i): "2026-11-20T10:00:0%dZ" % i for c in ("c1", "c2", "h1") for i in (1, 2, 3)}
+        sonnet = {k: {"ended_at": e, "usd": 0.25, "fn_calls": {"route": 1, "brief": 0}} for k, e in ends.items()}
+        fake_reader(w.out / "claude-sonnet", 3, {"c1": [GOOD, GOOD, "FACT-ALPHA one only"], "c2": [GOOD] * 3,
+                                                  "h1": ["FACT-HOST", "x", "x"]}, extra=sonnet)
+        fake_reader(w.out / "claude-haiku", 3, {"c1": [GOOD] * 3, "c2": [GOOD] * 3, "h1": ["x"] * 3},
+                    extra={k: {"ended_at": "2026-11-20T11:00:00Z"} for k in ends})
+        fake_reader(w.out / "muse-ember", 3, {"c1": [GOOD] * 3, "c2": [GOOD] * 3, "h1": ["x"] * 3})  # no ended_at
+        case_files(w, w.out)
+
+    def score(self, *extra):
+        return self.w.call("score", "--out", self.w.out, "--cases", self.w.host, *extra)
+
+    def calls(self):
+        return self.w.lines("ont.jsonl")
+
+    def test_score_record_defines_each_kpi_once_and_records_one_measurement_per_reader(self):
+        w = self.w
+        code, out, r = self.score("--record", KEY)
+        self.assertEqual((code, r.stderr), (0, ""), r.stdout)
+        self.assertEqual(out["recorded"], {"measurements": 2, "already": 0, "older": 0, "skipped": 1, "failed": 0})
+        written = json.loads((w.out / "score.json").read_text())
+        self.assertNotIn("recorded", written, "the counts are printed, not written")
+        self.assertEqual({k: v for k, v in out.items() if k != "recorded"}, written)
+        digest = hashlib.sha256((w.out / "score.json").read_bytes()).hexdigest()
+        st = w.ont_now()
+        self.assertEqual(sorted(k["name"] for k in st["kpis"]), ["suite routing claude-haiku", "suite routing claude-sonnet"])
+        for k in st["kpis"]:
+            reader = k["name"].split()[-1]
+            self.assertEqual(k["task"]["native_key"], KEY)
+            self.assertEqual(k["definition"], "Score of the routing suite for the reader %s in one scored run: mean share "
+                             "of passed cases, majority over all cases, samples per case, unanswered samples, share of "
+                             "answered samples that called a function, and the readers' own cost in USD; recorded by "
+                             "evals/routing/run score --record. No case text." % reader)
+        defines = [a for a in st["applied"] if a["kind"] == "define_kpi"]
+        self.assertEqual([a["rid"] for a in defines], [
+            "suite-kpi-" + hashlib.sha256(("%s:suite routing %s" % (KEY, k)).encode()).hexdigest()[:32]
+            for k in ("claude-sonnet", "claude-haiku")])
+        want = {"claude-sonnet": ("mean 2.0000 majority 2/3 n 3 unanswered 0 fn 1.0000 usd 2.25", "2026-11-20T10:00:03Z"),
+                "claude-haiku": ("mean 2.0000 majority 2/3 n 3 unanswered 0 fn n/a usd n/a", "2026-11-20T11:00:00Z")}
+        by_kpi = {k["key"]: k["name"].split()[-1] for k in st["kpis"]}
+        self.assertEqual(len(st["measurements"]), 2)
+        for m in st["measurements"]:
+            reader = by_kpi[m["kpi"]]
+            self.assertEqual((m["value"], m["observed_at"]), want[reader])
+            self.assertEqual(m["evidence"], "evals/routing/run score sha256:" + digest)
+            self.assertEqual(m["request_id"], "suite-" + hashlib.sha256(("%s:%s" % (reader, digest)).encode()).hexdigest()[:32])
+            self.assertLessEqual(len(m["value"].encode()), 200)
+        self.assertEqual(sorted(a["kind"] for a in st["applied"]), ["define_kpi"] * 2 + ["record_measurement"] * 2)
+        everything = json.dumps(st["applied"])
+        for private in ("SITUATION", "FACT-", "CASEID", str(w.t), "fixture-host", "host-cases"):
+            self.assertNotIn(private, everything)
+        for c in self.calls():
+            self.assertNotIn("--store", c["argv"])
+            if c["argv"][0] == "action":
+                self.assertEqual(c["argv"], ["action", "apply", "--client", "suite"])
+
+    def test_score_record_a_second_score_of_the_same_answers_applies_nothing_new(self):
+        w = self.w
+        self.assertEqual(self.score("--record", KEY)[0], 0)
+        before = json.dumps(w.ont_now()["applied"])
+        code, out, r = self.score("--record", KEY)
+        self.assertEqual((code, r.stderr), (0, ""))
+        self.assertEqual(out["recorded"], {"measurements": 0, "already": 2, "older": 0, "skipped": 1, "failed": 0})
+        st = w.ont_now()
+        self.assertEqual(json.dumps(st["applied"]), before)
+        self.assertEqual((len(st["kpis"]), len(st["measurements"])), (2, 2))
+        self.assertEqual([c["body"]["action_type"] for c in self.calls() if c["argv"][0] == "action"].count("define_kpi"), 2)
+
+    def test_score_record_a_kpi_of_another_task_is_not_used(self):
+        w = self.w
+        other = {"object_type": "task", "native_key": "other-task"}
+        w.ont_state({"tasks": [KEY, "other-task"], "kpis": [
+            {"key": "kpi-x", "name": "suite routing claude-sonnet", "task": other}]})
+        code, out, _ = self.score("--record", KEY)
+        self.assertEqual((code, out["recorded"]["failed"]), (0, 0))
+        st = w.ont_now()
+        self.assertEqual(sorted((k["task"]["native_key"], k["name"]) for k in st["kpis"]), sorted([
+            ("other-task", "suite routing claude-sonnet"), (KEY, "suite routing claude-sonnet"),
+            (KEY, "suite routing claude-haiku")]))
+        self.assertNotIn("kpi-x", [m["kpi"] for m in st["measurements"]])
+
+    def test_score_record_an_older_measurement_is_counted_and_is_no_failure(self):
+        w = self.w
+        self.assertEqual(self.score("--record", KEY)[0], 0)
+        for i in (1, 2, 3):  # other answers, so another score file; one reader's samples ended before its measurement
+            (w.out / "claude-haiku" / ("c1__s%d.md" % i)).write_text("x")
+            meta = json.loads((w.out / "claude-haiku" / ("c1__s%d.json" % i)).read_text())
+            (w.out / "claude-haiku" / ("c1__s%d.json" % i)).write_text(json.dumps(dict(meta, ended_at="2026-11-19T00:00:00Z")))
+        for c in ("c2", "h1"):
+            for i in (1, 2, 3):
+                p = w.out / "claude-haiku" / ("%s__s%d.json" % (c, i))
+                p.write_text(json.dumps(dict(json.loads(p.read_text()), ended_at="2026-11-19T00:00:00Z")))
+        code, out, r = self.score("--record", KEY)
+        self.assertEqual((code, r.stderr), (0, ""), r.stdout)
+        self.assertEqual(out["recorded"], {"measurements": 1, "already": 0, "older": 1, "skipped": 1, "failed": 0})
+
+    def test_score_record_a_refusal_or_an_unknown_task_is_a_failure_with_exit_3(self):
+        w = self.w
+        code, out, _ = self.score("--record", "no-such-task")
+        self.assertEqual((code, out["recorded"]["failed"], out["recorded"]["measurements"]), (3, 3, 0))
+        self.assertEqual([c for c in self.calls() if c["argv"][0] == "action"], [], "no KPI for a task the store lacks")
+        w.ont_state({"tasks": [KEY], "refuse": "record_measurement", "refuse_code": "bad"})
+        code, out, _ = self.score("--record", KEY)
+        self.assertEqual((code, out["recorded"]), (3, {"measurements": 0, "already": 0, "older": 0, "skipped": 1, "failed": 2}))
+        w.ont_state({"tasks": [KEY], "search_fails": True})
+        code, out, _ = self.score("--record", KEY)
+        self.assertEqual((code, out["recorded"]["failed"]), (3, 3))
+        self.assertTrue((w.out / "score.json").exists(), "the score is written whatever the record does")
+
+    def test_score_record_uses_an_answer_that_is_not_qualified(self):
+        w = self.w
+        w.ont_state({"tasks": [KEY], "qualified": False})
+        code, out, _ = self.score("--record", KEY)
+        self.assertEqual((code, out["recorded"]["measurements"]), (0, 2))
+
+    def test_score_record_without_the_option_starts_no_ont_and_an_empty_one_is_usage(self):
+        w = self.w
+        code, out, _ = self.score()
+        self.assertEqual(code, 0)
+        self.assertNotIn("recorded", out)
+        self.assertEqual(w.call("gate", "--baseline", w.out / "score.json", "--candidate", w.out / "score.json")[0], 0)
+        self.assertEqual(w.answers("--cases", w.host, "--samples", "3", "--case", "c1", "--case", "h1", reader="muse-ember")[0], 2)
+        self.assertEqual(self.calls(), [], "no `ont` call without --record")
+        code, out, _ = self.score("--record", "")
+        self.assertEqual((code, out), (2, {"status": "usage"}))
+        self.assertEqual(self.calls(), [])
+
+    def test_score_record_never_reaches_the_engine_ont_bin_names(self):
+        w = self.w
+        trap = w.t / "engine"
+        trap.write_text("#!/bin/sh\necho reached >> %s/engine.log\nexit 99\n" % w.t)
+        trap.chmod(0o755)
+        for extra in ((), ("--record", KEY)):
+            self.assertEqual(w.call("score", "--out", w.out, "--cases", w.host, *extra, env=w.env(ONT_BIN=str(trap)))[0], 0)
+        self.assertFalse((w.t / "engine.log").exists())
+        self.assertTrue(self.calls())
 
 
 def table(passes, n=3, unanswered=0):

@@ -3,7 +3,7 @@
 context the assignment needs? Several samples per case, scored by facts in the answer; no model judges.
 
   run answers --root DIR --reader R --out DIR [--cases FILE ...] [--samples N] [--jobs N] [--case ID ...] [--deny GLOB ...]
-  run score --out DIR [--cases FILE ...]
+  run score --out DIR [--cases FILE ...] [--record TASK]
   run gate --baseline SCORE.json --candidate SCORE.json
 
 Every reader is started through `systemd-run` as a transient service in agents.slice that sees the host read-only
@@ -41,7 +41,13 @@ KEEP = ("PATH", "HOME", "USER", "LOGNAME", "SHELL", "LANG", "LC_ALL", "TMPDIR", 
 MCP_MARKS = ("launcher.mjs", "mcp-server.js", "ont mcp")
 WITHHELD = "MCP startup withheld"
 ACTIVE = ("active", "activating", "deactivating", "reloading", "refreshing")
-PROMPT = ("You are an agent on this host. Your assignment: {situation}\n\nBefore you act, find the context you must "
+ROUTE_MARKS = ("ont fn route", "ap fn route")  # a command that asks the function `route`
+BRIEF_MARK = "ap status --brief"  # a command that asks the brief of an intent
+CLIENT = "suite"  # the client and the agent of the actions `score --record` applies
+PROMPT = ("You are an agent on this host. Your assignment: {situation}\n\n"
+          "Ask the functions first: `ont fn route` with `{{\"parameters\":{{\"words\":\"<what you look for>\"}}}}` on "
+          "standard input tells you where a fact lives, and `ap status --brief <intent>` tells you the state of an "
+          "intent.\n\nBefore you act, find the context you must "
           "load for this assignment. For this test the shared instructions are the directory {root}, laid out as "
           "/root/.agents: start at {root}/AGENTS.md and follow what it routes you to; read nothing under /root/.agents "
           "unless {root} is that directory. For everything else (repositories under /home/palantirkc/platforms/, task "
@@ -315,6 +321,53 @@ def usage_of(reader, stream):
     return tin, tout, sid
 
 
+def utc(t):
+    """A time in seconds since the epoch as UTC text to the second."""
+    return time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(t))
+
+
+def strings(v):
+    """Every string of a JSON value."""
+    if isinstance(v, str):
+        yield v
+    elif isinstance(v, dict):
+        for x in v.values():
+            yield from strings(x)
+    elif isinstance(v, list):
+        for x in v:
+            yield from strings(x)
+
+
+def fn_calls_of(reader, stream):
+    """{"route","brief"} for a Claude reader: its `tool_use` blocks, each counted once by its id, whose input holds
+    `ont fn route` or `ap fn route` (route) or `ap status --brief` (brief). None for the other readers."""
+    if not reader.startswith("claude"):
+        return None
+    seen, route, brief = set(), 0, 0
+    for e in events(stream):
+        message = e.get("message")
+        content = message.get("content") if isinstance(message, dict) else None
+        for b in content if isinstance(content, list) else []:
+            if not (isinstance(b, dict) and b.get("type") == "tool_use" and isinstance(b.get("id"), str)) \
+                    or b["id"] in seen:
+                continue
+            seen.add(b["id"])
+            text = list(strings(b.get("input")))
+            route += any(m in t for m in ROUTE_MARKS for t in text)
+            brief += any(BRIEF_MARK in t for t in text)
+    return {"route": route, "brief": brief}
+
+
+def usd_of(reader, stream):
+    """The `total_cost_usd` of the last `result` event of a Claude reader's stream (the CLI's own figure), else None."""
+    usd = None
+    for e in events(stream):
+        if reader.startswith("claude") and e.get("type") == "result":
+            v = e.get("total_cost_usd")
+            usd = v if isinstance(v, (int, float)) and not isinstance(v, bool) else None
+    return usd
+
+
 def muse_registered_servers():
     """How many MCP servers the Muse Code configuration directory registers (0 when it cannot be read)."""
     data = read_json(os.path.expanduser("~/.config/muse/settings.json"))
@@ -485,7 +538,7 @@ def run_sample(a, sandbox, case, n, base):
     unit = unit_of(base)
     meta = {"reader": a.reader, "case": case["id"], "sample": n, "unit": unit, "session": sid, "state": None,
             "exit": None, "seconds": None, "input_tokens": None, "output_tokens": None, "answered": False,
-            "mcp_processes": []}
+            "mcp_processes": [], "started_at": None, "ended_at": None, "fn_calls": None, "usd": None}
     try:
         env = {k: os.environ[k] for k in KEEP + row["env"] if k in os.environ}
         env.update(row.get("set", {}))
@@ -527,15 +580,18 @@ def run_sample(a, sandbox, case, n, base):
                 meta["state"] = "timeout"
             stop.set()
             t.join()
-        meta["seconds"] = round(time.time() - start, 1)
+        ended = time.time()
+        meta["seconds"] = round(ended - start, 1)
         meta["mcp_processes"] = sorted(seen)
         if not os.path.isfile(mark):
             meta["state"] = "sandbox_unavailable"
             return meta
+        meta["started_at"], meta["ended_at"] = utc(os.path.getmtime(mark)), utc(ended)
         with open(base + ".jsonl", encoding="utf-8", errors="replace") as f:
             stream = f.read()
         answer = answer_of(a.reader, stream)
         meta["input_tokens"], meta["output_tokens"], own = usage_of(a.reader, stream)
+        meta["fn_calls"], meta["usd"] = fn_calls_of(a.reader, stream), usd_of(a.reader, stream)
         if own:
             meta["session"] = own
         if answer:
@@ -633,11 +689,35 @@ def cmd_answers(a):
 
 # ---------------------------------------------------------------- score
 
+def cost_members(metas):
+    """`fn_samples` and `usd` of a reader from the usage records of its scored samples: the share of those that carry
+    a count and called a function at least once (four places), and the sum of their `usd` (two places); each None
+    when no sample has the figure."""
+    counts = [m["fn_calls"] for m in metas if isinstance(m.get("fn_calls"), dict)]
+    called = sum(1 for c in counts if num(c.get("route")) + num(c.get("brief")) > 0)
+    spent = [m["usd"] for m in metas if isinstance(m.get("usd"), (int, float)) and not isinstance(m["usd"], bool)]
+    return {"fn_samples": round(called / len(counts), 4) if counts else None,
+            "usd": round(sum(spent), 2) if spent else None}
+
+
+def latest_end(d, record):
+    """The latest `ended_at` of a reader's scored samples, or None."""
+    ends = []
+    for cid in record["cases"]:
+        for s in range(1, record["samples"] + 1):
+            base = os.path.join(d, "%s__s%d" % (cid, s))
+            if done(base):
+                meta = read_json(base + ".json")
+                if isinstance(meta.get("ended_at"), str) and meta["ended_at"]:
+                    ends.append(meta["ended_at"])
+    return max(ends) if ends else None
+
+
 def score_reader(d, record, cases):
     n, ids = record["samples"], record["cases"]
     passed = {cid: 0 for cid in ids}
     per_sample = [0] * n
-    unanswered, tokens = 0, []
+    unanswered, tokens, metas = 0, [], []
     for cid in ids:
         for s in range(1, n + 1):
             base = os.path.join(d, "%s__s%d" % (cid, s))
@@ -645,6 +725,7 @@ def score_reader(d, record, cases):
                 unanswered += 1
                 continue
             meta = read_json(base + ".json")
+            metas.append(meta)
             with open(base + ".md", encoding="utf-8", errors="replace") as f:
                 text = f.read()
             if isinstance(meta.get("input_tokens"), int):
@@ -654,7 +735,7 @@ def score_reader(d, record, cases):
                 per_sample[s - 1] += 1
     return {"n": n, "passes": passed, "samples": per_sample, "mean": round(sum(per_sample) / n, 4),
             "majority": sorted(cid for cid in ids if passed[cid] > n / 2), "unanswered": unanswered,
-            "tokens_median": statistics.median(tokens) if tokens else None}
+            "tokens_median": statistics.median(tokens) if tokens else None, **cost_members(metas)}
 
 
 def sheet(result):
@@ -682,7 +763,144 @@ def sheet(result):
     return "\n".join(lines) + "\n"
 
 
+# ---------------------------------------------------------------- the record of a score
+
+def ont_call(args, body):
+    """The answer object of one `ont` call on the host's store (the `ont` of PATH, no `--store`), or None."""
+    cmd = [shutil.which("ont") or "ont"] + args
+    env = {k: v for k, v in os.environ.items() if k not in ("ONT_AGENT", "ONT_ROLE")}  # the request id is the caller's
+    for attempt in range(4):
+        try:
+            p = subprocess.run(cmd, input=json.dumps(body), capture_output=True, text=True, timeout=120, env=env)
+            v = json.loads(p.stdout)
+        except (OSError, ValueError, subprocess.TimeoutExpired):
+            return None
+        if isinstance(v, dict) and v.get("code") == "store_busy" and attempt < 3:
+            time.sleep(0.2)
+            continue
+        return v if isinstance(v, dict) else None
+
+
+def ont_search(object_type, where=None):
+    """[(id, fields)] of every page of a search, each field its value or None; None when an answer is unreadable."""
+    body = {"object_type": object_type, "limit": 200}
+    if where is not None:
+        body["where"] = where
+    found = []
+    while True:
+        v = ont_call(["search"], body)
+        r = v.get("result") if isinstance(v, dict) and v.get("status") == "ok" else None
+        if not isinstance(r, dict) or not isinstance(r.get("objects"), list):
+            return None
+        for o in r["objects"]:
+            ident = o.get("id") if isinstance(o, dict) else None
+            fields = (o.get("head") or {}).get("fields") if isinstance(o, dict) else None
+            if not isinstance(ident, dict) or not isinstance(fields, dict):
+                return None
+            found.append((ident, {k: (f.get("value") if isinstance(f, dict) and f.get("kind") == "value" else None)
+                                  for k, f in fields.items()}))
+        c = r.get("continuation")
+        if c is None:
+            return found
+        if c == body.get("continuation"):
+            return None
+        body["continuation"] = c
+
+
+def ont_apply(kind, rid, params):
+    """(outcome, codes, the kpi id the action made): the outcome is None when the store refused or failed."""
+    v = ont_call(["action", "apply", "--client", CLIENT],
+                 {"action_type": kind, "agent": CLIENT, "request_id": rid, "parameters": params})
+    if not isinstance(v, dict):
+        return None, [], None
+    if v.get("status") == "refused":
+        failed = v.get("failed") if isinstance(v.get("failed"), list) else []
+        return None, [x for x in [v.get("code")] + failed if isinstance(x, str)], None
+    result = v.get("result") if isinstance(v.get("result"), dict) else {}
+    if v.get("status") == "ok" and result.get("outcome") in ("applied", "already_applied"):
+        made = next((e["id"] for e in result.get("edits") or [] if isinstance(e, dict) and isinstance(e.get("id"), dict)
+                     and e["id"].get("object_type") == "kpi"), None)
+        return result["outcome"], [], made
+    return None, [], None
+
+
+def is_task(ident, key, kind="task"):
+    return isinstance(ident, dict) and ident.get("object_type") == kind and ident.get("native_key") == key
+
+
+def kpi_of(task, key, name):
+    """The full id of the KPI `name` of the task, defined when there is none; None when the store does not answer."""
+    found = ont_search("kpi", {"eq": ["name", name]})
+    if found is None:
+        return None
+    mine = [i for i, f in found if is_task(f.get("task"), key)]
+    if mine:
+        return mine[0]
+    definition = ("Score of the %s suite for the reader %s in one scored run: mean share of passed cases, majority over "
+                  "all cases, samples per case, unanswered samples, share of answered samples that called a function, "
+                  "and the readers' own cost in USD; recorded by evals/%s/run score --record. No case text.")
+    suite, reader = name.split()[1:3]
+    _, _, made = ont_apply("define_kpi", "suite-kpi-" + hashlib.sha256(("%s:%s" % (key, name)).encode()).hexdigest()[:32],
+                           {"task": task, "name": name, "definition": definition % (suite, reader, suite)})
+    if made is not None:
+        return made
+    again = ont_search("kpi", {"eq": ["name", name]})
+    return next((i for i, f in again or [] if is_task(f.get("task"), key)), None)
+
+
+def measured(x):
+    """The value text of one reader's measurement (None written n/a)."""
+    cell = lambda v, places: "n/a" if v is None else "%.*f" % (places, v)
+    return "mean %s majority %d/%d n %d unanswered %d fn %s usd %s" % (
+        cell(x["mean"], 4), len(x["majority"]), len(x["passes"]), x["n"], x["unanswered"], cell(x.get("fn_samples"), 4),
+        cell(x.get("usd"), 2))
+
+
+def record_scores(suite, out, key, records, result, digest):
+    """One measurement of the KPI `suite <suite> <reader>` of the task `key` per reader of a score; the counts."""
+    done_ = {"measurements": 0, "already": 0, "older": 0, "skipped": 0, "failed": 0}
+    ends = {r: latest_end(os.path.join(out, r), records[r]) for r in result["readers"]}
+    found = ont_search("task")
+    task = next((i for i, _ in found or [] if is_task(i, key)), None)
+    if task is None:
+        done_["failed"] = len(ends)
+        return done_
+    for reader, end in ends.items():
+        if end is None:
+            done_["skipped"] += 1
+            continue
+        kpi = kpi_of(task, key, "suite %s %s" % (suite, reader))
+        if kpi is None:
+            done_["failed"] += 1
+            continue
+        rid = "suite-" + hashlib.sha256(("%s:%s" % (reader, digest)).encode()).hexdigest()[:32]
+        outcome, codes, _ = ont_apply("record_measurement", rid, {
+            "kpi": kpi, "value": measured(result["readers"][reader]), "observed_at": end,
+            "evidence": "evals/%s/run score sha256:%s" % (suite, digest)})
+        if outcome == "applied":
+            done_["measurements"] += 1
+        elif outcome == "already_applied":
+            done_["already"] += 1
+        elif "older_measurement" in codes:
+            done_["older"] += 1
+        else:
+            done_["failed"] += 1
+    return done_
+
+
+def report(a, suite, out, records, result, text):
+    """Prints the score, and with `--record` also the counts of the measurements; exit 3 when one failed."""
+    if a.record is None:
+        print(text)
+        return 0
+    counts = record_scores(suite, out, a.record, records, result, hashlib.sha256((text + "\n").encode()).hexdigest())
+    print(json.dumps(dict(result, recorded=counts), indent=1))
+    return 3 if counts["failed"] else 0
+
+
 def cmd_score(a):
+    if a.record == "":
+        refuse("usage")
     out = os.path.abspath(a.out)
     readers = [r for r in READER_NAMES if os.path.isdir(os.path.join(out, r))]
     if not readers:
@@ -708,8 +926,7 @@ def cmd_score(a):
     text = json.dumps(result, indent=1)
     write_atomic(os.path.join(out, "score.json"), text + "\n")
     write_atomic(os.path.join(out, "sheet.md"), sheet(result))
-    print(text)
-    return 0
+    return report(a, "routing", out, records, result, text)
 
 
 # ---------------------------------------------------------------- gate
@@ -776,6 +993,7 @@ def main():
     sc = sub.add_parser("score", allow_abbrev=False)
     sc.add_argument("--out", required=True)
     sc.add_argument("--cases", action="append", default=[])
+    sc.add_argument("--record", default=None)
     ga = sub.add_parser("gate", allow_abbrev=False)
     ga.add_argument("--baseline", required=True)
     ga.add_argument("--candidate", required=True)
