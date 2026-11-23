@@ -294,7 +294,7 @@ def lines_of(data, first, last):
     return text[:EXCERPT_CHARS] if text.strip() else None
 
 
-def excerpt(x, root):
+def pack_excerpt(x, root):
     """The text of the lines an answer names, read by the host: for a section of a repository from its clone at the
     answer's commit (`git -C <clone> show <commit>:<path>`), for a section of the instructions from the file the path
     maps to under the root. None (the pointer alone) when the answer has no lines or is of the Academy, or the text
@@ -335,7 +335,7 @@ def pack_prompt(case, root, answers):
         if not edu and isinstance(x.get("heading"), str) and x["heading"]:
             where += " (%s)" % x["heading"]
         lines.append("%d. %s" % (i, where))
-        text = excerpt(x, root)
+        text = pack_excerpt(x, root)
         if text:
             excerpts += 1
             lines += ["   | " + t for t in text.split("\n")]

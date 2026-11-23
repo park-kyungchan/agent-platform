@@ -600,21 +600,21 @@ class Ember(unittest.TestCase):
         x = {"repository": "owner/repo-a", "path": "docs/guide.md", "first_line": 1, "last_line": 399, "commit": commit}
         os.environ["ROUTING_CLONES_BASE"] = str(w.clones)
         self.addCleanup(lambda: os.environ.pop("ROUTING_CLONES_BASE", None))
-        text = m.excerpt(x, str(w.root))
+        text = m.pack_excerpt(x, str(w.root))
         self.assertEqual(len(text), 3000)
         self.assertTrue(text.startswith("0001 x"))
         for bad in (dict(x, commit="0" * 40), dict(x, commit="--output=x"), dict(x, commit=None), dict(x, repository="owner/none"),
                     dict(x, first_line=None), dict(x, first_line=5, last_line=4), dict(x, first_line=0), dict(x, first_line=True),
                     dict(x, path="docs/absent.md"), dict(x, first_line=900, last_line=901), dict(x, path="-x"),
                     dict(x, repository="owner/..")):
-            self.assertIsNone(m.excerpt(bad, str(w.root)), bad)
+            self.assertIsNone(m.pack_excerpt(bad, str(w.root)), bad)
         i = {"repository": None, "path": "/root/.agents/AGENTS.md", "first_line": 2, "last_line": 3}
-        self.assertEqual(m.excerpt(i, str(w.root)), "INSTR-LINE-TWO\nINSTR-LINE-THREE")
+        self.assertEqual(m.pack_excerpt(i, str(w.root)), "INSTR-LINE-TWO\nINSTR-LINE-THREE")
         for bad in (dict(i, path="/etc/passwd"), dict(i, path="/root/.agents/../x"), dict(i, path="/root/.agents/none.md"),
                     dict(i, path="AGENTS.md")):
-            self.assertIsNone(m.excerpt(bad, str(w.root)), bad)
+            self.assertIsNone(m.pack_excerpt(bad, str(w.root)), bad)
         (w.root / "link.md").symlink_to(w.root / "AGENTS.md")
-        self.assertIsNone(m.excerpt(dict(i, path="/root/.agents/link.md"), str(w.root)))
+        self.assertIsNone(m.pack_excerpt(dict(i, path="/root/.agents/link.md"), str(w.root)))
 
     def test_an_unreadable_excerpt_never_fails_the_sample_and_the_academy_is_names_only(self):
         w = self.w
