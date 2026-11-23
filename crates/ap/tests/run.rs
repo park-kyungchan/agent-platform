@@ -99,6 +99,9 @@ struct Fake {
     /// The key files (as written, under `/etc/agent-platform/credentials/`) whose examination
     /// answers an owner that is neither root nor this process (`specs/ap/run.md` R54).
     foreign: Vec<String>,
+    /// The units of launches on the PC: `systemctl stop` ends their group as a closed connection
+    /// ends the PC's side (a hang-up first, then the kill).
+    pc_units: std::collections::BTreeSet<String>,
 }
 /// The credentials directory of the host, which the fake maps to `<t>/credentials`.
 const CREDENTIALS: &str = "/etc/agent-platform/credentials/";
@@ -367,6 +370,7 @@ impl Fake {
             network_fails: false,
             way: Arc::new(FakeWay::default()),
             foreign: vec![],
+            pc_units: Default::default(),
         }
     }
     /// How far the fake's clocks (`now` and `wall`) stand ahead of the real ones: the seconds the
@@ -529,6 +533,24 @@ impl System for Fake {
             "stop" => {
                 std::thread::sleep(self.stop_delay);
                 if let Some(pgid) = self.groups.get(unit) {
+                    if self.pc_units.contains(unit) {
+                        let signal = |s: &str| {
+                            forks::forking(|| {
+                                Command::new("kill")
+                                    .args([s, "--", &format!("-{pgid}")])
+                                    .stderr(std::process::Stdio::null())
+                                    .status()
+                            })
+                            .is_ok_and(|s| s.success())
+                        };
+                        signal("-HUP");
+                        for _ in 0..30 {
+                            if !signal("-0") {
+                                break;
+                            }
+                            std::thread::sleep(std::time::Duration::from_millis(100));
+                        }
+                    }
                     kill_group(*pgid);
                 }
                 self.alive.remove(unit);
@@ -577,6 +599,31 @@ impl System for Fake {
             ["systemd-run", "--scope", "--quiet", "--collect"]
         );
         assert!(argv[..unit_at].contains(&"--slice=agents.slice".to_owned()));
+        // A launch on the PC (`specs/ap/run.md` R59): the stand-in `tailscale` runs the PC's side.
+        if argv[unit_at + 1] == "tailscale" {
+            let unit = argv[..unit_at]
+                .iter()
+                .find_map(|a| a.strip_prefix("--unit="))
+                .unwrap()
+                .to_owned();
+            forks::settled();
+            let child = forks::forking(|| {
+                Command::new(self.t.join("tsbin/tailscale"))
+                    .args(&argv[unit_at + 2..])
+                    .env_clear()
+                    .envs(env.iter().map(|(k, v)| (k, v)))
+                    .current_dir(cwd)
+                    .stdin(files[0].try_clone()?)
+                    .stdout(files[1].try_clone()?)
+                    .stderr(files[2].try_clone()?)
+                    .process_group(0)
+                    .spawn()
+            })?;
+            self.groups.insert(unit.clone(), child.id());
+            self.pc_units.insert(unit.clone());
+            self.alive.insert(unit);
+            return Ok(child);
+        }
         // `bwrap … --` in front of the CLI (limits) is checked by the tests and dropped here.
         let at = match argv[unit_at + 1] == BWRAP {
             true => unit_at + 1 + argv[unit_at + 1..].iter().position(|a| a == "--").unwrap(),
@@ -11572,4 +11619,1233 @@ fn a_policy_without_api_key_accounts_launches_as_the_base() {
             assert_eq!(settings_before, &now.3, "settings of {n}");
         }
     }
+}
+
+// ---- A look on the PC (specs/ap/run.md R57 to R63) --------------------------------------------
+//
+// The PC is a set of stand-ins under `<t>`: `tsbin/tailscale` (ping, and `ssh`, which runs its text
+// as the stage account's shell would), `pcbin/` (`bwrap`, `claude`, `python3`, `flock` and the
+// readings of the probe) and `pcsys/` (links to the system programs the PC's side needs). Nothing
+// runs a real `tailscale`, `claude` or `bwrap`. The stand-in `bwrap` mounts nothing: it records its
+// words and runs the command with the environment its `--setenv` words make.
+
+const PC_TAILSCALE: &str = r#"#!/bin/bash
+set -o pipefail
+st=@T@/ts
+n=$(( $(cat "$st/count" 2>/dev/null || echo 0) + 1 )); echo $n > "$st/count"
+printf '%s\n' "$*" > "$st/args.$n"
+tr '\0' '\n' < /proc/$$/environ | sort > "$st/env.$n"
+case $1 in
+  ping) [ ! -e "$st/noping" ] || exit 1; exit 0 ;;
+  ssh)
+    shift; echo "$1" > "$st/login.$n"; shift
+    text="$*"
+    run() { env -i HOME=@T@/pchome PATH=@T@/pcsys sh -c "$text"; }
+    case $text in
+      *ap-stage-probe*)
+        [ ! -e "$st/probe-fail" ] || exit 1
+        [ ! -e "$st/probe-garbage" ] || { echo garbage; exit 0; }
+        run | tee "$st/out.$n" ;;
+      *ap-stage-fetch*)
+        [ ! -e "$st/fetch-fail" ] || exit 1
+        run | tee "$st/out.$n" ;;
+      *)
+        [ ! -e "$st/launch-fail" ] || exit 255
+        if [ -e "$st/launch-lost" ]; then echo '{"type":"system","subtype":"init"}'; exit 255; fi
+        tee "$st/stdin.$n" | run 2> >(tee "$st/stderr.$n" >&2) ;;
+    esac ;;
+esac
+"#;
+const PC_BWRAP: &str = r#"#!/bin/bash
+st=@T@/ts
+n=$(( $(cat "$st/bwrap.count" 2>/dev/null || echo 0) + 1 )); echo $n > "$st/bwrap.count"
+printf '%s\n' "$@" > "$st/bwrap.$n"
+declare -A map
+setenvs=() chdir=/
+while [ $# -gt 0 ]; do
+  case $1 in
+    --) shift; break ;;
+    --ro-bind | --bind) map["$3"]=$2; shift 3 ;;
+    --symlink) shift 3 ;;
+    --setenv) setenvs+=("$2=$3"); shift 3 ;;
+    --chdir) chdir=$2; shift 2 ;;
+    --tmpfs | --dev | --proc | --uid | --gid | --remount-ro) shift 2 ;;
+    *) shift ;;
+  esac
+done
+for i in "${!setenvs[@]}"; do
+  case ${setenvs[$i]} in PATH=/ap-bin:*) setenvs[$i]="PATH=${map[/ap-bin]}:${setenvs[$i]#PATH=/ap-bin:}" ;; esac
+done
+cd -- "$chdir" && exec env -i "${setenvs[@]}" "$@"
+"#;
+const PC_PYTHON: &str = r#"#!/bin/bash
+st=@T@/ts
+case ${4-} in
+  check) [ ! -e "$st/proxy-not-ready" ] || exit 1; echo "ap-egress ready 3.12.0"; exit 0 ;;
+  outside)
+    printf '%s\n' "${@:4}" > "$st/outside.argv"; echo $$ > "$st/outside.pid"
+    if [ -e "$st/egress-lines" ]; then
+      while IFS= read -r l; do printf '\0ap-egress %s\n' "${l//@N@/$6}" >&2; done < "$st/egress-lines"
+    fi
+    exec @PY@ -c 'import os,socket,sys,time; os.chdir(os.path.dirname(sys.argv[1])); s=socket.socket(socket.AF_UNIX); s.bind(os.path.basename(sys.argv[1])); s.listen(1); time.sleep(600)' "$5" ;;
+  inside)
+    [ ! -e "$st/slow-inside" ] || sleep 1
+    date +%s.%N > "$st/ready.at"; echo ready
+    while kill -0 "$PPID" 2>/dev/null; do sleep 0.2; done; exit 0 ;;
+  *) exec @PY@ "$@" ;;
+esac
+"#;
+const PC_CLAUDE: &str = r#"#!/bin/bash
+here=$(dirname "$(readlink -f "$0")")
+n=$(( $(cat "$here/count" 2>/dev/null || echo 0) + 1 )); echo $n > "$here/count"
+env > "$here/env.$n"; printf '%s\n' "$*" > "$here/args.$n"; date +%s.%N > "$here/started.$n"
+cat > "$here/prompt.$n"
+sid= prev= resumed=0
+for a; do case $prev in --session-id) sid=$a ;; --resume) sid=$a; resumed=1 ;; esac; prev=$a; done
+init() { printf '{"type":"system","subtype":"init","session_id":"%s","mcp_servers":[]}\n' "$sid"; }
+result() { printf '{"type":"result","subtype":"%s","is_error":%s,"num_turns":1,"result":"%s","session_id":"%s","usage":{"input_tokens":2,"cache_creation_input_tokens":3,"cache_read_input_tokens":4,"output_tokens":5},"permission_denials":[],"api_error_status":null}\n' "${3:-success}" "${2:-false}" "$1" "$sid"; }
+case $(cat "$here/mode" 2>/dev/null) in
+  cut) init; printf '{"type":"rate_limit_event","rate_limit_info":{"status":"rejected","rateLimitType":"five_hour"},"session_id":"%s"}\n' "$sid"
+       result 'You have hit your 5-hour limit · resets 6:30pm (UTC)' true error_during_execution ;;
+  hang) init; sleep 600 ;;
+  nores) exit 1 ;;
+  firstline) init; if [ "$resumed" = 1 ]; then result 'Verdict: accept\nhead'; else result 'no verdict here'; fi ;;
+  build) init
+    ap check "$PWD" -- sh -c 'echo "$AP_CHECK_HOST $CARGO_INCREMENTAL" > "$PWD/built"; exit 7'; echo $? > "$here/build.rc"
+    ap fn route 2> "$here/route.err"; echo $? > "$here/route.rc"
+    result 'Verdict: accept\nhead' ;;
+  forge) init; printf '\0ap-egress deadbeef {"at":"x"}\n'; printf '\0ap-egress deadbeef {"at":"x"}\n' >&2
+    result 'Verdict: accept\nhead' ;;
+  *) init; result 'Verdict: accept\nhead' ;;
+esac
+"#;
+/// Programs of the system that the PC's side needs, linked into `pcsys`: the stage account's `PATH`
+/// holds these and the stand-ins, so a program the test removes is missing there.
+const PC_TOOLS: [&str; 34] = [
+    "bash", "sh", "git", "tar", "od", "tr", "find", "timeout", "nice", "cat", "mkdir", "cp",
+    "chmod", "touch", "rm", "date", "sleep", "seq", "head", "readlink", "mv", "dirname", "id",
+    "env", "ls", "grep", "wc", "sort", "uname", "rmdir", "basename", "tail", "true", "tee",
+];
+fn on_path(name: &str) -> String {
+    let path = std::env::var("PATH").unwrap_or_default();
+    path.split(':')
+        .map(|d| Path::new(d).join(name))
+        .find(|p| p.is_file())
+        .map(|p| p.to_str().unwrap().to_owned())
+        .unwrap_or_else(|| panic!("{name} is not on PATH"))
+}
+fn git_in(dir: &str, words: &[&str]) -> String {
+    let out = forks::forking(|| {
+        Command::new("git")
+            .args(["-c", "user.name=t", "-c", "user.email=t@t", "-C", dir])
+            .args(words)
+            .output()
+    })
+    .unwrap();
+    assert!(
+        out.status.success(),
+        "git {words:?}: {}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    String::from_utf8(out.stdout).unwrap().trim().to_owned()
+}
+fn executable(path: &Path, text: &str) {
+    std::fs::write(path, text).unwrap();
+    std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o755)).unwrap();
+}
+/// The words of a quoted command text, as the PC's shell reads them.
+fn shell_words(text: &str) -> Vec<String> {
+    let out = forks::forking(|| {
+        Command::new("sh")
+            .args([
+                "-c",
+                "eval \"set -- $1\"; for a; do printf '%s\\0' \"$a\"; done",
+                "sh",
+                text,
+            ])
+            .output()
+    })
+    .unwrap();
+    out.stdout
+        .split(|b| *b == 0)
+        .filter(|w| !w.is_empty() || false)
+        .map(|w| String::from_utf8(w.to_vec()).unwrap())
+        .collect()
+}
+impl Fake {
+    /// The PC: stand-ins, a Git worktree at `cwd` whose `origin/main` is its first commit, the stage
+    /// account's sign-in (valid for an hour) and a policy with `hosts.pc.stages`.
+    fn pc(&mut self) {
+        let t = self.t.to_str().unwrap().to_owned();
+        for d in ["tsbin", "pcbin", "pcsys", "ts", "pchome/.claude", "pcwork"] {
+            std::fs::create_dir_all(self.t.join(d)).unwrap();
+        }
+        let py = on_path("python3");
+        let fill = |s: &str| s.replace("@T@", &t).replace("@PY@", &py);
+        executable(&self.t.join("tsbin/tailscale"), &fill(PC_TAILSCALE));
+        for (name, text) in [
+            ("bwrap", PC_BWRAP),
+            ("python3", PC_PYTHON),
+            ("claude", PC_CLAUDE),
+            (
+                "nproc",
+                "#!/bin/sh\ncat @T@/ts/cpus 2>/dev/null || echo 4\n",
+            ),
+            (
+                "cut",
+                "#!/bin/sh\ncase \"$*\" in *loadavg*) cat @T@/ts/load 2>/dev/null || echo 0.10 ;; *) exec /usr/bin/cut \"$@\" ;; esac\n",
+            ),
+            (
+                "sed",
+                "#!/bin/sh\ncase \"$*\" in *MemAvailable*) cat @T@/ts/mem 2>/dev/null || echo 16000000 ;; *) exec /usr/bin/sed \"$@\" ;; esac\n",
+            ),
+            (
+                "flock",
+                "#!/bin/sh\nif [ -e @T@/ts/nolock ] && [ \"$2\" = 25 ]; then exit 1; fi\nexec /usr/bin/flock \"$@\"\n",
+            ),
+        ] {
+            executable(&self.t.join("pcbin").join(name), &fill(text));
+        }
+        for tool in PC_TOOLS.iter().chain(&["flock", "python3"]) {
+            // `flock` and `python3` of the system are reached by the stand-ins' absolute paths.
+            if *tool != "flock" && *tool != "python3" {
+                let _ = std::os::unix::fs::symlink(on_path(tool), self.t.join("pcsys").join(tool));
+            }
+        }
+        for (name, to) in [("nproc", "nproc"), ("cut", "cut"), ("sed", "sed")] {
+            let _ = std::os::unix::fs::symlink(
+                self.t.join("pcbin").join(name),
+                self.t.join("pcsys").join(to),
+            );
+        }
+        for name in ["bwrap", "python3", "claude", "flock"] {
+            let _ = std::os::unix::fs::symlink(
+                self.t.join("pcbin").join(name),
+                self.t.join("pcsys").join(name),
+            );
+        }
+        std::fs::write(self.t.join("pchome/.profile"), "").unwrap();
+        self.credentials(3_600_000, 90_000_000);
+        std::fs::write(
+            self.t.join("pchome/.claude/CLAUDE.md"),
+            "the account's instructions\n",
+        )
+        .unwrap();
+        forks::settled();
+        // The worktree: two commits, origin/main at the first, a GitHub remote.
+        git_in(&self.p("cwd"), &["init", "-q", "-b", "main"]);
+        std::fs::write(self.t.join("cwd/a.txt"), "one\n").unwrap();
+        git_in(&self.p("cwd"), &["add", "a.txt"]);
+        git_in(&self.p("cwd"), &["commit", "-q", "-m", "one"]);
+        let first = git_in(&self.p("cwd"), &["rev-parse", "HEAD"]);
+        std::fs::write(self.t.join("cwd/b.txt"), "two\n").unwrap();
+        git_in(&self.p("cwd"), &["add", "b.txt"]);
+        git_in(&self.p("cwd"), &["commit", "-q", "-m", "two"]);
+        git_in(
+            &self.p("cwd"),
+            &["remote", "add", "origin", "https://github.com/o/r.git"],
+        );
+        git_in(
+            &self.p("cwd"),
+            &["update-ref", "refs/remotes/origin/main", &first],
+        );
+        // The probe and the launch run with this process's PATH first on the tailscale stand-in.
+        let path = format!("{}:{}", self.p("tsbin"), std::env::var("PATH").unwrap());
+        self.env.retain(|(k, _)| k != "PATH");
+        self.env.push(("PATH".into(), path));
+        self.env.push(("USER".into(), "root".into()));
+        self.env.push(("LOGNAME".into(), "root".into()));
+        self.pc_policy(true);
+        let mut open = self.open_policy();
+        open["hosts"] = self.hosts(true);
+        self.policy_is(&open);
+    }
+    fn credentials(&self, expires_in_ms: i64, refresh_in_ms: i64) {
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_millis() as i64;
+        let creds = json!({"claudeAiOauth": {"accessToken": "sk-ant-oat-SECRET-ACCESS",
+            "refreshToken": "sk-ant-ort-SECRET-REFRESH", "expiresAt": now + expires_in_ms,
+            "refreshTokenExpiresAt": now + refresh_in_ms}});
+        std::fs::write(
+            self.t.join("pchome/.claude/.credentials.json"),
+            creds.to_string(),
+        )
+        .unwrap();
+    }
+    fn pc_policy(&self, _stages: bool) {}
+    fn hosts(&self, stages: bool) -> Value {
+        let mut pc = json!({"ssh": "u@pc-1", "work": self.p("pccheck"), "busy_load": 1.0});
+        if stages {
+            pc["stages"] = json!({"ssh": "stage@pc-1", "work": self.p("pcwork")});
+        }
+        json!({"pc": pc})
+    }
+    /// A look: a reviewer, `ont_role` verifier, `host` pc, `limits` of a scratch directory.
+    fn look(&self, out: &str) -> Value {
+        let mut r = self.request(out);
+        r["ont_role"] = json!("verifier");
+        r["host"] = json!("pc");
+        r["limits"] = json!({"scratch": self.p("scratch")});
+        r["expect"] = json!({"first_line": "Verdict: *"});
+        r
+    }
+    fn ts(&self, file: &str) -> String {
+        std::fs::read_to_string(self.t.join("ts").join(file)).unwrap_or_default()
+    }
+    /// The calls of the stand-in `tailscale`, as `(number, arguments)`.
+    fn ts_calls(&self) -> Vec<(u32, String)> {
+        let n: u32 = self.ts("count").trim().parse().unwrap_or(0);
+        (1..=n)
+            .map(|i| (i, self.ts(&format!("args.{i}"))))
+            .collect()
+    }
+    fn ts_call(&self, word: &str) -> Vec<(u32, String)> {
+        self.ts_calls()
+            .into_iter()
+            .filter(|(_, a)| a.contains(word))
+            .collect()
+    }
+    fn ts_launches(&self) -> Vec<(u32, String)> {
+        let rest = |a: &String| {
+            !a.contains("ap-stage-probe") && !a.contains("ap-stage-fetch") && a.starts_with("ssh")
+        };
+        self.ts_calls()
+            .into_iter()
+            .filter(|(_, a)| rest(a))
+            .collect()
+    }
+    fn pc_mode(&self, mode: &str) {
+        std::fs::write(self.t.join("pcbin/mode"), mode).unwrap();
+    }
+    fn ts_flag(&self, name: &str) {
+        std::fs::write(self.t.join("ts").join(name), "").unwrap();
+    }
+    fn key(&self) -> String {
+        format!("{:x}", sha2::Sha256::digest(self.p("cwd").as_bytes()))[..16].to_owned()
+    }
+    /// The words of the launch `n` of the stand-in (the script, then its arguments).
+    fn launch_words(&self, n: u32) -> Vec<String> {
+        let args = self.ts(&format!("args.{n}"));
+        let remote = args.trim_end().splitn(3, ' ').nth(2).unwrap().to_owned();
+        shell_words(&remote)
+    }
+    /// What a look run here ran, for a request that stayed here.
+    fn here_ran(&self) -> bool {
+        self.launches
+            .iter()
+            .all(|l| !l.contains(&"tailscale".to_owned()))
+            && !self.launches.is_empty()
+    }
+}
+fn pc_ok(f: &mut Fake, out: &str) -> Value {
+    let r = f.look(out);
+    let (v, status) = f.run(&r).unwrap();
+    assert_eq!(status, 0, "{v}");
+    assert_eq!(v["host"], "pc", "{} {}", f.ts("stderr.3"), f.ts("stderr.2"));
+    v
+}
+
+// spec: specs/ap/run.md#R57
+#[test]
+fn pc_r57_each_refusal_of_the_member_host_comes_before_any_effect() {
+    let mut f = Fake::new();
+    f.pc();
+    let big = f.p("big.md");
+    std::fs::write(&big, vec![b'x'; (1 << 20) + 1]).unwrap();
+    std::fs::write(f.p("small.md"), "x").unwrap();
+    let with = |f: &Fake, k: &str, v: Value| {
+        let mut r = f.look("x.md");
+        r[k] = v;
+        r
+    };
+    let mut cases = vec![
+        with(&f, "host", json!("local")),
+        with(&f, "host", json!(true)),
+        with(&f, "host", json!(null)),
+        with(&f, "runtime", json!("codex")),
+        with(&f, "role", json!("implementer")),
+        with(&f, "mcp_config", json!([f.p("small.md")])),
+        with(&f, "expect", json!({"file": f.p("o.txt")})),
+        with(&f, "resume", json!({"record": f.p("e.run.json")})),
+        with(
+            &f,
+            "limits",
+            json!({"scratch": f.p("scratch"), "show": ["~/.config/gh"]}),
+        ),
+        with(
+            &f,
+            "limits",
+            json!({"scratch": f.p("scratch"), "write": [f.p("cwd")]}),
+        ),
+        with(
+            &f,
+            "limits",
+            json!({"scratch": f.p("scratch"), "read_only": [f.p("cwd")]}),
+        ),
+        with(
+            &f,
+            "limits",
+            json!({"scratch": f.p("scratch"), "read_only": [big]}),
+        ),
+    ];
+    let mut no_ont = f.look("x.md");
+    no_ont.as_object_mut().unwrap().remove("ont_role");
+    cases.push(no_ont);
+    let mut no_limits = f.look("x.md");
+    no_limits.as_object_mut().unwrap().remove("limits");
+    cases.push(no_limits);
+    for r in cases {
+        let shown = r.to_string();
+        let got = code(f.run(&r));
+        assert!(
+            got == "invalid_input@host" || got.starts_with("invalid_input@"),
+            "{got} {shown}"
+        );
+        if !got.ends_with("@limits") && !got.ends_with("@runtime") && !got.ends_with("@role") {
+            // A code of another field (a refusal that came first) is the request's own.
+        }
+        assert!(f.launches.is_empty() && f.ts_calls().is_empty());
+    }
+    // The ones that are the member's own say `host`.
+    for r in [
+        with(&f, "host", json!("local")),
+        with(&f, "mcp_config", json!([f.p("small.md")])),
+        with(
+            &f,
+            "limits",
+            json!({"scratch": f.p("scratch"), "show": ["~/.config/gh"]}),
+        ),
+        with(
+            &f,
+            "limits",
+            json!({"scratch": f.p("scratch"), "read_only": [f.p("big.md")]}),
+        ),
+    ] {
+        assert_eq!(code(f.run(&r)), "invalid_input@host", "{r}");
+    }
+}
+
+// spec: specs/ap/run.md#R57
+#[test]
+fn pc_r57_a_malformed_stages_refuses_only_a_request_with_host() {
+    let mut f = Fake::new();
+    f.pc();
+    let mut p = f.open_policy();
+    p["hosts"] = f.hosts(true);
+    p["hosts"]["pc"]["stages"] = json!({"ssh": "stage@pc-1"});
+    f.policy_is(&p);
+    let r = f.look("x.md");
+    let failure = f.run(&r).unwrap_err();
+    assert_eq!(
+        (failure.code, failure.field.as_str()),
+        ("policy_invalid", "policy")
+    );
+    assert!(
+        failure
+            .detail
+            .as_str()
+            .unwrap()
+            .starts_with("hosts.pc.stages "),
+        "{failure:?}"
+    );
+    f.untouched("x.md");
+    // The same file for a request without `host`: no `hosts` read, no `tailscale`.
+    let (v, status) = f.run(&f.request("y.md")).unwrap();
+    assert_eq!(status, 0, "{v}");
+    assert!(v.get("host").is_none() && f.ts_calls().is_empty());
+    // No file, no `hosts` and no `stages` are no refusal: the look runs here.
+    for policy in [
+        None,
+        Some(f.open_policy()),
+        Some({
+            let mut p = f.open_policy();
+            p["hosts"] = f.hosts(false);
+            p
+        }),
+    ] {
+        match policy {
+            Some(p) => drop(f.policy_is(&p)),
+            None => f.policy = Some(f.t.join("absent.json")),
+        }
+        let out = format!("n{}.md", f.launches.len());
+        let (v, status) = f.run(&f.look(&out)).unwrap();
+        assert_eq!(
+            (status, v["host"].clone(), v["host_reason"].clone()),
+            (0, json!("local"), json!("no_pc_in_policy")),
+            "{v}"
+        );
+    }
+    assert!(f.ts_calls().is_empty());
+}
+
+// spec: specs/ap/run.md#R58
+#[test]
+fn pc_r58_each_reason_runs_the_look_here_within_the_call() {
+    type Setup = Box<dyn Fn(&Fake)>;
+    let cases: Vec<(&str, Setup)> = vec![
+        ("pc_unreachable", Box::new(|f| f.ts_flag("noping"))),
+        ("pc_unreachable", Box::new(|f| f.ts_flag("probe-fail"))),
+        ("pc_unreachable", Box::new(|f| f.ts_flag("probe-garbage"))),
+        (
+            "pc_not_ready",
+            Box::new(|f| std::fs::remove_file(f.t.join("pcbin/bwrap")).unwrap()),
+        ),
+        (
+            "pc_not_ready",
+            Box::new(|f| std::fs::remove_file(f.t.join("pcbin/claude")).unwrap()),
+        ),
+        ("pc_not_ready", Box::new(|f| f.ts_flag("proxy-not-ready"))),
+        (
+            "pc_signed_out",
+            Box::new(|f| {
+                std::fs::remove_file(f.t.join("pchome/.claude/.credentials.json")).unwrap()
+            }),
+        ),
+        // Ends before the look's bound, with a refresh token that lasts: still signed out.
+        (
+            "pc_signed_out",
+            Box::new(|f| f.credentials(1_000_000, 90_000_000)),
+        ),
+        (
+            "pc_busy",
+            Box::new(|f| std::fs::write(f.t.join("ts/load"), "9.50\n").unwrap()),
+        ),
+        (
+            "pc_memory_low",
+            Box::new(|f| std::fs::write(f.t.join("ts/mem"), "1024\n").unwrap()),
+        ),
+    ];
+    for (i, (reason, setup)) in cases.iter().enumerate() {
+        let mut f = Fake::new();
+        f.pc();
+        f.mode("a1", "answer");
+        std::fs::write(f.p("bin/answer"), "Verdict: accept\nhead").unwrap();
+        setup(&f);
+        let out = format!("r{i}.md");
+        let (v, status) = f.run(&f.look(&out)).unwrap();
+        assert_eq!(status, 0, "{reason} {v}");
+        assert_eq!(
+            (v["host"].clone(), v["host_reason"].clone()),
+            (json!("local"), json!(*reason)),
+            "{v}"
+        );
+        assert!(f.here_ran() && f.ts_launches().is_empty(), "{reason}");
+        // The ping and the probe are all the PC saw, none after a refusal before them.
+        assert!(f.ts_call("ap-stage-probe").len() <= 1);
+        assert_eq!(v["attempts"][0]["host"], "local");
+        assert_eq!(v["account"], f.p("a1"));
+    }
+}
+
+// spec: specs/ap/run.md#R58
+#[test]
+fn pc_r58_the_ping_the_probe_and_the_launch_get_four_variables_and_the_probe_reads_one_number() {
+    let mut f = Fake::new();
+    f.pc();
+    f.env
+        .push(("AP_SECRET_HOST_VARIABLE".into(), "leak".into()));
+    f.env.push(("LANG".into(), "C.UTF-8".into()));
+    let v = pc_ok(&mut f, "x.md");
+    assert_eq!(v["host"], "pc", "{v}");
+    let names = |n: u32| -> Vec<String> {
+        f.ts(&format!("env.{n}"))
+            .lines()
+            .filter_map(|l| l.split_once('=').map(|(k, _)| k.to_owned()))
+            .collect()
+    };
+    let four = ["HOME", "LOGNAME", "PATH", "USER"];
+    let mut seen = 0;
+    for (n, _) in f.ts_calls() {
+        let mut got = names(n);
+        got.retain(|k| !["PWD", "SHLVL", "_", "OLDPWD"].contains(&k.as_str()));
+        assert_eq!(got, four, "call {n}");
+        seen += 1;
+    }
+    assert!(seen >= 4, "ping, probe, launch and fetch");
+    // The launch went through the port's `launch` with exactly those four.
+    let env: Vec<&str> = f.launch_envs[0].iter().map(|(k, _)| k.as_str()).collect();
+    assert_eq!(env, ["PATH", "HOME", "USER", "LOGNAME"]);
+    // The ping first, with the PC's host; the probe is one `ssh` of the stage account.
+    let calls = f.ts_calls();
+    assert!(
+        calls[0]
+            .1
+            .starts_with("ping --c 1 --timeout 10s --until-direct=false pc-1"),
+        "{}",
+        calls[0].1
+    );
+    let probe = f.ts_call("ap-stage-probe");
+    assert_eq!(probe.len(), 1);
+    assert_eq!(f.ts(&format!("login.{}", probe[0].0)).trim(), "stage@pc-1");
+    // What the probe printed holds the end of the access token as one number, and no token.
+    let out = f.ts(&format!("out.{}", probe[0].0));
+    assert!(!out.contains("SECRET") && !out.contains("sk-ant"), "{out}");
+    let expires: Vec<&str> = out
+        .lines()
+        .filter_map(|l| l.strip_prefix("expires "))
+        .collect();
+    assert_eq!(expires.len(), 1);
+    assert!(expires[0].parse::<u64>().is_ok(), "{out}");
+    assert!(
+        out.contains(&format!("config {}/.claude", f.p("pchome"))),
+        "{out}"
+    );
+    assert!(
+        out.contains("programs yes yes") && out.contains("egress ap-egress ready "),
+        "{out}"
+    );
+}
+
+// spec: specs/ap/run.md#R58
+#[test]
+fn pc_r58_the_heads_file_of_the_key_makes_the_bundle_incremental() {
+    let members = |f: &Fake, n: u32| -> (Vec<String>, Vec<u8>) {
+        let bytes = std::fs::read(f.t.join(format!("ts/stdin.{n}"))).unwrap();
+        let nl = bytes.iter().position(|b| *b == b'\n').unwrap();
+        let len: usize = String::from_utf8_lossy(&bytes[..nl])
+            .split(' ')
+            .nth(1)
+            .unwrap()
+            .parse()
+            .unwrap();
+        let tar = bytes[nl + 1..nl + 1 + len].to_vec();
+        std::fs::write(f.t.join("first.tar"), &tar).unwrap();
+        let listed = Command::new("tar")
+            .args(["-tf"])
+            .arg(f.t.join("first.tar"))
+            .output()
+            .unwrap();
+        let names = String::from_utf8(listed.stdout)
+            .unwrap()
+            .lines()
+            .map(str::to_owned)
+            .collect();
+        (names, tar)
+    };
+    // The PC knows nothing: the bundle holds all of HEAD.
+    let mut f = Fake::new();
+    f.pc();
+    let v = pc_ok(&mut f, "x.md");
+    let n = f.ts_launches()[0].0;
+    let (names, _) = members(&f, n);
+    assert!(names.contains(&"head.bundle".to_owned()), "{names:?}");
+    drop(v);
+    // The PC's repository for the key holds HEAD~1: the bundle is the increment.
+    let mut f = Fake::new();
+    f.pc();
+    let parent = git_in(&f.p("cwd"), &["rev-parse", "HEAD~1"]);
+    let repo = f.t.join(format!("pcwork/repos/{}", f.key()));
+    let repo_text = repo.to_str().unwrap().to_owned();
+    std::fs::create_dir_all(&repo).unwrap();
+    git_in(&repo_text, &["init", "-q", "--bare"]);
+    git_in(
+        &repo_text,
+        &["fetch", "-q", &format!("{}/.git", f.p("cwd")), &parent],
+    );
+    git_in(&repo_text, &["update-ref", "--no-deref", "HEAD", &parent]);
+    pc_ok(&mut f, "x.md");
+    let n = f.ts_launches()[0].0;
+    let (names, tar) = members(&f, n);
+    assert!(names.contains(&"head.bundle".to_owned()), "{names:?}");
+    let dir = f.t.join("untar");
+    std::fs::create_dir_all(&dir).unwrap();
+    std::fs::write(dir.join("p.tar"), tar).unwrap();
+    assert!(
+        Command::new("tar")
+            .args(["-xf", "p.tar", "head.bundle"])
+            .current_dir(&dir)
+            .status()
+            .unwrap()
+            .success()
+    );
+    let bundle = std::fs::read(dir.join("head.bundle")).unwrap();
+    let header = String::from_utf8_lossy(&bundle[..bundle.len().min(400)]).into_owned();
+    assert!(header.contains(&format!("-{parent}")), "{header}");
+}
+
+// spec: specs/ap/run.md#R59
+#[test]
+fn pc_r59_the_launch_words_and_the_payload_parts() {
+    let mut f = Fake::new();
+    f.pc();
+    let mut r = f.look("x.md");
+    r["env"] = json!({"FOO_BAR": "a b'c \"d\""});
+    std::fs::write(f.p("ro.md"), "described\n").unwrap();
+    r["limits"] = json!({"scratch": f.p("scratch"), "read_only": [f.p("ro.md")]});
+    let (v, status) = f.run(&r).unwrap();
+    assert_eq!(status, 0, "{v}");
+    // After `systemd-run … --`: tailscale ssh, the stage account, one text for its shell.
+    let argv = &f.launches[0];
+    let at = argv.iter().position(|a| a == "--").unwrap();
+    assert!(argv[..at].iter().any(|a| a == "RuntimeMaxSec=3310s"));
+    assert_eq!(&argv[at + 1..at + 4], ["tailscale", "ssh", "stage@pc-1"]);
+    assert_eq!(argv.len(), at + 5);
+    assert!(!argv.iter().any(|a| a == BWRAP));
+    let n = f.ts_launches()[0].0;
+    let w = f.launch_words(n);
+    let script = include_str!("../src/check/stage.sh");
+    assert_eq!(&w[..3], ["bash", "-c", script]);
+    assert_eq!(w[3], "ap-stage");
+    let session = v["attempts"][0]["session"].as_str().unwrap();
+    let nonce = w[6].clone();
+    assert_eq!(
+        (
+            w[4].clone(),
+            w[5].clone(),
+            w[7].clone(),
+            w[8].clone(),
+            w[9].clone(),
+            w[10].clone()
+        ),
+        (
+            f.p("pcwork"),
+            f.key(),
+            "3300".to_owned(),
+            f.p("cwd"),
+            f.p("scratch"),
+            session.to_owned()
+        )
+    );
+    assert_eq!(nonce.len(), 36);
+    // The proxy's words: outside, the placeholder socket, the nonce, the role, names, ranges.
+    assert_eq!(
+        (
+            w[11].as_str(),
+            w[12].as_str(),
+            w[13].as_str(),
+            w[14].as_str()
+        ),
+        ("outside", "/ap-egress.sock", nonce.as_str(), "verifier")
+    );
+    assert!(w[15].contains("api.anthropic.com") && w[16].contains("10.0.0.0/8"));
+    // The request's env and the claims, as NAME=value words; then the CLI's words as R11, R12 build them.
+    let count: usize = w[17].parse().unwrap();
+    let env: Vec<&String> = w[18..18 + count].iter().collect();
+    assert!(env.contains(&&"FOO_BAR=a b'c \"d\"".to_owned()), "{env:?}");
+    assert!(env.contains(&&"ONT_ROLE=verifier".to_owned()));
+    assert!(env.iter().any(|e| e.starts_with("ONT_AGENT=claude:sonnet")));
+    let cli = &w[18 + count..];
+    assert_eq!(&cli[..2], ["claude", "--print"]);
+    assert_eq!(&cli[cli.len() - 2..], ["--session-id", session]);
+    // A word with a space and a quote reached the PC's claude whole.
+    let seen = std::fs::read_to_string(f.t.join("pcbin/env.1")).unwrap();
+    assert!(seen.contains("FOO_BAR=a b'c \"d\""), "{seen}");
+    // The payload: the check's tar, then the extra tar (origin/main, the read-only file, the proxy's
+    // text), then the prompt the CLI reads.
+    let bytes = std::fs::read(f.t.join(format!("ts/stdin.{n}"))).unwrap();
+    let text = String::from_utf8_lossy(&bytes);
+    assert!(text.starts_with("tar "));
+    assert!(text.contains("extra "));
+    assert!(bytes.ends_with(b"review this\n"));
+    let prompt = std::fs::read_to_string(f.t.join("pcbin/prompt.1")).unwrap();
+    assert_eq!(prompt, "review this\n");
+}
+
+// spec: specs/ap/run.md#R59
+#[test]
+fn pc_r59_the_sides_view_is_an_allow_list_and_the_proxy_comes_before_the_cli() {
+    let mut f = Fake::new();
+    f.pc();
+    f.ts_flag("slow-inside");
+    std::fs::write(f.p("ro.md"), "described\n").unwrap();
+    let mut r = f.look("x.md");
+    r["limits"] = json!({"scratch": f.p("scratch"), "read_only": [f.p("ro.md")]});
+    let (v, status) = f.run(&r).unwrap();
+    assert_eq!(status, 0, "{v}");
+    let words: Vec<String> = f.ts("bwrap.1").lines().map(str::to_owned).collect();
+    let has = |w: &[&str]| {
+        words
+            .windows(w.len())
+            .any(|x| x.iter().zip(w).all(|(a, b)| a == b))
+    };
+    let session = v["attempts"][0]["session"].as_str().unwrap();
+    let home = format!("{}/homes/{session}", f.p("pcwork"));
+    let cfg = format!("{}/.claude", f.p("pchome"));
+    for flag in [
+        "--unshare-user",
+        "--unshare-pid",
+        "--unshare-net",
+        "--clearenv",
+    ] {
+        assert!(words.contains(&flag.to_owned()), "{flag}");
+    }
+    // The home read-write; the configuration directory's two files read-only over it; nothing else of it.
+    assert!(has(&["--bind", &home, &home]));
+    assert!(has(&[
+        "--ro-bind",
+        &format!("{cfg}/.credentials.json"),
+        &format!("{home}/.credentials.json")
+    ]));
+    assert!(has(&[
+        "--ro-bind",
+        &format!("{cfg}/CLAUDE.md"),
+        &format!("{home}/CLAUDE.md")
+    ]));
+    assert!(
+        !words.iter().any(|w| w == &cfg
+            || w.starts_with(&format!("{cfg}/"))
+                && !w.ends_with("/.credentials.json")
+                && !w.ends_with("/CLAUDE.md")),
+        "{words:?}"
+    );
+    // The tree at `cwd` with the key's repository read-only inside; the read-only file at its path.
+    let tree = format!("{}/trees/{}", f.p("pcwork"), f.key());
+    let repo = format!("{}/repos/{}", f.p("pcwork"), f.key());
+    assert!(has(&["--bind", &tree, &f.p("cwd")]));
+    assert!(has(&["--ro-bind", &repo, &format!("{}/.git", f.p("cwd"))]));
+    assert!(
+        words
+            .windows(3)
+            .any(|x| x[0] == "--ro-bind" && x[2] == f.p("ro.md"))
+    );
+    // The scratch directory is `tmp/<id>/scratch` at its own path; `<id>` is not the nonce.
+    let w = f.launch_words(f.ts_launches()[0].0);
+    let nonce = w[6].clone();
+    let scratch = words
+        .windows(3)
+        .find(|x| x[0] == "--bind" && x[2] == f.p("scratch"))
+        .unwrap();
+    assert!(
+        scratch[1].starts_with(&format!("{}/tmp/", f.p("pcwork")))
+            && scratch[1].ends_with("/scratch")
+    );
+    assert!(!scratch[1].contains(&nonce));
+    // The nonce is in no word of `bwrap`, no variable of the look and no bound source.
+    assert!(!words.iter().any(|w| w.contains(&nonce)), "{words:?}");
+    let seen = std::fs::read_to_string(f.t.join("pcbin/env.1")).unwrap();
+    assert!(!seen.contains(&nonce), "{seen}");
+    // The proxy: its socket in place of the placeholder, in a directory under `tmp/<id>`.
+    let outside: Vec<String> = f.ts("outside.argv").lines().map(str::to_owned).collect();
+    assert_eq!(
+        (
+            outside[0].as_str(),
+            outside[2].as_str(),
+            outside[3].as_str()
+        ),
+        ("outside", nonce.as_str(), "verifier")
+    );
+    assert!(
+        outside[1].starts_with(&format!("{}/tmp/", f.p("pcwork")))
+            && outside[1].ends_with("/sock/ap-egress.sock"),
+        "{outside:?}"
+    );
+    assert!(!outside[1].contains(&nonce));
+    // The CLI started after `inside` said ready; the proxy variables name the port inside.
+    let ready: f64 = f.ts("ready.at").trim().parse().unwrap();
+    let started: f64 = std::fs::read_to_string(f.t.join("pcbin/started.1"))
+        .unwrap()
+        .trim()
+        .parse()
+        .unwrap();
+    assert!(started >= ready, "{started} {ready}");
+    assert!(
+        seen.contains("HTTPS_PROXY=http://127.0.0.1:") && seen.contains("CLAUDE_CONFIG_DIR="),
+        "{seen}"
+    );
+    assert!(
+        seen.contains(&format!("TMPDIR={}/tmp", f.p("scratch")))
+            && seen.contains(&format!("CARGO_TARGET_DIR={}/target", f.p("scratch")))
+    );
+    assert!(!seen.contains("AP_DOOR") && !seen.contains("AP_SECRET"));
+    // At its end: the proxy ended, `tmp/<nonce>` and `tmp/<id>` gone, the home kept (mode 0700).
+    let pid = f.ts("outside.pid");
+    assert!(
+        std::fs::metadata(format!("/proc/{}", pid.trim())).is_err()
+            || std::fs::read_to_string(format!("/proc/{}/stat", pid.trim()))
+                .unwrap()
+                .contains(" Z ")
+    );
+    let left: Vec<_> = std::fs::read_dir(f.t.join("pcwork/tmp"))
+        .unwrap()
+        .flatten()
+        .collect();
+    assert!(left.is_empty(), "{left:?}");
+    assert_eq!(
+        std::fs::metadata(&home).unwrap().permissions().mode() & 0o777,
+        0o700
+    );
+}
+
+// spec: specs/ap/run.md#R59
+#[test]
+fn pc_r59_nothing_of_this_hosts_view_is_made_for_a_launch_on_the_pc() {
+    let mut f = Fake::new();
+    f.pc();
+    let v = pc_ok(&mut f, "x.md");
+    assert_eq!(v["host"], "pc");
+    assert!(
+        f.inode.is_none(),
+        "no network namespace and no listener here"
+    );
+    assert!(f.auth.is_empty(), "no `claude auth status`");
+    assert!(!Path::new(&f.p("a1/homes")).exists(), "no home here");
+    assert!(
+        !Path::new(&f.p("scratch")).exists(),
+        "no scratch directory here"
+    );
+    assert!(!Path::new(&f.p("scratch.door")).exists());
+    assert!(f.launch_envs[0].iter().all(|(k, _)| k != "AP_DOOR"));
+    assert!(
+        v.get("home").is_none()
+            && v["limits"].get("egress").is_none()
+            && v["limits"].get("bwrap").is_none()
+    );
+    assert!(v["limits"].get("writable").is_none() && v["limits"].get("hidden").is_none());
+    assert!(
+        !Path::new(&f.p("egress.jsonl")).exists()
+            || std::fs::read_to_string(f.p("egress.jsonl"))
+                .unwrap()
+                .is_empty()
+    );
+}
+
+// spec: specs/ap/run.md#R59
+#[test]
+fn pc_r59_the_side_refuses_a_session_that_is_not_of_the_uuid_form() {
+    let f = Fake::new();
+    let script = f.p("stage.sh");
+    std::fs::write(&script, include_str!("../src/check/stage.sh")).unwrap();
+    let work = f.p("pcwork");
+    for session in [
+        "not-a-session",
+        "ABCDEF01-0000-0000-0000-000000000000",
+        "../../x",
+        "",
+    ] {
+        let out = Command::new("bash")
+            .args([
+                &script,
+                &work,
+                "0123456789abcdef",
+                "abc-1",
+                "10",
+                &f.p("cwd"),
+                &f.p("scratch"),
+                session,
+            ])
+            .env_clear()
+            .env("HOME", f.p("pchome"))
+            .env("PATH", std::env::var("PATH").unwrap())
+            .stdin(std::process::Stdio::null())
+            .output()
+            .unwrap();
+        assert_eq!(out.status.code(), Some(3), "{session:?}");
+        assert!(
+            String::from_utf8_lossy(&out.stderr).contains("bad session"),
+            "{session:?}"
+        );
+        assert!(
+            !Path::new(&work).exists(),
+            "nothing made before the refusal"
+        );
+    }
+}
+
+// spec: specs/ap/run.md#R60
+#[test]
+fn pc_r60_the_proxys_lines_are_fetched_and_appended_with_run() {
+    let mut f = Fake::new();
+    f.pc();
+    std::fs::write(
+        f.t.join("ts/egress-lines"),
+        "@N@ {\"at\":\"2026-11-23T10:00:00Z\",\"role\":\"verifier\",\"name\":\"api.anthropic.com\",\"port\":443,\"status\":200,\"reason\":null}\n\
+         @N@ {\"at\":\"2026-11-23T10:00:01Z\",\"role\":\"verifier\",\"name\":\"example.org\",\"port\":443,\"status\":403,\"reason\":\"not_listed\"}\n\
+         0000 {\"at\":\"2026-11-23T10:00:02Z\",\"role\":\"verifier\",\"name\":\"other.example\",\"port\":443,\"status\":200,\"reason\":null}\n",
+    )
+    .unwrap();
+    let v = pc_ok(&mut f, "x.md");
+    assert_eq!(v["attempts"][0]["egress_lines"], 2, "{v}");
+    let log = std::fs::read_to_string(f.p("egress.jsonl")).unwrap();
+    let lines: Vec<Value> = log
+        .lines()
+        .map(|l| serde_json::from_str(l).unwrap())
+        .collect();
+    assert_eq!(lines.len(), 2, "{log}");
+    assert!(lines.iter().all(|l| l["run"] == f.p("x.md.run.json")));
+    assert_eq!(lines[1]["reason"], "not_listed");
+    // The fetch removed the file; a fetch is one more `tailscale ssh` bounded and with four variables.
+    let names: Vec<_> = std::fs::read_dir(f.t.join("pcwork/egress"))
+        .unwrap()
+        .flatten()
+        .collect();
+    assert!(names.is_empty(), "{names:?}");
+    assert_eq!(f.ts_call("ap-stage-fetch").len(), 1);
+}
+
+// spec: specs/ap/run.md#R60
+#[test]
+fn pc_r60_a_failed_fetch_and_one_without_the_lock_give_null_and_change_nothing_else() {
+    for flag in ["fetch-fail", "nolock"] {
+        let mut f = Fake::new();
+        f.pc();
+        f.ts_flag(flag);
+        std::fs::write(
+            f.t.join("ts/egress-lines"),
+            "@N@ {\"at\":\"2026-11-23T10:00:00Z\",\"role\":\"verifier\",\"name\":\"api.anthropic.com\",\"port\":443,\"status\":200,\"reason\":null}\n",
+        )
+        .unwrap();
+        let (v, status) = f.run(&f.look("x.md")).unwrap();
+        assert_eq!(
+            (status, v["state"].clone(), v["host"].clone()),
+            (0, json!("ok"), json!("pc")),
+            "{flag} {v}"
+        );
+        assert_eq!(v["attempts"][0]["egress_lines"], Value::Null, "{flag}");
+        assert!(!Path::new(&f.p("egress.jsonl")).exists());
+        if flag == "nolock" {
+            // Without the lock the file stays (the PC removes it a day later).
+            let names: Vec<_> = std::fs::read_dir(f.t.join("pcwork/egress"))
+                .unwrap()
+                .flatten()
+                .collect();
+            assert_eq!(names.len(), 1, "{names:?}");
+        }
+    }
+}
+
+// spec: specs/ap/run.md#R60
+#[test]
+fn pc_r60_a_line_the_look_prints_reaches_no_log() {
+    let mut f = Fake::new();
+    f.pc();
+    f.pc_mode("forge");
+    let v = pc_ok(&mut f, "x.md");
+    assert_eq!(v["attempts"][0]["egress_lines"], 0);
+    assert!(
+        !Path::new(&f.p("egress.jsonl")).exists()
+            || std::fs::read_to_string(f.p("egress.jsonl"))
+                .unwrap()
+                .is_empty()
+    );
+    // Both streams hold what the look printed; neither is read as the proxy's.
+    assert!(
+        std::fs::read(f.p("x.md.stream.jsonl"))
+            .unwrap()
+            .windows(10)
+            .any(|w| w == b"ap-egress ")
+    );
+    assert!(
+        std::fs::read(f.p("x.md.err"))
+            .unwrap()
+            .windows(10)
+            .any(|w| w == b"ap-egress ")
+    );
+}
+
+// spec: specs/ap/run.md#R61
+#[test]
+fn pc_r61_ap_check_builds_in_the_looks_own_view_and_no_other_verb_is_served() {
+    let mut f = Fake::new();
+    f.pc();
+    f.pc_mode("build");
+    let v = pc_ok(&mut f, "x.md");
+    assert_eq!(v["host"], "pc");
+    assert_eq!(
+        std::fs::read_to_string(f.t.join("cwd/built"))
+            .unwrap()
+            .trim(),
+        "pc 0"
+    );
+    assert_eq!(
+        std::fs::read_to_string(f.t.join("pcbin/build.rc"))
+            .unwrap()
+            .trim(),
+        "7"
+    );
+    assert_eq!(
+        std::fs::read_to_string(f.t.join("pcbin/route.rc"))
+            .unwrap()
+            .trim(),
+        "2"
+    );
+    let err: Value =
+        serde_json::from_str(&std::fs::read_to_string(f.t.join("pcbin/route.err")).unwrap())
+            .unwrap();
+    assert_eq!(
+        err,
+        json!({"error": {"code": "not_on_pc", "field": "args", "detail": "no door on the PC: ap fn and every other verb are not served here; read the worktree instead"}})
+    );
+    // No line of the checks log, no door.
+    assert!(!Path::new(&f.p("checks.jsonl")).exists());
+}
+
+// spec: specs/ap/run.md#R62
+#[test]
+fn pc_r62_an_ask_goes_to_the_pc_with_resume_of_the_session_there() {
+    let mut f = Fake::new();
+    f.pc();
+    f.pc_mode("firstline");
+    let v = pc_ok(&mut f, "x.md");
+    assert_eq!(v["host"], "pc", "{v}");
+    let attempts = v["attempts"].as_array().unwrap();
+    assert_eq!(attempts.len(), 2);
+    assert_eq!(
+        (attempts[0]["asked"].clone(), attempts[1]["asked"].clone()),
+        (json!(false), json!(true))
+    );
+    assert_eq!(attempts[0]["session"], attempts[1]["session"]);
+    assert!(
+        attempts
+            .iter()
+            .all(|a| a["host"] == "pc" && a["account"] == "pc-stage")
+    );
+    assert_eq!(f.ts_launches().len(), 2);
+    let second = std::fs::read_to_string(f.t.join("pcbin/args.2")).unwrap();
+    assert!(second.contains("--resume"), "{second}");
+}
+
+// spec: specs/ap/run.md#R62
+#[test]
+fn pc_r62_a_launch_on_the_pc_that_ends_other_than_ok_is_followed_by_one_launch_here() {
+    // A lost one (the connection ends with no result), a cut, a timeout and a failed launch.
+    for (case, flag, mode) in [
+        ("lost", Some("launch-lost"), ""),
+        ("cut", None, "cut"),
+        ("timeout", None, "hang"),
+        ("failed", Some("launch-fail"), ""),
+    ] {
+        let mut f = Fake::new();
+        f.pc();
+        f.mode("a1", "answer");
+        f.mode("a2", "answer");
+        std::fs::write(f.p("bin/answer"), "Verdict: accept\nhead").unwrap();
+        if let Some(flag) = flag {
+            f.ts_flag(flag);
+        }
+        if !mode.is_empty() {
+            f.pc_mode(mode);
+        }
+        let mut r = f.look("x.md");
+        r["next_accounts"] = json!([f.p("a2")]);
+        if case == "timeout" {
+            r["timeout_seconds"] = json!(2);
+        }
+        let (v, status) = f.run(&r).unwrap();
+        assert_eq!(status, 0, "{case} {v}");
+        // One launch on the PC, one here on `account`: no move to `next_accounts`.
+        let attempts = v["attempts"].as_array().unwrap();
+        assert_eq!(attempts.len(), 2, "{case} {v}");
+        assert_eq!(
+            (attempts[0]["host"].clone(), attempts[0]["account"].clone()),
+            (json!("pc"), json!("pc-stage")),
+            "{case}"
+        );
+        assert_eq!(
+            (attempts[1]["host"].clone(), attempts[1]["account"].clone()),
+            (json!("local"), json!(f.p("a1"))),
+            "{case}"
+        );
+        assert_ne!(attempts[0]["state"], "ok");
+        assert_eq!(v["host"], "local");
+        assert_eq!(v["host_reason"], "pc_lost");
+        assert_eq!(v["account"], f.p("a1"));
+        assert_ne!(
+            attempts[0]["session"], attempts[1]["session"],
+            "a new session"
+        );
+        assert_eq!(f.ts_launches().len(), 1);
+        assert_eq!(f.launches.len(), 2);
+    }
+}
+
+// spec: specs/ap/run.md#R62
+#[test]
+fn pc_r62_a_cut_here_after_the_way_back_moves_on_as_for_any_fresh_look() {
+    let mut f = Fake::new();
+    f.pc();
+    f.pc_mode("cut");
+    f.mode("a1", "limit1");
+    f.mode("a2", "answer");
+    std::fs::write(f.p("bin/answer"), "Verdict: accept\nhead").unwrap();
+    let mut r = f.look("x.md");
+    r["next_accounts"] = json!([f.p("a2")]);
+    let (v, status) = f.run(&r).unwrap();
+    assert_eq!(status, 0, "{v}");
+    let accounts: Vec<&str> = v["attempts"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|a| a["account"].as_str().unwrap())
+        .collect();
+    assert_eq!(
+        accounts,
+        ["pc-stage", f.p("a1").as_str(), f.p("a2").as_str()]
+    );
+}
+
+// spec: specs/ap/run.md#R63
+#[test]
+fn pc_r63_the_record_the_account_and_the_start_of_the_run() {
+    let mut f = Fake::new();
+    f.pc();
+    let mut r = f.look("x.md");
+    let store = f.store_with(&["unit:u-1"]);
+    r["unit"] = json!("u-1");
+    r["store"] = json!(store);
+    let (v, status) = f.run(&r).unwrap();
+    assert_eq!(status, 0, "{v}");
+    assert_eq!(
+        (
+            v["host"].clone(),
+            v["host_reason"].clone(),
+            v["account"].clone()
+        ),
+        (json!("pc"), Value::Null, json!("pc-stage"))
+    );
+    let a = &v["attempts"][0];
+    assert_eq!(a["host"], "pc");
+    assert_eq!(
+        a["pc_config"],
+        format!("stage@pc-1:{}/.claude", f.p("pchome"))
+    );
+    assert_eq!(a["limits"], json!({"scratch": f.p("scratch")}));
+    assert_eq!(a["egress_lines"], 0);
+    let start = &f.store().bodies("start_run")[0]["parameters"];
+    assert_eq!(start["host"], object_id("host", "pc"));
+    assert_eq!(start["account"], "pc-stage");
+    assert_eq!(start["uses"], object_id("account", "pc-stage"));
+    // The start comes after the placement: the ping and the probe, then `start_run`, then the launch.
+    assert_eq!(f.store().bodies("start_run").len(), 1);
+    let events: Vec<&String> = f.events.iter().filter(|e| *e != "probe").collect();
+    assert_eq!(&events[..3], ["ont get", "ont start_run", "launch"]);
+}
+
+// spec: specs/ap/run-object.md#R15
+#[test]
+fn pc_run_object_r15_the_start_names_the_host_of_the_placement() {
+    let mut f = Fake::new();
+    f.pc();
+    f.ts_flag("noping");
+    f.mode("a1", "answer");
+    std::fs::write(f.p("bin/answer"), "Verdict: accept\nhead").unwrap();
+    let mut r = f.look("x.md");
+    let store = f.store_with(&["unit:u-1"]);
+    r["unit"] = json!("u-1");
+    r["store"] = json!(store);
+    let (v, status) = f.run(&r).unwrap();
+    assert_eq!(
+        (status, v["host"].clone(), v["host_reason"].clone()),
+        (0, json!("local"), json!("pc_unreachable")),
+        "{v}"
+    );
+    let start = &f.store().bodies("start_run")[0]["parameters"];
+    assert_eq!(start["host"], object_id("host", "local"));
+    assert_eq!(start["uses"], object_id("account", "a1"));
+}
+
+// spec: specs/ap/run.md#R57
+#[test]
+fn pc_r57_a_request_without_host_has_no_host_member_and_calls_no_tailscale() {
+    let mut f = Fake::new();
+    f.pc();
+    let (v, status) = f.run(&f.request("x.md")).unwrap();
+    assert_eq!(status, 0, "{v}");
+    for k in ["host", "host_reason"] {
+        assert!(v.get(k).is_none(), "{k}");
+    }
+    assert!(v["attempts"][0].get("host").is_none());
+    assert!(f.ts_calls().is_empty());
+    assert!(f.launches[0].iter().all(|a| a != "tailscale"));
 }

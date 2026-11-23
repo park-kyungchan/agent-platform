@@ -8,6 +8,7 @@ use crate::host::{
 use crate::store;
 use serde_json::{Value, json};
 mod egress;
+mod pc;
 use std::{
     ffi::OsString,
     fs::File,
@@ -47,7 +48,7 @@ pub(crate) const MODES: [&str; 6] = [
 pub(crate) const KEEP: [&str; 10] = [
     "PATH", "HOME", "USER", "LOGNAME", "SHELL", "LANG", "LC_ALL", "TERM", "TMPDIR", "TZ",
 ];
-const MEMBERS: [&str; 28] = [
+const MEMBERS: [&str; 29] = [
     "role",
     "runtime",
     "account",
@@ -76,6 +77,7 @@ const MEMBERS: [&str; 28] = [
     "git_author",
     "ont_role",
     "limits",
+    "host",
 ];
 /// The largest file of `answer_schema`, in bytes.
 const SCHEMA_MAX: u64 = 65_536;
@@ -293,6 +295,13 @@ struct Request {
     /// The scratch directory of `limits`, as written, and the home its hidden paths are under
     /// (`specs/ap/run-limits.md`).
     limits: Option<Limits>,
+    /// `host` `pc` (R57): the look may run on the PC; the policy's `hosts.pc` as read for it (None
+    /// without a file or without `hosts`).
+    host: bool,
+    pc: Option<crate::check::Pc>,
+    /// What the look's environment on the PC holds of this request: its `env`, `ONT_ROLE` and
+    /// `ONT_AGENT` (R59).
+    pc_env: Vec<(String, String)>,
 }
 /// What a request with `limits` holds: its scratch directory, the paths it writes, binds over or
 /// reads only (R1, R5), whether `~/.config/gh` is shown (R10), and the home of the passwd entry of
@@ -976,6 +985,8 @@ pub(crate) struct Policy {
     key_accounts: Vec<(String, String)>,
     /// The string `api.key_file`, when the policy has one.
     batch_key_file: Option<String>,
+    /// `hosts.pc`, read only for a request with `host` (`specs/ap/run.md` R57).
+    pc: Option<crate::check::Pc>,
 }
 fn invalid(member: &str, why: &str) -> Failure {
     fail("policy_invalid", "policy", json!(format!("{member} {why}")))
@@ -1005,6 +1016,10 @@ fn names(
 }
 /// The policy file the host names, read once at admission. None: no path or no such file.
 pub(crate) fn policy(s: &impl System) -> Result<Option<Policy>, Failure> {
+    policy_for(s, false)
+}
+/// The policy, with `hosts.pc` read by the reader of `ap check` when the request has `host`.
+fn policy_for(s: &impl System, hosts: bool) -> Result<Option<Policy>, Failure> {
     let Some(file) = s.policy_file() else {
         return Ok(None);
     };
@@ -1070,6 +1085,11 @@ pub(crate) fn policy(s: &impl System) -> Result<Option<Policy>, Failure> {
         .and_then(Value::as_str)
         .map(str::to_owned);
     let key_accounts = key_accounts(object.get("api_key_accounts"), batch_key_file.as_deref())?;
+    let pc = if hosts {
+        crate::check::hosts(&value)?
+    } else {
+        None
+    };
     Ok(Some(Policy {
         path,
         sha256,
@@ -1078,6 +1098,7 @@ pub(crate) fn policy(s: &impl System) -> Result<Option<Policy>, Failure> {
         accounts,
         key_accounts,
         batch_key_file,
+        pc,
     }))
 }
 /// An account directory as `api_key_accounts` names it (`specs/ap/policy.md` R17): absolute, no NUL
@@ -1268,6 +1289,12 @@ fn request_at(s: &mut impl System, r: &Value, at_cwd: bool) -> Result<Request, F
             Some(path(v, "record").map_err(|_| error("invalid_input", "resume"))?)
         }
     };
+    // `host` is the string `pc` (R57); its other conditions are checked once `limits` is read.
+    let host = match r.get("host") {
+        None => false,
+        Some(v) if v == "pc" => true,
+        Some(_) => return Err(error("invalid_input", "host")),
+    };
     let (model, effort) = (word(r, "model", 40)?, word(r, "effort", 16)?);
     for (key, value) in [("model", &model), ("effort", &effort)] {
         require!(runtime.argument_ok(value) => "invalid_input", key);
@@ -1356,6 +1383,18 @@ fn request_at(s: &mut impl System, r: &Value, at_cwd: bool) -> Result<Request, F
     };
     // No writer stage without `limits` (R53).
     require!(role != "writer" || limits.is_some() => "invalid_input", "limits");
+    // A look on the PC (R57): a Claude verifier's look with `limits` of `scratch` and
+    // `read_only` files of at most 1 MiB, and without `resume`, `mcp_config` and `expect.file`.
+    if host {
+        let regular =
+            |p: &String| std::fs::metadata(p).is_ok_and(|m| m.is_file() && m.len() <= 1 << 20);
+        let fits = limits.as_ref().is_some_and(|l| {
+            l.write.is_empty() && l.over.is_empty() && !l.show && l.read_only.iter().all(regular)
+        });
+        require!(runtime == Runtime::Claude && role == "reviewer" && actor_role == "verifier"
+            && fits && resume.is_none() && mcp.is_empty() && expect_file.is_none()
+            => "invalid_input", "host");
+    }
     // A typed answer is the Claude CLI's: its answer is the object, not a text with a first line.
     let schema = match r.get("answer_schema") {
         None => None,
@@ -1567,10 +1606,22 @@ fn request_at(s: &mut impl System, r: &Value, at_cwd: bool) -> Result<Request, F
     // The host's policy is the last check of admission: after every refusal `ap run` had before it,
     // the checks of the host's state included, and before any effect. A resumed call's record
     // account is one of `accounts` (`resume_account_differs`).
-    let policy = policy(s)?;
+    let policy = policy_for(s, host)?;
     if let Some(p) = &policy {
         p.admit(runtime, role, &model, &accounts)?;
     }
+    let pc = policy.as_ref().and_then(|p| p.pc.clone());
+    let pc_env: Vec<(String, String)> = if host {
+        let mut all = env.clone();
+        all.extend(
+            identity(runtime, (actor_role, &model), false)
+                .into_iter()
+                .filter(|(k, _)| k == "ONT_ROLE" || k == "ONT_AGENT"),
+        );
+        all
+    } else {
+        vec![]
+    };
     Ok(Request {
         role: role.to_owned(),
         accounts,
@@ -1616,6 +1667,9 @@ fn request_at(s: &mut impl System, r: &Value, at_cwd: bool) -> Result<Request, F
         store,
         actor_role: actor_role.to_owned(),
         limits,
+        pc,
+        host,
+        pc_env,
     })
 }
 /// The `home` of an `agy` record that a resume runs in: a directory under `<account>/homes` (links
@@ -2638,6 +2692,10 @@ struct Launch<'a> {
     hooks: Option<&'a Path>,
     /// Its time bound.
     bound: Duration,
+    /// The stage account of a launch on the PC (`specs/ap/run.md` R59); none for a launch here.
+    pc: Option<&'a pc::Placed>,
+    /// For a launch here of a request with `host`: the reason it is not on the PC (R63).
+    reason: Option<&'static str>,
 }
 /// One launch on one account, after the launches `earlier` (their entries of `attempts`); with a
 /// `lead` its input holds that text first; it resumes the session `resume` when one is given, else
@@ -2661,6 +2719,8 @@ fn attempt(
         proxy,
         hooks,
         bound,
+        pc,
+        reason,
     } = *launch;
     // The continuation is the text of a fresh call; a resumed call's text is a move's; an ask is
     // neither.
@@ -2681,8 +2741,9 @@ fn attempt(
         "run_object": object.member(),
     });
     // A key launch (R54) runs on the API credit; a Claude stage's every launch says which it is (R56).
+    // A launch on the PC runs on that account's sign-in, never on a key (R59).
     let key_file = Some(q.runtime)
-        .filter(|r| *r == Runtime::Claude)
+        .filter(|r| *r == Runtime::Claude && pc.is_none())
         .and_then(|_| q.key_file(account));
     if q.runtime == Runtime::Claude {
         record["auth"] = json!(if key_file.is_some() {
@@ -2693,7 +2754,21 @@ fn attempt(
         record["auth_fault"] = Value::Null;
     }
     let mut attempts = earlier.to_vec();
-    attempts.push(json!({"continued": continued, "asked": ask}));
+    let mut entry = json!({"continued": continued, "asked": ask});
+    // A request with `host` says where each launch ran (R63).
+    if q.host {
+        let host = if pc.is_some() { "pc" } else { "local" };
+        record["host"] = json!(host);
+        record["host_reason"] = json!(reason);
+        entry["host"] = json!(host);
+        if let Some(p) = pc {
+            entry["egress_lines"] = Value::Null;
+            entry["pc_config"] = json!(p.config);
+            entry["limits"] = pc::limits_member(q);
+            record["limits"] = pc::limits_member(q);
+        }
+    }
+    attempts.push(entry);
     record["attempts"] = json!(attempts);
     mirror(&mut record, false);
     if let Some((path, _, sha256)) = &q.schema {
@@ -2741,6 +2816,7 @@ fn attempt(
     let stage_home = q
         .limits
         .as_ref()
+        .filter(|_| pc.is_none())
         .map(|_| Path::new(account).join("homes").join(&session));
     if let Some(home) = &stage_home {
         record["home"] = json!(home);
@@ -2750,6 +2826,7 @@ fn attempt(
     let view = q
         .limits
         .as_ref()
+        .filter(|_| pc.is_none())
         .map(|l| view(q, l, &s.work_root(), hooks))
         .unwrap_or_default();
     let hidden = match (&q.limits, &stage_home) {
@@ -2785,8 +2862,24 @@ fn attempt(
         f.seek(SeekFrom::Start(0))?;
         f.try_clone()
     };
-    let (Ok(prompt), Ok(stdout), Ok(stderr)) = (input(q, lead, ask), empty(output), empty(errs))
-    else {
+    // A launch on the PC reads one payload on its standard input (R59).
+    let mut staged = None;
+    let prompt = match pc {
+        Some(p) => {
+            let mut words = vec![];
+            claude_args(q, &mut words, resume, &session);
+            match pc::stage(s, q, p, (lead, ask), &session, &words[1..]) {
+                Ok(made) => {
+                    let input = made.input.try_clone();
+                    staged = Some(made);
+                    input
+                }
+                Err(_) => Err(std::io::Error::other("payload")),
+            }
+        }
+        None => input(q, lead, ask),
+    };
+    let (Ok(prompt), Ok(stdout), Ok(stderr)) = (prompt, empty(output), empty(errs)) else {
         return not_launched(record, "launch");
     };
     let reader = output;
@@ -2862,6 +2955,15 @@ fn attempt(
     let mut env = q.base_env.clone();
     let cli = argv.len();
     match q.runtime {
+        Runtime::Claude if pc.is_some() => {
+            // The words of the PC's side (R59); the launch's environment is the four variables a
+            // `tailscale` child gets, and nothing else of this host.
+            if let (Some(p), Some(made)) = (pc, &staged) {
+                argv.push("--".into());
+                argv.extend(pc::launch_words(p, made));
+            }
+            env = pc::environment(s);
+        }
         Runtime::Claude => {
             claude_args(q, &mut argv, resume, &session);
             let dir = stage_home.as_deref().unwrap_or(Path::new(account));
@@ -2899,7 +3001,7 @@ fn attempt(
             env.push(("AGY_CLI_DISABLE_AUTO_UPDATE".into(), "1".into()));
         }
     }
-    if let Some(limits @ Limits { scratch, .. }) = &q.limits {
+    if let Some(limits @ Limits { scratch, .. }) = q.limits.as_ref().filter(|_| pc.is_none()) {
         // After `systemd-run … --`, in front of the CLI: its own user namespace, in which it can
         // make no other, and its own pid namespace (no other stage in its `/proc`); a root built
         // from nothing but the view of R16, everything read-only but the launch's home, the
@@ -2985,6 +3087,11 @@ fn attempt(
     let stopped = stop(s, &unit, &mut child);
     // The launch has ended: its derived sign-in goes (R15).
     drop(sign);
+    // The proxy's lines of a launch on the PC, fetched once the launch has ended (R60).
+    if let (Some(p), Some(made)) = (pc, &staged) {
+        let lines = pc::fetch(s, q, p, &made.nonce);
+        record["attempts"][earlier.len()]["egress_lines"] = json!(lines);
+    }
     // The writer is stopped: the stream is read to its end, a last line without newline included.
     loop {
         let read = offset;
@@ -3068,7 +3175,7 @@ impl Object {
     }
     /// The start: after admission and the claim, before the first launch. `account` is the first
     /// launch's; the paths and the session are as the stage will hold them.
-    fn begin(&mut self, s: &mut impl System, q: &Request, account: &str) {
+    fn begin(&mut self, s: &mut impl System, q: &Request, account: &str, host: &str) {
         self.session = match (&q.resume, q.runtime) {
             (Some((session, _, _)), _) => Some(session.clone()),
             (None, Runtime::Claude | Runtime::Muse) => new_session_id(s).ok(),
@@ -3084,7 +3191,7 @@ impl Object {
         p["model"] = json!(q.model);
         p["effort"] = json!(q.effort);
         p["account"] = json!(component.filter(|n| n.len() <= 200));
-        p["host"] = crate::host::id("host", "local");
+        p["host"] = crate::host::id("host", host);
         p["uses"] = component
             .filter(|n| n.len() <= 200)
             .map_or(Value::Null, |n| crate::host::id("account", n));
@@ -3241,6 +3348,65 @@ fn door_stage(q: &Request) -> crate::door::Stage {
         store: q.store.clone(),
     }
 }
+/// What the launches of a call here need (`specs/ap/run-limits.md` R4, R13, R17): the scratch
+/// directory (removed by the call whose `mkdir` made it, after its last launch, R8), the door and the
+/// stage's network with its proxy; `ready` is false when one could not be made.
+struct Here<'a> {
+    ready: bool,
+    proxy: Option<egress::Proxy>,
+    door: Option<crate::door::Door>,
+    removal: Option<std::mem::DropGuard<&'a str, fn(&str)>>,
+}
+/// The scratch directory, after the claim and before the first launch here; the door; then the
+/// stage's network and its proxy (a failure of any is a call that launches nothing).
+fn make_here<'a>(s: &mut impl System, q: &'a Request, hooks: Option<&Path>) -> Here<'a> {
+    let scratch = q.limits.as_ref().map(|l| l.scratch.as_str());
+    let (made, ready) = scratch.map_or((false, true), |d| make_scratch(d, hooks.is_some()));
+    // Only the call whose `mkdir` made it removes it, after its last launch (R8): the guard is
+    // dropped where the removal runs, and on a panic that unwinds out of the call.
+    let removal = scratch
+        .filter(|_| made)
+        .map(|scratch| std::mem::DropGuard::new(scratch, remove_scratch as fn(&str)));
+    // The door: opened after the scratch directory and before the first launch; one that cannot be
+    // opened is a scratch directory that cannot be made (R13, `specs/ap/door.md` R1).
+    let mut door = None;
+    let ready = match scratch {
+        Some(scratch) if ready => {
+            let opened = crate::door::open(s, door_stage(q), &crate::door::path_of(scratch));
+            door = opened.ok();
+            door.is_some()
+        }
+        _ => ready,
+    };
+    // The stage's network and its proxy: after the door and before the first launch; one that
+    // cannot be made is a scratch directory that cannot be made (`specs/ap/run-limits.md` R17).
+    let mut proxy = None;
+    let ready = match scratch {
+        Some(_) if ready => {
+            proxy = egress::open(s, record_path(&q.out), &q.actor_role).ok();
+            proxy.is_some()
+        }
+        _ => ready,
+    };
+    Here {
+        ready,
+        proxy,
+        door,
+        removal,
+    }
+}
+/// The ask of R20: its sentence when the answer of `last` (the launch just ended) missed its first
+/// or its second line, and what is left of that launch's bound; no sentence for any other end.
+fn asked(q: &Request, last: &Value, spent: Duration) -> (Option<&'static str>, Duration) {
+    let left = Duration::from_secs(q.timeout).saturating_sub(spent);
+    let lead = match last["unmet"].as_str() {
+        Some("first_line") => Some(ASK),
+        Some("second_line") => Some(ASK_SECOND),
+        _ => None,
+    };
+    let lead = lead.filter(|_| q.runtime == Runtime::Claude && last["state"] == "no_result");
+    (lead, left)
+}
 /// One `ap run` request. A refusal (exit 2) comes before any effect and writes no file.
 pub fn execute(s: &mut impl System, r: &Value) -> Result<(Value, u8), Failure> {
     let q = request(s, r)?;
@@ -3294,126 +3460,170 @@ pub fn execute(s: &mut impl System, r: &Value) -> Result<(Value, u8), Failure> {
     };
     if let (Ok(output), Ok(errs)) = files {
         let files = (output, errs);
+        // The placement of a look (R58): once per call, after the claim of `out` and before the
+        // start of the run object and the first launch.
+        let (placed, reason) = match q.host {
+            false => (None, None),
+            true => match pc::place(s, &q) {
+                pc::Place::Pc(placed) => (Some(placed), None),
+                pc::Place::Here(reason) => (None, Some(reason)),
+            },
+        };
         if q.target.is_some() {
-            object.begin(s, &q, &accounts[0]);
+            let first = placed.as_ref().map_or(&accounts[0], |p| &p.account);
+            let host = if placed.is_some() { "pc" } else { "local" };
+            object.begin(s, &q, first, host);
         }
-        // The scratch directory: made once, after the claim and before the first launch (R4).
-        let scratch = q.limits.as_ref().map(|l| l.scratch.as_str());
+        // What a launch here needs (R4, R13, R17): made once, after the claim and before the first
+        // launch here, which for a request placed on the PC is the way back's (R62).
         let hooks = host_hooks(s, &q);
-        let (made, ready) = scratch.map_or((false, true), |d| make_scratch(d, hooks.is_some()));
-        // Only the call whose `mkdir` made it removes it, after its last launch (R8): the guard is
-        // dropped where the removal runs, and on a panic that unwinds out of this block.
-        let removal = scratch
-            .filter(|_| made)
-            .map(|scratch| std::mem::DropGuard::new(scratch, remove_scratch));
-        // The door: opened after the scratch directory and before the first launch; one that cannot
-        // be opened is a scratch directory that cannot be made (R13, `specs/ap/door.md` R1).
-        let mut door = None;
-        let ready = match scratch {
-            Some(scratch) if ready => {
-                let opened = crate::door::open(s, door_stage(&q), &crate::door::path_of(scratch));
-                door = opened.ok();
-                door.is_some()
-            }
-            _ => ready,
-        };
-        // The stage's network and its proxy: after the door and before the first launch; one that
-        // cannot be made is a scratch directory that cannot be made (`specs/ap/run-limits.md` R17).
-        let mut proxy = None;
-        let ready = match scratch {
-            Some(_) if ready => {
-                proxy = egress::open(s, record_path(&q.out), &q.actor_role).ok();
-                proxy.is_some()
-            }
-            _ => ready,
-        };
+        let mut here = placed.is_none().then(|| make_here(s, &q, hooks.as_deref()));
         // When the last launch began: it and its ask share one `timeout_seconds` (R20).
         let mut began = s.now();
         // The calls of `claude auth status` of this call, by account (`specs/ap/run-limits.md` R15).
         let mut renewed = Renewed::default();
-        for (i, account) in accounts.iter().enumerate() {
-            // Once a launch of an implementer or a fixer has worked, every later one gets the text;
-            // a launch of a resumed call after the first is a move and gets its own.
-            let lead = match &q.moved {
-                Some(text) if i > 0 => Some(text.as_str()),
-                _ if q.resume.is_none() && worked_before && !first_result(&q.role) => {
-                    Some(CONTINUATION)
-                }
-                _ => None,
-            };
-            let earlier = last["attempts"].as_array().cloned().unwrap_or_default();
-            // Only the first launch of a resumed call resumes the record's session.
-            let resume = q.resume.as_ref().filter(|_| i == 0);
+        // An ask spent on the PC is not given again (R62).
+        let (mut ask_spent, mut lost) = (false, false);
+        if let Some(p) = placed.as_deref() {
+            // The launch on the PC, and its ask (R59, R62); it is no move to a next account.
             let launch = Launch {
-                earlier: &earlier,
-                lead,
-                resume: resume.map(|(session, _, _)| session.as_str()),
+                earlier: &[],
+                lead: None,
+                resume: None,
                 ask: false,
-                ready,
-                proxy: proxy.as_ref(),
-                hooks: hooks.as_deref(),
+                ready: true,
+                proxy: None,
+                hooks: None,
                 bound: Duration::from_secs(q.timeout),
+                pc: Some(p),
+                reason: None,
             };
             began = s.now();
-            let (record, worked, saved) =
-                attempt(s, &q, account, &files, &launch, &object, &mut renewed);
+            let (record, _, saved) =
+                attempt(s, &q, &p.account, &files, &launch, &object, &mut renewed);
             clean &= saved;
-            worked_before |= worked;
-            // A run cut at any point goes on at the next account: before any tool ran, and after
-            // (a reviewer changes no file; an implementer or a fixer is told to read the state its
-            // predecessor left). A resumed call goes on only when it can tell the new session
-            // which prompt and answer the cut one had.
-            let movable = q.resume.is_none() || q.moved.is_some();
-            let next = record["state"] == "cut" && movable && i + 1 < accounts.len();
             last = record;
-            if !next || !saved {
-                break;
+            let (lead, left) = asked(&q, &last, s.now().duration_since(began));
+            if let (true, Some(lead), Some(session)) =
+                (saved && !left.is_zero(), lead, last["session"].as_str())
+            {
+                let earlier = last["attempts"].as_array().cloned().unwrap_or_default();
+                let launch = Launch {
+                    earlier: &earlier,
+                    lead: Some(lead),
+                    resume: Some(session),
+                    ask: true,
+                    ready: true,
+                    proxy: None,
+                    hooks: None,
+                    bound: left,
+                    pc: Some(p),
+                    reason: None,
+                };
+                let (mut record, _, saved) =
+                    attempt(s, &q, &p.account, &files, &launch, &object, &mut renewed);
+                asked_after(&mut record, &last);
+                clean &= saved && persist(&q.out, &record);
+                last = record;
+                ask_spent = true;
+            }
+            lost = clean && last["state"] != "ok";
+        }
+        if placed.is_none() || lost {
+            // A launch here: the first of the call, or the one launch that follows a launch on
+            // the PC that did not end `ok` (R62), with a new session and the request's prompt.
+            let here = here.get_or_insert_with(|| make_here(s, &q, hooks.as_deref()));
+            let reason = if lost { Some("pc_lost") } else { reason };
+            let ready = here.ready;
+            for (i, account) in accounts.iter().enumerate() {
+                // Once a launch of an implementer or a fixer has worked, every later one gets the
+                // text; a launch of a resumed call after the first is a move and gets its own.
+                let lead = match &q.moved {
+                    Some(text) if i > 0 => Some(text.as_str()),
+                    _ if q.resume.is_none() && worked_before && !first_result(&q.role) => {
+                        Some(CONTINUATION)
+                    }
+                    _ => None,
+                };
+                let earlier = last["attempts"].as_array().cloned().unwrap_or_default();
+                // Only the first launch of a resumed call resumes the record's session.
+                let resume = q.resume.as_ref().filter(|_| i == 0);
+                let launch = Launch {
+                    earlier: &earlier,
+                    lead,
+                    resume: resume.map(|(session, _, _)| session.as_str()),
+                    ask: false,
+                    ready,
+                    proxy: here.proxy.as_ref(),
+                    hooks: hooks.as_deref(),
+                    bound: Duration::from_secs(q.timeout),
+                    pc: None,
+                    reason,
+                };
+                began = s.now();
+                let (record, worked, saved) =
+                    attempt(s, &q, account, &files, &launch, &object, &mut renewed);
+                clean &= saved;
+                worked_before |= worked;
+                // A run cut at any point goes on at the next account: before any tool ran, and
+                // after (a reviewer changes no file; an implementer or a fixer is told to read the
+                // state its predecessor left). A resumed call goes on only when it can tell the
+                // new session which prompt and answer the cut one had.
+                let movable = q.resume.is_none() || q.moved.is_some();
+                let next = record["state"] == "cut" && movable && i + 1 < accounts.len();
+                last = record;
+                if !next || !saved {
+                    break;
+                }
+            }
+            // A Claude stage whose answer's first line missed `expect.first_line`, or whose second
+            // line missed `expect.second_line`, is asked once more, in its own session on its own
+            // account, within what is left of the bound of the launch that answered; whatever the
+            // ask ends in ends the call (R20).
+            let (lead, left) = asked(&q, &last, s.now().duration_since(began));
+            if let (true, Some(lead), Some(session), Some(account)) = (
+                clean && !ask_spent && !left.is_zero(),
+                lead,
+                last["session"].as_str(),
+                last["account"].as_str(),
+            ) {
+                let earlier = last["attempts"].as_array().cloned().unwrap_or_default();
+                let launch = Launch {
+                    earlier: &earlier,
+                    lead: Some(lead),
+                    resume: Some(session),
+                    ask: true,
+                    ready,
+                    proxy: here.proxy.as_ref(),
+                    hooks: hooks.as_deref(),
+                    bound: left,
+                    pc: None,
+                    reason,
+                };
+                let (mut record, _, saved) =
+                    attempt(s, &q, account, &files, &launch, &object, &mut renewed);
+                asked_after(&mut record, &last);
+                clean &= saved && persist(&q.out, &record);
+                last = record;
             }
         }
-        // A Claude stage whose answer's first line missed `expect.first_line`, or whose second line
-        // missed `expect.second_line`, is asked once more, in its own session on its own account,
-        // within what is left of the bound of the launch that answered; whatever the ask ends in
-        // ends the call (R20).
-        let left = Duration::from_secs(q.timeout).saturating_sub(s.now().duration_since(began));
-        let lead = match last["unmet"].as_str() {
-            Some("first_line") => Some(ASK),
-            Some("second_line") => Some(ASK_SECOND),
-            _ => None,
-        };
-        let asked = q.runtime == Runtime::Claude
-            && clean
-            && last["state"] == "no_result"
-            && lead.is_some()
-            && !left.is_zero();
-        if let (true, Some(session), Some(account)) =
-            (asked, last["session"].as_str(), last["account"].as_str())
+        // The proxy is closed after the last launch, before the scratch directory goes (R20); the
+        // door too (R13).
+        if let Some(Here {
+            proxy,
+            door,
+            removal,
+            ..
+        }) = here
         {
-            let earlier = last["attempts"].as_array().cloned().unwrap_or_default();
-            let launch = Launch {
-                earlier: &earlier,
-                lead,
-                resume: Some(session),
-                ask: true,
-                ready,
-                proxy: proxy.as_ref(),
-                hooks: hooks.as_deref(),
-                bound: left,
-            };
-            let (mut record, _, saved) =
-                attempt(s, &q, account, &files, &launch, &object, &mut renewed);
-            asked_after(&mut record, &last);
-            clean &= saved && persist(&q.out, &record);
-            last = record;
+            if let Some(proxy) = proxy {
+                proxy.close();
+            }
+            if let Some(door) = door {
+                door.close();
+            }
+            drop(removal);
         }
-        // The proxy is closed after the last launch, before the scratch directory goes (R20).
-        if let Some(proxy) = proxy {
-            proxy.close();
-        }
-        // The door is closed after the last launch, before the scratch directory goes (R13).
-        if let Some(door) = door {
-            door.close();
-        }
-        drop(removal);
     } else {
         last = json!({"state": "failed", "unmet": "launch", "account": accounts[0]});
         let _ = persist(&q.out, &last);

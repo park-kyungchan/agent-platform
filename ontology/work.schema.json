@@ -1,7 +1,7 @@
 {
   "format": "ontology-schema/v1",
   "domain": "work",
-  "version": 22,
+  "version": 23,
   "namespace": {
     "instance": "vps://palantirkc",
     "account": "root"
@@ -4808,6 +4808,9 @@
         "start_unit",
         "start_unit_review",
         "stop_unit"
+      ],
+      "functions": [
+        "capacity"
       ]
     },
     {
