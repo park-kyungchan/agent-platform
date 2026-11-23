@@ -25,6 +25,6 @@ Purpose: a Lead reads what the files of a task directory and Git say of its unit
 
 ## Not included
 
-- No check that a generated block of `STATE.md` is current: `ont render --check STATE.md` does that. No read of fenced code, of `HANDOVER.md` or of `BOTTLENECKS.md`.
+- No check that a generated block of `STATE.md` is current: `ont render --check STATE.md` does that. No read of fenced code, of `HANDOFF.md` or of `BOTTLENECKS.md`.
 - It does not print the installed revisions (`deploy/README.md`, "Read the state"), the store's holds, items and rows, or the host's disk and CPU.
 - It does not remove or write a `runs/` tree: `ap unit <page>` still writes `<page directory>/runs/`, and `ap state` reads what it finds.
