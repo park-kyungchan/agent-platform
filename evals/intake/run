@@ -3,7 +3,7 @@
 missing? Several samples per case, scored by five facts read from a scratch store and from the answer; no model judges.
 
   run answers --reader R --out DIR [--root DIR] [--cases FILE ...] [--samples N] [--case ID ...]
-  run score --out DIR [--cases FILE ...]
+  run score --out DIR [--cases FILE ...] [--record TASK]
   run gate --baseline SCORE.json --candidate SCORE.json
 
 The readers, their command lines, the unit that holds a session, the scoring by facts and the gate are those of
@@ -348,7 +348,7 @@ def cmd_answers(a):
 def score_reader(d, record, cases):
     n, ids = record["samples"], record["cases"]
     passed, per_sample, tally = {c: 0 for c in ids}, [0] * n, {c: dict.fromkeys(FACTS, 0) for c in ids}
-    unanswered, tokens, recorded, verified = 0, [], 0, 0
+    unanswered, tokens, recorded, verified, metas = 0, [], 0, 0, []
     for cid in ids:
         for s in range(1, n + 1):
             base = os.path.join(d, "%s__s%d" % (cid, s))
@@ -356,6 +356,7 @@ def score_reader(d, record, cases):
                 unanswered += 1
                 continue
             meta = R.read_json(base + ".json")
+            metas.append(meta)
             with open(base + ".md", encoding="utf-8", errors="replace") as f:
                 got, ver, rec = facts(cases[cid], f.read(), base + ".store")
             if isinstance(meta.get("input_tokens"), int):
@@ -370,7 +371,7 @@ def score_reader(d, record, cases):
     return {"n": n, "passes": passed, "samples": per_sample, "mean": round(sum(per_sample) / n, 4),
             "majority": sorted(c for c in ids if passed[c] > n / 2), "unanswered": unanswered,
             "tokens_median": statistics.median(tokens) if tokens else None, "facts": tally,
-            "requests_recorded": recorded, "requests_verified": verified}
+            "requests_recorded": recorded, "requests_verified": verified, **R.cost_members(metas)}
 
 
 def sheet(result):
@@ -384,6 +385,8 @@ def sheet(result):
 
 
 def cmd_score(a):
+    if a.record == "":
+        R.refuse("usage")
     out = os.path.abspath(a.out)
     readers = [r for r in R.READER_NAMES if os.path.isdir(os.path.join(out, r))]
     if not readers:
@@ -409,8 +412,7 @@ def cmd_score(a):
     text = json.dumps(result, indent=1)
     R.write_atomic(os.path.join(out, "score.json"), text + "\n")
     R.write_atomic(os.path.join(out, "sheet.md"), sheet(result))
-    print(text)
-    return 0
+    return R.report(a, "intake", out, records, result, text)
 
 
 def main():
@@ -427,6 +429,7 @@ def main():
     sc = sub.add_parser("score", allow_abbrev=False)
     sc.add_argument("--out", required=True)
     sc.add_argument("--cases", action="append", default=[])
+    sc.add_argument("--record", default=None)
     ga = sub.add_parser("gate", allow_abbrev=False)
     ga.add_argument("--baseline", required=True)
     ga.add_argument("--candidate", required=True)

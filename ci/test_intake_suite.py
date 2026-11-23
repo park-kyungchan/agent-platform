@@ -82,15 +82,31 @@ if args[0] == "show":
 sys.exit(1)
 '''
 
-# The engine behind a shim: a call without --store is refused (the host's store is the engine's default).
+# The engine behind a shim. A call with --store is logged (ont.jsonl) and runs the engine. A call without it would be
+# the host's store (the engine's default): it is logged apart (host-ont.jsonl), answered from the file of the test
+# (host-ont.json: the keys of its tasks) and never reaches the engine.
 ONT_SHIM = r'''#!@PY@
 import json, os, sys
+state = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 a = sys.argv[1:]
-with open(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "ont.jsonl"), "a") as f:
-    f.write(json.dumps({"argv": a, "fake_store": os.environ.get("FAKE_STORE")}) + "\n")
-if "--store" not in a:
+if "--store" in a:
+    with open(os.path.join(state, "ont.jsonl"), "a") as f:
+        f.write(json.dumps({"argv": a, "fake_store": os.environ.get("FAKE_STORE")}) + "\n")
+    os.execv("@ONT@", ["@ONT@"] + a)
+body = json.loads(sys.stdin.read() or "null")
+with open(os.path.join(state, "host-ont.jsonl"), "a") as f:
+    f.write(json.dumps({"argv": a, "body": body, "engine": False}) + "\n")
+tasks = json.load(open(os.path.join(state, "host-ont.json")))["tasks"]
+ns = {"instance": "vps://x", "account": "root"}
+if a == ["search"]:
+    objs = [{"id": {"object_type": "task", "namespace": ns, "native_key": t}, "head": {"fields": {}}} for t in tasks] \
+        if body["object_type"] == "task" else []
+    print(json.dumps({"status": "ok", "result": {"objects": objs, "basis": {"qualified": True}}}))
+elif a[:2] == ["action", "apply"]:
+    edits = [{"id": {"object_type": "kpi", "namespace": ns, "native_key": "kpi-" + body["request_id"][-6:]}, "change": "initial"}]
+    print(json.dumps({"status": "ok", "result": {"outcome": "applied", "edits": edits}}))
+else:
     sys.exit(97)
-os.execv("@ONT@", ["@ONT@"] + a)
 '''
 
 # A session: applies the actions of its plan through `ont` on FAKE_STORE, then answers. A plan is found by the words.
@@ -124,7 +140,9 @@ if beh.get("exit"):
     sys.exit(1)
 answer = beh.get("answer", "")
 if name == "claude":
-    events = [{"type": "result", "result": answer, "usage": {"input_tokens": 10, "output_tokens": 7}}]
+    events = [{"type": "assistant", "message": {"content": [{"type": "tool_use", "id": "t1", "name": "Bash",
+                                                              "input": {"command": "ont fn route < /dev/null"}}]}},
+              {"type": "result", "result": answer, "total_cost_usd": 0.0123, "usage": {"input_tokens": 10, "output_tokens": 7}}]
 elif name == "muse":
     events = [{"payload": {"kind": "run_terminal", "text": answer}}]
 else:
@@ -363,7 +381,78 @@ class Scored(unittest.TestCase):
                              capture_output=True, text=True)
         self.assertEqual(out.returncode, 0)
         host = [json.loads(x) for x in Path(self.w.sample("none").with_suffix(".jsonl")).read_text().splitlines()]
-        self.assertEqual(host[0]["result"], "The draft is nightly-backup.")
+        self.assertEqual(host[-1]["result"], "The draft is nightly-backup.")  # after the stream's tool_use line
+
+
+@unittest.skipUnless(ONT, "ONT_BIN names the engine `check` found or built")
+class ScoreRecord(unittest.TestCase):
+    """`score --record <task key>` of the intake suite: the scratch stores are read with `--store`, the record goes to
+    the `ont` of PATH without it, and that call is answered by the shim from a file, never by the engine."""
+    def setUp(self):
+        self.w = World(self, [case("one", "none")])
+        self.words = self.w.cases_path and json.loads(self.w.cases_path.read_text())[0]["words"]
+        self.w.plan({"cli": {self.words: {"answer": "fine"}}})
+        (self.w.t / "host-ont.json").write_text(json.dumps({"tasks": ["task-suite"]}))
+        for reader in ("claude-haiku", "muse-ember"):
+            self.assertEqual(self.w.answers("--samples", "1", reader=reader)[0], 0)
+        trap = self.w.t / "engine-trap"  # what ONT_BIN names for the score call: it must never run
+        trap.write_text("#!/bin/sh\necho reached >> %s/trap.log\nexit 99\n" % self.w.t)
+        trap.chmod(0o755)
+        self.trap = trap
+
+    def score(self, *extra):
+        return self.w.call("score", "--out", self.w.out, *extra, env=self.w.env(ONT_BIN=str(self.trap)))
+
+    def test_score_record_without_the_option_makes_no_call_without_a_store(self):
+        code, out, r = self.score()
+        self.assertEqual((code, r.stderr), (0, ""))
+        self.assertNotIn("recorded", out)
+        self.assertEqual(self.w.lines("host-ont.jsonl"), [])
+        self.assertFalse((self.w.t / "trap.log").exists())
+
+    def test_score_record_one_measurement_per_reader_and_no_call_reached_the_engine(self):
+        w = self.w
+        code, out, r = self.score("--record", "task-suite")
+        self.assertEqual((code, r.stderr), (0, ""), out)
+        self.assertEqual(out["recorded"], {"measurements": 2, "already": 0, "older": 0, "skipped": 0, "failed": 0})
+        x = out["readers"]["claude-haiku"]
+        self.assertEqual((x["fn_samples"], x["usd"]), (1.0, 0.01))
+        self.assertEqual((out["readers"]["muse-ember"]["fn_samples"], out["readers"]["muse-ember"]["usd"]), (None, None))
+        written = json.loads((w.out / "score.json").read_text())
+        self.assertNotIn("recorded", written)
+        digest = hashlib.sha256((w.out / "score.json").read_bytes()).hexdigest()
+        calls = w.lines("host-ont.jsonl")
+        self.assertTrue(calls and all("--store" not in c["argv"] and c["engine"] is False for c in calls))
+        self.assertFalse((w.t / "trap.log").exists(), "no call reached the engine ONT_BIN names")
+        actions = [c["body"] for c in calls if c["argv"][0] == "action"]
+        self.assertEqual(sorted(a["action_type"] for a in actions), ["define_kpi"] * 2 + ["record_measurement"] * 2)
+        self.assertEqual({a["parameters"]["name"] for a in actions if a["action_type"] == "define_kpi"},
+                         {"suite intake claude-haiku", "suite intake muse-ember"})
+        for a in actions:
+            if a["action_type"] == "define_kpi":
+                self.assertIn("recorded by evals/intake/run score --record. No case text.", a["parameters"]["definition"])
+        measured = {a["request_id"]: a["parameters"] for a in actions if a["action_type"] == "record_measurement"}
+        for reader, value in (("claude-haiku", "mean 1.0000 majority 1/1 n 1 unanswered 0 fn 1.0000 usd 0.01"),
+                              ("muse-ember", "mean 1.0000 majority 1/1 n 1 unanswered 0 fn n/a usd n/a")):
+            rid = "suite-" + hashlib.sha256(("%s:%s" % (reader, digest)).encode()).hexdigest()[:32]
+            p = measured[rid]
+            self.assertEqual((p["value"], p["evidence"]), (value, "evals/intake/run score sha256:" + digest))
+            self.assertRegex(p["observed_at"], r"^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ$")
+        self.assertNotIn(self.words, json.dumps(actions))
+        self.assertNotIn(str(w.t), json.dumps(actions))
+        # every call with a store is the score of the scratch stores, and none names the host's
+        for c in w.lines("ont.jsonl"):
+            self.assertTrue(c["argv"][c["argv"].index("--store") + 1].startswith(str(w.out)))
+
+    def test_score_record_the_members_of_the_score_are_the_intake_suites_and_the_new_two(self):
+        code, out, _ = self.score()
+        x = out["readers"]["claude-haiku"]
+        self.assertEqual(set(x), {"n", "passes", "samples", "mean", "majority", "unanswered", "tokens_median", "facts",
+                                  "requests_recorded", "requests_verified", "fn_samples", "usd"})
+        self.assertEqual(set(out), {"suite", "case_files", "readers", "parity"})
+        first = (self.w.out / "score.json").read_bytes()
+        self.score()
+        self.assertEqual((self.w.out / "score.json").read_bytes(), first)
 
 
 @unittest.skipUnless(ONT, "ONT_BIN names the engine `check` found or built")
