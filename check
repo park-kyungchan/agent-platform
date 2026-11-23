@@ -19,7 +19,7 @@ python3 -I -B ci/check-map.py crates/ ci/ content/ deploy/ evals/ github/ ontolo
 python3 -I -B ci/check-spec-trace.py
 # Every ci/test_*.py in sorted order, but those that build their stores with the engine: each of these has a step
 # of its own after the build.
-after_build="test_lesson_replay.py test_intake_suite.py"
+after_build="test_lesson_replay.py test_intake_suite.py test_cases_engine.py"
 for test in $(cd ci && printf '%s\n' test_*.py | LC_ALL=C sort); do
   case " $after_build " in *" $test "*) continue ;; esac
   python3 -I -B -m unittest discover -s ci -p "$test"
@@ -88,13 +88,15 @@ for route_tests in $engine_tests; do
     ONT_BIN="$ont_bin" "$route_tests" --ignored --test-threads=1 --quiet
   fi
 done
-# The tests of evals/lesson/replay and of evals/intake/run build their stores with that engine (which also admits only uid 0).
+# The tests of evals/lesson/replay, of evals/intake/run and of evals/cases build their stores with that engine (which also admits only uid 0).
 if [ "${CI:-}" = true ] && [ "$(id -u)" != 0 ]; then
   sudo env "ONT_BIN=$ont_bin" python3 -I -B -m unittest discover -s ci -p 'test_lesson_replay.py'
   sudo env "ONT_BIN=$ont_bin" python3 -I -B -m unittest discover -s ci -p 'test_intake_suite.py'
+  sudo env "ONT_BIN=$ont_bin" python3 -I -B -m unittest discover -s ci -p 'test_cases_engine.py'
 else
   ONT_BIN="$ont_bin" python3 -I -B -m unittest discover -s ci -p 'test_lesson_replay.py'
   ONT_BIN="$ont_bin" python3 -I -B -m unittest discover -s ci -p 'test_intake_suite.py'
+  ONT_BIN="$ont_bin" python3 -I -B -m unittest discover -s ci -p 'test_cases_engine.py'
 fi
 # The walk of `ap deliver` on the real installer scripts, with the built ap and a scratch store of the same
 # engine; it kills real processes under one temporary directory. Skipped, saying so, under CI=true.

@@ -1,0 +1,153 @@
+#!/usr/bin/env -S python3 -I -B
+"""reproduce: whether the rule of `select` would have named the cases a full gate failed on, with fewer cases than the
+suites hold, and the measurement of that.
+
+  reproduce --repository <owner/name>=<clone> --base <rev> --head <rev> --cases <suite>=<file>... --gate <file>
+            [--also <owner/name>=<clone>]... [--record <task key>] [--store <path>]
+
+The mapping is computed at `--base` without the store. With `--record`, the KPI `case_map` of the task gets the value
+`reproduced <map_digest> failures <f> selected <s>/<n>` (or `not_reproduced ...`). One JSON line, exit 0 when
+reproduced, else 1; 3 when the record failed. Every refusal is one line `{"status":"<code>"}` with exit 2. Rules and
+codes: evals/cases/README.md.
+"""
+import hashlib
+import importlib.machinery
+import importlib.util
+import json
+import os
+import sys
+import time
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+
+
+def _load(name, path):
+    loader = importlib.machinery.SourceFileLoader(name, path)
+    mod = importlib.util.module_from_spec(importlib.util.spec_from_loader(name, loader))
+    loader.exec_module(mod)
+    return mod
+
+
+L = _load("cases_lib", os.path.join(HERE, "lib.py"))
+B = L.B
+FLAGS = {"--repository": True, "--base": False, "--head": False, "--cases": True, "--gate": False, "--also": True,
+         "--record": False, "--store": False}
+
+
+def read_gate(path):
+    """(the failures of the gate file, its SHA-256); `gate_invalid` when it cannot be read as a gate."""
+    try:
+        with open(path, "rb") as f:
+            data = f.read()
+        gate = json.loads(data.decode("utf-8"))
+    except (OSError, ValueError):
+        raise L.Refuse("gate_invalid")
+    fails = L.failures(gate)
+    if fails is None:
+        raise L.Refuse("gate_invalid")
+    return fails, hashlib.sha256(data).hexdigest()
+
+
+def record(store, key, value, evidence, now):
+    """("applied"|"already", None) or (None, the store's code or None): the KPI `case_map` of the task `key`, its
+    definition when the task has none, and the measurement."""
+    eng = L.engine(store)
+    tasks = L.search_all(eng, "task")
+    if tasks is None:
+        return None, None
+    task = next((i for i, _ in tasks[0] if i.get("native_key") == key and i.get("object_type") == "task"), None)
+    if task is None:
+        return None, None
+    kpis = L.search_all(eng, "kpi", {"eq": ["name", L.KPI_NAME]})
+    if kpis is None:
+        return None, None
+    mine = [(i, f) for i, f in kpis[0] if isinstance(f.get("task"), dict) and f["task"].get("native_key") == key
+            and f["task"].get("object_type") == "task"]
+    if mine:
+        kpi, fields = mine[0]
+    else:
+        body = {"action_type": "define_kpi", "agent": "cases",
+                "parameters": {"task": task, "name": L.KPI_NAME, "definition": L.KPI_DEFINITION},
+                "request_id": "cases-kpi-" + B.sha256(f"{key}:{L.KPI_NAME}")[:32]}
+        answer = apply(eng, body)
+        if answer[0] is None:
+            return None, answer[1]
+        kpi, fields = answer[2], {}
+        if kpi is None:
+            again = L.search_all(eng, "kpi", {"eq": ["name", L.KPI_NAME]})
+            found = [i for i, f in (again[0] if again else []) if isinstance(f.get("task"), dict)
+                     and f["task"].get("native_key") == key]
+            if not found:
+                return None, None
+            kpi = found[0]
+    if fields.get("value") == value and fields.get("evidence") == evidence:
+        return "already", None
+    observed = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(now))
+    rid = "cases-" + B.sha256(B.canon({"value": value, "evidence": evidence, "observed_at": observed}))[:32]
+    body = {"action_type": "record_measurement", "agent": "cases", "request_id": rid,
+            "parameters": {"kpi": kpi, "value": value, "observed_at": observed, "evidence": evidence}}
+    answer = apply(eng, body)
+    if answer[0] is None:
+        return None, answer[1]
+    return ("already" if answer[0] == "already_applied" else "applied"), None
+
+
+def apply(eng, body):
+    """(outcome, code, the id the action made, if any); the outcome is None when the store refused or failed."""
+    v, ok = eng.call(["action", "apply", "--client", eng.client], body)
+    if not isinstance(v, dict):
+        return None, None, None
+    if v.get("status") == "refused" and isinstance(v.get("code"), str):
+        failed = v.get("failed")
+        first = failed[0] if isinstance(failed, list) and failed and isinstance(failed[0], str) else None
+        return None, first or v["code"], None
+    result = v.get("result") if isinstance(v.get("result"), dict) else {}
+    outcome = result.get("outcome")
+    if ok and v.get("status") == "ok" and outcome in ("applied", "already_applied"):
+        made = next((e["id"] for e in result.get("edits") or [] if isinstance(e, dict)
+                     and isinstance(e.get("id"), dict) and e["id"].get("object_type") == "kpi"), None)
+        return outcome, None, made
+    return None, None, None
+
+
+def run(argv):
+    a = L.parse(argv, FLAGS)
+    repos = L.repositories(a.get("--repository", []))
+    also = L.repositories(a.get("--also", []))
+    if len(repos) != 1 or not all(k in a for k in ("--base", "--head", "--cases", "--gate")):
+        raise L.Refuse("usage")
+    if len({n for n, _ in repos + also}) != 1 + len(also):
+        raise L.Refuse("usage")
+    base, head = L.rev_value(a["--base"][0]), L.rev_value(a["--head"][0])
+    pairs = L.case_args(a["--cases"])
+    gate_path = a["--gate"][0]
+    key = a.get("--record", [None])[0]
+    store = a.get("--store", [None])[0]
+    L.academy([n for n, _ in repos + also], [c for _, c in repos + also] + [f for _, f in pairs] + [gate_path])
+    name, clone = repos[0]
+    base_commit, head_commit = L.commit_of(clone, base), L.commit_of(clone, head)
+    sources = [L.Source(name, clone, base_commit)] + [L.Source(n, c, "origin/main") for n, c in also]
+    cases = L.load_cases(pairs)
+    fails, gate_digest = read_gate(gate_path)
+    rows = L.records(sources, cases, 0)
+    paths, body = L.changed_names(sources[0], base_commit, head_commit)
+    picked = {i for s in rows for i in L.select(rows[s], paths, body)}
+    given = sum(len(v) for v in cases.values())
+    missed = sorted(f for f in fails if f not in picked)
+    reproduced = bool(fails) and not missed and len(picked) < given
+    line = {"reproduced": reproduced, "map_digest": L.map_digest(), "failures": len(fails), "selected": len(picked),
+            "cases": given, "missed": missed}
+    if key is None:
+        return [line], (0 if reproduced else 1)
+    value = (f"{'reproduced' if reproduced else 'not_reproduced'} {line['map_digest']} failures {len(fails)} "
+             f"selected {len(picked)}/{given}")
+    evidence = f"evals/cases/reproduce gate sha256:{gate_digest[:16]} {base_commit[:12]}..{head_commit[:12]}"
+    recorded, code = record(store, key, value, evidence, int(time.time()))
+    if recorded is None:
+        return [line, {"status": "record_failed", "code": code}], 3
+    line["recorded"] = recorded
+    return [line], (0 if reproduced else 1)
+
+
+if __name__ == "__main__":
+    sys.exit(L.main(run))
