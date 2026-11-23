@@ -1,6 +1,6 @@
 //! `ap measure sessions` and the functions `cost`, `flow` and `share` (`specs/ap/measure.md`) against a fake host:
 //! invented session records, stage records and a door record in a scratch directory of each test, and a fake `ont`
-//! whose store is a map in memory (search, get, log, render and the four actions of schema version 19). No test
+//! whose store is a map in memory (search, get, log, render and the five actions of schema version 19 the passes apply). No test
 //! reads the host's accounts, stage directories, door record or store. The test with the real engine is ignored by
 //! the plain `cargo test`: `./check` runs it with `--ignored` and the engine in `ONT_BIN`.
 #![allow(
@@ -74,6 +74,7 @@ struct Fake {
     calls: Vec<(Vec<String>, Value)>,
     made: u32,
     fail_search: bool,
+    refuse: Vec<String>,
 }
 impl Fake {
     fn new(dir: &Scratch) -> Self {
@@ -89,6 +90,7 @@ impl Fake {
             calls: vec![],
             made: 0,
             fail_search: false,
+            refuse: vec![],
         }
     }
     fn put(&mut self, kind: &str, key: &str, fields: Value) {
@@ -214,9 +216,41 @@ impl Fake {
                 }
                 key
             }
+            "record_measurement" => {
+                let kpi = p["kpi"]["native_key"].as_str().unwrap().to_owned();
+                if self.refuse.contains(&kpi) {
+                    return reply(&json!({"status": "refused", "code": "invalid_parameter"}));
+                }
+                let latest = self
+                    .objects
+                    .iter()
+                    .filter(|((k, _), f)| {
+                        k == "measurement" && f["kpi"]["native_key"] == kpi.as_str()
+                    })
+                    .filter_map(|(_, f)| f["observed_at"].as_str().map(str::to_owned))
+                    .max();
+                if latest.is_some_and(|l| l.as_str() > p["observed_at"].as_str().unwrap()) {
+                    return reply(&json!({"status": "refused", "code": "older_measurement"}));
+                }
+                self.made += 1;
+                let key = format!("act-measurement-{}", self.made);
+                let mut f = p.clone();
+                f["recorded_at"] = json!(now);
+                self.put("measurement", &key, f);
+                let current = self.objects.get_mut(&("kpi".into(), kpi.clone())).unwrap();
+                for m in ["value", "observed_at", "evidence"] {
+                    current[m] = p[m].clone();
+                }
+                key
+            }
             other => panic!("action {other}"),
         };
-        let edits = json!([{"change": if action == "record_session" { "initial" } else { "update" }, "id": oid("run", &key)}]);
+        let kind = if action == "record_measurement" {
+            "measurement"
+        } else {
+            "run"
+        };
+        let edits = json!([{"change": if action == "record_session" || kind == "measurement" { "initial" } else { "update" }, "id": oid(kind, &key)}]);
         self.requests.insert(rid, (p, edits.clone()));
         self.ok(json!({"outcome": "applied", "edits": edits}))
     }
@@ -250,9 +284,23 @@ impl System for Fake {
                     .collect();
                 self.ok(json!({"rows": rows, "withheld": 0, "continuation": null}))
             }
-            "render" => reply(
-                &json!({"status": "ok", "now": self.wall, "truncated": false, "markdown": "| Key |\n| --- |\n", "rows": 0}),
-            ),
+            "render" => {
+                let unit = input["args"]["unit"].as_str().unwrap_or_default();
+                let kind = match input["view"].as_str() {
+                    Some("reviews_of_unit") => "review",
+                    _ => "run",
+                };
+                let keys: Vec<&String> = self
+                    .objects
+                    .iter()
+                    .filter(|((k, _), f)| k == kind && f["unit"]["native_key"] == unit)
+                    .map(|((_, key), _)| key)
+                    .collect();
+                let table: String = keys.iter().map(|k| format!("| {k} |\n")).collect();
+                reply(
+                    &json!({"status": "ok", "now": self.wall, "truncated": false, "markdown": format!("| Key |\n| --- |\n{table}"), "rows": keys.len()}),
+                )
+            }
             other => panic!("ont {other}"),
         }
     }
@@ -399,7 +447,7 @@ fn day<'a>(run: &'a Value, d: &str) -> &'a Value {
 fn r1_the_verb_names_its_pass_and_refuses_another() {
     let bed = Bed::new();
     let mut f = Fake::new(&bed.dir);
-    for args in [&[][..], &["kpis"][..], &["--since"][..]] {
+    for args in [&[][..], &["kpi"][..], &["--since"][..]] {
         let argv: Vec<OsString> = args.iter().map(OsString::from).collect();
         let e = measure::run(&mut f, &argv).unwrap_err();
         assert_eq!((e.code, e.field.as_str()), ("usage", "args"), "{args:?}");
@@ -411,11 +459,9 @@ fn r1_the_verb_names_its_pass_and_refuses_another() {
         .output()
         .unwrap();
     assert_eq!(help.status.code(), Some(0));
-    assert!(
-        String::from_utf8(help.stdout)
-            .unwrap()
-            .contains("Usage: ap measure sessions [--since <YYYY-MM-DD>]")
-    );
+    let usage = String::from_utf8(help.stdout).unwrap();
+    assert!(usage.contains("Usage: ap measure sessions [--since <YYYY-MM-DD>]"));
+    assert!(usage.contains("Usage: ap measure kpis [--day <YYYY-MM-DD>] [--store <path>]"));
     let none = Command::new(env!("CARGO_BIN_EXE_ap"))
         .arg("measure")
         .env_remove("ONT_FN_NAME")
@@ -1528,29 +1574,965 @@ fn r10_cost_by_intent_unit_and_day_and_of_one_intent() {
     );
 }
 
+// The functions `flow` and `share` and the pass `kpis`: one store of an intent with merged units, their reviews, runs
+// of every role with counts, and the KPIs of the table.
+fn d(day: &str, usd: i64, refusals: u64, [fr, sr, fw, sw]: [u64; 4]) -> Value {
+    json!({"day": day, "messages": 1, "usd_micros": usd, "refusals": refusals, "file_reads": fr,
+        "store_reads": sr, "file_writes": fw, "store_writes": sw})
+}
+fn flow_store(f: &mut Fake) {
+    f.put("intent", "gadget", json!({"status": "confirmed"}));
+    f.put("intent", "old", json!({"status": "met"}));
+    f.put("intent", "other-intent", json!({"status": "confirmed"}));
+    let unit = |intent: &str| json!({"state": "merged", "intent": oid("intent", intent), "class": "plain"});
+    for (u, intent) in [
+        ("u1", "gadget"),
+        ("u2", "gadget"),
+        ("u3", "gadget"),
+        ("u4", "gadget"),
+        ("u5", "other-intent"),
+    ] {
+        f.put("unit", u, unit(intent));
+    }
+    // (unit, start, merge, causes of its stops)
+    for (u, start, merge, stops) in [
+        (
+            "u1",
+            "2026-11-17T08:00:00Z",
+            "2026-11-17T10:00:00Z",
+            &[][..],
+        ),
+        (
+            "u2",
+            "2026-11-18T11:00:00Z",
+            "2026-11-18T12:00:00Z",
+            &["ci_failed", "page_cannot_hold"][..],
+        ),
+        (
+            "u3",
+            "2026-11-19T10:00:00Z",
+            "2026-11-19T10:30:00Z",
+            &["ci_failed"][..],
+        ),
+        (
+            "u4",
+            "2026-11-29T10:00:00Z",
+            "2026-11-30T10:00:00Z",
+            &["outside"][..],
+        ),
+        (
+            "u5",
+            "2026-11-17T08:00:00Z",
+            "2026-11-17T09:00:00Z",
+            &["elsewhere"][..],
+        ),
+    ] {
+        f.log.push(json!({"action_type": "start_unit", "submitted_at": start, "parameters": {"unit": oid("unit", u)}}));
+        f.log.push(json!({"action_type": "merge_unit", "submitted_at": merge, "parameters": {"unit": oid("unit", u)}}));
+        for c in stops {
+            f.log.push(json!({"action_type": "stop_unit", "submitted_at": start, "parameters": {"unit": oid("unit", u), "cause": c}}));
+        }
+    }
+    // (key, unit, kind, status, verdict, closed_at)
+    for (k, u, kind, status, verdict, at) in [
+        (
+            "p1a",
+            "u1",
+            "page",
+            "closed",
+            "repair",
+            "2026-11-16T10:00:00Z",
+        ),
+        (
+            "p1b",
+            "u1",
+            "page",
+            "closed",
+            "accept",
+            "2026-11-16T12:00:00Z",
+        ),
+        (
+            "p1c",
+            "u1",
+            "page",
+            "closed",
+            "accept",
+            "2026-11-16T13:00:00Z",
+        ),
+        (
+            "k1",
+            "u1",
+            "packet",
+            "closed",
+            "accept",
+            "2026-11-17T09:00:00Z",
+        ),
+        (
+            "p2a",
+            "u2",
+            "page",
+            "closed",
+            "accept",
+            "2026-11-17T10:00:00Z",
+        ),
+        (
+            "p2b",
+            "u2",
+            "page",
+            "revoked",
+            "accept",
+            "2026-11-17T11:00:00Z",
+        ),
+        (
+            "k2a",
+            "u2",
+            "packet",
+            "closed",
+            "repair",
+            "2026-11-18T09:00:00Z",
+        ),
+        (
+            "k2b",
+            "u2",
+            "packet",
+            "closed",
+            "accept",
+            "2026-11-18T10:00:00Z",
+        ),
+        (
+            "p3a",
+            "u3",
+            "page",
+            "closed",
+            "accept",
+            "2026-11-18T10:00:00Z",
+        ),
+        (
+            "p3b",
+            "u3",
+            "page",
+            "closed",
+            "accept",
+            "2026-11-18T11:00:00Z",
+        ),
+        (
+            "p4",
+            "u4",
+            "page",
+            "closed",
+            "accept",
+            "2026-11-29T11:00:00Z",
+        ),
+        (
+            "p5",
+            "u5",
+            "page",
+            "closed",
+            "repair",
+            "2026-11-17T08:30:00Z",
+        ),
+    ] {
+        f.put("review", k, json!({"unit": oid("unit", u), "kind": kind, "status": status, "verdict": verdict, "closed_at": at}));
+    }
+    // The runs: the Lead (a day before the window, a day in it), the stages of u1 and u2, a page writer, a session of
+    // no intent, a verifier with no step, and a run of the API credit with a day (no group counts it).
+    let run = |role: &str, days: Value| json!({"role": role, "runtime": "claude", "model": OPUS, "status": "closed", "started_at": "2026-11-15T10:00:00Z", "measured_at": "2026-11-20T00:00:00Z", "days": days});
+    let with = |mut r: Value, k: &str, v: Value| {
+        r[k] = v;
+        r
+    };
+    f.put(
+        "run",
+        "r-lead",
+        with(
+            run(
+                "lead",
+                json!([
+                    d("2026-11-15", 9_000_000, 9, [100, 100, 100, 100]),
+                    d("2026-11-17", 4_000_000, 2, [6, 2, 3, 1])
+                ]),
+            ),
+            "intent",
+            oid("intent", "gadget"),
+        ),
+    );
+    f.put(
+        "run",
+        "r-writer",
+        with(
+            run(
+                "writer",
+                json!([d("2026-11-17", 1_000_000, 0, [0, 4, 0, 5])]),
+            ),
+            "intent",
+            oid("intent", "gadget"),
+        ),
+    );
+    f.put(
+        "run",
+        "r-impl",
+        with(
+            run(
+                "implementer",
+                json!([d("2026-11-17", 3_000_000, 0, [5, 0, 7, 0])]),
+            ),
+            "unit",
+            oid("unit", "u1"),
+        ),
+    );
+    f.put(
+        "run",
+        "r-ver",
+        with(
+            run(
+                "verifier",
+                json!([d("2026-11-18", 1_000_000, 0, [0, 0, 0, 0])]),
+            ),
+            "unit",
+            oid("unit", "u2"),
+        ),
+    );
+    f.put(
+        "run",
+        "r-inter",
+        run(
+            "interactive",
+            json!([d("2026-11-18", 500_000, 0, [10, 10, 0, 0])]),
+        ),
+    );
+    f.put("run", "r-batch", json!({"role": "batch", "runtime": "api", "model": OPUS, "status": "closed", "started_at": "2026-11-17T01:00:00Z", "settled_usd_micros": 1_500_000, "reserved_usd_micros": 4_000_000, "days": [d("2026-11-17", 0, 0, [1, 1, 1, 1])]}));
+}
+const WINDOW: &str = "2026-11-16..2026-11-22";
+fn flow(f: &mut Fake, p: Value) -> Value {
+    measure::answer(f, "flow", "/scratch/store.sqlite", &p).unwrap()
+}
+fn share(f: &mut Fake, p: Value) -> Value {
+    measure::answer(f, "share", "/scratch/store.sqlite", &p).unwrap()
+}
+fn window(intent: &str) -> Value {
+    json!({"intent": intent, "since": "2026-11-16", "until": "2026-11-22"})
+}
+
 // spec: specs/ap/measure.md#R11
 #[test]
-fn r11_flow_and_share_are_not_built() {
+fn r11_flow_answers_the_merged_units_of_the_window() {
     let bed = Bed::new();
     let mut f = Fake::new(&bed.dir);
-    for name in ["flow", "share"] {
-        let e = measure::answer(&mut f, name, "/scratch/store.sqlite", &json!({})).unwrap_err();
+    flow_store(&mut f);
+    let a = flow(&mut f, window("gadget"));
+    // u1, u2 and u3 merged in the window; u4 merged after it and u5 belongs to another intent.
+    assert_eq!(
+        a,
+        json!({"intent": "gadget", "since": "2026-11-16", "until": "2026-11-22", "merged": 3,
+            "merged_a_day": 0.43, "median_minutes": 60, "packet_first_accept": 0.5, "units_stopped": 2,
+            "stops": {"ci_failed": 2, "page_cannot_hold": 1},
+            // u1 three looks, u2 one (its revoked look is none), u3 two accepts
+            "page_looks": 2.0, "looks_after_accept": 0.67, "first_accept": 0.667, "log_cut": false})
+    );
+    // A window that holds no merged unit.
+    let none = flow(
+        &mut f,
+        json!({"intent": "gadget", "since": "2026-12-01", "until": "2026-12-07"}),
+    );
+    assert_eq!(none["merged"], 0);
+    assert_eq!(none["merged_a_day"], 0.0);
+    assert_eq!(none["stops"], json!({}));
+    assert_eq!(none["units_stopped"], 0);
+    for m in [
+        "median_minutes",
+        "packet_first_accept",
+        "page_looks",
+        "looks_after_accept",
+        "first_accept",
+    ] {
+        assert!(none[m].is_null(), "{m}");
+    }
+    // One day is a window of its own: u1's day alone.
+    let day = flow(
+        &mut f,
+        json!({"intent": "gadget", "since": "2026-11-17", "until": "2026-11-17"}),
+    );
+    assert_eq!(
+        (
+            day["merged"].as_u64(),
+            day["merged_a_day"].as_f64(),
+            day["median_minutes"].as_u64()
+        ),
+        (Some(1), Some(1.0), Some(120))
+    );
+    assert_eq!(
+        (
+            day["page_looks"].as_f64(),
+            day["looks_after_accept"].as_f64(),
+            day["first_accept"].as_f64()
+        ),
+        (Some(3.0), Some(1.0), Some(0.0))
+    );
+}
+
+// spec: specs/ap/measure.md#R11
+#[test]
+fn r11_a_log_the_store_cut_marks_the_answer() {
+    let bed = Bed::new();
+    let mut f = Fake::new(&bed.dir);
+    flow_store(&mut f);
+    f.log.retain(|r| {
+        !(r["action_type"] == "start_unit" && r["parameters"]["unit"]["native_key"] == "u3")
+    });
+    let a = flow(&mut f, window("gadget"));
+    assert_eq!(
+        (
+            a["merged"].as_u64(),
+            a["log_cut"].as_bool(),
+            a["median_minutes"].as_u64()
+        ),
+        (Some(3), Some(true), Some(90))
+    );
+}
+
+// spec: specs/ap/measure.md#R11
+// spec: specs/ap/measure.md#R9
+#[test]
+fn r11_flow_refuses_its_parameters_by_member_and_reads_nothing_of_the_host() {
+    let bed = Bed::new();
+    let mut f = Fake::new(&bed.dir);
+    flow_store(&mut f);
+    let ok = window("gadget");
+    let with = |m: &str, v: Value| {
+        let mut p = ok.clone();
+        p[m] = v;
+        p
+    };
+    for (p, field) in [
+        (
+            json!({"since": "2026-11-16", "until": "2026-11-22"}),
+            "intent",
+        ),
+        (with("intent", json!("")), "intent"),
+        (with("intent", json!(7)), "intent"),
+        (with("since", json!("2026-11-23")), "until"),
+        (with("since", json!("2026-02-30")), "since"),
+        (with("until", json!("2027-03-01")), "until"),
+        (with("by", json!("day")), "by"),
+        (json!([]), "stdin"),
+    ] {
+        let e = measure::answer(&mut f, "flow", "/scratch/store.sqlite", &p).unwrap_err();
+        assert_eq!((e.code, e.field.as_str()), ("invalid_input", field), "{p}");
+        assert_eq!(measure::exit_of(&e), 2);
+    }
+    let e =
+        measure::answer(&mut f, "flow", "/scratch/store.sqlite", &window("absent")).unwrap_err();
+    assert_eq!((e.code, e.field.as_str()), ("unknown_intent", "intent"));
+    assert_eq!(measure::exit_of(&e), 2);
+    assert!(f.applies().is_empty());
+    let out = Command::new(env!("CARGO_BIN_EXE_ap"))
+        .env("ONT_FN_NAME", "flow")
+        .env("ONT_FN_STORE", bed.dir.path("no-store.sqlite"))
+        .stdin(Stdio::null())
+        .output()
+        .unwrap();
+    assert_eq!(out.status.code(), Some(2));
+    let e: Value = serde_json::from_slice(&out.stderr).unwrap();
+    assert_eq!(e["error"]["code"], "invalid_input");
+    assert!(out.stdout.is_empty());
+}
+
+// spec: specs/ap/measure.md#R12
+#[test]
+fn r12_share_by_role_and_by_group_with_the_null_shares() {
+    let bed = Bed::new();
+    let mut f = Fake::new(&bed.dir);
+    flow_store(&mut f);
+    let row = |role: &str, runs: u64, c: [u64; 4], r: Value, w: Value| {
+        json!({"role": role, "runs": runs, "file_reads": c[0], "store_reads": c[1], "file_writes": c[2],
+            "store_writes": c[3], "read_share": r, "write_share": w})
+    };
+    let group = |g: &str, runs: u64, c: [u64; 4], r: Value, w: Value| {
+        let mut v = row(g, runs, c, r, w);
+        v["group"] = v["role"].take();
+        v.as_object_mut().unwrap().remove("role");
+        v
+    };
+    let a = share(
+        &mut f,
+        json!({"since": "2026-11-16", "until": "2026-11-22"}),
+    );
+    assert_eq!(
+        a,
+        json!({"since": "2026-11-16", "until": "2026-11-22", "intent": null,
+        "roles": [
+            row("batch", 1, [1, 1, 1, 1], json!(50.0), json!(50.0)),
+            row("implementer", 1, [5, 0, 7, 0], json!(0.0), json!(0.0)),
+            row("interactive", 1, [10, 10, 0, 0], json!(50.0), Value::Null),
+            row("lead", 1, [6, 2, 3, 1], json!(25.0), json!(25.0)),
+            row("verifier", 1, [0, 0, 0, 0], Value::Null, Value::Null),
+            row("writer", 1, [0, 4, 0, 5], json!(100.0), json!(100.0)),
+        ],
+        "groups": [
+            group("stages", 3, [5, 4, 7, 5], json!(44.4), json!(41.7)),
+            group("sessions", 2, [16, 12, 3, 1], json!(42.9), json!(25.0)),
+        ]})
+    );
+    // Of one intent: the runs of its own and of its units (the session of no intent and the batch run are out).
+    let g = share(
+        &mut f,
+        json!({"since": "2026-11-16", "until": "2026-11-22", "intent": "gadget"}),
+    );
+    assert_eq!(g["intent"], "gadget");
+    assert_eq!(
+        g["groups"][0],
+        group("stages", 3, [5, 4, 7, 5], json!(44.4), json!(41.7))
+    );
+    assert_eq!(
+        g["groups"][1],
+        group("sessions", 1, [6, 2, 3, 1], json!(25.0), json!(25.0))
+    );
+    // A window without a run: no role, every share null.
+    let none = share(
+        &mut f,
+        json!({"since": "2026-12-01", "until": "2026-12-07"}),
+    );
+    assert_eq!(none["roles"], json!([]));
+    assert_eq!(
+        none["groups"][0],
+        group("stages", 0, [0, 0, 0, 0], Value::Null, Value::Null)
+    );
+    assert_eq!(
+        none["groups"][1],
+        group("sessions", 0, [0, 0, 0, 0], Value::Null, Value::Null)
+    );
+    let e = measure::answer(
+        &mut f,
+        "share",
+        "/scratch/store.sqlite",
+        &json!({"since": "2026-11-16", "until": "2026-11-22", "intent": "absent"}),
+    )
+    .unwrap_err();
+    assert_eq!(e.code, "unknown_intent");
+    let e = measure::answer(
+        &mut f,
+        "share",
+        "/scratch/store.sqlite",
+        &json!({"since": "2026-11-16", "until": "2026-11-22", "by": "role"}),
+    )
+    .unwrap_err();
+    assert_eq!((e.code, e.field.as_str()), ("invalid_input", "by"));
+    assert!(f.applies().is_empty());
+}
+
+// spec: specs/ap/measure.md#R13
+#[test]
+fn r13_a_run_across_the_windows_edge_counts_only_its_days_inside_it() {
+    let bed = Bed::new();
+    let mut f = Fake::new(&bed.dir);
+    flow_store(&mut f);
+    // The Lead's run has a day of 100 each on 2026-11-15 and a day in the window.
+    let before = share(
+        &mut f,
+        json!({"since": "2026-11-15", "until": "2026-11-15"}),
+    );
+    assert_eq!(before["roles"][0]["role"], "lead");
+    assert_eq!(before["roles"][0]["file_reads"], 100);
+    let inside = share(
+        &mut f,
+        json!({"since": "2026-11-16", "until": "2026-11-22"}),
+    );
+    let lead = inside["roles"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|r| r["role"] == "lead")
+        .unwrap()
+        .clone();
+    assert_eq!(
+        (
+            lead["runs"].as_u64(),
+            lead["file_reads"].as_u64(),
+            lead["store_writes"].as_u64()
+        ),
+        (Some(1), Some(6), Some(1))
+    );
+    let both = share(
+        &mut f,
+        json!({"since": "2026-11-15", "until": "2026-11-22"}),
+    );
+    let lead = both["roles"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|r| r["role"] == "lead")
+        .unwrap()
+        .clone();
+    assert_eq!(
+        (
+            lead["runs"].as_u64(),
+            lead["file_reads"].as_u64(),
+            lead["store_writes"].as_u64()
+        ),
+        (Some(1), Some(106), Some(101))
+    );
+    // An entry that lacks a count counts 0; the run is still counted.
+    f.put("run", "r-old", json!({"role": "lead", "runtime": "claude", "days": [{"day": "2026-11-17", "messages": 1, "usd_micros": 0, "refusals": 0}]}));
+    let old = share(
+        &mut f,
+        json!({"since": "2026-11-17", "until": "2026-11-17"}),
+    );
+    let lead = old["roles"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|r| r["role"] == "lead")
+        .unwrap()
+        .clone();
+    assert_eq!(
+        (lead["runs"].as_u64(), lead["file_reads"].as_u64()),
+        (Some(2), Some(6))
+    );
+    assert!(f.applies().is_empty());
+}
+
+fn kpi_store(f: &mut Fake) {
+    flow_store(f);
+    f.wall = epoch("2026-11-23T00:20:00Z");
+    f.put("intent", &"x".repeat(300), json!({"status": "confirmed"}));
+    let kpi = |name: &str, intent: Option<&str>| {
+        let mut k = json!({"task": oid("task", "ws-test"), "name": name, "definition": "d"});
+        if let Some(i) = intent {
+            k["intent"] = oid("intent", i);
+        }
+        k
+    };
+    for (name, _, _) in measure::TABLE {
+        f.put("kpi", &format!("k-{name}"), kpi(name, Some("gadget")));
+    }
+    f.put("kpi", "k-closed", kpi("usd_a_pr", Some("old")));
+    f.put("kpi", "k-gate", kpi("gate", Some("gadget")));
+    f.put("kpi", "k-noint", kpi("usd_a_pr", None));
+}
+fn kpis(f: &mut Fake, args: &[&str]) -> (Value, u8) {
+    let argv: Vec<OsString> = std::iter::once("kpis")
+        .chain(args.iter().copied())
+        .map(OsString::from)
+        .collect();
+    measure::run(f, &argv).unwrap()
+}
+fn measurements(f: &Fake) -> Vec<(String, Value)> {
+    f.objects
+        .iter()
+        .filter(|((k, _), _)| k == "measurement")
+        .map(|((_, key), v)| (key.clone(), v.clone()))
+        .collect()
+}
+fn value_of(line: &Value, kpi: &str) -> String {
+    let found: Vec<&Value> = line["measured"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|m| m["kpi"] == format!("k-{kpi}").as_str())
+        .collect();
+    assert_eq!(found.len(), 1, "{kpi}: {line}");
+    found[0]["value"].as_str().unwrap().to_owned()
+}
+
+// spec: specs/ap/measure.md#R14
+// spec: specs/ap/measure.md#R15
+#[test]
+fn r15_a_pass_records_one_measurement_of_each_kpi_of_a_confirmed_intent() {
+    let bed = Bed::new();
+    let mut f = Fake::new(&bed.dir);
+    kpi_store(&mut f);
+    let (line, status) = kpis(&mut f, &[]);
+    assert_eq!(status, 0, "{line}");
+    assert_eq!(
+        (
+            line["at"].as_str(),
+            line["day"].as_str(),
+            line["since"].as_str(),
+            line["until"].as_str()
+        ),
+        (
+            Some("2026-11-23T00:20:00Z"),
+            Some("2026-11-23"),
+            Some("2026-11-16"),
+            Some("2026-11-22")
+        )
+    );
+    // The KPI of a closed intent, the one of a name outside the table and the one with no intent are skipped.
+    assert_eq!(
+        (
+            line["measured"].as_array().unwrap().len(),
+            line["unchanged"].as_u64(),
+            line["skipped"].as_u64()
+        ),
+        (13, Some(0), Some(3))
+    );
+    assert_eq!(line["failed"], json!([]));
+    for (kpi, text) in [
+        ("usd_a_pr", "3.0 (WINDOW, 3 merged)"),
+        ("usd_stages", "1.33 (WINDOW, 3 merged)"),
+        ("usd_lead", "1.67 (WINDOW, 3 merged)"),
+        ("lead_share", "55.6 (WINDOW, 3 merged)"),
+        ("lead_refusals", "0.67 (WINDOW, 3 merged)"),
+        ("minutes_to_merge", "60 (WINDOW, 3 merged)"),
+        ("merged_a_day", "0.43 (WINDOW, 3 merged)"),
+        (
+            "stops",
+            "2 of 3 stopped: ci_failed 2, page_cannot_hold 1 (WINDOW)",
+        ),
+        ("page_looks", "2.0 (WINDOW, 3 merged)"),
+        ("looks_after_accept", "0.67 (WINDOW, 3 merged)"),
+        ("first_accept", "0.667 (WINDOW, 3 merged)"),
+        ("store_writes", "sessions 25.0 % stages 41.7 % (WINDOW)"),
+        ("store_queries", "sessions 25.0 % stages 44.4 % (WINDOW)"),
+    ] {
+        assert_eq!(
+            value_of(&line, kpi),
+            text.replace("WINDOW", WINDOW),
+            "{kpi}"
+        );
+    }
+    // What is stored: the measurement of each KPI, its evidence the call of its function, its request id of the day.
+    let stored = measurements(&f);
+    assert_eq!(stored.len(), 13);
+    let of = |kpi: &str| -> Value {
+        let found: Vec<_> = stored
+            .iter()
+            .filter(|(_, m)| m["kpi"]["native_key"] == format!("k-{kpi}").as_str())
+            .collect();
+        assert_eq!(found.len(), 1, "{kpi}");
+        found[0].1.clone()
+    };
+    let p = r#"{"intent":"gadget","since":"2026-11-16","until":"2026-11-22"}"#;
+    for (kpi, function) in [
+        ("usd_a_pr", "cost"),
+        ("first_accept", "flow"),
+        ("store_queries", "share"),
+    ] {
+        let m = of(kpi);
+        assert_eq!(
+            m["evidence"],
+            format!("ont fn {function} {p}").as_str(),
+            "{kpi}"
+        );
+        assert_eq!(m["observed_at"], "2026-11-23T00:20:00Z");
+        assert_eq!(
+            f.objects[&("kpi".to_owned(), format!("k-{kpi}"))]["value"],
+            m["value"],
+            "{kpi} is the KPI's value"
+        );
+    }
+    let rids: Vec<String> = f
+        .applies()
+        .into_iter()
+        .map(|(a, r)| {
+            assert_eq!(a, "record_measurement");
+            r
+        })
+        .collect();
+    assert!(
+        rids.contains(&"measure-k-stops-20261123".to_owned()),
+        "{rids:?}"
+    );
+    assert_eq!(rids.len(), 13);
+    assert!(
+        f.applies()
+            .iter()
+            .all(|(_, r)| !r.contains("closed") && !r.contains("gate") && !r.contains("noint"))
+    );
+    // Each function ran once for the intent: `cost` and `flow` each read the merged units' log once.
+    let merges = f
+        .calls
+        .iter()
+        .filter(|(a, b)| a[0] == "log" && b["action_type"] == "merge_unit")
+        .count();
+    assert_eq!(merges, 2);
+    // No answer holds a path or a message's text.
+    assert!(!line.to_string().contains('/'));
+}
+
+// spec: specs/ap/measure.md#R15
+#[test]
+fn r15_a_second_pass_of_a_day_adds_no_measurement_even_after_a_run_grew() {
+    let bed = Bed::new();
+    let mut f = Fake::new(&bed.dir);
+    kpi_store(&mut f);
+    let (first, _) = kpis(&mut f, &[]);
+    assert_eq!(first["measured"].as_array().unwrap().len(), 13);
+    // The same second, the same values: the engine answers already_applied.
+    let (again, status) = kpis(&mut f, &[]);
+    assert_eq!(
+        (
+            status,
+            again["measured"].as_array().unwrap().len(),
+            again["unchanged"].as_u64()
+        ),
+        (0, 0, Some(13))
+    );
+    // A run grew and the clock moved: the same request ids with other parameters are request_id_reused.
+    let lead = f
+        .objects
+        .get_mut(&("run".to_owned(), "r-lead".to_owned()))
+        .unwrap();
+    lead["days"][1] = d("2026-11-17", 40_000_000, 2, [60, 20, 3, 1]);
+    f.wall += 3600;
+    let (later, status) = kpis(&mut f, &[]);
+    assert_eq!(status, 0, "{later}");
+    assert_eq!(
+        (
+            later["measured"].as_array().unwrap().len(),
+            later["unchanged"].as_u64(),
+            later["failed"].clone()
+        ),
+        (0, Some(13), json!([]))
+    );
+    assert_eq!(measurements(&f).len(), 13);
+    assert_eq!(
+        f.objects[&("kpi".to_owned(), "k-usd_a_pr".to_owned())]["value"],
+        format!("3.0 ({WINDOW}, 3 merged)").as_str()
+    );
+    // Another day is another request id: a pass for the day before measures again, each KPI twice in all.
+    f.wall += 3600;
+    let (before, _) = kpis(&mut f, &["--day", "2026-11-22"]);
+    assert_eq!(before["measured"].as_array().unwrap().len(), 13);
+    assert_eq!(
+        (before["since"].as_str(), before["until"].as_str()),
+        (Some("2026-11-15"), Some("2026-11-21"))
+    );
+    assert_eq!(measurements(&f).len(), 26);
+}
+
+// spec: specs/ap/measure.md#R14
+#[test]
+fn r14_the_options_are_checked_before_any_effect() {
+    let bed = Bed::new();
+    let mut f = Fake::new(&bed.dir);
+    kpi_store(&mut f);
+    for args in [
+        &["--day"][..],
+        &["--store"],
+        &["--since", "2026-11-01"],
+        &["--day", "2026-11-20", "--day", "2026-11-21"],
+        &["extra"],
+    ] {
+        let argv: Vec<OsString> = std::iter::once("kpis")
+            .chain(args.iter().copied())
+            .map(OsString::from)
+            .collect();
+        let e = measure::run(&mut f, &argv).unwrap_err();
+        assert_eq!((e.code, e.field.as_str()), ("usage", "args"), "{args:?}");
+        assert_eq!(measure::exit_of(&e), 2);
+    }
+    for (args, field) in [
+        (&["--day", "2026-11-24"][..], "day"),
+        (&["--day", "2026-02-30"], "day"),
+        (&["--day", "yesterday"], "day"),
+        (&["--day", "2026-11-1"], "day"),
+        (&["--store", "relative.sqlite"], "store"),
+    ] {
+        let argv: Vec<OsString> = std::iter::once("kpis")
+            .chain(args.iter().copied())
+            .map(OsString::from)
+            .collect();
+        let e = measure::run(&mut f, &argv).unwrap_err();
         assert_eq!(
             (e.code, e.field.as_str()),
-            ("function_not_built", "ONT_FN_NAME")
+            ("invalid_input", field),
+            "{args:?}"
         );
-        let out = Command::new(env!("CARGO_BIN_EXE_ap"))
-            .env("ONT_FN_NAME", name)
-            .env("ONT_FN_STORE", bed.dir.path("no-store.sqlite"))
-            .stdin(Stdio::null())
-            .output()
-            .unwrap();
-        assert_eq!(out.status.code(), Some(2), "{name}");
-        let e: Value = serde_json::from_slice(&out.stderr).unwrap();
-        assert_eq!(e["error"]["code"], "function_not_built");
-        assert!(out.stdout.is_empty());
+        assert_eq!(measure::exit_of(&e), 2);
     }
     assert!(f.calls.is_empty());
+    // Today and the days before it are allowed.
+    for day in ["2026-11-23", "2026-11-01"] {
+        let (line, status) = kpis(&mut f, &["--day", day]);
+        assert_eq!((status, line["day"].as_str()), (0, Some(day)));
+    }
+    let (line, _) = kpis(&mut f, &["--day", "2026-11-01"]);
+    assert_eq!(
+        (line["since"].as_str(), line["until"].as_str()),
+        (Some("2026-10-25"), Some("2026-10-31"))
+    );
+}
+
+// spec: specs/ap/measure.md#R15
+#[test]
+fn r15_a_failed_measurement_does_not_end_the_pass() {
+    let bed = Bed::new();
+    let mut f = Fake::new(&bed.dir);
+    kpi_store(&mut f);
+    f.refuse = vec!["k-stops".to_owned()];
+    let (line, status) = kpis(&mut f, &[]);
+    assert_eq!(status, 3);
+    assert_eq!(line["measured"].as_array().unwrap().len(), 12);
+    assert_eq!(
+        line["failed"],
+        json!([{"kpi": "k-stops", "name": "stops", "code": "invalid_parameter"}])
+    );
+    assert_eq!(measurements(&f).len(), 12);
+    // A KPI whose intent's key makes the evidence over 300 bytes is failed and not sent.
+    let long = "x".repeat(300);
+    let mut g = Fake::new(&bed.dir);
+    g.wall = epoch("2026-11-23T00:20:00Z");
+    g.put("intent", &long, json!({"status": "confirmed"}));
+    g.put("kpi", "k-long", json!({"task": oid("task", "ws-test"), "name": "usd_a_pr", "definition": "d", "intent": oid("intent", &long)}));
+    let (line, status) = kpis(&mut g, &[]);
+    assert_eq!(status, 3);
+    assert_eq!(
+        line["failed"],
+        json!([{"kpi": "k-long", "name": "usd_a_pr", "code": "evidence_too_long"}])
+    );
+    assert!(g.applies().is_empty());
+    // A search of the store that fails ends the pass with nothing applied.
+    let mut h = Fake::new(&bed.dir);
+    kpi_store(&mut h);
+    h.fail_search = true;
+    let e = measure::run(&mut h, &[OsString::from("kpis")]).unwrap_err();
+    assert_eq!(measure::exit_of(&e), 3);
+    assert!(h.applies().is_empty());
+}
+
+// spec: specs/ap/measure.md#R15
+#[test]
+fn r15_the_text_of_each_kind_of_kpi_and_its_bounds() {
+    let w = ("2026-11-16", "2026-11-22");
+    let text = |name: &str, a: Value| measure::value_text(name, &a, w);
+    assert_eq!(
+        text("usd_a_pr", json!({"usd_a_pr": null, "merged": 0})).unwrap(),
+        format!("n/a ({WINDOW}, 0 merged)")
+    );
+    assert_eq!(
+        text(
+            "minutes_to_merge",
+            json!({"median_minutes": 90.5, "merged": 4})
+        )
+        .unwrap(),
+        format!("90.5 ({WINDOW}, 4 merged)")
+    );
+    assert_eq!(
+        text("usd_lead", json!({"usd_lead_a_pr": 1.67, "merged": 3})).unwrap(),
+        format!("1.67 ({WINDOW}, 3 merged)")
+    );
+    assert_eq!(
+        text(
+            "stops",
+            json!({"units_stopped": 0, "merged": 2, "stops": {}})
+        )
+        .unwrap(),
+        format!("0 of 2 stopped: none ({WINDOW})")
+    );
+    assert_eq!(
+        text(
+            "stops",
+            json!({"units_stopped": 2, "merged": 5, "stops": {"b": 1, "a": 2}})
+        )
+        .unwrap(),
+        format!("2 of 5 stopped: a 2, b 1 ({WINDOW})")
+    );
+    let groups = json!({"groups": [{"group": "stages", "write_share": 41.7, "read_share": null}, {"group": "sessions", "write_share": null, "read_share": 12.5}]});
+    assert_eq!(
+        text("store_writes", groups.clone()).unwrap(),
+        format!("sessions n/a % stages 41.7 % ({WINDOW})")
+    );
+    assert_eq!(
+        text("store_queries", groups).unwrap(),
+        format!("sessions 12.5 % stages n/a % ({WINDOW})")
+    );
+    assert_eq!(text("gate", json!({})), Err("unknown_kpi"));
+    // A `stops` list over 200 bytes keeps the causes that fit whole and ends with `...`.
+    let causes: serde_json::Map<String, Value> = (0..30)
+        .map(|n| (format!("cause_number_{n:02}"), json!(n + 1)))
+        .collect();
+    let cut = text(
+        "stops",
+        json!({"units_stopped": 30, "merged": 31, "stops": causes}),
+    )
+    .unwrap();
+    assert!(cut.len() <= 200, "{} bytes", cut.len());
+    let head = "30 of 31 stopped: cause_number_00 1, cause_number_01 2, ";
+    assert!(cut.starts_with(head), "{cut}");
+    assert!(cut.ends_with(&format!(", ... ({WINDOW})")), "{cut}");
+    let kept = cut.matches("cause_number_").count();
+    let one_more = format!(
+        "{}, cause_number_{kept:02} {}, ... ({WINDOW})",
+        cut.trim_end_matches(&format!(", ... ({WINDOW})")),
+        kept + 1
+    );
+    assert!(one_more.len() > 200, "the cut keeps every cause that fits");
+    // Any other value over 200 bytes is a failed measurement; so is an evidence over 300 bytes.
+    let long = "x".repeat(200);
+    assert_eq!(
+        measure::value_text(
+            "usd_a_pr",
+            &json!({"usd_a_pr": 1.0, "merged": 1}),
+            (&long, "2026-11-22")
+        ),
+        Err("value_too_long")
+    );
+    assert_eq!(
+        measure::value_text(
+            "store_writes",
+            &json!({"groups": []}),
+            (&long, "2026-11-22")
+        ),
+        Err("value_too_long")
+    );
+    let p = json!({"intent": "gadget", "since": "2026-11-16", "until": "2026-11-22"});
+    assert_eq!(
+        measure::evidence_text("flow", &p).unwrap(),
+        format!(
+            "ont fn flow {}",
+            r#"{"intent":"gadget","since":"2026-11-16","until":"2026-11-22"}"#
+        )
+    );
+    let p = json!({"intent": "i".repeat(300), "since": "2026-11-16", "until": "2026-11-22"});
+    assert_eq!(measure::evidence_text("flow", &p), Err("evidence_too_long"));
+    // The table names thirteen KPIs of three functions.
+    assert_eq!(measure::TABLE.len(), 13);
+}
+
+// spec: specs/ap/measure.md#R16
+#[test]
+fn r16_the_timer_runs_the_sessions_pass_and_then_the_kpi_pass_each_night() {
+    let service = include_str!("../../../deploy/ap-measure.service");
+    let timer = include_str!("../../../deploy/ap-measure.timer");
+    let route = include_str!("../../../deploy/ap-route.service");
+    let lines: Vec<&str> = service.lines().collect();
+    let at = |l: &str| lines.iter().position(|x| *x == l);
+    let (sessions, kpis) = (
+        at("ExecStart=-/usr/local/bin/ap measure sessions"),
+        at("ExecStart=/usr/local/bin/ap measure kpis"),
+    );
+    assert!(sessions.is_some() && kpis.is_some() && sessions < kpis);
+    for l in [
+        "Type=oneshot",
+        "TimeoutStartSec=3600",
+        "Slice=agents.slice",
+        "Nice=10",
+        "ProtectSystem=full",
+        "NoNewPrivileges=yes",
+        "ProtectKernelModules=yes",
+        "ProtectKernelLogs=yes",
+        "ProtectKernelTunables=yes",
+        "ProtectControlGroups=yes",
+        "ProtectHostname=yes",
+        "LockPersonality=yes",
+        "RestrictRealtime=yes",
+        "RestrictSUIDSGID=yes",
+        "SystemCallArchitectures=native",
+    ] {
+        assert_eq!(lines.iter().filter(|x| **x == l).count(), 1, "{l}");
+    }
+    for l in route.lines().filter(|l| l.starts_with("Environment=")) {
+        assert!(lines.contains(&l), "{l}");
+    }
+    let timer: Vec<&str> = timer.lines().collect();
+    for l in [
+        "OnCalendar=*-*-* 00:20:00 UTC",
+        "Persistent=true",
+        "WantedBy=timers.target",
+    ] {
+        assert!(timer.contains(&l), "{l}");
+    }
 }
 
 // spec: specs/ap/run-object.md#R16
@@ -1775,4 +2757,335 @@ fn engine_a_pass_measures_a_stage_run_and_cost_answers_from_it() {
         ]
     );
     assert_eq!(answer["total_usd"], 0.01);
+}
+
+// The KPI pass and the functions `flow` and `share` against the real engine: a scratch store with the repository's
+// schema (its task source redirected to the scratch directory, its functions to a copy of the built `ap`), an indexed
+// task, a confirmed intent with KPIs set to it, a sessions pass and then the KPI pass twice.
+// spec: specs/ap/measure.md#R11
+// spec: specs/ap/measure.md#R12
+// spec: specs/ap/measure.md#R14
+// spec: specs/ap/measure.md#R15
+#[test]
+#[ignore = "needs the engine in ONT_BIN as uid 0; ./check runs it"]
+fn engine_the_kpi_pass_records_once_a_day_and_flow_and_share_answer() {
+    let ont = PathBuf::from(std::env::var("ONT_BIN").expect("ONT_BIN names the engine"));
+    let bed = Bed::new();
+    let root = &bed.dir.0;
+    let ap = root.join("ap");
+    std::fs::copy(env!("CARGO_BIN_EXE_ap"), &ap).unwrap();
+    std::fs::set_permissions(&ap, std::fs::Permissions::from_mode(0o755)).unwrap();
+    fn redirect(v: &mut Value, host: &str, to: &str) {
+        match v {
+            Value::String(s) => {
+                if let Some(rest) = s.strip_prefix(host) {
+                    *s = format!("{to}{rest}");
+                }
+            }
+            Value::Array(a) => a.iter_mut().for_each(|x| redirect(x, host, to)),
+            Value::Object(o) => o.values_mut().for_each(|x| redirect(x, host, to)),
+            _ => {}
+        }
+    }
+    let mut schema: Value =
+        serde_json::from_str(include_str!("../../../ontology/work.schema.json")).unwrap();
+    for f in ["cost", "flow", "share"] {
+        assert_eq!(schema["functions"][f]["program"], "/usr/local/bin/ap");
+        schema["functions"][f]["program"] = json!(ap.to_str().unwrap());
+    }
+    let work = format!("{}/", bed.dir.path("work"));
+    let host = "/home/palantirkc/work/";
+    redirect(&mut schema["sources"], host, &work);
+    for kind in schema["object_types"].as_object_mut().unwrap().values_mut() {
+        redirect(&mut kind["primary_key"], host, &work);
+        if let Some(props) = kind["properties"].as_object_mut() {
+            for p in props.values_mut() {
+                redirect(&mut p["transform"], host, &work);
+            }
+        }
+    }
+    std::fs::write(root.join("schema.json"), schema.to_string()).unwrap();
+    std::fs::create_dir_all(bed.dir.at("work/ws-test")).unwrap();
+    std::fs::write(
+        bed.dir.at("work/ws-test/STATE.md"),
+        "# A test task\nOwner: nobody\n",
+    )
+    .unwrap();
+    let store = root.join("store.sqlite").to_str().unwrap().to_owned();
+    let path = format!(
+        "{}:{}",
+        ont.parent().unwrap().display(),
+        std::env::var("PATH").unwrap_or_default()
+    );
+    let ont_call = |args: &[&str], input: &str| -> Value {
+        let mut c = Command::new(&ont)
+            .arg("--store")
+            .arg(&store)
+            .args(args)
+            .env("PATH", &path)
+            .env_remove("ONT_ROLE")
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .spawn()
+            .unwrap();
+        {
+            use std::io::Write;
+            c.stdin.take().unwrap().write_all(input.as_bytes()).unwrap();
+        }
+        let out = c.wait_with_output().unwrap();
+        serde_json::from_slice(&out.stdout)
+            .unwrap_or_else(|_| panic!("{}", String::from_utf8_lossy(&out.stderr)))
+    };
+    let installed = ont_call(
+        &[
+            "schema",
+            "install",
+            root.join("schema.json").to_str().unwrap(),
+        ],
+        "",
+    );
+    assert_eq!(installed["status"], "ok", "{installed}");
+    let indexed = Command::new(&ont)
+        .args(["--store", &store, "index", "--source", "task_states"])
+        .env("PATH", &path)
+        .output()
+        .unwrap();
+    assert!(
+        indexed.status.success(),
+        "{}",
+        String::from_utf8_lossy(&indexed.stdout)
+    );
+    let apply = |action: &str, rid: &str, p: Value| -> Value {
+        let v = ont_call(
+            &["action", "apply"],
+            &json!({"action_type": action, "request_id": rid, "parameters": p}).to_string(),
+        );
+        assert_eq!(v["status"], "ok", "{action}: {v}");
+        v["result"].clone()
+    };
+    let made = |r: &Value, kind: &str| -> Value {
+        r["edits"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|e| e["id"]["object_type"] == kind && e["change"] == "initial")
+            .unwrap()["id"]
+            .clone()
+    };
+    let now = || {
+        SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_secs()
+    };
+    let request = |rid: &str, kind: &str| -> Value {
+        made(
+            &apply(
+                "record_request",
+                rid,
+                json!({"words": format!("Invented words of {rid}."), "words_verified": true, "reading": format!("The user says {rid}."),
+                    "kind": kind, "topic": "kpi-engine", "said_at": ap::watch::utc(now()), "session": "fixture-session", "runtime": "fixture-cli"}),
+            ),
+            "request",
+        )
+    };
+    let intent = oid("intent", "widget");
+    let r0 = request("r0", "order");
+    apply(
+        "draft_intent",
+        "draft",
+        json!({"intent": intent, "outcome": "The invented widget board lists every widget.", "first_user": "The fixture reader.",
+            "origin": r0, "directory": bed.work("task-a")}),
+    );
+    apply(
+        "add_criterion",
+        "c1",
+        json!({"intent": intent, "statement": "The board lists 3 widgets.", "check": "fixture-check --count 3", "baseline": "0 widgets"}),
+    );
+    std::thread::sleep(Duration::from_millis(1_100));
+    let r3 = request("r3", "decision");
+    apply(
+        "route_request",
+        "route-r3",
+        json!({"request": r3, "intent": intent}),
+    );
+    apply(
+        "confirm_intent",
+        "confirmed",
+        json!({"intent": intent, "by": r3}),
+    );
+    let task = oid("task", "ws-test");
+    let mut kpi_ids = vec![];
+    for name in ["store_writes", "merged_a_day", "stops", "gate"] {
+        let k = made(
+            &apply(
+                "define_kpi",
+                &format!("kpi-{name}"),
+                json!({"task": task, "name": name, "definition": "d"}),
+            ),
+            "kpi",
+        );
+        apply(
+            "set_kpi_intent",
+            &format!("set-{name}"),
+            json!({"kpi": k, "intent": intent}),
+        );
+        kpi_ids.push(k);
+    }
+    // A Lead session of the intent's directory: one file write and one store read on 2026-11-10.
+    let cwd = bed.work("task-a");
+    bed.file(
+        "accounts/claude-a/projects/p/s-lead.jsonl",
+        &[
+            msg("s-lead", "2026-11-10T09:20:00Z", &cwd, "e2"),
+            synthetic(
+                "s-lead",
+                "2026-11-10T09:21:00Z",
+                &cwd,
+                "u-edit",
+                "Edit",
+                json!({"file_path": "/x"}),
+            ),
+            synthetic(
+                "s-lead",
+                "2026-11-10T09:22:00Z",
+                &cwd,
+                "u-search",
+                "mcp__ont__ont_search",
+                json!({}),
+            ),
+        ],
+        "2026-11-10T09:30:01Z",
+    );
+    let run = |args: &[String]| -> (Option<i32>, Value) {
+        let out = Command::new(&ap)
+            .arg("measure")
+            .args(args)
+            .env_clear()
+            .env("PATH", &path)
+            .env("HOME", bed.dir.path("home"))
+            .env("AP_DOOR_LOG", bed.dir.path("door.jsonl"))
+            .output()
+            .unwrap();
+        (
+            out.status.code(),
+            serde_json::from_slice(&out.stdout)
+                .unwrap_or_else(|_| panic!("{}", String::from_utf8_lossy(&out.stderr))),
+        )
+    };
+    let mut sessions: Vec<String> = bed
+        .args("2026-11-10")
+        .iter()
+        .map(|a| a.to_str().unwrap().to_owned())
+        .collect();
+    sessions.extend(["--store".to_owned(), store.clone()]);
+    let (code, line) = run(&sessions);
+    assert_eq!(
+        (code, line["runs"]["recorded"].as_u64()),
+        (Some(0), Some(1)),
+        "{line}"
+    );
+    let kpis: Vec<String> = ["kpis", "--day", "2026-11-11", "--store", &store]
+        .iter()
+        .map(|a| (*a).to_owned())
+        .collect();
+    let (code, line) = run(&kpis);
+    assert_eq!(code, Some(0), "{line}");
+    assert_eq!(
+        (
+            line["measured"].as_array().unwrap().len(),
+            line["skipped"].as_u64(),
+            line["unchanged"].as_u64()
+        ),
+        (3, Some(1), Some(0)),
+        "{line}"
+    );
+    let w = "2026-11-04..2026-11-10";
+    let texts: BTreeMap<String, String> = line["measured"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|m| {
+            (
+                m["name"].as_str().unwrap().to_owned(),
+                m["value"].as_str().unwrap().to_owned(),
+            )
+        })
+        .collect();
+    assert_eq!(
+        texts["store_writes"],
+        format!("sessions 0.0 % stages n/a % ({w})")
+    );
+    assert_eq!(texts["merged_a_day"], format!("0.0 ({w}, 0 merged)"));
+    assert_eq!(texts["stops"], format!("0 of 0 stopped: none ({w})"));
+    let found = ont_call(&["search"], r#"{"object_type":"measurement","limit":50}"#);
+    assert_eq!(
+        found["result"]["objects"].as_array().unwrap().len(),
+        3,
+        "{found}"
+    );
+    // The same day again, at once and a second later: no measurement is added and the pass succeeds.
+    for wait in [0, 1_100] {
+        std::thread::sleep(Duration::from_millis(wait));
+        let (code, again) = run(&kpis);
+        assert_eq!(
+            (
+                code,
+                again["measured"].as_array().unwrap().len(),
+                again["unchanged"].as_u64(),
+                again["failed"].clone()
+            ),
+            (Some(0), 0, Some(3), json!([])),
+            "{again}"
+        );
+    }
+    let found = ont_call(&["search"], r#"{"object_type":"measurement","limit":50}"#);
+    assert_eq!(
+        found["result"]["objects"].as_array().unwrap().len(),
+        3,
+        "{found}"
+    );
+    let got = ont_call(&["get"], &json!({"id": kpi_ids[0]}).to_string());
+    let fields = &got["result"]["objects"][0]["observations"]
+        .as_array()
+        .unwrap()
+        .last()
+        .unwrap()["fields"];
+    assert_eq!(fields["value"]["value"], texts["store_writes"].as_str());
+    // The functions as the engine runs them.
+    let v = ont_call(
+        &["fn", "flow"],
+        r#"{"parameters": {"intent": "widget", "since": "2026-11-04", "until": "2026-11-10"}}"#,
+    );
+    assert_eq!(v["function"], "flow", "{v}");
+    let a = &v["answer"];
+    assert_eq!(
+        (
+            a["merged"].as_u64(),
+            a["units_stopped"].as_u64(),
+            a["stops"].clone(),
+            a["median_minutes"].clone()
+        ),
+        (Some(0), Some(0), json!({}), Value::Null),
+        "{v}"
+    );
+    let v = ont_call(
+        &["fn", "share"],
+        r#"{"parameters": {"since": "2026-11-10", "until": "2026-11-10", "intent": "widget"}}"#,
+    );
+    assert_eq!(v["function"], "share", "{v}");
+    let sessions = &v["answer"]["groups"][1];
+    assert_eq!(sessions["group"], "sessions");
+    assert_eq!(
+        (
+            sessions["runs"].as_u64(),
+            sessions["file_writes"].as_u64(),
+            sessions["store_reads"].as_u64(),
+            sessions["read_share"].as_f64(),
+            sessions["write_share"].as_f64()
+        ),
+        (Some(1), Some(1), Some(1), Some(100.0), Some(0.0)),
+        "{v}"
+    );
 }
