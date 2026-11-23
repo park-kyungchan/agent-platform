@@ -1775,3 +1775,82 @@ read back; `measure_run` of a run the store does not have (`unknown_run`), then 
 an absent KPI and intent (`unknown_kpi`, `unknown_intent`), of a KPI to an intent, reached by `ont around` from the
 intent by `intent_kpis`, of that KPI and intent again under another request id (applied), and of a second KPI of that
 name to the intent (`duplicate_kpi_in_intent`). The last line of standard output of the rehearsal is `v19 measures: ok`.
+
+Version 19 stays pinned as stated at the head of section "Version 20: eval cases"; the migration and the rehearsal as they
+stand now are described in section "Version 20: eval cases", "The migration and the rehearsal".
+
+## Version 20: eval cases
+Version 19 remains pinned at
+`95783e743d47121aeba19fad870ef2ab52ea4a91:ontology/work.schema.json`,
+sha256 `5c3310941b8d6866a64d8b5d8e7ce8249b27159bfde45bc6b4e5ca4674ccbfa8`.
+Version 20 only adds to version 19. Every value type, link type, action type, view, function and source of version 19
+reads the same in canonical JSON; one object type, its source and the type's name in the grant's `read` are added.
+
+A change of the shared instructions, of a repository's `AGENTS.md` or map, or of a design document is gated by the
+routing and intake suites (`evals/README.md`). The cases make the gate run only the cases a change can reach: each case
+of the two suites is an object that names the files which hold its facts, so that `evals/cases/select` prints the cases
+a change serves and `evals/cases/reproduce` shows, on a full gate that failed, that the same rule would have named the
+failing cases with fewer cases than the suites hold (`evals/cases/README.md`). No text of a case is stored.
+
+### `case`: one case of the routing or intake suite
+One object per case of each case file `evals/cases/index` is given, written to
+`/var/lib/agent-platform/cases/<suite>.cases.jsonl`. Keyed by the hex SHA-256 of `<suite>:<case id>`, so a key stays when
+the case's text changes; titled by `case_id`. Every property is read `from` its member of the record.
+
+| Property | Type | Meaning |
+| --- | --- | --- |
+| `suite` | string | `routing` or `intake` |
+| `case_id` | string | the case's `id` in its file |
+| `file` | string | the repository path `evals/<suite>/cases.json` of the case file, or for a host file the short name its digest line in `evals/<suite>/host-cases.sha256` gives; never a host path |
+| `file_digest` | string | SHA-256 of the case file's bytes |
+| `facts` | integer | the case's facts: its `must` facts (routing) or its `expect.missing` facts (intake) |
+| `unhomed` | integer | the facts that no Markdown file of the repositories read holds |
+| `all` | boolean | the case serves every path: it has no fact, one of its facts is unhomed, or its record would pass 60,000 bytes |
+| `serves` | array of strings | sorted `<owner/name>:<path>` of each Markdown file that holds one of its facts; empty when `all` |
+| `commits` | array of strings | sorted `<owner/name>@<commit>` of the revisions read |
+| `map_digest` | string | SHA-256 of `evals/cases/lib.py`: the rule that made the record |
+
+A file holds a fact when every string of the fact, backticks removed and each run of white space made one space, is in
+the file's text made the same way.
+
+### Source and grant
+The source `cases` is of kind `records` (`specs/ont/index.md` R14 to R29 of the engine): every line of
+`/var/lib/agent-platform/cases/*.cases.jsonl` is one record, its time the member `observed_at` (the producer's run time),
+its type the member `type`; `complete_listing` is set, so a case whose file or line is gone is retracted, and
+`fresh_for_s` is 86,400. The source is owned by its one type. The grant of the domain reads `case`; it is source-owned,
+so the grant derives it no more than it derives `section`. No action, function, view or link type is added.
+
+The type has a description of at most 300 bytes and no property has one: `ont_describe` of the repository's schema grows
+by about 2,000 bytes (the line `v20_mcp_bytes=` of the rehearsal was 257,087 of 262,144 when this section was written).
+
+### What the store does not check
+- That a record's `serves` lists the files that hold the facts at the commits it names: the engine reads the records as
+  the producer wrote them. A producer other than `evals/cases/index` may write any list.
+- That `facts` and `unhomed` count the case's facts, that `unhomed` is at most `facts`, or that `all` is true when
+  `serves` is empty or `unhomed` above 0.
+- That `file_digest` is the digest of the file `file` names, that `map_digest` is the digest of the rule's file at a
+  revision, or that `commits` names a commit of the repositories the paths belong to.
+- That `suite` is `routing` or `intake`, or that a case id is unique within its suite.
+
+### The migration and the rehearsal
+`ontology/migrate` knows version 20; its step is empty (no data migration): no case object exists before this version.
+The line `HIGHEST = 20` names it; `20 21` and `9 21` are pairs it does not know (exit 2). The pairs refused on the version
+10 part of the rehearsal are (9, 21), (10, 10) and (10, 9). An `ap` of the version before reads and writes as on version
+19: no verb of `ap` reads a `case`.
+
+The second store of the rehearsal now installs version 19 from Git by its commit and digest (above) instead of the
+repository's file, and runs the walk of version 19 on it. Then it installs the repository's file over the objects made
+under version 19, with the glob of the source `cases` rewritten to a directory of the rehearsal's own root: every object
+read under version 19 and the ten views read the same; the schema differs from version 19 only by the type, the source
+and the grant's `read` (each is taken off a copy and the rest compared); the description of the type, and of each of its
+properties that has one, is at most 300 bytes; `ont_describe` and `ont_action_list` stay within 262,144 bytes (the line
+`v20_mcp_bytes=`); `ontology/migrate` runs 19 20 (exit 0, the store unchanged) and 20 21 (exit 2). The root of the
+rehearsal is made under `/tmp` and not under the caller's `TMPDIR`: every redirected path begins with it, and the size of
+the engine's description grows with its length (the version 19 line was 260,682 bytes under the host's long `TMPDIR`
+and 254,112 under `/tmp`).
+
+The walk of version 20: an index of `cases` while its directory is absent fails `glob_root_missing`; three records (one
+of the intake suite with `all` true and `serves` empty, one of the routing suite with an unhomed fact) are indexed
+(`initial`), read back by `ont search` with every property, then indexed again unchanged; a line of another type fails
+the source `record_type_mismatch` and changes no head; a file written again without one case retracts it. The last line
+of standard output of the rehearsal is `v20 cases: ok`.

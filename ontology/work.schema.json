@@ -1,7 +1,7 @@
 {
   "format": "ontology-schema/v1",
   "domain": "work",
-  "version": 19,
+  "version": 20,
   "namespace": {
     "instance": "vps://palantirkc",
     "account": "root"
@@ -305,7 +305,8 @@
     "components": {"kind": "records", "glob": "/var/lib/agent-platform/route/*.components.jsonl", "time_member": "observed_at", "type_member": "type", "complete_listing": true, "fresh_for_s": 3600},
     "clauses": {"kind": "records", "glob": "/var/lib/agent-platform/clause/*.clauses.jsonl", "time_member": "observed_at", "type_member": "type", "complete_listing": true, "fresh_for_s": 3600},
     "host_samples": {"kind": "records", "glob": "/var/lib/agent-platform/resource/*.samples.jsonl", "time_member": "observed_at", "type_member": "type", "complete_listing": true, "fresh_for_s": 1728000},
-    "checks": {"kind": "records", "glob": "/var/lib/agent-platform/resource/*.checks.jsonl", "time_member": "observed_at", "type_member": "type", "complete_listing": true, "fresh_for_s": 5184000}
+    "checks": {"kind": "records", "glob": "/var/lib/agent-platform/resource/*.checks.jsonl", "time_member": "observed_at", "type_member": "type", "complete_listing": true, "fresh_for_s": 5184000},
+    "cases": {"kind": "records", "glob": "/var/lib/agent-platform/cases/*.cases.jsonl", "time_member": "observed_at", "type_member": "type", "complete_listing": true, "fresh_for_s": 86400}
   },
   "object_types": {
     "task": {
@@ -1432,6 +1433,24 @@
         "milliseconds": {"type": "integer", "required": true, "from": "/milliseconds"},
         "reason": {"type": "string", "required": false, "from": "/reason", "max_bytes": 40},
         "start": {"type": {"value_type": "utc_time"}, "required": false, "from": "/start"}
+      }
+    },
+    "case": {
+      "description": "One case of the routing or intake suite and the files that serve it, written by evals/cases/index (evals/cases/README.md). Key: the hex SHA-256 of <suite>:<case id>. No text of the case.",
+      "owner": {"source": "cases"},
+      "primary_key": {"from": "/key"},
+      "title": "case_id",
+      "properties": {
+        "suite": {"type": "string", "required": true, "from": "/suite"},
+        "case_id": {"type": "string", "required": true, "from": "/case_id"},
+        "file": {"type": "string", "required": true, "from": "/file"},
+        "file_digest": {"type": "string", "required": true, "from": "/file_digest"},
+        "facts": {"type": "integer", "required": true, "from": "/facts"},
+        "unhomed": {"type": "integer", "required": true, "from": "/unhomed"},
+        "all": {"type": "boolean", "required": true, "from": "/all"},
+        "serves": {"type": {"array": "string"}, "required": true, "from": "/serves"},
+        "commits": {"type": {"array": "string"}, "required": true, "from": "/commits"},
+        "map_digest": {"type": "string", "required": true, "from": "/map_digest"}
       }
     }
   },
@@ -4554,7 +4573,8 @@
         "host",
         "account",
         "host_sample",
-        "check"
+        "check",
+        "case"
       ],
       "derive": [
         "hold",
