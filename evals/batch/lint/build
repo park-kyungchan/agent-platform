@@ -1,0 +1,100 @@
+#!/usr/bin/env -S python3 -I -B
+"""The spec-lint job's builder: one Message Batch request per specification file of each repository, read from Git's
+objects at one commit, that asks for ambiguity, contradiction and gaps.
+
+  build --repo <owner>/<name>=<clone> [--repo ...] --model <id> --out <dir> [--rev <rev>] [--results <file>]...
+        [--max-tokens <n>]
+
+Writes requests.jsonl and files.json into --out and prints one JSON line. Calls no model and no network; starts no
+program but git; reads no file of a checkout and changes no clone. Every refusal is {"status":"<code>"} with exit 2.
+Contract: evals/batch/lint/README.md.
+"""
+import importlib.machinery
+import importlib.util
+import os
+import re
+import sys
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+
+
+def load(name, path):
+    loader = importlib.machinery.SourceFileLoader(name, path)
+    mod = importlib.util.module_from_spec(importlib.util.spec_from_loader(name, loader))
+    loader.exec_module(mod)
+    return mod
+
+
+L = load("batch_lib", os.path.join(HERE, "..", "lib.py"))
+X = load("lint_common", os.path.join(HERE, "common.py"))
+C = X.bind(L)
+
+
+def parse(argv):
+    p = C.Parser(add_help=False, allow_abbrev=False)
+    p.add_argument("--repo", action="append", required=True)
+    p.add_argument("--model", required=True)
+    p.add_argument("--out", required=True)
+    p.add_argument("--rev", default="origin/main")
+    p.add_argument("--results", action="append", default=[])
+    p.add_argument("--max-tokens", default="4000")
+    a = p.parse_args(argv)
+    repos = []
+    for r in a.repo:
+        name, sep, clone = r.partition("=")
+        if not sep or not X.REPO_NAME.match(name) or not clone or name in [x[0] for x in repos]:
+            raise L.Refuse("usage")
+        repos.append((name, clone))
+    if not a.model or not a.rev or a.rev.startswith("-") or not a.out or any(not r for r in a.results):
+        raise L.Refuse("usage")
+    a.max_tokens = C.integer(a.max_tokens, 1024, 8000)
+    a.repos = repos
+    return a
+
+
+def run(argv):
+    a = parse(argv)
+    # The Academy rule before any read: the names and the strings as given, then each path resolved.
+    for name, clone in a.repos:
+        L.refuse_academy(name)
+        L.refuse_academy(clone)
+    L.refuse_academy(a.out)
+    for r in a.results:
+        L.refuse_academy(r)
+    clones = [(name, L.resolve(clone)) for name, clone in a.repos]
+    out = L.resolve(a.out)
+    results = [L.resolve(r) for r in a.results]
+
+    counts = {"academy_skipped": 0, "result_lines_skipped": 0}
+    resolved = [X.clone_at(name, path, a.rev) for name, path in clones]
+    settled = C.settled_keys(results, counts)
+    system = X.text_file("prompt.md")
+    schema = X.json_file("verdict.schema.json")
+
+    files, lines = [], []
+    for clone in sorted(resolved, key=lambda c: c.name):
+        for path, text, rules in X.spec_files(clone, counts):
+            user = X.user_text(clone.name, path, text)
+            params = {"model": a.model, "max_tokens": a.max_tokens, "system": system,
+                      "messages": [{"role": "user", "content": user}],
+                      "output_config": {"format": {"type": "json_schema", "schema": schema}}}
+            k = L.key(params)
+            if len(user.encode("utf-8")) > X.TEXT_LIMIT:
+                state = "too_large"
+            elif k in settled:
+                state = "settled"
+            else:
+                state = "requested"
+                lines.append(L.request_line(params))
+            files.append({"key": k, "repository": clone.name, "commit": clone.commit, "path": path, "rules": rules,
+                          "state": state})
+
+    doc = {"job": X.JOB, "model": a.model, "files": files}
+    L.write_files(out, [("requests.jsonl", C.lines_file(lines)), ("files.json", C.json_text(doc))])
+    states = [f["state"] for f in files]
+    return {"status": "ok", "out": out, "files": len(files), "requested": states.count("requested"),
+            "settled": states.count("settled"), "too_large": states.count("too_large"), **counts}, 0
+
+
+if __name__ == "__main__":
+    sys.exit(L.main(run))

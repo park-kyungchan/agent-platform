@@ -1,0 +1,227 @@
+#!/usr/bin/env -S python3 -I -B
+"""The evals job's scorer: the result lines of a build's items (and, for the Lead suite, of the blind scorer's requests)
+turned into a score.json of the routing suite's form with its spread; with --baseline one finding of detector
+`batch:evals` per case the pass lost; with --record one measurement of the task.
+
+  score --items <items.json> --results <file>... --out <dir> [--cases <path>]... [--blind <blind.json> --scores <file>...]
+        [--baseline <score.json>] [--record <task key>] [--store <path>]
+
+Writes score.json into --out. The engine is ONT_BIN (default `ont`), started only with --record and with the program's
+environment unchanged. Calls no model and no network. Every refusal is {"status":"<code>"} with exit 2; a store that
+cannot be read, or a task it does not know, is exit 3. Contract: evals/batch/evals/README.md.
+"""
+import importlib.machinery
+import importlib.util
+import json
+import os
+import sys
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+
+
+def load(name, path):
+    loader = importlib.machinery.SourceFileLoader(name, path)
+    mod = importlib.util.module_from_spec(importlib.util.spec_from_loader(name, loader))
+    loader.exec_module(mod)
+    return mod
+
+
+L = load("batch_lib", os.path.join(HERE, "..", "lib.py"))
+C = load("evals_common", os.path.join(HERE, "common.py"))
+C.L = L
+
+
+def parse(argv):
+    p = C.Parser(add_help=False, allow_abbrev=False)
+    p.add_argument("--items", required=True)
+    p.add_argument("--results", action="append", required=True)
+    p.add_argument("--out", required=True)
+    p.add_argument("--cases", action="append", default=[])
+    p.add_argument("--blind")
+    p.add_argument("--scores", action="append", default=[])
+    p.add_argument("--baseline")
+    p.add_argument("--record")
+    p.add_argument("--store")
+    a = p.parse_args(argv)
+    if not a.items or not a.out or any(not x for x in (*a.results, *a.cases, *a.scores)) \
+            or "" in (a.blind, a.baseline, a.record, a.store):
+        raise L.Refuse("usage")
+    return a
+
+
+def load_blind(path, doc, digest):
+    """blind.json in the form `blind` writes for these items; refuses `blind_unreadable`."""
+    def bad():
+        raise L.Refuse("blind_unreadable")
+
+    try:
+        with open(path, "rb") as f:
+            blind = json.loads(f.read().decode("utf-8"))
+    except (OSError, ValueError):
+        bad()
+    if not isinstance(blind, dict) or set(blind) != {"job", "suite", "model", "items", "answers"} \
+            or blind["job"] != "evals" or blind["suite"] != "lead" or not isinstance(blind["model"], str) \
+            or blind["items"] != digest or not isinstance(blind["answers"], list) \
+            or len(blind["answers"]) != len(doc["items"]):
+        bad()
+    for e, it in zip(blind["answers"], doc["items"]):
+        if not isinstance(e, dict) or set(e) != {"case", "sample", "key", "score_key"} \
+                or (e["case"], e["sample"], e["key"]) != (it["case"], it["sample"], it["key"]) \
+                or not (e["score_key"] is None or (isinstance(e["score_key"], str) and C.HEX64.match(e["score_key"]))):
+            bad()
+    return blind
+
+
+def load_baseline(path, suite, case_files, reader):
+    """The reader's entry of a score.json of this program of the same suite and case files."""
+    try:
+        with open(path, "rb") as f:
+            card = json.loads(f.read().decode("utf-8"))
+    except (OSError, ValueError):
+        raise L.Refuse("score_unreadable")
+    readers = card.get("readers") if isinstance(card, dict) else None
+    if not isinstance(readers, dict) or card.get("job") != "evals" or not all(
+            isinstance(x, dict) and C.whole(x.get("n")) and x["n"] >= 1 and isinstance(x.get("passes"), dict)
+            and all(C.whole(v) for v in x["passes"].values()) and isinstance(x.get("majority"), list)
+            for x in readers.values()):
+        raise L.Refuse("score_unreadable")
+    if card.get("suite") != suite or card.get("case_files") != case_files or reader not in readers:
+        raise L.Refuse("case_sets_differ")
+    return readers[reader], C.sha_bytes(open(path, "rb").read())
+
+
+def measurement(r, cases):
+    return "mean %.4f spread %.4f samples %s majority %d/%d n %d unanswered %d" % (
+        r["mean"], r["spread"], " ".join(str(c) for c in r["samples"]), len(r["majority"]), cases, r["n"],
+        r["unanswered"])
+
+
+def run(argv):
+    a = parse(argv)
+    items_path, out, store, baseline_path, blind_path, *rest = C.paths(
+        a.items, a.out, a.store, a.baseline, a.blind, *a.results, *a.cases, *a.scores)
+    results = rest[:len(a.results)]
+    cases = rest[len(a.results):len(a.results) + len(a.cases)]
+    scores = rest[len(a.results) + len(a.cases):]
+    doc, digest = C.load_items(items_path)
+    suite, reader = doc["suite"], doc["model"]
+    if suite == "lead" and (blind_path is None or not scores):
+        raise L.Refuse("usage")
+    if suite == "routing" and (blind_path is not None or scores):
+        raise L.Refuse("usage")
+
+    keys = {i["key"] for i in doc["items"]}
+    counts, answers = C.count_lines(C.read_results(results), keys, C.free_answer)
+    out_counts = {"counts": counts}
+    scorer = None
+    passed, answered = set(), set()
+    if suite == "routing":
+        found, case_files = C.routing_cases(cases)
+        if case_files != doc["case_files"] or any(i["case"] not in found for i in doc["items"]):
+            raise L.Refuse("case_sets_differ")
+        routing = C.routing_module()
+        for it in doc["items"]:
+            text = answers.get(it["key"])
+            if text is not None:
+                answered.add((it["case"], it["sample"]))
+                if routing.passes(found[it["case"]], text):
+                    passed.add((it["case"], it["sample"]))
+    else:
+        blind = load_blind(blind_path, doc, digest)
+        scorer = blind["model"]
+        schema = C.json_file("blind.schema.json")
+        score_keys = {e["score_key"] for e in blind["answers"] if e["score_key"] is not None}
+        score_counts, verdicts = C.count_lines(C.read_results(scores),
+                                               score_keys, C.schema_answer(schema))
+        out_counts["score_counts"] = score_counts
+        for it, e in zip(doc["items"], blind["answers"]):
+            verdict = verdicts.get(e["score_key"]) if e["score_key"] is not None else None
+            if it["key"] in answers and verdict is not None:
+                answered.add((it["case"], it["sample"]))
+                if verdict["result"] == "caught":
+                    passed.add((it["case"], it["sample"]))
+        case_files = doc["case_files"]
+
+    r = C.reader_score(doc, passed, answered)
+    card = {"job": "evals", "suite": suite, "instructions": doc["instructions"], "case_files": doc["case_files"],
+            "items": digest, "scorer": scorer, "readers": {reader: r}}
+    data = C.json_text(card)
+    score_sha = C.sha_bytes(data)
+    content16 = doc["instructions"]["sums"][:16]
+
+    lost, signals, base_sha, base = [], [], None, None
+    if baseline_path is not None:
+        base, base_sha = load_baseline(baseline_path, suite, doc["case_files"], reader)
+        lost = sorted(set(base["majority"]) - set(r["majority"]))
+        for case in lost:
+            sig = "evals:%s:%s:%s:%s" % (suite, reader, case, content16)
+            summary = ("%s case %s lost for %s: passed in %d of %d samples of the baseline and %d of %d of this pass"
+                       % (suite, case, reader, base["passes"].get(case, 0), base["n"], r["passes"].get(case, 0), r["n"]))
+            signals.append({"key": "batch-evals-" + L.sha256(sig)[:16], "summary": L.cut(summary, 600),
+                            "evidence": "score sha256:%s baseline sha256:%s content sha256:%s"
+                                        % (score_sha[:16], base_sha[:16], content16), "basis": score_sha})
+
+    answer = {"status": "ok", "out": out, "suite": suite, "reader": reader, "cases": len(r["passes"]), "n": r["n"],
+              "mean": r["mean"], "spread": r["spread"], "unanswered": r["unanswered"], "lost": lost, **out_counts}
+    if a.record is None:
+        L.write_files(out, [("score.json", data)])
+        return answer, 0
+
+    # The reads of the store, all before the first apply.
+    e = C.engine(store)
+    tasks = C.search_full(e, "task", None, qualified=False, limit=200)
+    if tasks is None:
+        raise C.store_failed()
+    task = next((i for i, _ in tasks if C.is_ref(i, "task", a.record)), None)
+    if task is None:
+        raise L.Refuse("unknown_task", exit_code=3)
+    name = "batch evals %s %s" % (suite, reader)
+    kpis = C.search_full(e, "kpi", [{"eq": ["name", name]}])
+    if kpis is None:
+        raise C.store_failed()
+    mine = next(((i, f) for i, f in kpis if C.is_ref(f.get("task"), "task", a.record)), None)
+    stored = C.read_findings(e, C.DETECTOR) if baseline_path is not None else {}
+
+    L.write_files(out, [("score.json", data)])
+    recorded = {"kpi": "found" if mine else "defined", "measurement": "failed", "opened": [], "seen": [], "left": 0,
+                "over_cap": 0, "already_applied": 0, "failed": []}
+    kpi = mine[0] if mine else None
+    if kpi is None:
+        outcome, code = C.apply_action(e, "define_kpi", name, score_sha,
+                                       {"task": task, "name": name, "definition": C.KPI_DEFINITION})
+        if outcome == "applied":
+            kpi = C.created(e, "kpi")
+        if kpi is None and outcome != "failed":
+            again = C.search_full(e, "kpi", [{"eq": ["name", name]}])
+            kpi = next((i for i, f in again or [] if C.is_ref(f.get("task"), "task", a.record)), None)
+        if kpi is None:
+            recorded["failed"].append({"key": name, "code": code or "kpi_not_found"})
+    if kpi is not None:
+        evidence = "evals/batch/evals/score sha256:%s content sha256:%s" % (score_sha[:16], content16)
+        if suite == "lead":
+            evidence += " scorer %s" % scorer
+        if mine and mine[1].get("evidence") == evidence:
+            recorded["measurement"] = "already"
+        else:
+            params = {"kpi": kpi, "value": L.cut(measurement(r, len(r["passes"])), 200), "observed_at": C.utc_now(),
+                      "evidence": evidence}
+            outcome, code = C.apply_action(e, "record_measurement", name, score_sha, params)
+            if outcome == "applied":
+                recorded["measurement"] = "applied"
+            elif outcome == "already_applied":
+                recorded["measurement"] = "already"
+            elif code == "older_measurement":
+                recorded["measurement"] = "older"
+            else:
+                recorded["failed"].append({"key": name, "code": code})
+    if signals:
+        done = C.finding_pass(e, C.DETECTOR, C.AGENT, C.PREFIX, signals, stored)
+        failed = recorded["failed"] + done.pop("failed")
+        recorded.update(done)
+        recorded["failed"] = failed
+    answer["recorded"] = recorded
+    return answer, (1 if recorded["failed"] else 0)
+
+
+if __name__ == "__main__":
+    sys.exit(L.main(run))

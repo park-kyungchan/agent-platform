@@ -1,0 +1,10 @@
+{
+  "type": "object",
+  "properties": {
+    "result": {"type": "string", "enum": ["caught", "partly", "missed"]},
+    "quote": {"type": "string"},
+    "clause": {"type": "string"}
+  },
+  "required": ["result", "quote", "clause"],
+  "additionalProperties": false
+}

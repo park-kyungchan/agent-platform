@@ -1,0 +1,103 @@
+#!/usr/bin/env -S python3 -I -B
+"""The evals job's builder: three Message Batch requests (samples) for each case of the routing suite or the Lead suite,
+each with the text of content/ at one commit as its system prompt and no tool.
+
+  build --suite routing|lead --clone <dir> [--rev <rev>] --model <id> --out <dir> [--cases <path>]...
+        [--samples <n>] [--max-tokens <n>] [--results <file>]...
+
+Writes requests.jsonl and items.json into --out and prints one JSON line. Calls no model and no network; starts no
+program but git; reads no file of a checkout of the clone and changes nothing in it. Every refusal is
+{"status":"<code>"} with exit 2. Contract: evals/batch/evals/README.md.
+"""
+import importlib.machinery
+import importlib.util
+import json
+import os
+import sys
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+
+
+def load(name, path):
+    loader = importlib.machinery.SourceFileLoader(name, path)
+    mod = importlib.util.module_from_spec(importlib.util.spec_from_loader(name, loader))
+    loader.exec_module(mod)
+    return mod
+
+
+L = load("batch_lib", os.path.join(HERE, "..", "lib.py"))
+C = load("evals_common", os.path.join(HERE, "common.py"))
+C.L = L
+
+
+def parse(argv):
+    p = C.Parser(add_help=False, allow_abbrev=False)
+    p.add_argument("--suite", required=True)
+    p.add_argument("--clone", required=True)
+    p.add_argument("--rev", default="origin/main")
+    p.add_argument("--model", required=True)
+    p.add_argument("--out", required=True)
+    p.add_argument("--cases", action="append", default=[])
+    p.add_argument("--samples", default="3")
+    p.add_argument("--max-tokens", default="4000")
+    p.add_argument("--results", action="append", default=[])
+    a = p.parse_args(argv)
+    if a.suite not in C.SUITES or not a.clone or not a.model or not a.out or not a.rev or a.rev.startswith("-") \
+            or any(not c for c in a.cases) or any(not r for r in a.results):
+        raise L.Refuse("usage")
+    if a.suite == "lead" and len(a.cases) != 1:
+        raise L.Refuse("usage")
+    a.samples = C.integer(a.samples, 3, 9)
+    a.max_tokens = C.integer(a.max_tokens, 256, 8000)
+    return a
+
+
+def run(argv):
+    a = parse(argv)
+    # The Academy rule before any read, call or write: the strings as given, then each path resolved.
+    clone, out, *rest = C.paths(a.clone, a.out, *a.cases, *a.results)
+    cases, results = rest[:len(a.cases)], rest[len(a.cases):]
+
+    # The cases of the suite: (id, user text) by id, and the digests of the case files.
+    if a.suite == "routing":
+        found, case_files = C.routing_cases(cases)
+        template = C.text_file("answer.md").rstrip("\n") + "\n"
+        users = [(cid, template.replace("{situation}", found[cid]["situation"])) for cid in sorted(found)]
+    else:
+        ids = C.lead_cases(cases[0])
+        case_files = {"cases.sha256": C.lead_digest()}
+        users = [(cid, C.lead_user(cases[0], cid)) for cid in ids]
+
+    repo = C.Clone(clone, a.rev)
+    files, instructions = repo.instructions()
+    system = C.instruction_text(files)
+    counts = {"result_lines_skipped": 0}
+    settled = C.settled_keys(results, counts)
+
+    items, lines, written = [], [], set()
+    for cid, user in users:
+        params = C.answer_params(a.model, a.max_tokens, system, user)
+        too_large = C.text_bytes(params) > C.TEXT_LIMIT
+        for s in range(1, a.samples + 1):
+            k = C.sample_key(params, s)
+            if too_large:
+                state = "too_large"
+            elif k in settled:
+                state = "settled"
+            else:
+                state = "requested"
+                if k not in written:
+                    written.add(k)
+                    lines.append(C.line_of(k, params))
+            items.append({"case": cid, "sample": s, "key": k, "state": state})
+    doc = {"job": "evals", "suite": a.suite, "model": a.model, "instructions": instructions, "case_files": case_files,
+           "samples": a.samples, "items": items}
+    L.write_files(out, [("requests.jsonl", C.lines_file(lines)), ("items.json", C.json_text(doc))])
+    states = [i["state"] for i in items]
+    return {"status": "ok", "out": out, "suite": a.suite, "cases": len(users), "requested": states.count("requested"),
+            "settled": states.count("settled"), "too_large": states.count("too_large"),
+            "system_bytes": len(system.encode("utf-8")), "result_lines_skipped": counts["result_lines_skipped"]}, 0
+
+
+if __name__ == "__main__":
+    sys.exit(L.main(run))

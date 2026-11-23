@@ -1,0 +1,89 @@
+#!/usr/bin/env -S python3 -I -B
+"""The spec-lint job's reader: one result file of the job's requests read against the builder's files.json into at most
+ten new findings of detector `batch:spec-lint` and severity `info`, one per file, anchor and kind.
+
+  read --files <files.json> --results <file> [--store <path>]
+
+The engine is ONT_BIN (default `ont`). Prints one JSON line; writes no file. Calls no model and no network; starts no
+program but the engine. Every refusal is {"status":"<code>"} with exit 2; a store that cannot be searched is
+{"status":"store_failed"} with exit 3. Contract: evals/batch/lint/README.md.
+"""
+import importlib.machinery
+import importlib.util
+import os
+import sys
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+
+
+def load(name, path):
+    loader = importlib.machinery.SourceFileLoader(name, path)
+    mod = importlib.util.module_from_spec(importlib.util.spec_from_loader(name, loader))
+    loader.exec_module(mod)
+    return mod
+
+
+L = load("batch_lib", os.path.join(HERE, "..", "lib.py"))
+X = load("lint_common", os.path.join(HERE, "common.py"))
+C = X.bind(L)
+
+ORDER = ("status", "lines", "read", "refused", "errored", "unreadable", "stale", "duplicate", "skipped", "items",
+         "opened", "seen", "left", "over_cap", "already_applied", "failed")
+
+
+def parse(argv):
+    p = C.Parser(add_help=False, allow_abbrev=False)
+    p.add_argument("--files", required=True)
+    p.add_argument("--results", required=True)
+    p.add_argument("--store")
+    a = p.parse_args(argv)
+    if not a.files or not a.results or a.store == "":
+        raise L.Refuse("usage")
+    return a
+
+
+def signal(f, item):
+    """The signal of one item of a file: the model decides the kind (of a closed list) and, among the rules the file
+    holds, the anchor; every other member comes from files.json and the fixed words."""
+    anchor = next((r for r in item["rules"] if r in f["rules"]), "file")
+    signature = "%s:%s#%s:%s" % (f["repository"], f["path"], anchor, item["kind"])
+    evidence = "key %s commit %s; rules %s; quote: %s; why: %s" % (
+        f["key"], f["commit"], ",".join(item["rules"]), item["quote"], item["why"])
+    summary = "%s: the weekly reading of the specifications found this %s" % (signature, item["kind"])
+    return signature, {"key": X.KEY_PREFIX + L.sha256(signature)[:16], "kind": "note", "severity": "info",
+                       "summary": L.cut(summary, X.SUMMARY), "evidence": L.cut(L.plain(evidence), X.EVIDENCE),
+                       "basis": f["key"]}
+
+
+def run(argv):
+    a = parse(argv)
+    for p in (a.files, a.results, a.store):
+        if p is not None:
+            L.refuse_academy(p)
+    files_path, results_path = L.resolve(a.files), L.resolve(a.results)
+    store = L.resolve(a.store) if a.store is not None else None
+    files = X.load_files(files_path)
+    lines = L.result_lines(results_path)
+    schema = X.json_file("verdict.schema.json")
+
+    counts, verdicts = C.count_lines(lines, {f["key"] for f in files}, C.schema_answer(schema))
+    signals, met = [], set()
+    for f in files:
+        verdict = verdicts.get(f["key"])
+        for item in verdict["items"] if verdict is not None else []:
+            sig, s = signal(f, item)
+            if sig not in met:
+                met.add(sig)
+                signals.append(s)
+
+    done = {"opened": [], "seen": [], "left": 0, "over_cap": 0, "already_applied": 0, "failed": []}
+    if signals:
+        engine = L.Engine(store, X.AGENT, "api")
+        stored = C.read_findings(engine, X.DETECTOR)
+        done = C.finding_pass(engine, X.DETECTOR, X.AGENT, X.PREFIX, signals, stored)
+    answer = {"status": "ok", "lines": len(lines), **counts, "items": len(signals), **done}
+    return {k: answer[k] for k in ORDER}, (1 if done["failed"] else 0)
+
+
+if __name__ == "__main__":
+    sys.exit(L.main(run))
