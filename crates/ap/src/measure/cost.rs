@@ -10,7 +10,7 @@ use std::collections::{BTreeMap, BTreeSet};
 const BY: [&str; 4] = ["role", "intent", "unit", "day"];
 const STAGES: [&str; 4] = ["implementer", "fixer", "verifier", "reviewer"];
 const LEAD: [&str; 2] = ["lead", "writer"];
-const DAY: u64 = 86_400;
+pub(super) const DAY: u64 = 86_400;
 
 struct Window {
     since: String,
@@ -19,15 +19,12 @@ struct Window {
     intent: Option<String>,
 }
 
-fn parameters(p: &Value) -> Result<Window, Failure> {
+/// The window of the parameters `o`: `since` and `until`, UTC days of the calendar, `since` not after `until`, at most
+/// 92 days (R9). `flow` and `share` read their window as `cost` does.
+pub(super) fn window(
+    o: &serde_json::Map<String, Value>,
+) -> Result<(String, String), Failure> {
     let invalid = |f: &str| error("invalid_input", f);
-    let o = p.as_object().ok_or_else(|| invalid("stdin"))?;
-    if let Some(k) = o
-        .keys()
-        .find(|k| !["since", "until", "by", "intent"].contains(&k.as_str()))
-    {
-        return Err(invalid(k));
-    }
     let day = |name: &str| -> Result<(String, u64), Failure> {
         let d = o
             .get(name)
@@ -44,6 +41,19 @@ fn parameters(p: &Value) -> Result<Window, Failure> {
     if to < from || (to - from) / DAY + 1 > 92 {
         return Err(invalid("until"));
     }
+    Ok((since, until))
+}
+
+fn parameters(p: &Value) -> Result<Window, Failure> {
+    let invalid = |f: &str| error("invalid_input", f);
+    let o = p.as_object().ok_or_else(|| invalid("stdin"))?;
+    if let Some(k) = o
+        .keys()
+        .find(|k| !["since", "until", "by", "intent"].contains(&k.as_str()))
+    {
+        return Err(invalid(k));
+    }
+    let (since, until) = window(o)?;
     let by = match o.get("by") {
         None | Some(Value::Null) => "role".to_owned(),
         Some(Value::String(b)) if BY.contains(&b.as_str()) => b.clone(),
@@ -91,10 +101,9 @@ struct Group {
     runs: BTreeSet<String>,
 }
 
-/// `cost` over the store `store` with the parameters `p`.
-pub(super) fn cost(s: &mut impl System, store: &str, p: &Value) -> Result<Value, Failure> {
+/// `cost` over the store `st` (the engine's default when none) with the parameters `p`.
+pub(super) fn cost(s: &mut impl System, st: Option<&str>, p: &Value) -> Result<Value, Failure> {
     let w = parameters(p)?;
-    let st = Some(store);
     if let Some(i) = &w.intent
         && store::get(s, st, "intent", i)?.is_none()
     {

@@ -1,0 +1,10 @@
+[Unit]
+Description=ap measure every night at 00:20 UTC
+Documentation=https://github.com/park-kyungchan/agent-platform/blob/main/deploy/README.md
+
+[Timer]
+OnCalendar=*-*-* 00:20:00 UTC
+Persistent=true
+
+[Install]
+WantedBy=timers.target
