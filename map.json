@@ -1,6 +1,6 @@
 {
  "components": [
-  {"name": "ap", "purpose": "The ap command: stages, the gate, reviews, units, delivery and store reads.", "paths": ["crates/ap/"], "entry": ["crates/ap/src/main.rs:1-10", "crates/ap/src/unit/render.rs:217-225"], "spec": ["specs/ap/unit.md", "specs/ap/work.md"], "tests": ["crates/ap/tests/unit.rs", "crates/ap/tests/help.rs"]},
+  {"name": "ap", "purpose": "The ap command: stages, the gate, reviews, units, delivery and store reads.", "paths": ["crates/ap/"], "entry": ["crates/ap/src/main.rs:1-10", "crates/ap/src/unit/render.rs:217-225"], "spec": ["specs/ap/unit.md", "specs/ap/work.md", "specs/ap/state.md"], "tests": ["crates/ap/tests/unit.rs", "crates/ap/tests/help.rs"]},
   {"name": "secret-scan", "purpose": "The scan of a unit head's added lines for a secret: five forms, admissions in the page's notes, one path at a time.", "paths": ["crates/ap/src/unit/scan.rs", "crates/ap/tests/unit_scan.rs"], "entry": ["crates/ap/src/unit/scan.rs:1-10"], "spec": ["specs/ap/unit-run.md"], "tests": ["crates/ap/tests/unit_scan.rs"]},
  {"name": "crates", "purpose": "The Cargo workspace's crates: the ap crate.", "paths": ["crates/"], "entry": ["crates/ap/Cargo.toml:1-10"], "spec": [], "tests": []},
   {"name": "repo-files", "purpose": "The repository check and the workspace manifests at the root.", "paths": ["check", "rust-toolchain.toml", "Cargo.toml", "Cargo.lock"], "entry": ["check:1-15"], "spec": [], "tests": []},

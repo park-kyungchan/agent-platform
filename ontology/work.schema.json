@@ -1,7 +1,7 @@
 {
   "format": "ontology-schema/v1",
   "domain": "work",
-  "version": 20,
+  "version": 21,
   "namespace": {
     "instance": "vps://palantirkc",
     "account": "root"
@@ -108,7 +108,7 @@
     "unit_state": {"base": "string", "enum": ["draft", "ready", "running", "accepted", "stopped", "merged", "done", "dropped"]},
     "acceptance_kind": {"base": "string", "enum": ["fails_on_base", "invariant"]},
     "run_status": {"base": "string", "enum": ["running", "closed"]},
-    "finding_kind": {"base": "string", "enum": ["incident", "lesson", "drift", "security", "note"]},
+    "finding_kind": {"base": "string", "enum": ["incident", "lesson", "drift", "security", "note", "bottleneck"]},
     "finding_severity": {"base": "string", "enum": ["info", "act", "urgent"]},
     "finding_state": {"base": "string", "enum": ["open", "planned", "dismissed", "closed"]}
   },
@@ -1305,7 +1305,7 @@
       "owner": "ontology",
       "primary_key": {"from": "/native_key"},
       "properties": {
-        "kind": {"type": {"value_type": "finding_kind"}, "required": true, "description": "incident, lesson, drift, security or note."},
+        "kind": {"type": {"value_type": "finding_kind"}, "required": true, "description": "incident, lesson, drift, security, note or bottleneck."},
         "detector": {"type": "string", "required": true, "max_bytes": 60, "description": "What found it: a check, a command or an agent's role."},
         "summary": {"type": "string", "required": true, "max_bytes": 600, "description": "What should change, in a sentence or two."},
         "evidence": {"type": "string", "required": false, "max_bytes": 2000, "description": "The last evidence: output, a path and line, a record."},
@@ -2696,6 +2696,7 @@
       "rules": [
         {
           "modify_object": "memory_record",
+          "target": "$record",
           "set": {
             "status": "superseded"
           }
@@ -3474,7 +3475,7 @@
         {"code": "by_not_later", "message": "stopped_by must be said after the delegation it ends.", "all": [{"exists": "$request"}, {"exists": "$stopped_by"}, {"gt": ["$stopped_by.said_at", "$request.said_at"]}]}
       ],
       "rules": [
-        {"modify_object": "request", "set": {"status": "superseded"}}
+        {"modify_object": "request", "target": "$request", "set": {"status": "superseded"}}
       ]
     },
     "draft_intent": {
@@ -4097,7 +4098,7 @@
       "description": "Open a finding. The key is the native key of the parameter finding, formed from the detector and a signature; a used key is refused by the engine (revision_conflict): see it again or reopen it.",
       "parameters": {
         "finding": {"type": {"ref": "finding"}, "required": true, "description": "The new finding: an Id of type finding whose native_key is the new key."},
-        "kind": {"type": {"value_type": "finding_kind"}, "required": true, "description": "incident, lesson, drift, security or note."},
+        "kind": {"type": {"value_type": "finding_kind"}, "required": true, "description": "incident, lesson, drift, security, note or bottleneck."},
         "detector": {"type": "string", "required": true, "max_bytes": 60, "description": "What found it: a check, a command or an agent's role."},
         "summary": {"type": "string", "required": true, "max_bytes": 600, "description": "What should change, in a sentence or two."},
         "evidence": {"type": "string", "required": false, "max_bytes": 2000, "description": "The last evidence: output, a path and line, a record."},
@@ -4282,7 +4283,7 @@
         {"code": "requests_empty", "message": "A list of requests given is not empty; omit it to keep the list.", "none": [{"all": [{"present": "$requests"}, {"eq": ["$requests", []]}]}]}
       ],
       "rules": [
-        {"modify_object": "principle", "set": {"order_key": "$order_key", "statement": "$statement", "parent": "$parent", "requests": "$requests", "amended_at": "$now"}}
+        {"modify_object": "principle", "target": "$principle", "set": {"order_key": "$order_key", "statement": "$statement", "parent": "$parent", "requests": "$requests", "amended_at": "$now"}}
       ]
     },
     "retire_principle": {
@@ -5170,6 +5171,55 @@
         {"header": "Parent", "property": "parent"},
         {"header": "Statement", "property": "statement"},
         {"header": "Requests", "property": "requests"}
+      ]
+    },
+    "lead_state": {
+      "args": ["directory"],
+      "blocks": [
+        {"heading": "Intent", "list": {"object_type": "intent", "filter": {"all": [{"eq": ["directory", "$directory"]}, {"in": ["status", ["draft", "assumed", "confirmed"]]}]}, "order": [{"property": "amended_at", "direction": "desc"}], "properties": ["$key", "lead_session", "lead_named_by", "notes"], "limit": 1}},
+        {"heading": "Holds", "list": {"object_type": "hold", "filter": {"all": [{"eq": ["status", "active"]}]}, "order": [{"property": "set_at", "direction": "asc"}], "properties": ["$key", "effect", "until"], "limit": 6}},
+        {"heading": "Lessons", "list": {"object_type": "finding", "filter": {"all": [{"eq": ["kind", "lesson"]}, {"in": ["state", ["open", "planned"]]}]}, "order": [{"property": "first_seen_at", "direction": "asc"}], "properties": ["$key", "summary"], "limit": 8}}
+      ]
+    },
+    "lead_handover": {
+      "args": ["directory", "intent", "task"],
+      "blocks": [
+        {"heading": "Mandate", "table": {"object_type": "intent", "filter": {"all": [{"eq": ["directory", "$directory"]}, {"in": ["status", ["draft", "assumed", "confirmed"]]}]}, "order": [{"property": "amended_at", "direction": "desc"}], "columns": [
+          {"header": "Key", "property": "$key"},
+          {"header": "Outcome", "property": "outcome"},
+          {"header": "First user", "property": "first_user"},
+          {"header": "Lead", "property": "lead_session"}
+        ], "limit": 1}},
+        {"heading": "Criteria", "table": {"object_type": "criterion", "filter": {"all": [{"eq": ["intent", "$intent"]}]}, "order": [{"property": "added_at", "direction": "asc"}], "columns": [
+          {"header": "Key", "property": "$key"},
+          {"header": "State", "property": "state"},
+          {"header": "Check", "property": "check"},
+          {"header": "Evidence", "property": "evidence"}
+        ], "limit": 40}},
+        {"heading": "Units", "table": {"object_type": "unit", "filter": {"all": [{"eq": ["intent", "$intent"]}, {"in": ["state", ["draft", "ready", "running", "accepted", "stopped"]]}]}, "order": [{"property": "added_at", "direction": "asc"}], "columns": [
+          {"header": "Key", "property": "$key"},
+          {"header": "State", "property": "state"},
+          {"header": "Class", "property": "class"},
+          {"header": "Waits on", "property": "waits_on"}
+        ], "limit": 100}},
+        {"heading": "Baseline", "table": {"object_type": "kpi", "filter": {"all": [{"eq": ["task", "$task"]}]}, "order": [{"property": "name", "direction": "asc"}], "columns": [
+          {"header": "KPI", "property": "name"},
+          {"header": "Current", "property": "value"},
+          {"header": "Observed", "property": "observed_at"},
+          {"header": "Evidence", "property": "evidence"}
+        ], "limit": 60}},
+        {"heading": "Lessons", "list": {"object_type": "finding", "filter": {"all": [{"eq": ["kind", "lesson"]}, {"in": ["state", ["open", "planned"]]}]}, "order": [{"property": "first_seen_at", "direction": "asc"}], "properties": ["$key", "summary"], "limit": 40}}
+      ]
+    },
+    "bottlenecks": {
+      "blocks": [
+        {"heading": "Open", "table": {"object_type": "finding", "filter": {"all": [{"eq": ["kind", "bottleneck"]}, {"in": ["state", ["open", "planned"]]}]}, "order": [{"property": "$key", "direction": "asc"}], "columns": [
+          {"header": "Key", "property": "$key"},
+          {"header": "Bottleneck", "property": "summary"},
+          {"header": "Value and command", "property": "evidence"},
+          {"header": "Last seen", "property": "last_seen_at"}
+        ], "limit": 200}},
+        {"heading": "Closed", "list": {"object_type": "finding", "filter": {"all": [{"eq": ["kind", "bottleneck"]}, {"in": ["state", ["closed", "dismissed"]]}]}, "order": [{"property": "$key", "direction": "asc"}], "properties": ["$key", "summary", "reason"], "limit": 200}}
       ]
     }
   }

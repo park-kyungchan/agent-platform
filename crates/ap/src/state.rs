@@ -1,17 +1,26 @@
-//! `ap state`: what the records of a task directory and Git say of its unit calls and stages, read
-//! only (README "The task's state"). Files are read with `std::fs`; `git`, `systemctl` and `ps`
-//! cross the `System` port.
+//! `ap state`: what the records of a task directory and Git say of its unit calls and stages, and
+//! the form of its `STATE.md`, read only (`specs/ap/state.md`). Files are read with `std::fs`;
+//! `git`, `systemctl` and `ps` cross the `System` port.
 use crate::host::{Failure, System, args, error};
 use crate::run::stamp;
 use serde_json::{Value, json};
 use std::{
     collections::BTreeMap,
     ffi::OsString,
-    io::Write,
+    fs::OpenOptions,
+    io::{BufRead, BufReader, Write},
+    os::unix::fs::OpenOptionsExt,
     path::Path,
     process::ExitCode,
     time::{Duration, SystemTime},
 };
+
+/// The most lines `STATE.md` holds (`ontology/README.md`, "Version 21").
+const STATE_LINES: usize = 30;
+/// The lines the plain form prints in all, the form line included.
+const TEXT_LINES: usize = 60;
+/// What a block rendered by `ont render` begins with.
+const BLOCK_OPENING: &[u8] = b"<!-- ont:render ";
 
 /// A record that parsed: its path relative to the task directory and its object.
 struct Rec {
@@ -112,6 +121,36 @@ fn git(s: &mut impl System, dir: &str, rest: &[&str]) -> Option<String> {
         .success
         .then(|| String::from_utf8_lossy(&reply.stdout).into_owned())
 }
+/// The form of `<dir>/STATE.md` (R13): None when it is absent or not a regular file, else its line
+/// count and the number of its lines that open a rendered block. Not read through a symbolic link.
+fn state_md(root: &Path) -> Option<(usize, usize)> {
+    let path = root.join("STATE.md");
+    if !std::fs::symlink_metadata(&path).ok()?.is_file() {
+        return None;
+    }
+    let mut options = OpenOptions::new();
+    options.read(true);
+    options.custom_flags(rustix::fs::OFlags::NOFOLLOW.bits() as i32);
+    let file = options.open(&path).ok()?;
+    if !file.metadata().ok()?.is_file() {
+        return None;
+    }
+    let (mut lines, mut blocks) = (0, 0);
+    let mut reader = BufReader::new(file);
+    let mut line = vec![];
+    loop {
+        line.clear();
+        match reader.read_until(b'\n', &mut line) {
+            Ok(0) => break,
+            Ok(_) => {
+                lines += 1;
+                blocks += usize::from(line.starts_with(BLOCK_OPENING));
+            }
+            Err(_) => return None,
+        }
+    }
+    Some((lines, blocks))
+}
 fn modified(path: &Path) -> Value {
     let time = std::fs::metadata(path).and_then(|m| m.modified());
     time.map_or(Value::Null, |t: SystemTime| json!(stamp(t)))
@@ -130,16 +169,19 @@ pub fn execute(s: &mut impl System, argv: &[String]) -> Result<String, Failure> 
     let dir = dir.ok_or_else(|| error("usage", "args"))?;
     let root = s.directory(dir).map_err(|_| error("usage", "args"))?;
     let runs = root.join("runs");
-    if !runs.is_dir() {
-        return Err(error("usage", "args"));
-    }
+    // A directory without `runs/` has no record to read and nothing to ask `systemctl` or `ps`.
+    let run_tree = runs.is_dir();
     let root_text = root.to_string_lossy().into_owned();
     let head = git(s, &root_text, &["rev-parse", "HEAD"]).map(|h| h.trim().to_owned());
     let uncommitted = git(s, &root_text, &["status", "--porcelain"]).map(|o| o.lines().count());
 
     let mut unreadable = vec![];
-    let calls = records(&runs, ".unit.json", &mut unreadable);
-    let stage_records = records(&runs, ".run.json", &mut unreadable);
+    let calls = run_tree
+        .then(|| records(&runs, ".unit.json", &mut unreadable))
+        .unwrap_or_default();
+    let stage_records = run_tree
+        .then(|| records(&runs, ".run.json", &mut unreadable))
+        .unwrap_or_default();
     unreadable.sort();
 
     // The state of each stage record: live or not, for the ones that say they run. `ap run` writes
@@ -269,17 +311,45 @@ pub fn execute(s: &mut impl System, argv: &[String]) -> Result<String, Failure> 
         .map(|(account, (_, r))| json!({"account": account, "record": r.path, "limit": r.get("limit")}))
         .collect();
 
+    let form = json!({"state_md": state_md(&root).map(|(lines, blocks)|
+            json!({"lines": lines, "limit": STATE_LINES, "blocks": blocks})), "run_tree": run_tree});
     let v = json!({"at": stamp(now),
         "task": {"dir": root_text, "head": head, "uncommitted": uncommitted},
         "units": units, "stages": stages, "streams_without_record": streams,
-        "limits": limits, "unreadable": unreadable});
+        "limits": limits, "unreadable": unreadable, "form": form});
     Ok(match lines {
         true => text_of(&v),
         false => format!("{v}\n"),
     })
 }
-/// The plain form: at most 60 lines.
+/// The plain form: the form line, then the lines of the base, at most 60 lines in all (R14).
 fn text_of(v: &Value) -> String {
+    let form = &v["form"];
+    let tree = if form["run_tree"] == true {
+        "present"
+    } else {
+        "absent"
+    };
+    let head = match form["state_md"].as_object() {
+        None => format!("form: STATE.md absent, runs/ {tree}"),
+        Some(m) => {
+            let lines = m["lines"].as_u64().unwrap_or(0);
+            let over = if lines > STATE_LINES as u64 {
+                " over"
+            } else {
+                ""
+            };
+            format!(
+                "form: STATE.md {lines} of {STATE_LINES} lines, {} rendered blocks, runs/ {tree}{over}",
+                m["blocks"].as_u64().unwrap_or(0)
+            )
+        }
+    };
+    let rest = base_lines(v);
+    head + "\n" + &rest.iter().map(|l| format!("{l}\n")).collect::<String>()
+}
+/// The lines of the base's plain form, cut so that with the form line they are at most 60.
+fn base_lines(v: &Value) -> Vec<String> {
     let t = |v: &Value| match v {
         Value::String(s) => s.replace(['\n', '\r'], " "),
         Value::Null => "-".to_owned(),
@@ -351,14 +421,14 @@ fn text_of(v: &Value) -> String {
             t(&l["record"])
         ));
     }
-    if out.len() > 60 {
-        let more = out.len() - 59;
-        out.truncate(59);
+    if out.len() > TEXT_LINES - 1 {
+        let more = out.len() - (TEXT_LINES - 2);
+        out.truncate(TEXT_LINES - 2);
         out.push(format!(
             "... {more} more lines: ap state without --text prints them all"
         ));
     }
-    out.join("\n") + "\n"
+    out
 }
 pub fn cli(argv: &[OsString]) -> ExitCode {
     let words: Option<Vec<String>> = argv.iter().map(|a| a.to_str().map(str::to_owned)).collect();

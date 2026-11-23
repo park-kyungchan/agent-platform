@@ -1854,3 +1854,125 @@ of the intake suite with `all` true and `serves` empty, one of the routing suite
 (`initial`), read back by `ont search` with every property, then indexed again unchanged; a line of another type fails
 the source `record_type_mismatch` and changes no head; a file written again without one case retracts it. The last line
 of standard output of the rehearsal is `v20 cases: ok`.
+
+## Version 21: documents and rule targets
+Version 20 remains pinned at
+`949478b56c00cd64d559e01b29e7dbb35d26b7b3:ontology/work.schema.json`,
+sha256 `916a9f502ca956644330632efa14963455b16e445a511b2633715189bf19b4c2`.
+Version 21 changes version 20 in three places only; every object type, link type, function, source and grant reads the
+same, and no parameter, criterion or action name changes, so every caller of `ap` sends the same requests and gets the
+same answers. The point of the version: a task directory's `STATE.md`, a Lead's hand-over and the table of bottlenecks
+are document views rendered by `ont render` from objects, not files edited by hand. The engine that renders them is the
+pin of this version (below).
+
+1. The schema.
+   - (a) The value type `finding_kind` gains `bottleneck`, after `note` (`incident`, `lesson`, `drift`, `security`,
+     `note`, `bottleneck`); the descriptions of the property `finding.kind` and of the parameter `kind` of
+     `open_finding` name it. A finding's kind is set only when it opens, so a bottleneck is a finding opened as one. A
+     carried note of the Lead is a finding of kind `lesson`, recorded before this version and closed when the refusal
+     that prevents it is delivered; a bottleneck row is a finding of kind `bottleneck`, recorded after delivery.
+   - (b) Rule targets: the member `target` of a rule, the string `$<parameter>`, names the parameter whose object the
+     rule edits (`specs/ont/action.md` R108 of the engine). The rule of `amend_principle` gets `"target":
+     "$principle"`, the rule of `end_delegation` `"$request"` and the rule of `mark_memory_record_superseded`
+     `"$record"`: each action declares two parameters of the type its rule edits (`principle` and `parent`; `request` and
+     `stopped_by`; `record` and `successor`), and the engine refuses such a rule without a target
+     (`ambiguous_rule_target`, R109) when a schema is installed. These are the only three rules of version 20 the
+     engine refuses: `ont schema check` of version 20 under the pin names exactly them and of version 21 names none.
+     `mark_memory_record_pending` has two parameters of its type too, but its type is keyed by `/native_key`, not by
+     `$action_id`, and the engine does not refuse it. No other member of an action changes.
+   - (c) Three views, each a document (`{"blocks": [...], "args"?: [...]}`; a block is `{"heading", "table" | "list"}`;
+     a list prints `- ` and its cells joined by `: `, `- (none)` when empty and `- (+N more; limit L)` past its limit;
+     `specs/ont/render.md` R51 to R54 of the engine). An open intent is one whose `status` is `draft`, `assumed` or
+     `confirmed`; a live finding is one whose `state` is `open` or `planned`. The grants do not change: every type the
+     views read is in the grant's `read` already.
+
+     | View | Arguments | Blocks, in this order |
+     | --- | --- | --- |
+     | `lead_state` | `directory` | `Intent`: a list of the open intent of that `directory`, newest `amended_at` first, `$key`, `lead_session`, `lead_named_by`, `notes`, limit 1. `Holds`: a list of the active holds by `set_at`, `$key`, `effect`, `until`, limit 6. `Lessons`: a list of the live findings of kind `lesson` by `first_seen_at`, `$key`, `summary`, limit 8. |
+     | `lead_handover` | `directory`, `intent`, `task` | `Mandate`: a table of the open intent of `directory` (`Key`, `Outcome`, `First user`, `Lead`), limit 1. `Criteria`: a table of the criteria of `intent` by `added_at` (`Key`, `State`, `Check`, `Evidence`), limit 40. `Units`: a table of the units of `intent` in the states `draft`, `ready`, `running`, `accepted` and `stopped` by `added_at` (`Key`, `State`, `Class`, `Waits on`), limit 100. `Baseline`: a table of the KPIs of `task` by name (`KPI`, `Current`, `Observed`, `Evidence`), limit 60. `Lessons`: as in `lead_state`, limit 40. |
+     | `bottlenecks` | none | `Open`: a table of the live findings of kind `bottleneck` by `$key` (`Key`, `Bottleneck`, `Value and command`, `Last seen`), limit 200. `Closed`: a list of those whose `state` is `closed` or `dismissed` by `$key`: `$key`, `summary`, `reason`, limit 200. |
+
+     So the markdown of `lead_state` is at most 25 lines: two marker lines, three headings, two empty lines and at most
+     2, 7 and 9 item lines (an item line and the line `- (+N more; limit L)`). The engine writes a line break inside a
+     cell as a space and an opening or closing marker of a block inside a cell with an escape, so a note cannot add a
+     line or end its block. `ont describe` of the engine lists the table views and not the documents; a document is
+     read with `ont render`. A table view reads the bytes it read under version 20.
+
+2. The engine. `ENGINE-PIN` holds `d35048a568230e4065910ddcea56efa8de1d1db4`, the ontology-platform merge of the unit
+   view-doc. Its history holds the merges of the units sec-actor (`87b40bb29575fef8bef595349cdfe642f3a9cd9a`) and
+   dom-isolate (`a5230373c9e0da7ab1b9d4b80588262dc0c14f61`), and no other commit is the pin. An `ont` older than the pin
+   refuses `blocks` and `target` of a schema (`unknown_field`), so delivery installs the engine before the schema
+   (`specs/ap/deliver.md` R37): the call with `engine` first, then the call that installs version 21. Between those two
+   calls alone, the three actions of point 1 (b) refuse `ambiguous_rule_target`: the engine of the pin applies the
+   strict check to a new install, an identical reinstall included, and refuses a rule without its target (R110).
+
+   A stage of a unit holds no credential for the private ontology-platform, so `cargo install --git` of a pin fails
+   there. The rule of `./check`: a unit that moves the pin is made ready only after the Lead installs
+   `/usr/local/bin/ont-<its pin>`, which `ci/engine-pin.sh` takes when that file is executable and names the pin (the
+   line `check: engine /usr/local/bin/ont-<pin> (pinned)`); a stage sees `/usr` read-only. The host's `ont` moves only by
+   delivery with `engine`, in two calls (the engine, then the schema), and until then `ont-<pin>` serves the `./check` of
+   the next unit too.
+
+   What a reader of the store sees change since the engine of version 20's pin (`c600967`): a row of `ont log` names its
+   actor with `principal` (`uid:<n>`), `host` and `claimed` (the names of the actor's members the caller supplied: `agent`,
+   `client`, `role`); a call whose action type is declared by two domains refuses `action_ambiguous` (field `domains`); a
+   schema with a rule that needs a target refuses `ambiguous_rule_target`; `--now` with `--store` naming the default store
+   refuses `now_at_default_store` (without `--store`, `now_requires_store`).
+
+   The behaviour of `amend_principle` changes with the target. Under `c600967` a call that gave `parent` edited the
+   parent: the engine took the first reference parameter of the type in name order, and `parent` sorts before
+   `principle`. The rehearsal's row `want-reparent` asserted only the parent's key and so passed. From version 21 the
+   call edits `principle` and only sets its `parent`; the parent given is left as it was (its `parent`, `statement`,
+   `amended_at` and every other member). A principle that a call with `parent` damaged under `c600967` is repaired by the
+   Lead's own reading of `ont log`, not by this version. `end_delegation` and `mark_memory_record_superseded` edit
+   `request` and `record`, as under `c600967`, which took the first in name order.
+
+### What the store does not check
+- That a lesson is closed when the refusal that prevents it is delivered: `close_finding` is the Lead's step, and a
+  lesson that stays open stays in `lead_state`.
+- That a bottleneck's key keeps its row number: the key is the native key of the finding, chosen by the Lead when it
+  opens one; the store keeps a key unique and nothing more.
+- That `STATE.md` holds at most 30 lines, or that a block of it is current. A `lead_state` block is at most 25 lines; the
+  file's other lines are the Lead's. `ap state <directory> --text` prints the line count, the number of rendered blocks
+  and whether the file is over (`specs/ap/state.md`), and `ont render --check STATE.md` reads a block's currency.
+- That the intent of a `directory` is the only one: `lead_state` shows the newest open intent of that `directory` and
+  says `- (+N more; limit 1)` when there are others.
+- That a finding of kind `lesson` or `bottleneck` is a lesson or a bottleneck in fact: the kind is the opener's word.
+
+### The migration and the rehearsal
+`ontology/migrate` knows version 21; its step is empty (no data migration). The line `HIGHEST = 21` names it; `21 22`
+and `9 22` are pairs it does not know (exit 2). The pairs refused on the version 10 part of the rehearsal are (9, 22),
+(10, 10) and (10, 9). An `ap` of the version before reads and writes as on version 20.
+
+Under the engine of the pin a new install, an identical reinstall included, takes the strict check, which refuses a rule
+of point 1 (b) without `target`. The versions the rehearsal installs from Git hold such rules:
+`mark_memory_record_superseded` from the version of commit `f46cdf49ba74e117ddaaf387416a0eac1d53f2af` on,
+`end_delegation` from version 10, `amend_principle` from version 13. Each pinned version is therefore installed as a
+copy in which only those rules gain the `target` of point 1 (b), after the digest of its Git bytes is asserted, beside
+the copy that already moves the sources' paths (`redirect.make` does both, and asserts that the copy restored to the
+Git bytes differs from them by the three targets alone); no walk of an earlier version is removed. The two installs of
+the first store that asserted no digest, version 5 (`f46cdf49ba74e117ddaaf387416a0eac1d53f2af`) and version 6
+(`8ad36bf3cf10e19659965cc2d458a921533cdfae`), now assert their Git digests, the ones the second store's `install`
+asserts, before their copies.
+
+The second store of the rehearsal now installs version 20 from Git by its commit and digest (above) instead of the
+repository's file, and runs the walk of version 20 on it. Then it installs the repository's file over the objects made
+under version 20: every object read under version 20 and the twenty views read the same (the table views, byte for
+byte but for the schema's version in the marker line); the schema differs from version 20 only by points 1 (a) to (c)
+(each is taken off a copy and the rest compared, and the three documents are compared with the blocks above);
+`ont_describe` and `ont_action_list` stay within 262,144 bytes (the line `v21_mcp_bytes=` of the rehearsal was 257,111
+and 158,163 when this section was written); `ontology/migrate` runs 20 21 and 19 21 (exit 0, the store unchanged) and
+21 22 (exit 2).
+
+The walk of version 21: `open_finding` with kind `bottleneck` applies and a word that is not a kind is refused
+`invalid_parameter`; `amend_principle` with `principle` and `parent` edits that principle and leaves every member of the
+parent and of the parent's own parent as it was; `end_delegation` supersedes `request` and leaves `stopped_by` current;
+`mark_memory_record_superseded` marks `record` and leaves `successor` as it was. Then objects in every block (an open
+intent with a `directory`, its Lead and notes, a retired intent and an intent of another directory that the views leave
+out, criteria, units, a dropped unit that is left out, a KPI of a task with a measurement, active and lifted holds, live,
+closed and dismissed lessons, live, closed and dismissed bottlenecks): each document renders twice with the same bytes;
+`render --write` into a file with text around one block and `render --check --expect-blocks 1` exit 0, a change of the
+store makes `--check` refuse `render_drift`, and `--expect-blocks 2` refuses `render_block_count`; after `close_finding`
+of a lesson the next render of `lead_state` lacks it; a second open intent of the directory, ten active holds and ten
+more live lessons make `lead_state` exactly 25 lines, with a note of several lines among them. The last line of standard
+output of the rehearsal is `v21 documents: ok`.
