@@ -1036,9 +1036,7 @@ fn fields<'a>(v: &'a Value, names: &[&str]) -> Step<Vec<&'a Value>> {
         .collect()
 }
 fn listed<'a>(v: &'a Value, name: &str) -> Step<&'a Vec<Value>> {
-    v.get(name)
-        .and_then(Value::as_array)
-        .ok_or_else(unreadable)
+    v.get(name).and_then(Value::as_array).ok_or_else(unreadable)
 }
 /// Millionths of a USD as USD to the cent, in integers, half away from zero.
 fn usd(v: &Value) -> Step<String> {
@@ -1088,7 +1086,13 @@ fn cost_lines(label: &str, a: &Value, all: bool) -> Step<Vec<String>> {
         let (key, usd, runs) = (cell(key), cell(usd), cell(runs));
         out.push(format!("cost {label} {key} {usd} USD {runs} runs"));
     }
-    let names = ["total_usd", "merged", "usd_a_pr", "lead_share", "unmeasured"];
+    let names = [
+        "total_usd",
+        "merged",
+        "usd_a_pr",
+        "lead_share",
+        "unmeasured",
+    ];
     let got = fields(a, &names[..if all { 5 } else { 4 }])?;
     let [total, merged, per, share] = [0, 1, 2, 3].map(|i| cell(got[i]));
     let end = if all {
@@ -1109,7 +1113,12 @@ fn section_lines(name: &str, lines: Step<Vec<String>>) -> Vec<String> {
 fn api_lines(month: &str, a: &Value) -> Step<Vec<String>> {
     let mut out = vec![];
     for j in listed(a, "jobs")? {
-        let names = ["job", "settled_usd_micros", "reserved_usd_micros", "counted_usd_micros"];
+        let names = [
+            "job",
+            "settled_usd_micros",
+            "reserved_usd_micros",
+            "counted_usd_micros",
+        ];
         let [job, settled, reserved, counted] = fields(j, &names)?[..] else {
             return Err(unreadable());
         };
@@ -1126,7 +1135,11 @@ fn api_lines(month: &str, a: &Value) -> Step<Vec<String>> {
             cell(running)
         ));
     }
-    let names = ["settled_usd_micros", "reserved_usd_micros", "counted_usd_micros"];
+    let names = [
+        "settled_usd_micros",
+        "reserved_usd_micros",
+        "counted_usd_micros",
+    ];
     let [settled, reserved, counted] = fields(a, &names)?[..] else {
         return Err(unreadable());
     };
@@ -1142,7 +1155,9 @@ fn api_lines(month: &str, a: &Value) -> Step<Vec<String>> {
 fn capacity_lines(a: &Value) -> Step<Vec<String>> {
     let mut out = vec!["HOSTS".to_owned()];
     for h in listed(a, "hosts")? {
-        let names = ["host", "machine", "node", "answers", "stale", "free", "cpus"];
+        let names = [
+            "host", "machine", "node", "answers", "stale", "free", "cpus",
+        ];
         let [host, machine, node, answers, stale, free, cpus] = fields(h, &names)?[..] else {
             return Err(unreadable());
         };
@@ -1208,14 +1223,17 @@ fn capacity_lines(a: &Value) -> Step<Vec<String>> {
 fn page(s: &mut impl System, store: Option<&str>) -> Result<Value, Failure> {
     let began = s.now();
     let head = overview(s, store)?;
-    let now = (head["at"].as_str().and_then(epoch)).ok_or_else(|| error("store_answer_unreadable", "now"))?;
+    let now = (head["at"].as_str().and_then(epoch))
+        .ok_or_else(|| error("store_answer_unreadable", "now"))?;
     let (since, until) = (day(now.saturating_sub(6 * DAY)), day(now));
     let month: String = until.chars().take(7).collect();
     let intents: Vec<String> = (head["intents"].as_array().into_iter().flatten())
         .filter_map(|i| i["intent"].as_str().map(str::to_owned))
         .collect();
     // The calls, in the order of R48; the lines print in the order of R49.
-    let capacity = bounded(s, began, |s| store::function(s, store, "capacity", &json!({})));
+    let capacity = bounded(s, began, |s| {
+        store::function(s, store, "capacity", &json!({}))
+    });
     let spend = bounded(s, began, |s| {
         store::function(s, store, "api_spend", &json!({ "month": month }))
     });
