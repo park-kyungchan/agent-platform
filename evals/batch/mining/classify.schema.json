@@ -1,0 +1,11 @@
+{
+ "type": "object",
+ "properties": {
+  "cause": {"type": "string", "enum": ["base_claim", "outside_write_set", "class_or_lane", "contradiction", "weak_check", "unguarded_effect", "plan_order", "build_defect", "environment", "other"]},
+  "machine": {"type": "boolean"},
+  "check": {"type": "string"},
+  "why": {"type": "string"}
+ },
+ "required": ["cause", "machine", "check", "why"],
+ "additionalProperties": false
+}

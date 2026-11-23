@@ -1,0 +1,12 @@
+[
+ {"cause": "base_claim", "means": "the page, plan or stage states a fact about the base, a path, line, name, behaviour or command form, that the base does not hold"},
+ {"cause": "outside_write_set", "means": "the change needs a file outside the write set, or a pattern is not of the two forms"},
+ {"cause": "class_or_lane", "means": "the class or lane does not admit the paths or the effect the change needs"},
+ {"cause": "contradiction", "means": "two rules of the page, or of the page and another page or a specification, cannot both hold"},
+ {"cause": "weak_check", "means": "an acceptance check passes without the change, cannot pass with it, or tests nothing the page changes"},
+ {"cause": "unguarded_effect", "means": "an effect on a real target with no guard"},
+ {"cause": "plan_order", "means": "a dependency missing, circular or wrong, a criterion no unit reaches, or two units that cannot both hold"},
+ {"cause": "build_defect", "means": "the head does not do what its page says, or breaks a test, an invariant or a contract"},
+ {"cause": "environment", "means": "the host, a service, a limit, the network or the hosting service stopped the work, not the page or the head"},
+ {"cause": "other", "means": "none of the causes above"}
+]

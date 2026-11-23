@@ -1,0 +1,20 @@
+{
+ "type": "object",
+ "properties": {
+  "causes": {
+   "type": "array",
+   "items": {
+    "type": "object",
+    "properties": {
+     "cause": {"type": "string"},
+     "change": {"type": "string"},
+     "why": {"type": "string"}
+    },
+    "required": ["cause", "change", "why"],
+    "additionalProperties": false
+   }
+  }
+ },
+ "required": ["causes"],
+ "additionalProperties": false
+}

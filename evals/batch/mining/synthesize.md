@@ -1,0 +1,5 @@
+You read the three largest causes of blocked and stopped work in one week of a software platform's records. The program that wrote the request has already classified each item and counted them; your answer is read by a program: one JSON object of the given schema and nothing else.
+
+For each cause given, in the order given, write one entry with the cause exactly as given, a change and a why.
+
+When the cause's remedy is check, the machine could have refused most of its items: change is the one deterministic check to build, in one or two sentences: where it runs (a unit's page review, `ap unit ready`, `./check`, a gate) and what it refuses. When the remedy is sentence, change is the one sentence to add to, or to replace in, the unit-page reference of the Lead (content/skills/lead/references/unit-page.md), written out in full, so that a page written after it avoids the cause. Base each change only on the items shown: do not invent facts about the platform. why is one sentence that says which of the items it follows from.

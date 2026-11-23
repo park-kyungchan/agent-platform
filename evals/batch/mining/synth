@@ -1,0 +1,140 @@
+#!/usr/bin/env -S python3 -I -B
+"""The mining job's synthesizer: the classification results of the builder's items counted by cause, and one
+synthesis request for the three largest causes.
+
+  synth --items <items.json> --results <file> [--results <file>]... --model <id> --out <dir> [--max-tokens <n>]
+
+Writes requests.jsonl and synthesis.json into --out and prints one JSON line. Calls no model, no network and no
+engine. Every refusal is {"status":"<code>"} with exit 2. Contract: evals/batch/mining/README.md.
+"""
+import importlib.machinery
+import importlib.util
+import json
+import os
+import sys
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+
+
+def load(name, path):
+    loader = importlib.machinery.SourceFileLoader(name, path)
+    mod = importlib.util.module_from_spec(importlib.util.spec_from_loader(name, loader))
+    loader.exec_module(mod)
+    return mod
+
+
+L = load("batch_lib", os.path.join(HERE, "..", "lib.py"))
+M = load("mining_common", os.path.join(HERE, "common.py"))
+M.L = L
+
+TOP = 3
+SHOWN = 20
+EXCERPT = 1500
+
+
+def parse(argv):
+    p = M.Parser(add_help=False, allow_abbrev=False)
+    p.add_argument("--items", required=True)
+    p.add_argument("--results", action="append", required=True)
+    p.add_argument("--model", required=True)
+    p.add_argument("--out", required=True)
+    p.add_argument("--max-tokens", default="4000")
+    a = p.parse_args(argv)
+    if not a.model or not a.items or not a.out or any(not r for r in a.results):
+        raise L.Refuse("usage")
+    a.max_tokens = M.integer(a.max_tokens, 256, 8000)
+    return a
+
+
+def load_items(path):
+    """items.json in the form the builder writes; refuses `items_unreadable`."""
+    def bad():
+        raise L.Refuse("items_unreadable")
+
+    try:
+        with open(path, encoding="utf-8") as f:
+            doc = json.load(f)
+    except (OSError, ValueError):
+        bad()
+    if not isinstance(doc, dict) or set(doc) != {"job", "since", "until", "model", "items"} or doc["job"] != "mining":
+        bad()
+    if not isinstance(doc["model"], str) or not isinstance(doc["items"], list):
+        bad()
+    try:
+        M.window(doc["since"], doc["until"])
+    except L.Refuse:
+        bad()
+    ids, by_key = set(), {}
+    for it in doc["items"]:
+        if not isinstance(it, dict) or set(it) != M.ITEM_KEYS:
+            bad()
+        if not (isinstance(it["item"], str) and it["item"] and it["item"] not in ids and it["kind"] in M.KINDS
+                and isinstance(it["text"], str) and isinstance(it["at"], str) and it["state"] in M.STATES
+                and isinstance(it["key"], str) and M.HEX64.match(it["key"])
+                and all(it[k] is None or isinstance(it[k], str) for k in ("name", "review", "unit", "intent"))):
+            bad()
+        ids.add(it["item"])
+        by_key.setdefault(it["key"], []).append(it)
+    return doc, by_key
+
+
+def synthesis_text(since, until, top, shown):
+    parts = [f"Window: {since}..{until} (UTC dates, both included)", ""]
+    for t in top:
+        parts += [f"Cause: {t['cause']}", f"Means: {t['means']}", f"Count: {t['count']}",
+                  f"Machine: {t['machine']}", f"Remedy: {t['remedy']}", "Items:"]
+        for item, verdict in shown[t["cause"]]:
+            parts += [f"- id: {item['item']}", f"  check: {verdict['check']}", f"  why: {verdict['why']}",
+                      "  text:", L.cut(item["text"], EXCERPT), ""]
+    return "\n".join(parts)
+
+
+def run(argv):
+    a = parse(argv)
+    for p in (a.items, *a.results, a.out):
+        L.refuse_academy(p)
+    items_path = L.resolve(a.items)
+    results = [L.resolve(r) for r in a.results]
+    out = L.resolve(a.out)
+
+    doc, by_key = load_items(items_path)
+    lines = M.read_results(results)
+    schema = M.load_json("classify.schema.json")
+    counts, answers = M.count_lines(lines, set(by_key), schema)
+
+    order = [c["cause"] for c in M.causes()]
+    means = {c["cause"]: c["means"] for c in M.causes()}
+    groups = {}  # cause -> [(item, verdict)] in item order
+    classified = 0
+    for item in doc["items"]:
+        verdict = answers.get(item["key"])
+        if verdict is None:
+            continue
+        classified += 1
+        groups.setdefault(verdict["cause"], []).append((item, verdict))
+    ranked = sorted(groups, key=lambda c: (-len(groups[c]), order.index(c)))[:TOP]
+    top = []
+    for c in ranked:
+        n = len(groups[c])
+        machine = sum(1 for _, v in groups[c] if v["machine"])
+        top.append({"cause": c, "means": means[c], "count": n, "machine": machine,
+                    "remedy": "check" if 2 * machine >= n else "sentence", "items": [i["item"] for i, _ in groups[c]]})
+
+    key, request = None, []
+    if top:
+        text = synthesis_text(doc["since"], doc["until"], top, {t["cause"]: groups[t["cause"]][:SHOWN] for t in top})
+        params = M.request_params(a.model, a.max_tokens, M.load_text("synthesize.md"), text,
+                                  M.load_json("synthesis.schema.json"))
+        key = L.key(params)
+        request = [L.request_line(params)]
+    synthesis = {"job": "mining", "since": doc["since"], "until": doc["until"], "model": a.model, "key": key,
+                 "classified": classified, "unclassified": len(doc["items"]) - classified, "counts": counts,
+                 "causes": [{k: t[k] for k in ("cause", "count", "machine", "remedy", "items")} for t in top]}
+    L.write_files(out, [("requests.jsonl", "".join(x + "\n" for x in request).encode("utf-8")),
+                        ("synthesis.json", (json.dumps(synthesis, indent=1, ensure_ascii=False) + "\n").encode("utf-8"))])
+    return {"status": "ok", "out": out, "causes": len(top), "classified": classified,
+            "unclassified": synthesis["unclassified"], "requested": len(request), **counts}, 0
+
+
+if __name__ == "__main__":
+    sys.exit(L.main(run))
