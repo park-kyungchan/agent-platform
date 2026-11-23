@@ -789,7 +789,7 @@ class BatchMiningTest(Case):
             if p.suffix in (".py", "") and p.name != "README.md":
                 text = p.read_text()
                 self.assertIsNone(banned_imports.search(text), p.name)
-                self.assertNotIn("api.anthropic.com", text.replace("api.anthropic" + ".com", ""), p.name)
+                self.assertNotIn("api.anthropic" + ".com", text, p.name)
             text = p.read_text()
             self.assertNotIn(host, text, p.name)
             self.assertNotIn("/var/lib/" + "agent-platform/store", text, p.name)
