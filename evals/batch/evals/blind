@@ -1,0 +1,78 @@
+#!/usr/bin/env -S python3 -I -B
+"""The evals job's blind scorer: one scoring request per answer of the Lead suite that was read, from the answers
+(result lines) of a build's items; the request names neither the answering model, the sample, the case id, a key, the
+commit nor the instructions.
+
+  blind --items <items.json> --results <file>... --cases <dir> --model <id> --out <dir> [--max-tokens <n>]
+
+Writes requests.jsonl and blind.json into --out and prints one JSON line. Calls no model and no network; starts no
+program. Every refusal is {"status":"<code>"} with exit 2. Contract: evals/batch/evals/README.md.
+"""
+import importlib.machinery
+import importlib.util
+import json
+import os
+import sys
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+
+
+def load(name, path):
+    loader = importlib.machinery.SourceFileLoader(name, path)
+    mod = importlib.util.module_from_spec(importlib.util.spec_from_loader(name, loader))
+    loader.exec_module(mod)
+    return mod
+
+
+L = load("batch_lib", os.path.join(HERE, "..", "lib.py"))
+C = load("evals_common", os.path.join(HERE, "common.py"))
+C.L = L
+
+
+def parse(argv):
+    p = C.Parser(add_help=False, allow_abbrev=False)
+    p.add_argument("--items", required=True)
+    p.add_argument("--results", action="append", required=True)
+    p.add_argument("--cases", required=True)
+    p.add_argument("--model", required=True)
+    p.add_argument("--out", required=True)
+    p.add_argument("--max-tokens", default="2000")
+    a = p.parse_args(argv)
+    if not a.items or not a.cases or not a.model or not a.out or any(not r for r in a.results):
+        raise L.Refuse("usage")
+    a.max_tokens = C.integer(a.max_tokens, 256, 8000)
+    return a
+
+
+def run(argv):
+    a = parse(argv)
+    items_path, cases, out, *results = C.paths(a.items, a.cases, a.out, *a.results)
+    C.lead_cases(cases)
+    doc, digest = C.load_items(items_path, "lead")
+    lines = C.read_results(results)
+    counts, answers = C.count_lines(lines, {i["key"] for i in doc["items"]}, C.free_answer)
+
+    system = C.text_file("../../lead/scoring.md").rstrip("\n") + "\n\n" + C.text_file("blind.md").rstrip("\n") + "\n"
+    schema = C.json_file("blind.schema.json")
+    rubrics, requests, entries = {}, {}, []
+    for it in doc["items"]:
+        answer = answers.get(it["key"])
+        score_key = None
+        if answer is not None:
+            if it["case"] not in rubrics:
+                rubrics[it["case"]] = C.expected_text(cases, it["case"]).rstrip("\n")
+            user = "Rubric:\n%s\n\nAnswer:\n%s" % (rubrics[it["case"]], answer.strip("\n"))
+            params = {"model": a.model, "max_tokens": a.max_tokens, "system": system,
+                      "messages": [{"role": "user", "content": user}],
+                      "output_config": {"format": {"type": "json_schema", "schema": schema}}}
+            score_key = L.key(params)
+            requests.setdefault(score_key, C.line_of(score_key, params))
+        entries.append({"case": it["case"], "sample": it["sample"], "key": it["key"], "score_key": score_key})
+    blind = {"job": "evals", "suite": "lead", "model": a.model, "items": digest, "answers": entries}
+    L.write_files(out, [("requests.jsonl", C.lines_file(list(requests.values()))), ("blind.json", C.json_text(blind))])
+    return {"status": "ok", "out": out, "answers": len(entries), "requested": len(requests),
+            "unanswered": sum(e["score_key"] is None for e in entries), "lines": len(lines), **counts}, 0
+
+
+if __name__ == "__main__":
+    sys.exit(L.main(run))
