@@ -337,5 +337,76 @@ class Readout(unittest.TestCase):
         self.assertFalse([l for l in self.run_readout().splitlines() if l.startswith("BLOCKING")])  # no review in the window, no line
 
 
+
+class WithoutAcademy(unittest.TestCase):
+    """--without-academy (specs/ap/measure.md R3), on records of this test's own directory: no fixture changes, and no
+    directory whose name begins with edu- is made (that rule is tested on the function that decides a name)."""
+
+    def setUp(self):
+        self.tmp = Path(tempfile.mkdtemp(prefix="readout-academy-test-"))
+        self.addCleanup(shutil.rmtree, self.tmp, True)
+        shutil.copy(FIXTURES / "prices.tsv", self.tmp / "prices.tsv")
+        for d in ("work/task", "platforms", "stages", "codex", "acct/projects", "acct/homes"):
+            (self.tmp / d).mkdir(parents=True)
+        readout.run_gh = lambda repo, since, until: []
+
+    def session(self, rel, sid, n):
+        path = self.tmp / "acct" / rel / f"{sid}.jsonl"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        line = {"type": "assistant", "sessionId": sid, "timestamp": "2026-11-12T10:00:00Z", "cwd": str(self.tmp / "work" / "task"),
+                "message": {"id": "m-" + sid, "model": "claude-opus-9-9", "usage": {"input_tokens": n * 1000000}}}
+        path.write_text(json.dumps(line) + "\n")
+
+    def run_readout(self, *extra):
+        out = io.StringIO()
+        args = ["--since", "2026-11-11", "--until", "2026-11-13", "--prices", str(self.tmp / "prices.tsv"),
+                "--accounts", str(self.tmp / "acct"), "--codex-dir", str(self.tmp / "codex"), "--work-root", str(self.tmp / "work"),
+                "--platforms-root", str(self.tmp / "platforms"), "--stage-dir", str(self.tmp / "stages"), *extra]
+        with contextlib.redirect_stdout(out):
+            readout.main(args)
+        return out.getvalue()
+
+    def engineering_msgs(self, text):
+        return int(re.search(r"^week \S+ route engineering TOTAL msgs=(\d+) ", text, re.M).group(1))
+
+    def test_without_academy_the_function_decides_a_name(self):
+        self.assertTrue(readout.academy_name("edu-lessons"))
+        self.assertTrue(readout.academy_name("edu-lessons", project=True))
+        self.assertTrue(readout.academy_name("-home-palantirkc-work-edu-lessons", project=True))
+        self.assertTrue(readout.academy_name("-home-palantirkc-platforms-education-platform", project=True))
+        self.assertFalse(readout.academy_name("-home-palantirkc-work-edu-lessons"))  # the substring rule is a project directory's
+        self.assertFalse(readout.academy_name("-home-palantirkc-work-task", project=True))
+        self.assertFalse(readout.academy_name("reduce-x"))
+
+    def test_without_academy_a_project_directory_is_not_read(self):
+        self.session("projects/-scratch-work-task", "s-kept", 1)
+        self.session("projects/-scratch-work-edu-x", "s-academy", 2)
+        self.assertEqual(self.engineering_msgs(self.run_readout()), 2)
+        text = self.run_readout("--without-academy")
+        self.assertEqual(self.engineering_msgs(text), 1)
+        self.assertIn("input claude files=1 ", text)
+
+    def test_without_academy_a_homes_project_directory_is_not_read(self):
+        self.session("homes/h1/projects/-scratch-work-task", "s-home", 1)
+        self.session("homes/h2/projects/-scratch-work-edu-x", "s-home-academy", 2)
+        self.session("homes/h2/projects/-scratch-work-edu-x/sub", "s-home-deeper", 3)
+        self.assertEqual(self.engineering_msgs(self.run_readout()), 3)
+        self.assertEqual(self.engineering_msgs(self.run_readout("--without-academy")), 1)
+
+    def test_without_academy_the_output_is_unchanged_where_nothing_is_the_academys(self):
+        self.session("projects/-scratch-work-task", "s-a", 1)
+        self.session("homes/h1/projects/-scratch-work-task", "s-b", 2)
+        stage = {"role": "implementer", "model": "claude-opus-9-9", "session": "s-b", "start": "2026-11-12T09:00:00Z", "state": "ok"}
+        (self.tmp / "stages" / "u1").mkdir()
+        (self.tmp / "stages" / "u1" / "1.implementer.md.run.json").write_text(json.dumps(stage))
+        (self.tmp / "work" / "task" / "x.md.run.json").write_text(json.dumps(dict(stage, session="s-a", role="writer")))
+        (self.tmp / "work" / "top.run.json").write_text(json.dumps(dict(stage, session="s-a", role="fixer")))  # directly in the work root: not read
+        text = self.run_readout()
+        self.assertEqual(text, self.run_readout("--without-academy"))
+        self.assertIn("role=implementer family=opus msgs=1 ", text)
+        self.assertIn("role=writer family=opus msgs=1 ", text)
+        self.assertNotIn("role=fixer", text)
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -6,7 +6,7 @@ use serde::Serialize;
 const HELP: &str = "Usage: ap <verb> [< request.json]\n";
 /// Every verb the dispatch below knows: the verb, its request form, the heading of the section of
 /// `crates/ap/README.md` that documents it. `ap --help` prints one line of this table per verb.
-const VERBS: [(&str, &str, &str); 24] = [
+const VERBS: [(&str, &str, &str); 25] = [
     ("version", "version | --version", "The older verbs"),
     ("run", "run < request.json", "One stage"),
     ("gate", "gate < request.json", "The gate"),
@@ -82,6 +82,11 @@ const VERBS: [(&str, &str, &str); 24] = [
         "api",
         "api batch <job> --requests <file> --out <dir> [--queue standard|soak] [--store <path>]",
         "The API credit",
+    ),
+    (
+        "measure",
+        "measure sessions [--since <YYYY-MM-DD>] [--accounts <dir>]... [--work-root <dir>] [--platforms-root <dir>] [--stage-dir <dir>]... [--prices <file>] [--store <path>]",
+        "Measures",
     ),
 ];
 fn verb_line(verb: &str, form: &str, heading: &str) -> String {
@@ -350,6 +355,10 @@ fn main() -> ExitCode {
         }
         return ap::api::cli(&args[1..]);
     }
+    // `ap measure` prints its own usage (`specs/ap/measure.md` R1).
+    if args.first().is_some_and(|arg| arg == "measure") {
+        return ap::measure::cli(&args[1..]);
+    }
     if args.first().is_some_and(|arg| arg == "clause") {
         if args.len() == 2 && args[1] == "--help" {
             return match io::stdout().lock().write_all(CLAUSE_HELP.as_bytes()) {
@@ -378,6 +387,13 @@ fn main() -> ExitCode {
     }
     if args.is_empty() && std::env::var_os("ONT_FN_NAME").is_some_and(|name| name == "gate") {
         return ap::resource::function("gate");
+    }
+    // The functions of `ap measure` (`specs/ap/measure.md` R9 to R11): `flow` and `share` are refused there.
+    if args.is_empty()
+        && let Some(name) = std::env::var_os("ONT_FN_NAME")
+        && let Some(name @ ("cost" | "flow" | "share")) = name.to_str()
+    {
+        return ap::measure::function(name);
     }
     if args.len() == 1 && (args[0] == "--help" || args[0] == "-h") {
         let mut text = format!("{HELP}Verbs; the section is of crates/ap/README.md:\n");
