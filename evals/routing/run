@@ -4,6 +4,7 @@ context the assignment needs? Several samples per case, scored by facts in the a
 
   run answers --root DIR --reader R --out DIR [--cases FILE ...] [--samples N] [--jobs N] [--case ID ...] [--deny GLOB ...]
   run score --out DIR [--cases FILE ...]
+  run bars --score SCORE.json [--reader R]
   run gate --baseline SCORE.json --candidate SCORE.json
 
 Every reader is started through `systemd-run` as a transient service in agents.slice that sees the host read-only
@@ -31,7 +32,9 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 SELF = os.path.abspath(__file__)
 REPO_CASES = os.path.join(HERE, "cases.json")
 HOST_DIGESTS = os.path.join(HERE, "host-cases.sha256")
-READER_NAMES = ("claude-sonnet", "claude-haiku", "muse-ember", "agy-hydrogen")
+READER_NAMES = ("claude-sonnet", "claude-haiku", "muse-ember", "ember-yolo", "ember-route", "agy-hydrogen")
+# The readers that are Muse Code: one answer, usage and session branch for all of them.
+MUSE = ("muse-ember", "ember-yolo", "ember-route")
 TIME_BOUND = 600  # seconds per session: the unit's RuntimeMaxSec
 GRACE = 30  # seconds past the bound after which this program stops waiting for systemd-run
 SLICE = "agents.slice"
@@ -226,6 +229,48 @@ def muse_argv(prompt, root, work, sid):
             "--workspace", work, prompt]
 
 
+def yolo_argv(prompt, root, work, sid):
+    # The muse-ember command line and --yolo (the workspace is trusted, so a registered MCP server starts): nothing else.
+    return muse_argv(prompt, root, work, sid)[:-1] + ["--yolo", prompt]
+
+
+# The route pack of ember-route: the host asks the function route once for the assignment, outside the unit, and the
+# reader is given its answers with the discipline of reading at most three files.
+PACK_LIMIT = 8
+PACK_FILES = 3
+PACK_TIMEOUT = 60  # seconds for the call of the function
+
+
+def route_pack(situation):
+    """The answers of `ont fn route` for the assignment (a non-empty list of dicts), or None."""
+    request = {"parameters": {"words": situation, "limit": PACK_LIMIT}}
+    try:
+        done = subprocess.run([shutil.which("ont") or "ont", "fn", "route"], input=json.dumps(request), text=True,
+                              capture_output=True, timeout=PACK_TIMEOUT)
+        answers = json.loads(done.stdout)["answer"]["answers"]
+    except (OSError, ValueError, KeyError, TypeError, subprocess.TimeoutExpired):
+        return None
+    if done.returncode != 0 or not isinstance(answers, list):
+        return None
+    answers = [x for x in answers if isinstance(x, dict) and isinstance(x.get("path"), str)][:PACK_LIMIT]
+    return answers or None
+
+
+def pack_prompt(case, root, answers):
+    lines = []
+    for i, x in enumerate(answers, 1):
+        where = x["path"] if x.get("repository") is None else "%s: %s" % (x["repository"], x["path"])
+        if isinstance(x.get("first_line"), int) and isinstance(x.get("last_line"), int):
+            where += " lines %d-%d" % (x["first_line"], x["last_line"])
+        lines.append("%d. %s%s" % (i, where, " (%s)" % x["heading"] if isinstance(x.get("heading"), str) and x["heading"] else ""))
+    return (PROMPT.format(situation=case["situation"], root=root)
+            + "\n\nThe host's route index has already ranked where facts for this assignment live (best first):\n"
+            + "\n".join(lines)
+            + "\n\nOpen at most %d files in all, chosen from these pointers, best first, and search nothing else. A "
+              "repository's file is read at origin/main of its checkout under /home/palantirkc/platforms/<name>/. "
+              "Then give the answer in the form above." % PACK_FILES)
+
+
 def agy_argv(prompt, root, work, sid):
     # HOME is a new directory without MCP configuration (agy_home); every action allowed.
     allow = ["read_file(%s)" % root] + ["command(%s)" % c for c in ("rg", "grep", "cat", "sed", "head", "tail", "ls", "find", "wc")]
@@ -261,6 +306,10 @@ READERS = {
     "claude-sonnet": {"cli": "claude", "argv": claude_argv("sonnet"), "env": ("CLAUDE_CONFIG_DIR",), "state": claude_state},
     "claude-haiku": {"cli": "claude", "argv": claude_argv("haiku"), "env": ("CLAUDE_CONFIG_DIR",), "state": claude_state},
     "muse-ember": {"cli": "muse", "argv": muse_argv, "env": (), "set": {"MUSE_NO_AUTO_UPDATE": "1"}, "state": muse_state},
+    "ember-yolo": {"cli": "muse", "argv": yolo_argv, "env": (), "set": {"MUSE_NO_AUTO_UPDATE": "1"}, "state": muse_state,
+                   "mcp_exempt": True},
+    "ember-route": {"cli": "muse", "argv": muse_argv, "env": (), "set": {"MUSE_NO_AUTO_UPDATE": "1"}, "state": muse_state,
+                    "pack": True},
     "agy-hydrogen": {"cli": "agy", "argv": agy_argv, "env": (), "home": agy_home, "state": agy_state},
 }
 
@@ -281,7 +330,7 @@ def answer_of(reader, stream):
     for e in events(stream):
         if reader.startswith("claude") and e.get("type") == "result" and isinstance(e.get("result"), str):
             text = e["result"]
-        elif reader == "muse-ember" and (e.get("payload") or {}).get("kind") == "run_terminal":
+        elif reader in MUSE and (e.get("payload") or {}).get("kind") == "run_terminal":
             text = e["payload"].get("text") if isinstance(e["payload"].get("text"), str) else text
         elif reader == "agy-hydrogen" and e.get("event") == "result" and isinstance((e.get("result") or {}).get("response"), str):
             text = e["result"]["response"]
@@ -308,7 +357,7 @@ def usage_of(reader, stream):
                 u = r.get("usage") if isinstance(r.get("usage"), dict) else {}
                 tin = num(u.get("input_tokens")) + num(u.get("cache_read_tokens"))
                 tout = num(u.get("output_tokens"))
-        elif reader == "muse-ember" and (e.get("payload") or {}).get("kind") == "run_usage":
+        elif reader in MUSE and (e.get("payload") or {}).get("kind") == "run_usage":
             models = [m for m in e["payload"].get("models") or [] if isinstance(m, dict)]
             tin = sum(num(m.get("input_tokens")) for m in models)
             tout = sum(num(m.get("output_tokens")) for m in models)
@@ -495,6 +544,13 @@ def run_sample(a, sandbox, case, n, base):
             row["home"](home)
             env["HOME"] = home
         prompt = PROMPT.format(situation=case["situation"], root=a.root)
+        if row.get("pack"):
+            answers = route_pack(case["situation"])
+            if answers is None:
+                meta["state"] = "route_failed"  # no session without its pack
+                return meta
+            meta["pack"] = len(answers)
+            prompt = pack_prompt(case, a.root, answers)
         cli = row["argv"](prompt, a.root, work, sid)
         cli[0] = shutil.which(cli[0]) or cli[0]
         argv = unit_argv(sandbox.run, unit, "routing-%s-%s-s%d" % (a.reader, case["id"], n), work,
@@ -540,7 +596,7 @@ def run_sample(a, sandbox, case, n, base):
             meta["session"] = own
         if answer:
             write_atomic(base + ".md", answer)
-        if a.reader == "muse-ember":
+        if a.reader in MUSE:
             records = glob.glob(os.path.expanduser("~/.local/share/muse/sessions/*/*/*/%s/session.jsonl" % sid))
             text = ""
             for r in records:
@@ -548,7 +604,7 @@ def run_sample(a, sandbox, case, n, base):
                     text += f.read()
             # With no registered server the CLI never prints the withheld text: the process watch is the rule then.
             meta["mcp_registered"] = muse_registered_servers()
-            meta["mcp_withheld"] = (WITHHELD in text) if meta["mcp_registered"] else None
+            meta["mcp_withheld"] = (WITHHELD in text) if meta["mcp_registered"] and not row.get("mcp_exempt") else None
         if meta["state"] is None and meta["seconds"] >= TIME_BOUND:
             meta["state"] = "timeout"
         if meta["state"] is None:
@@ -576,6 +632,10 @@ def cmd_answers(a):
     sandbox = Sandbox(a.reader, a.deny)
     if not shutil.which(READERS[a.reader]["cli"]):
         refuse("cli_missing")
+    if READERS[a.reader].get("pack") and not shutil.which("ont"):
+        refuse("route_unavailable")
+    if READERS[a.reader].get("mcp_exempt") and muse_registered_servers():
+        refuse("mcp_not_allowed")  # trusted, the CLI would start a registered server and the watch is off
     out = os.path.join(os.path.abspath(a.out), a.reader)
     record = {"samples": a.samples, "cases": ids, "case_files": digests, "suite": sha_file(SELF)}
     old = read_json(os.path.join(out, "run.json")) if os.path.exists(os.path.join(out, "run.json")) else None
@@ -598,6 +658,7 @@ def cmd_answers(a):
     if old is None or old.get("samples") != a.samples:
         write_atomic(os.path.join(out, "run.json"), json.dumps(record, indent=1) + "\n")
     broke, lost, lock = [], [], threading.Lock()
+    row_exempt = READERS[a.reader].get("mcp_exempt", False)
 
     def worker():
         while True:
@@ -614,7 +675,7 @@ def cmd_answers(a):
                 states[key] = m["state"]
                 if m["state"] == "sandbox_unavailable":
                     lost.append(key)
-                if m["mcp_processes"] or m.get("mcp_withheld") is False:
+                if not row_exempt and (m["mcp_processes"] or m.get("mcp_withheld") is False):
                     broke.append(key)  # the MCP rule did not hold: start no further session
     # Daemon threads: a stopped call ends at once; a unit it started runs on, and no answer of it is written.
     threads = [threading.Thread(target=worker, daemon=True) for _ in range(a.jobs)]
@@ -682,6 +743,11 @@ def sheet(result):
     return "\n".join(lines) + "\n"
 
 
+def parity_of(sonnet, majority):
+    """The share of Sonnet's majority that is in the reader's majority (None without Sonnet or with an empty one)."""
+    return len(set(sonnet) & set(majority)) / len(sonnet) if sonnet else None
+
+
 def cmd_score(a):
     out = os.path.abspath(a.out)
     readers = [r for r in READER_NAMES if os.path.isdir(os.path.join(out, r))]
@@ -703,13 +769,68 @@ def cmd_score(a):
     result = {"suite": first.get("suite"), "case_files": digests,
               "readers": {r: score_reader(os.path.join(out, r), records[r], cases) for r in readers}}
     sonnet = result["readers"].get("claude-sonnet", {}).get("majority")
-    result["parity"] = {r: (round(len(set(sonnet) & set(x["majority"])) / len(sonnet), 4) if sonnet else None)
+    result["parity"] = {r: (None if parity_of(sonnet, x["majority"]) is None else round(parity_of(sonnet, x["majority"]), 4))
                         for r, x in result["readers"].items() if r != "claude-sonnet"}
     text = json.dumps(result, indent=1)
     write_atomic(os.path.join(out, "score.json"), text + "\n")
     write_atomic(os.path.join(out, "sheet.md"), sheet(result))
     print(text)
     return 0
+
+
+# ---------------------------------------------------------------- bars
+
+# The bars of ember-route against Sonnet, from a score file. G4 and G5 are not measured here.
+BARS_N = 3  # the fewest samples a bar is read at
+
+
+def measure(x, sonnet):
+    """(parity, share of unanswered samples as (unanswered, samples), ratio of the input-token medians) of a judged
+    reader against Sonnet's; a member that cannot be had is None."""
+    cells = x["n"] * len(x["passes"])
+    t, base = x.get("tokens_median"), sonnet.get("tokens_median")
+    number = lambda v: isinstance(v, (int, float)) and not isinstance(v, bool)
+    ratio = (t / base) if number(t) and number(base) and base > 0 else None
+    return (parity_of(sonnet["majority"], x["majority"]), (x["unanswered"], cells) if cells else None, ratio)
+
+
+def cmd_bars(a):
+    reader = a.reader
+    if reader not in READER_NAMES or reader == "claude-sonnet":
+        refuse("usage")
+    score = read_json(a.score)
+    readers = score.get("readers") if isinstance(score, dict) else None
+    if not (isinstance(readers, dict) and judged(readers.get("claude-sonnet"))):
+        refuse("score_unreadable")
+    sonnet, x = readers["claude-sonnet"], readers.get(reader)
+    if x is not None and not judged(x):
+        refuse("score_unreadable")
+    if x is None or x["n"] < BARS_N:
+        values = (None, None, None)  # a reader that is absent, or read at fewer samples, misses every bar
+    else:
+        values = measure(x, sonnet)
+    parity, share, ratio = values
+    if sonnet["n"] < BARS_N:
+        parity = ratio = None
+    held = {"G1": parity is not None and parity >= 0.90,
+            "G2": share is not None and share[0] * 24 <= 2 * share[1],
+            "G3": ratio is not None and ratio <= 1.2}
+    bars = {"G1": {"bar": "parity >= 0.90", "value": None if parity is None else round(parity, 4)},
+            "G2": {"bar": "unanswered rate <= 2/24", "value": None if share is None else round(share[0] / share[1], 4)},
+            "G3": {"bar": "tokens_median ratio <= 1.2", "value": None if ratio is None else round(ratio, 4)}}
+    for k in bars:
+        bars[k]["ok"] = held[k]
+    information = {}
+    for r, y in sorted(readers.items()):
+        if r not in ("claude-sonnet", reader) and judged(y) and y["n"] >= 1:
+            p, s, t = measure(y, sonnet)
+            information[r] = {"parity": None if p is None else round(p, 4),
+                              "unanswered_rate": None if s is None else round(s[0] / s[1], 4),
+                              "tokens_ratio": None if t is None else round(t, 4)}
+    missed = [k for k in bars if not held[k]]
+    print(json.dumps({"status": "fail" if missed else "pass", "reader": reader, "bars": bars, "missed": missed,
+                      "information": information}, indent=1))
+    return 1 if missed else 0
 
 
 # ---------------------------------------------------------------- gate
@@ -776,12 +897,15 @@ def main():
     sc = sub.add_parser("score", allow_abbrev=False)
     sc.add_argument("--out", required=True)
     sc.add_argument("--cases", action="append", default=[])
+    ba = sub.add_parser("bars", allow_abbrev=False)
+    ba.add_argument("--score", required=True)
+    ba.add_argument("--reader", default="ember-route")
     ga = sub.add_parser("gate", allow_abbrev=False)
     ga.add_argument("--baseline", required=True)
     ga.add_argument("--candidate", required=True)
     try:
         a = p.parse_args()
-        return {"answers": cmd_answers, "score": cmd_score, "gate": cmd_gate}[a.verb](a)
+        return {"answers": cmd_answers, "score": cmd_score, "bars": cmd_bars, "gate": cmd_gate}[a.verb](a)
     except Refuse as e:
         print(json.dumps({"status": e.args[0]}, separators=(",", ":")))
         return 2
