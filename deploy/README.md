@@ -430,9 +430,9 @@ systemctl is-active ap-api-nightly.service ap-api-weekly.service   # inactive or
 
 ## The status page
 
-`ap-status-page.service` (`Type=oneshot`, `Nice=10`, `Environment=HOME=/root`, `TimeoutStartSec=120`, `StateDirectory=agent-platform/status-page` mode `0755`, no `Restart=`) runs `/usr/local/bin/ap status --text` into `/var/lib/agent-platform/status-page/status.txt.new`, removes that file and exits 1 when `ap` fails, and otherwise renames it over `/var/lib/agent-platform/status-page/status.txt`. Nothing else is written, so a failed run keeps the previous page and a reader never sees a half-written file. `ap-status-page.timer` starts it every five minutes (`OnCalendar=*:0/5`, `AccuracySec=10s`, `Persistent=false`: a run missed while the host was down is not made up at boot). Each run is a new process of the installed `ap`, so a delivery of `ap` reaches the next run with no restart.
+`ap-status-page.service` (`Type=oneshot`, `Nice=10`, `Environment=HOME=/root`, `TimeoutStartSec=1290`, `StateDirectory=agent-platform/status-page` mode `0755`, no `Restart=`) runs `/usr/local/bin/ap status --page` into `/var/lib/agent-platform/status-page/status.txt.new`, removes that file and exits 1 when `ap` fails, and otherwise renames it over `/var/lib/agent-platform/status-page/status.txt`. Nothing else is written, so a failed run keeps the previous page and a reader never sees a half-written file. `ap-status-page.timer` starts it every fifteen minutes (`OnCalendar=*:0/15`, `AccuracySec=10s`, `Persistent=false`: a run missed while the host was down is not made up at boot). Each run is a new process of the installed `ap`, so a delivery of `ap` reaches the next run with no restart. The page is the lines of `ap status --text` and, after them, each open intent's brief, flow and week's cost, the flow, cost and month's API spend of all, and the hosts, machines and accounts with their capacity (`specs/ap/status.md` R47 to R53); the `ap status --page` run asks no step after 600 seconds, so `TimeoutStartSec=1290` is those 600 seconds, the 630 seconds of one `ont fn` begun just before them, and 60 to print and rename. A run longer than fifteen minutes delays the next one: a timer that elapses while its service is still active leaves it running and starts no second run (systemd.timer(5)). A run that passes `TimeoutStartSec` (a brief or the rows of the flow begun before the bound and slow past it) is killed and leaves the previous page, whose first line's `at` shows its age.
 
-`ap deliver` installs `ap-status-page.service` and `ap-status-page.timer` with an `ap` that has `ap status --text` and enables the timer (section "The unit files"). For a first run now, and to read it, as root:
+`ap deliver` installs `ap-status-page.service` and `ap-status-page.timer` with an `ap` that has `ap status --page` and enables the timer (section "The unit files"). For a first run now, and to read it, as root:
 
 ```sh
 systemctl start ap-status-page.service
@@ -441,7 +441,7 @@ stat -c '%y' /var/lib/agent-platform/status-page/status.txt
 head -n 1 /var/lib/agent-platform/status-page/status.txt
 ```
 
-Read `stat -c '%y'` and the `status <time>` first line again after the next timer run (`systemctl list-timers ap-status-page.timer`) to verify that the file is rewritten every five minutes.
+Read `stat -c '%y'` and the `status <time>` first line again after the next timer run (`systemctl list-timers ap-status-page.timer`) to verify that the file is rewritten every fifteen minutes.
 
 Save the present `tailscale serve` configuration first in a subshell with `set -C` (so a second install never replaces the saved file), then publish `/var/lib/agent-platform/status-page/status.txt` and read it back:
 

@@ -786,6 +786,30 @@ pub fn logged(s: &mut impl System, store: Option<&str>, action: &str) -> Result<
         }
     }
 }
+/// The milliseconds one `ont fn` call is bound to: the engine's own bound for a function is 600 seconds.
+const FUNCTION_MS: u64 = 630_000;
+/// `ont fn <name>` with `{"parameters": <parameters>}`: the member `answer` of the engine's line
+/// `{"function","domain","answer","elapsed_ms"}`. One attempt, no retry. A refusal of the engine is the store's
+/// refusal with the engine's code; another shape is `store_answer_unreadable`.
+pub fn function(
+    s: &mut impl System,
+    store: Option<&str>,
+    name: &str,
+    parameters: &Value,
+) -> Result<Value, Failure> {
+    let unreadable = || error("store_answer_unreadable", "fn");
+    let body = json!({ "parameters": parameters });
+    let ctx = json!({ "store": store });
+    let reply = ont_within(s, &ctx, &["fn", name], &body, FUNCTION_MS)?;
+    let v: Value = serde_json::from_slice(&reply.bytes).map_err(|_| unreadable())?;
+    if v["status"] == "refused" && v["code"].is_string() {
+        return Err(fail(REFUSED, "fn", v));
+    }
+    match v.get("answer") {
+        Some(answer) if reply.success && v["function"] == name => Ok(answer.clone()),
+        _ => Err(unreadable()),
+    }
+}
 /// The first cell of a row of a rendered table: `| a | b |` gives `a`; `\|` and `\\` are unescaped.
 fn first_cell(row: &str) -> Option<String> {
     let mut chars = row.strip_prefix("| ")?.chars().peekable();

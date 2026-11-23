@@ -7,7 +7,11 @@ use crate::unit::drive::{self, key_form};
 use crate::work;
 use serde_json::{Value, json};
 use std::{cmp::Reverse, ffi::OsString, io::Write, process::ExitCode};
-use std::{collections::BTreeSet, path::PathBuf, time::Duration};
+use std::{
+    collections::BTreeSet,
+    path::PathBuf,
+    time::{Duration, Instant},
+};
 
 /// The request of delivery on this host (its member `state`), and the directory it defaults to.
 const DELIVER: &str = "/etc/agent-platform/deliver.json";
@@ -46,6 +50,9 @@ pub enum Call {
     Indicators(Option<String>),
     /// `--brief <intent>`: the forty lines a Lead reads first.
     Brief(String),
+    /// `--page`: the status page, `--text`'s lines then every open intent's brief, flow and cost, and the
+    /// flow, the credit's spend and the capacity of all.
+    Page,
 }
 pub struct Args {
     pub store: Option<String>,
@@ -54,12 +61,12 @@ pub struct Args {
 }
 /// `--store <absolute path>`, `--text`, `--term <word>`, one key and `--requests` (with a key only), each at
 /// most once; or `--wait <intent>` with `--timeout <seconds>` and `--store`; or `--indicators` with an optional
-/// intent, `--text` and `--store`; or `--brief <intent>` with `--store` alone.
+/// intent, `--text` and `--store`; or `--brief <intent>` with `--store` alone; or `--page` with `--store` alone.
 pub fn parse(argv: &[OsString]) -> Result<Args, Failure> {
     let usage = || error("usage", "args");
     let (mut store, mut text, mut term, mut key) = (None, false, None, None);
     let (mut wait, mut timeout, mut indicators) = (None, None, false);
-    let (mut brief, mut requests) = (None, false);
+    let (mut brief, mut requests, mut page) = (None, false, false);
     let plain = |k: &str| {
         !k.starts_with('-') && (1..=512).contains(&k.len()) && !k.chars().any(char::is_control)
     };
@@ -86,6 +93,7 @@ pub fn parse(argv: &[OsString]) -> Result<Args, Failure> {
             }
             "--indicators" if !indicators => indicators = true,
             "--requests" if !requests => requests = true,
+            "--page" if !page => page = true,
             "--brief" if brief.is_none() => {
                 brief = Some(it.next().flatten().filter(|k| plain(k)).ok_or_else(usage)?);
             }
@@ -102,16 +110,19 @@ pub fn parse(argv: &[OsString]) -> Result<Args, Failure> {
             _ => return Err(usage()),
         }
     }
-    let call = match (term, key, wait, timeout, indicators, brief, requests) {
-        (None, None, None, None, false, None, false) => Call::Overview,
-        (None, Some(k), None, None, false, None, false) => Call::Key(k),
-        (None, Some(k), None, None, false, None, true) => Call::KeyAll(k),
-        (Some(w), None, None, None, false, None, false) => Call::Term(w),
-        (None, None, Some(i), t, false, None, false) if !text => {
+    let call = match (term, key, wait, timeout, indicators, brief, requests, page) {
+        (None, None, None, None, false, None, false, false) => Call::Overview,
+        (None, Some(k), None, None, false, None, false, false) => Call::Key(k),
+        (None, Some(k), None, None, false, None, true, false) => Call::KeyAll(k),
+        (Some(w), None, None, None, false, None, false, false) => Call::Term(w),
+        (None, None, Some(i), t, false, None, false, false) if !text => {
             Call::Wait(i.to_owned(), t.unwrap_or(14_400))
         }
-        (None, k, None, None, true, None, false) => Call::Indicators(k),
-        (None, None, None, None, false, Some(i), false) if !text => Call::Brief(i.to_owned()),
+        (None, k, None, None, true, None, false, false) => Call::Indicators(k),
+        (None, None, None, None, false, Some(i), false, false) if !text => {
+            Call::Brief(i.to_owned())
+        }
+        (None, None, None, None, false, None, false, true) if !text => Call::Page,
         _ => return Err(usage()),
     };
     Ok(Args { store, text, call })
@@ -845,6 +856,7 @@ pub fn execute(s: &mut impl System, store: Option<&str>, call: &Call) -> Result<
         Call::Term(word) => term(s, store, word),
         Call::Wait(intent, timeout) => wait(s, store, intent, *timeout),
         Call::Indicators(intent) => indicators(s, store, intent.as_deref()),
+        Call::Page => page(s, store),
     }
 }
 
@@ -973,6 +985,11 @@ fn indicators(
     for unit in &units {
         rows.push(indicator(s, store, unit, [began, merged_log, stopped])?);
     }
+    let summary = summarize(&rows.iter().collect::<Vec<_>>());
+    Ok(json!({"at": utc(now), "units": rows, "summary": summary}))
+}
+/// The summary of rows of the indicators (R40): their count, the medians and the first-accept share.
+fn summarize(rows: &[&Value]) -> Value {
     let numbers = |m: &str| {
         rows.iter()
             .filter_map(|r| r[m].as_u64())
@@ -987,10 +1004,273 @@ fn indicators(
         let accepted = verdicts.iter().filter(|v| **v == "accept").count();
         (accepted as f64 / verdicts.len() as f64 * 1000.0).round() / 1000.0
     });
-    let summary = json!({"count": rows.len(), "median_minutes": median(numbers("minutes")),
+    json!({"count": rows.len(), "median_minutes": median(numbers("minutes")),
         "median_rounds": median(numbers("rounds")), "median_repairs": median(numbers("repairs")),
-        "first_accept_share": share});
-    Ok(json!({"at": utc(now), "units": rows, "summary": summary}))
+        "first_accept_share": share})
+}
+
+/// No step of the page begins once this long has passed since its first call of the store (R48).
+const PAGE_BOUND: Duration = Duration::from_secs(600);
+/// What a section of the page holds, or the code that says why it cannot be read (R53).
+type Step<T> = Result<T, String>;
+fn unreadable() -> String {
+    "store_answer_unreadable".to_owned()
+}
+/// One step of the page: `page_bound` when the bound has passed before it begins, else its own result, a
+/// failure as the code R22 passes on.
+fn bounded<S: System, T>(
+    s: &mut S,
+    began: Instant,
+    step: impl FnOnce(&mut S) -> Result<T, Failure>,
+) -> Step<T> {
+    if s.now().saturating_duration_since(began) >= PAGE_BOUND {
+        return Err("page_bound".to_owned());
+    }
+    step(s).map_err(|f| store::code(&f))
+}
+/// The members of an answer, null ones included; one that is missing makes the section unreadable.
+fn fields<'a>(v: &'a Value, names: &[&str]) -> Step<Vec<&'a Value>> {
+    names
+        .iter()
+        .map(|n| v.get(n).ok_or_else(unreadable))
+        .collect()
+}
+fn listed<'a>(v: &'a Value, name: &str) -> Step<&'a Vec<Value>> {
+    v.get(name)
+        .and_then(Value::as_array)
+        .ok_or_else(unreadable)
+}
+/// Millionths of a USD as USD to the cent, in integers, half away from zero.
+fn usd(v: &Value) -> Step<String> {
+    let micros = i128::from(v.as_i64().ok_or_else(unreadable)?);
+    let cents = (micros.abs() + 5_000) / 10_000;
+    let sign = if micros < 0 && cents > 0 { "-" } else { "" };
+    Ok(format!("{sign}{}.{:02}", cents / 100, cents % 100))
+}
+/// A load written in hundredths as `<n / 100>.<n % 100 in two digits>`; null is `-`.
+fn load(v: &Value) -> Step<String> {
+    if v.is_null() {
+        return Ok("-".to_owned());
+    }
+    let n = v.as_u64().ok_or_else(unreadable)?;
+    Ok(format!("{}.{:02}", n / 100, n % 100))
+}
+/// The UTC day `YYYY-MM-DD` of a time in seconds since 1970.
+fn day(secs: u64) -> String {
+    utc(secs).chars().take(10).collect()
+}
+/// The flow line of R50 over rows of the indicators.
+fn flow_line(label: &str, rows: &[&Value], (since, until): (&str, &str)) -> String {
+    let summary = summarize(rows);
+    let in_week = |r: &&&Value| {
+        let day = r["merged_at"].as_str().and_then(|t| t.get(..10));
+        day.is_some_and(|d| since <= d && d <= until)
+    };
+    let cut = if rows.iter().any(|r| r["log_cut"] == true) {
+        " log_cut"
+    } else {
+        ""
+    };
+    format!(
+        "flow {label} {} merged, {} in the week, {}{cut}",
+        cell(&summary["count"]),
+        rows.iter().filter(in_week).count(),
+        median_tail(&summary)
+    )
+}
+/// The lines of R50 or R51 for an answer of `cost`: one for each group, then the total.
+fn cost_lines(label: &str, a: &Value, all: bool) -> Step<Vec<String>> {
+    let mut out = vec![];
+    for g in listed(a, "groups")? {
+        let [key, usd, runs] = fields(g, &["key", "usd", "runs"])?[..] else {
+            return Err(unreadable());
+        };
+        let (key, usd, runs) = (cell(key), cell(usd), cell(runs));
+        out.push(format!("cost {label} {key} {usd} USD {runs} runs"));
+    }
+    let names = ["total_usd", "merged", "usd_a_pr", "lead_share", "unmeasured"];
+    let got = fields(a, &names[..if all { 5 } else { 4 }])?;
+    let [total, merged, per, share] = [0, 1, 2, 3].map(|i| cell(got[i]));
+    let end = if all {
+        format!(" unmeasured {}", cell(got[4]))
+    } else {
+        String::new()
+    };
+    out.push(format!(
+        "cost {label} total {total} USD, merged {merged}, a pr {per}, lead share {share}{end}"
+    ));
+    Ok(out)
+}
+/// The lines of a section that may not be read: its lines, or the one line with the code.
+fn section_lines(name: &str, lines: Step<Vec<String>>) -> Vec<String> {
+    lines.unwrap_or_else(|code| vec![format!("{name} unreadable {code}")])
+}
+/// The `api` lines of R51 for an answer of `api_spend`.
+fn api_lines(month: &str, a: &Value) -> Step<Vec<String>> {
+    let mut out = vec![];
+    for j in listed(a, "jobs")? {
+        let names = ["job", "settled_usd_micros", "reserved_usd_micros", "counted_usd_micros"];
+        let [job, settled, reserved, counted] = fields(j, &names)?[..] else {
+            return Err(unreadable());
+        };
+        let [runs, running] = fields(j, &["runs", "running"])?[..] else {
+            return Err(unreadable());
+        };
+        out.push(format!(
+            "api {month} {} settled {} reserved {} counted {} USD, {} runs, {} running",
+            cell(job),
+            usd(settled)?,
+            usd(reserved)?,
+            usd(counted)?,
+            cell(runs),
+            cell(running)
+        ));
+    }
+    let names = ["settled_usd_micros", "reserved_usd_micros", "counted_usd_micros"];
+    let [settled, reserved, counted] = fields(a, &names)?[..] else {
+        return Err(unreadable());
+    };
+    out.push(format!(
+        "api {month} total settled {} reserved {} counted {} USD",
+        usd(settled)?,
+        usd(reserved)?,
+        usd(counted)?
+    ));
+    Ok(out)
+}
+/// The lines of R52 for an answer of `capacity`.
+fn capacity_lines(a: &Value) -> Step<Vec<String>> {
+    let mut out = vec!["HOSTS".to_owned()];
+    for h in listed(a, "hosts")? {
+        let names = ["host", "machine", "node", "answers", "stale", "free", "cpus"];
+        let [host, machine, node, answers, stale, free, cpus] = fields(h, &names)?[..] else {
+            return Err(unreadable());
+        };
+        let [l, available, seen] = fields(h, &["load_x100", "available_mb", "seen_at"])?[..] else {
+            return Err(unreadable());
+        };
+        out.push(format!(
+            "host {} machine {} node {} answers {} stale {} free {} cpus {} load {} available {} MB seen {}",
+            cell(host),
+            cell(machine),
+            cell(node),
+            cell(answers),
+            cell(stale),
+            cell(free),
+            cell(cpus),
+            load(l)?,
+            cell(available),
+            cell(seen)
+        ));
+    }
+    for m in listed(a, "machines")? {
+        let names = ["machine", "up", "free", "cpus", "load_x100", "available_mb"];
+        let [machine, up, free, cpus, l, available] = fields(m, &names)?[..] else {
+            return Err(unreadable());
+        };
+        out.push(format!(
+            "machine {} up {} free {} cpus {} load {} available {} MB",
+            cell(machine),
+            cell(up),
+            cell(free),
+            cell(cpus),
+            load(l)?,
+            cell(available)
+        ));
+    }
+    let can: Vec<String> = listed(a, "can_start")?.iter().map(cell).collect();
+    let can = if can.is_empty() {
+        "none".to_owned()
+    } else {
+        can.join(",")
+    };
+    out.push(format!("can start {can}"));
+    out.push("ACCOUNTS".to_owned());
+    for c in listed(a, "accounts")? {
+        let names = ["account", "runtime", "allowance", "source", "at"];
+        let [account, runtime, allowance, source, at] = fields(c, &names)?[..] else {
+            return Err(unreadable());
+        };
+        out.push(format!(
+            "account {} {} allowance {} source {} at {}",
+            cell(account),
+            cell(runtime),
+            cell(allowance),
+            cell(source),
+            cell(at)
+        ));
+    }
+    Ok(out)
+}
+/// `ap status --page`: the lines of `--text`, the week, then each open intent's brief, flow and cost, then the
+/// flow, cost and credit's spend of all and the capacity (R47 to R53). Only a failure of the reads of R4
+/// fails the form; every other section that cannot be read is one line with its code.
+fn page(s: &mut impl System, store: Option<&str>) -> Result<Value, Failure> {
+    let began = s.now();
+    let head = overview(s, store)?;
+    let now = (head["at"].as_str().and_then(epoch)).ok_or_else(|| error("store_answer_unreadable", "now"))?;
+    let (since, until) = (day(now.saturating_sub(6 * DAY)), day(now));
+    let month: String = until.chars().take(7).collect();
+    let intents: Vec<String> = (head["intents"].as_array().into_iter().flatten())
+        .filter_map(|i| i["intent"].as_str().map(str::to_owned))
+        .collect();
+    // The calls, in the order of R48; the lines print in the order of R49.
+    let capacity = bounded(s, began, |s| store::function(s, store, "capacity", &json!({})));
+    let spend = bounded(s, began, |s| {
+        store::function(s, store, "api_spend", &json!({ "month": month }))
+    });
+    let briefs: Vec<Step<Value>> = (intents.iter())
+        .map(|i| bounded(s, began, |s| brief(s, store, i)))
+        .collect();
+    let rows = bounded(s, began, |s| indicators(s, store, None));
+    let window = json!({"since": since, "until": until, "by": "role"});
+    let cost_all = bounded(s, began, |s| store::function(s, store, "cost", &window));
+    let costs: Vec<Step<Value>> = (intents.iter())
+        .map(|i| {
+            let mut mine = window.clone();
+            mine["intent"] = json!(i);
+            bounded(s, began, |s| store::function(s, store, "cost", &mine))
+        })
+        .collect();
+
+    let all_rows: Step<Vec<&Value>> = match &rows {
+        Ok(v) => listed(v, "units").map(|u| u.iter().collect()),
+        Err(code) => Err(code.clone()),
+    };
+    let flow = |label: &str, only: Option<&str>| match &all_rows {
+        Ok(r) => {
+            let mine: Vec<&Value> = (r.iter().copied())
+                .filter(|u| only.is_none_or(|i| u["intent"].as_str() == Some(i)))
+                .collect();
+            vec![flow_line(label, &mine, (&since, &until))]
+        }
+        Err(code) => vec![format!("flow {label} unreadable {code}")],
+    };
+    let mut lines: Vec<String> = overview_text(&head).lines().map(str::to_owned).collect();
+    lines.push(format!("WEEK {since} {until}"));
+    for ((i, brief), cost) in intents.iter().zip(&briefs).zip(&costs) {
+        let label = one(i);
+        lines.push(format!("INTENT {label}"));
+        match brief {
+            Ok(v) => {
+                let said = text_of(&Call::Brief(i.clone()), v);
+                lines.extend(said.lines().map(str::to_owned));
+            }
+            Err(code) => lines.push(format!("brief {label} unreadable {code}")),
+        }
+        lines.extend(flow(&label, Some(i)));
+        let cost = cost.clone().and_then(|a| cost_lines(&label, &a, false));
+        lines.extend(section_lines(&format!("cost {label}"), cost));
+    }
+    lines.push("ALL".to_owned());
+    lines.extend(flow("all", None));
+    let cost = cost_all.and_then(|a| cost_lines("all", &a, true));
+    lines.extend(section_lines("cost all", cost));
+    let spent = spend.and_then(|a| api_lines(&month, &a));
+    lines.extend(section_lines(&format!("api {month}"), spent));
+    let capacity = capacity.and_then(|a| capacity_lines(&a));
+    lines.extend(section_lines("capacity", capacity));
+    Ok(json!({ "page": lines }))
 }
 
 /// One reading of the wait: the store's clock, the intent's units by key, the keys of the open `act` or
@@ -1388,13 +1668,28 @@ fn labelled(v: &Value, depth: usize, out: &mut String) {
         }
     }
 }
-/// One line a row of the indicators and a last line of the summary, a null member `-`.
-fn indicators_text(v: &Value) -> String {
-    let g = |x: &Value| match x {
+/// A value on one line: a null is `-`, a string with its control characters as spaces, anything else as its
+/// JSON writes it.
+fn cell(x: &Value) -> String {
+    match x {
         Value::Null => "-".to_owned(),
         Value::String(t) => one(t),
         other => other.to_string(),
-    };
+    }
+}
+/// The summary of R41 from `median minutes` to the end, a null member `-`.
+fn median_tail(m: &Value) -> String {
+    format!(
+        "median minutes {} rounds {} repairs {} first accepted {}",
+        cell(&m["median_minutes"]),
+        cell(&m["median_rounds"]),
+        cell(&m["median_repairs"]),
+        cell(&m["first_accept_share"]),
+    )
+}
+/// One line a row of the indicators and a last line of the summary, a null member `-`.
+fn indicators_text(v: &Value) -> String {
+    let g = cell;
     let mut out = String::new();
     for r in v["units"].as_array().into_iter().flatten() {
         let who = &r["implementer"];
@@ -1433,14 +1728,7 @@ fn indicators_text(v: &Value) -> String {
         );
     }
     let m = &v["summary"];
-    out + &format!(
-        "summary {} units median minutes {} rounds {} repairs {} first accepted {}\n",
-        g(&m["count"]),
-        g(&m["median_minutes"]),
-        g(&m["median_rounds"]),
-        g(&m["median_repairs"]),
-        g(&m["first_accept_share"]),
-    )
+    out + &format!("summary {} units {}\n", g(&m["count"]), median_tail(m))
 }
 /// The plain lines of an answer.
 pub fn text_of(call: &Call, v: &Value) -> String {
@@ -1450,6 +1738,10 @@ pub fn text_of(call: &Call, v: &Value) -> String {
         Call::Wait(..) => format!("{v}\n"),
         Call::Brief(_) => {
             let lines = v["brief"].as_array().into_iter().flatten();
+            lines.map(|l| format!("{}\n", text(l))).collect()
+        }
+        Call::Page => {
+            let lines = v["page"].as_array().into_iter().flatten();
             lines.map(|l| format!("{}\n", text(l))).collect()
         }
         Call::Key(_) | Call::KeyAll(_) => {
@@ -1495,7 +1787,7 @@ pub fn cli(argv: &[OsString]) -> ExitCode {
         .is_ok_and(|a| matches!(a.call, Call::Wait(..)));
     let result = parsed.and_then(|a| {
         let v = execute(&mut Host, a.store.as_deref(), &a.call)?;
-        Ok(if a.text || matches!(a.call, Call::Brief(_)) {
+        Ok(if a.text || matches!(a.call, Call::Brief(_) | Call::Page) {
             text_of(&a.call, &v)
         } else {
             format!("{v}\n")
