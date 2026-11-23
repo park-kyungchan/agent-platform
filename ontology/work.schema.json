@@ -1,7 +1,7 @@
 {
   "format": "ontology-schema/v1",
   "domain": "work",
-  "version": 18,
+  "version": 19,
   "namespace": {
     "instance": "vps://palantirkc",
     "account": "root"
@@ -757,7 +757,8 @@
           "required": false,
           "max_bytes": 300,
           "description": "Path or command whose output proves the measured value; do not include private payloads."
-        }
+        },
+        "intent": {"type": {"ref": "intent"}, "required": false}
       }
     },
     "measurement": {
@@ -1292,7 +1293,10 @@
         "uses": {"type": {"ref": "account"}, "required": false},
         "job": {"type": "string", "required": false, "max_bytes": 40},
         "reserved_usd_micros": {"type": "integer", "required": false},
-        "settled_usd_micros": {"type": "integer", "required": false}
+        "settled_usd_micros": {"type": "integer", "required": false},
+        "days": {"type": {"array": {"struct": {"day": "string", "messages": "integer", "usd_micros": "integer", "refusals": "integer", "file_reads": "integer", "file_writes": "integer", "store_reads": "integer", "store_writes": "integer"}}}, "required": false},
+        "refusals": {"type": "integer", "required": false},
+        "measured_at": {"type": {"value_type": "utc_time"}, "required": false}
       }
     },
     "finding": {
@@ -1520,6 +1524,16 @@
       "names": {
         "forward": "measurement_kpi",
         "reverse": "measurements"
+      }
+    },
+    "kpi_intent": {
+      "from": "kpi",
+      "via": "intent",
+      "to": "intent",
+      "cardinality": "many_to_one",
+      "names": {
+        "forward": "kpi_intent",
+        "reverse": "intent_kpis"
       }
     },
     "decision_supersedes": {
@@ -4336,6 +4350,82 @@
       "rules": [
         {"create_or_modify_object": "account", "set": {"allowance": "$allowance", "allowance_by": "$by", "allowance_at": "$now"}}
       ]
+    },
+    "record_session": {
+      "description": "Record one closed run of a Claude Code session no ap run started, from its session records (ap measure sessions, specs/ap/measure.md R6).",
+      "parameters": {
+        "session": {"type": {"value_type": "nonempty_text"}, "required": true, "max_bytes": 200},
+        "role": {"type": {"value_type": "nonempty_text"}, "required": true, "max_bytes": 40},
+        "runtime": {"type": {"value_type": "nonempty_text"}, "required": true, "max_bytes": 40},
+        "model": {"type": {"value_type": "nonempty_text"}, "required": true, "max_bytes": 80},
+        "started_at": {"type": {"value_type": "utc_time"}, "required": true},
+        "ended_at": {"type": {"value_type": "utc_time"}, "required": true},
+        "account": {"type": "string", "required": false, "max_bytes": 200},
+        "record": {"type": {"value_type": "file_path"}, "required": false},
+        "intent": {"type": {"ref": "intent"}, "required": false},
+        "host": {"type": {"ref": "host"}, "required": false},
+        "uses": {"type": {"ref": "account"}, "required": false},
+        "input_tokens": {"type": "integer", "required": false},
+        "cache_read_tokens": {"type": "integer", "required": false},
+        "cache_write_tokens": {"type": "integer", "required": false},
+        "output_tokens": {"type": "integer", "required": false}
+      },
+      "submission_criteria": [
+        {"code": "ended_before_started", "message": "ended_at is before started_at: give the times of the first and the last message.", "none": [{"gt": ["$started_at", "$ended_at"]}]},
+        {"code": "ended_in_future", "message": "ended_at is after now: give the UTC time of the last message.", "none": [{"gt": ["$ended_at", "$now"]}]}
+      ],
+      "rules": [
+        {"create_object": "run", "set": {"session": "$session", "role": "$role", "runtime": "$runtime", "model": "$model", "started_at": "$started_at", "ended_at": "$ended_at", "account": "$account", "record": "$record", "intent": "$intent", "host": "$host", "uses": "$uses", "input_tokens": "$input_tokens", "cache_read_tokens": "$cache_read_tokens", "cache_write_tokens": "$cache_write_tokens", "output_tokens": "$output_tokens", "status": "closed", "state": "session", "measured_at": "$now"}}
+      ]
+    },
+    "extend_session": {
+      "description": "Extend a run of state session to its later messages: the new end and the token counts; a parameter not given stays (specs/ap/measure.md R6).",
+      "parameters": {
+        "run": {"type": {"ref": "run"}, "required": true},
+        "ended_at": {"type": {"value_type": "utc_time"}, "required": true},
+        "model": {"type": {"value_type": "nonempty_text"}, "required": false, "max_bytes": 80},
+        "input_tokens": {"type": "integer", "required": false},
+        "cache_read_tokens": {"type": "integer", "required": false},
+        "cache_write_tokens": {"type": "integer", "required": false},
+        "output_tokens": {"type": "integer", "required": false}
+      },
+      "submission_criteria": [
+        {"code": "not_a_session_run", "message": "Choose a run of state session (record_session made it); a stage's run is not extended.", "all": [{"exists": "$run"}, {"present": "$run.state"}, {"eq": ["$run.state", "session"]}]},
+        {"code": "ended_in_future", "message": "ended_at is after now: give the UTC time of the last message.", "none": [{"gt": ["$ended_at", "$now"]}]},
+        {"code": "ended_before_started", "message": "ended_at is before the run's started_at.", "none": [{"all": [{"exists": "$run"}, {"gt": ["$run.started_at", "$ended_at"]}]}]}
+      ],
+      "rules": [
+        {"modify_object": "run", "set": {"ended_at": "$ended_at", "model": "$model", "input_tokens": "$input_tokens", "cache_read_tokens": "$cache_read_tokens", "cache_write_tokens": "$cache_write_tokens", "output_tokens": "$output_tokens"}}
+      ]
+    },
+    "measure_run": {
+      "description": "Set a run's spend at list price and its refusals by UTC day, and when they were measured (ap measure sessions, specs/ap/measure.md R6, R7).",
+      "parameters": {
+        "run": {"type": {"ref": "run"}, "required": true},
+        "days": {"type": {"array": {"struct": {"day": "string", "messages": "integer", "usd_micros": "integer", "refusals": "integer", "file_reads": "integer", "file_writes": "integer", "store_reads": "integer", "store_writes": "integer"}}}, "required": true},
+        "refusals": {"type": "integer", "required": true}
+      },
+      "submission_criteria": [
+        {"code": "unknown_run", "message": "Name an existing run (search run).", "all": [{"exists": "$run"}]}
+      ],
+      "rules": [
+        {"modify_object": "run", "set": {"days": "$days", "refusals": "$refusals", "measured_at": "$now"}}
+      ]
+    },
+    "set_kpi_intent": {
+      "description": "Make a KPI one of an intent's: names of the KPIs of one intent are unique.",
+      "parameters": {
+        "kpi": {"type": {"ref": "kpi"}, "required": true},
+        "intent": {"type": {"ref": "intent"}, "required": true}
+      },
+      "submission_criteria": [
+        {"code": "unknown_kpi", "message": "Name an existing KPI (search kpi).", "all": [{"exists": "$kpi"}]},
+        {"code": "unknown_intent", "message": "Name an existing intent (search intent).", "all": [{"exists": "$intent"}]},
+        {"code": "duplicate_kpi_in_intent", "message": "Another KPI of this intent has this name: use that KPI.", "none": [{"all": [{"exists": "$kpi"}, {"exists": "$intent"}, {"linked": {"from": "$intent", "link": "intent_kpis", "where": {"all": [{"eq": ["name", "$kpi.name"]}, {"ne": ["task", "$kpi.task"]}]}}}]}]}
+      ],
+      "rules": [
+        {"modify_object": "kpi", "set": {"intent": "$intent"}}
+      ]
     }
   },
   "functions": {
@@ -4392,6 +4482,40 @@
       "program": "/usr/local/bin/ap",
       "answer_bytes": 65536,
       "timeout_ms": 30000
+    },
+    "cost": {
+      "description": "What a window of UTC days cost at list price: by role, intent, unit or day, per merged unit, the Lead's share, the API credit's spend (specs/ap/measure.md R10).",
+      "parameters": {
+        "since": {"type": "string", "required": true},
+        "until": {"type": "string", "required": true},
+        "by": {"type": "string", "required": false},
+        "intent": {"type": "string", "required": false}
+      },
+      "program": "/usr/local/bin/ap",
+      "answer_bytes": 65536,
+      "timeout_ms": 600000
+    },
+    "flow": {
+      "description": "The flow of an intent's units over a window of UTC days (specs/ap/measure.md; answered from unit m-kpi on).",
+      "parameters": {
+        "intent": {"type": "string", "required": true},
+        "since": {"type": "string", "required": true},
+        "until": {"type": "string", "required": true}
+      },
+      "program": "/usr/local/bin/ap",
+      "answer_bytes": 65536,
+      "timeout_ms": 600000
+    },
+    "share": {
+      "description": "The share of the work done through the Ontology over a window of UTC days (specs/ap/measure.md; answered from unit m-kpi on).",
+      "parameters": {
+        "since": {"type": "string", "required": true},
+        "until": {"type": "string", "required": true},
+        "intent": {"type": "string", "required": false}
+      },
+      "program": "/usr/local/bin/ap",
+      "answer_bytes": 65536,
+      "timeout_ms": 600000
     }
   },
   "grants": [
@@ -4545,7 +4669,11 @@
         "declare_host",
         "observe_host",
         "observe_account",
-        "state_allowance"
+        "state_allowance",
+        "record_session",
+        "extend_session",
+        "measure_run",
+        "set_kpi_intent"
       ]
     }
   ],

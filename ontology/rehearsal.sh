@@ -948,7 +948,7 @@ apply('triage_decision', 'v9-after-carry', dict(decision=third, triage='none', r
 unchanged = fingerprint()
 assert migrate(9, 10) == dict(carried=0, already=3)
 assert fingerprint() == unchanged and fields(third_request)['route_reason'] == 'carried from version 9'
-for before, after in [(9, 19), (10, 10), (10, 9)]:
+for before, after in [(9, 20), (10, 10), (10, 9)]:
     assert migrate(before, after, 2) == dict(status='unknown_pair')
 assert fingerprint() == unchanged
 assert migrate(9, 10) == dict(carried=0, already=3)
@@ -2144,14 +2144,19 @@ assert (answer['host_samples']['appended']['retraction'], answer['checks']['appe
 print('gate_row=v17-records-retracted expected=admitted')
 print('v17_gate_rows_complete')
 print('v17 resources: ok')
-# Version 18: the repository's file over the objects made under version 17. The schema differs from version 17 only by
-# points 1 and 2 of ontology/README.md, "Version 18": each is taken off a copy, and what is left reads as version 17.
+# Version 18, pinned in Git by the commit of main that holds it, over the objects made under version 17. The schema
+# differs from version 17 only by points 1 and 2 of ontology/README.md, "Version 18": each is taken off a copy, and what
+# is left reads as version 17.
 v17_schema = schema
 v17_objects = [o['id'] for t in ('task', 'decision', 'request', 'intent', 'criterion', 'unit', 'review', 'run', 'finding', 'hold', 'principle', 'host', 'account')
                for o in call(['search'], dict(object_type=t, limit=1000))['objects']]
 v17_before = [obj(i) for i in v17_objects]
 v17_views = [(view, args, call(['render'], dict(view=view, args=args))) for view, args, _ in v13_views]
-schema = json.loads(pathlib.Path(repo, 'ontology/work.schema.json').read_text())
+V18_PIN = ('682ec9d9d3c6c3917860990b10b6a595f92b9c6b', '233aab1431aea0385c5333fdd01d20eb966c4c941fa462c85dbc506e7771f5e0')
+v18_bytes = subprocess.check_output(['git', '-C', repo, 'show', V18_PIN[0] + ':ontology/work.schema.json'], timeout=10)
+assert hashlib.sha256(v18_bytes).hexdigest() == V18_PIN[1]
+v18_path = pathlib.Path(store).with_name('pinned-' + V18_PIN[0] + '.json'); v18_path.write_bytes(v18_bytes)
+schema = json.loads(v18_bytes)
 assert schema['version'] == 18
 head, old = json.loads(json.dumps(schema)), json.loads(json.dumps(v17_schema))
 SHAPES18 = dict(job={'type': 'string', 'required': False, 'max_bytes': 40}, reserved_usd_micros={'type': 'integer', 'required': False},
@@ -2169,7 +2174,7 @@ assert len(spend_fn.pop('description').encode()) <= 200
 assert spend_fn == dict(parameters=dict(month={'type': 'string', 'required': True}), program='/usr/local/bin/ap', answer_bytes=65536, timeout_ms=30000), spend_fn
 assert {k: v for k, v in head.items() if k != 'version'} == {k: v for k, v in old.items() if k != 'version'}
 print('gate_row=v18-only-points-1-and-2 expected=admitted functions=' + str(len(schema['functions'])))
-call(['schema', 'install', str(resource_copy(pathlib.Path(repo, 'ontology/work.schema.json'), 'repository.json', 'repository-route.json'))])
+call(['schema', 'install', str(resource_copy(v18_path, 'pinned-v18.json', 'pinned-v18-route.json'))])
 redirect.trace(work, copies)
 assert [obj(i) for i in v17_objects] == v17_before
 for view, args, before in v17_views:
@@ -2188,7 +2193,6 @@ assert sorted(listed) == ['api_spend', 'capacity', 'clause', 'gate', 'horizon', 
 assert 'program' not in listed['api_spend'] and [p['name'] for p in listed['api_spend']['parameters']] == ['month'], listed['api_spend']
 unchanged = fingerprint()
 assert migrate(17, 18) == dict(carried=0, already=0)
-assert migrate(18, 19, 2) == dict(status='unknown_pair')
 assert fingerprint() == unchanged and [obj(i) for i in v17_objects] == v17_before
 print('v18_migration_rows_complete')
 phase = 'v18'
@@ -2216,4 +2220,124 @@ f = fields(plain); assert f['status'] == 'closed' and f['input_tokens'] == 1 and
 print('gate_row=v18-credit-ledger expected=admitted')
 print('v18_gate_rows_complete')
 print('v18 credit: ok')
+# Version 19: the repository's file over the objects made under version 18. The schema differs from version 18 only by
+# points 1 to 6 of ontology/README.md, "Version 19": each is taken off a copy, and what is left reads as version 18.
+v18_schema = schema
+v18_objects = [o['id'] for t in ('task', 'decision', 'request', 'intent', 'criterion', 'unit', 'review', 'run', 'finding', 'hold', 'principle', 'host', 'account', 'kpi')
+               for o in call(['search'], dict(object_type=t, limit=1000))['objects']]
+v18_before = [obj(i) for i in v18_objects]
+v18_views = [(view, args, call(['render'], dict(view=view, args=args))) for view, args, _ in v13_views]
+schema = json.loads(pathlib.Path(repo, 'ontology/work.schema.json').read_text())
+assert schema['version'] == 19
+head, old = json.loads(json.dumps(schema)), json.loads(json.dumps(v18_schema))
+DAYS = {'array': {'struct': dict(day='string', **{k: 'integer' for k in ('messages', 'usd_micros', 'refusals', 'file_reads', 'file_writes', 'store_reads', 'store_writes')})}}
+TOKENS = ('input_tokens', 'cache_read_tokens', 'cache_write_tokens', 'output_tokens')
+run_properties = head['object_types']['run']['properties']
+assert run_properties.pop('days') == {'type': DAYS, 'required': False}
+assert run_properties.pop('refusals') == {'type': 'integer', 'required': False}
+assert run_properties.pop('measured_at') == {'type': UTC, 'required': False}
+assert head['object_types']['kpi']['properties'].pop('intent') == {'type': {'ref': 'intent'}, 'required': False}
+assert head['link_types'].pop('kpi_intent') == {'from': 'kpi', 'via': 'intent', 'to': 'intent', 'cardinality': 'many_to_one', 'names': {'forward': 'kpi_intent', 'reverse': 'intent_kpis'}}
+NEW19 = ('record_session', 'extend_session', 'measure_run', 'set_kpi_intent')
+for name in NEW19:
+    a = head['action_types'].pop(name)
+    assert len(a['description'].encode()) <= 200 and all('description' not in p for p in a['parameters'].values()), name
+    globals()['act_' + name] = a
+TOKEN_SHAPES = {k: ('integer', False, None, None) for k in TOKENS}
+assert shapes(act_record_session['parameters']) == dict(session=(NE, True, 200, None), role=(NE, True, 40, None), runtime=(NE, True, 40, None), model=(NE, True, 80, None),
+    started_at=(UTC, True, None, None), ended_at=(UTC, True, None, None), account=('string', False, 200, None), record=({'value_type': 'file_path'}, False, None, None),
+    intent=({'ref': 'intent'}, False, None, None), host=({'ref': 'host'}, False, None, None), uses=({'ref': 'account'}, False, None, None), **TOKEN_SHAPES)
+assert [c['code'] for c in act_record_session['submission_criteria']] == ['ended_before_started', 'ended_in_future']
+assert act_record_session['rules'] == [{'create_object': 'run', 'set': dict({k: '$' + k for k in ('session', 'role', 'runtime', 'model', 'started_at', 'ended_at', 'account', 'record', 'intent', 'host', 'uses') + TOKENS},
+                                                                         status='closed', state='session', measured_at='$now')}]
+assert shapes(act_extend_session['parameters']) == dict(run=({'ref': 'run'}, True, None, None), ended_at=(UTC, True, None, None), model=(NE, False, 80, None), **TOKEN_SHAPES)
+assert [c['code'] for c in act_extend_session['submission_criteria']] == ['not_a_session_run', 'ended_in_future', 'ended_before_started']
+assert act_extend_session['rules'] == [{'modify_object': 'run', 'set': {k: '$' + k for k in ('ended_at', 'model') + TOKENS}}]
+assert shapes(act_measure_run['parameters']) == dict(run=({'ref': 'run'}, True, None, None), days=(DAYS, True, None, None), refusals=('integer', True, None, None))
+assert [c['code'] for c in act_measure_run['submission_criteria']] == ['unknown_run']
+assert act_measure_run['rules'] == [{'modify_object': 'run', 'set': {'days': '$days', 'refusals': '$refusals', 'measured_at': '$now'}}]
+assert shapes(act_set_kpi_intent['parameters']) == dict(kpi=({'ref': 'kpi'}, True, None, None), intent=({'ref': 'intent'}, True, None, None))
+assert [c['code'] for c in act_set_kpi_intent['submission_criteria']] == ['unknown_kpi', 'unknown_intent', 'duplicate_kpi_in_intent']
+assert act_set_kpi_intent['rules'] == [{'modify_object': 'kpi', 'set': {'intent': '$intent'}}]
+FN19 = dict(cost=dict(since=True, until=True, by=False, intent=False), flow=dict(intent=True, since=True, until=True), share=dict(since=True, until=True, intent=False))
+for name, params in FN19.items():
+    f = head['functions'].pop(name)
+    assert len(f.pop('description').encode()) <= 200, name
+    assert f == dict(parameters={p: {'type': 'string', 'required': r} for p, r in params.items()}, program='/usr/local/bin/ap', answer_bytes=65536, timeout_ms=600000), (name, f)
+[grant], [grant18] = head['grants'], old['grants']
+assert grant['actions'] == grant18['actions'] + list(NEW19)
+head['grants'] = old['grants']
+assert {k: v for k, v in head.items() if k != 'version'} == {k: v for k, v in old.items() if k != 'version'}
+print('gate_row=v19-only-points-1-to-6 expected=admitted functions=' + str(len(schema['functions'])))
+call(['schema', 'install', str(resource_copy(pathlib.Path(repo, 'ontology/work.schema.json'), 'repository.json', 'repository-route.json'))])
+redirect.trace(work, copies)
+assert [obj(i) for i in v18_objects] == v18_before
+for view, args, before in v18_views:
+    answer = call(['render'], dict(view=view, args=args))
+    assert answer['rows'] == before['rows'] and answer['markdown'] == before['markdown'].replace('schema=work@18', 'schema=work@19'), view
+print('gate_row=v19-v18-objects-and-views-unchanged expected=admitted objects=' + str(len(v18_objects)) + ' views=' + str(len(v18_views)))
+sizes = []
+for name in ('ont_describe', 'ont_action_list'):
+    wire = subprocess.run([binary, '--store', store, 'mcp'], input=json.dumps(dict(jsonrpc='2.0', id=1, method='tools/call', params=dict(name=name, arguments={}))) + '\n', text=True, capture_output=True, timeout=60)
+    answer = json.loads(wire.stdout.splitlines()[0])['result']; assert wire.returncode == 0 and not answer['isError'], answer
+    sizes.append(len(answer['content'][0]['text'].encode())); assert sizes[-1] <= 262144, (name, sizes[-1])
+print('v19_mcp_bytes=' + ','.join(map(str, sizes)), file=sys.stderr)
+described = call(['describe'], {})
+listed = {f['name']: f for f in described['functions'] if f['domain'] == 'work'}
+assert sorted(listed) == ['api_spend', 'capacity', 'clause', 'cost', 'flow', 'gate', 'horizon', 'route', 'share'], sorted(listed)
+for name, params in FN19.items():
+    assert 'program' not in listed[name] and sorted(p['name'] for p in listed[name]['parameters']) == sorted(params), listed[name]
+unchanged = fingerprint()
+assert migrate(18, 19) == dict(carried=0, already=0)
+assert migrate(19, 20, 2) == dict(status='unknown_pair')
+assert fingerprint() == unchanged and [obj(i) for i in v18_objects] == v18_before
+print('v19_migration_rows_complete')
+phase = 'v19'
+# The walk of version 19. Each refusal row is before the action it guards; a refusal writes nothing.
+def every(i): return {k: v.get('value') for k, v in obj(i)['observations'][-1]['fields'].items()}
+tick(); start, end = stamp(now - 7200), stamp(now - 60)
+SESSION = dict(session='fixture-session-19', role='lead', runtime='claude', model='claude-opus-5-5', started_at=start, ended_at=end, account='fixture-account',
+               record='/fixture/units/u19/1.implementer.md.run.json', intent=gadget, host=local, uses=acct, input_tokens=10, cache_read_tokens=20, cache_write_tokens=30, output_tokens=40)
+apply('record_session', 'ended-before-started', dict(SESSION, started_at=end, ended_at=start), 'ended_before_started')
+apply('record_session', 'ended-in-future', dict(SESSION, ended_at=stamp(now + 1)), 'ended_in_future')
+session_run = created(apply('record_session', 'session', SESSION), 'run')
+f = every(session_run)
+assert f == dict(SESSION, status='closed', state='session', measured_at=stamp()), f
+# extend_session: only a run of state session; a run of start_run is refused.
+tick(); stage = created(apply('start_run', 'v19-stage', dict(role='implementer', runtime='claude', model='claude-opus-5-5', session='fixture-stage-19')), 'run')
+apply('extend_session', 'stage-run', dict(run=stage, ended_at=stamp()), 'not_a_session_run')
+apply('extend_session', 'in-future', dict(run=session_run, ended_at=stamp(now + 1)), 'ended_in_future')
+apply('extend_session', 'before-start', dict(run=session_run, ended_at=stamp(now - 100000)), 'ended_before_started')
+tick(); apply('extend_session', 'session', dict(run=session_run, ended_at=stamp(), input_tokens=11, output_tokens=41))
+f = every(session_run)
+assert f == dict(SESSION, status='closed', state='session', measured_at=f['measured_at'], ended_at=stamp(), input_tokens=11, output_tokens=41), f
+# measure_run: the days, the refusals and the time; nothing else of the run changes.
+DAY = dict(day=start[:10], messages=3, usd_micros=1234567, refusals=2, file_reads=4, file_writes=1, store_reads=5, store_writes=1)
+apply('measure_run', 'unknown', dict(run=oid('run', 'absent-v19-run'), days=[DAY], refusals=2), 'unknown_run')
+tick(); before = every(session_run)
+apply('measure_run', 'session', dict(run=session_run, days=[DAY], refusals=2))
+f = every(session_run)
+assert f == dict(before, days=[DAY], refusals=2, measured_at=stamp()), f
+tick(); apply('close_run', 'v19-stage', dict(run=stage, state='done', input_tokens=100, cache_read_tokens=200, cache_write_tokens=300, output_tokens=400))
+closed = every(stage)
+tick(); apply('measure_run', 'stage', dict(run=stage, days=[dict(DAY, messages=9)], refusals=2))
+f = every(stage)
+assert f == dict(closed, days=[dict(DAY, messages=9)], refusals=2, measured_at=stamp()) and f['ended_at'] == closed['ended_at'] and f['input_tokens'] == 100, f
+print('gate_row=v19-sessions-and-measures expected=admitted')
+# set_kpi_intent: a KPI of an intent, reached from it; the same KPI again; a second KPI of that name in the intent.
+other_base = oid('task', 'workspace-strategy-reassessment-20261109')
+KP = dict(name='fixture-v19-cost', definition='The invented cost of a week.')
+kpi_a = created(apply('define_kpi', 'v19-a', dict(KP, task=task)), 'kpi')
+kpi_b = created(apply('define_kpi', 'v19-b', dict(KP, task=other_base)), 'kpi')
+apply('set_kpi_intent', 'unknown', dict(kpi=oid('kpi', 'absent-v19-kpi'), intent=oid('intent', 'absent-v19-intent')), ('unknown_kpi', 'unknown_intent'))
+apply('set_kpi_intent', 'a', dict(kpi=kpi_a, intent=gadget))
+assert every(kpi_a)['intent'] == gadget
+reached = around('intent', {'eq': ['outcome', fields(gadget)['outcome']]}, ['intent_kpis'])
+assert [o['id'] for o in reached['objects']] == [kpi_a], reached
+apply('set_kpi_intent', 'a-again', dict(kpi=kpi_a, intent=gadget))
+apply('set_kpi_intent', 'b-same-name', dict(kpi=kpi_b, intent=gadget), 'duplicate_kpi_in_intent')
+assert every(kpi_b).get('intent') is None
+print('gate_row=v19-kpi-of-an-intent expected=admitted')
+print('v19_gate_rows_complete')
+print('v19 measures: ok')
 PY
