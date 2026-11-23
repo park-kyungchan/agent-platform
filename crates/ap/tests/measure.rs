@@ -180,6 +180,8 @@ impl Fake {
             b["parameters"].clone(),
         );
         assert_eq!(b["agent"], "ap-measure");
+        // `ap measure sessions` and `kpis` claim `measure` (specs/ap/roles.md R3).
+        assert_eq!(b["role"], "measure", "{b}");
         assert!(rid.len() <= 64, "{rid}");
         if let Some((before, edits)) = self.requests.get(&rid) {
             if *before != p {

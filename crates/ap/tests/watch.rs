@@ -624,6 +624,8 @@ impl F {
     }
     fn apply(&mut self, b: &Value) -> Answer {
         let action = b["action_type"].as_str().unwrap().to_owned();
+        // Every apply of `ap watch` claims `watch` (specs/ap/roles.md R3).
+        assert_eq!(b["role"], "watch", "{b}");
         if let Some(code) = self.refuse.get(&action) {
             return json_reply(false, &json!({"status": "refused", "code": code}));
         }

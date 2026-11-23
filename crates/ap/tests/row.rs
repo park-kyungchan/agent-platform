@@ -114,6 +114,8 @@ impl R {
         }
         assert_eq!(a[0], "action", "{a:?}");
         assert_eq!(a[2..4], ["--client", "lead"], "{a:?}");
+        // `ap row` claims `lead` (specs/ap/roles.md R3).
+        assert_eq!(body["role"], "lead", "{body}");
         let (p, id) = (
             &body["parameters"],
             body["request_id"].as_str().unwrap().to_owned(),

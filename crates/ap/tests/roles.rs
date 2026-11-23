@@ -367,7 +367,10 @@ fn every_apply_of_ap_claims_its_role() {
         );
         assert!(applied.is_empty(), "{verb}: {applied:?}");
     }
-    // Every other verb of the table, by the role its source names where it builds the request: the verbs of the Lead,
+    // The bodies of the other verbs are asserted where their fakes record them: `ap watch` (`watch.rs`), `ap row`
+    // (`row.rs`), `ap backlog` and `ap review` (`unit.rs`, `review.rs`), `ap measure` (`measure.rs`), `ap work`
+    // (`work.rs`), `ap unit` (`unit_object.rs`, `unit_review.rs`, `unit_run.rs`, `unit_write.rs`), `ap run` (`run.rs`),
+    // `ap api` (`api.rs`) and `ap deliver` (`deliver.rs`). Every other verb of the table, by the role its source names where it builds the request: the verbs of the Lead,
     // of the drivers (`dispatch`), of delivery, the watch and the pass of the resources and measures.
     let table: [(&str, &[&str]); 12] = [
         ("request.rs", &["lead", "lead"]),

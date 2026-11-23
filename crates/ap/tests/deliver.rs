@@ -6521,6 +6521,16 @@ fn r58_a_host_entry_that_is_no_regular_file_fails_before_the_engine_and_the_sche
         }
         assert_eq!(w.last(), Some(v));
     }
+    // A directory at the path is `failed` also when T has no blob: the host entry is judged first.
+    let mut w = W::at_pin();
+    std::fs::create_dir(roles_path(&w)).unwrap();
+    let (v, exit) = w.run();
+    assert_eq!(
+        (end(&v), exit),
+        (("failed", "roles_install_failed"), 4),
+        "{v}"
+    );
+    assert!(w.launched().is_empty() && no_store_write(&w));
     // A clone that cannot answer is no "absent" either.
     let mut w = W::at_pin();
     (w.roles_blob, w.roles_git_fails) = (Some(ROLES_NEW), true);
