@@ -252,14 +252,16 @@ inner='exec 3< <(exec python3 -I -c "$1" inside "$2" "$3" 2>/dev/null); IFS= rea
 
 left=$((start + limit - $(date +%s)))
 [ "$left" -ge 1 ] || bad "time"
-timeout -k 10 "$left" nice -n 10 bwrap "${ns[@]}" "${view[@]}" \
+# The CLI's input is a pipe, never a file: a file's path (it holds the nonce) shows in the look's own
+# /proc/self/fd/0. The lock's descriptor is closed for the sandbox.
+cat -- "$in/stdin" | timeout -k 10 "$left" nice -n 10 bwrap "${ns[@]}" "${view[@]}" \
   --bind "$tree" "$cwd" --ro-bind "$repo" "$cwd/.git" \
   ${readonly_binds[@]+"${readonly_binds[@]}"} \
   --bind "$run/scratch" "$scratch" \
   --bind "$home" "$home" ${credentials[@]+"${credentials[@]}"} \
   --ro-bind "$run/sock" /ap-egress --ro-bind "$run/bin" /ap-bin \
   --remount-ro / "${setenv[@]}" --chdir "$cwd" -- \
-  bash -c "$inner" ap-inner "$prog" /ap-egress/ap-egress.sock "$port" "${cli[@]}" < "$in/stdin"
-rc=$?
+  bash -c "$inner" ap-inner "$prog" /ap-egress/ap-egress.sock "$port" "${cli[@]}" 9>&-
+rc=${PIPESTATUS[1]}
 touch -- "$work/used/$key"
 exit "$rc"

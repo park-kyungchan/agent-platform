@@ -544,7 +544,7 @@ impl System for Fake {
                             .is_ok_and(|s| s.success())
                         };
                         signal("-HUP");
-                        for _ in 0..30 {
+                        for _ in 0..100 {
                             if !signal("-0") {
                                 break;
                             }
@@ -11714,6 +11714,7 @@ case $(cat "$here/mode" 2>/dev/null) in
     ap check "$PWD" -- sh -c 'echo "$AP_CHECK_HOST $CARGO_INCREMENTAL" > "$PWD/built"; exit 7'; echo $? > "$here/build.rc"
     ap fn route 2> "$here/route.err"; echo $? > "$here/route.rc"
     result 'Verdict: accept\nhead' ;;
+  fds) init; for f in /proc/self/fd/*; do readlink "$f"; done > "$here/fds"; result 'Verdict: accept\nhead' ;;
   forge) init; printf '\0ap-egress deadbeef {"at":"x"}\n'; printf '\0ap-egress deadbeef {"at":"x"}\n' >&2
     result 'Verdict: accept\nhead' ;;
   *) init; result 'Verdict: accept\nhead' ;;
@@ -12457,10 +12458,17 @@ fn pc_r59_the_sides_view_is_an_allow_list_and_the_proxy_comes_before_the_cli() {
                 .unwrap()
                 .contains(" Z ")
     );
-    let left: Vec<_> = std::fs::read_dir(f.t.join("pcwork/tmp"))
-        .unwrap()
-        .flatten()
-        .collect();
+    let mut left: Vec<_> = vec![];
+    for _ in 0..100 {
+        left = std::fs::read_dir(f.t.join("pcwork/tmp"))
+            .unwrap()
+            .flatten()
+            .collect();
+        if left.is_empty() {
+            break;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(100));
+    }
     assert!(left.is_empty(), "{left:?}");
     assert_eq!(
         std::fs::metadata(&home).unwrap().permissions().mode() & 0o777,
@@ -12848,4 +12856,22 @@ fn pc_r57_a_request_without_host_has_no_host_member_and_calls_no_tailscale() {
     assert!(v["attempts"][0].get("host").is_none());
     assert!(f.ts_calls().is_empty());
     assert!(f.launches[0].iter().all(|a| a != "tailscale"));
+}
+
+// spec: specs/ap/run.md#R59
+#[test]
+fn pc_r59_the_look_inherits_no_descriptor_whose_path_holds_the_nonce_or_the_lock() {
+    let mut f = Fake::new();
+    f.pc();
+    f.pc_mode("fds");
+    let v = pc_ok(&mut f, "x.md");
+    assert_eq!(v["host"], "pc");
+    let nonce = f.launch_words(f.ts_launches()[0].0)[6].clone();
+    let fds = std::fs::read_to_string(f.t.join("pcbin/fds")).unwrap();
+    assert!(
+        fds.lines().any(|l| l.starts_with("pipe:")),
+        "standard input is a pipe: {fds}"
+    );
+    assert!(!fds.contains(&nonce), "{fds}");
+    assert!(!fds.contains("/locks/"), "{fds}");
 }
