@@ -32,9 +32,10 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 SELF = os.path.abspath(__file__)
 REPO_CASES = os.path.join(HERE, "cases.json")
 HOST_DIGESTS = os.path.join(HERE, "host-cases.sha256")
-READER_NAMES = ("claude-sonnet", "claude-haiku", "muse-ember", "ember-yolo", "ember-route", "agy-hydrogen")
+READER_NAMES = ("claude-sonnet", "claude-haiku", "muse-ember", "ember-yolo", "ember-route", "ember-pack",
+                "agy-hydrogen")
 # The readers that are Muse Code: one answer, usage and session branch for all of them.
-MUSE = ("muse-ember", "ember-yolo", "ember-route")
+MUSE = ("muse-ember", "ember-yolo", "ember-route", "ember-pack")
 TIME_BOUND = 600  # seconds per session: the unit's RuntimeMaxSec
 GRACE = 30  # seconds past the bound after which this program stops waiting for systemd-run
 SLICE = "agents.slice"
@@ -240,16 +241,25 @@ def yolo_argv(prompt, root, work, sid):
     return muse_argv(prompt, root, work, sid)[:-1] + ["--yolo", prompt]
 
 
-# The route pack of ember-route: the host asks the function route once for the assignment, outside the unit, and the
-# reader is given its answers with the discipline of reading at most three files.
-PACK_LIMIT = 8
-PACK_FILES = 3
-PACK_TIMEOUT = 60  # seconds for the call of the function
+# The route pack of ember-route (8 answers) and ember-pack (4): the host asks the function route once for the assignment,
+# outside the unit, and gives the reader its answers with the text of each section (an excerpt read by the host), and
+# the discipline of opening at most one further file.
+PACK_FILES = 1
+PACK_TIMEOUT = 60  # seconds for one call of the function
+PACK_TRIES = 3
+PACK_BACKOFF = (2, 4)  # seconds before the second and the third try; the worst case is 3 * 60 + 2 + 4 = 186 seconds
+EXCERPT_CHARS = 3000
+GIT_TIMEOUT = 20  # seconds for one `git show`
+CLONES = "/home/palantirkc/platforms"  # a repository's clone is <CLONES>/<name>; ROUTING_CLONES_BASE replaces CLONES
+INSTRUCTIONS_DIR = "/root/.agents"  # where the index reads the shared instructions; --root stands in for it
+EDU = re.compile(r"(^|/)(edu-|education-)")
+HEX_COMMIT = re.compile(r"[0-9a-f]{7,64}")
+REPO_NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*")
 
 
-def route_pack(situation):
-    """The answers of `ont fn route` for the assignment (a non-empty list of dicts), or None."""
-    request = {"parameters": {"words": situation, "limit": PACK_LIMIT}}
+def route_once(situation, limit):
+    """One call of `ont fn route`: a list of dicts that name a path (possibly empty), or None when the call failed."""
+    request = {"parameters": {"words": situation, "limit": limit}}
     try:
         done = subprocess.run([shutil.which("ont") or "ont", "fn", "route"], input=json.dumps(request), text=True,
                               capture_output=True, timeout=PACK_TIMEOUT)
@@ -258,23 +268,85 @@ def route_pack(situation):
         return None
     if done.returncode != 0 or not isinstance(answers, list):
         return None
-    answers = [x for x in answers if isinstance(x, dict) and isinstance(x.get("path"), str)][:PACK_LIMIT]
-    return answers or None
+    return [x for x in answers if isinstance(x, dict) and isinstance(x.get("path"), str)][:limit]
+
+
+def route_pack(situation, limit):
+    """The answers of `ont fn route` for the assignment (a non-empty list of dicts), or None after PACK_TRIES calls
+    that failed or answered nothing, with PACK_BACKOFF seconds between them."""
+    for i in range(PACK_TRIES):
+        if i:
+            time.sleep(PACK_BACKOFF[i - 1])
+        answers = route_once(situation, limit)
+        if answers:
+            return answers
+    return None
+
+
+def is_edu(x):
+    """A pointer of the Academy: its repository or any component of its path begins `edu-` or `education-`."""
+    return any(isinstance(v, str) and EDU.search(v) for v in (x.get("repository"), x["path"]))
+
+
+def lines_of(data, first, last):
+    """Lines first to last (counted from 1, at \n) of the bytes, as text cut to EXCERPT_CHARS, or None."""
+    text = "\n".join(data.decode("utf-8", errors="replace").split("\n")[first - 1:last]).strip("\n")
+    return text[:EXCERPT_CHARS] if text.strip() else None
+
+
+def pack_excerpt(x, root):
+    """The text of the lines an answer names, read by the host: for a section of a repository from its clone at the
+    answer's commit (`git -C <clone> show <commit>:<path>`), for a section of the instructions from the file the path
+    maps to under the root. None (the pointer alone) when the answer has no lines or is of the Academy, or the text
+    cannot be read."""
+    first, last = x.get("first_line"), x.get("last_line")
+    if not all(isinstance(v, int) and not isinstance(v, bool) for v in (first, last)) or not 1 <= first <= last \
+            or is_edu(x):
+        return None
+    path, repository = x["path"], x.get("repository")
+    try:
+        if repository is None:
+            rel = os.path.relpath(path, INSTRUCTIONS_DIR) if os.path.isabs(path) else ".."
+            full = os.path.join(root, rel)
+            if rel.startswith("..") or not os.path.isfile(full) or os.path.islink(full):
+                return None
+            with open(full, "rb") as f:
+                return lines_of(f.read(), first, last)
+        name = repository.split("/")[-1] if isinstance(repository, str) else ""
+        commit = x.get("commit")
+        if not (REPO_NAME.fullmatch(name) and isinstance(commit, str) and HEX_COMMIT.fullmatch(commit)
+                and not path.startswith("-") and os.path.basename(name) == name):
+            return None
+        clone = os.path.join(os.environ.get("ROUTING_CLONES_BASE") or CLONES, name)
+        done = subprocess.run([shutil.which("git") or "git", "-C", clone, "show", "%s:%s" % (commit, path)],
+                              capture_output=True, timeout=GIT_TIMEOUT)
+        return lines_of(done.stdout, first, last) if done.returncode == 0 else None
+    except (OSError, ValueError, subprocess.TimeoutExpired):
+        return None
 
 
 def pack_prompt(case, root, answers):
-    lines = []
+    lines, excerpts = [], 0
     for i, x in enumerate(answers, 1):
+        edu = is_edu(x)
         where = x["path"] if x.get("repository") is None else "%s: %s" % (x["repository"], x["path"])
-        if isinstance(x.get("first_line"), int) and isinstance(x.get("last_line"), int):
+        if not edu and isinstance(x.get("first_line"), int) and isinstance(x.get("last_line"), int):
             where += " lines %d-%d" % (x["first_line"], x["last_line"])
-        lines.append("%d. %s%s" % (i, where, " (%s)" % x["heading"] if isinstance(x.get("heading"), str) and x["heading"] else ""))
+        if not edu and isinstance(x.get("heading"), str) and x["heading"]:
+            where += " (%s)" % x["heading"]
+        lines.append("%d. %s" % (i, where))
+        text = pack_excerpt(x, root)
+        if text:
+            excerpts += 1
+            lines += ["   | " + t for t in text.split("\n")]
     return (PROMPT.format(situation=case["situation"], root=root)
-            + "\n\nThe host's route index has already ranked where facts for this assignment live (best first):\n"
+            + "\n\nThe host's route index has already ranked where facts for this assignment live (best first), and "
+              "the host has read the text of each section for you (a line starting with `|` is the text of the "
+              "pointer above it; a pointer with no text is one the host could not or must not read):\n"
             + "\n".join(lines)
-            + "\n\nOpen at most %d files in all, chosen from these pointers, best first, and search nothing else. A "
-              "repository's file is read at origin/main of its checkout under /home/palantirkc/platforms/<name>/. "
-              "Then give the answer in the form above." % PACK_FILES)
+            + "\n\nOpen at most %d further file in all, chosen from these pointers, best first, and search nothing "
+              "else. A repository's file is read at origin/main of its checkout under "
+              "/home/palantirkc/platforms/<name>/. Then give the answer in the form above." % PACK_FILES), excerpts
 
 
 def agy_argv(prompt, root, work, sid):
@@ -315,7 +387,9 @@ READERS = {
     "ember-yolo": {"cli": "muse", "argv": yolo_argv, "env": (), "set": {"MUSE_NO_AUTO_UPDATE": "1"}, "state": muse_state,
                    "mcp_exempt": True},
     "ember-route": {"cli": "muse", "argv": muse_argv, "env": (), "set": {"MUSE_NO_AUTO_UPDATE": "1"}, "state": muse_state,
-                    "pack": True},
+                    "pack": 8},
+    "ember-pack": {"cli": "muse", "argv": muse_argv, "env": (), "set": {"MUSE_NO_AUTO_UPDATE": "1"}, "state": muse_state,
+                   "pack": 4},
     "agy-hydrogen": {"cli": "agy", "argv": agy_argv, "env": (), "home": agy_home, "state": agy_state},
 }
 
@@ -598,12 +672,12 @@ def run_sample(a, sandbox, case, n, base):
             env["HOME"] = home
         prompt = PROMPT.format(situation=case["situation"], root=a.root)
         if row.get("pack"):
-            answers = route_pack(case["situation"])
+            answers = route_pack(case["situation"], row["pack"])
             if answers is None:
                 meta["state"] = "route_failed"  # no session without its pack
                 return meta
+            prompt, meta["excerpts"] = pack_prompt(case, a.root, answers)
             meta["pack"] = len(answers)
-            prompt = pack_prompt(case, a.root, answers)
         cli = row["argv"](prompt, a.root, work, sid)
         cli[0] = shutil.which(cli[0]) or cli[0]
         argv = unit_argv(sandbox.run, unit, "routing-%s-%s-s%d" % (a.reader, case["id"], n), work,
@@ -997,7 +1071,7 @@ def cmd_score(a):
 
 # ---------------------------------------------------------------- bars
 
-# The bars of ember-route against Sonnet, from a score file. G4 and G5 are not measured here.
+# The bars of a Muse reader against Sonnet, from a score file. G4 and G5 are not measured here.
 BARS_N = 3  # the fewest samples a bar is read at
 
 
@@ -1022,6 +1096,8 @@ def cmd_bars(a):
     sonnet, x = readers["claude-sonnet"], readers.get(reader)
     if x is not None and not judged(x):
         refuse("score_unreadable")
+    if x is not None and set(x["passes"]) != set(sonnet["passes"]):
+        refuse("case_sets_differ")  # the bars compare the same cases; a subset is judged against the same subset
     if x is None or x["n"] < BARS_N:
         values = (None, None, None)  # a reader that is absent, or read at fewer samples, misses every bar
     else:
