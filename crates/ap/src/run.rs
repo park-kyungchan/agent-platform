@@ -166,15 +166,15 @@ impl Runtime {
             ],
         }
     }
-    /// The roles this runtime builds: Codex has no reviewer, and an `agy` stage no other role (its
-    /// `HOME` is the account, so a writing stage's `git`, `gh` and `cargo` lose their files); a
-    /// page's writer runs on Claude alone (R53).
+    /// The roles this runtime builds: Codex has no reviewer, an `agy` stage no writer (its `HOME` is
+    /// its own home, so `ap run` hands it the toolchain's paths by variables, R47); a page's writer
+    /// runs on Claude alone (R53).
     fn role_ok(self, role: &str) -> bool {
         match self {
             Self::Claude => true,
             Self::Muse => role != "writer",
             Self::Codex => role != "reviewer" && role != "writer",
-            Self::Agy => role == "reviewer",
+            Self::Agy => matches!(role, "reviewer" | "implementer" | "fixer"),
         }
     }
     fn typed_answer(self) -> bool {
@@ -497,8 +497,6 @@ const BUILD_LOCK: &str = "/var/lib/agent-platform/build.lock";
 const POLICY_DEFAULT: &str = "/etc/agent-platform/policy.json";
 /// The store's directory (`specs/ap/deliver.md` R37): no policy file inside it is shown (R16 (i)).
 const STORE_DIR: &str = "/var/lib/ontology-platform";
-/// The word that starts the CLI of a stage with `limits` (R16 (e)).
-const CLI_WORD: &str = "claude";
 /// What R16 places in place of `--ro-bind / /`: its words, the source of each read-only bind in
 /// the words' order (the record's `view`, R7) and the target of each (R10).
 #[derive(Default)]
@@ -551,7 +549,7 @@ fn view(q: &Request, l: &Limits, work_root: &Path, hooks: Option<&Path>) -> View
     for rel in VIEW_HOME {
         v.bind_present(&at_home(rel));
     }
-    if let Some((found, file)) = program(variable(&q.base_env, "PATH"), &q.cwd) {
+    if let Some((found, file)) = program(q.runtime.word(), variable(&q.base_env, "PATH"), &q.cwd) {
         v.bind(&file, &found);
     }
     v.bind_present(BUILD_LOCK);
@@ -583,13 +581,14 @@ pub fn top_words(p: &str) -> Vec<String> {
         _ => vec![],
     }
 }
-/// Where `execvp` finds the CLI's word on `path` (the default search path without one), and the
-/// file it resolves to through every link: the path found and the file (R16 (e)).
-fn program(path: Option<&str>, cwd: &str) -> Option<(String, String)> {
+/// Where `execvp` finds the CLI's `word` (the runtime's: `claude` or `agy`) on `path` (the default
+/// search path without one), and the file it resolves to through every link: the path found and
+/// the file (R16 (e)).
+fn program(word: &str, path: Option<&str>, cwd: &str) -> Option<(String, String)> {
     use std::os::unix::fs::PermissionsExt;
     for dir in path.unwrap_or("/bin:/usr/bin").split(':') {
         let dir = if dir.is_empty() { cwd } else { dir };
-        let found = Path::new(cwd).join(dir).join(CLI_WORD);
+        let found = Path::new(cwd).join(dir).join(word);
         let Ok(m) = std::fs::metadata(&found) else {
             continue;
         };
@@ -800,8 +799,8 @@ fn listed_paths(o: &serde_json::Map<String, Value>, key: &str, max: usize) -> Op
     list.iter().map(listed).collect()
 }
 /// The `limits` of a request: a reviewer, an implementer, a fixer or a writer (with `scratch` alone,
-/// `specs/ap/run.md` R53) on the Claude CLI only; a
-/// `scratch`, an absolute path without `..`, apart from the accounts, the cwd, the out, the prompt
+/// `specs/ap/run.md` R53) on the Claude CLI, a reviewer, an implementer or a fixer on `agy`, and
+/// on no other CLI; a `scratch`, an absolute path without `..`, apart from the accounts, the cwd, the out, the prompt
 /// and the paths it writes by its components as written; the optional `write`, `over`, `read_only`
 /// and `show`; never with `expect.file` (`specs/ap/run-limits.md` R1).
 fn scratch(
@@ -863,7 +862,8 @@ fn scratch(
     let roles = ["reviewer", "implementer", "fixer", "writer"];
     // A writer's `limits` names no path but its scratch directory (`specs/ap/run.md` R53).
     let only_scratch = role != "writer" || o.len() == 1;
-    let stage = roles.contains(&role) && runtime == Runtime::Claude && !expect_file && only_scratch;
+    let runs = matches!(runtime, Runtime::Claude | Runtime::Agy);
+    let stage = roles.contains(&role) && runs && !expect_file && only_scratch;
     require!(stage && !up && !inside && !holds && !held && !in_account => "invalid_input", "limits");
     // The hidden list's `~`: without a passwd entry for this user there is no list to hide (R10).
     let home = s.home().map(|h| h.to_string_lossy().into_owned());
@@ -1749,6 +1749,28 @@ fn home_words(accounts: &[String], account: &str, home: &Path, signed: bool) -> 
     }
     words
 }
+/// The `bwrap` words of the home of an `agy` launch (`specs/ap/run-limits.md` R5, R14): the account
+/// an empty directory, then only its `.gemini` read-only, the launch's home writable (so no
+/// sibling home under `<account>/homes` is seen), the one real token file read-only when the
+/// token's link leaves `.gemini` (the caller's `~/.gemini` stays absent), and the account
+/// read-only.
+fn agy_home_words(account: &str, home: &Path) -> Vec<String> {
+    let gemini = Path::new(account).join(".gemini");
+    let (gemini_text, home_text) = (lossy(&gemini), lossy(home));
+    let mut words = args(&["--tmpfs", account]);
+    words.extend(args(&["--ro-bind", &gemini_text, &gemini_text]));
+    words.extend(args(&["--bind", &home_text, &home_text]));
+    if let Ok(token) = std::fs::canonicalize(gemini.join(AGY_TOKEN))
+        && !token.starts_with(&gemini)
+    {
+        let token = lossy(&token);
+        words.extend(args(&["--ro-bind", &token, &token]));
+    }
+    words.extend(args(&["--remount-ro", account]));
+    words
+}
+/// The token of an `agy` account, below its `.gemini` (`specs/ap/run.md` R47).
+const AGY_TOKEN: &str = "antigravity-cli/antigravity-oauth-token";
 /// The name of an account's sign-in, and of the derived file in a home.
 const CREDENTIALS: &str = ".credentials.json";
 /// The largest sign-in `ap run` derives from (`specs/ap/run-limits.md` R15).
@@ -2811,13 +2833,17 @@ fn attempt(
     if let Some(home) = &home {
         record["home"] = json!(home);
     }
-    // A stage with `limits` runs in its home of the launch, `<account>/homes/<session>`: a new
-    // session's, or the one of the session it continues (`specs/ap/run-limits.md` R14).
+    // A stage with `limits` runs in its home of the launch: a Claude stage's `<account>/homes/<session>`
+    // (a new session's, or the one of the session it continues), an `agy` stage's own home above,
+    // the record's on a resume and never one named by the conversation (`specs/ap/run-limits.md` R14).
     let stage_home = q
         .limits
         .as_ref()
         .filter(|_| pc.is_none())
-        .map(|_| Path::new(account).join("homes").join(&session));
+        .map(|_| match (&home, q.runtime) {
+            (Some(home), Runtime::Agy) => home.clone(),
+            _ => Path::new(account).join("homes").join(&session),
+        });
     if let Some(home) = &stage_home {
         record["home"] = json!(home);
     }
@@ -2909,7 +2935,8 @@ fn attempt(
     // The home: made for a new session; the two names its binds cover hold no link and no
     // directory; then the derived sign-in, when the account has one (R14, R15).
     let mut sign = None;
-    if let Some(home) = &stage_home {
+    // Only a Claude stage's home: an `agy` stage's is made above and holds no sign-in of this kind.
+    if let (Some(home), Runtime::Claude) = (&stage_home, q.runtime) {
         if resume.is_none() && make_stage_home(home).is_err() {
             return not_launched(record, "launch");
         }
@@ -2999,6 +3026,23 @@ fn attempt(
                     .into(),
             ));
             env.push(("AGY_CLI_DISABLE_AUTO_UPDATE".into(), "1".into()));
+            // `HOME` is the stage's own home, so the toolchain's and Git's files of the passwd home
+            // are named by variables, each unless the request's `env` gave it (`specs/ap/run.md`
+            // R49); the state of `gh` only to a stage whose `limits` show it.
+            if let Some(passwd) = s.home() {
+                let shown = q.limits.as_ref().is_some_and(|l| l.show);
+                let at = |rel: &str| lossy(&passwd.join(rel));
+                let given = [
+                    ("RUSTUP_HOME", at(".rustup"), true),
+                    ("GIT_CONFIG_GLOBAL", at(".gitconfig"), true),
+                    ("GH_CONFIG_DIR", at(".config/gh"), shown),
+                ];
+                for (name, value, wanted) in given {
+                    if wanted && variable(&q.base_env, name).is_none() {
+                        env.push((name.into(), value));
+                    }
+                }
+            }
         }
     }
     if let Some(limits @ Limits { scratch, .. }) = q.limits.as_ref().filter(|_| pc.is_none()) {
@@ -3011,12 +3055,15 @@ fn attempt(
         bwrap.extend(view.words.iter().cloned());
         bwrap.extend(args(&["--dev", "/dev", "--proc", "/proc"]));
         bwrap.extend(args(&["--ro-bind", "/proc/sys", "/proc/sys"]));
-        bwrap.extend(args(&[
-            "--bind", account, account, "--bind", scratch, scratch,
-        ]));
+        match (&stage_home, q.runtime) {
+            // An `agy` stage sees of its account the login's directory and its own home (R5, R14).
+            (Some(home), Runtime::Agy) => bwrap.extend(agy_home_words(account, home)),
+            _ => bwrap.extend(args(&["--bind", account, account])),
+        }
+        bwrap.extend(args(&["--bind", scratch, scratch]));
         bwrap.extend(limits.named());
         // Each account of the request hidden but the home of the launch (R5, R14, R15).
-        if let Some(home) = &stage_home {
+        if let (Some(home), Runtime::Claude) = (&stage_home, q.runtime) {
             bwrap.extend(home_words(&q.accounts, account, home, sign.is_some()));
         }
         // After the binds: the host's credentials and sockets, hidden (R10).
@@ -3385,7 +3432,7 @@ fn make_here<'a>(s: &mut impl System, q: &'a Request, hooks: Option<&Path>) -> H
     let mut proxy = None;
     let ready = match scratch {
         Some(_) if ready => {
-            proxy = egress::open(s, record_path(&q.out), &q.actor_role).ok();
+            proxy = egress::open(s, record_path(&q.out), q.runtime, &q.actor_role).ok();
             proxy.is_some()
         }
         _ => ready,

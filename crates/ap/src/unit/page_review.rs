@@ -306,6 +306,32 @@ fn request(r: &Value) -> Result<New<'_>, Failure> {
         timeout,
     })
 }
+/// The accounts of the first key present among `<runtime>/reviewer`, `<runtime>/<model>` and
+/// `<runtime>` of the policy's `accounts` (`specs/ap/policy.md` R6), or None when no key is.
+fn mapped(policy: &Value, runtime: &str, model: &str) -> Result<Option<Vec<String>>, Failure> {
+    let accounts = &policy["accounts"];
+    let keys = [
+        format!("{runtime}/reviewer"),
+        format!("{runtime}/{model}"),
+        runtime.to_owned(),
+    ];
+    let Some(key) = keys.iter().find(|k| accounts.get(k.as_str()).is_some()) else {
+        return Ok(None);
+    };
+    let list = accounts[key.as_str()]
+        .as_array()
+        .cloned()
+        .unwrap_or_default();
+    let paths: Vec<String> = list
+        .iter()
+        .filter_map(Value::as_str)
+        .map(str::to_owned)
+        .collect();
+    if paths.is_empty() || paths.len() > 5 || paths.len() != list.len() {
+        return Err(invalid(&format!("accounts.{key}"), "is not 1 to 5 paths"));
+    }
+    Ok(Some(paths))
+}
 fn invalid(member: &str, why: &str) -> Failure {
     fail("policy_invalid", "policy", json!(format!("{member} {why}")))
 }
@@ -343,6 +369,14 @@ pub(crate) fn policy(s: &impl System) -> Result<Map<String, Value>, Failure> {
             "runtime" | "model" | "effort" | "permission_mode" | "task" => word.is_some(),
             "account" => word.is_some_and(|p| Path::new(p).is_absolute() && !p.contains('\0')),
             "compact_window" => v.is_u64(),
+            // The accounts a Claude look moves to when the first is cut (R4): 1 to 4 paths.
+            "next_accounts" => v.as_array().is_some_and(|l| {
+                (1..=4).contains(&l.len())
+                    && l.iter().all(|p| {
+                        p.as_str()
+                            .is_some_and(|p| Path::new(p).is_absolute() && !p.contains('\0'))
+                    })
+            }),
             "models" => v.as_array().is_some_and(|l| {
                 (1..=64).contains(&l.len())
                     && l.iter().all(|m| m.as_str().is_some_and(|m| !m.is_empty()))
@@ -445,12 +479,6 @@ fn look_at(
 ) -> Result<(Value, u8), Failure> {
     let task = new.task.or(reviews.get("task").and_then(Value::as_str));
     let task = task.ok_or_else(|| bad("task"))?;
-    let mut stage = Map::new();
-    for k in REVIEWER {
-        if let Some(v) = new.reviewer.get(k).or(reviews.get(k)) {
-            stage.insert(k.to_owned(), v.clone());
-        }
-    }
     let read = match look.page {
         true => store::head_of::<objects::Unit>(s, look.store, look.key),
         false => store::head_of::<objects::Intent>(s, look.store, look.key),
@@ -466,6 +494,7 @@ fn look_at(
     let found = |k: &str| list.iter().find(|(key, _)| key == k).map(|(_, v)| v);
     let text_of = |v: &Value, k: &str| v[k].as_str().filter(|t| !t.is_empty()).map(str::to_owned);
     let mut resumed = None;
+    let mut resumed_rec = None;
     if let Some(k) = new.resume {
         let no = |why: &str| fail("resume_not_possible", "resume", json!(why));
         let v = found(k).ok_or_else(|| no("no review of this subject and kind has this key"))?;
@@ -497,12 +526,54 @@ fn look_at(
                 "the review {running} of this subject is running"
             )));
         }
+        resumed_rec = Some(rec);
+        resumed = Some((record, cwd, wd));
+    }
+    // The look's runtime is settled before any default is read (R4, R8): the resumed record's, else
+    // the request's, else the policy's, else Claude. A default bound to a runtime (the model, the
+    // effort, the account, the permission mode, the compaction window and the next accounts) is
+    // inherited only from `reviews` of that same runtime.
+    let reviews_runtime = reviews.get("runtime").and_then(Value::as_str);
+    let runtime = match &resumed_rec {
+        Some(rec) => rec.get("runtime").and_then(Value::as_str),
+        None => new.reviewer.get("runtime").and_then(Value::as_str),
+    };
+    let runtime = runtime.or(reviews_runtime).unwrap_or("claude").to_owned();
+    let same = runtime == reviews_runtime.unwrap_or("claude");
+    let mut stage = Map::new();
+    for k in REVIEWER {
+        let inherited = reviews.get(k).filter(|_| k == "runtime" || same);
+        // A resume never moves to other accounts (R8).
+        let inherited = inherited.filter(|_| k != "next_accounts" || resumed_rec.is_none());
+        if let Some(v) = new.reviewer.get(k).or(inherited) {
+            stage.insert(k.to_owned(), v.clone());
+        }
+    }
+    if let Some(rec) = &resumed_rec {
         for k in ["runtime", "model", "effort", "account"] {
             if let Some(v) = rec.get(k).filter(|v| v.is_string()) {
                 stage.insert(k.to_owned(), v.clone());
             }
         }
-        resumed = Some((record, cwd, wd));
+    }
+    let policy = crate::work::policy(s).ok().flatten().unwrap_or_default();
+    let model_of = |stage: &Map<String, Value>| {
+        stage
+            .get("model")
+            .and_then(Value::as_str)
+            .map(str::to_owned)
+    };
+    if runtime == "agy" {
+        // An `agy` look has one account and runs without approval (`specs/ap/run.md` R47).
+        stage
+            .entry("permission_mode")
+            .or_insert_with(|| json!("bypassPermissions"));
+        if !stage.contains_key("account")
+            && let Some(model) = model_of(&stage)
+            && let Some(paths) = mapped(&policy, "agy", &model)?
+        {
+            stage.insert("account".into(), json!(paths[0]));
+        }
     }
     let mut earlier = String::new();
     // The paths the stage reads outside its working directory (R13): a plan's clones, then the
@@ -528,6 +599,19 @@ fn look_at(
             .ok_or_else(|| bad(&format!("reviewer.{k}")))
     };
     let (model, effort) = (word("model")?, word("effort")?);
+    // A Claude look on a mapped list of accounts (`policy.md` R6) that starts with its account moves
+    // on to the rest when the first is cut, unless the request or `reviews` names them (R4); a
+    // resume does not (R8).
+    let named = new.reviewer.contains_key("next_accounts") || reviews.contains_key("next_accounts");
+    if runtime == "claude"
+        && resumed.is_none()
+        && !named
+        && let Ok(Some(paths)) = mapped(&policy, "claude", &model)
+        && paths.len() > 1
+        && stage.get("account").and_then(Value::as_str) == Some(paths[0].as_str())
+    {
+        stage.insert("next_accounts".into(), json!(&paths[1..]));
+    }
     if let Some(models) = reviews.get("models").and_then(Value::as_array)
         && !models.iter().any(|m| m == model.as_str())
     {
@@ -688,10 +772,10 @@ fn look_at(
     if let Some((record, ..)) = &resumed {
         req["resume"] = json!({"record": record});
     }
-    // A reviewer on the Claude CLI runs under `limits`: it writes only its home of the launch
-    // (`specs/ap/run-limits.md` R14) and its own scratch directory, the working directory is
+    // A reviewer on the Claude CLI or on `agy` runs under `limits`: it writes only its home of the
+    // launch (`specs/ap/run-limits.md` R14) and its own scratch directory, the working directory is
     // read-only to it, and it reads outside it only a plan's clones and the earlier reports (R13).
-    if req.get("runtime").is_none_or(|r| r == "claude") {
+    if matches!(runtime.as_str(), "claude" | "agy") {
         let scratch = look.scratch(&review).to_string_lossy().into_owned();
         req["limits"] = json!({ "scratch": scratch });
         if !read_only.is_empty() {

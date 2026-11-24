@@ -33,6 +33,7 @@ use std::{
 static NEXT: AtomicU32 = AtomicU32::new(0);
 const FAKE: &str = include_str!("fixtures/fake-claude.sh");
 const SCRIPT: &str = include_str!("fixtures/unit_review/script.sh");
+const FAKE_AGY: &str = include_str!("fixtures/fake-agy.sh");
 const PLAN_PART: &str = include_str!("fixtures/unit_review/plan-part.md");
 const REPAIR_LOOK: &str = include_str!("../src/unit/frames/repair-look.md");
 const PLAN_REVIEWER: &str = include_str!("../src/unit/frames/plan-reviewer.md");
@@ -1042,6 +1043,16 @@ fn r4_the_reviewer_s_members_come_from_the_request_or_the_policy() {
         (json!({"compact_window": "large"}), "reviews.compact_window"),
         (json!({"account": "relative"}), "reviews.account"),
         (json!({"models": []}), "reviews.models"),
+        (json!({"next_accounts": []}), "reviews.next_accounts"),
+        (
+            json!({"next_accounts": ["relative"]}),
+            "reviews.next_accounts",
+        ),
+        (json!({"next_accounts": "/a"}), "reviews.next_accounts"),
+        (
+            json!({"next_accounts": ["/a", "/b", "/c", "/d", "/e"]}),
+            "reviews.next_accounts",
+        ),
         (json!({"directory": "/a b"}), "reviews.directory"),
     ] {
         f.write_policy(policy);
@@ -3100,4 +3111,192 @@ fn r13_a_look_reads_only_a_plans_clones_and_the_earlier_reports_beside_its_direc
         json!([f.p("clone"), plan["report"]]),
         "{rec}"
     );
+}
+
+impl F {
+    /// The fake `agy` at `bin/agy`, the account `ag` that holds its login token, the policy's
+    /// accounts `agy/reviewer: [ag]` and the models of `agy`; `reviews` as `write_policy` takes it.
+    fn agy_policy(&self, reviews: Value) {
+        let fake = self.t.join("bin/agy");
+        std::fs::write(&fake, FAKE_AGY).unwrap();
+        std::fs::set_permissions(&fake, std::fs::Permissions::from_mode(0o755)).unwrap();
+        let dir = self.t.join("ag/.gemini/antigravity-cli");
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::write(self.t.join("token"), "not-a-token").unwrap();
+        let _ = symlink(self.t.join("token"), dir.join("antigravity-oauth-token"));
+        std::fs::write(self.t.join("bin/mode-ag"), "script").unwrap();
+        std::fs::write(self.t.join("bin/script-ag.sh"), SCRIPT).unwrap();
+        self.write_policy(reviews);
+        let path = self.t.join("policy.json");
+        let mut policy: Value = serde_json::from_slice(&std::fs::read(&path).unwrap()).unwrap();
+        policy["accounts"]["agy/reviewer"] = json!([self.p("ag")]);
+        policy["models"]["allowed"] = json!(["sonnet", "opus", "gemini-4-neon-high"]);
+        std::fs::write(&path, policy.to_string()).unwrap();
+    }
+}
+
+// spec: specs/ap/unit-review.md#R4
+// spec: specs/ap/unit-review.md#R8
+// spec: specs/ap/unit-review.md#R13
+#[test]
+fn r13_an_agy_look_runs_under_limits_on_the_policys_account_and_resumes_in_its_home() {
+    let mut f = F::new();
+    // The policy's defaults are Claude's, `compact_window` and `permission_mode` among them: an
+    // `agy` look inherits none of them.
+    f.agy_policy(json!({"compact_window": 400_000}));
+    let mut r = f.req("unit", "u1");
+    r["reviewer"] = json!({"runtime": "agy", "model": "gemini-4-neon-high", "effort": "high"});
+    f.answer("verdict", Some("repair"));
+    let (first, _) = f.ok(&r);
+    assert_eq!(first["verdict"], "repair", "{first}");
+    let rec = record(first["report"].as_str().unwrap());
+    assert_eq!(
+        (&rec["runtime"], &rec["account"]),
+        (&json!("agy"), &json!(f.p("ag")))
+    );
+    assert!(rec["compact_window"].is_null(), "{rec}");
+    let home = rec["home"].as_str().unwrap().to_owned();
+    assert!(home.starts_with(&format!("{}/homes/", f.p("ag"))), "{home}");
+    assert_eq!(rec["limits"]["writable"][0], json!(home));
+    assert!(
+        rec["limits"]["view"].is_array()
+            && rec["limits"]["egress"]["names"][0] == "daily-cloudcode-pa.googleapis.com"
+    );
+    let wrap = f.wraps.last().unwrap();
+    assert_eq!(wrap[0], BWRAP, "{wrap:?}");
+    let words = [
+        "--tmpfs",
+        &f.p("ag"),
+        "--ro-bind",
+        &format!("{}/.gemini", f.p("ag")),
+    ]
+    .map(str::to_owned);
+    assert!(wrap.windows(4).any(|w| w == words), "{wrap:?}");
+    assert!(
+        !f.dir()
+            .join("scratch")
+            .join(first["review"].as_str().unwrap())
+            .exists()
+    );
+    // A resume reads the resumed record's runtime first: the same home, the same account, and
+    // no `next_accounts` or Claude default.
+    f.tick(5);
+    f.amend("u1");
+    f.tick(5);
+    f.answer("verdict", Some("accept"));
+    let (second, _) = f.ok(&resume(&f, &first["review"]));
+    assert_eq!(second["verdict"], "accept", "{second}");
+    let again = record(second["report"].as_str().unwrap());
+    assert_eq!(
+        (&again["runtime"], &again["home"], &again["session"]),
+        (&json!("agy"), &json!(home), &rec["session"])
+    );
+    assert!(f.wraps.last().unwrap().iter().any(|w| w == BWRAP));
+}
+
+// spec: specs/ap/unit-review.md#R4
+#[test]
+fn r4_the_runtime_of_the_look_is_settled_before_the_defaults_of_reviews_are_read() {
+    // `reviews` names `agy`: a Claude look of the request inherits none of its defaults.
+    let mut f = F::new();
+    f.agy_policy(
+        json!({"runtime": "agy", "model": "gemini-4-neon-high", "effort": "high",
+        "account": f.p("ag"), "permission_mode": "bypassPermissions"}),
+    );
+    let (v, _) = f.ok(&f.req("unit", "u1"));
+    let rec = record(v["report"].as_str().unwrap());
+    assert_eq!(
+        (&rec["runtime"], &rec["model"]),
+        (&json!("agy"), &json!("gemini-4-neon-high"))
+    );
+    let mut r = f.req("unit", "u1");
+    r["reviewer"] = json!({"runtime": "claude"});
+    assert_eq!(
+        code(&f.refusal(&r)),
+        ("invalid_input".into(), "reviewer".into())
+    );
+    r["reviewer"] = json!({"runtime": "claude", "model": "sonnet", "effort": "high",
+        "account": f.p("a1"), "permission_mode": "auto"});
+    let (v, _) = f.ok(&r);
+    assert_eq!(record(v["report"].as_str().unwrap())["runtime"], "claude");
+    // An `agy` look without an account in the policy's `accounts` has none.
+    let mut f = F::new();
+    f.agy_policy(json!({}));
+    let path = f.t.join("policy.json");
+    let mut policy: Value = serde_json::from_slice(&std::fs::read(&path).unwrap()).unwrap();
+    policy["accounts"]
+        .as_object_mut()
+        .unwrap()
+        .remove("agy/reviewer");
+    std::fs::write(&path, policy.to_string()).unwrap();
+    let mut r = f.req("unit", "u1");
+    r["reviewer"] = json!({"runtime": "agy", "model": "gemini-4-neon-high", "effort": "high"});
+    assert_eq!(
+        code(&f.refusal(&r)),
+        ("invalid_input".into(), "reviewer".into())
+    );
+    // The key of the model, then the runtime's own, name the account.
+    policy["accounts"]["agy"] = json!([f.p("ag")]);
+    std::fs::write(&path, policy.to_string()).unwrap();
+    let (v, _) = f.ok(&r);
+    assert_eq!(
+        record(v["report"].as_str().unwrap())["account"],
+        json!(f.p("ag"))
+    );
+}
+
+// spec: specs/ap/unit-review.md#R4
+// spec: specs/ap/unit-review.md#R8
+#[test]
+fn r4_a_claude_look_moves_to_the_rest_of_its_mapped_accounts_when_the_first_is_cut() {
+    // The fixture maps `claude` to `[a1, a2]` and `reviews.account` is `a1`.
+    let mut f = F::new();
+    std::fs::write(f.t.join("bin/mode-a1"), "limit1").unwrap();
+    let (v, _) = f.ok(&f.req("unit", "u1"));
+    let rec = record(v["report"].as_str().unwrap());
+    assert_eq!(
+        (&v["verdict"], &rec["account"]),
+        (&json!("accept"), &json!(f.p("a2"))),
+        "{v}"
+    );
+    assert_eq!(rec["attempts"].as_array().unwrap().len(), 2);
+    // A first account that is not the map's first: no other account.
+    let mut f = F::new();
+    f.write_policy(json!({"account": f.p("a2")}));
+    std::fs::write(f.t.join("bin/mode-a2"), "limit1").unwrap();
+    let (v, _) = f.ok(&f.req("unit", "u1"));
+    assert_eq!((&v["verdict"], f.launches), (&json!("abandoned"), 1), "{v}");
+}
+
+// spec: specs/ap/unit-review.md#R4
+// spec: specs/ap/unit-review.md#R8
+#[test]
+fn r4_the_next_accounts_of_reviews_or_the_request_stand_and_a_resume_has_none() {
+    let mut f = F::new();
+    // `reviews.next_accounts` is the look's list, not the map's.
+    f.write_policy(json!({"next_accounts": [f.p("a2")]}));
+    std::fs::write(f.t.join("bin/mode-a1"), "limit1").unwrap();
+    let (v, _) = f.ok(&f.req("unit", "u1"));
+    assert_eq!(
+        record(v["report"].as_str().unwrap())["account"],
+        json!(f.p("a2")),
+        "{v}"
+    );
+    // A list the request names stands in place of the map's: here the cut account twice, so the look never reaches `a2`.
+    let mut f = F::new();
+    std::fs::write(f.t.join("bin/mode-a1"), "limit1").unwrap();
+    let mut r = f.req("unit", "u1");
+    r["reviewer"] = json!({"next_accounts": [f.p("a1")]});
+    let (v, _) = f.ok(&r);
+    assert_eq!((&v["verdict"], f.launches), (&json!("abandoned"), 2), "{v}");
+    // A resume takes none of them: a cut resumed look stays on the record's account.
+    let mut f = F::new();
+    f.write_policy(json!({"next_accounts": [f.p("a2")]}));
+    let first = first_look(&mut f, "repair");
+    f.tick(5);
+    f.amend("u1");
+    f.tick(5);
+    std::fs::write(f.t.join("bin/mode-a1"), "limit1").unwrap();
+    let (v, _) = f.ok(&resume(&f, &first["review"]));
+    assert_eq!((&v["verdict"], f.launches), (&json!("abandoned"), 2), "{v}");
 }

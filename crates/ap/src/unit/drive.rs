@@ -679,7 +679,8 @@ pub(crate) fn github(policy: &Value) -> Result<Github, Failure> {
 fn tier(u: &Value, which: &str, role: &str, policy: &Value) -> Result<Value, Failure> {
     let t = &u[which];
     let (runtime, model) = (text(t, "runtime").unwrap_or_default(), text(t, "model"));
-    if runtime != "claude" {
+    // Claude and `agy` only (R2): Codex and Muse stay out.
+    if !matches!(runtime, "claude" | "agy") {
         return Err(fail("tier_not_supported", which, json!(runtime)));
     }
     let model = model.unwrap_or_default();
@@ -699,9 +700,13 @@ fn tier(u: &Value, which: &str, role: &str, policy: &Value) -> Result<Value, Fai
     if paths.is_empty() || paths.len() > 5 || paths.len() != list.len() {
         return Err(invalid(&format!("accounts.{key}"), "is not 1 to 5 paths"));
     }
+    // An `agy` stage has one account and never `auto` (`specs/ap/run.md` R47); a Claude stage's
+    // other accounts follow it.
+    let agy = runtime == "agy";
+    let mode = if agy { "bypassPermissions" } else { "auto" };
     let mut req = json!({"runtime": runtime, "model": model, "effort": t["effort"],
-        "account": paths[0], "permission_mode": "auto"});
-    if paths.len() > 1 {
+        "account": paths[0], "permission_mode": mode});
+    if paths.len() > 1 && !agy {
         req["next_accounts"] = json!(paths[1..]);
     }
     Ok(req)

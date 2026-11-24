@@ -3,7 +3,7 @@
 //! list of the stage's role, resolved and connected outside the stage through the port's way out,
 //! relays the bytes both ways, writes one line per request to `AP_EGRESS_LOG` and is closed after
 //! the call's last launch.
-use super::stamp;
+use super::{Runtime, stamp};
 pub(super) mod pc;
 use crate::host::{Network, System, WayOut};
 use serde_json::json;
@@ -27,6 +27,26 @@ const MODEL: [&str; 1] = ["api.anthropic.com"];
 /// crate registry, in the order of R18.
 const BUILD: [&str; 5] = [
     "api.anthropic.com",
+    "github.com",
+    "api.github.com",
+    "index.crates.io",
+    "static.crates.io",
+];
+/// The names every role of an `agy` stage reaches: the CLI's model service and its sign-in
+/// (R18); its telemetry, avatar and update hosts stay off the list.
+const AGY_MODEL: [&str; 4] = [
+    "daily-cloudcode-pa.googleapis.com",
+    "www.googleapis.com",
+    "oauth2.googleapis.com",
+    "aicode.googleapis.com",
+];
+/// The names an implementer, a fixer and a verifier of an `agy` stage reach: its model names,
+/// then GitHub and the crate registry, in the order of R18.
+const AGY_BUILD: [&str; 8] = [
+    "daily-cloudcode-pa.googleapis.com",
+    "www.googleapis.com",
+    "oauth2.googleapis.com",
+    "aicode.googleapis.com",
     "github.com",
     "api.github.com",
     "index.crates.io",
@@ -68,6 +88,15 @@ pub(crate) fn names(role: &str) -> &'static [&'static str] {
     }
 }
 
+/// The list of names of a role on a runtime (R18): `names` for a Claude stage, an `agy` stage's own.
+pub(crate) fn names_for(runtime: Runtime, role: &str) -> &'static [&'static str] {
+    match (runtime, role) {
+        (Runtime::Agy, "implementer" | "fixer" | "verifier") => &AGY_BUILD,
+        (Runtime::Agy, _) => &AGY_MODEL,
+        _ => names(role),
+    }
+}
+
 /// An open proxy; `close` ends it (R20), as its drop does.
 pub(crate) struct Proxy {
     port: u16,
@@ -102,7 +131,12 @@ fn lock<T>(m: &Mutex<T>) -> MutexGuard<'_, T> {
 /// Opens the proxy of a call (R17): the port makes the stage's network and answers the way out;
 /// the record's path is read from the port's environment once, here (R19). `run` is the path of
 /// the call's record and `role` the stage's `ONT_ROLE`.
-pub(crate) fn open(s: &mut impl System, run: String, role: &str) -> std::io::Result<Proxy> {
+pub(crate) fn open(
+    s: &mut impl System,
+    run: String,
+    runtime: Runtime,
+    role: &str,
+) -> std::io::Result<Proxy> {
     let log = s
         .environment()
         .into_iter()
@@ -118,7 +152,7 @@ pub(crate) fn open(s: &mut impl System, run: String, role: &str) -> std::io::Res
     let way = s.way_out();
     listener.set_nonblocking(true)?;
     let port = listener.local_addr()?.port();
-    let names = names(role);
+    let names = names_for(runtime, role);
     let shared = Arc::new(Shared {
         names,
         run,
@@ -572,5 +606,35 @@ mod tests {
         for role in ["implementer", "fixer", "verifier"] {
             assert_eq!(names(role).len(), 5);
         }
+    }
+
+    // spec: specs/ap/run-limits.md#R18
+    #[test]
+    fn names_for_gives_a_runtime_its_own_list() {
+        use super::{Runtime, names_for};
+        for role in ["reviewer", "writer", "implementer", "fixer", "verifier"] {
+            assert_eq!(names_for(Runtime::Claude, role), names(role), "{role}");
+        }
+        let model = [
+            "daily-cloudcode-pa.googleapis.com",
+            "www.googleapis.com",
+            "oauth2.googleapis.com",
+            "aicode.googleapis.com",
+        ];
+        assert_eq!(names_for(Runtime::Agy, "reviewer"), model);
+        for role in ["implementer", "fixer", "verifier"] {
+            let list = names_for(Runtime::Agy, role);
+            assert_eq!(list[..4], model, "{role}");
+            assert_eq!(
+                list[4..],
+                [
+                    "github.com",
+                    "api.github.com",
+                    "index.crates.io",
+                    "static.crates.io"
+                ]
+            );
+        }
+        assert!(!names_for(Runtime::Agy, "reviewer").contains(&"api.anthropic.com"));
     }
 }

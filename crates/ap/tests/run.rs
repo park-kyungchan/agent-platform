@@ -5572,14 +5572,11 @@ fn g1_refusals_name_their_field_and_come_before_any_effect() {
     };
     type Edit = Box<dyn Fn(&mut Value)>;
     let mut cases: Vec<(&str, Edit, &str)> = vec![
+        // Changed by the unit `run-any`: an `agy` implementer and fixer are admitted (R47); the
+        // writer stays Claude-only (R53).
         (
             "role",
-            Box::new(set("role", json!("implementer"))),
-            "invalid_input@role",
-        ),
-        (
-            "role",
-            Box::new(set("role", json!("fixer"))),
+            Box::new(set("role", json!("writer"))),
             "invalid_input@role",
         ),
         (
@@ -12873,4 +12870,332 @@ fn pc_r59_the_look_inherits_no_descriptor_whose_path_holds_the_nonce_or_the_lock
     );
     assert!(!fds.contains(&nonce), "{fds}");
     assert!(!fds.contains("/locks/"), "{fds}");
+}
+
+// ---- run-any: an `agy` implementer, fixer and reviewer with the toolchain and `limits` ------------
+
+impl Fake {
+    /// An `agy` stage on `out` whose `limits` name the scratch directory `<t>/scratch`, with
+    /// the hidden paths `limited` makes.
+    fn agy_limited(&self, out: &str) -> Value {
+        let mut r = self.agy(out);
+        r["limits"] = self.limited(out)["limits"].clone();
+        r
+    }
+    /// The environment of launch `n` as the fake recorded it.
+    fn env_of(&self, n: usize) -> Vec<(String, String)> {
+        self.launch_envs[n].clone()
+    }
+}
+fn var<'a>(env: &'a [(String, String)], name: &str) -> Option<&'a str> {
+    env.iter()
+        .rev()
+        .find(|(k, _)| k == name)
+        .map(|(_, v)| v.as_str())
+}
+
+// spec: specs/ap/run.md#R47
+#[test]
+fn g_r47_an_agy_implementer_and_a_fixer_are_admitted_and_a_writer_is_not() {
+    let mut f = Fake::new();
+    f.agy_lines(&g_run("stage ok"));
+    for (i, role) in ["implementer", "fixer", "reviewer"].into_iter().enumerate() {
+        let mut r = f.agy(&format!("a{i}.md"));
+        r["role"] = json!(role);
+        let (v, status) = f.run(&r).unwrap();
+        assert_eq!(
+            (status, &v["state"], &v["role"]),
+            (0, &json!("ok"), &json!(role)),
+            "{v}"
+        );
+        assert_eq!(v["runtime"], "agy");
+    }
+    let mut r = f.agy("w.md");
+    r["role"] = json!("writer");
+    assert_eq!(code(f.run(&r)), "invalid_input@role");
+    assert!(!Path::new(&f.p("w.md.run.json")).exists());
+}
+
+// spec: specs/ap/run.md#R49
+#[test]
+fn g_r49_an_agy_stage_gets_the_toolchain_of_the_passwd_home_unless_the_request_names_it() {
+    let mut f = Fake::new();
+    f.agy_lines(&g_run("stage ok"));
+    let home = f.p("home");
+    // Without `limits`: the toolchain and Git's file, no state of `gh`.
+    let mut r = f.agy("a.md");
+    r["role"] = json!("implementer");
+    f.run(&r).unwrap();
+    let env = f.env_of(0);
+    assert_eq!(
+        var(&env, "RUSTUP_HOME"),
+        Some(format!("{home}/.rustup").as_str())
+    );
+    assert_eq!(
+        var(&env, "GIT_CONFIG_GLOBAL"),
+        Some(format!("{home}/.gitconfig").as_str())
+    );
+    assert_eq!(var(&env, "GH_CONFIG_DIR"), None);
+    assert_ne!(var(&env, "HOME"), Some(home.as_str()));
+    // With `show` the state of `gh` too, and a name the request gave stays as given.
+    let mut r = f.agy_limited("b.md");
+    r["role"] = json!("implementer");
+    r["limits"]["show"] = json!(["~/.config/gh"]);
+    r["env"] =
+        json!({"RUSTUP_HOME": "/given/rustup", "CARGO_HOME": "/given/cargo", "GH_TOKEN": "t"});
+    f.run(&r).unwrap();
+    let env = f.env_of(1);
+    assert_eq!(var(&env, "RUSTUP_HOME"), Some("/given/rustup"));
+    assert_eq!(env.iter().filter(|(k, _)| k == "RUSTUP_HOME").count(), 1);
+    assert_eq!(var(&env, "CARGO_HOME"), Some("/given/cargo"));
+    assert_eq!(var(&env, "GH_TOKEN"), Some("t"));
+    assert_eq!(
+        var(&env, "GIT_CONFIG_GLOBAL"),
+        Some(format!("{home}/.gitconfig").as_str())
+    );
+    assert_eq!(
+        var(&env, "GH_CONFIG_DIR"),
+        Some(format!("{home}/.config/gh").as_str())
+    );
+    // A verifier's look without `show` never gets it.
+    let mut r = f.agy_limited("c.md");
+    r["ont_role"] = json!("verifier");
+    f.run(&r).unwrap();
+    let env = f.env_of(2);
+    assert_eq!(var(&env, "GH_CONFIG_DIR"), None);
+    assert_eq!(
+        var(&env, "RUSTUP_HOME"),
+        Some(format!("{home}/.rustup").as_str())
+    );
+    // A Claude stage gets none of the three.
+    f.run(&f.request("d.md")).unwrap();
+    let env = f.env_of(3);
+    for name in ["RUSTUP_HOME", "GIT_CONFIG_GLOBAL", "GH_CONFIG_DIR"] {
+        assert_eq!(var(&env, name), None, "{name}");
+    }
+}
+
+// spec: specs/ap/run-limits.md#R1
+#[test]
+fn limits_r1_agy_admits_limits_for_three_roles_and_codex_and_muse_refuse_them() {
+    let mut f = Fake::new();
+    f.agy_lines(&g_run("stage ok"));
+    for (i, role) in ["reviewer", "implementer", "fixer"].into_iter().enumerate() {
+        let mut r = f.agy_limited(&format!("x{i}.md"));
+        r["role"] = json!(role);
+        r["limits"]["scratch"] = json!(f.p(&format!("s{i}")));
+        let (v, _) = f.run(&r).unwrap();
+        assert_eq!(v["state"], "ok", "{role}: {v}");
+        assert_eq!(v["limits"]["scratch"], json!(f.p(&format!("s{i}"))));
+    }
+    // A writer is refused by its role first; Codex and Muse by `limits`.
+    let mut r = f.agy_limited("w.md");
+    r["role"] = json!("writer");
+    assert_eq!(code(f.run(&r)), "invalid_input@role");
+    for runtime in ["codex", "muse"] {
+        let mut r = f.limited("y.md");
+        r["role"] = json!("implementer");
+        r["runtime"] = json!(runtime);
+        r["permission_mode"] = json!("bypassPermissions");
+        assert_eq!(code(f.run(&r)), "invalid_input@limits", "{runtime}");
+    }
+    // The paths of the request keep R1's rules on `agy`: a scratch inside the account is refused.
+    let mut r = f.agy_limited("z.md");
+    r["limits"]["scratch"] = json!(format!("{}/s", r["account"].as_str().unwrap()));
+    assert_eq!(code(f.run(&r)), "invalid_input@limits");
+}
+
+// spec: specs/ap/run-limits.md#R16
+#[test]
+fn limits_r16_the_program_of_an_agy_stage_is_the_agy_word_on_the_path() {
+    let mut f = Fake::new();
+    f.agy_lines(&g_run("stage ok"));
+    f.program_at("p1/agy");
+    f.program_at("p1/claude");
+    f.env.retain(|(k, _)| k != "PATH");
+    f.env
+        .push(("PATH".into(), format!("{}:/usr/bin:/bin", f.p("p1"))));
+    let (v, _) = f.run(&f.agy_limited("x.md")).unwrap();
+    assert_eq!(v["state"], "ok", "{v}");
+    let view = f.view_words(0);
+    let agy = f.p("p1/agy");
+    let bind = ["--ro-bind", &agy, &agy].map(str::to_owned);
+    assert!(view.windows(3).any(|w| w == bind), "{view:?}");
+    assert!(!view.contains(&f.p("p1/claude")), "{view:?}");
+    assert!(
+        v["limits"]["view"]
+            .as_array()
+            .unwrap()
+            .contains(&json!(agy))
+    );
+}
+
+// spec: specs/ap/run-limits.md#R5
+// spec: specs/ap/run-limits.md#R7
+// spec: specs/ap/run-limits.md#R14
+#[test]
+fn limits_r5_an_agy_stage_sees_its_home_and_the_logins_directory_of_its_account_alone() {
+    let mut f = Fake::new();
+    f.agy_lines(&g_run("stage ok"));
+    let (account, scratch) = (f.agy_home("g1"), f.p("scratch"));
+    let (v, _) = f.run(&f.agy_limited("x.md")).unwrap();
+    assert_eq!(v["state"], "ok", "{v}");
+    // The home is a fresh directory below `homes`, not named by the conversation.
+    let home = v["home"].as_str().unwrap().to_owned();
+    assert_eq!(
+        Path::new(&home).parent(),
+        Some(Path::new(&format!("{account}/homes")))
+    );
+    assert_ne!(
+        Path::new(&home).file_name().unwrap(),
+        v["session"].as_str().unwrap()
+    );
+    let gemini = format!("{account}/.gemini");
+    let token = f.p("token");
+    let after = f.after_unit(0);
+    let words = [
+        "--tmpfs",
+        &account,
+        "--ro-bind",
+        &gemini,
+        &gemini,
+        "--bind",
+        &home,
+        &home,
+        "--ro-bind",
+        &token,
+        &token,
+        "--remount-ro",
+        &account,
+        "--bind",
+        &scratch,
+        &scratch,
+    ]
+    .map(str::to_owned);
+    let at = after
+        .windows(words.len())
+        .position(|w| w == words)
+        .expect("the home's words");
+    // Right after the words of `/dev`, `/proc` and `/proc/sys`; no bind of the account itself.
+    assert_eq!(after[at - 3..at], ["--ro-bind", "/proc/sys", "/proc/sys"]);
+    assert!(
+        !after
+            .windows(3)
+            .any(|w| w == ["--bind", &account, &account]),
+        "{after:?}"
+    );
+    let ro = after
+        .windows(2)
+        .filter(|w| w[0] == "--remount-ro" && w[1] == account)
+        .count();
+    assert_eq!(ro, 1, "{after:?}");
+    // The record: the home first of `writable`, none of the account's words in `view`.
+    assert_eq!(v["limits"]["writable"][0], json!(home));
+    assert_eq!(v["limits"]["writable"][1], json!(scratch));
+    let view = v["limits"]["view"].as_array().unwrap();
+    assert!(
+        view.iter()
+            .all(|p| !p.as_str().unwrap().starts_with(&account)),
+        "{view:?}"
+    );
+    // No sign-in of Claude's kind: no variable of it, no `claude auth status`, no derived file.
+    let env = f.env_of(0);
+    for name in ["CLAUDE_CONFIG_DIR", "ANTHROPIC_API_KEY"] {
+        assert_eq!(var(&env, name), None, "{name}");
+    }
+    assert_eq!(var(&env, "HOME"), Some(home.as_str()));
+    assert!(!Path::new(&format!("{home}.sign-in")).exists());
+    assert!(f.auth.is_empty());
+    // A token whose link stays in `.gemini` adds no further bind.
+    let inside = f.t.join("g5/.gemini/antigravity-cli");
+    std::fs::create_dir_all(&inside).unwrap();
+    std::fs::write(f.t.join("g5/.gemini/real"), "x").unwrap();
+    std::os::unix::fs::symlink("../real", inside.join("antigravity-oauth-token")).unwrap();
+    let mut r = f.agy_limited("y.md");
+    r["account"] = json!(f.p("g5"));
+    f.run(&r).unwrap();
+    let after = f.after_unit(1);
+    let g5 = f.p("g5");
+    let words = [
+        "--ro-bind",
+        &format!("{g5}/.gemini"),
+        &format!("{g5}/.gemini"),
+    ]
+    .map(str::to_owned);
+    assert!(after.windows(3).any(|w| w == words), "{after:?}");
+    assert_eq!(
+        after.iter().filter(|w| w.ends_with("/real")).count(),
+        0,
+        "{after:?}"
+    );
+}
+
+// spec: specs/ap/run-limits.md#R14
+#[test]
+fn limits_r14_a_resumed_agy_stage_runs_in_the_home_of_its_record() {
+    let mut f = Fake::new();
+    f.agy_lines(&g_run("first"));
+    let (first, _) = f.run(&f.agy_limited("r1.md")).unwrap();
+    let home = first["home"].as_str().unwrap().to_owned();
+    f.agy_lines(&g_run("second"));
+    let mut r = f.agy_limited("r2.md");
+    r = f.resume(r, "r2.md", "r1.md");
+    r["limits"]["scratch"] = json!(f.p("scratch2"));
+    let (v, _) = f.run(&r).unwrap();
+    assert_eq!(v["state"], "ok", "{v}");
+    assert_eq!(v["home"], json!(home));
+    assert_eq!(v["limits"]["writable"][0], json!(home));
+    let after = f.after_unit(1);
+    let bind = ["--bind", &home, &home].map(str::to_owned);
+    assert!(after.windows(3).any(|w| w == bind), "{after:?}");
+    // No home was made for the conversation's id.
+    let named = format!(
+        "{}/homes/{}",
+        v["account"].as_str().unwrap(),
+        v["session"].as_str().unwrap()
+    );
+    assert!(!Path::new(&named).exists());
+}
+
+// spec: specs/ap/run-limits.md#R18
+// spec: specs/ap/run-limits.md#R7
+#[test]
+fn limits_r18_an_agy_stage_reaches_the_names_of_its_runtime_and_its_role() {
+    let model = [
+        "daily-cloudcode-pa.googleapis.com",
+        "www.googleapis.com",
+        "oauth2.googleapis.com",
+        "aicode.googleapis.com",
+    ];
+    let build = [
+        "github.com",
+        "api.github.com",
+        "index.crates.io",
+        "static.crates.io",
+    ];
+    for (role, ont_role, build_too) in [
+        ("reviewer", None, false),
+        ("implementer", None, true),
+        ("fixer", None, true),
+        ("reviewer", Some("verifier"), true),
+    ] {
+        let mut f = Fake::new();
+        f.agy_lines(&g_run("stage ok"));
+        let mut r = f.agy_limited("x.md");
+        r["role"] = json!(role);
+        if let Some(o) = ont_role {
+            r["ont_role"] = json!(o);
+        }
+        let (v, _) = f.run(&r).unwrap();
+        assert_eq!(v["state"], "ok", "{role}: {v}");
+        let mut want: Vec<&str> = model.to_vec();
+        if build_too {
+            want.extend(build);
+        }
+        assert_eq!(v["limits"]["egress"]["names"], json!(want), "{role}");
+    }
+    // A Claude stage keeps its own list.
+    let mut f = Fake::new();
+    let (v, _) = f.run(&f.limited("c.md")).unwrap();
+    assert_eq!(v["limits"]["egress"]["names"], json!(["api.anthropic.com"]));
 }
