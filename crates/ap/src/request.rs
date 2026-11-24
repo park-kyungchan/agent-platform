@@ -504,9 +504,32 @@ pub fn is_hook(r: &Value) -> bool {
 }
 /// The hook form (R26 to R29): the one line it prints, or none. It never ends as a refusal.
 pub fn hook(s: &mut impl System, store: Option<&str>, r: &Value) -> Option<String> {
-    match r["hook_event_name"].as_str() {
-        Some("UserPromptSubmit") => Some(prompt_hook(s, store, r)),
-        Some("Stop") => stop_hook(s, store, r),
+    let event = r["hook_event_name"].as_str()?;
+    let remote = match crate::client::resolve(s, store) {
+        Ok(endpoint) => endpoint,
+        Err(f) => {
+            return (event == "UserPromptSubmit").then(|| {
+                let path = r["transcript_path"].as_str().filter(|p| admitted(s, p));
+                let record = path.map_or(String::new(), |p| format!("; its session record is {p}"));
+                let code = store::code(&f);
+                format!(
+                    "ap request: not recorded by the hook ({code}). If this message is the user's, record it \
+                     with ap request{record}."
+                )
+            });
+        }
+    };
+    match (event, remote) {
+        ("UserPromptSubmit", Some(ep)) => {
+            let mut transport = crate::client::Transport::new(s, ep);
+            Some(prompt_hook(&mut transport, store, r))
+        }
+        ("UserPromptSubmit", None) => Some(prompt_hook(s, store, r)),
+        ("Stop", Some(ep)) => {
+            let mut transport = crate::client::Transport::new(s, ep);
+            stop_hook(&mut transport, store, r)
+        }
+        ("Stop", None) => stop_hook(s, store, r),
         _ => None,
     }
 }
@@ -706,7 +729,15 @@ fn refusal(f: Failure, done: Option<String>) -> Refusal {
 /// The call: the answer, or the refusal with how far the call went.
 pub fn execute(s: &mut impl System, store: Option<&str>, r: &Value) -> Result<Value, Refusal> {
     let mut done = None;
-    run(s, store, r, &mut done).map_err(|f| refusal(f, done))
+    let result = match crate::client::resolve(s, store) {
+        Ok(Some(endpoint)) => {
+            let mut transport = crate::client::Transport::new(s, endpoint);
+            run(&mut transport, store, r, &mut done)
+        }
+        Ok(None) => run(s, store, r, &mut done),
+        Err(f) => Err(f),
+    };
+    result.map_err(|f| refusal(f, done))
 }
 pub fn cli(argv: &[OsString]) -> ExitCode {
     let called = store::input(argv, "list").map_err(|f| refusal(f, None));

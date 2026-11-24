@@ -308,7 +308,7 @@ fn delivery(s: &impl System) -> Option<Value> {
     )
 }
 
-fn overview(s: &mut impl System, store: Option<&str>) -> Result<Value, Failure> {
+fn overview(s: &mut impl System, store: Option<&str>, remote: bool) -> Result<Value, Failure> {
     let mut seen = Seen::default();
     let unrouted = vec![eq("status", "current"), eq("route", "unrouted")];
     let mut requests = at(
@@ -354,7 +354,7 @@ fn overview(s: &mut impl System, store: Option<&str>) -> Result<Value, Failure> 
     sort_findings(&mut findings);
     let mut holds = active_holds(s, store)?;
     sort_holds(&mut holds);
-    let delivered = delivery(s);
+    let delivered = if remote { None } else { delivery(s) };
     let mut need = vec![];
     let mut push = |kind: &str, (k, why): (&String, &Value)| {
         need.push(json!({"kind": kind, "key": k, "why": why}))
@@ -554,7 +554,12 @@ fn capped(label: &str, mut lines: Vec<String>, cap: usize) -> Vec<String> {
 /// `ap status --brief <intent>`: at most `BRIEF_LINES` lines of `BRIEF_BYTES` bytes, in sections: the status
 /// and the Lead, the criteria, the units that are not ended, what needs the Lead, the holds and the last
 /// delivery. It reads what `ap status <intent>` and `ap status` read, and writes nothing.
-fn brief(s: &mut impl System, store: Option<&str>, key: &str) -> Result<Value, Failure> {
+fn brief(
+    s: &mut impl System,
+    store: Option<&str>,
+    key: &str,
+    remote: bool,
+) -> Result<Value, Failure> {
     let Some(i) = at(store::get(s, store, "intent", key), "intent")? else {
         return Err(error("unknown_intent", "intent"));
     };
@@ -577,7 +582,7 @@ fn brief(s: &mut impl System, store: Option<&str>, key: &str) -> Result<Value, F
     sort_findings(&mut findings);
     let mut holds = active_holds(s, store)?;
     sort_holds(&mut holds);
-    let delivered = delivery(s);
+    let delivered = if remote { None } else { delivery(s) };
 
     let mut names: Vec<&String> = vec![];
     let units: Vec<&Found> = every
@@ -867,17 +872,40 @@ fn term(s: &mut impl System, store: Option<&str>, word: &str) -> Result<Value, F
     Ok(json!({"word": word, "matches": matches, "more": more}))
 }
 
-pub fn execute(s: &mut impl System, store: Option<&str>, call: &Call) -> Result<Value, Failure> {
+fn execute_with(
+    s: &mut impl System,
+    store: Option<&str>,
+    call: &Call,
+    remote: Option<crate::client::Endpoint>,
+) -> Result<Value, Failure> {
+    if let Some(endpoint) = remote {
+        let mut transport = crate::client::Transport::new(s, endpoint);
+        return dispatch(&mut transport, store, call, true);
+    }
+    dispatch(s, store, call, false)
+}
+
+fn dispatch(
+    s: &mut impl System,
+    store: Option<&str>,
+    call: &Call,
+    remote: bool,
+) -> Result<Value, Failure> {
     match call {
-        Call::Overview => overview(s, store),
+        Call::Overview => overview(s, store, remote),
         Call::Key(key) => keyed(s, store, key, false),
         Call::KeyAll(key) => keyed(s, store, key, true),
-        Call::Brief(intent) => brief(s, store, intent),
+        Call::Brief(intent) => brief(s, store, intent, remote),
         Call::Term(word) => term(s, store, word),
-        Call::Wait(intent, timeout) => wait(s, store, intent, *timeout),
+        Call::Wait(intent, timeout) => wait(s, store, intent, *timeout, remote),
         Call::Indicators(intent) => indicators(s, store, intent.as_deref()),
-        Call::Page => page(s, store),
+        Call::Page => page(s, store, remote),
     }
+}
+
+pub fn execute(s: &mut impl System, store: Option<&str>, call: &Call) -> Result<Value, Failure> {
+    let remote = crate::client::resolve(s, store)?;
+    execute_with(s, store, call, remote)
 }
 
 /// The sum of one token member over the runs of a role, null where every run has none.
@@ -1240,9 +1268,9 @@ fn capacity_lines(a: &Value) -> Step<Vec<String>> {
 /// `ap status --page`: the lines of `--text`, the week, then each open intent's brief, flow and cost, then the
 /// flow, cost and credit's spend of all and the capacity (R47 to R53). Only a failure of the reads of R4
 /// fails the form; every other section that cannot be read is one line with its code.
-fn page(s: &mut impl System, store: Option<&str>) -> Result<Value, Failure> {
+fn page(s: &mut impl System, store: Option<&str>, remote: bool) -> Result<Value, Failure> {
     let began = s.now();
-    let head = overview(s, store)?;
+    let head = overview(s, store, remote)?;
     let now = (head["at"].as_str().and_then(epoch))
         .ok_or_else(|| error("store_answer_unreadable", "now"))?;
     let (since, until) = (day(now.saturating_sub(6 * DAY)), day(now));
@@ -1258,7 +1286,7 @@ fn page(s: &mut impl System, store: Option<&str>) -> Result<Value, Failure> {
         store::function(s, store, "api_spend", &json!({ "month": month }))
     });
     let briefs: Vec<Step<Value>> = (intents.iter())
-        .map(|i| bounded(s, began, |s| brief(s, store, i)))
+        .map(|i| bounded(s, began, |s| brief(s, store, i, remote)))
         .collect();
     let rows = bounded(s, began, |s| indicators(s, store, None));
     let window = json!({"since": since, "until": until, "by": "role"});
@@ -1346,7 +1374,11 @@ fn idle(
     store: Option<&str>,
     intent: &str,
     units: &[Found],
+    remote: bool,
 ) -> Result<BTreeSet<String>, Failure> {
+    if remote {
+        return Ok(BTreeSet::new());
+    }
     let Some((root, prefix)) = watched(s, store)? else {
         return Ok(BTreeSet::new());
     };
@@ -1379,7 +1411,12 @@ fn idle(
     }
     Ok(idle)
 }
-fn reading(s: &mut impl System, store: Option<&str>, intent: &str) -> Result<Reading, Failure> {
+fn reading(
+    s: &mut impl System,
+    store: Option<&str>,
+    intent: &str,
+    remote: bool,
+) -> Result<Reading, Failure> {
     let Some((_, _, now)) = at(store::head_now(s, store, "intent", intent), "intent")? else {
         return Err(error("unknown_intent", "intent"));
     };
@@ -1393,7 +1430,7 @@ fn reading(s: &mut impl System, store: Option<&str>, intent: &str) -> Result<Rea
         .filter(severe)
         .map(|f| f.0)
         .collect();
-    let idle = idle(s, store, intent, &units)?;
+    let idle = idle(s, store, intent, &units, remote)?;
     Ok(Reading {
         at,
         units,
@@ -1449,12 +1486,13 @@ fn wait(
     store: Option<&str>,
     intent: &str,
     timeout: u64,
+    remote: bool,
 ) -> Result<Value, Failure> {
     let began = s.now();
     let (mut first, mut before, mut failed, mut last_at, mut last) =
         (None, BTreeSet::new(), 0, None, None);
     loop {
-        match reading(s, store, intent) {
+        match reading(s, store, intent, remote) {
             Err(f) if f.code == "unknown_intent" || failed == 2 => return Err(f),
             Err(f) => (failed, last) = (failed + 1, Some(f)),
             Ok(r) => {
@@ -1805,18 +1843,23 @@ pub fn text_of(call: &Call, v: &Value) -> String {
     }
 }
 
-/// The exit status of a refusal: 3 for a wait's error but `unknown_intent`, else 2.
+/// The exit status of a refusal: 3 for a wait's error but `unknown_intent` and
+/// `store_url_invalid`, else 2.
 pub fn exit_code(waiting: bool, f: &Failure) -> u8 {
-    2 + u8::from(waiting && f.code != "unknown_intent")
+    2 + u8::from(waiting && !matches!(f.code, "unknown_intent" | "store_url_invalid"))
 }
 
 pub fn cli(argv: &[OsString]) -> ExitCode {
     let parsed = parse(argv);
-    let waiting = parsed
+    let configured = parsed.and_then(|a| {
+        let remote = crate::client::resolve(&Host, a.store.as_deref())?;
+        Ok((a, remote))
+    });
+    let waiting = configured
         .as_ref()
-        .is_ok_and(|a| matches!(a.call, Call::Wait(..)));
-    let result = parsed.and_then(|a| {
-        let v = execute(&mut Host, a.store.as_deref(), &a.call)?;
+        .is_ok_and(|(a, _)| matches!(a.call, Call::Wait(..)));
+    let result = configured.and_then(|(a, remote)| {
+        let v = execute_with(&mut Host, a.store.as_deref(), &a.call, remote)?;
         Ok(if a.text || matches!(a.call, Call::Brief(_) | Call::Page) {
             text_of(&a.call, &v)
         } else {

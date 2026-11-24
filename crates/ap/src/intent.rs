@@ -503,7 +503,15 @@ fn refusal(f: Failure, mut done: Done) -> Box<Refusal> {
 /// The call: the answer, or the refusal with how far the call went.
 pub fn execute(s: &mut impl System, store: Option<&str>, r: &Value) -> Result<Value, Box<Refusal>> {
     let mut done = Done::default();
-    run(s, store, r, &mut done).map_err(|f| refusal(f, done))
+    let result = match crate::client::resolve(s, store) {
+        Ok(Some(endpoint)) => {
+            let mut transport = crate::client::Transport::new(s, endpoint);
+            run(&mut transport, store, r, &mut done)
+        }
+        Ok(None) => run(s, store, r, &mut done),
+        Err(f) => Err(f),
+    };
+    result.map_err(|f| refusal(f, done))
 }
 pub fn cli(argv: &[OsString]) -> ExitCode {
     let called = store::input(argv, "show").map_err(|f| refusal(f, Done::default()));

@@ -352,7 +352,7 @@ The answer is one JSON line on stdout, exit 0: `topic`, `decision` (the row's id
 
 ## The policy check
 
-`ap policy check [<file>]`: `specs/ap/policy.md` R12 to R16. Its reader `writer` reads the member `writer` of the page writer (`specs/ap/unit-write.md` R2); its last reader, `api`, reads the member `api` of the API credit (`specs/ap/api.md` R3).
+`ap policy check [<file>]`: `specs/ap/policy.md` R12 to R16. Its reader `writer` reads the member `writer` of the page writer (`specs/ap/unit-write.md` R2); `api` reads the member `api` of the API credit (`specs/ap/api.md` R3); its last reader, `client`, reads the member `store_url` of the remote store client (`specs/ap/policy.md` R19, `specs/ap/client.md`).
 
 ## The API credit
 
@@ -373,3 +373,7 @@ The answer is one JSON line on stdout, exit 0: `topic`, `decision` (the row's id
 ## Roles
 
 Every apply of `ap` names its role, and the work schema's grants give each role what it applies and calls: `specs/ap/roles.md` (R1 to R6; the claims of each verb are R3, the services' `ONT_ROLE` R4, the roles file R5; its install is `specs/ap/deliver.md` R58 and R59). The steps of the first delivery are in `deploy/README.md`.
+
+## Remote client
+
+`ap status`, `ap request` and `ap intent` talk directly over HTTP/1.1 to `ont serve` when configured with a tailnet `store_url` (`http://<tailnet-ip>:<port>`, IPv4 `100.64.0.0/10` or bracketed IPv6 `[fd7a:115c:a1e0::/48]`, port `1..=65535`) via `AP_STORE_URL` or the policy file's `store_url` member (`specs/ap/client.md`, `specs/ap/policy.md` R19). Explicit `--store <path>` always selects local `ont` subprocess mode; `AP_STORE_URL` takes precedence over policy `store_url`. In remote mode, `ap status` skips reading local VPS delivery and systemd unit files, and VPS-only driver verbs (`ap deliver`, `ap work`, `ap unit ready|run|review|write` without `--store`) refuse `remote_mode_unsupported` (exit 2).
