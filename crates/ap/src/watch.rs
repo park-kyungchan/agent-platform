@@ -541,7 +541,7 @@ fn pass(s: &mut impl System, dir: &Path) -> (Value, u8) {
             "accounts" => accounts::detect(s, now, &policy),
             "checks" => checks::detect(s, &policy),
             "runtimes" => runtimes::detect(s, member(d)),
-            "drift" => drift::detect(s),
+            "drift" => drift::detect(s, &policy),
             _ => credit::detect(s, now, &policy),
         };
         readings.push((d, reading));

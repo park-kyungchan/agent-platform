@@ -11,5 +11,10 @@
   "etc": {
     "repository": "park-kyungchan/agent-vps-operations",
     "url": "https://github.com/park-kyungchan/agent-vps-operations.git"
+  },
+  "pc": {
+    "host": "pc",
+    "ssh": "apcheck@ap-checks",
+    "bin": "/home/apcheck/.cargo/bin/ont"
   }
 }

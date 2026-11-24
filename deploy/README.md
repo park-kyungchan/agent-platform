@@ -6,7 +6,7 @@ The files of this directory make `ap deliver` run with no session in the path. T
 | --- | --- | --- |
 | `ap-deliver.service` | One run of `/usr/local/bin/ap deliver` with the host's request on stdin (`Type=oneshot`, in `agents.slice`, which holds the host's CPU and memory limits; `Nice=10`; at most an hour). `SuccessExitStatus=2`: a refusal (exit 2, nothing installed) is no failure of the unit; the exits 3, 4 and 5 fail it | `/etc/systemd/system/ap-deliver.service` |
 | `ap-deliver.timer` | Starts the service ten minutes after boot and ten minutes after each run ended | `/etc/systemd/system/ap-deliver.timer` |
-| `deliver.json` | The timer's request of this host: `repository`, `url`, `state` (`/var/lib/agent-platform/deliver`), `build_lock` (the build lock `scripts/install-ap.sh` names), `build_wait_seconds: 480` (wait up to eight minutes for that lock), `engine` (the engine's repository `park-kyungchan/ontology-platform` and its URL: delivery also installs the engine at `ontology/ENGINE-PIN` and a higher version of `ontology/work.schema.json`), and `etc` (the operations repository `park-kyungchan/agent-vps-operations` and its URL: delivery also runs that repository's installer of the host's configuration files at its accepted tip, section "The configuration files"). It has no `by` and no `reason`: that is the timer's form | `/etc/agent-platform/deliver.json` |
+| `deliver.json` | The timer's request of this host: `repository`, `url`, `state` (`/var/lib/agent-platform/deliver`), `build_lock` (the build lock `scripts/install-ap.sh` names), `build_wait_seconds: 480` (wait up to eight minutes for that lock), `engine` (the engine's repository `park-kyungchan/ontology-platform` and its URL: delivery also installs the engine at `ontology/ENGINE-PIN` and a higher version of `ontology/work.schema.json`), `etc` (the operations repository `park-kyungchan/agent-vps-operations` and its URL: delivery also runs that repository's installer of the host's configuration files at its accepted tip, section "The configuration files"), and `pc` (the PC checks account `apcheck@ap-checks`, host `pc`, and target `/home/apcheck/.cargo/bin/ont`: delivery pushes the pinned `ont` binary to the checks account when the PC is reachable, section "The PC checks engine"). It has no `by` and no `reason`: that is the timer's form | `/etc/agent-platform/deliver.json` |
 
 The build lock is one file for every repository of the host, `/var/lib/agent-platform/build.lock`: the `check` of each repository and the installers that build (`scripts/install-ap.sh` here, `scripts/install-ont.sh` of `ontology-platform`) take it. The `check` of `education-platform` also makes its fixture directory beside the lock, so a directory `edu-check.*` under `/var/lib/agent-platform` belongs to a running check of that repository and is removed when it ends.
 
@@ -170,6 +170,26 @@ ap deliver check < /etc/agent-platform/deliver.json.new &&
 python3 -I -c 'import json; print(sorted(json.load(open("/etc/agent-platform/deliver.json"))))'
 rm -rf /var/lib/agent-platform/deliver/agent-vps-operations
 ```
+
+## The PC checks engine
+
+With the member `pc` (`specs/ap/deliver.md` R60 to R63), after every call that ends `current` or `installed` and is not a rollback, delivery pushes the host's installed `ont` binary over `tailscale ssh` to the PC checks account (`apcheck@ap-checks`, and nowhere else on the PC: `ap` refuses any SSH user other than `apcheck`), recording one `install` object on host `pc` with digest and `--version` readback and automatic rollback to `.before-<12 hex>`. An offline PC ends the `pc` step `unreachable` and never changes the VPS call's `end`, `code` or exit.
+
+Add the member `pc` to `/etc/agent-platform/deliver.json` once, after delivery installed an `ap` that knows it (keeping existing members such as `checkouts`):
+
+```sh
+python3 -I -c 'import json, sys; r = json.load(open(sys.argv[1])); r["pc"] = json.load(open(sys.argv[2]))["pc"]; open(sys.argv[3], "w").write(json.dumps(r, indent=2) + "\n")' \
+  /etc/agent-platform/deliver.json deploy/deliver.json /etc/agent-platform/deliver.json.new
+ap deliver check < /etc/agent-platform/deliver.json.new &&
+  cp -p /etc/agent-platform/deliver.json /etc/agent-platform/deliver.json.before-pc &&
+  install -m 0644 /etc/agent-platform/deliver.json.new /etc/agent-platform/deliver.json &&
+  rm /etc/agent-platform/deliver.json.new
+python3 -I -c 'import json; print(sorted(json.load(open("/etc/agent-platform/deliver.json"))))'
+```
+
+Read the state in `last.json` or the journal (`r.get("pc")`: `host`, `target`, `from`, `to`, `sha256`, `install`, `result`, `code`). Undo: remove the `pc` member from `/etc/agent-platform/deliver.json` after checking with `ap deliver check`.
+
+The user's own account on the PC is never pushed to from the VPS; the user updates their own `ap` and `ont` binaries by running `scripts/pc-pull.sh` directly on the PC (`specs/ap/deliver.md` R64).
 
 ## A Lead's call
 
@@ -384,7 +404,7 @@ systemctl is-active ap-route.service                  # until it answers inactiv
 - `accounts`: checks Claude account `.credentials.json` expiry (only the expiry timestamp is kept) and recent `run` usage limits (`>= 0.9`).
 - `checks`: checks GitHub `main` workflow conclusions, open Dependabot alerts and `github/apply --check` settings drift for policy repositories.
 - `runtimes`: checks `--version` and `--help` flags of `claude`, `muse` and `agy` against the flags `ap run` invokes.
-- `drift`: compares by SHA-256, without fetching, three sources with the host's files: the files listed in `deployments/host-artifacts.json` at `origin/main` of `agent-vps-operations`; the unit files of `deploy/` at the commit the installed `ap` names, read from delivery's clone `/var/lib/agent-platform/deliver/agent-platform`, with `/etc/systemd/system/<name>`; and the files of `etc/` at the tip delivery's last fetch of the operations repository read (its clone `/var/lib/agent-platform/deliver/agent-vps-operations`), each with the host's file of the same path under `/`.
+- `drift`: compares by SHA-256, without fetching, four sources: the files listed in `deployments/host-artifacts.json` at `origin/main` of `agent-vps-operations`; the unit files of `deploy/` at the commit the installed `ap` names, read from delivery's clone `/var/lib/agent-platform/deliver/agent-platform`, with `/etc/systemd/system/<name>`; the files of `etc/` at the tip delivery's last fetch of the operations repository read (its clone `/var/lib/agent-platform/deliver/agent-vps-operations`), each with the host's file of the same path under `/`; and, when the policy names a valid `apcheck@<node>` in `hosts.pc.ssh` and the PC is reachable, the checks account's `ont` binary (read-only digest probe over `tailscale ssh`, `specs/ap/watch.md` R33) against the host's `/usr/local/bin/ont`.
 - `credit`: when the policy has the member `api` (`specs/ap/api.md` R3), reads the runs of role `batch` of the store by the rule `ap api batch` counts with: the month's counted spend at 80 % of a stop (`stop standard`, `stop soak`), a batch run still running more than 26 hours after its start (`unsettled <run>`), and the key file's mode by `stat` alone, never its bytes (`key mode`, urgent, when it is not a regular file of mode 600); without the member it reads nothing and its findings are neither seen nor closed.
 
 `ap-watch.service` (`Type=oneshot`, run of `/usr/local/bin/ap watch`, `Nice=10`, `TZ=UTC` so that `systemctl` prints the times the pass reads in UTC, a `PATH` with `/usr/sbin` for `sshd`, no `Restart=`) is one pass; `ap-watch.timer` starts one at every fifth minute (`OnCalendar=*:0/5`) and makes up no pass missed while the host was down. Each pass is a new process of the installed `ap`: a delivery of `ap` reaches the next pass with no restart. The answer of each pass is one line in the journal.

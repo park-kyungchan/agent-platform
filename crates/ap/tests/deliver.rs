@@ -213,6 +213,22 @@ struct W {
     xcheckout_fails: bool,
     xsearch_fails: bool,
     xruns: Vec<(i32, String)>,
+    /// PC push (`specs/ap/deliver.md` R60 to R63): optional `pc` member of request, how
+    /// `tailscale ssh` behaves, local `ont` fault injection, and virtual clock for timeouts.
+    pc: Option<Value>,
+    pc_ssh: PcSsh,
+    ont_unreadable: bool,
+    ont_version_bad: bool,
+    extra_env: Vec<(String, String)>,
+    clock_offset: std::time::Duration,
+    advance_on_pause: std::time::Duration,
+}
+
+#[derive(Clone)]
+enum PcSsh {
+    Local,
+    Script(std::collections::VecDeque<(i32, String)>),
+    Hang,
 }
 
 impl W {
@@ -321,6 +337,13 @@ impl W {
             xcheckout_fails: false,
             xsearch_fails: false,
             xruns: vec![],
+            pc: None,
+            pc_ssh: PcSsh::Local,
+            ont_unreadable: false,
+            ont_version_bad: false,
+            extra_env: vec![],
+            clock_offset: std::time::Duration::ZERO,
+            advance_on_pause: std::time::Duration::ZERO,
         };
         w.lock = w.p("deliver.lock");
         for n in 1..=k {
@@ -439,6 +462,9 @@ impl W {
         }
         if self.etc {
             r["etc"] = json!({"repository": "o/ops", "url": XURL});
+        }
+        if let Some(pc) = &self.pc {
+            r["pc"] = pc.clone();
         }
         r
     }
@@ -794,7 +820,11 @@ impl W {
                             json!({"status": "ok", "result": {"outcome": "already_applied", "edits": [{"change": "initial", "id": id}]}}),
                         );
                     }
-                    if self.installs.iter().any(|i| i["status"] == "running") {
+                    if self
+                        .installs
+                        .iter()
+                        .any(|i| i["target"] == p["target"] && i["status"] == "running")
+                    {
                         return Self::ok(
                             json!({"status": "refused", "code": "submission_criteria", "failed": ["install_running"]}),
                         );
@@ -877,6 +907,9 @@ impl System for W {
         self.calls.push((program.into(), a.to_vec(), body.clone()));
         if program == self.p("ont-bin/ont") {
             assert_eq!(a, ["--version"]);
+            if self.ont_version_bad {
+                return Self::text(true, "ont 0.1.0 unknown\n");
+            }
             return Self::text(true, &format!("ont 0.1.0 {}\n", self.ont));
         }
         if program == self.p("bin/ap") {
@@ -922,6 +955,12 @@ impl System for W {
     }
     fn read(&self, path: &str) -> std::io::Result<Vec<u8>> {
         if path == self.p("ont-bin/ont") {
+            if self.ont_unreadable {
+                return Err(std::io::ErrorKind::NotFound.into());
+            }
+            if let Ok(bytes) = std::fs::read(path) {
+                return Ok(bytes);
+            }
             return Ok(engine_binary(&self.ont));
         }
         if path == self.p("bin/ap") {
@@ -956,6 +995,41 @@ impl System for W {
             argv[1..].to_vec(),
             json!({"cwd": cwd, "env": env_map}),
         ));
+        if argv[0] == "tailscale" {
+            assert_eq!(argv.len(), 4, "tailscale argv: {argv:?}");
+            assert_eq!(argv[1], "ssh");
+            let [stdin, stdout, stderr] = files;
+            return match &mut self.pc_ssh {
+                PcSsh::Local => Command::new("sh")
+                    .args(["-c", &argv[3]])
+                    .stdin(stdin)
+                    .stdout(stdout)
+                    .stderr(stderr)
+                    .spawn(),
+                PcSsh::Script(q) => {
+                    let (exit, out) = q.pop_front().unwrap_or((1, String::new()));
+                    Command::new("sh")
+                        .args([
+                            "-c",
+                            "printf '%s' \"$1\"; exit \"$2\"",
+                            "sh",
+                            &out,
+                            &exit.to_string(),
+                        ])
+                        .env_clear()
+                        .stdin(stdin)
+                        .stdout(stdout)
+                        .stderr(stderr)
+                        .spawn()
+                }
+                PcSsh::Hang => Command::new("sh")
+                    .args(["-c", "sleep 60"])
+                    .stdin(stdin)
+                    .stdout(stdout)
+                    .stderr(stderr)
+                    .spawn(),
+            };
+        }
         if argv[0].ends_with("/ontology/migrate") || argv[1].ends_with("/scripts/install-ont.sh") {
             return self.launch_engine(argv, files);
         }
@@ -1010,6 +1084,16 @@ impl System for W {
             .stderr(stderr)
             .spawn()
     }
+    fn now(&self) -> std::time::Instant {
+        std::time::Instant::now() + self.clock_offset
+    }
+    fn pause(&mut self, duration: std::time::Duration) {
+        if self.advance_on_pause.is_zero() {
+            std::thread::sleep(duration);
+        } else {
+            self.clock_offset += self.advance_on_pause;
+        }
+    }
     fn environment(&self) -> Vec<(String, String)> {
         vec![
             ("PATH".into(), std::env::var("PATH").unwrap_or_default()),
@@ -1024,6 +1108,7 @@ impl System for W {
         ]
         .into_iter()
         .chain(self.invocation.clone().map(|v| ("INVOCATION_ID".into(), v)))
+        .chain(self.extra_env.clone())
         .collect()
     }
 }
@@ -3489,6 +3574,15 @@ impl W {
             ["checkout", "--quiet", "--force", "--detach", pin] => {
                 assert_eq!(*pin, self.pin);
                 Self::text(true, "")
+            }
+            ["rev-list", "--parents", "-n", "1", pin] => {
+                if let Some(c) = self.echain.iter().find(|c| c.id == *pin) {
+                    let mut words = vec![c.id.clone()];
+                    words.extend(c.parents.iter().cloned());
+                    Self::text(true, &format!("{}\n", words.join(" ")))
+                } else {
+                    Self::text(false, "")
+                }
             }
             ["rev-list", "--first-parent", "--parents", range] => {
                 let (from, to) = range.split_once("..").unwrap();
@@ -6564,4 +6658,496 @@ fn r59_a_call_without_engine_has_no_roles_member_and_reads_no_file() {
     let (v, _) = w.run();
     assert_eq!(v["end"], "refused");
     assert_eq!(v["roles"], Value::Null);
+}
+
+// ---- PC push (specs/ap/deliver.md R60 to R64) --------------------------------------------------
+
+fn fake_ont_script(commit: &str) -> Vec<u8> {
+    format!("#!/bin/sh\nif [ \"${{1:-}}\" = --version ]; then printf 'ont 0.1.0 {commit}\\n'; fi\n")
+        .into_bytes()
+}
+
+fn pc_target(w: &W) -> Value {
+    json!({"host": "pc", "ssh": "apcheck@ap-checks", "bin": w.p("pc-bin/ont")})
+}
+
+fn plant_local_ont_installed(w: &mut W, commit: &str, rev_idx: u32) -> Value {
+    let rev = w
+        .reviews
+        .iter()
+        .find(|r| r["head"] == eh(rev_idx) && r["repository"] == "o/engine")
+        .unwrap()["id"]
+        .clone();
+    let id = oid("install", &format!("act-local-ont-{}", w.installs.len()));
+    w.installs.push(json!({
+        "id": id,
+        "target": etarget(),
+        "host": oid("host", "local"),
+        "kind": "forward",
+        "repository": "o/engine",
+        "commit": commit,
+        "attempt": 1,
+        "from": ec(0),
+        "from_sha256": sha(&engine_binary(&ec(0))),
+        "by": "timer:1",
+        "head": eh(rev_idx),
+        "review": rev,
+        "reviews": [rev],
+        "status": "closed",
+        "outcome": "installed",
+        "to": commit,
+        "started_at": "2026-11-14T08:00:00Z",
+        "closed_at": "2026-11-14T08:01:00Z"
+    }));
+    id
+}
+
+fn plant_pc_install(
+    w: &mut W,
+    host: &str,
+    commit: &str,
+    from: &str,
+    from_sha: Option<&str>,
+    outcome: Option<&str>,
+    attempt: usize,
+) -> Value {
+    let n = w.installs.len();
+    let id = oid("install", &format!("act-pc-{host}-{n}"));
+    let status = if outcome.is_some() {
+        "closed"
+    } else {
+        "running"
+    };
+    let mut row = json!({
+        "id": id,
+        "target": etarget(),
+        "host": oid("host", host),
+        "kind": "forward",
+        "repository": "o/engine",
+        "commit": commit,
+        "attempt": attempt,
+        "from": from,
+        "by": "timer:1",
+        "status": status,
+        "started_at": format!("2026-11-14T09:{n:02}:00Z"),
+    });
+    if let Some(sha) = from_sha {
+        row["from_sha256"] = json!(sha);
+    }
+    if let Some(out) = outcome {
+        row["outcome"] = json!(out);
+        row["closed_at"] = json!(format!("2026-11-14T09:{n:02}:30Z"));
+    } else {
+        row["running_in"] = etarget();
+    }
+    w.installs.push(row);
+    id
+}
+
+// spec: specs/ap/deliver.md#R60
+#[test]
+fn r60_pc_request_validation_and_omission_on_invalid_input() {
+    let w = W::new();
+    let mut ok_req = w.request();
+    ok_req["pc"] =
+        json!({"host": "pc", "ssh": "apcheck@ap-checks", "bin": "/home/apcheck/.cargo/bin/ont"});
+    let (v, exit) = check_request(&ok_req);
+    assert_eq!((v, exit), (json!({"status": "ok"}), 0));
+
+    let bad_cases: Vec<(Value, &str)> = vec![
+        (json!(null), "pc"),
+        (json!("pc"), "pc"),
+        (
+            json!({"host": "pc", "ssh": "apcheck@ap-checks", "bin": "/a/b", "extra": 1}),
+            "pc.extra",
+        ),
+        (
+            json!({"ssh": "apcheck@ap-checks", "bin": "/a/b"}),
+            "pc.host",
+        ),
+        (
+            json!({"host": "local", "ssh": "apcheck@ap-checks", "bin": "/a/b"}),
+            "pc.host",
+        ),
+        (
+            json!({"host": "-bad", "ssh": "apcheck@ap-checks", "bin": "/a/b"}),
+            "pc.host",
+        ),
+        (
+            json!({"host": "PC", "ssh": "apcheck@ap-checks", "bin": "/a/b"}),
+            "pc.host",
+        ),
+        (
+            json!({"host": "a".repeat(60), "ssh": "apcheck@ap-checks", "bin": "/a/b"}),
+            "pc.host",
+        ),
+        (
+            json!({"host": "pc", "ssh": "root@ap-checks", "bin": "/a/b"}),
+            "pc.ssh",
+        ),
+        (
+            json!({"host": "pc", "ssh": "user@ap-checks", "bin": "/a/b"}),
+            "pc.ssh",
+        ),
+        (
+            json!({"host": "pc", "ssh": "apcheck@", "bin": "/a/b"}),
+            "pc.ssh",
+        ),
+        (
+            json!({"host": "pc", "ssh": "apcheck@-bad", "bin": "/a/b"}),
+            "pc.ssh",
+        ),
+        (
+            json!({"host": "pc", "ssh": format!("apcheck@{}", "a".repeat(129)), "bin": "/a/b"}),
+            "pc.ssh",
+        ),
+        (
+            json!({"host": "pc", "ssh": "apcheck@ap-checks", "bin": "rel/ont"}),
+            "pc.bin",
+        ),
+        (
+            json!({"host": "pc", "ssh": "apcheck@ap-checks", "bin": "/"}),
+            "pc.bin",
+        ),
+        (
+            json!({"host": "pc", "ssh": "apcheck@ap-checks", "bin": "/home/apcheck/bad path"}),
+            "pc.bin",
+        ),
+        (
+            json!({"host": "pc", "ssh": "apcheck@ap-checks", "bin": "/home/apcheck/../ont"}),
+            "pc.bin",
+        ),
+        (
+            json!({"host": "pc", "ssh": "apcheck@ap-checks", "bin": format!("/{}", "a".repeat(400))}),
+            "pc.bin",
+        ),
+    ];
+    for (pc_val, want_field) in bad_cases {
+        let mut w = W::new();
+        let mut r = w.request();
+        r["pc"] = pc_val.clone();
+        let (v, exit) = w.run_with(&r);
+        assert_eq!(
+            (end(&v), exit),
+            (("refused", "invalid_input"), 2),
+            "{pc_val}: {v}"
+        );
+        assert_eq!(v["detail"], json!({"field": want_field}), "{pc_val}: {v}");
+        assert!(
+            v.get("pc").is_none(),
+            "pc must be omitted from invalid_input: {v}"
+        );
+        assert!(w.calls.is_empty() && !w.t.join("state").exists());
+    }
+}
+
+// spec: specs/ap/deliver.md#R61
+#[test]
+fn r61_pc_attempts_are_isolated_from_local_and_pc_dead_clears_running_attempts() {
+    // 1. A failed PC attempt on /usr/local/bin/ont never suppresses local VPS engine delivery
+    //    and never increments local attempt numbering.
+    let mut w = W::engine();
+    plant_pc_install(&mut w, "pc", &ec(2), &ec(0), None, Some("failed"), 1);
+    let r = w.timer();
+    let (v, exit) = w.run_with(&r);
+    assert_eq!((end(&v), exit), (("installed", ""), 0), "{v}");
+    assert_eq!(v["target"], ENGINE);
+    assert_eq!(v["attempt"], 1);
+    let started = &w.applies("start_install")[0];
+    assert_eq!(started["parameters"]["host"], oid("host", "local"));
+
+    // 2. A running PC attempt on /usr/local/bin/ont without `pc` in request: `pc_dead` closes
+    //    it `failed` (dead_call, to: neither) BEFORE `engine_dead` and local `engine_install`.
+    let mut w = W::engine();
+    let dead_id = plant_pc_install(&mut w, "pc", &ec(2), &ec(0), None, None, 1);
+    let (v, exit) = w.run();
+    assert_eq!((end(&v), exit), (("installed", ""), 0), "{v}");
+    let closes = w.applies("close_install");
+    assert_eq!(closes.len(), 2, "{closes:?}");
+    assert_eq!(closes[0]["request_id"], format!("pc.pc.{}.1.close", ec(2)));
+    assert_eq!(
+        closes[0]["parameters"],
+        json!({"install": dead_id, "outcome": "failed", "code": "dead_call", "to": "neither"})
+    );
+    assert!(w.launched().iter().all(|l| l != "ont-rollback"));
+
+    // 3. `pc_dead` with `pc` in request: remote matches commit -> closed `installed`.
+    let mut w = W::at_pin();
+    (w.file, w.tree, w.bytes) = (Some(c(2)), Some(c(2)), binary(&c(2)));
+    w.pc = Some(pc_target(&w));
+    let bin_bytes = fake_ont_script(&ec(2));
+    std::fs::write(w.p("ont-bin/ont"), &bin_bytes).unwrap();
+    let pc_bin = w.p("pc-bin/ont");
+    std::fs::create_dir_all(w.t.join("pc-bin")).unwrap();
+    std::fs::write(&pc_bin, &bin_bytes).unwrap();
+    std::fs::set_permissions(&pc_bin, std::os::unix::fs::PermissionsExt::from_mode(0o755)).unwrap();
+    let dead_id = plant_pc_install(&mut w, "pc", &ec(2), &ec(0), None, None, 1);
+    let (v, exit) = w.run();
+    assert_eq!((end(&v), exit), (("current", ""), 0), "{v}");
+    let closes = w.applies("close_install");
+    assert_eq!(closes.len(), 1);
+    assert_eq!(
+        closes[0]["parameters"],
+        json!({"install": dead_id, "outcome": "installed", "to": ec(2)})
+    );
+    assert_eq!(v["pc"]["result"], "same");
+
+    // 4. `pc_dead` with `pc` in request: remote matches `from` -> closed `not_started` (dead_call).
+    let mut w = W::at_pin();
+    (w.file, w.tree, w.bytes) = (Some(c(2)), Some(c(2)), binary(&c(2)));
+    w.pc = Some(pc_target(&w));
+    let old_bytes = fake_ont_script(&ec(0));
+    let new_bytes = fake_ont_script(&ec(2));
+    std::fs::write(w.p("ont-bin/ont"), &new_bytes).unwrap();
+    let pc_bin = w.p("pc-bin/ont");
+    std::fs::create_dir_all(w.t.join("pc-bin")).unwrap();
+    std::fs::write(&pc_bin, &old_bytes).unwrap();
+    std::fs::set_permissions(&pc_bin, std::os::unix::fs::PermissionsExt::from_mode(0o755)).unwrap();
+    let dead_id = plant_pc_install(
+        &mut w,
+        "pc",
+        &ec(2),
+        &ec(0),
+        Some(&sha(&old_bytes)),
+        None,
+        1,
+    );
+    plant_local_ont_installed(&mut w, &ec(2), 2);
+    let (v, exit) = w.run();
+    assert_eq!((end(&v), exit), (("current", ""), 0), "{v}");
+    let closes = w.applies("close_install");
+    assert_eq!(closes.len(), 2, "{closes:?}");
+    assert_eq!(
+        closes[0]["parameters"],
+        json!({"install": dead_id, "outcome": "not_started", "code": "dead_call", "to": ec(0)})
+    );
+    assert_eq!(v["pc"]["result"], "installed");
+}
+
+// spec: specs/ap/deliver.md#R62
+#[test]
+fn r62_pc_push_guards_unreachable_timeout_same_suppression_and_tailscale_env() {
+    // 1. Without `pc`, `pc` is omitted completely from record.
+    let mut w = W::at_pin();
+    (w.file, w.tree, w.bytes) = (Some(c(2)), Some(c(2)), binary(&c(2)));
+    let (v, exit) = w.run();
+    assert_eq!((end(&v), exit), (("current", ""), 0));
+    assert!(v.get("pc").is_none());
+
+    // 2. Refusal or rollback leaves `pc: null` and never launches `tailscale`.
+    let mut w = W::at_pin();
+    w.pc = Some(pc_target(&w));
+    w.build_busy = true;
+    let (v, exit) = w.run();
+    assert_eq!((end(&v), exit), (("refused", "build_busy"), 2));
+    assert_eq!(v["pc"], Value::Null);
+    assert!(!w.calls.iter().any(|(p, _, _)| p == "tailscale"));
+
+    // 3. Unreachable PC (and timeout) records `unreachable` / `pc_unreachable` and keeps VPS exit 0;
+    //    `tailscale` receives ONLY `TAILSCALE_ENV` and no bare `--`.
+    let mut w = W::at_pin();
+    (w.file, w.tree, w.bytes) = (Some(c(2)), Some(c(2)), binary(&c(2)));
+    w.pc = Some(pc_target(&w));
+    w.extra_env = vec![
+        ("HOME".into(), "/root".into()),
+        ("USER".into(), "root".into()),
+        ("LOGNAME".into(), "root".into()),
+        ("LANG".into(), "C.UTF-8".into()),
+        ("LC_ALL".into(), "en_US.UTF-8".into()),
+        ("SSH_AUTH_SOCK".into(), "/tmp/agent.sock".into()),
+    ];
+    w.pc_ssh = PcSsh::Script(std::collections::VecDeque::from([(255, String::new())]));
+    let (v, exit) = w.run();
+    assert_eq!((end(&v), exit), (("current", ""), 0), "{v}");
+    assert_eq!(
+        v["pc"],
+        json!({
+            "host": "pc",
+            "target": w.p("pc-bin/ont"),
+            "from": null,
+            "to": null,
+            "sha256": null,
+            "install": null,
+            "result": "unreachable",
+            "code": "pc_unreachable"
+        })
+    );
+    let ts_call = w.calls.iter().find(|(p, _, _)| p == "tailscale").unwrap();
+    assert_eq!(ts_call.1[0], "ssh");
+    assert_eq!(ts_call.1[1], "apcheck@ap-checks");
+    assert_eq!(ts_call.1.len(), 3);
+    let env_obj = ts_call.2["env"].as_object().unwrap();
+    let mut keys: Vec<&str> = env_obj.keys().map(String::as_str).collect();
+    keys.sort();
+    assert_eq!(keys, ["HOME", "LOGNAME", "PATH", "USER"]);
+
+    // 4. Probe timeout (> 15 s) also ends `unreachable` without failing VPS delivery.
+    let mut w = W::at_pin();
+    (w.file, w.tree, w.bytes) = (Some(c(2)), Some(c(2)), binary(&c(2)));
+    w.pc = Some(pc_target(&w));
+    w.pc_ssh = PcSsh::Hang;
+    w.advance_on_pause = std::time::Duration::from_secs(20);
+    let (v, exit) = w.run();
+    assert_eq!((end(&v), exit), (("current", ""), 0), "{v}");
+    assert_eq!(v["pc"]["result"], "unreachable");
+    assert_eq!(v["pc"]["code"], "pc_unreachable");
+
+    // 5. Local `ont` unreadable -> `failed` / `engine_unreadable`, VPS exit unchanged.
+    let mut w = W::at_pin();
+    (w.file, w.tree, w.bytes) = (Some(c(2)), Some(c(2)), binary(&c(2)));
+    w.pc = Some(pc_target(&w));
+    w.ont_unreadable = true;
+    let (v, exit) = w.run();
+    assert_eq!((end(&v), exit), (("current", ""), 0), "{v}");
+    assert_eq!(v["pc"]["result"], "failed");
+    assert_eq!(v["pc"]["code"], "engine_unreadable");
+
+    // 6. Timer suppression (`suppressed`, `attempt_exists`, `attempts_exhausted`) vs Lead bypass.
+    for (setup, want_code) in [
+        ("failed", "suppressed"),
+        ("installed", "attempt_exists"),
+        ("three_not_started", "attempts_exhausted"),
+    ] {
+        let mut w = W::at_pin();
+        (w.file, w.tree, w.bytes) = (Some(c(2)), Some(c(2)), binary(&c(2)));
+        w.pc = Some(pc_target(&w));
+        std::fs::write(w.p("ont-bin/ont"), fake_ont_script(&ec(2))).unwrap();
+        match setup {
+            "failed" => {
+                plant_pc_install(&mut w, "pc", &ec(1), &ec(0), None, Some("failed"), 1);
+            }
+            "installed" => {
+                plant_pc_install(&mut w, "pc", &ec(2), &ec(0), None, Some("installed"), 1);
+            }
+            _ => {
+                for n in 1..=3 {
+                    plant_pc_install(&mut w, "pc", &ec(2), &ec(0), None, Some("not_started"), n);
+                }
+            }
+        }
+        let r = w.timer();
+        let (v, exit) = w.run_with(&r);
+        assert_eq!((end(&v), exit), (("current", ""), 0), "{setup}: {v}");
+        assert_eq!(v["pc"]["result"], "suppressed", "{setup}: {v}");
+        assert_eq!(v["pc"]["code"], want_code, "{setup}: {v}");
+        assert!(w.applies("start_install").is_empty(), "{setup}");
+    }
+
+    // Lead call (`by` present) bypasses timer suppression.
+    let mut w = W::at_pin();
+    (w.file, w.tree, w.bytes) = (Some(c(2)), Some(c(2)), binary(&c(2)));
+    w.pc = Some(pc_target(&w));
+    std::fs::write(w.p("ont-bin/ont"), fake_ont_script(&ec(2))).unwrap();
+    plant_pc_install(&mut w, "pc", &ec(2), &ec(0), None, Some("failed"), 1);
+    plant_local_ont_installed(&mut w, &ec(2), 2);
+    let (v, exit) = w.run();
+    assert_eq!((end(&v), exit), (("current", ""), 0), "{v}");
+    assert_eq!(v["pc"]["result"], "installed");
+    assert_eq!(
+        w.applies("start_install")[0]["request_id"],
+        format!("pc.pc.{}.2", ec(2))
+    );
+}
+
+// spec: specs/ap/deliver.md#R63
+#[test]
+fn r63_pc_push_installs_backs_up_rolls_back_and_resolves_review() {
+    use std::os::unix::fs::PermissionsExt;
+
+    // 1. Fresh install via engine-clone `accepted()` fallback (no local closed `installed` attempt).
+    let mut w = W::at_pin();
+    (w.file, w.tree, w.bytes) = (Some(c(2)), Some(c(2)), binary(&c(2)));
+    w.pc = Some(pc_target(&w));
+    let v2 = fake_ont_script(&ec(2));
+    std::fs::write(w.p("ont-bin/ont"), &v2).unwrap();
+    let (v, exit) = w.run();
+    assert_eq!((end(&v), exit), (("current", ""), 0), "{v}");
+    assert_eq!(v["pc"]["result"], "installed", "{v}");
+    assert_eq!(v["pc"]["to"], ec(2));
+    assert_eq!(v["pc"]["sha256"], sha(&v2));
+    assert_eq!(v["pc"]["code"], Value::Null);
+    let pc_bin = w.p("pc-bin/ont");
+    assert_eq!(std::fs::read(&pc_bin).unwrap(), v2);
+    assert_eq!(
+        std::fs::metadata(&pc_bin).unwrap().permissions().mode() & 0o777,
+        0o755
+    );
+    let start = &w.applies("start_install")[0];
+    assert_eq!(start["request_id"], format!("pc.pc.{}.1", ec(2)));
+    assert_eq!(start["parameters"]["host"], oid("host", "pc"));
+    assert_eq!(start["parameters"]["from"], "0".repeat(40));
+    assert_eq!(start["parameters"]["head"], eh(2));
+
+    // 2. Upgrade existing binary: backs up to `.before-<sha12>` and passes `rollback_binary`.
+    let mut w = W::at_pin();
+    (w.file, w.tree, w.bytes) = (Some(c(2)), Some(c(2)), binary(&c(2)));
+    w.pc = Some(pc_target(&w));
+    let old = fake_ont_script(&ec(0));
+    let new = fake_ont_script(&ec(2));
+    std::fs::write(w.p("ont-bin/ont"), &new).unwrap();
+    std::fs::create_dir_all(w.t.join("pc-bin")).unwrap();
+    std::fs::write(w.p("pc-bin/ont"), &old).unwrap();
+    std::fs::set_permissions(w.p("pc-bin/ont"), std::fs::Permissions::from_mode(0o755)).unwrap();
+    plant_local_ont_installed(&mut w, &ec(2), 2);
+    let (v, exit) = w.run();
+    assert_eq!((end(&v), exit), (("current", ""), 0), "{v}");
+    assert_eq!(v["pc"]["result"], "installed");
+    assert_eq!(v["pc"]["from"], ec(0));
+    let backup = format!("{}.before-{}", w.p("pc-bin/ont"), &sha(&old)[..12]);
+    assert_eq!(std::fs::read(&backup).unwrap(), old);
+    assert_eq!(
+        w.applies("close_install")[0]["parameters"]["rollback_binary"],
+        backup
+    );
+
+    // 3. Failed readback after rename: remote script restores `.before-<sha12>` atomically and
+    //    records `failed_restored` while leaving VPS exit 0.
+    let mut w = W::at_pin();
+    (w.file, w.tree, w.bytes) = (Some(c(2)), Some(c(2)), binary(&c(2)));
+    w.pc = Some(pc_target(&w));
+    let old = fake_ont_script(&ec(0));
+    let broken_new = fake_ont_script(&ec(1)); // prints ec(1) instead of expected ec(2)
+    std::fs::write(w.p("ont-bin/ont"), &broken_new).unwrap();
+    std::fs::create_dir_all(w.t.join("pc-bin")).unwrap();
+    std::fs::write(w.p("pc-bin/ont"), &old).unwrap();
+    std::fs::set_permissions(w.p("pc-bin/ont"), std::fs::Permissions::from_mode(0o755)).unwrap();
+    plant_local_ont_installed(&mut w, &ec(2), 2);
+    let (v, exit) = w.run();
+    assert_eq!((end(&v), exit), (("current", ""), 0), "{v}");
+    assert_eq!(v["pc"]["result"], "failed_restored", "{v}");
+    assert_eq!(v["pc"]["code"], "readback_failed");
+    assert_eq!(std::fs::read(w.p("pc-bin/ont")).unwrap(), old);
+    assert_eq!(
+        w.applies("close_install")[0]["parameters"]["outcome"],
+        "failed_restored"
+    );
+
+    // 4. No accepting review -> `not_accepted`, nothing pushed.
+    let mut w = W::new();
+    (w.file, w.tree, w.bytes) = (Some(c(2)), Some(c(2)), binary(&c(2)));
+    w.pc = Some(pc_target(&w));
+    std::fs::create_dir_all(w.t.join("ont-bin")).unwrap();
+    std::fs::write(w.p("ont-bin/ont"), fake_ont_script(&"e".repeat(40))).unwrap();
+    let (v, exit) = w.run();
+    assert_eq!((end(&v), exit), (("current", ""), 0), "{v}");
+    assert_eq!(v["pc"]["result"], "not_accepted", "{v}");
+    assert!(w.applies("start_install").is_empty());
+}
+
+// spec: specs/ap/deliver.md#R60
+// spec: specs/ap/deliver.md#R64
+#[test]
+fn r64_deliver_json_and_pc_pull_script_present() {
+    use std::os::unix::fs::PermissionsExt;
+    let request: Value =
+        serde_json::from_str(include_str!("../../../deploy/deliver.json")).unwrap();
+    let (v, exit) = check_request(&request);
+    assert_eq!((v, exit), (json!({"status": "ok"}), 0));
+    assert_eq!(
+        request["pc"],
+        json!({"host": "pc", "ssh": "apcheck@ap-checks", "bin": "/home/apcheck/.cargo/bin/ont"})
+    );
+    let pull = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../scripts/pc-pull.sh");
+    let meta = std::fs::metadata(&pull).unwrap();
+    assert!(meta.is_file() && meta.permissions().mode() & 0o111 != 0);
 }
