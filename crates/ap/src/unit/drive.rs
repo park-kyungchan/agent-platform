@@ -8,9 +8,10 @@ use super::object::{self, branch_ok, clone_of};
 use super::page_review::{self, key_ok, stage_unit, unit_ended};
 use super::render::{self, Role};
 use super::scan;
-use crate::host::{Failure, Host, System, args, digest, error, fail, id, new_session_id};
+use crate::host::{Failure, Host, System, args, digest, error, fail, new_session_id};
 use crate::review::{self, DIFF_OPTIONS, GIT_SAFE};
-use crate::store::{self, Actor, Applied, Lead, at};
+use crate::store::work::{self, Action, Id, actions, objects, values};
+use crate::store::{self, Actor, Applied, at};
 use serde_json::{Map, Value, json};
 use std::{
     ffi::OsString,
@@ -407,8 +408,12 @@ pub fn execute(
         }
         Err((Halt::Stop(cause, detail), _)) => {
             let detail = cut(&detail, DETAIL);
-            let p = json!({"unit": id("unit", key), "cause": cause, "detail": detail});
-            let stopped = run.apply(s, "stop_unit", p);
+            let stop = actions::StopUnit {
+                cause: cause.clone(),
+                detail: Some(detail.clone()),
+                unit: Id::new(key),
+            };
+            let stopped = run.apply(s, &stop);
             stopped.and_then(|_| run.answer(s, Some((&cause, &detail)), &Outcome::default()))
         }
         Err((Halt::Fail(f), _)) => Err(f),
@@ -416,6 +421,26 @@ pub fn execute(
     };
     let status = if run.applied || ended { 3 } else { 2 };
     answered.map_err(|f| refusal(f, status, true))
+}
+/// How a verifier's review closes: the verdict, the session that closes it (the recovery session when none), the
+/// report with its SHA-256 and the account of the stage.
+struct Closing {
+    verdict: &'static str,
+    session: Option<String>,
+    report: Option<String>,
+    sha: Option<String>,
+    account: Option<String>,
+}
+impl Closing {
+    fn abandoned(session: Option<String>) -> Self {
+        Closing {
+            verdict: "abandoned",
+            session,
+            report: None,
+            sha: None,
+            account: None,
+        }
+    }
 }
 /// How a call that did not stop ended: the merge, the cleanup, the refusal that left the unit as
 /// it is (R25).
@@ -776,7 +801,7 @@ fn prepare(s: &mut impl System, store: Option<&str>, key: &str) -> Result<(Run, 
     if !key_form(key) {
         return Err(error("invalid_input", "unit"));
     }
-    let u = at(store::get(s, store, "unit", key), "unit")?;
+    let u = at(store::get_of::<objects::Unit>(s, store, key), "unit")?;
     let u = u.ok_or_else(|| error("unknown_unit", "unit"))?;
     let c = checked(s, key, &u)?;
     // The status needs the Lead's App; the run alone refuses its absence, before the lock (R41).
@@ -816,52 +841,57 @@ impl Run {
     fn store(&self) -> Option<&str> {
         self.store.as_deref()
     }
-    /// One apply as the client `ap`, the agent `ap-unit`, the session `u-<key>` and no role (R1).
-    fn apply(&mut self, s: &mut impl System, action: &str, p: Value) -> Result<Applied, Failure> {
+    /// One apply as the client `ap`, the agent `ap-unit`, the session `u-<key>` and the role `dispatch` (R1).
+    fn apply<A: Action>(&mut self, s: &mut impl System, action: &A) -> Result<Applied, Failure> {
         let rid = self.rid();
-        self.apply_as(s, action, rid, p)
+        self.apply_as(s, rid, action)
     }
-    fn apply_as(
+    fn apply_as<A: Action>(
         &mut self,
         s: &mut impl System,
-        action: &str,
         rid: String,
-        p: Value,
+        action: &A,
     ) -> Result<Applied, Failure> {
         let actor = Actor {
             agent: "ap-unit",
             session: &self.session,
             role: "dispatch",
         };
-        let applied = store::unit_action(s, self.store.as_deref(), &actor, action, rid, p);
+        let applied = store::apply_action(s, self.store.as_deref(), &actor.call(rid), action);
         self.applied |= applied.is_ok();
-        at(applied, action)
+        at(applied, A::NAME)
+    }
+    /// The `intent` of an action of an objective unit, copied from the unit's head; the head is the store's, so
+    /// what `Id::from_value` does not read ends the form before the action (`name`), nothing applied.
+    fn intent(&self, name: &str) -> Result<Option<Id<objects::Intent>>, Failure> {
+        match self.u["lane"] == "objective" {
+            true => store::id_of(&self.u["intent"], name),
+            false => Ok(None),
+        }
     }
     /// A new request id `ur-<16 hex>-<counter>` (R1).
     fn rid(&mut self) -> String {
         self.done.count += 1;
         format!("{}-{}", self.prefix, self.done.count)
     }
-    fn unit_id(&self) -> Value {
-        id("unit", &self.key)
-    }
     fn reread(&mut self, s: &mut impl System) -> Result<(), Failure> {
-        let u = at(store::get(s, self.store(), "unit", &self.key), "unit")?;
+        let u = at(
+            store::get_of::<objects::Unit>(s, self.store(), &self.key),
+            "unit",
+        )?;
         self.u = u.ok_or_else(|| error("store_answer_unreadable", "unit"))?;
         Ok(())
     }
     /// `start_unit` from `ready`, `resume_unit` from `stopped` (R6).
     fn begin(&mut self, s: &mut impl System) -> Result<(), Failure> {
-        let action = if self.u["state"] == "ready" {
-            "start_unit"
+        let unit = Id::new(&self.key);
+        if self.u["state"] == "ready" {
+            let intent = self.intent(actions::StartUnit::NAME)?;
+            self.apply(s, &actions::StartUnit { intent, unit })?;
         } else {
-            "resume_unit"
-        };
-        let mut p = json!({"unit": self.unit_id()});
-        if self.u["lane"] == "objective" {
-            p["intent"] = self.u["intent"].clone();
+            let intent = self.intent(actions::ResumeUnit::NAME)?;
+            self.apply(s, &actions::ResumeUnit { intent, unit })?;
         }
-        self.apply(s, action, p)?;
         self.u["state"] = json!("running");
         Ok(())
     }
@@ -967,7 +997,10 @@ impl Run {
         )?;
         let mut list = vec![];
         for k in keys {
-            let v = at(store::get(s, self.store(), "review", &k), "reviews")?;
+            let v = at(
+                store::get_of::<objects::Review>(s, self.store(), &k),
+                "reviews",
+            )?;
             if let Some(v) = v.filter(|v| v["kind"] == "packet") {
                 list.push((k, v));
             }
@@ -984,18 +1017,23 @@ impl Run {
     }
     /// `close_unit_review`; a session the store refuses as a writer closes `abandoned` with the
     /// session `u-<key>:recovery` (R7). True when the review closed as asked.
-    fn close(&mut self, s: &mut impl System, review: &str, mut p: Value) -> Step<bool> {
-        (p["review"], p["unit"]) = (id("review", review), self.unit_id());
+    fn close(&mut self, s: &mut impl System, review: &str, e: Closing) -> Step<bool> {
         let recovery = format!("{}:recovery", self.session);
-        if p["session"].is_null() {
-            p["session"] = json!(recovery);
-        }
-        match self.apply(s, "close_unit_review", p.clone()) {
+        let session = e.session.unwrap_or_else(|| recovery.clone());
+        let action = actions::CloseUnitReview {
+            account: e.account,
+            report: e.report.map(values::FilePath),
+            report_sha256: e.sha.map(values::Sha256Hex),
+            review: Id::new(review),
+            session: Some(session.clone()),
+            unit: Some(Id::new(&self.key)),
+            verdict: values::ReviewVerdict(e.verdict.to_owned()),
+        };
+        match self.apply(s, &action) {
             Ok(_) => Ok(true),
-            Err(f) if store::code(&f) == "writer_cannot_review" && p["session"] != *recovery => {
-                let p = json!({"verdict": "abandoned", "session": recovery});
-                self.close(s, review, p).map(|_| false)
-            }
+            Err(f) if store::code(&f) == "writer_cannot_review" && session != recovery => self
+                .close(s, review, Closing::abandoned(Some(recovery)))
+                .map(|_| false),
             Err(f) => Err(f.into()),
         }
     }
@@ -1003,17 +1041,17 @@ impl Run {
     /// The leftovers of a cut run, before the loop (R7).
     fn leftovers(&mut self, s: &mut impl System) -> Step {
         for a in self.authors() {
-            self.end_stage(s, &a.path, &a.rec, &a.role)?;
+            self.end_stage(s, &a.path, &a.rec)?;
         }
         let v = self.verdicts(s)?;
         for (k, _) in v.list.iter().filter(|(_, r)| r["status"] == "running") {
             let record = self.report(k).map(|out| format!("{out}.run.json"));
             let rec = record.as_deref().and_then(json_file);
             if let (Some(path), Some(rec)) = (&record, &rec) {
-                self.end_stage(s, path, rec, "verifier")?;
+                self.end_stage(s, path, rec)?;
             }
             let session = rec.as_ref().and_then(session);
-            self.close(s, k, json!({"verdict": "abandoned", "session": session}))?;
+            self.close(s, k, Closing::abandoned(session.map(str::to_owned)))?;
         }
         // No stage of the unit lives now: every scratch directory goes, the one a killed `ap run`
         // left (its record still `running`) among them; no link is followed (R7).
@@ -1030,7 +1068,7 @@ impl Run {
         Ok(())
     }
     /// A stage of a cut run: its unit stopped and read as ended, its run closed (R7).
-    fn end_stage(&mut self, s: &mut impl System, path: &str, rec: &Value, role: &str) -> Step {
+    fn end_stage(&mut self, s: &mut impl System, path: &str, rec: &Value) -> Step {
         let running = rec["state"] == "running";
         if let Some(name) = rec["unit"].as_str().filter(|_| running)
             && !(stage_unit(name) && unit_ended(s, name, true))
@@ -1042,7 +1080,9 @@ impl Run {
             .as_str()
             .filter(|_| closed == [false, false]);
         let Some(run) = run else { return Ok(()) };
-        let found = store::get(s, self.store(), "run", run).ok().flatten();
+        let found = store::get_of::<objects::Run>(s, self.store(), run)
+            .ok()
+            .flatten();
         if !found.is_some_and(|r| r["record"] == path && r["status"] == "running") {
             return Ok(());
         }
@@ -1051,14 +1091,24 @@ impl Run {
         } else {
             rec["state"].as_str().unwrap_or("failed")
         };
-        let mut p = json!({"run": id("run", run), "state": state});
-        if let Some(t) = session(rec) {
-            p["session"] = json!(t);
-        }
+        let action = actions::CloseRun {
+            cache_read_tokens: None,
+            cache_write_tokens: None,
+            input_tokens: None,
+            limit: None,
+            output_tokens: None,
+            record: None,
+            run: Id::new(run),
+            served_by: None,
+            session: session(rec).map(str::to_owned),
+            settled_usd_micros: None,
+            state: state.to_owned(),
+            stream: None,
+        };
         let out = path.strip_suffix(".run.json").unwrap_or(path);
         let rid = format!("run-{}-close", &digest(out.as_bytes())[..32]);
         // The stage's own request id; the store's answer is the run's, and a later call tries again.
-        let _ = store::close_run(s, self.store(), (&rid, role, &p));
+        let _ = store::close_run_action(s, self.store(), rid, &action);
         Ok(())
     }
 
@@ -1586,9 +1636,16 @@ impl Run {
             }
         }
         let rounds = self.verdicts(s)?.rounds();
-        let p = json!({"unit": self.unit_id(), "head": head, "pull_request": n, "rounds": rounds,
-            "writers": writers});
-        self.apply(s, "record_head", p)?;
+        let name = actions::RecordHead::NAME;
+        let action = actions::RecordHead {
+            delivered_lines: None,
+            head: values::CommitOrDigest(head.to_owned()),
+            pull_request: Some(store::integer(n, name)?),
+            rounds: Some(store::integer(rounds, name)?),
+            unit: Id::new(&self.key),
+            writers,
+        };
+        self.apply(s, &action)?;
         Ok(self.reread(s)?)
     }
 
@@ -1739,8 +1796,16 @@ impl Run {
         self.prompt(&format!("{n}.description.md"), &scrubbed(body))
     }
     /// One validate naming the review's key, the admission of the stage, the start (R19).
-    fn start_review(&mut self, s: &mut impl System, body: &Value, req: &mut Value) -> Step<String> {
-        let checked = at(store::validate(s, self.store(), body), "start")?;
+    fn start_review(
+        &mut self,
+        s: &mut impl System,
+        (call, action): (&work::Call, &actions::StartUnitReview),
+        req: &mut Value,
+    ) -> Step<String> {
+        let checked = at(
+            store::validate_action(s, self.store(), call, action),
+            "start",
+        )?;
         if let Some(detail) = not_valid(&checked) {
             return failed(store::REFUSED, "start", detail);
         }
@@ -1762,7 +1827,7 @@ impl Run {
         // The store compares strictly: a review in the second of the amendment would not count.
         let amended = self.u["amended_at"].as_str().unwrap_or_default().to_owned();
         self.past(s, &amended)?;
-        let started = at(store::start_unit_review(s, self.store(), body), "start")?;
+        let started = at(store::apply_action(s, self.store(), call, action), "start")?;
         self.applied = true;
         let key = started
             .made("review")
@@ -1840,21 +1905,33 @@ impl Run {
         }
         let prompt = self.prompt(&format!("{n}.verifier.prompt.md"), &text)?;
         let t = &self.verifier;
-        let p = json!({"task": id("task", &self.task), "kind": "packet", "head": head,
-            "base": self.base, "model": t["model"], "effort": t["effort"], "prompt": prompt,
-            "prompt_sha256": digest(text.as_bytes()), "unit": self.unit_id(), "round": v.rounds() + 1,
-            "repository": self.repo, "pull_request": number});
+        // The tier is the policy's: a model or an effort that is no text ends the form before the start.
+        let name = actions::StartUnitReview::NAME;
+        let word = |k: &str| t[k].as_str().map(str::to_owned);
+        let word = |k: &str| word(k).ok_or_else(|| error("store_answer_unreadable", name));
+        let action = actions::StartUnitReview {
+            base: Some(values::CommitOrDigest(self.base.clone())),
+            effort: word("effort")?,
+            head: values::CommitOrDigest(head.to_owned()),
+            intent: None,
+            kind: values::ReviewKind::Packet,
+            model: word("model")?,
+            prompt: values::FilePath(prompt.clone()),
+            prompt_sha256: values::Sha256Hex(digest(text.as_bytes())),
+            pull_request: Some(store::integer(number, name)?),
+            repository: Some(self.repo.clone()),
+            round: Some(store::integer(v.rounds() + 1, name)?),
+            runs: None,
+            task: Id::new(&self.task),
+            unit: Some(Id::new(&self.key)),
+        };
         let rid = self.rid();
-        let body = store::body(
-            &Actor {
-                agent: "ap-unit",
-                session: &self.session,
-                role: "dispatch",
-            },
-            "start_unit_review",
-            rid,
-            p,
-        );
+        let actor = Actor {
+            agent: "ap-unit",
+            session: &self.session,
+            role: "dispatch",
+        };
+        let call = actor.call(rid);
         let mut req = self.stage(&self.verifier, "reviewer", "verifier", (&prompt, ""));
         (req["ont_role"], req["expect"]) = (json!("verifier"), json!({"first_line": "Verdict: *"}));
         (req["limits"], req["env"]) = self.limits(s, n, false, false, &files)?;
@@ -1863,17 +1940,17 @@ impl Run {
         } else if self.pc_free(s, &req, &files) {
             req["host"] = json!("pc");
         }
-        let review = self.start_review(s, &body, &mut req)?;
+        let review = self.start_review(s, (&call, &action), &mut req)?;
         let out = req["out"].as_str().unwrap_or_default().to_owned();
         let rec = match crate::run::execute(s, &req) {
             Ok((rec, _)) => rec,
             Err(f) => {
-                self.close(s, &review, json!({"verdict": "abandoned"}))?;
+                self.close(s, &review, Closing::abandoned(None))?;
                 return Err(refused(f));
             }
         };
         let session = session(&rec).map(str::to_owned);
-        let abandon = json!({"verdict": "abandoned", "session": session});
+        let abandon = || Closing::abandoned(session.clone());
         // A verifier that wrote or pushed becomes a writer before the unit stops; a read that fails
         // closes the review first (R20).
         let read = self
@@ -1882,12 +1959,12 @@ impl Run {
         let (t, (state, now)) = match read {
             Ok(read) => read,
             Err(h) => {
-                self.close(s, &review, abandon)?;
+                self.close(s, &review, abandon())?;
                 return Err(h);
             }
         };
         if !t.clean || t.head != head || now != head || !t.on_branch || state != "OPEN" {
-            self.close(s, &review, abandon)?;
+            self.close(s, &review, abandon())?;
             self.record_head(s, number, &now, session.as_deref())?;
             let detail = json!({"review": review, "head": now, "worktree": t.shown()});
             return stop("verifier_wrote", detail);
@@ -1904,7 +1981,7 @@ impl Run {
         };
         let head_line = super::names_head(lines.next(), head);
         let Some(verdict) = verdict.filter(|_| rec["state"] == "ok" && named && head_line) else {
-            self.close(s, &review, abandon)?;
+            self.close(s, &review, abandon())?;
             return stop(
                 "verifier_failed",
                 json!({"review": review, "state": rec["state"]}),
@@ -1913,12 +1990,14 @@ impl Run {
         let account = rec["account"]
             .as_str()
             .and_then(|a| Path::new(a).file_name()?.to_str());
-        let mut p =
-            json!({"verdict": verdict, "session": session, "report": out, "report_sha256": sha});
-        if let Some(a) = account.filter(|a| a.len() <= 40) {
-            p["account"] = json!(a);
-        }
-        if !self.close(s, &review, p)? {
+        let closing = Closing {
+            verdict,
+            session: session.clone(),
+            report: Some(out.clone()),
+            sha: Some(sha),
+            account: account.filter(|a| a.len() <= 40).map(str::to_owned),
+        };
+        if !self.close(s, &review, closing)? {
             let detail = json!({"review": review, "cause": "writer_cannot_review"});
             return stop("verifier_failed", detail);
         }
@@ -2008,8 +2087,12 @@ impl Run {
         }
         // The store compares by the second: the carried review starts after the one it carries.
         self.past(s, &started)?;
-        let p = json!({"review": id("review", &from), "unit": self.unit_id(), "head": head});
-        let applied = match self.apply(s, "carry_review", p) {
+        let action = actions::CarryReview {
+            head: values::CommitOrDigest(head.to_owned()),
+            review: Id::new(&from),
+            unit: Id::new(&self.key),
+        };
+        let applied = match self.apply(s, &action) {
             Ok(a) => a,
             Err(f) if f.code == store::REFUSED => return Ok(None),
             Err(f) => return Err(f.into()),
@@ -2018,7 +2101,8 @@ impl Run {
             .made("review")
             .and_then(|i| i["native_key"].as_str());
         let made = made.filter(|k| key_ok(k)).map(str::to_owned);
-        let review = made.ok_or_else(|| error("store_answer_unreadable", "carry_review"))?;
+        let review =
+            made.ok_or_else(|| error("store_answer_unreadable", actions::CarryReview::NAME))?;
         let mut text = format!(
             "# The accept of {judged} carried to {head}\n\nUnit: {key}\nAccepted head: {judged}\nIts review: {from}\nHead now: {head}\nCarried review: {review}\n\nUpdates, the base each merged, oldest first:\n",
             key = self.key
@@ -2090,7 +2174,10 @@ impl Run {
     /// One second passes when the store's clock reads `floor` or earlier: the store writes and compares
     /// times by the second (R19, R37).
     fn past(&mut self, s: &mut impl System, floor: &str) -> Step {
-        let read = at(store::head_now(s, self.store(), "unit", &self.key), "unit")?;
+        let read = at(
+            store::head_now_of::<objects::Unit>(s, self.store(), &self.key),
+            "unit",
+        )?;
         let now = read.and_then(|(_, _, n)| n);
         let read_at = now.map(|n| crate::run::stamp(UNIX_EPOCH + Duration::from_secs(n)));
         if read_at.is_none_or(|t| t.as_str() <= floor) {
@@ -2187,8 +2274,11 @@ impl Run {
                 },
             };
             if verdict == "accept" {
-                let p = json!({"unit": self.unit_id(), "head": head});
-                self.apply(s, "accept_unit", p)?;
+                let accepted = actions::AcceptUnit {
+                    head: values::CommitOrDigest(head.to_string()),
+                    unit: Id::new(&self.key),
+                };
+                self.apply(s, &accepted)?;
                 self.reread(s)?;
                 // A `plain` unit goes on to its merge in this call (R18, R30).
                 if self.u["class"] != "plain" {
@@ -2313,8 +2403,8 @@ impl Run {
                     return stop("github_unreadable", "mergeCommit");
                 };
                 let rid = self.rid();
-                let p = self.merge_parameters(&head, commit);
-                self.record_merge(s, rid, p).map(Some)
+                let action = self.merge_action(&head, commit)?;
+                self.record_merge(s, rid, action).map(Some)
             }
             "OPEN" if *now != *head => self.reopen(s, "head_moved").map(|()| None),
             "OPEN" if !self.contains_base(s, &head) => self.reopen(s, "main_moved").map(|()| None),
@@ -2330,11 +2420,12 @@ impl Run {
     }
     /// `reopen_unit` with `cause`; the store's refusal ends the call with the unit `accepted` (R30).
     fn reopen(&mut self, s: &mut impl System, cause: &str) -> Step {
-        let mut p = json!({"unit": self.unit_id(), "cause": cause});
-        if self.u["lane"] == "objective" {
-            p["intent"] = self.u["intent"].clone();
-        }
-        match self.apply(s, "reopen_unit", p) {
+        let action = actions::ReopenUnit {
+            cause: cause.to_owned(),
+            intent: self.intent(actions::ReopenUnit::NAME)?,
+            unit: Id::new(&self.key),
+        };
+        match self.apply(s, &action) {
             Err(f) if f.code == store::REFUSED => stop(&store::code(&f), f.detail),
             other => {
                 other?;
@@ -2342,25 +2433,27 @@ impl Run {
             }
         }
     }
-    fn merge_parameters(&self, head: &str, commit: &str) -> Value {
-        let mut p = json!({"unit": self.unit_id(), "head": head, "merged_commit": commit});
-        if self.u["lane"] == "objective" {
-            p["intent"] = self.u["intent"].clone();
-        }
-        p
+    fn merge_action(&self, head: &str, commit: &str) -> Result<actions::MergeUnit, Failure> {
+        Ok(actions::MergeUnit {
+            head: values::CommitOrDigest(head.to_owned()),
+            intent: self.intent(actions::MergeUnit::NAME)?,
+            merged_commit: values::CommitOrDigest(commit.to_owned()),
+            unit: Id::new(&self.key),
+        })
     }
     /// The merge: `merge_unit` validated, the status `lead-review`, the merge with the head pinned,
     /// read back, then `merge_unit` applied with the merge commit (R31).
     fn merge(&mut self, s: &mut impl System, n: u64, head: &str) -> Step<Outcome> {
         let rid = self.rid();
-        let p = self.merge_parameters(head, &"0".repeat(40));
+        let action = self.merge_action(head, &"0".repeat(40))?;
         let actor = Actor {
             agent: "ap-unit",
             session: &self.session,
             role: "dispatch",
         };
-        let body = store::body(&actor, "merge_unit", rid.clone(), p);
-        let checked = at(store::validate(s, self.store(), &body), "merge_unit")?;
+        let call = actor.call(rid.clone());
+        let validated = store::validate_action(s, self.store(), &call, &action);
+        let checked = at(validated, actions::MergeUnit::NAME)?;
         if let Some(detail) = not_valid(&checked) {
             let code = detail["failed"][0]
                 .as_str()
@@ -2405,17 +2498,22 @@ impl Run {
             let _ = review::post(s, &target, "failure", "merge failed");
             return said("merge_failed", json!({"head": head}), reply);
         };
-        let p = self.merge_parameters(head, &commit);
-        self.record_merge(s, rid, p)
+        let action = self.merge_action(head, &commit)?;
+        self.record_merge(s, rid, action)
     }
     /// `merge_unit` applied, then the cleanup; the store's refusal leaves the unit as it reads (R30,
     /// R31, R35).
-    fn record_merge(&mut self, s: &mut impl System, rid: String, p: Value) -> Step<Outcome> {
+    fn record_merge(
+        &mut self,
+        s: &mut impl System,
+        rid: String,
+        action: actions::MergeUnit,
+    ) -> Step<Outcome> {
         let mut out = Outcome {
-            merged_commit: p["merged_commit"].as_str().map(str::to_owned),
+            merged_commit: Some(action.merged_commit.0.clone()),
             ..Outcome::default()
         };
-        match self.apply_as(s, "merge_unit", rid, p) {
+        match self.apply_as(s, rid, &action) {
             Err(f) if f.code == store::REFUSED => out.refused = Some(store::code(&f)),
             Err(f) => return Err(f.into()),
             Ok(_) => {
@@ -2649,29 +2747,32 @@ pub fn decide(
     }
     let (directory, _) = units(&policy_of(s))?;
     let (_, _lock) = locked(&directory, key)?;
-    let u = at(store::get(s, store, "unit", key), "unit")?;
+    let u = at(store::get_of::<objects::Unit>(s, store, key), "unit")?;
     let u = u.ok_or_else(|| error("unknown_unit", "unit"))?;
     let intent = u["intent"]["native_key"].as_str();
     let intent = intent.ok_or_else(|| error("no_intent", "unit"))?;
-    let read = at(store::head(s, store, "intent", intent), "intent")?;
+    let read = at(
+        store::head_of::<objects::Intent>(s, store, intent),
+        "intent",
+    )?;
     let (revision, i) = read.ok_or_else(|| error("unknown_intent", "intent"))?;
     if i["lead_session"].as_str() != Some(actor.session) {
         return Err(fail("not_the_lead", "session", i["lead_session"].clone()));
     }
-    let unit = id("unit", key);
     if approve {
-        let lead = Lead {
-            intent: u["intent"].clone(),
-            revision,
+        let action = actions::ApproveUnit {
+            head: values::CommitOrDigest(head.unwrap_or_default().to_owned()),
+            reason: reason.to_owned(),
+            unit: Id::new(key),
         };
-        let p = json!({"unit": unit, "head": head, "reason": reason});
-        let rid = format!("{rid}-approve");
-        let applied = at(
-            store::approve_unit(s, store, &actor, rid, p, &lead),
-            "approve",
-        )?;
+        // The Lead's apply carries the intent's revision as `expected`.
+        let call = work::Call {
+            expected: vec![(u["intent"].clone(), revision)],
+            ..actor.call(format!("{rid}-approve"))
+        };
+        let applied = at(store::apply_action(s, store, &call, &action), "approve")?;
         *after = Some("approve".into());
-        let back = at(store::get(s, store, "unit", key), "unit")?.unwrap_or_default();
+        let back = at(store::get_of::<objects::Unit>(s, store, key), "unit")?.unwrap_or_default();
         return Ok(
             json!({"unit": key, "outcome": applied.outcome, "state": back["state"],
             "approved_head": back["approved_head"]}),
@@ -2681,15 +2782,24 @@ pub fn decide(
     if u["approved_head"].is_string() && u["approved_head"] == u["head"] {
         return Err(fail("approved", "unit", u["head"].clone()));
     }
-    let mut p = json!({"unit": unit, "cause": "rejected by the Lead"});
-    if u["lane"] == "objective" {
-        p["intent"] = u["intent"].clone();
-    }
-    let reopened = store::unit_action(s, store, &actor, "reopen_unit", format!("{rid}-reopen"), p);
+    let intent = match u["lane"] == "objective" {
+        true => store::id_of(&u["intent"], actions::ReopenUnit::NAME)?,
+        false => None,
+    };
+    let reopen = actions::ReopenUnit {
+        cause: "rejected by the Lead".to_owned(),
+        intent,
+        unit: Id::new(key),
+    };
+    let reopened = store::apply_action(s, store, &actor.call(format!("{rid}-reopen")), &reopen);
     at(reopened, "reopen")?;
     *after = Some("reopen".into());
-    let p = json!({"unit": unit, "cause": "lead_rejected", "detail": reason});
-    let stopped = store::unit_action(s, store, &actor, "stop_unit", format!("{rid}-stop"), p);
+    let stop = actions::StopUnit {
+        cause: "lead_rejected".to_owned(),
+        detail: Some(reason.to_owned()),
+        unit: Id::new(key),
+    };
+    let stopped = store::apply_action(s, store, &actor.call(format!("{rid}-stop")), &stop);
     let applied = at(stopped, "stop")?;
     *after = Some("stop".into());
     let mut posted = Value::Null;
@@ -2706,7 +2816,7 @@ pub fn decide(
             "not_posted"
         });
     }
-    let back = at(store::get(s, store, "unit", key), "unit")?.unwrap_or_default();
+    let back = at(store::get_of::<objects::Unit>(s, store, key), "unit")?.unwrap_or_default();
     Ok(
         json!({"unit": key, "outcome": applied.outcome, "state": back["state"],
         "lead_review": posted}),

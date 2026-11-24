@@ -1,9 +1,25 @@
 //! Every call of `ap request`, `ap intent`, `ap status`, the stage runner and the unit object (`ap unit
 //! add|amend|ready|drop|page|review`) to the store engine `ont`: one function per action they apply and one
 //! per read. An answer `store_busy` is asked again up to five times after a short wait; nothing else is. Also the request form both verbs share: the arguments, the members and their shapes.
+//! The forms of `ap unit` apply and validate the typed actions of the module `work` (`apply_action`, `validate_action`,
+//! `close_run_action`) and read an object by its type (`get_of`, `head_of`, `head_now_of`, `search_of`).
 use crate::host::{Failure, LIMIT, System, error, fail, id, ont_within};
 use serde_json::{Map, Value, json};
 use std::{ffi::OsString, io::Read, time::Duration};
+
+// The module generated from `ontology/work.schema.json` by `crates/ap/build.rs` is written for edition 2024 and
+// names outside items only under `::std` and `::serde_json`: the crate takes `edition.workspace = true` (the root
+// sets 2024) and `serde_json.workspace = true`, and no manifest line changes for it.
+#[allow(
+    clippy::allow_attributes_without_reason,
+    reason = "the generated module opens with an allow without a reason (specs/ont/gen.md R3); an allow on the include! does not reach the included text, the one on this enclosing module does, and covers nothing else of this file"
+)]
+mod generated {
+    include!(concat!(env!("OUT_DIR"), "/work.rs"));
+}
+/// The typed module of the schema `work`: its objects, properties, values and actions (`crate::store::work`;
+/// the crate root has a module `work` of its own, the verb).
+pub use generated::work;
 
 /// The code of a refusal of the store; the refusal object is the failure's `detail`.
 pub const REFUSED: &str = "store_refused";
@@ -20,6 +36,18 @@ pub struct Actor<'a> {
     pub agent: &'a str,
     pub session: &'a str,
     pub role: &'a str,
+}
+impl Actor<'_> {
+    /// The call of an action by this actor with the request id `request_id`, without `expected`.
+    pub fn call(&self, request_id: String) -> work::Call {
+        work::Call {
+            request_id: Some(request_id),
+            agent: Some(self.agent.to_owned()),
+            session: Some(self.session.to_owned()),
+            role: Some(self.role.to_owned()),
+            expected: vec![],
+        }
+    }
 }
 /// The role `lead` of an apply, with the revision of the intent it was decided on: the apply passes it
 /// as `expected`, so an intent changed since (a Lead renamed) ends `revision_conflict`.
@@ -159,6 +187,89 @@ fn applied(v: &Value) -> Result<Applied, Failure> {
         _ => Err(error("store_answer_unreadable", "action")),
     }
 }
+/// The module's engine over the call path of `ont`: the words of the command, `--client ap` after `action apply` and
+/// `action validate`, `--store` where `ont_within` puts it, and the `(retries, milliseconds)` of the call.
+struct Ont<'a, S: System> {
+    s: &'a mut S,
+    store: Option<&'a str>,
+    within: (usize, u64),
+}
+impl<S: System> work::Engine for Ont<'_, S> {
+    type Error = Failure;
+    fn call(&mut self, command: work::Command, request: Value) -> Result<Value, Failure> {
+        let mut words = command.argv();
+        if matches!(
+            command,
+            work::Command::ActionApply | work::Command::ActionValidate
+        ) {
+            words.extend(["--client", "ap"]);
+        }
+        call_in(self.s, self.store, &words, &request, self.within)
+    }
+}
+/// An action applied by the module's `apply`, bound as `call`: 30 seconds, and up to five more calls on
+/// `store_busy`. Its answer is read as `applied` reads it.
+pub fn apply_action<A: work::Action>(
+    s: &mut impl System,
+    store: Option<&str>,
+    call: &work::Call,
+    action: &A,
+) -> Result<Applied, Failure> {
+    let within = (RETRIES, 30_000);
+    let v = work::apply(&mut Ont { s, store, within }, action, call)?;
+    applied(&v)
+}
+/// An action validated by the module's `validate`, bound as `call`: the engine's answer as it gives it.
+pub fn validate_action<A: work::Action>(
+    s: &mut impl System,
+    store: Option<&str>,
+    call: &work::Call,
+    action: &A,
+) -> Result<Value, Failure> {
+    let within = (RETRIES, 30_000);
+    work::validate(&mut Ont { s, store, within }, action, call)
+}
+/// The `close_run` of a stage of `ap unit` as `once` sends it: the agent `ap-run` claiming the role `dispatch`,
+/// without a session, one attempt of 15 seconds.
+pub fn close_run_action(
+    s: &mut impl System,
+    store: Option<&str>,
+    request_id: String,
+    action: &work::actions::CloseRun,
+) -> Result<Applied, Failure> {
+    let call = work::Call {
+        request_id: Some(request_id),
+        agent: Some("ap-run".to_owned()),
+        role: Some("dispatch".to_owned()),
+        ..work::Call::default()
+    };
+    let within = (0, 15_000);
+    let v = work::apply(&mut Ont { s, store, within }, action, &call)?;
+    applied(&v)
+}
+/// The bytes of the request an action makes (`specs/ap/unit.md` R8): `action_type`, `request_id`, `agent`,
+/// `session`, `role` and the `parameters` of the action, without `expected`.
+pub fn request_bytes<A: work::Action>(call: &work::Call, action: &A) -> usize {
+    let body = json!({"action_type": A::NAME, "request_id": call.request_id, "agent": call.agent,
+        "session": call.session, "role": call.role, "parameters": action.parameters()});
+    serde_json::to_vec(&body).map_or(usize::MAX, |b| b.len())
+}
+/// The integer a number read from the store, a file or another program holds for a member the module types
+/// `i64`; one it cannot hold is `store_answer_unreadable`, named by the action.
+pub fn integer(n: impl TryInto<i64>, action: &str) -> Result<i64, Failure> {
+    n.try_into()
+        .map_err(|_| error("store_answer_unreadable", action))
+}
+/// The id of type `T` a value read from the store holds for a member the module types `Id`: an absent or null
+/// value is none; another that `Id::from_value` does not read is `store_answer_unreadable`, named by the action.
+pub fn id_of<T: work::ObjectType>(v: &Value, action: &str) -> Result<Option<work::Id<T>>, Failure> {
+    match v {
+        Value::Null => Ok(None),
+        v => work::Id::from_value(v)
+            .map(Some)
+            .ok_or_else(|| error("store_answer_unreadable", action)),
+    }
+}
 /// The stage runner's own action (`specs/ap/run-object.md`): one attempt bound to 15 seconds, as the
 /// agent `ap-run` claiming `claim` (`dispatch`, or `api` for `ap api batch`), with the stage's `role` as
 /// the parameter of the run.
@@ -296,9 +407,6 @@ macro_rules! actions {
     )*};
 }
 actions!(
-    add_unit,
-    amend_unit,
-    drop_unit,
     draft_intent,
     amend_intent,
     note_intent,
@@ -309,8 +417,7 @@ actions!(
     waive_criterion,
     close_intent,
     retire_intent,
-    end_delegation,
-    close_unit_review
+    end_delegation
 );
 // Schema version 17 on: the actions of `ap resource` (`specs/ap/resource.md` R5, R8).
 actions!(declare_host, observe_host, observe_account);
@@ -327,18 +434,8 @@ pub fn unit_action(
 ) -> Result<Applied, Failure> {
     apply(s, store, actor, action, rid, p)
 }
-/// `ap unit approve`: the Lead's approval of a unit's accepted head, with the role `lead`.
-pub fn approve_unit(
-    s: &mut impl System,
-    store: Option<&str>,
-    actor: &Actor,
-    rid: String,
-    p: Value,
-    lead: &Lead,
-) -> Result<Applied, Failure> {
-    apply_as(s, store, actor, "approve_unit", rid, p, Some(lead))
-}
-/// The Lead proceeds on a draft: with `approve_unit`, the actions that also carry the intent's revision as `expected`.
+/// The Lead proceeds on a draft: with `confirm_intent_delegated`, the actions that also carry the intent's revision as
+/// `expected`.
 pub fn assume_intent(
     s: &mut impl System,
     store: Option<&str>,
@@ -371,29 +468,6 @@ pub fn confirm_intent_delegated(
 /// reads the key its start will make); its answer as the engine gives it.
 pub fn validate(s: &mut impl System, store: Option<&str>, body: &Value) -> Result<Value, Failure> {
     call(s, store, &["action", "validate", "--client", "ap"], body)
-}
-/// Schema version 11 on: a review of a unit's page or an intent's plan started, the whole request
-/// (with `expected` for a page) as `validate` was given it.
-pub fn start_unit_review(
-    s: &mut impl System,
-    store: Option<&str>,
-    body: &Value,
-) -> Result<Applied, Failure> {
-    send(s, store, body)
-}
-/// `ready_unit` with the actor's role, with the unit's id and the revision it was read at as `expected`: a
-/// unit changed since that read ends `revision_conflict`.
-pub fn ready_unit(
-    s: &mut impl System,
-    store: Option<&str>,
-    actor: &Actor,
-    rid: String,
-    p: Value,
-    revision: &str,
-) -> Result<Applied, Failure> {
-    let mut body = body(actor, "ready_unit", rid, p);
-    body["expected"] = json!([{"id": body["parameters"]["unit"], "revision": revision}]);
-    send(s, store, &body)
 }
 /// The native keys of the rows of a view (`ont render`), read from the first column (`Key`) of the
 /// table it renders, the cell unescaped (`\|`, `\\`); a truncated rendering, or one whose rows differ from its
@@ -495,6 +569,38 @@ pub fn get(
     key: &str,
 ) -> Result<Option<Value>, Failure> {
     Ok(head(s, store, kind, key)?.map(|(_, fields)| fields))
+}
+/// `get` of the object of type `T` with native key `key`.
+pub fn get_of<T: work::ObjectType>(
+    s: &mut impl System,
+    store: Option<&str>,
+    key: &str,
+) -> Result<Option<Value>, Failure> {
+    get(s, store, T::NAME, key)
+}
+/// `head` of the object of type `T` with native key `key`.
+pub fn head_of<T: work::ObjectType>(
+    s: &mut impl System,
+    store: Option<&str>,
+    key: &str,
+) -> Result<Option<(String, Value)>, Failure> {
+    head(s, store, T::NAME, key)
+}
+/// `head_now` of the object of type `T` with native key `key`.
+pub fn head_now_of<T: work::ObjectType>(
+    s: &mut impl System,
+    store: Option<&str>,
+    key: &str,
+) -> Result<Option<(String, Value, Option<u64>)>, Failure> {
+    head_now(s, store, T::NAME, key)
+}
+/// `search` of the objects of type `T`.
+pub fn search_of<T: work::ObjectType>(
+    s: &mut impl System,
+    store: Option<&str>,
+    all: Vec<Value>,
+) -> Result<Vec<Found>, Failure> {
+    search(s, store, T::NAME, all)
 }
 /// The revision of the head of one object and its fields, as `get` reads them.
 pub fn head(
@@ -701,20 +807,6 @@ pub fn around(
     }
     let matched = r["basis"]["matched"].as_u64().ok_or_else(unreadable)?;
     Ok((found, matched))
-}
-/// `amend_unit` with the actor's role, with the unit's id and the revision it was read at as `expected`
-/// (`specs/ap/unit.md` R42): a unit changed since that read ends `revision_conflict`.
-pub fn amend_unit_at(
-    s: &mut impl System,
-    store: Option<&str>,
-    actor: &Actor,
-    rid: String,
-    p: Value,
-    revision: &str,
-) -> Result<Applied, Failure> {
-    let mut body = body(actor, "amend_unit", rid, p);
-    body["expected"] = json!([{"id": body["parameters"]["unit"], "revision": revision}]);
-    send(s, store, &body)
 }
 /// `ont index` of the named sources (`specs/ap/route.md` R13), bound to `ms`: the engine's answer whether every
 /// source held (`status` `ok`) or one failed (`source_failed`, each source's own `status`, `code` and `cause`);
@@ -976,4 +1068,25 @@ pub fn input(argv: &[OsString], text_op: &str) -> Result<(Option<String>, bool, 
         return Err(error("usage", "args"));
     }
     Ok((store, text, r))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::work;
+    use sha2::{Digest, Sha256};
+
+    /// The module is the one of the schema of this tree: its version, its SHA-256 and its domain.
+    #[test]
+    fn the_module_is_generated_from_the_schema_of_this_tree() {
+        let file = concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../ontology/work.schema.json"
+        );
+        let bytes = std::fs::read(file).unwrap_or_default();
+        assert!(!bytes.is_empty(), "the schema is read");
+        let schema: serde_json::Value = serde_json::from_slice(&bytes).unwrap_or_default();
+        assert_eq!(Some(work::VERSION), schema["version"].as_u64());
+        assert_eq!(work::SHA256, format!("{:x}", Sha256::digest(&bytes)));
+        assert_eq!(work::DOMAIN, "work");
+    }
 }

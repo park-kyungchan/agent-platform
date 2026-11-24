@@ -3,7 +3,8 @@
 //! `close_unit_review` (`specs/ap/unit-review.md`).
 use super::object::{self, clone_of};
 use super::render::{self, Role};
-use crate::host::{Failure, Host, System, digest, error, fail, id};
+use crate::host::{Failure, Host, System, digest, error, fail};
+use crate::store::work::{self, Id, actions, objects, properties, values};
 use crate::store::{self, Actor, Found, at, bad, only, shaped, sized};
 use serde_json::{Map, Value, json};
 use std::{
@@ -72,8 +73,15 @@ struct Look<'a> {
     dir: PathBuf,
 }
 impl Look<'_> {
+    fn review_kind(&self) -> values::ReviewKind {
+        if self.page {
+            values::ReviewKind::Page
+        } else {
+            values::ReviewKind::Plan
+        }
+    }
     fn kind(&self) -> &'static str {
-        if self.page { "page" } else { "plan" }
+        self.review_kind().as_str()
     }
     fn member(&self) -> &'static str {
         if self.page { "unit" } else { "intent" }
@@ -367,13 +375,20 @@ fn reviews(s: &mut impl System, look: &Look) -> Result<Vec<Found>, Failure> {
             "reviews",
         )?;
         for k in keys {
-            if let Some(v) = at(store::get(s, look.store, "review", &k), "reviews")? {
+            if let Some(v) = at(
+                store::get_of::<objects::Review>(s, look.store, &k),
+                "reviews",
+            )? {
                 list.push((k, v));
             }
         }
     } else {
-        let all = vec![json!({"eq": ["kind", "plan"]})];
-        list = at(store::search(s, look.store, "review", all), "reviews")?;
+        let kind = properties::Review::Kind.name();
+        let all = vec![json!({"eq": [kind, values::ReviewKind::Plan.as_str()]})];
+        list = at(
+            store::search_of::<objects::Review>(s, look.store, all),
+            "reviews",
+        )?;
     }
     list.retain(|(_, v)| look.of(v));
     let order = |(k, v): &Found| {
@@ -436,10 +451,11 @@ fn look_at(
             stage.insert(k.to_owned(), v.clone());
         }
     }
-    let read = at(
-        store::head(s, look.store, look.member(), look.key),
-        look.member(),
-    );
+    let read = match look.page {
+        true => store::head_of::<objects::Unit>(s, look.store, look.key),
+        false => store::head_of::<objects::Intent>(s, look.store, look.key),
+    };
+    let read = at(read, look.member());
     let unknown = if look.page {
         "unknown_unit"
     } else {
@@ -590,19 +606,36 @@ fn look_at(
         .map_err(|_| io("the prompt cannot be written"))?;
     let prompt = prompt.to_string_lossy().into_owned();
     // ONE validate of the start names the review's key before anything is written (R10, R11).
-    let mut p = json!({"task": id("task", task), "kind": look.kind(), "head": head, "model": model,
-        "effort": effort, "prompt": prompt, "prompt_sha256": digest(text.as_bytes()),
-        look.member(): id(look.member(), look.key), "round": round});
-    if let Some(r) = &repository {
-        p["repository"] = json!(r);
-    }
+    let action = actions::StartUnitReview {
+        base: None,
+        effort,
+        head: values::CommitOrDigest(head.clone()),
+        intent: (!look.page).then(|| Id::new(look.key)),
+        kind: look.review_kind(),
+        model,
+        prompt: values::FilePath(prompt.clone()),
+        prompt_sha256: values::Sha256Hex(digest(text.as_bytes())),
+        pull_request: None,
+        repository: repository.clone(),
+        round: Some(store::integer(
+            round,
+            <actions::StartUnitReview as work::Action>::NAME,
+        )?),
+        runs: None,
+        task: Id::new(task),
+        unit: look.page.then(|| Id::new(look.key)),
+    };
     let rid = format!("{}-start", look.rid);
-    let mut body = store::body(&look.actor, "start_unit_review", rid, p);
-    if look.page {
-        body["expected"] = json!([{"id": id("unit", look.key), "revision": revision}]);
-    }
+    let expected = match look.page {
+        true => vec![(Id::<objects::Unit>::new(look.key).to_value(), revision)],
+        false => vec![],
+    };
+    let call = work::Call {
+        expected,
+        ..look.actor.call(rid)
+    };
     let refused = |s: &mut _, f| started_refusal(s, look, &head, f);
-    let v = match store::validate(s, look.store, &body) {
+    let v = match store::validate_action(s, look.store, &call, &action) {
         Ok(v) => v,
         Err(f) => return Err(refused(s, f)),
     };
@@ -670,7 +703,7 @@ fn look_at(
         false => f,
     })?;
     trace.sent = true;
-    let applied = match store::start_unit_review(s, look.store, &body) {
+    let applied = match store::apply_action(s, look.store, &call, &action) {
         Ok(a) => a,
         Err(f) => {
             trace.sent = f.code != store::REFUSED;
@@ -726,10 +759,10 @@ fn started_refusal(s: &mut impl System, look: &Look, head: &str, mut f: Failure)
     }
     if store::code(&f) == "duplicate_running_review" {
         let all = vec![
-            json!({"eq": ["kind", look.kind()]}),
-            json!({"eq": ["status", "running"]}),
+            json!({"eq": [properties::Review::Kind.name(), look.kind()]}),
+            json!({"eq": [properties::Review::Status.name(), "running"]}),
         ];
-        let found = store::search(s, look.store, "review", all).unwrap_or_default();
+        let found = store::search_of::<objects::Review>(s, look.store, all).unwrap_or_default();
         let running = found
             .into_iter()
             .find(|(_, v)| look.of(v) && v["head"] == head);
@@ -806,26 +839,18 @@ fn close(
     suffix: &'static str,
     trace: &mut Trace,
 ) -> Result<(), Failure> {
-    let params = |e: &Ending| {
-        let mut p =
-            json!({"review": id("review", review), "verdict": e.verdict, "session": e.session});
-        let named = [
-            ("report", &e.report),
-            ("report_sha256", &e.sha),
-            ("account", &e.account),
-        ];
-        for (k, v) in named {
-            if let Some(v) = v {
-                p[k] = json!(v);
-            }
-        }
-        if look.page {
-            p["unit"] = id("unit", look.key);
-        }
-        p
+    let params = |e: &Ending| actions::CloseUnitReview {
+        account: e.account.clone(),
+        report: e.report.clone().map(values::FilePath),
+        report_sha256: e.sha.clone().map(values::Sha256Hex),
+        review: Id::new(review),
+        session: Some(e.session.clone()),
+        unit: look.page.then(|| Id::new(look.key)),
+        verdict: values::ReviewVerdict(e.verdict.to_owned()),
     };
     let rid = format!("{}-{suffix}", look.rid);
-    let first = store::close_unit_review(s, look.store, &look.actor, rid.clone(), params(e));
+    let call = look.actor.call(rid);
+    let first = store::apply_action(s, look.store, &call, &params(e));
     let caller = look.actor.session;
     let writer = |f: &Failure| store::code(f) == "writer_cannot_review";
     match first {
@@ -837,7 +862,7 @@ fn close(
                 e.cause = Some("writer_cannot_review".into());
             }
             // A refused request id is not used: the same id carries the caller's session.
-            let again = store::close_unit_review(s, look.store, &look.actor, rid, params(e));
+            let again = store::apply_action(s, look.store, &call, &params(e));
             again.map_err(|f| match writer(&f) {
                 true => another(review, f),
                 false => named(f, suffix),
@@ -882,7 +907,10 @@ fn answer(
     }
     if look.page {
         // The page read again after the stage has another digest than the one reviewed (R21).
-        let unit = at(store::get(s, look.store, "unit", look.key), "unit")?;
+        let unit = at(
+            store::get_of::<objects::Unit>(s, look.store, look.key),
+            "unit",
+        )?;
         let during = unit.is_some_and(|u| render::page_digest(look.key, &u) != head);
         a["page_amended_during_review"] = json!(during);
     }
@@ -927,7 +955,7 @@ fn ended(
     discard: bool,
     trace: &mut Trace,
 ) -> Result<(Value, u8), Failure> {
-    let v = at(store::get(s, look.store, "review", key), which)?;
+    let v = at(store::get_of::<objects::Review>(s, look.store, key), which)?;
     let v = v.filter(|v| v["status"] == "running" && look.of(v));
     let v = v.ok_or_else(|| error("review_not_running", which))?;
     let out = look.out(key);
@@ -968,7 +996,7 @@ fn ended(
     let list = reviews_of(s, look, trace)?;
     let run_closed = close_run(s, look, rec, &record_path, &out);
     if run_closed == "applied" {
-        trace.after = Some("close_run");
+        trace.after = Some(<actions::CloseRun as work::Action>::NAME);
     }
     // The one working directory of that stage, before the close (R18).
     let wd = match rec {
@@ -1018,7 +1046,7 @@ fn close_run(
     let Some(run) = rec["run_object"]["key"].as_str() else {
         return Value::Null;
     };
-    match store::get(s, look.store, "run", run) {
+    match store::get_of::<objects::Run>(s, look.store, run) {
         Ok(Some(r)) if r["record"] == record => {}
         _ => return Value::Null,
     }
@@ -1026,15 +1054,25 @@ fn close_run(
         None | Some("running") => "killed",
         Some(state) => state,
     };
-    let mut p = json!({"run": id("run", run), "state": state});
-    if let Some(session) = rec["session"]
+    let session = rec["session"]
         .as_str()
-        .filter(|t| !t.is_empty() && t.len() <= 200)
-    {
-        p["session"] = json!(session);
-    }
+        .filter(|t| !t.is_empty() && t.len() <= 200);
+    let action = actions::CloseRun {
+        cache_read_tokens: None,
+        cache_write_tokens: None,
+        input_tokens: None,
+        limit: None,
+        output_tokens: None,
+        record: None,
+        run: Id::new(run),
+        served_by: None,
+        session: session.map(str::to_owned),
+        settled_usd_micros: None,
+        state: state.to_owned(),
+        stream: None,
+    };
     let rid = format!("run-{}-close", &digest(out.as_bytes())[..32]);
-    match store::close_run(s, look.store, (&rid, "reviewer", &p)) {
+    match store::close_run_action(s, look.store, rid, &action) {
         Ok(a) => json!(a.outcome),
         Err(f) => json!(store::code_of(&f)),
     }
@@ -1064,7 +1102,7 @@ fn dependencies(s: &mut impl System, store: Option<&str>, u: &Value) -> Result<S
     }
     let mut out = "\n## Pages of the dependencies\n".to_owned();
     for d in deps {
-        match at(store::get(s, store, "unit", d), "depends_on")? {
+        match at(store::get_of::<objects::Unit>(s, store, d), "depends_on")? {
             Some(dep) => {
                 let state = dep["state"].as_str().unwrap_or_default();
                 out.push_str(&format!("\n### {d}: {state}\n\n"));
@@ -1090,12 +1128,17 @@ fn plan(
             o.0.clone(),
         )
     };
-    let all = vec![eq("intent", id("intent", key))];
-    let mut criteria = at(store::search(s, store, "criterion", all), "criteria")?;
+    let subject = Id::<objects::Intent>::new(key).to_value();
+    let all = vec![eq(properties::Criterion::Intent.name(), subject)];
+    let mut criteria = at(
+        store::search_of::<objects::Criterion>(s, store, all),
+        "criteria",
+    )?;
     criteria.sort_by_key(by);
     // Both lanes: a unit of the lane `small` may name the intent too.
-    let all = vec![json!({"in": ["lane", ["small", "objective"]]})];
-    let mut units = at(store::search(s, store, "unit", all), "units")?;
+    let lanes = [values::UnitLane::Small, values::UnitLane::Objective].map(|l| l.as_str());
+    let all = vec![json!({"in": [properties::Unit::Lane.name(), lanes]})];
+    let mut units = at(store::search_of::<objects::Unit>(s, store, all), "units")?;
     units.retain(|(_, u)| u["intent"]["native_key"] == key && u["state"] != "dropped");
     let deps = |u: &Value| -> Vec<String> {
         let d = u["depends_on"].as_array().into_iter().flatten();
