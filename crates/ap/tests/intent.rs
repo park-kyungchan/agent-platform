@@ -33,9 +33,10 @@ fn refused(v: Value) -> Answer {
     v["status"] = json!("refused");
     reply(false, v)
 }
-const WRITERS: [&str; 13] = [
+const WRITERS: [&str; 14] = [
     "draft_intent",
     "amend_intent",
+    "answer_questions",
     "note_intent",
     "name_lead",
     "assume_intent",
@@ -213,6 +214,14 @@ impl F {
             "amend_intent" => {
                 need(open, "intent_closed");
                 need(p["outcome"] != "", "outcome_empty");
+            }
+            "answer_questions" => {
+                need(open, "intent_closed");
+                need(
+                    word("by", &["order", "decision", "answer"]),
+                    "by_not_the_users_word",
+                );
+                need(routed("by", &p["intent"]), "by_not_routed_here");
             }
             "note_intent" => need(open, "intent_closed"),
             "name_lead" => {
@@ -414,6 +423,7 @@ impl F {
                         s["confirmed_by"] = Value::Null;
                         s
                     }
+                    "answer_questions" => json!({"questions": p["questions"]}),
                     "note_intent" => json!({"notes": p["notes"]}),
                     "name_lead" => json!({"lead_session": p["session"], "lead_named_by": p["by"]}),
                     "assume_intent" => json!({"status": "assumed", "assumed_reason": p["reason"]}),
@@ -1914,4 +1924,215 @@ fn r22_only_the_schema_actions_of_the_verb_write() {
             .all(|c| ["action", "get", "search", "log"].contains(&c.0[0].as_str()))
     );
     assert_eq!(f.o("widget-report")["status"], "met");
+}
+
+/// A confirmed intent `widget-report` with three questions, the first answered, its Lead `s-lead`.
+fn asked() -> F {
+    let mut f = F::new();
+    let questions = json!([{"question": "Which?", "default": "a", "answer": "b"},
+        {"question": "When?", "default": "now"}, {"question": "Who?", "default": "me"}]);
+    run(&mut f, &with(draft(), json!({"questions": questions})));
+    f.route("q-name", "widget-report");
+    f.route("q-yes", "widget-report");
+    for q in [
+        with(
+            writer("lead", "l1"),
+            json!({"intent": "widget-report", "lead_session": "s-lead", "by": "q-name"}),
+        ),
+        with(
+            writer("confirm", "c1"),
+            json!({"intent": "widget-report", "by": "q-yes"}),
+        ),
+    ] {
+        run(&mut f, &q);
+    }
+    f.route("q-free", "widget-report");
+    f.calls.clear();
+    f.log.clear();
+    f
+}
+fn answer(rid: &str, answers: Value) -> Value {
+    with(
+        writer("answer", rid),
+        json!({"intent": "widget-report", "by": "q-free", "answers": answers}),
+    )
+}
+
+// spec: specs/ap/intent.md#R24
+#[test]
+fn r24_answer_questions_changes_only_the_named_answers_and_keeps_the_confirmation() {
+    let mut f = asked();
+    let before = f.o("widget-report").clone();
+    assert_eq!(before["status"], "confirmed");
+    let q = answer(
+        "a1",
+        json!([{"question": 3, "answer": "you"}, {"question": 2, "answer": "later"}]),
+    );
+    let v = run(&mut f, &q);
+    assert_eq!(
+        v,
+        json!({"intent": "widget-report", "outcome": "applied", "status": "confirmed"})
+    );
+    // One read, one apply, one read back.
+    assert_eq!(
+        f.names(),
+        ["get intent", "apply answer_questions", "get intent"]
+    );
+    let b = &f.applies()[0];
+    assert_eq!(b["request_id"], "a1-answer");
+    assert_eq!(
+        (&b["role"], &b["agent"], &b["session"]),
+        (&json!("lead"), &json!("lead"), &json!("s-lead"))
+    );
+    assert!(b.get("expected").is_none());
+    assert_eq!(
+        b["parameters"],
+        json!({"intent": oid("intent", "widget-report"), "by": oid("request", "q-free"),
+            "questions": [{"question": "Which?", "default": "a", "answer": "b"},
+                {"question": "When?", "default": "now", "answer": "later"},
+                {"question": "Who?", "default": "me", "answer": "you"}]})
+    );
+    // Nothing but the answers changed: the status and the confirmation are as they were.
+    let after = f.o("widget-report");
+    for k in [
+        "status",
+        "amended_at",
+        "confirmed_by",
+        "confirmed_delegated",
+        "confirmed_at",
+    ] {
+        assert_eq!(after[k], before[k], "{k}");
+    }
+    assert_eq!(after["questions"][1]["answer"], "later");
+    assert_eq!(after["questions"][0], before["questions"][0]);
+    // The same request repeated applies nothing again; an amendment still clears the confirmation.
+    assert_eq!(run(&mut f, &q)["outcome"], "already_applied");
+    let amend = with(
+        writer("amend", "m1"),
+        json!({"intent": "widget-report", "why": "w"}),
+    );
+    assert_eq!(run(&mut f, &amend)["status"], "draft");
+    assert!(f.o("widget-report")["confirmed_by"].is_null());
+}
+
+// spec: specs/ap/intent.md#R23
+#[test]
+fn r23_answer_questions_refuses_a_bad_shape_or_position_before_any_apply() {
+    let mut f = asked();
+    let one = json!({"question": 1, "answer": "x"});
+    // A shape the request itself breaks: no call at all.
+    for (answers, field) in [
+        (json!([]), "answers"),
+        (json!({"question": 1}), "answers"),
+        (json!([one, one, one, one, one, one]), "answers"),
+        (
+            json!([{"question": 0, "answer": "x"}]),
+            "answers.0.question",
+        ),
+        (
+            json!([{"question": "1", "answer": "x"}]),
+            "answers.0.question",
+        ),
+        (
+            json!([{"question": 1.5, "answer": "x"}]),
+            "answers.0.question",
+        ),
+        (
+            json!([{"question": -1, "answer": "x"}]),
+            "answers.0.question",
+        ),
+        (json!([{"question": 1}]), "answers.0.answer"),
+        (json!([{"question": 1, "answer": ""}]), "answers.0.answer"),
+        (
+            json!([{"question": 1, "answer": "é".repeat(301)}]),
+            "answers.0.answer",
+        ),
+        (
+            json!([{"question": 1, "answer": "x", "default": "y"}]),
+            "answers.0.default",
+        ),
+        (json!([one, {"question": 1, "answer": "y"}]), "answers"),
+    ] {
+        let e = refusal(&mut f, &answer("a1", answers.clone()));
+        assert_eq!(
+            (e.code.as_str(), e.field.as_str()),
+            ("invalid_input", field),
+            "{answers}"
+        );
+        assert!(e.after.is_none());
+        assert!(f.calls.is_empty(), "{answers}");
+    }
+    let e = refusal(&mut f, &without(answer("a1", json!([one])), "by"));
+    assert_eq!((e.code.as_str(), e.field.as_str()), ("invalid_input", "by"));
+    let e = refusal(
+        &mut f,
+        &with(answer("a1", json!([one])), json!({"extra": 1})),
+    );
+    assert_eq!(e.field, "extra");
+    assert!(f.calls.is_empty());
+    // 600 bytes are fine; a position the stored list does not have is refused after the read, before any apply.
+    let e = refusal(
+        &mut f,
+        &answer("a2", json!([one, {"question": 4, "answer": "x"}])),
+    );
+    assert_eq!(
+        (e.code.as_str(), e.field.as_str(), &e.detail),
+        ("invalid_input", "answers", &json!({"question": 4}))
+    );
+    assert!(e.after.is_none());
+    assert_eq!(f.names(), ["get intent"]);
+    assert!(f.log.is_empty());
+    let long = json!([{"question": 2, "answer": "x".repeat(600)}]);
+    assert_eq!(run(&mut f, &answer("a3", long))["outcome"], "applied");
+    // An intent the store does not have.
+    let e = refusal(
+        &mut f,
+        &with(answer("a4", json!([one])), json!({"intent": "nothing"})),
+    );
+    assert_eq!(
+        (e.code.as_str(), e.intent.as_deref()),
+        ("unknown_intent", Some("nothing"))
+    );
+}
+
+// spec: specs/ap/intent.md#R24
+#[test]
+fn r24_answer_questions_passes_on_the_store_refusals_and_ont_role_refuses_it() {
+    for (by, code) in [
+        ("q-stop", "by_not_the_users_word"),
+        ("q-two", "by_not_routed_here"),
+    ] {
+        let mut f = asked();
+        let q = with(
+            answer("a1", json!([{"question": 2, "answer": "x"}])),
+            json!({"by": by}),
+        );
+        let e = refusal(&mut f, &q);
+        assert_eq!((e.code.as_str(), e.after.as_deref()), (code, None), "{by}");
+        assert_eq!(f.o("widget-report")["questions"][1]["answer"], "");
+    }
+    let mut f = asked();
+    run(
+        &mut f,
+        &with(
+            writer("retire", "x1"),
+            json!({"intent": "widget-report", "reason": "r"}),
+        ),
+    );
+    let e = refusal(
+        &mut f,
+        &answer("a1", json!([{"question": 2, "answer": "x"}])),
+    );
+    assert_eq!(
+        (e.code.as_str(), e.after.as_deref()),
+        ("intent_closed", None)
+    );
+    let mut f = asked();
+    f.env = vec![("ONT_ROLE".into(), "lead".into())];
+    let e = refusal(
+        &mut f,
+        &answer("a1", json!([{"question": 2, "answer": "x"}])),
+    );
+    assert_eq!(e.code, "role_in_environment");
+    assert!(f.calls.is_empty());
 }
