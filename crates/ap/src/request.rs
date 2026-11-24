@@ -171,11 +171,11 @@ fn admitted(s: &impl System, path: &str) -> bool {
 fn require_none(r: &Value, k: &str) -> Result<(), Failure> {
     r.get(k).map_or(Ok(()), |_| Err(bad(k)))
 }
+/// A route: aside with its reason, or to the subject of type `kind` (`intent`, `unit`, `finding`, or `host` as an
+/// inherited route) with native key `key`.
 enum Route {
-    Intent(String),
+    To { kind: &'static str, key: String },
     Aside(String),
-    Unit(String),
-    Finding(String),
 }
 /// Exactly one of `intent` (an intent's key), `aside` (a reason of 1 to 600 bytes), `unit` (a unit's
 /// key) and `finding` (a finding's native key) of `v`.
@@ -190,15 +190,15 @@ fn route_of(v: &Value, at: &str) -> Result<Route, Failure> {
     let max = if way == "aside" { 600 } else { 512 };
     let value = sized(&v[way], &format!("{at}{way}"), max)?.to_owned();
     Ok(match way {
-        "intent" => Route::Intent(value),
         "aside" => Route::Aside(value),
-        "unit" => Route::Unit(value),
-        _ => Route::Finding(value),
+        "intent" => Route::To { kind: "intent", key: value },
+        "unit" => Route::To { kind: "unit", key: value },
+        _ => Route::To { kind: "finding", key: value },
     })
 }
-/// Before anything is applied: the intent a route names exists and is open.
+/// The intent a route names exists and is open (R12; R17 for an inherited route).
 fn check(s: &mut impl System, store: Option<&str>, route: &Route, f: &str) -> Result<(), Failure> {
-    let Route::Intent(key) = route else {
+    let Route::To { kind: "intent", key } = route else {
         return Ok(());
     };
     let intent =
@@ -216,37 +216,15 @@ fn apply_route(
     key: &str,
     route: &Route,
 ) -> Result<Applied, Failure> {
-    let (request, rid) = (id("request", key), format!("{rid}-route"));
+    let rid = format!("{rid}-route");
     at(
         match route {
-            Route::Intent(k) => store::route_request(
-                s,
-                store,
-                actor,
-                rid,
-                json!({"request": request, "intent": id("intent", k)}),
-            ),
-            Route::Aside(why) => store::set_request_aside(
-                s,
-                store,
-                actor,
-                rid,
-                json!({"request": request, "reason": why}),
-            ),
-            Route::Unit(k) => store::route_request_to_unit(
-                s,
-                store,
-                actor,
-                rid,
-                json!({"request": request, "unit": id("unit", k)}),
-            ),
-            Route::Finding(k) => store::route_request_to_finding(
-                s,
-                store,
-                actor,
-                rid,
-                json!({"request": request, "finding": id("finding", k)}),
-            ),
+            Route::To { kind, key: to } => {
+                let subject = store::subject_of(kind, to)
+                    .ok_or_else(|| error("route_unknown", "route"))?;
+                store::route_request(s, store, actor, rid, (key, subject))
+            }
+            Route::Aside(why) => store::set_request_aside(s, store, actor, rid, (key, why)),
         },
         "route",
     )
@@ -260,7 +238,8 @@ fn actor(r: &Value) -> Result<Actor<'_>, Failure> {
         role: "lead",
     })
 }
-/// The route a request had: to its intent, aside with its reason, or none.
+/// The route a request had: to its subject (a route written before version 24 names its intent, unit or
+/// finding), aside with its reason, or none.
 fn inherited(
     s: &mut impl System,
     store: Option<&str>,
@@ -279,12 +258,22 @@ fn inherited(
             .map(str::to_owned)
     };
     let held = |k: &str| text(k).ok_or_else(|| error("store_answer_unreadable", "supersedes"));
+    let to = |kind: &'static str| {
+        held(kind).map(|key| Some(Route::To { kind, key }))
+    };
     Ok(match old["route"].as_str() {
         Some("unrouted") => None,
-        Some("intent") => Some(Route::Intent(held("intent")?)),
+        Some("intent") => to("intent")?,
         Some("aside") => Some(Route::Aside(held("route_reason")?)),
-        Some("unit") => Some(Route::Unit(held("unit")?)),
-        Some("finding") => Some(Route::Finding(held("finding")?)),
+        Some("unit") => to("unit")?,
+        Some("finding") => to("finding")?,
+        Some("subject") => {
+            let kind = old["subject"]["object_type"].as_str().unwrap_or_default();
+            let key = old["subject"]["native_key"].as_str().unwrap_or_default();
+            let kind = ["intent", "unit", "finding", "host"].into_iter().find(|k| *k == kind);
+            let kind = kind.ok_or_else(|| error("store_answer_unreadable", "supersedes"))?;
+            Some(Route::To { kind, key: key.to_owned() })
+        }
         // Never read as unrouted (R24).
         _ => return Err(fail("route_unknown", "supersedes", old["route"].clone())),
     })
@@ -385,7 +374,14 @@ fn record(
         return Err(error("readback_differs", "words"));
     }
     let route = match (route, old) {
-        (None, Some(old)) => inherited(s, store, old)?,
+        (None, Some(old)) => {
+            let route = inherited(s, store, old)?;
+            // R17: the intent an inherited route names is checked as R12 does, after the supersede.
+            if let Some(route) = &route {
+                check(s, store, route, "route")?;
+            }
+            route
+        }
         (route, _) => route,
     };
     let routed = match route {
@@ -439,10 +435,20 @@ fn list(s: &mut impl System, store: Option<&str>, r: &Value) -> Result<Value, Fa
     }
     let row = |(key, f): Found| {
         let aside = f["route"] == "aside";
+        // A stored route `subject` is listed as the subject's type, its key in the member of that name.
+        let subject = (f["route"] == "subject")
+            .then(|| (f["subject"]["object_type"].as_str(), &f["subject"]["native_key"]))
+            .and_then(|(t, k)| t.map(|t| (t, k)));
+        let named = |member: &str| match subject {
+            Some((t, k)) if t == member => k.clone(),
+            Some(_) => Value::Null,
+            None => f[member]["native_key"].clone(),
+        };
+        let route = subject.map_or_else(|| f["route"].clone(), |(t, _)| json!(t));
         json!({"request": key, "topic": f["topic"], "kind": f["kind"], "said_at": f["said_at"],
-            "words_verified": f["words_verified"], "truncated": f["truncated"] == true, "route": f["route"],
-            "intent": f["intent"]["native_key"], "unit": f["unit"]["native_key"],
-            "finding": f["finding"]["native_key"], "route_reason": if aside { f["route_reason"].clone() } else { Value::Null },
+            "words_verified": f["words_verified"], "truncated": f["truncated"] == true, "route": route,
+            "intent": named("intent"), "unit": named("unit"), "finding": named("finding"), "host": named("host"),
+            "route_reason": if aside { f["route_reason"].clone() } else { Value::Null },
             "reading": f["reading"], "words": f["words"]})
     };
     Ok(json!({"requests": found.into_iter().map(row).collect::<Vec<_>>()}))
@@ -460,7 +466,7 @@ pub fn text(v: &Value) -> String {
             out.push_str(" [truncated]");
         }
         out.push_str(&match g("route") {
-            way @ ("intent" | "unit" | "finding") => format!(" -> {way} {}", g(way)),
+            way @ ("intent" | "unit" | "finding" | "host") => format!(" -> {way} {}", g(way)),
             "aside" => format!(" -> aside ({})", g("route_reason")),
             other => format!(" -> {other}"),
         });

@@ -782,6 +782,20 @@ pub fn capacity(s: &mut impl System, store: &str, p: &Value) -> Result<Value, Fa
         store::search_pages(s, Some(store), ("host", None), SMALL_PAGE, CAPACITY_MS)?;
     let (accounts, _) =
         store::search_pages(s, Some(store), ("account", None), SMALL_PAGE, CAPACITY_MS)?;
+    // Schema version 24 on: one search of the active holds; a host that is the subject of one is held.
+    let active = json!({"eq": ["status", "active"]});
+    let (holds, _) = store::search_pages(
+        s,
+        Some(store),
+        ("hold", Some(active)),
+        SMALL_PAGE,
+        CAPACITY_MS,
+    )?;
+    let held_hosts: BTreeSet<&str> = holds
+        .iter()
+        .filter(|(_, f)| f["subject"]["object_type"] == "host")
+        .filter_map(|(_, f)| f["subject"]["native_key"].as_str())
+        .collect();
     let at = now.ok_or_else(|| error("store_answer_unreadable", "now"))?;
     let mut hosts = hosts;
     hosts.sort_by(|a, b| a.0.cmp(&b.0));
@@ -794,9 +808,11 @@ pub fn capacity(s: &mut impl System, store: &str, p: &Value) -> Result<Value, Fa
             Some(_) => f["answers"].clone(),
             None => Value::Null,
         };
+        let held = held_hosts.contains(key.as_str());
+        let free = if held { json!(false) } else { f["free"].clone() };
         rows.push(json!({"host": key, "node": f["node"], "machine": f["machine"], "answers": answers,
             "stale": stale, "observed_at": f["observed_at"], "seen_at": f["seen_at"], "cpus": f["cpus"],
-            "load_x100": f["load_x100"], "available_mb": f["available_mb"], "free": f["free"]}));
+            "load_x100": f["load_x100"], "available_mb": f["available_mb"], "free": free, "held": held}));
         if let Some(m) = f["machine"].as_str() {
             machines.entry(m.to_owned()).or_default().push(i);
         }
@@ -816,9 +832,10 @@ pub fn capacity(s: &mut impl System, store: &str, p: &Value) -> Result<Value, Fa
                 .then_with(|| hosts[*a].0.cmp(&hosts[*b].0))
         });
         let names: Vec<&str> = members.iter().map(|i| hosts[*i].0.as_str()).collect();
+        let held = members.iter().any(|i| rows[*i]["held"] == true);
         let (up, free) = (
             chosen.is_some(),
-            chosen.is_some_and(|i| rows[i]["free"] == true),
+            !held && chosen.is_some_and(|i| rows[i]["free"] == true),
         );
         let reading = |k: &str| chosen.map_or(Value::Null, |i| rows[i][k].clone());
         if free {

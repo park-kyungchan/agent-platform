@@ -979,7 +979,7 @@ apply('triage_decision', 'v9-after-carry', dict(decision=third, triage='none', r
 unchanged = fingerprint()
 assert migrate(9, 10) == dict(carried=0, already=3)
 assert fingerprint() == unchanged and fields(third_request)['route_reason'] == 'carried from version 9'
-for before, after in [(9, 24), (10, 10), (10, 9)]:
+for before, after in [(9, 25), (10, 10), (10, 9)]:
     assert migrate(before, after, 2) == dict(status='unknown_pair')
 assert fingerprint() == unchanged
 assert migrate(9, 10) == dict(carried=0, already=3)
@@ -2482,7 +2482,8 @@ print('v20_gate_rows_complete')
 print('v20 cases: ok')
 # Version 21, pinned in Git by the commit of main that holds it, over the objects made under version 20. The schema
 # differs from version 20 only by point 1 of ontology/README.md, "Version 21": each part is taken off a copy, and what
-# is left reads as version 20. The repository's file is version 23, whose walk (version 22's, then 23's) comes after this one.
+# is left reads as version 20. Version 23 is pinned in Git too, and its walk (version 22's, then 23's) comes after this one; the
+# repository's file is version 24, whose walk comes last.
 V21_PIN = ('72fb5e499221d3dc030404ddfa308c673ba7096e', '1812ef2baac76e4c78fc3208c69926d73fb6b5bab7f2ee3361cfa6723499cb35')
 v20_schema = schema
 v20_objects = [o['id'] for t in ('task', 'decision', 'request', 'intent', 'criterion', 'unit', 'review', 'run', 'finding', 'hold', 'principle', 'host', 'account', 'kpi', 'case')
@@ -2688,7 +2689,7 @@ assert len(item_lines(full, 'Lessons')) == 9 and item_lines(full, 'Lessons')[-1]
 print('gate_row=v21-lead-state-within-25-lines expected=admitted lines=25')
 print('v21_gate_rows_complete')
 print('v21 documents: ok')
-# Version 22 and 23: the repository's file over the objects made under version 21. The schema differs from version 21 only by
+# Version 22 and 23, pinned in Git by the commit of main that holds version 23, over the objects made under version 21. The schema differs from version 21 only by
 # its version and its grants (ontology/README.md, "Version 22: roles", "Version 23: capacity for dispatch"): the grant without a role keeps the reads and the
 # derivations of version 21 and holds the one function route, and each of twelve roles has a grant of its own.
 v21_schema = schema
@@ -2699,7 +2700,11 @@ ARGS22 = dict(ARGS21, directory=DIR, intent='v21-lead')
 v21_views = [(view, args, call(['render'], dict(view=view, args=args)))
              for view, args in [(name, {a: ARGS22[a] for a in body.get('args', [])}) for name, body in v21_schema['views'].items()]]
 assert len(v21_views) == 23
-schema = json.loads(pathlib.Path(repo, 'ontology/work.schema.json').read_text())
+V23_PIN = ('8c83202ddca01bdc68fba5d00244e0d57d87d288', '0d93be949a122324b2d77439b84028ca24f00d71e34ccf2a3b8f78547351f144')
+v23_bytes = subprocess.check_output(['git', '-C', repo, 'show', V23_PIN[0] + ':ontology/work.schema.json'], timeout=10)
+assert hashlib.sha256(v23_bytes).hexdigest() == V23_PIN[1]
+v23_path = pathlib.Path(store).with_name('pinned-' + V23_PIN[0] + '.json'); v23_path.write_bytes(v23_bytes)
+schema = json.loads(v23_bytes)
 assert schema['version'] == 23
 head, old = json.loads(json.dumps(schema)), json.loads(json.dumps(v21_schema))
 ROLES22 = ['lead', 'dispatch', 'deliver', 'watch', 'route', 'measure', 'api', 'implementer', 'fixer', 'verifier', 'reviewer', 'writer']
@@ -2724,7 +2729,7 @@ assert {k: v for k, v in head.items() if k != 'version'} == {k: v for k, v in ol
 print('gate_row=v22-only-version-and-grants expected=admitted grants=' + str(len(schema['grants'])))
 # The functions of this copy run a program of the rehearsal's own: the rows below ask whether a role's grant lets the call through.
 fake_fn = pathlib.Path(store).with_name('fake-fn'); fake_fn.write_text('#!/bin/sh\ncat > /dev/null\necho \'{"ok":true}\'\n'); fake_fn.chmod(0o755)
-copy22 = cases_copy(pathlib.Path(repo, 'ontology/work.schema.json'), 'repository.json', 'repository-cases.json')
+copy22 = cases_copy(v23_path, 'pinned-v23.json', 'pinned-v23-route.json')
 copy22_schema = json.loads(copy22.read_text())
 for fn in copy22_schema['functions'].values(): fn['program'] = str(fake_fn)
 copy22.write_text(json.dumps(copy22_schema))
@@ -2739,7 +2744,7 @@ unchanged = fingerprint()
 assert migrate(21, 23) == dict(carried=0, already=0)
 assert migrate(20, 23) == dict(carried=0, already=0)
 assert migrate(22, 23) == dict(carried=0, already=0)
-assert migrate(23, 24, 2) == dict(status='unknown_pair')
+assert migrate(23, 25, 2) == dict(status='unknown_pair')
 assert fingerprint() == unchanged and [obj(i) for i in v21_objects] == v21_before
 print('v22_migration_rows_complete')
 phase = 'v22'

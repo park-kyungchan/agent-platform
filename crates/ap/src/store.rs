@@ -354,43 +354,43 @@ pub fn supersede_request(
 ) -> Result<Applied, Failure> {
     apply(s, store, actor, "supersede_request", rid, p)
 }
+/// The subject of type `kind` (`intent`, `unit`, `finding` or `host`) with native key `key`; none for another type.
+pub fn subject_of(kind: &str, key: &str) -> Option<work::interfaces::SubjectRef> {
+    use work::{Id, objects};
+    Some(match kind {
+        "intent" => Id::<objects::Intent>::new(key).into(),
+        "unit" => Id::<objects::Unit>::new(key).into(),
+        "finding" => Id::<objects::Finding>::new(key).into(),
+        "host" => Id::<objects::Host>::new(key).into(),
+        _ => return None,
+    })
+}
+/// Schema version 24 on: the request routed to its subject (`route_request`).
 pub fn route_request(
     s: &mut impl System,
     store: Option<&str>,
     actor: &Actor,
     rid: String,
-    p: Value,
+    (request, subject): (&str, work::interfaces::SubjectRef),
 ) -> Result<Applied, Failure> {
-    apply(s, store, actor, "route_request", rid, p)
+    let action = work::actions::RouteRequest {
+        request: work::Id::new(request),
+        subject,
+    };
+    apply_action(s, store, &actor.call(rid), &action)
 }
 pub fn set_request_aside(
     s: &mut impl System,
     store: Option<&str>,
     actor: &Actor,
     rid: String,
-    p: Value,
+    (request, reason): (&str, &str),
 ) -> Result<Applied, Failure> {
-    apply(s, store, actor, "set_request_aside", rid, p)
-}
-/// Schema version 11 on: the request answered by a unit.
-pub fn route_request_to_unit(
-    s: &mut impl System,
-    store: Option<&str>,
-    actor: &Actor,
-    rid: String,
-    p: Value,
-) -> Result<Applied, Failure> {
-    apply(s, store, actor, "route_request_to_unit", rid, p)
-}
-/// Schema version 11 on: the request reports a finding.
-pub fn route_request_to_finding(
-    s: &mut impl System,
-    store: Option<&str>,
-    actor: &Actor,
-    rid: String,
-    p: Value,
-) -> Result<Applied, Failure> {
-    apply(s, store, actor, "route_request_to_finding", rid, p)
+    let action = work::actions::SetRequestAside {
+        request: work::Id::new(request),
+        reason: reason.to_owned(),
+    };
+    apply_action(s, store, &actor.call(rid), &action)
 }
 /// The actions of the verbs of the Lead and of the services: each claims the role of its actor.
 macro_rules! actions {
@@ -983,6 +983,13 @@ pub fn intent_shown(
     let all = vec![eq("status", json!("current")), eq("route", json!("intent"))];
     let mut requests = at(search(s, store, "request", all), "requests")?;
     requests.retain(|(_, f)| f["intent"]["native_key"] == key);
+    // Schema version 24 on: a request routed to the intent as its subject.
+    let all = vec![eq("status", json!("current")), eq("route", json!("subject"))];
+    let mut routed = at(search(s, store, "request", all), "requests")?;
+    routed.retain(|(_, f)| {
+        f["subject"]["object_type"] == "intent" && f["subject"]["native_key"] == key
+    });
+    requests.append(&mut routed);
     requests.sort_by_key(by("said_at"));
     let criterion = |(k, f): Found| {
         json!({"criterion": k, "statement": f["statement"], "check": f["check"], "baseline": f["baseline"],

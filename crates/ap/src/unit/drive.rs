@@ -10,7 +10,7 @@ use super::render::{self, Role};
 use super::scan;
 use crate::host::{Failure, Host, System, args, digest, error, fail, new_session_id};
 use crate::review::{self, DIFF_OPTIONS, GIT_SAFE};
-use crate::store::work::{self, Action, Id, actions, objects, values};
+use crate::store::work::{self, Action, Id, ObjectType, actions, objects, properties, values};
 use crate::store::{self, Actor, Applied, at};
 use serde_json::{Map, Value, json};
 use std::{
@@ -895,22 +895,26 @@ impl Run {
         self.u["state"] = json!("running");
         Ok(())
     }
-    /// The take-over of a cut run applies nothing: an active hold on the unit or its intent refuses it (R6).
+    /// The take-over of a cut run applies nothing: an active hold whose subject is the unit or its intent
+    /// refuses it (R6).
     fn held(&mut self, s: &mut impl System) -> Result<(), Failure> {
-        let rows = at(
-            store::view_rows(s, self.store(), "holds_on_work", json!({})),
+        let active = json!({"eq": [properties::Hold::Status.name(), values::HoldStatus::Active.as_str()]});
+        let holds = at(
+            store::search_of::<objects::Hold>(s, self.store(), vec![active]),
             "holds",
         )?;
         let intent = self.u["intent"]["native_key"].as_str();
-        let cell = |r: &Map<String, Value>, k: &str| {
-            let c = r.get(k).and_then(Value::as_str).unwrap_or_default();
-            c.trim_end_matches(" (stale)").to_owned()
+        let named = |f: &Value| {
+            let subject = &f[properties::Hold::Subject.name()];
+            let key = subject["native_key"].as_str();
+            match subject["object_type"].as_str() {
+                Some(objects::Unit::NAME) => key == Some(self.key.as_str()),
+                Some(objects::Intent::NAME) => key.is_some() && key == intent,
+                _ => false,
+            }
         };
-        let named = |r: &&Map<String, Value>| {
-            cell(r, "Unit") == self.key || intent.is_some_and(|i| cell(r, "Intent") == i)
-        };
-        match rows.iter().find(named) {
-            Some(r) => Err(fail("held", "unit", json!(r))),
+        match holds.iter().find(|(_, f)| named(f)) {
+            Some((key, _)) => Err(fail("held", "unit", json!(key))),
             None => Ok(()),
         }
     }
