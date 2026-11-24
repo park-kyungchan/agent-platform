@@ -26,15 +26,19 @@
  },
  "accounts": {
   "claude": [
+   "/root/.claude",
    "/root/.claude-api"
   ],
   "claude/reviewer": [
+   "/root/.claude",
    "/root/.claude-api"
   ],
   "claude/sonnet": [
+   "/root/.claude",
    "/root/.claude-api"
   ],
   "claude/haiku": [
+   "/root/.claude",
    "/root/.claude-api"
   ],
   "muse": [
@@ -65,12 +69,14 @@
   "runtime": "claude",
   "model": "opus",
   "effort": "high",
-  "account": "/root/.claude-api",
+  "account": "/root/.claude",
   "permission_mode": "auto",
   "models": [
    "opus",
    "gemini-4-argon-high",
-   "fable"
+   "fable",
+   "gemini-4-neon-high",
+   "gemini-4-neon-xhigh"
   ],
   "directory": "/var/lib/agent-platform/reviews",
   "task": "workspace-strategy-reassessment-20261109"
