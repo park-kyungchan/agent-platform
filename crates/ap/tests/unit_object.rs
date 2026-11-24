@@ -2732,6 +2732,23 @@ fn r33_the_frames_and_the_change() {
     );
     assert!(verifier.ends_with(&change), "{verifier}");
     assert!(include_str!("../src/unit/frames/implementer.md").contains("page_cannot_hold"));
+    // The door's two functions and the page's `## Use` in the frames of the stages.
+    let route = "echo '{\"parameters\":{\"words\":\"<what you look for>\",\"limit\":5}}' | ap fn route";
+    let clause = "echo '{\"parameters\":{\"key\":\"<owner>/<name>:<path>#R<n>\"}}' | ap fn clause";
+    let reads = "Read a requirement the page cites with clause instead of opening the specification whole; ask route before a search over the repository.";
+    for frame in [
+        include_str!("../src/unit/frames/implementer.md"),
+        include_str!("../src/unit/frames/verifier.md"),
+        include_str!("../src/unit/frames/fixer.md"),
+    ] {
+        assert!(frame.contains(route) && frame.contains(clause) && frame.contains(reads));
+    }
+    assert!(include_str!("../src/unit/frames/implementer.md").contains(
+        "- The page's section \"## Use\", when present, names the run that will show the result in use: build what that run needs, do not perform it, and say in your report how to perform it.\n"
+    ));
+    assert!(include_str!("../src/unit/frames/verifier.md").contains(
+        "- When the page has a \"## Use\", say in one line of the report whether the run it names can happen with this head, and why not when it cannot.\n"
+    ));
     // No repository: no frame of an implementer or a verifier; no head: no verifier.
     plain_unit(&mut f, "u-doc", check("x", "invariant"));
     for role in ["implementer", "verifier"] {
