@@ -90,7 +90,8 @@ pub fn page_text(
     Ok((out, commit))
 }
 /// The SHA-256 of the page part as built for the reviewer, without its line `Depends on: ...`: the
-/// unit's own page properties but its dependencies, and neither its tiers nor its estimate (R34).
+/// unit's own page properties but its dependencies, and neither its tiers nor its estimate (R34), nor its
+/// kind, its units delivered before the start and its use (R49).
 pub fn page_digest(key: &str, u: &Value) -> String {
     digest(part(key, u, true, false).as_bytes())
 }
@@ -120,8 +121,14 @@ fn list(u: &Value, k: &str) -> Option<String> {
 pub fn page_part(key: &str, u: &Value, questions: bool) -> String {
     part(key, u, questions, true)
 }
-/// The page part, with its line `Depends on: ...` only when `with_depends` (R30, R34).
-fn part(key: &str, u: &Value, questions: bool, with_depends: bool) -> String {
+/// The keys of a list of references to units.
+fn unit_keys<'a>(u: &'a Value, k: &str) -> Vec<&'a str> {
+    let keys = u[k].as_array().into_iter().flatten();
+    keys.filter_map(|d| d["native_key"].as_str()).collect()
+}
+/// The page part; its line `Depends on: ...`, its lines `Kind: ...` and `Delivered before start: ...` and
+/// its section `## Use` only when `full`, which the digest is not (R30, R34, R49).
+fn part(key: &str, u: &Value, questions: bool, full: bool) -> String {
     let class = u["class"].as_str().unwrap_or_default();
     let lane = u["lane"].as_str().unwrap_or_default();
     let repository = text(u, "repository").unwrap_or("no repository");
@@ -129,13 +136,27 @@ fn part(key: &str, u: &Value, questions: bool, with_depends: bool) -> String {
     if let Some(branch) = text(u, "branch") {
         out.push_str(&format!("Branch: {branch}\n"));
     }
-    let depends = u["depends_on"].as_array().into_iter().flatten();
-    let depends: Vec<&str> = depends.filter_map(|d| d["native_key"].as_str()).collect();
-    if !depends.is_empty() && with_depends {
-        out.push_str(&format!("Depends on: {}\n", depends.join(", ")));
+    let depends = unit_keys(u, "depends_on");
+    let delivered = unit_keys(u, "depends_delivered");
+    if full {
+        if !depends.is_empty() {
+            out.push_str(&format!("Depends on: {}\n", depends.join(", ")));
+        }
+        if let Some(kind) = text(u, "kind") {
+            out.push_str(&format!("Kind: {kind}\n"));
+        }
+        if !delivered.is_empty() {
+            out.push_str(&format!(
+                "Delivered before start: {}\n",
+                delivered.join(", ")
+            ));
+        }
     }
     let body = |k: &str| text(u, k).map(lines);
     section(&mut out, "Objective", body("objective"));
+    if full {
+        section(&mut out, "Use", body("use"));
+    }
     section(&mut out, INTERFACE, body("interface"));
     section(&mut out, "Invariants", body("invariants"));
     let checks = u["acceptance"].as_array().filter(|a| !a.is_empty());

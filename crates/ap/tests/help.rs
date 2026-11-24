@@ -182,3 +182,22 @@ fn verbs_r5_an_answer_that_cannot_be_written_exits_4() {
         );
     }
 }
+
+// spec: specs/ap/unit.md#R50
+#[test]
+fn r50_the_help_names_defer_undefer_and_used_in_the_line_of_unit() {
+    let all = String::from_utf8(ap(&["--help"]).stdout).unwrap();
+    let line = all
+        .lines()
+        .find(|l| l.trim_start().starts_with("unit: "))
+        .unwrap();
+    assert!(
+        line.contains("unit defer|undefer|used [--store <path>] < request.json"),
+        "{line}"
+    );
+    let unit = String::from_utf8(ap(&["unit", "--help"]).stdout).unwrap();
+    assert!(
+        unit.contains("ap unit defer|undefer|used [--store <path>] < request.json"),
+        "{unit}"
+    );
+}
