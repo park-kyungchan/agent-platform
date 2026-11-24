@@ -171,7 +171,9 @@ fn roles_file_lists_every_role() {
         serde_json::from_slice(&fs::read(repo("deploy/roles.json")).unwrap()).unwrap();
     let principals = file["principals"].as_object().unwrap();
     assert_eq!(file.as_object().unwrap().len(), 1);
-    assert_eq!(principals.keys().collect::<Vec<_>>(), ["uid:0"]);
+    let mut keys: Vec<&str> = principals.keys().map(String::as_str).collect();
+    keys.sort();
+    assert_eq!(keys, ["ts:park-kyungchan@github", "uid:0"]);
     let listed = strings(&principals["uid:0"]);
     assert_eq!(listed, sorted(listed.clone()));
     let granted: BTreeSet<String> = schema()["grants"]
@@ -182,6 +184,11 @@ fn roles_file_lists_every_role() {
         .collect();
     assert_eq!(listed.iter().cloned().collect::<BTreeSet<_>>(), granted);
     assert_eq!(listed.len(), granted.len());
+    let ts_roles = strings(&principals["ts:park-kyungchan@github"]);
+    assert_eq!(ts_roles, ["lead"]);
+    for role in &ts_roles {
+        assert!(granted.contains(role), "{role}");
+    }
 }
 
 // spec: specs/ap/roles.md#R4
@@ -211,7 +218,7 @@ fn every_service_names_its_role() {
             .lines()
             .filter(|l| l.starts_with("Environment=ONT_ROLE="))
             .collect();
-        if service == "ont-backup" {
+        if matches!(service, "ont-backup" | "ont-serve") {
             assert!(lines.is_empty(), "{service}");
             continue;
         }

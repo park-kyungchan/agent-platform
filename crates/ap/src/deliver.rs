@@ -1096,10 +1096,12 @@ fn deliver(s: &mut impl System, c: &mut Call) -> Step<()> {
     judged(s, c, &tip)?;
     if c.engine.is_some() {
         marker(s, c, &tip)?;
-        roles_step(s, c, &tip)?;
     }
     if engine_moves {
         return engine_install(s, c, &pin, &engine.unwrap_or_default());
+    }
+    if c.engine.is_some() {
+        roles_step(s, c, &tip)?;
     }
     if let (true, Some(to_v), Some(from_v)) = (higher, to_v, from_v) {
         schema_step(s, c, &tip, from_v, to_v)?;

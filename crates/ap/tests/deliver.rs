@@ -6473,6 +6473,8 @@ fn roles_path(w: &W) -> PathBuf {
     w.t.join("ont-state/ont/roles.json")
 }
 const ROLES_NEW: &str = "{\"principals\":{\"uid:0\":[\"lead\"]}}\n";
+const ROLES_TS: &str =
+    "{\"principals\":{\"ts:park-kyungchan@github\":[\"lead\"],\"uid:0\":[\"lead\"]}}\n";
 const ROLES_OLD: &str = "{\"principals\":{\"uid:0\":[]}}\n";
 fn no_store_write(w: &W) -> bool {
     !w.calls.iter().any(|c| {
@@ -6570,13 +6572,63 @@ fn r58_no_blob_at_the_tip_is_absent_and_writes_nothing() {
     );
 }
 
+// spec: specs/ap/deliver.md#R42
 // spec: specs/ap/deliver.md#R58
 // spec: specs/ap/deliver.md#R59
 #[test]
-fn r58_a_host_entry_that_is_no_regular_file_fails_before_the_engine_and_the_schema() {
+fn r42_engine_moves_before_roles_step_so_forward_only_roles_wait_for_the_new_engine() {
+    // Call 1 installs the engine only (`roles` is null and host `roles.json` stays untouched, even
+    // when it differs or is absent), so an older engine never reads forward-only `roles.json` bytes
+    // before the new engine is installed; Call 2 installs `roles.json` and the pair.
+    let mut w = W::engine();
+    w.roles_blob = Some(ROLES_TS);
+    std::fs::write(roles_path(&w), ROLES_OLD).unwrap();
+    let (v, exit) = w.run();
+    assert_eq!(
+        (end(&v), exit, v["target"].clone(), v["roles"].clone()),
+        (("installed", ""), 0, json!(ENGINE), Value::Null),
+        "{v}"
+    );
+    assert_eq!(std::fs::read_to_string(roles_path(&w)).unwrap(), ROLES_OLD);
+    assert_eq!(
+        std::fs::read_dir(w.t.join("ont-state/ont"))
+            .unwrap()
+            .count(),
+        1
+    );
+    w.settle();
+    let (v, exit) = w.run();
+    assert_eq!(
+        (end(&v), exit, v["target"].clone()),
+        (("installed", ""), 0, json!(TARGET)),
+        "{v}"
+    );
+    let old = sha(ROLES_OLD.as_bytes());
+    assert_eq!(
+        v["roles"],
+        json!({"before": old, "after": sha(ROLES_TS.as_bytes()), "result": "written"})
+    );
+    assert_eq!(std::fs::read_to_string(roles_path(&w)).unwrap(), ROLES_TS);
+
+    // Absent host `roles.json` stays absent on Call 1 when the engine moves.
+    let mut w = W::engine();
+    w.roles_blob = Some(ROLES_TS);
+    let (v, exit) = w.run();
+    assert_eq!(
+        (end(&v), exit, v["target"].clone(), v["roles"].clone()),
+        (("installed", ""), 0, json!(ENGINE), Value::Null),
+        "{v}"
+    );
+    assert!(!roles_path(&w).exists());
+}
+
+// spec: specs/ap/deliver.md#R58
+// spec: specs/ap/deliver.md#R59
+#[test]
+fn r58_a_host_entry_that_is_no_regular_file_fails_before_the_schema_and_the_pair() {
     for kind in ["directory", "link"] {
-        // The engine moves and the schema is higher: neither may happen.
-        let mut w = W::engine();
+        // The engine is at the pin and the schema is higher: neither schema nor pair may happen.
+        let mut w = W::at_pin();
         (w.schema, w.tip_schema) = (8, 9);
         w.roles_blob = Some(ROLES_NEW);
         let path = roles_path(&w);

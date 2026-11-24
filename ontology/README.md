@@ -2083,7 +2083,8 @@ Version 24 declares the interface `subject`, what a hold, a request or a finding
 subject. Every value type, object type, link type, action type, view, source, function and grant not named below reads
 as on version 23 in canonical JSON. The point of the version: a hold or a finding about a host has nothing to refer to
 without another parallel property; the interface lets one reference name an intent, a unit, a finding or a host. The
-engine is the pin of this version; `ENGINE-PIN` is `48530577c3d5ad7376b7c57f7a7e6531abef78e6`, the pin of the base.
+engine is the pin of this version; `ENGINE-PIN` is `3a1eda9f95d731ab3a43ba9afa7336e965c0c04b` (updated from
+`48530577c3d5ad7376b7c57f7a7e6531abef78e6` for `ont serve`, with no schema change).
 
 1. The interface. The top-level member `interfaces` holds `subject` (a description and `properties` `{}`); `intent`,
    `unit`, `finding` and `host` each have `implements` `["subject"]`. `account` implements nothing.

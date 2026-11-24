@@ -445,10 +445,11 @@ CE=$W/state/engine
 [ "$(git -C "$CE" remote get-url origin)" = "$E" ] || fail "pass i: the clone's remote"
 git -C "$CE" fetch origin +refs/heads/main:refs/remotes/origin/main --refmap= || fail "pass i: the installer's fetch"
 [ "$(attempt_host "$E1")" = local ] || fail "pass i: the attempt's host"
-[ "$(member 'r["roles"]["result"]')" = same ] || fail "pass i: the roles step"
+[ "$(member 'r["roles"]')" = null ] || fail "pass i: the roles step on engine move"
 line i 0 "$(pair)" "$(member 'r["outcome"]')"
 call engine
-[ "$RC" = 0 ] && [ "$(member 'r["target"]')" = /usr/local/bin/ap ] && [ "$(pair)" = "$M" ] || fail "pass i: the pair after the engine (exit $RC)"
+[ "$RC" = 0 ] && [ "$(member 'r["target"]')" = /usr/local/bin/ap ] && [ "$(pair)" = "$M" ] &&
+  [ "$(member 'r["roles"]["result"]')" = same ] || fail "pass i: the pair after the engine (exit $RC)"
 line i 1 "$(pair)" "$(member 'r["outcome"]')"
 
 # spec: specs/ap/deliver.md#R44

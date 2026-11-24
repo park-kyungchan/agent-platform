@@ -80,9 +80,9 @@ Undo: remove the member `engine` from `/etc/agent-platform/deliver.json`; delive
 
 ## Roles
 
-Each service that runs `ap` or applies to the store has one line `Environment=ONT_ROLE=<role>` (`specs/ap/roles.md` R4): `ap-work` `dispatch`; `ap-deliver` `deliver`; `ap-watch` `watch`; `ap-route` and `ap-clause` `route`; `ap-resource`, `ap-quota`, `ap-status-page` and `ap-measure` `measure`; `ap-api-nightly` and `ap-api-weekly` `api`; `ont-backup.service` has none. It is the role of the service's function calls and of a program it runs that is not `ap`; `ap` names its own role in each apply (R3). The roles of the grants are those of `deploy/roles.json`, `{"principals":{"uid:0":[...]}}`, the file the engine reads beside the store (`/var/lib/ontology-platform/ont/roles.json`, mode 0644): without it every claimed role is refused `role_not_admitted` (`roles_file_absent`) and every apply with no role `not_granted`.
+Each service that runs `ap` or applies to the store has one line `Environment=ONT_ROLE=<role>` (`specs/ap/roles.md` R4): `ap-work` `dispatch`; `ap-deliver` `deliver`; `ap-watch` `watch`; `ap-route` and `ap-clause` `route`; `ap-resource`, `ap-quota`, `ap-status-page` and `ap-measure` `measure`; `ap-api-nightly` and `ap-api-weekly` `api`; `ont-backup.service` and `ont-serve.service` have none (`ont serve` authenticates remote peers over Tailscale and never inherits server `ONT_ROLE`). It is the role of the service's function calls and of a program it runs that is not `ap`; `ap` names its own role in each apply (R3). The roles of the grants are those of `deploy/roles.json`, `{"principals":{"ts:park-kyungchan@github":["lead"],"uid:0":[...]}}`, the file the engine reads beside the store (`/var/lib/ontology-platform/ont/roles.json`, mode 0644): without it every claimed role is refused `role_not_admitted` (`roles_file_absent`) and every apply with no role `not_granted`.
 
-A call of `ap deliver` with `engine` compares the blob `deploy/roles.json` of the tip with that file after the marker and before the engine and the schema (`specs/ap/deliver.md` R58): equal bytes are `same`, a differing regular file is kept beside it as `roles.json.before-<12 hex>` and the tip's bytes are written (`written`), no blob at the tip is `absent`, and an entry that is not a regular file, or any failure, ends the call `roles_install_failed` (exit 4, `detail` `{"path"}`) with nothing else installed. The record's member `roles` is `{"before", "after", "result"}`. A change of the host's roles file by hand is put back only by the next merge's delivery (deliver.md R39, R58): the call that ends `current` does not look at it. No rollback of it is built: from the kept copy by hand (`install -m 0644 roles.json.before-<12 hex> roles.json` in that directory, read back by `sha256sum`).
+A call of `ap deliver` with `engine` installs a moving engine before running the roles step (`specs/ap/deliver.md` R42, R43, R58), so forward-only `roles.json` forms (such as `ts:` principals) wait until the new engine is installed and never brick an older engine; in that engine-move call the record's `roles` is `null` (R59). When the engine already equals `ontology/ENGINE-PIN`, `ap deliver` compares the blob `deploy/roles.json` of the tip with the host's file after the marker and before the schema and the pair (R58): equal bytes are `same`, a differing regular file is kept beside it as `roles.json.before-<12 hex>` and the tip's bytes are written (`written`), no blob at the tip is `absent`, and an entry that is not a regular file, or any failure, ends the call `roles_install_failed` (exit 4, `detail` `{"path"}`) with neither schema nor pair installed. The record's member `roles` is `{"before", "after", "result"}`. A change of the host's roles file by hand is put back only by the next merge's delivery (deliver.md R39, R58): the call that ends `current` does not look at it. No rollback of it is built: from the kept copy by hand (`install -m 0644 roles.json.before-<12 hex> roles.json` in that directory, read back by `sha256sum`).
 
 Read the state of a delivery's roles step:
 
@@ -508,3 +508,64 @@ systemctl is-active ap-status-page.service            # until it answers inactiv
 ```
 
 `/var/lib/agent-platform/status-page/` (`status.txt` and `serve.before.json`) stays; remove it by hand when no longer needed.
+
+## The tailnet Ontology server (ont-serve)
+
+`ont-serve.service` runs `/usr/local/bin/ont serve --bind 100.95.133.99:7432` as a long-lived `Type=simple` service (`Restart=on-failure`, `RestartSec=5`, `Nice=10`, `Environment=TZ=UTC`, all eleven R52 confinement lines, and no `Environment=ONT_ROLE=` or `ONT_AGENT=`: `ont serve` authenticates remote peers over Tailscale and never inherits server `ONT_ROLE`).
+
+### First delivery of pin-srv
+
+Because the `ap` installed before `pin-srv` runs `roles_step` before `engine_install`, letting it deliver `pin-srv` directly would write `ts:park-kyungchan@github` into `roles.json` before the new `ont` is installed. Before or right after merging `pin-srv`, stop the timers and install `ont` `3a1eda9f95d731ab3a43ba9afa7336e965c0c04b` first, then run `ap deliver`:
+
+```sh
+systemctl stop ap-deliver.timer ap-work.timer
+systemctl is-active ap-deliver.service       # must be inactive or failed, not activating
+bash /var/lib/agent-platform/deliver/ontology-platform/scripts/install-ont.sh install 3a1eda9f95d731ab3a43ba9afa7336e965c0c04b
+ont --version                                # ont 0.1.0 3a1eda9f95d731ab3a43ba9afa7336e965c0c04b
+ap deliver < /etc/agent-platform/deliver.json
+systemctl start ap-deliver.timer ap-work.timer
+```
+
+With the new `ont` already at the pin, `ap deliver` installs `deploy/roles.json`, the new `ap` (which runs `engine_install` before `roles_step` on all future pin bumps), and `/etc/systemd/system/ont-serve.service`.
+
+### Enable, readback, restart, and undo
+
+`ap deliver` writes `/etc/systemd/system/ont-serve.service` and runs `daemon-reload`, but R50 leaves `.service` activation to the Lead. Enable and start it once, and verify it listens only on the tailnet address:
+
+```sh
+systemctl enable --now ont-serve.service
+systemctl is-active ont-serve.service        # active
+ss -H -ltn '( sport = :7432 )'               # 100.95.133.99:7432 only (never 0.0.0.0 or ::)
+```
+
+After any future engine upgrade of `/usr/local/bin/ont`, restart the long-lived daemon so it runs the new binary:
+
+```sh
+systemctl restart ont-serve.service
+```
+
+Undo:
+
+```sh
+systemctl disable --now ont-serve.service
+```
+
+### Tailnet ACL grant (user step)
+
+In the Tailscale tailnet policy, admit `park-kyungchan@github` to `tag:vps` on TCP port `7432` only (never `tag:ap-checks`, `tag:ap-stages`, or `*`).
+
+Readback from the user's PC (`kcpalantir-wsl`):
+
+```sh
+tailscale nc 100.95.133.99 7432
+curl -fsS http://100.95.133.99:7432/healthz
+# {"service":"ont-serve","status":"ok","version":"3a1eda9f95d731ab3a43ba9afa7336e965c0c04b"}
+```
+
+Readback from `ap-checks` (must fail with a non-zero exit):
+
+```sh
+wsl -d ap-checks --exec tailscale nc -w 3 100.95.133.99 7432
+```
+
+Undo: remove the TCP 7432 grant from the Tailscale ACL and verify `tailscale nc 100.95.133.99 7432` / `curl -fsS http://100.95.133.99:7432/healthz` from `kcpalantir-wsl` fails.
