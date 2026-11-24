@@ -1,6 +1,8 @@
 //! Every call of `ap request`, `ap intent`, `ap status`, the stage runner and the unit object (`ap unit
 //! add|amend|ready|drop|page|review`) to the store engine `ont`: one function per action they apply and one
 //! per read. An answer `store_busy` is asked again up to five times after a short wait; nothing else is. Also the request form both verbs share: the arguments, the members and their shapes.
+//! The forms of `ap unit` apply and validate the typed actions of the module `work` (`apply_action`, `validate_action`,
+//! `close_run_action`) and read an object by its type (`get_of`, `head_of`, `head_now_of`, `search_of`).
 use crate::host::{Failure, LIMIT, System, error, fail, id, ont_within};
 use serde_json::{Map, Value, json};
 use std::{ffi::OsString, io::Read, time::Duration};
