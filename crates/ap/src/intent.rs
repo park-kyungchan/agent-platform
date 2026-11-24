@@ -157,6 +157,54 @@ fn criteria(r: &Value, key: &str) -> Result<Vec<Value>, Failure> {
     };
     list.iter().enumerate().map(one).collect()
 }
+/// The `answers` of `answer`: 1 to 5 objects of exactly `question` (a position from 1) and `answer`
+/// (1 to 600 bytes), no position twice; the pairs of position and answer, from the request alone.
+fn answers(r: &Value) -> Result<Vec<(usize, String)>, Failure> {
+    let list = r["answers"]
+        .as_array()
+        .filter(|l| (1..=5).contains(&l.len()));
+    let list = list.ok_or_else(|| bad("answers"))?;
+    let mut all: Vec<(usize, String)> = vec![];
+    for (i, a) in list.iter().enumerate() {
+        let at = format!("answers.{i}.");
+        only(a, "question answer", &at)?;
+        let position = a["question"].as_u64().filter(|n| *n >= 1);
+        let position = position.ok_or_else(|| bad(&format!("{at}question")))?;
+        let text = sized(&a["answer"], &format!("{at}answer"), 600)?;
+        let position = usize::try_from(position).map_err(|_| bad("answers"))?;
+        if all.iter().any(|(n, _)| *n == position) {
+            return Err(fail(
+                "invalid_input",
+                "answers",
+                json!({"question": position}),
+            ));
+        }
+        all.push((position, text.to_owned()));
+    }
+    Ok(all)
+}
+/// The stored list of questions of intent `key` with only the named answers replaced; a position the
+/// list does not have is refused `invalid_input` (field `answers`).
+fn answered(
+    s: &mut impl System,
+    store: Option<&str>,
+    key: &str,
+    given: &[(usize, String)],
+) -> Result<Value, Failure> {
+    let read = at(store::get(s, store, "intent", key), "intent")?;
+    let intent = read.ok_or_else(|| error("unknown_intent", "intent"))?;
+    let mut list = intent["questions"].as_array().cloned().unwrap_or_default();
+    for (position, text) in given {
+        let q = list.get_mut(position - 1);
+        let q = q.ok_or_else(|| fail("invalid_input", "answers", json!({"question": position})))?;
+        q["answer"] = json!(text);
+    }
+    let whole = |q: &Value| {
+        let g = |k: &str| q[k].as_str().unwrap_or_default();
+        json!({"question": g("question"), "default": g("default"), "answer": g("answer")})
+    };
+    Ok(list.iter().map(whole).collect())
+}
 /// The action of a writing `op`, from the request alone: nothing is read or applied here.
 fn plan<S: System>(op: &str, r: &Value) -> Result<Plan<S>, Failure> {
     let on = |k: &str| json!({"intent": id("intent", k)});
@@ -177,6 +225,12 @@ fn plan<S: System>(op: &str, r: &Value) -> Result<Plan<S>, Failure> {
             }
             p.insert("origin".into(), id("request", key(r, "origin")?));
             Plan::on(Act::Plain(store::draft_intent), "draft", p.into(), k)
+        }
+        "answer" => {
+            // The whole list of questions is filled in `write`, once the intent is read.
+            let mut p = on(k()?);
+            p["by"] = id("request", key(r, "by")?);
+            Plan::on(Act::Plain(store::answer_questions), "answer", p, k()?)
         }
         "note" => {
             let mut p = on(k()?);
@@ -277,6 +331,7 @@ fn members(op: &str, r: &Value) -> Result<&'static str, Failure> {
             "intent outcome first_user origin why not_included constraints directory questions criteria"
         }
         "amend" => "intent outcome first_user why not_included constraints directory questions",
+        "answer" => "intent by answers",
         "note" => "intent notes",
         "lead" => "intent lead_session by",
         "assume" | "close" | "retire" => "intent reason",
@@ -371,9 +426,13 @@ fn write<S: System>(
         session: shaped(r, "session", 64, "._:-")?,
         role: "lead",
     };
-    let plan: Plan<S> = plan(op, r)?;
+    let mut plan: Plan<S> = plan(op, r)?;
     let added = match op {
         "draft" => criteria(r, plan.key.as_deref().unwrap_or_default())?,
+        _ => vec![],
+    };
+    let given = match op {
+        "answer" => answers(r)?,
         _ => vec![],
     };
     let lead = match (&plan.act, &plan.key) {
@@ -381,6 +440,9 @@ fn write<S: System>(
         _ if lead_in_environment(s) => return Err(error("role_in_environment", "ONT_ROLE")),
         _ => None,
     };
+    if op == "answer" {
+        plan.p["questions"] = answered(s, store, plan.key.as_deref().unwrap_or_default(), &given)?;
+    }
     let name = plan.suffix.to_owned();
     let applied = step(s, store, &actor, (rid, name), &plan, lead.as_ref(), done);
     let (key, outcome, back) = match applied {

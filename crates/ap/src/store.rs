@@ -409,6 +409,7 @@ macro_rules! actions {
 actions!(
     draft_intent,
     amend_intent,
+    answer_questions,
     note_intent,
     name_lead,
     confirm_intent,
