@@ -6708,12 +6708,16 @@ fn plant_pc_install(
     commit: &str,
     from: &str,
     from_sha: Option<&str>,
-    status: &str,
     outcome: Option<&str>,
     attempt: usize,
 ) -> Value {
     let n = w.installs.len();
     let id = oid("install", &format!("act-pc-{host}-{n}"));
+    let status = if outcome.is_some() {
+        "closed"
+    } else {
+        "running"
+    };
     let mut row = json!({
         "id": id,
         "target": etarget(),
@@ -6730,11 +6734,11 @@ fn plant_pc_install(
     if let Some(sha) = from_sha {
         row["from_sha256"] = json!(sha);
     }
-    if status == "running" {
-        row["running_in"] = etarget();
-    } else if let Some(out) = outcome {
+    if let Some(out) = outcome {
         row["outcome"] = json!(out);
         row["closed_at"] = json!(format!("2026-11-14T09:{n:02}:30Z"));
+    } else {
+        row["running_in"] = etarget();
     }
     w.installs.push(row);
     id
@@ -6843,16 +6847,7 @@ fn r61_pc_attempts_are_isolated_from_local_and_pc_dead_clears_running_attempts()
     // 1. A failed PC attempt on /usr/local/bin/ont never suppresses local VPS engine delivery
     //    and never increments local attempt numbering.
     let mut w = W::engine();
-    plant_pc_install(
-        &mut w,
-        "pc",
-        &ec(2),
-        &ec(0),
-        None,
-        "closed",
-        Some("failed"),
-        1,
-    );
+    plant_pc_install(&mut w, "pc", &ec(2), &ec(0), None, Some("failed"), 1);
     let r = w.timer();
     let (v, exit) = w.run_with(&r);
     assert_eq!((end(&v), exit), (("installed", ""), 0), "{v}");
@@ -6864,7 +6859,7 @@ fn r61_pc_attempts_are_isolated_from_local_and_pc_dead_clears_running_attempts()
     // 2. A running PC attempt on /usr/local/bin/ont without `pc` in request: `pc_dead` closes
     //    it `failed` (dead_call, to: neither) BEFORE `engine_dead` and local `engine_install`.
     let mut w = W::engine();
-    let dead_id = plant_pc_install(&mut w, "pc", &ec(2), &ec(0), None, "running", None, 1);
+    let dead_id = plant_pc_install(&mut w, "pc", &ec(2), &ec(0), None, None, 1);
     let (v, exit) = w.run();
     assert_eq!((end(&v), exit), (("installed", ""), 0), "{v}");
     let closes = w.applies("close_install");
@@ -6886,7 +6881,7 @@ fn r61_pc_attempts_are_isolated_from_local_and_pc_dead_clears_running_attempts()
     std::fs::create_dir_all(w.t.join("pc-bin")).unwrap();
     std::fs::write(&pc_bin, &bin_bytes).unwrap();
     std::fs::set_permissions(&pc_bin, std::os::unix::fs::PermissionsExt::from_mode(0o755)).unwrap();
-    let dead_id = plant_pc_install(&mut w, "pc", &ec(2), &ec(0), None, "running", None, 1);
+    let dead_id = plant_pc_install(&mut w, "pc", &ec(2), &ec(0), None, None, 1);
     let (v, exit) = w.run();
     assert_eq!((end(&v), exit), (("current", ""), 0), "{v}");
     let closes = w.applies("close_install");
@@ -6914,7 +6909,6 @@ fn r61_pc_attempts_are_isolated_from_local_and_pc_dead_clears_running_attempts()
         &ec(2),
         &ec(0),
         Some(&sha(&old_bytes)),
-        "running",
         None,
         1,
     );
@@ -7020,41 +7014,14 @@ fn r62_pc_push_guards_unreachable_timeout_same_suppression_and_tailscale_env() {
         std::fs::write(w.p("ont-bin/ont"), fake_ont_script(&ec(2))).unwrap();
         match setup {
             "failed" => {
-                plant_pc_install(
-                    &mut w,
-                    "pc",
-                    &ec(1),
-                    &ec(0),
-                    None,
-                    "closed",
-                    Some("failed"),
-                    1,
-                );
+                plant_pc_install(&mut w, "pc", &ec(1), &ec(0), None, Some("failed"), 1);
             }
             "installed" => {
-                plant_pc_install(
-                    &mut w,
-                    "pc",
-                    &ec(2),
-                    &ec(0),
-                    None,
-                    "closed",
-                    Some("installed"),
-                    1,
-                );
+                plant_pc_install(&mut w, "pc", &ec(2), &ec(0), None, Some("installed"), 1);
             }
             _ => {
                 for n in 1..=3 {
-                    plant_pc_install(
-                        &mut w,
-                        "pc",
-                        &ec(2),
-                        &ec(0),
-                        None,
-                        "closed",
-                        Some("not_started"),
-                        n,
-                    );
+                    plant_pc_install(&mut w, "pc", &ec(2), &ec(0), None, Some("not_started"), n);
                 }
             }
         }
@@ -7071,16 +7038,7 @@ fn r62_pc_push_guards_unreachable_timeout_same_suppression_and_tailscale_env() {
     (w.file, w.tree, w.bytes) = (Some(c(2)), Some(c(2)), binary(&c(2)));
     w.pc = Some(pc_target(&w));
     std::fs::write(w.p("ont-bin/ont"), fake_ont_script(&ec(2))).unwrap();
-    plant_pc_install(
-        &mut w,
-        "pc",
-        &ec(2),
-        &ec(0),
-        None,
-        "closed",
-        Some("failed"),
-        1,
-    );
+    plant_pc_install(&mut w, "pc", &ec(2), &ec(0), None, Some("failed"), 1);
     plant_local_ont_installed(&mut w, &ec(2), 2);
     let (v, exit) = w.run();
     assert_eq!((end(&v), exit), (("current", ""), 0), "{v}");
