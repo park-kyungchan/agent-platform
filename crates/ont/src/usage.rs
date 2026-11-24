@@ -21,6 +21,7 @@ pub(crate) enum Command {
     ActionApply,
     Fn,
     Mcp,
+    Serve,
 }
 struct Spec {
     command: Command,
@@ -217,6 +218,16 @@ const SPECS: &[Spec] = &[
         fields: "newline JSON-RPC 2.0: initialize, ping, tools/list, tools/call; discover tool request fields with tools/list",
         example: "ont mcp --client codex",
     },
+    Spec {
+        command: Serve,
+        words: &["serve"],
+        files: &[0],
+        form: "serve --bind ADDR:PORT [--tailscale-socket PATH] [--client NAME]",
+        options: &["--bind", "--tailscale-socket", "--client"],
+        stdin: false,
+        fields: "HTTP/1.1 tailnet server: GET /healthz, POST /mcp, POST /v1/<op>",
+        example: "ont serve --bind 100.64.0.1:8080",
+    },
 ];
 pub(crate) const OPTIONS: &[(&str, &str)] = &[
     ("--store", "PATH"),
@@ -224,6 +235,11 @@ pub(crate) const OPTIONS: &[(&str, &str)] = &[
     (
         "--client",
         "NAME: ASCII lowercase letter/digit then lowercase letters/digits/'-', 1-32 bytes",
+    ),
+    ("--bind", "ADDR:PORT (Tailscale IP only)"),
+    (
+        "--tailscale-socket",
+        "PATH (absolute, default /run/tailscale/tailscaled.sock)",
     ),
     (
         "--source-repository",
@@ -310,8 +326,8 @@ mod tests {
     fn usage_and_dispatch_have_the_same_commands_and_options() {
         let help = help(&[]).unwrap_or(Value::Null);
         assert_eq!(help["commands"].as_array().map(Vec::len), Some(SPECS.len()));
-        // Help text budget in bytes, raised from 5200 when fn was added (2026-11-20).
-        assert!(help.to_string().len() < 5500);
+        // Help text budget in bytes, raised from 5500 by 406 bytes when serve was added (2026-11-24).
+        assert!(help.to_string().len() < 5906);
         for spec in SPECS {
             for files in spec.files {
                 let mut words: Vec<String> = spec.words.iter().map(|s| s.to_string()).collect();

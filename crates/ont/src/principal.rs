@@ -316,10 +316,22 @@ impl<'de> Deserialize<'de> for UniqueMap {
     }
 }
 
-/// A principal as the engine writes it (`specs/ont/action.md` R101).
-fn principal_form(s: &str) -> bool {
-    s.strip_prefix("uid:")
-        .is_some_and(|n| !n.is_empty() && n.len() <= 10 && n.bytes().all(|b| b.is_ascii_digit()))
+/// A principal as the engine writes it (`specs/ont/action.md` R101, R113):
+/// `uid:<1-10 ASCII digits>` or `ts:<1-120 printable non-whitespace ASCII bytes
+/// with no '/', '\\' or '..'>`.
+pub(crate) fn principal_form(s: &str) -> bool {
+    if let Some(n) = s.strip_prefix("uid:") {
+        return !n.is_empty() && n.len() <= 10 && n.bytes().all(|b| b.is_ascii_digit());
+    }
+    if let Some(ts) = s.strip_prefix("ts:") {
+        return !ts.is_empty()
+            && ts.len() <= 120
+            && !ts.contains("..")
+            && ts
+                .bytes()
+                .all(|b| (0x21..=0x7E).contains(&b) && b != b'/' && b != b'\\');
+    }
+    false
 }
 
 /// Read the roles file of `store` for `principal` and `role`, now

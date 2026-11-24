@@ -85,8 +85,8 @@ fn every_help_form_is_json_without_stdin_or_a_store() {
         );
         assert_eq!(out.code, 0, "{}", out.stdout);
         assert!(out.stderr.is_empty());
-        // Help text budget in bytes, raised from 5200 when fn was added (2026-11-20).
-        assert!(out.stdout.len() <= 5500);
+        // Help text budget in bytes, raised from 5500 by 406 bytes when serve was added (2026-11-24).
+        assert!(out.stdout.len() <= 5906);
         let body: Value = serde_json::from_str(&out.stdout).unwrap();
         assert_eq!(body["status"], "ok");
         for command in body["commands"].as_array().unwrap() {

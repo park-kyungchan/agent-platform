@@ -59,14 +59,16 @@
     "specs/ont/render.md",
     "specs/ont/cli.md",
     "specs/ont/fn.md",
-    "specs/ont/gen.md"
+    "specs/ont/gen.md",
+    "specs/ont/serve.md"
    ],
    "tests": [
     "crates/ont/tests/action.rs",
     "crates/ont/tests/render.rs",
     "crates/ont/tests/mcp.rs",
     "crates/ont/tests/refusal_log.rs",
-    "crates/ont/tests/function.rs"
+    "crates/ont/tests/function.rs",
+    "crates/ont/tests/serve.rs"
    ]
   },
   {

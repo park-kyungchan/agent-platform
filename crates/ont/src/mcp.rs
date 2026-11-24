@@ -126,6 +126,16 @@ fn take_panic_location() -> String {
         .unwrap_or_else(|| panic_location(file!(), line!()))
 }
 
+/// Run `f` inside panic containment with [`IN_CALL`] armed so the installed
+/// panic recorder captures the panic site without printing to stderr.
+pub(crate) fn catch_call_panic<T>(f: impl FnOnce() -> T) -> Result<T, String> {
+    IN_CALL.with(|c| c.set(true));
+    let guard = std::mem::DropGuard::new((), |()| IN_CALL.with(|c| c.set(false)));
+    let ran = catch_unwind(AssertUnwindSafe(f));
+    drop(guard);
+    ran.map_err(|_| take_panic_location())
+}
+
 #[derive(Clone, Copy)]
 enum ToolOp {
     Read(Op),
@@ -289,12 +299,21 @@ fn rpc_result(id: Value, result: Value) -> Value {
     json!({"jsonrpc":"2.0","id":id,"result":result})
 }
 
+/// Remote peer identity and header attribution for HTTP `POST /mcp` calls
+/// handled by `crate::serve`. Never inherits server `ONT_AGENT` or `ONT_ROLE`.
+pub(crate) struct RemoteCall {
+    pub(crate) identity: crate::principal::EngineIdentity,
+    pub(crate) agent: Option<String>,
+    pub(crate) role: Option<String>,
+}
+
 /// The server: configuration plus the [`Session`].
 #[doc(hidden)]
 pub struct Server<'a> {
     config: Config,
     session: Session,
     exec: &'a Exec<'a>,
+    remote: Option<RemoteCall>,
 }
 
 impl<'a> Server<'a> {
@@ -307,6 +326,20 @@ impl<'a> Server<'a> {
             config,
             session,
             exec,
+            remote: None,
+        }
+    }
+
+    pub(crate) fn new_remote(config: Config, exec: &'a Exec<'a>, remote: RemoteCall) -> Self {
+        let session = Session {
+            client: config.client.clone(),
+            ..Session::default()
+        };
+        Self {
+            config,
+            session,
+            exec,
+            remote: Some(remote),
         }
     }
 
@@ -402,6 +435,10 @@ impl<'a> Server<'a> {
     /// contained here and answered as an internal failure of this call.
     fn call(&self, op: ToolOp, arguments: &Value) -> (String, bool) {
         let now = self.config.now.unwrap_or_else(now_seconds);
+        if self.remote.is_some() && matches!(op, ToolOp::Read(Op::Index)) {
+            let outcome = render(Err(Refusal::new("operation_not_served").into()), now);
+            return (outcome.stdout.trim_end_matches('\n').to_string(), true);
+        }
         if self.config.read_only && matches!(op, ToolOp::Apply | ToolOp::Read(Op::Index)) {
             // Before any store is opened and before any refusal is recorded.
             let outcome = render(Err(crate::read_only_refusal().into()), now);
@@ -409,29 +446,6 @@ impl<'a> Server<'a> {
         }
         let mut ctx = Context::new(self.config.store.clone(), now);
         ctx.read_only = self.config.read_only;
-        ctx.client = if self.config.client.is_empty() {
-            self.session
-                .client_info_name
-                .as_deref()
-                .filter(|name| valid_client(name))
-                .unwrap_or("mcp")
-                .to_string()
-        } else {
-            self.config.client.clone()
-        };
-        // Keep the CLI action namespace distinct even for a literal "cli" name.
-        if ctx.client == "cli" {
-            ctx.client = "mcp".to_string();
-        }
-        ctx.agent = arguments
-            .get("agent")
-            .and_then(Value::as_str)
-            .map(str::to_string)
-            .or_else(|| std::env::var("ONT_AGENT").ok().filter(|s| !s.is_empty()));
-        ctx.session = arguments
-            .get("session")
-            .and_then(Value::as_str)
-            .map(str::to_string);
         // `role` is a `Context` member: taken out of an action's arguments
         // before the request struct parses the rest (`Err` for a wrong type).
         let mut arguments = arguments.clone();
@@ -443,11 +457,49 @@ impl<'a> Server<'a> {
             },
             _ => Ok(None),
         };
-        ctx.role = role
-            .clone()
-            .ok()
-            .flatten()
-            .or_else(|| std::env::var("ONT_ROLE").ok().filter(|s| !s.is_empty()));
+        if let Some(remote) = &self.remote {
+            ctx.peer_identity = Some(remote.identity.clone());
+            ctx.client = if self.config.client.is_empty() || self.config.client == "cli" {
+                "remote".to_string()
+            } else {
+                self.config.client.clone()
+            };
+            ctx.agent = arguments
+                .get("agent")
+                .and_then(Value::as_str)
+                .map(str::to_string)
+                .or_else(|| remote.agent.clone());
+            ctx.role = role.clone().ok().flatten().or_else(|| remote.role.clone());
+        } else {
+            ctx.client = if self.config.client.is_empty() {
+                self.session
+                    .client_info_name
+                    .as_deref()
+                    .filter(|name| valid_client(name))
+                    .unwrap_or("mcp")
+                    .to_string()
+            } else {
+                self.config.client.clone()
+            };
+            // Keep the CLI action namespace distinct even for a literal "cli" name.
+            if ctx.client == "cli" {
+                ctx.client = "mcp".to_string();
+            }
+            ctx.agent = arguments
+                .get("agent")
+                .and_then(Value::as_str)
+                .map(str::to_string)
+                .or_else(|| std::env::var("ONT_AGENT").ok().filter(|s| !s.is_empty()));
+            ctx.role = role
+                .clone()
+                .ok()
+                .flatten()
+                .or_else(|| std::env::var("ONT_ROLE").ok().filter(|s| !s.is_empty()));
+        }
+        ctx.session = arguments
+            .get("session")
+            .and_then(Value::as_str)
+            .map(str::to_string);
         let check_role = || {
             role.clone()
                 .map(|_| ())
@@ -455,10 +507,7 @@ impl<'a> Server<'a> {
         };
         let arguments = &arguments;
         let request = arguments.to_string();
-        // The thread is inside a tool call until the guard is dropped.
-        IN_CALL.with(|c| c.set(true));
-        let guard = std::mem::DropGuard::new((), |()| IN_CALL.with(|c| c.set(false)));
-        let ran = catch_unwind(AssertUnwindSafe(|| {
+        let ran = catch_call_panic(|| {
             let result = match op {
                 ToolOp::Read(op) => (self.exec)(op, request.as_bytes(), &ctx),
                 ToolOp::ListActions => crate::action::ListActionsRequest::parse(request.as_bytes())
@@ -488,13 +537,11 @@ impl<'a> Server<'a> {
                     }),
             };
             render(result, now)
-        }));
-        drop(guard);
+        });
         let outcome = match ran {
             Ok(o) => o,
-            Err(_) => {
-                let text =
-                    json!({"status":"internal","code":format!("panic@{}", take_panic_location())});
+            Err(loc) => {
+                let text = json!({"status":"internal","code":format!("panic@{loc}")});
                 return (text.to_string(), true);
             }
         };
