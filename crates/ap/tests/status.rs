@@ -598,21 +598,21 @@ fn fixture() -> F {
         "h-unit",
         "active",
         "2026-11-17T08:00:00Z",
-        json!({"unit": oid("unit", "u-run"), "scope": "one unit"}),
+        json!({"subject": oid("unit", "u-run"), "scope": "one unit"}),
     );
     hold(
         &mut f,
         "h-intent",
         "active",
         "2026-11-17T06:00:00Z",
-        json!({"intent": a()}),
+        json!({"subject": a()}),
     );
     hold(
         &mut f,
         "h-other",
         "active",
         "2026-11-17T05:00:00Z",
-        json!({"intent": oid("intent", "beta-index")}),
+        json!({"subject": oid("intent", "beta-index")}),
     );
     hold(
         &mut f,
@@ -831,7 +831,7 @@ fn r4_the_time_and_the_schema_are_the_first_answers_of_the_store() {
     let v = run(&mut f, &Call::Overview);
     // The fake's clock moves with every answer: the first one is the verb's `at`.
     assert_eq!(v["at"], "2026-11-17T12:00:00Z");
-    assert_eq!(v["schema"], 23);
+    assert_eq!(v["schema"], 24);
     let first_schema = v["schema"].clone();
     let members: Vec<&str> = v.as_object().unwrap().keys().map(String::as_str).collect();
     assert_eq!(
@@ -1078,12 +1078,109 @@ fn r10_active_holds_are_listed_with_what_they_name() {
     );
     assert_eq!(
         v["holds"][3],
-        json!({"hold": "h-unit", "effect": "effect of h-unit", "until": "a condition", "unit": "u-run", "intent": null, "scope": "one unit"})
+        json!({"hold": "h-unit", "effect": "effect of h-unit", "until": "a condition", "subject": {"type": "unit", "key": "u-run"}, "unit": "u-run", "intent": null, "scope": "one unit"})
     );
     assert_eq!(
         v["holds"][2],
-        json!({"hold": "h-user", "effect": "effect of h-user", "until": "a condition", "unit": null, "intent": null, "scope": null})
+        json!({"hold": "h-user", "effect": "effect of h-user", "until": "a condition", "subject": null, "unit": null, "intent": null, "scope": null})
     );
+}
+
+// spec: specs/ap/status.md#R10
+#[test]
+fn r10_a_hold_names_its_subject() {
+    let mut f = fixture();
+    // A hold on a host and one on a finding, a hold on a task alone, and one written before schema 24 that names
+    // a unit by the property `unit`: its subject, unit and intent are null.
+    hold(
+        &mut f,
+        "h-host",
+        "active",
+        "2026-11-17T09:00:00Z",
+        json!({"subject": oid("host", "pc"), "scope": "the PC"}),
+    );
+    hold(
+        &mut f,
+        "h-finding",
+        "active",
+        "2026-11-17T09:30:00Z",
+        json!({"subject": oid("finding", "f-info")}),
+    );
+    hold(
+        &mut f,
+        "h-old",
+        "active",
+        "2026-11-17T10:00:00Z",
+        json!({"unit": oid("unit", "u-run")}),
+    );
+    let v = run(&mut f, &Call::Overview);
+    let row = |key: &str| {
+        v["holds"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|h| h["hold"] == key)
+            .unwrap()
+            .clone()
+    };
+    let named = |h: Value| [h["subject"].clone(), h["unit"].clone(), h["intent"].clone()];
+    assert_eq!(
+        named(row("h-host")),
+        [
+            json!({"type": "host", "key": "pc"}),
+            Value::Null,
+            Value::Null
+        ]
+    );
+    assert_eq!(
+        named(row("h-finding")),
+        [
+            json!({"type": "finding", "key": "f-info"}),
+            Value::Null,
+            Value::Null
+        ]
+    );
+    assert_eq!(
+        named(row("h-unit")),
+        [
+            json!({"type": "unit", "key": "u-run"}),
+            json!("u-run"),
+            Value::Null
+        ]
+    );
+    assert_eq!(
+        named(row("h-intent")),
+        [
+            json!({"type": "intent", "key": "alpha-report"}),
+            Value::Null,
+            json!("alpha-report")
+        ]
+    );
+    assert_eq!(named(row("h-old")), [Value::Null, Value::Null, Value::Null]);
+    // The text forms print a subject of another type where a unit is printed.
+    let text = text_of(&Call::Overview, &v);
+    assert!(
+        text.contains("effect of h-host until a condition host pc\n"),
+        "{text}"
+    );
+    assert!(
+        text.contains("effect of h-finding until a condition finding f-info\n"),
+        "{text}"
+    );
+    assert!(
+        text.contains("effect of h-unit until a condition unit u-run\n"),
+        "{text}"
+    );
+    let lines = brief(&mut f, "alpha-report");
+    assert!(
+        lines
+            .iter()
+            .any(|l| l == "hold effect of h-host until a condition host pc scope the PC"),
+        "{lines:?}"
+    );
+    // The unit's own page lists the holds that name it, and the host's hold is not among them.
+    let unit = run(&mut f, &key("u-run"));
+    assert_eq!(strs(&column(&unit["holds"], "hold")), ["h-unit"]);
 }
 
 // spec: specs/ap/status.md#R11
@@ -1303,7 +1400,7 @@ fn r15_a_unit_is_printed_with_its_page_reviews_runs_holds_and_blockers() {
         "h-dep",
         "active",
         "2026-11-17T03:00:00Z",
-        json!({"unit": oid("unit", "u-dep")}),
+        json!({"subject": oid("unit", "u-dep")}),
     );
     let v = run(&mut f, &key("u-dep"));
     // Every property of the page whole, unchanged.
@@ -1399,7 +1496,7 @@ fn r17_the_overview_text_is_one_golden_text() {
     assert!(text.is_ascii());
 }
 const GOLDEN: &str = "\
-status 2026-11-17T12:00:00Z schema work@23
+status 2026-11-17T12:00:00Z schema work@24
 NEEDS THE LEAD
 finding f-urgent: Summary of f-urgent.
 unit u-stop: ci_failed
@@ -1527,7 +1624,7 @@ fn r17_the_text_stays_within_80_lines_and_says_what_it_cut() {
     assert!(text.ends_with("DELIVERY\nunreadable\n"), "{text}");
     assert_eq!(
         text.lines().next(),
-        Some("status 2026-11-17T12:00:00Z schema work@23")
+        Some("status 2026-11-17T12:00:00Z schema work@24")
     );
 }
 
@@ -1629,14 +1726,8 @@ fn r19_a_word_matches_names_exact_first_and_at_most_twelve() {
     let v2 = run(&mut f, &term("route_request"));
     let binding = column(&v2["matches"], "name");
     let names = strs(&binding);
-    assert_eq!(
-        names[..3],
-        [
-            "route_request",
-            "route_request_to_finding",
-            "route_request_to_unit"
-        ]
-    );
+    // Schema 24 removed `route_request_to_finding` and `route_request_to_unit`: the action alone is left.
+    assert_eq!(names, ["route_request"]);
     assert!(
         v2["matches"]
             .as_array()
@@ -2671,7 +2762,7 @@ fn r30_a_cut_run_of_a_unit_under_an_active_hold_gives_no_reason() {
             "h-1",
             status,
             "2026-11-17T10:00:00Z",
-            json!({"unit": unit, "intent": intent}),
+            json!({"subject": if unit.is_null() { intent } else { unit }}),
         );
         w.answer(90)
     };
@@ -3823,7 +3914,7 @@ fn r45_a_section_over_its_share_is_cut_and_the_units_take_the_lines_left() {
             &format!("h-more-{n}"),
             "active",
             "2026-11-17T09:00:00Z",
-            json!({"intent": a()}),
+            json!({"subject": a()}),
         );
     }
     let lines = brief(&mut f, "alpha-report");
@@ -3988,7 +4079,7 @@ fn r44_the_brief_is_at_most_forty_lines_of_at_most_120_bytes_whatever_the_store_
             &format!("h-{n:02}"),
             "active",
             "2026-11-17T09:00:00Z",
-            json!({"intent": a(), "effect": nasty, "until": nasty}),
+            json!({"subject": a(), "effect": nasty, "until": nasty}),
         );
     }
     unit(

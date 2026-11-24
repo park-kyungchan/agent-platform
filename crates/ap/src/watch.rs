@@ -15,6 +15,7 @@ pub mod runtimes;
 
 use crate::host::{Failure, Host, LIMIT, System, digest, fail, id, new_session_id};
 use crate::run::stamp;
+use crate::store::work::{Action, actions};
 use crate::store::{self, Actor};
 use serde_json::{Map, Value, json};
 use std::{
@@ -356,6 +357,19 @@ enum Done {
     Reopened,
     Closed,
 }
+/// The subject a signal's finding names (R32): the host `local` for a signal of the detector `host`, but the host
+/// `pc` for `pc down` (R30); none for another detector.
+fn subject(detector: &str, sig: &Signal) -> Option<Value> {
+    if detector != "host" {
+        return None;
+    }
+    let host = if sig.signature == "pc down" {
+        "pc"
+    } else {
+        "local"
+    };
+    store::subject_of("host", host).map(|s| s.to_value())
+}
 impl Pass {
     fn apply(&mut self, s: &mut impl System, action: &str, key: &str, p: Value, done: Done) {
         self.count += 1;
@@ -419,10 +433,13 @@ impl Pass {
             let f = found.get(&key);
             match f.and_then(|f| f["state"].as_str()) {
                 None => {
-                    let p = json!({"finding": finding, "kind": kind, "detector": detector,
+                    let mut p = json!({"finding": finding, "kind": kind, "detector": detector,
                         "summary": cut(&sig.summary, SUMMARY), "evidence": evidence,
                         "severity": sig.severity});
-                    self.apply(s, "open_finding", &key, p, Done::Opened);
+                    if let Some(subject) = subject(d, sig) {
+                        p["subject"] = subject;
+                    }
+                    self.apply(s, actions::OpenFinding::NAME, &key, p, Done::Opened);
                 }
                 Some("open" | "planned") => {
                     let f = f.unwrap_or(&Value::Null);
@@ -434,12 +451,18 @@ impl Pass {
                         if differs {
                             p["severity"] = json!(sig.severity);
                         }
-                        self.apply(s, "see_finding_again", &key, p, Done::Seen);
+                        if let Some(subject) = subject(d, sig) {
+                            p["subject"] = subject;
+                        }
+                        self.apply(s, actions::SeeFindingAgain::NAME, &key, p, Done::Seen);
                     }
                 }
                 Some("closed") => {
-                    let p = json!({"finding": finding, "evidence": evidence});
-                    self.apply(s, "reopen_finding", &key, p, Done::Reopened);
+                    let mut p = json!({"finding": finding, "evidence": evidence});
+                    if let Some(subject) = subject(d, sig) {
+                        p["subject"] = subject;
+                    }
+                    self.apply(s, actions::ReopenFinding::NAME, &key, p, Done::Reopened);
                 }
                 Some(_) => {}
             }

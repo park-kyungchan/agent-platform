@@ -2074,3 +2074,81 @@ version 22 runs on the repository's file (now version 23): the schema differs fr
 `grants`, `ontology/migrate` runs 21 23, 20 23 and 22 23 (exit 0, the store unchanged) and 23 24 (exit 2). One row is
 new: `ont fn capacity` with `ONT_ROLE=dispatch` answers (it was `not_granted` under that role on version 22). The
 assertions of the rehearsal that named version 22 follow the file's version (23).
+
+## Version 24: subjects
+Version 23 remains pinned at
+`8c83202ddca01bdc68fba5d00244e0d57d87d288:ontology/work.schema.json`,
+sha256 `0d93be949a122324b2d77439b84028ca24f00d71e34ccf2a3b8f78547351f144`.
+Version 24 declares the interface `subject`, what a hold, a request or a finding is about, and one action each acts on a
+subject. Every value type, object type, link type, action type, view, source, function and grant not named below reads
+as on version 23 in canonical JSON. The point of the version: a hold or a finding about a host has nothing to refer to
+without another parallel property; the interface lets one reference name an intent, a unit, a finding or a host. The
+engine is the pin of this version; `ENGINE-PIN` is `48530577c3d5ad7376b7c57f7a7e6531abef78e6`, the pin of the base.
+
+1. The interface. The top-level member `interfaces` holds `subject` (a description and `properties` `{}`); `intent`,
+   `unit`, `finding` and `host` each have `implements` `["subject"]`. `account` implements nothing.
+2. The hold. `hold` gains the optional property `subject` (`{"ref": "subject"}`) and the link `hold_subject` /
+   `subject_holds` (`many_to_one`, `to` the interface); `task` is optional. `set_hold` takes `subject` and `task` (both
+   optional), `effect`, `until` and `scope` (optional, 200 bytes). Its criteria, in this order: `no_subject` (neither
+   `subject` nor `task` given), `unknown_subject`, `unknown_task`, `duplicate_active_hold` (an active hold of the same
+   `effect` on the same subject, read through `subject_holds`, or on the same task, through `holds`). One rule creates the
+   hold with `subject`, `task`, `effect`, `until`, `scope`, `status` `active` and `set_at`. `set_hold_on` is removed;
+   `lift_hold` is unchanged.
+3. The refusal of work. The criterion `held` of `start_unit`, `resume_unit`, `merge_unit`, `close_unit` and `reopen_unit`
+   keeps its code and message and reads `subject_holds` from `$unit` and, with `$intent` given, from `$intent`: a hold on
+   a unit or an intent refuses the same actions with the same code as a hold of `set_hold_on` did. The view
+   `holds_on_work` lists the active holds that have a subject, oldest `set_at` first, with the columns Effect, Until,
+   Subject and Scope.
+4. The finding. `finding` gains the optional property `subject` and the link `finding_subject` / `subject_findings`;
+   `open_finding`, `see_finding_again` and `reopen_finding` take the optional parameter `subject`, which their rule sets
+   (absent: unchanged). No criterion of theirs reads it.
+5. The request. `request` gains the optional property `subject` and the link `request_subject` / `subject_requests`;
+   `request_route` gains the value `subject`. `route_request` takes `request` and `subject` (both required); criteria
+   `request_not_current`, `unknown_subject`, `request_confirms_an_intent`; its rule sets `route` `subject`, `subject` and
+   `routed_at` and clears `intent`, `unit` and `finding`. `route_request_to_unit` and `route_request_to_finding` are
+   removed. `set_request_aside` also clears `subject`. The criterion `by_not_routed_here` of `confirm_intent`,
+   `name_lead` and `waive_criterion` passes for a request routed as on version 23 (`route` `intent`, its `intent` the
+   intent) or by the new form (`route` `subject`, its `subject` that intent; for `waive_criterion` the criterion's
+   intent); these are the only criteria that read a request's `route`. The view `requests_by_topic` gains the column
+   Subject after Intent.
+6. Kept for objects written before this version and set by no action: `hold.unit`, `hold.intent`, `request.unit`,
+   `request.finding`, the route values `unit` and `finding`, and the links `hold_unit`, `hold_intent`, `request_unit` and
+   `request_finding`. The removed actions leave every grant. The engine accepted `linked` from `$subject` (a parameter
+   that references the interface), so `duplicate_active_hold` reads the subject and the task.
+
+### What the store does not check
+- A finding's subject may name no object: the action reads no property through the interface.
+- `route_request` no longer refuses a closed intent (`intent_closed`): an action reads no property through the
+  interface. `ap request` checks the intent first: a route given in the request by `specs/ap/request.md` R12, a route
+  `supersede` inherits by R17.
+- A hold written before this version with `unit` or `intent` and no `subject` is listed by `ap status` with `subject`,
+  `unit` and `intent` null and stops no unit, and `holds_on_work` does not list it.
+- A request written before this version with the route `unit` or `finding` is read by `ap request` as on version 23
+  (`specs/ap/request.md` R16, R20).
+- A subject may be a host, a finding, an intent or a unit that is closed, dropped or retired; a hold on it stays active
+  until `lift_hold`.
+
+### The migration and the rehearsal
+`ontology/migrate` knows version 24; its step is empty. `HIGHEST = 24`; `24 25` is a pair it does not know (exit 2); the
+pairs refused on the version 10 part of the rehearsal are (9, 25), (10, 10) and (10, 9). The walk of versions 22 and 23
+runs on version 23 installed from Git by the commit and digest above (it ran on the repository's file before); its pair
+refused is 23 25. The rehearsal then installs the repository's file over the objects that walk made, with two requests
+routed under version 23 (one to an intent, one to a unit): every object reads the same, every view reads the same but
+`holds_on_work` (no active hold has a subject yet: no row) and `requests_by_topic` (the same rows, a column more); the
+schema differs from version 23 only by points 1 to 6 (the changed names of each section are compared); `ont describe`
+lists the interface `subject`; `ont_describe` and `ont_action_list` stay within 262,144 bytes (the line `v24_mcp_bytes=`
+was 256,410 and 155,646 when this section was written); `ontology/migrate` runs 23 24 and 22 24 (exit 0, the store
+unchanged) and 24 25 (exit 2).
+
+The walk of version 24, each refusal before the action it guards: `set_hold` is refused `no_subject`, `unknown_subject`
+(a unit and a host), `unknown_task` (with a subject and alone) and `duplicate_active_hold` (on a subject and on a task);
+a hold on a unit refuses its `start_unit` `held` and, lifted, admits it; a hold on an intent refuses the `start_unit` of
+its unit and, lifted, admits it; a hold on a host, one on a task alone and one on both apply, and `holds_on_work` lists
+the two that have a subject; `route_request` is refused `unknown_subject`, then routes a request to an intent, a unit, a
+finding and a host, each time clearing `intent`, `unit` and `finding` (the two requests routed under version 23 are
+routed again and lose their old references); `set_request_aside` clears `subject`; `confirm_intent` and `name_lead` by a
+request routed to the intent by `route_request` apply, and by one routed to a unit of the same key are refused
+`by_not_routed_here`; `open_finding` with a host as subject applies, `see_finding_again` without a subject leaves it,
+`see_finding_again` and `reopen_finding` set the subject of a finding that had none; `ont around` from the host reaches
+its findings through `subject_findings` and its holds through `subject_holds`. The last line of standard output of the
+rehearsal is `v24 subjects: ok`.

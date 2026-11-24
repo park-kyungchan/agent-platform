@@ -979,7 +979,7 @@ apply('triage_decision', 'v9-after-carry', dict(decision=third, triage='none', r
 unchanged = fingerprint()
 assert migrate(9, 10) == dict(carried=0, already=3)
 assert fingerprint() == unchanged and fields(third_request)['route_reason'] == 'carried from version 9'
-for before, after in [(9, 24), (10, 10), (10, 9)]:
+for before, after in [(9, 25), (10, 10), (10, 9)]:
     assert migrate(before, after, 2) == dict(status='unknown_pair')
 assert fingerprint() == unchanged
 assert migrate(9, 10) == dict(carried=0, already=3)
@@ -2482,7 +2482,8 @@ print('v20_gate_rows_complete')
 print('v20 cases: ok')
 # Version 21, pinned in Git by the commit of main that holds it, over the objects made under version 20. The schema
 # differs from version 20 only by point 1 of ontology/README.md, "Version 21": each part is taken off a copy, and what
-# is left reads as version 20. The repository's file is version 23, whose walk (version 22's, then 23's) comes after this one.
+# is left reads as version 20. Version 23 is pinned in Git too, and its walk (version 22's, then 23's) comes after this one; the
+# repository's file is version 24, whose walk comes last.
 V21_PIN = ('72fb5e499221d3dc030404ddfa308c673ba7096e', '1812ef2baac76e4c78fc3208c69926d73fb6b5bab7f2ee3361cfa6723499cb35')
 v20_schema = schema
 v20_objects = [o['id'] for t in ('task', 'decision', 'request', 'intent', 'criterion', 'unit', 'review', 'run', 'finding', 'hold', 'principle', 'host', 'account', 'kpi', 'case')
@@ -2688,7 +2689,7 @@ assert len(item_lines(full, 'Lessons')) == 9 and item_lines(full, 'Lessons')[-1]
 print('gate_row=v21-lead-state-within-25-lines expected=admitted lines=25')
 print('v21_gate_rows_complete')
 print('v21 documents: ok')
-# Version 22 and 23: the repository's file over the objects made under version 21. The schema differs from version 21 only by
+# Version 22 and 23, pinned in Git by the commit of main that holds version 23, over the objects made under version 21. The schema differs from version 21 only by
 # its version and its grants (ontology/README.md, "Version 22: roles", "Version 23: capacity for dispatch"): the grant without a role keeps the reads and the
 # derivations of version 21 and holds the one function route, and each of twelve roles has a grant of its own.
 v21_schema = schema
@@ -2699,7 +2700,11 @@ ARGS22 = dict(ARGS21, directory=DIR, intent='v21-lead')
 v21_views = [(view, args, call(['render'], dict(view=view, args=args)))
              for view, args in [(name, {a: ARGS22[a] for a in body.get('args', [])}) for name, body in v21_schema['views'].items()]]
 assert len(v21_views) == 23
-schema = json.loads(pathlib.Path(repo, 'ontology/work.schema.json').read_text())
+V23_PIN = ('8c83202ddca01bdc68fba5d00244e0d57d87d288', '0d93be949a122324b2d77439b84028ca24f00d71e34ccf2a3b8f78547351f144')
+v23_bytes = subprocess.check_output(['git', '-C', repo, 'show', V23_PIN[0] + ':ontology/work.schema.json'], timeout=10)
+assert hashlib.sha256(v23_bytes).hexdigest() == V23_PIN[1]
+v23_path = pathlib.Path(store).with_name('pinned-' + V23_PIN[0] + '.json'); v23_path.write_bytes(v23_bytes)
+schema = json.loads(v23_bytes)
 assert schema['version'] == 23
 head, old = json.loads(json.dumps(schema)), json.loads(json.dumps(v21_schema))
 ROLES22 = ['lead', 'dispatch', 'deliver', 'watch', 'route', 'measure', 'api', 'implementer', 'fixer', 'verifier', 'reviewer', 'writer']
@@ -2724,7 +2729,7 @@ assert {k: v for k, v in head.items() if k != 'version'} == {k: v for k, v in ol
 print('gate_row=v22-only-version-and-grants expected=admitted grants=' + str(len(schema['grants'])))
 # The functions of this copy run a program of the rehearsal's own: the rows below ask whether a role's grant lets the call through.
 fake_fn = pathlib.Path(store).with_name('fake-fn'); fake_fn.write_text('#!/bin/sh\ncat > /dev/null\necho \'{"ok":true}\'\n'); fake_fn.chmod(0o755)
-copy22 = cases_copy(pathlib.Path(repo, 'ontology/work.schema.json'), 'repository.json', 'repository-cases.json')
+copy22 = cases_copy(v23_path, 'pinned-v23.json', 'pinned-v23-route.json')
 copy22_schema = json.loads(copy22.read_text())
 for fn in copy22_schema['functions'].values(): fn['program'] = str(fake_fn)
 copy22.write_text(json.dumps(copy22_schema))
@@ -2739,7 +2744,7 @@ unchanged = fingerprint()
 assert migrate(21, 23) == dict(carried=0, already=0)
 assert migrate(20, 23) == dict(carried=0, already=0)
 assert migrate(22, 23) == dict(carried=0, already=0)
-assert migrate(23, 24, 2) == dict(status='unknown_pair')
+assert migrate(23, 25, 2) == dict(status='unknown_pair')
 assert fingerprint() == unchanged and [obj(i) for i in v21_objects] == v21_before
 print('v22_migration_rows_complete')
 phase = 'v22'
@@ -2800,4 +2805,164 @@ assert fn('cost', 'verifier', dict(since='2026-11-01', until='2026-11-02'), 2)['
 assert fn('clause', 'nosuch', dict(key='o/r:specs/ap/unit.md#R11'), 2)['code'] == 'role_not_admitted'
 print('v22_gate_rows_complete')
 print('v22 roles: ok')
+# Version 24, the repository's file, over the objects made under version 23 (pinned in Git above). The schema differs from
+# version 23 only by points 1 to 6 of ontology/README.md, "Version 24: subjects": the interface and its four types, the hold, the
+# finding and the request with their links, the actions that act on a subject and the two views.
+v23_schema = schema
+v23_objects = [o['id'] for t in ('task', 'decision', 'request', 'intent', 'criterion', 'unit', 'review', 'run', 'finding', 'hold', 'principle', 'host', 'account', 'kpi', 'case')
+               for o in call(['search'], dict(object_type=t, limit=1000))['objects']]
+v23_before = [obj(i) for i in v23_objects]
+v23_views = [(view, args, call(['render'], dict(view=view, args=args)))
+             for view, args in [(name, {a: ARGS22[a] for a in body.get('args', [])}) for name, body in v23_schema['views'].items()]]
+assert len(v23_views) == 23
+# Two requests written under version 23: one routed to an intent, one to a unit (the references version 24 keeps and clears).
+phase = 'v24'
+_apply = apply
+def apply(action, rid, parameters, failure=None, role='lead'): return _apply(action, rid, parameters, failure, role)
+tick(); legacy_intent_request = word21('legacy-intent', 'order'); apply('route_request', 'legacy-intent', dict(request=legacy_intent_request, intent=other_intent))
+tick(); legacy_unit_request = word21('legacy-unit', 'order'); apply('route_request_to_unit', 'legacy-unit', dict(request=legacy_unit_request, unit=unit_a))
+assert fields(legacy_intent_request)['route'] == 'intent' and fields(legacy_unit_request)['route'] == 'unit'
+v23_objects += [legacy_intent_request, legacy_unit_request]
+v23_before = [obj(i) for i in v23_objects]
+schema = json.loads(pathlib.Path(repo, 'ontology/work.schema.json').read_text())
+assert schema['version'] == 24
+head = json.loads(json.dumps(schema))
+old = v23_schema
+# 1: the interface, the member `implements` of four types and nothing else of the sections that carry no point.
+assert 'interfaces' not in old and list(head['interfaces']) == ['subject'] and head['interfaces']['subject']['properties'] == {} and len(head['interfaces']['subject']['description'].encode()) <= 200
+for kind in ('intent', 'unit', 'finding', 'host'): assert head['object_types'][kind]['implements'] == ['subject'], kind
+changed = lambda sec: {k for k in set(head[sec]) | set(old[sec]) if head[sec].get(k) != old[sec].get(k)}
+assert changed('object_types') == {'intent', 'unit', 'finding', 'host', 'hold', 'request'}, changed('object_types')
+assert changed('value_types') == {'request_route'} and changed('sources') == set() and changed('functions') == set()
+assert changed('link_types') == {'hold_subject', 'finding_subject', 'request_subject'} and all(k not in old['link_types'] for k in changed('link_types'))
+assert all(head['link_types'][k]['to'] == 'subject' and head['link_types'][k]['cardinality'] == 'many_to_one' for k in changed('link_types'))
+assert head['link_types']['hold_subject']['names'] == dict(forward='hold_subject', reverse='subject_holds')
+REMOVED24 = {'set_hold_on', 'route_request_to_unit', 'route_request_to_finding'}
+assert set(old['action_types']) - set(head['action_types']) == REMOVED24 and set(head['action_types']) <= set(old['action_types'])
+assert changed('action_types') == REMOVED24 | {'set_hold', 'route_request', 'set_request_aside', 'open_finding', 'see_finding_again', 'reopen_finding', 'confirm_intent', 'name_lead', 'waive_criterion',
+                                                 'start_unit', 'resume_unit', 'merge_unit', 'close_unit', 'reopen_unit'}, changed('action_types')
+assert changed('views') == {'holds_on_work', 'requests_by_topic'}
+assert [c['header'] for c in head['views']['holds_on_work']['columns']] == ['Effect', 'Until', 'Subject', 'Scope']
+assert [c['header'] for c in head['views']['requests_by_topic']['columns']][3:5] == ['Intent', 'Subject']
+for g_new, g_old in zip(head['grants'], old['grants']):
+    assert g_new == dict(g_old, **({'actions': [a for a in g_old['actions'] if a not in REMOVED24]} if 'actions' in g_old else {})), g_new.get('role')
+assert len(head['grants']) == len(old['grants']) and not any(REMOVED24 & set(g.get('actions', [])) for g in head['grants'])
+print('gate_row=v24-only-points-1-to-6 expected=admitted object_types=' + str(len(schema['object_types'])) + ' actions=' + str(len(schema['action_types'])))
+copy24 = cases_copy(pathlib.Path(repo, 'ontology/work.schema.json'), 'repository.json', 'repository-cases.json')
+copy24_schema = json.loads(copy24.read_text())
+for fn_ in copy24_schema['functions'].values(): fn_['program'] = str(fake_fn)
+copy24.write_text(json.dumps(copy24_schema))
+call(['schema', 'install', str(copy24)])
+redirect.trace(work, copies)
+assert [obj(i) for i in v23_objects] == v23_before
+for view, args, before in v23_views:
+    answer = call(['render'], dict(view=view, args=args))
+    if view == 'holds_on_work': assert answer['rows'] == 0, answer
+    elif view == 'requests_by_topic': assert answer['rows'] == before['rows'] and answer['status'] == 'ok', view
+    else: assert answer['rows'] == before['rows'] and answer['markdown'] == before['markdown'].replace('schema=work@23', 'schema=work@24'), view
+print('gate_row=v24-v23-objects-and-views-unchanged expected=admitted objects=' + str(len(v23_objects)) + ' views=' + str(len(v23_views) - 2))
+sizes = []
+for name in ('ont_describe', 'ont_action_list'):
+    wire = subprocess.run([binary, '--store', store, 'mcp'], input=json.dumps(dict(jsonrpc='2.0', id=1, method='tools/call', params=dict(name=name, arguments={}))) + '\n', text=True, capture_output=True, timeout=60)
+    answer = json.loads(wire.stdout.splitlines()[0])['result']; assert wire.returncode == 0 and not answer['isError'], answer
+    sizes.append(len(answer['content'][0]['text'].encode())); assert sizes[-1] <= 262144, (name, sizes[-1])
+print('v24_mcp_bytes=' + ','.join(map(str, sizes)), file=sys.stderr)
+described = call(['describe'], {})
+print('v24_describe_keys=' + ','.join(sorted(described)), file=sys.stderr)
+listed_interfaces = described['interfaces']
+assert 'subject' in (listed_interfaces if isinstance(listed_interfaces, dict) else [i.get('name', i) if isinstance(i, dict) else i for i in listed_interfaces]), listed_interfaces
+unchanged = fingerprint()
+assert migrate(23, 24) == dict(carried=0, already=0)
+assert migrate(22, 24) == dict(carried=0, already=0)
+assert migrate(24, 25, 2) == dict(status='unknown_pair')
+assert fingerprint() == unchanged and [obj(i) for i in v23_objects] == v23_before
+print('v24_migration_rows_complete')
+# The walk. Each refusal row is before the action it guards; a refusal writes nothing.
+gadget = oid('intent', 'gadget-board'); plain_ready = oid('unit', 'fixture-plain-12'); plain_ready_b = oid('unit', 'fixture-v16-c')
+local_host = oid('host', 'v24-local')
+apply('declare_host', 'local', dict(host=local_host, node='v24-local-node', machine='v24-local-machine'))
+sp = dict(effect='v24 effect', until='v24 until', scope='v24 scope')
+# set_hold: a subject or a task, an existing one, and one active hold of an effect per subject.
+apply('set_hold', 'no-subject', dict(sp), 'no_subject')
+apply('set_hold', 'unknown-subject', dict(sp, subject=oid('unit', 'absent-v24-unit')), 'unknown_subject')
+apply('set_hold', 'unknown-subject-host', dict(sp, subject=oid('host', 'absent-v24-host')), 'unknown_subject')
+apply('set_hold', 'unknown-task', dict(sp, subject=plain_ready, task=oid('task', 'absent-v24-task')), 'unknown_task')
+apply('set_hold', 'unknown-task-alone', dict(sp, task=oid('task', 'absent-v24-task')), 'unknown_task')
+# A hold on a unit refuses its start, and lifted admits it.
+hold_unit = created(apply('set_hold', 'unit', dict(sp, subject=plain_ready)), 'hold')
+f = fields(hold_unit); assert f['subject'] == plain_ready and f['status'] == 'active' and f['effect'] == 'v24 effect' and f['scope'] == 'v24 scope' and f.get('task') is None and f['set_at'] == stamp(), f
+apply('set_hold', 'duplicate', dict(sp, subject=plain_ready), 'duplicate_active_hold')
+apply('start_unit', 'unit-held', dict(unit=plain_ready, intent=gadget), 'held')
+apply('lift_hold', 'unit', dict(hold=hold_unit, reason='v24 done'))
+apply('start_unit', 'unit-lifted', dict(unit=plain_ready, intent=gadget)); assert fields(plain_ready)['state'] == 'running'
+# A hold on an intent refuses the start of its unit.
+hold_intent = created(apply('set_hold', 'intent', dict(sp, subject=gadget)), 'hold')
+apply('start_unit', 'intent-held', dict(unit=plain_ready_b, intent=gadget), 'held')
+apply('lift_hold', 'intent', dict(hold=hold_intent, reason='v24 done'))
+apply('start_unit', 'intent-lifted', dict(unit=plain_ready_b, intent=gadget)); assert fields(plain_ready_b)['state'] == 'running'
+# A hold on a host, one on a task alone, and one on a task and a subject.
+hold_host = created(apply('set_hold', 'host', dict(sp, subject=local_host)), 'hold')
+assert fields(hold_host)['subject'] == local_host
+hold_task = created(apply('set_hold', 'task', dict(sp, task=task)), 'hold')
+f = fields(hold_task); assert f['task'] == task and f.get('subject') is None, f
+apply('set_hold', 'task-duplicate', dict(sp, task=task), 'duplicate_active_hold')
+hold_both = created(apply('set_hold', 'both', dict(effect='v24 effect both', until='v24 until', subject=local_host, task=task)), 'hold')
+f = fields(hold_both); assert f['task'] == task and f['subject'] == local_host, f
+view = call(['render'], dict(view='holds_on_work', args={}))
+assert view['rows'] == 2 and 'v24 effect' in view['markdown'] and 'v24 scope' in view['markdown'] and '| Subject |' in view['markdown'], view
+# route_request: a subject that exists, each type, each clearing the other references.
+apply('declare_host', 'local-again', dict(host=oid('host', 'v24-local-b'), node='v24-local-b-node', machine='v24-local-machine'))
+tick(); routed = word21('routed', 'order')
+apply('route_request', 'unknown-subject', dict(request=routed, subject=oid('unit', 'absent-v24-unit')), 'unknown_subject')
+assert fields(routed)['route'] == 'unrouted'
+def route_to(rid, request, subject):
+    apply('route_request', rid, dict(request=request, subject=subject))
+    f = fields(request)
+    assert f['route'] == 'subject' and f['subject'] == subject and f['routed_at'] == stamp() and f.get('intent') is None and f.get('unit') is None and f.get('finding') is None, (rid, f)
+# The two requests routed under version 23 keep their route until they are routed again, which clears the old references.
+tick(); route_to('legacy-intent-to-unit', legacy_intent_request, unit_a)
+tick(); route_to('legacy-unit-to-intent', legacy_unit_request, oid('intent', 'v21-other'))
+tick(); route_to('to-intent', routed, oid('intent', 'v21-other'))
+tick(); route_to('to-unit', routed, unit_a)
+tick(); route_to('to-finding', routed, lesson_a)
+tick(); route_to('to-host', routed, local_host)
+assert fields(routed)['subject']['object_type'] == 'host'
+# set_request_aside clears the subject.
+tick(); apply('set_request_aside', 'subject', dict(request=routed, reason='v24 aside'))
+f = fields(routed); assert f['route'] == 'aside' and f.get('subject') is None and f['route_reason'] == 'v24 aside', f
+# A request routed to an intent by route_request confirms it; one routed to a unit of the same key does not.
+conf = draft('v24-conf', DIR, 'The invented v24 board is delivered.')
+apply('add_criterion', 'conf', dict(intent=conf, statement='The v24 board lists 3 widgets.', check='fixture-check --count 3', baseline='0 widgets'))
+twin_intent = draft('v24-twin', DIR, 'The invented v24 twin board is delivered.')
+apply('add_criterion', 'twin', dict(intent=twin_intent, statement='The v24 twin board lists 3 widgets.', check='fixture-check --count 3', baseline='0 widgets'))
+twin_unit = oid('unit', 'v24-twin')
+apply('add_unit', 'twin', dict(unit=twin_unit, lane='objective', intent=lead_intent, objective='The invented unit v24-twin.', **{'class': 'plain'}))
+tick(); said_unit = word21('twin-unit', 'decision'); route_to('twin-unit', said_unit, twin_unit)
+apply('confirm_intent', 'twin-unit', dict(intent=twin_intent, by=said_unit), 'by_not_routed_here')
+apply('name_lead', 'twin-unit', dict(intent=twin_intent, session='v24-twin-lead', by=said_unit), 'by_not_routed_here')
+tick(); said_conf = word21('conf', 'decision'); route_to('conf', said_conf, conf)
+apply('confirm_intent', 'conf', dict(intent=conf, by=said_conf)); assert fields(conf)['status'] == 'confirmed'
+apply('name_lead', 'conf', dict(intent=conf, session='v24-conf-lead', by=said_conf)); assert fields(conf)['lead_session'] == 'v24-conf-lead'
+# A finding names its subject; seeing it again or reopening it sets the subject of one that had none; absent leaves it.
+finding_host = oid('finding', 'v24-host-finding')
+apply('open_finding', 'host', dict(finding=finding_host, kind='incident', detector='fixture-timer', summary='old cli', evidence='ps', severity='act', subject=local_host))
+assert fields(finding_host)['subject'] == local_host
+tick(); apply('see_finding_again', 'none-given', dict(finding=finding_host, evidence='ps again'))
+assert fields(finding_host)['subject'] == local_host and fields(finding_host)['evidence'] == 'ps again'
+finding_bare = oid('finding', 'v22-watch'); assert fields(finding_bare).get('subject') is None
+apply('see_finding_again', 'subject', dict(finding=finding_bare, evidence='v24 again', subject=local_host))
+assert fields(finding_bare)['subject'] == local_host
+assert fields(lesson_c).get('subject') is None and fields(lesson_c)['state'] == 'closed'
+apply('reopen_finding', 'subject', dict(finding=lesson_c, evidence='v24 back', subject=local_host))
+assert fields(lesson_c)['subject'] == local_host and fields(lesson_c)['state'] == 'open'
+apply('open_finding', 'no-subject', dict(finding=oid('finding', 'v24-no-subject'), kind='note', detector='fixture-timer', summary='v24', severity='info'))
+assert fields(oid('finding', 'v24-no-subject')).get('subject') is None
+# ont around from the host reaches its findings and its holds.
+def around(path): return call(['around'], dict({'from': dict(object_type='host', where={'eq': ['node', 'v24-local-node']}), 'path': [path]}))
+reached = json.dumps(around('subject_findings'))
+assert all(f['native_key'] in reached for f in (finding_host, finding_bare, lesson_c)) and 'v24-no-subject' not in reached, reached
+reached = json.dumps(around('subject_holds'))
+assert hold_host['native_key'] in reached and hold_both['native_key'] in reached and hold_task['native_key'] not in reached and hold_unit['native_key'] not in reached, reached
+print('v24_gate_rows_complete')
+print('v24 subjects: ok')
 PY

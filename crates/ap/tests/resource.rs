@@ -1643,6 +1643,7 @@ fn r12_capacity_counts_a_machine_once_and_says_what_can_start() {
             "available_mb",
             "cpus",
             "free",
+            "held",
             "host",
             "load_x100",
             "machine",
@@ -1692,6 +1693,76 @@ fn r12_capacity_counts_a_machine_once_and_says_what_can_start() {
         (json!(true), json!(false))
     );
     assert_eq!(v["can_start"], json!(["local"]));
+}
+
+// spec: specs/ap/resource.md#R12
+#[test]
+fn r12_a_held_host_leaves_its_machine_out() {
+    let mut f = Fake::new(None);
+    let store = f.dir.path("store.sqlite");
+    f.put(
+        "host",
+        "local",
+        host_fields("local", Some(NOW - 60), NOW - 60, true, true, 2),
+    );
+    // Two hosts of the machine pc, both free; the hold names one of them.
+    f.put(
+        "host",
+        "pc",
+        host_fields("pc", Some(NOW - 30), NOW - 30, true, true, 22),
+    );
+    f.put(
+        "host",
+        "pc-user",
+        host_fields("pc", Some(NOW - 10), NOW - 10, true, true, 24),
+    );
+    let hold = |status: &str, subject: Value| json!({"effect": "no work here", "until": "the Lead says so", "status": status, "subject": subject, "set_at": utc(NOW - 5)});
+    f.put("hold", "h-pc", hold("active", oid("host", "pc")));
+    // A hold on a unit, and one on no subject, change no host.
+    f.put("hold", "h-unit", hold("active", oid("unit", "pc")));
+    f.put(
+        "hold",
+        "h-task",
+        json!({"effect": "e", "until": "u", "status": "active", "task": oid("task", "t")}),
+    );
+    let v = resource::capacity(&mut f, &store, &json!({})).unwrap();
+    let row = |v: &Value, host: &str| {
+        let h = v["hosts"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|h| h["host"] == host)
+            .unwrap();
+        (h["held"].clone(), h["free"].clone())
+    };
+    assert_eq!(row(&v, "local"), (json!(false), json!(true)));
+    assert_eq!(row(&v, "pc"), (json!(true), json!(false)));
+    assert_eq!(row(&v, "pc-user"), (json!(false), json!(true)));
+    // The machine has a held host: it is up and not free, and it is not in can_start.
+    let machine = v["machines"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|m| m["machine"] == "pc")
+        .unwrap();
+    assert_eq!(
+        (&machine["up"], &machine["free"]),
+        (&json!(true), &json!(false))
+    );
+    assert_eq!(v["can_start"], json!(["local"]));
+    // One search of the holds, by the status `active`.
+    let searches: Vec<_> = f
+        .calls
+        .iter()
+        .filter(|(c, b)| c == "search" && b["object_type"] == "hold")
+        .collect();
+    assert_eq!(searches.len(), 1);
+    assert_eq!(searches[0].1["where"], json!({"eq": ["status", "active"]}));
+    // A lifted hold frees the machine again.
+    f.put("hold", "h-pc", hold("lifted", oid("host", "pc")));
+    let v = resource::capacity(&mut f, &store, &json!({})).unwrap();
+    assert_eq!(row(&v, "pc"), (json!(false), json!(true)));
+    assert_eq!(v["can_start"], json!(["local", "pc"]));
 }
 
 /// `n` samples of `local` from `since` on, each made by `each(i)` over the base fields.

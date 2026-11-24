@@ -2922,7 +2922,7 @@ fn engine_the_kpi_pass_records_once_a_day_and_flow_and_share_answer() {
     apply(
         "route_request",
         "route-r3",
-        json!({"request": r3, "intent": intent}),
+        json!({"request": r3, "subject": intent}),
     );
     apply(
         "confirm_intent",

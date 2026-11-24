@@ -237,9 +237,24 @@ fn finding_row((k, f): &Found) -> Value {
     json!({"finding": k, "severity": f["severity"], "kind": f["kind"], "state": f["state"],
         "summary": f["summary"], "last_seen_at": f["last_seen_at"]})
 }
+/// What a hold is about: the type and the native key of its `subject` (R10).
+fn subject_of(f: &Value) -> Option<(&str, &str)> {
+    let subject = &f["subject"];
+    Some((
+        subject["object_type"].as_str()?,
+        subject["native_key"].as_str()?,
+    ))
+}
+/// Whether the subject of the hold `f` is the unit or the intent `key` of that `kind`.
+fn names_of(f: &Value, kind: &str, key: &str) -> bool {
+    subject_of(f) == Some((kind, key))
+}
 fn hold_row((k, f): &Found) -> Value {
-    json!({"hold": k, "effect": f["effect"], "until": f["until"], "unit": key_of(&f["unit"]),
-        "intent": key_of(&f["intent"]), "scope": f["scope"]})
+    let subject = subject_of(f);
+    let named = |kind: &str| subject.filter(|s| s.0 == kind).map(|s| s.1);
+    json!({"hold": k, "effect": f["effect"], "until": f["until"],
+        "subject": subject.map(|(t, k)| json!({"type": t, "key": k})),
+        "unit": named("unit"), "intent": named("intent"), "scope": f["scope"]})
 }
 /// ` w<wave>` after a unit's class for a unit that has a wave, else nothing (R17, R45).
 fn wave(w: &Value) -> String {
@@ -448,10 +463,8 @@ fn intent_in_full(
     reviews.sort_by_key(|(k, r)| (Reverse(text(&r["started_at"]).to_owned()), k.clone()));
     let mut holds = active_holds(s, store)?;
     let here = |f: &Found| {
-        f.1["intent"]["native_key"] == key
-            || f.1["unit"]["native_key"]
-                .as_str()
-                .is_some_and(|u| names.iter().any(|n| *n == u))
+        names_of(&f.1, "intent", key)
+            || subject_of(&f.1).is_some_and(|(t, u)| t == "unit" && names.iter().any(|n| *n == u))
     };
     sort_holds(&mut holds);
     holds.sort_by_key(|h| !here(h));
@@ -493,7 +506,7 @@ fn unit_in_full(
     let reviews = of_unit(s, store, ("reviews_of_unit", "review"), key)?;
     let runs = of_unit(s, store, ("runs_of_unit", "run"), key)?;
     let mut holds = active_holds(s, store)?;
-    holds.retain(|h| h.1["unit"]["native_key"] == key);
+    holds.retain(|h| names_of(&h.1, "unit", key));
     sort_holds(&mut holds);
     let mut blocked = vec![];
     for dep in v["depends_on"].as_array().cloned().unwrap_or_default() {
@@ -579,6 +592,14 @@ fn brief(s: &mut impl System, store: Option<&str>, key: &str) -> Result<Value, F
             || f.1["intent"]["native_key"] == key
     };
     let neither = |f: &Found| f.1["unit"].is_null() && f.1["intent"].is_null();
+    // A hold names the intent or one of its units by its subject (R46); a subject of another type, or none,
+    // is neither.
+    let hold_mine = |f: &Found| {
+        names_of(&f.1, "intent", key)
+            || subject_of(&f.1).is_some_and(|(t, u)| t == "unit" && names.iter().any(|n| *n == u))
+    };
+    let hold_neither =
+        |f: &Found| !subject_of(&f.1).is_some_and(|(t, _)| t == "unit" || t == "intent");
     let value = |v: &Value| one(v.as_str().unwrap_or("-"));
 
     let confirmed = store::confirmed(&i);
@@ -664,22 +685,21 @@ fn brief(s: &mut impl System, store: Option<&str>, key: &str) -> Result<Value, F
     }
 
     let hold_line = |h: &Found| {
-        let on = |k: &str| match h.1[k]["native_key"].as_str().or(h.1[k].as_str()) {
-            Some(x) => format!(" {k} {}", one(x)),
+        let scope = match h.1["scope"].as_str() {
+            Some(x) => format!(" scope {}", one(x)),
             None => String::new(),
         };
-        let (unit, intent) = (on("unit"), on("intent"));
-        let scope = on("scope");
+        let subject = subject_of(&h.1).map_or(String::new(), |(t, k)| format!(" {t} {}", one(k)));
         format!(
-            "hold {} until {}{unit}{intent}{scope}",
+            "hold {} until {}{subject}{scope}",
             value(&h.1["effect"]),
             value(&h.1["until"])
         )
     };
     let (here, rest): (Vec<&Found>, Vec<&Found>) = holds
         .iter()
-        .filter(|h| mine(h) || neither(h))
-        .partition(|h| mine(h));
+        .filter(|h| hold_mine(h) || hold_neither(h))
+        .partition(|h| hold_mine(h));
     let held: Vec<String> = here.into_iter().chain(rest).map(hold_line).collect();
 
     let last = vec![match &delivered {
@@ -1353,9 +1373,8 @@ fn idle(
         .collect();
     if !idle.is_empty() {
         let held = active_holds(s, store)?;
-        let named = |k: &String, h: &Found| {
-            h.1["unit"]["native_key"] == *k || h.1["intent"]["native_key"] == intent
-        };
+        let named =
+            |k: &String, h: &Found| names_of(&h.1, "unit", k) || names_of(&h.1, "intent", intent);
         idle.retain(|k| !held.iter().any(|h| named(k, h)));
     }
     Ok(idle)
@@ -1581,18 +1600,11 @@ fn overview_text(v: &Value) -> String {
         &mut out,
         "HOLDS",
         each("holds", &|h| {
-            let on = |k: &str| {
-                h[k].as_str()
-                    .map(|x| format!(" {k} {}", one(x)))
-                    .unwrap_or_default()
+            let subject = match (h["subject"]["type"].as_str(), h["subject"]["key"].as_str()) {
+                (Some(t), Some(k)) => format!(" {t} {}", one(k)),
+                _ => String::new(),
             };
-            format!(
-                "{} until {}{}{}",
-                g(h, "effect"),
-                g(h, "until"),
-                on("unit"),
-                on("intent")
-            )
+            format!("{} until {}{}", g(h, "effect"), g(h, "until"), subject)
         }),
     );
     let n = v["requests_unrouted"]["count"].as_u64().unwrap_or(0) as usize;

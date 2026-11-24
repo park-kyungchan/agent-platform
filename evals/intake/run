@@ -195,7 +195,7 @@ def build_store(store, seed):
     if seed == "confirmed" and ok:
         yes = act("record_request", dict(said, kind="answer", words="Yes, that is what I want.",
                                          said_at="2026-10-26T07:40:00Z"), 600)
-        ok = yes and act("route_request", {"request": yes, "intent": iid}, 610) \
+        ok = yes and act("route_request", {"request": yes, "subject": iid}, 610) \
             and act("confirm_intent", {"intent": iid, "by": yes}, 620)
     return bool(ok)
 
@@ -252,7 +252,10 @@ def facts(case, answer, store):
         return [r for r in after if r.get("outcome") == "applied" and (not kinds or r.get("action_type") in kinds)]
     mine = [(k, f) for k, f in reqs if f.get("words") == case["words"]]
     if ex["lane"] == "objective":
-        b = any(f.get("route") == "intent" and ref(f.get("intent")) for _, f in mine)
+        # Routed to an intent: as the schema before version 24 wrote it (`route` `intent`), or with an intent as the subject.
+        subject = lambda f: f.get("route") == "subject" and isinstance(f.get("subject"), dict) \
+            and f["subject"].get("object_type") == "intent" and ref(f["subject"])
+        b = any((f.get("route") == "intent" and ref(f.get("intent"))) or subject(f) for _, f in mine)
     elif ex["lane"] == "small":
         b = any(f.get("lane") == "small" and ref(f.get("origin")) in {k for k, _ in mine} for _, f in units)
     else:
