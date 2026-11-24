@@ -1656,11 +1656,24 @@ fn r2_every_check_before_anything_is_made_or_applied() {
             json!({}),
             ("tier_not_supported", "verifier"),
         ),
+        // Muse stays refused (R2); `agy` is admitted (`r4_an_agy_tier_...`).
+        (
+            KEY,
+            json!({"implementer": {"runtime": "muse", "model": "m", "effort": "high"}}),
+            json!({}),
+            ("tier_not_supported", "implementer"),
+        ),
         (
             KEY,
             json!({}),
             json!({"accounts": {"claude/reviewer": ["/a"]}}),
             ("account_not_mapped", "implementer"),
+        ),
+        (
+            KEY,
+            json!({"verifier": {"runtime": "agy", "model": "gemini-4-neon-high", "effort": "high"}}),
+            json!({"accounts": {"claude": ["/a"], "agy/implementer": ["/b"]}}),
+            ("account_not_mapped", "verifier"),
         ),
     ];
     for (key, unit, policy, want) in cases {
@@ -1783,6 +1796,114 @@ fn r4_the_accounts_of_each_stage_by_the_policy_order() {
     f.steps(&["implement", "accept"]);
     assert_eq!(f.ok().0["state"], "merged");
     assert_eq!(account(f.launch(1).0.split('|').next().unwrap()), f.p("a3"));
+}
+
+impl F {
+    /// The units of the walk on `agy`: the fake `agy` at `bin/agy` runs the stage script on the
+    /// accounts `a4` (the implementer's, with a second path `a5` the stage never gets) and `a5`
+    /// (the verifier's), each holding the login token.
+    fn agy_tiers(&mut self) {
+        let fake = self.t.join("bin/agy");
+        std::fs::write(&fake, include_str!("fixtures/fake-agy.sh")).unwrap();
+        std::fs::set_permissions(&fake, std::fs::Permissions::from_mode(0o755)).unwrap();
+        std::fs::write(self.t.join("token"), "not-a-token").unwrap();
+        for account in ["a4", "a5"] {
+            let dir = self.t.join(account).join(".gemini/antigravity-cli");
+            std::fs::create_dir_all(&dir).unwrap();
+            std::os::unix::fs::symlink(self.t.join("token"), dir.join("antigravity-oauth-token"))
+                .unwrap();
+            std::fs::write(self.t.join(format!("bin/mode-{account}")), "script").unwrap();
+            std::fs::write(self.t.join(format!("bin/script-{account}.sh")), STAGE).unwrap();
+        }
+        let accounts = json!({"agy/implementer": [self.p("a4"), self.p("a5")],
+            "agy/reviewer": [self.p("a5")]});
+        let models = json!({"allowed": ["opus", "gemini-4-neon-high", "gemini-4-neon-medium"],
+            "never": []});
+        self.policy(json!({"accounts": accounts, "models": models}));
+        let tier = |level: &str| {
+            json!({"runtime": "agy", "model": format!("gemini-4-neon-{level}"),
+            "effort": level})
+        };
+        self.set_unit(json!({"implementer": tier("high"), "verifier": tier("medium")}));
+        forks::settled();
+    }
+}
+
+// spec: specs/ap/unit-run.md#R2
+// spec: specs/ap/unit-run.md#R4
+// spec: specs/ap/unit-run.md#R38
+// spec: specs/ap/unit-run.md#R43
+#[test]
+fn r4_an_agy_tier_runs_on_its_one_account_never_on_auto_and_the_verifier_has_no_login() {
+    let mut f = F::new();
+    f.agy_tiers();
+    f.steps(&["implement", "accept"]);
+    let (v, _) = f.ok();
+    assert_eq!(v["state"], "merged", "{v}");
+    let author = f.record("1.implementer.md.run.json");
+    let key = by_round(&f)[0].0.clone();
+    let look: Value = serde_json::from_slice(
+        &std::fs::read(f.t.join(format!("reviews/{key}.md.run.json"))).unwrap(),
+    )
+    .unwrap();
+    for (rec, account, role) in [(&author, "a4", "implementer"), (&look, "a5", "reviewer")] {
+        assert_eq!(
+            (&rec["runtime"], &rec["role"]),
+            (&json!("agy"), &json!(role)),
+            "{rec}"
+        );
+        assert_eq!(rec["state"], "ok", "{rec}");
+        assert_eq!(rec["account"], json!(f.p(account)));
+        let home = rec["home"].as_str().unwrap();
+        assert!(
+            home.starts_with(&format!("{}/homes/", f.p(account))),
+            "{home}"
+        );
+        assert_eq!(rec["limits"]["writable"][0], json!(home));
+    }
+    // The author keeps the host's login (`show`) and the Cargo home; its stage names the toolchain.
+    assert_eq!(author["limits"]["show"], json!(["~/.config/gh"]));
+    assert_eq!(
+        author["limits"]["egress"]["names"]
+            .as_array()
+            .unwrap()
+            .len(),
+        8
+    );
+    assert!(env_of(&f, 0, "CARGO_HOME").is_some());
+    assert!(env_of(&f, 0, "RUSTUP_HOME").unwrap().ends_with("/.rustup"));
+    assert!(
+        env_of(&f, 0, "GH_CONFIG_DIR")
+            .unwrap()
+            .ends_with("/.config/gh")
+    );
+    // The verifier is shown no state of `gh` and gets no variable for it, no token.
+    assert!(look["limits"].get("show").is_none(), "{look}");
+    for name in ["GH_CONFIG_DIR", "GH_TOKEN"] {
+        assert_eq!(env_of(&f, 1, name), None, "{name}");
+    }
+    assert!(
+        env_of(&f, 1, "GIT_CONFIG_GLOBAL")
+            .unwrap()
+            .ends_with("/.gitconfig")
+    );
+    assert_eq!(
+        look["limits"]["egress"]["names"].as_array().unwrap().len(),
+        8
+    );
+    // A Claude tier of the same walk is unchanged: `auto`, its other accounts.
+    let mut g = F::new();
+    g.steps(&["implement", "accept"]);
+    assert_eq!(g.ok().0["state"], "merged");
+    let claude = g.record("1.implementer.md.run.json");
+    assert_eq!(claude["runtime"], "claude");
+    assert_eq!(
+        claude["limits"]["egress"]["names"]
+            .as_array()
+            .unwrap()
+            .len(),
+        5
+    );
 }
 
 // spec: specs/ap/unit-run.md#R5
