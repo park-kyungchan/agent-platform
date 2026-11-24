@@ -11,7 +11,6 @@ built here. Agents follow [`AGENTS.md`](AGENTS.md).
 | --- | --- |
 | `deployments/host-artifacts.json` | The inventory: for each recorded copy, the host file (`source`), the copy (`destination`) and the SHA-256 of the copy's bytes (`sha256`) |
 | `deployments/ssh/` | The Tailscale-only sshd drop-in, the plain-ssh drop-in `00-01-ssh-only.conf` and the `ssh.socket` override |
-| `deployments/hindsight/compose.yaml` | The Hindsight compose file |
 | `deployments/tsidp/compose.yaml` | The tsidp compose file |
 | `deployments/host-cron/` | The Docker prune cron files |
 | `etc/agent-platform/policy.json` | The source of the host's `/etc/agent-platform/policy.json` (section "The policy file") |
