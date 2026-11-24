@@ -852,18 +852,14 @@ impl Run {
         rid: String,
         action: &A,
     ) -> Result<Applied, Failure> {
-        let applied = store::apply_action(s, self.store.as_deref(), &self.call(rid), action);
-        self.applied |= applied.is_ok();
-        at(applied, A::NAME)
-    }
-    /// The call of an action of this run: the agent `ap-unit`, the session `u-<key>`, the role `dispatch`.
-    fn call(&self, rid: String) -> work::Call {
         let actor = Actor {
             agent: "ap-unit",
             session: &self.session,
             role: "dispatch",
         };
-        actor.call(rid)
+        let applied = store::apply_action(s, self.store.as_deref(), &actor.call(rid), action);
+        self.applied |= applied.is_ok();
+        at(applied, A::NAME)
     }
     /// The `intent` of an action of an objective unit, copied from the unit's head; the head is the store's, so
     /// what `Id::from_value` does not read ends the form before the action (`name`), nothing applied.
@@ -1930,7 +1926,12 @@ impl Run {
             unit: Some(Id::new(&self.key)),
         };
         let rid = self.rid();
-        let call = self.call(rid);
+        let actor = Actor {
+            agent: "ap-unit",
+            session: &self.session,
+            role: "dispatch",
+        };
+        let call = actor.call(rid);
         let mut req = self.stage(&self.verifier, "reviewer", "verifier", (&prompt, ""));
         (req["ont_role"], req["expect"]) = (json!("verifier"), json!({"first_line": "Verdict: *"}));
         (req["limits"], req["env"]) = self.limits(s, n, false, false, &files)?;
@@ -2445,7 +2446,12 @@ impl Run {
     fn merge(&mut self, s: &mut impl System, n: u64, head: &str) -> Step<Outcome> {
         let rid = self.rid();
         let action = self.merge_action(head, &"0".repeat(40))?;
-        let call = self.call(rid.clone());
+        let actor = Actor {
+            agent: "ap-unit",
+            session: &self.session,
+            role: "dispatch",
+        };
+        let call = actor.call(rid.clone());
         let validated = store::validate_action(s, self.store(), &call, &action);
         let checked = at(validated, actions::MergeUnit::NAME)?;
         if let Some(detail) = not_valid(&checked) {
