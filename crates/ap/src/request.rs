@@ -191,14 +191,27 @@ fn route_of(v: &Value, at: &str) -> Result<Route, Failure> {
     let value = sized(&v[way], &format!("{at}{way}"), max)?.to_owned();
     Ok(match way {
         "aside" => Route::Aside(value),
-        "intent" => Route::To { kind: "intent", key: value },
-        "unit" => Route::To { kind: "unit", key: value },
-        _ => Route::To { kind: "finding", key: value },
+        "intent" => Route::To {
+            kind: "intent",
+            key: value,
+        },
+        "unit" => Route::To {
+            kind: "unit",
+            key: value,
+        },
+        _ => Route::To {
+            kind: "finding",
+            key: value,
+        },
     })
 }
 /// The intent a route names exists and is open (R12; R17 for an inherited route).
 fn check(s: &mut impl System, store: Option<&str>, route: &Route, f: &str) -> Result<(), Failure> {
-    let Route::To { kind: "intent", key } = route else {
+    let Route::To {
+        kind: "intent",
+        key,
+    } = route
+    else {
         return Ok(());
     };
     let intent =
@@ -220,8 +233,8 @@ fn apply_route(
     at(
         match route {
             Route::To { kind, key: to } => {
-                let subject = store::subject_of(kind, to)
-                    .ok_or_else(|| error("route_unknown", "route"))?;
+                let subject =
+                    store::subject_of(kind, to).ok_or_else(|| error("route_unknown", "route"))?;
                 store::route_request(s, store, actor, rid, (key, subject))
             }
             Route::Aside(why) => store::set_request_aside(s, store, actor, rid, (key, why)),
@@ -258,9 +271,7 @@ fn inherited(
             .map(str::to_owned)
     };
     let held = |k: &str| text(k).ok_or_else(|| error("store_answer_unreadable", "supersedes"));
-    let to = |kind: &'static str| {
-        held(kind).map(|key| Some(Route::To { kind, key }))
-    };
+    let to = |kind: &'static str| held(kind).map(|key| Some(Route::To { kind, key }));
     Ok(match old["route"].as_str() {
         Some("unrouted") => None,
         Some("intent") => to("intent")?,
@@ -270,9 +281,14 @@ fn inherited(
         Some("subject") => {
             let kind = old["subject"]["object_type"].as_str().unwrap_or_default();
             let key = old["subject"]["native_key"].as_str().unwrap_or_default();
-            let kind = ["intent", "unit", "finding", "host"].into_iter().find(|k| *k == kind);
+            let kind = ["intent", "unit", "finding", "host"]
+                .into_iter()
+                .find(|k| *k == kind);
             let kind = kind.ok_or_else(|| error("store_answer_unreadable", "supersedes"))?;
-            Some(Route::To { kind, key: key.to_owned() })
+            Some(Route::To {
+                kind,
+                key: key.to_owned(),
+            })
         }
         // Never read as unrouted (R24).
         _ => return Err(fail("route_unknown", "supersedes", old["route"].clone())),
@@ -437,7 +453,12 @@ fn list(s: &mut impl System, store: Option<&str>, r: &Value) -> Result<Value, Fa
         let aside = f["route"] == "aside";
         // A stored route `subject` is listed as the subject's type, its key in the member of that name.
         let subject = (f["route"] == "subject")
-            .then(|| (f["subject"]["object_type"].as_str(), &f["subject"]["native_key"]))
+            .then(|| {
+                (
+                    f["subject"]["object_type"].as_str(),
+                    &f["subject"]["native_key"],
+                )
+            })
             .and_then(|(t, k)| t.map(|t| (t, k)));
         let named = |member: &str| match subject {
             Some((t, k)) if t == member => k.clone(),

@@ -240,7 +240,10 @@ fn finding_row((k, f): &Found) -> Value {
 /// What a hold is about: the type and the native key of its `subject` (R10).
 fn subject_of(f: &Value) -> Option<(&str, &str)> {
     let subject = &f["subject"];
-    Some((subject["object_type"].as_str()?, subject["native_key"].as_str()?))
+    Some((
+        subject["object_type"].as_str()?,
+        subject["native_key"].as_str()?,
+    ))
 }
 /// Whether the subject of the hold `f` is the unit or the intent `key` of that `kind`.
 fn names_of(f: &Value, kind: &str, key: &str) -> bool {
@@ -595,7 +598,8 @@ fn brief(s: &mut impl System, store: Option<&str>, key: &str) -> Result<Value, F
         names_of(&f.1, "intent", key)
             || subject_of(&f.1).is_some_and(|(t, u)| t == "unit" && names.iter().any(|n| *n == u))
     };
-    let hold_neither = |f: &Found| !subject_of(&f.1).is_some_and(|(t, _)| t == "unit" || t == "intent");
+    let hold_neither =
+        |f: &Found| !subject_of(&f.1).is_some_and(|(t, _)| t == "unit" || t == "intent");
     let value = |v: &Value| one(v.as_str().unwrap_or("-"));
 
     let confirmed = store::confirmed(&i);
@@ -1369,7 +1373,8 @@ fn idle(
         .collect();
     if !idle.is_empty() {
         let held = active_holds(s, store)?;
-        let named = |k: &String, h: &Found| names_of(&h.1, "unit", k) || names_of(&h.1, "intent", intent);
+        let named =
+            |k: &String, h: &Found| names_of(&h.1, "unit", k) || names_of(&h.1, "intent", intent);
         idle.retain(|k| !held.iter().any(|h| named(k, h)));
     }
     Ok(idle)

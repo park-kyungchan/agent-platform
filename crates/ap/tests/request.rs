@@ -115,7 +115,8 @@ impl F {
             json!({"object_type": "finding", "state": "open"}),
         );
         // Schema 24: a host is a subject too.
-        f.objects.insert("h1".into(), json!({"object_type": "host"}));
+        f.objects
+            .insert("h1".into(), json!({"object_type": "host"}));
         f
     }
     fn names(&self) -> Vec<String> {
@@ -1190,11 +1191,7 @@ fn r16_supersede_replaces_reads_back_and_keeps_the_route() {
                 };
                 assert_eq!(
                     tail,
-                    [
-                        "search request",
-                        middle,
-                        format!("apply {action}").as_str()
-                    ]
+                    ["search request", middle, format!("apply {action}").as_str()]
                 );
                 p["request"] = oid("request", new);
                 assert_eq!(applied_params(&f, action), p);
@@ -1574,7 +1571,12 @@ fn r16_an_inherited_route_to_a_unit_or_a_finding_is_applied_again() {
 // spec: specs/ap/request.md#R16
 #[test]
 fn r16_an_inherited_subject_is_passed_on_whatever_its_type() {
-    for (kind, key) in [("intent", "open"), ("unit", "u1"), ("finding", "f1"), ("host", "h1")] {
+    for (kind, key) in [
+        ("intent", "open"),
+        ("unit", "u1"),
+        ("finding", "f1"),
+        ("host", "h1"),
+    ] {
         let mut f = F::new();
         let target = oid(kind, key);
         let old = routed_by_hand(&mut f, "subject", Value::Null);
@@ -1597,7 +1599,11 @@ fn r18_each_route_applies_route_request() {
         let request = run(&mut f, &rec())["request"].clone();
         let q = json!({"op": "route", "request_id": "m9", "agent": "lead", "session": "s1", "request": request, member: key});
         let v = run(&mut f, &q);
-        assert_eq!(v, json!({"request": request, "route": "applied"}), "{member}");
+        assert_eq!(
+            v,
+            json!({"request": request, "route": "applied"}),
+            "{member}"
+        );
         // The action is `route_request`, and its `subject` is the object of that type and key.
         assert_eq!(
             applied_params(&f, "route_request"),
@@ -1759,15 +1765,43 @@ fn r20_list_names_a_stored_subject_by_its_type_and_a_stored_route_as_it_is() {
     let intent = routed("m3", "subject", "subject", oid("intent", "open"));
     let v = run(&mut f, &json!({"op": "list", "topic": "walk/one"}));
     let row = |k: &Value| {
-        v["requests"].as_array().unwrap().iter().find(|r| r["request"] == *k).unwrap().clone()
+        v["requests"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|r| r["request"] == *k)
+            .unwrap()
+            .clone()
     };
-    let pick = |r: Value| [&r["route"], &r["intent"], &r["unit"], &r["finding"], &r["host"]].map(Value::clone);
+    let pick = |r: Value| {
+        [
+            &r["route"],
+            &r["intent"],
+            &r["unit"],
+            &r["finding"],
+            &r["host"],
+        ]
+        .map(Value::clone)
+    };
     let n = Value::Null;
-    assert_eq!(pick(row(&old)), [json!("unit"), n.clone(), json!("u1"), n.clone(), n.clone()]);
-    assert_eq!(pick(row(&host)), [json!("host"), n.clone(), n.clone(), n.clone(), json!("h1")]);
-    assert_eq!(pick(row(&intent)), [json!("intent"), json!("open"), n.clone(), n.clone(), n]);
+    assert_eq!(
+        pick(row(&old)),
+        [json!("unit"), n.clone(), json!("u1"), n.clone(), n.clone()]
+    );
+    assert_eq!(
+        pick(row(&host)),
+        [json!("host"), n.clone(), n.clone(), n.clone(), json!("h1")]
+    );
+    assert_eq!(
+        pick(row(&intent)),
+        [json!("intent"), json!("open"), n.clone(), n.clone(), n]
+    );
     let shown = text(&v);
-    assert!(shown.contains(" -> host h1\n") && shown.contains(" -> intent open\n") && shown.contains(" -> unit u1\n"));
+    assert!(
+        shown.contains(" -> host h1\n")
+            && shown.contains(" -> intent open\n")
+            && shown.contains(" -> unit u1\n")
+    );
 }
 
 /// A line of a session record: a prompt the user typed at `t` (`origin.kind` `human`).

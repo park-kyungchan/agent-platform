@@ -898,7 +898,8 @@ impl Run {
     /// The take-over of a cut run applies nothing: an active hold whose subject is the unit or its intent
     /// refuses it (R6).
     fn held(&mut self, s: &mut impl System) -> Result<(), Failure> {
-        let active = json!({"eq": [properties::Hold::Status.name(), values::HoldStatus::Active.as_str()]});
+        let active =
+            json!({"eq": [properties::Hold::Status.name(), values::HoldStatus::Active.as_str()]});
         let holds = at(
             store::search_of::<objects::Hold>(s, self.store(), vec![active]),
             "holds",

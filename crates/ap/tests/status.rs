@@ -1092,26 +1092,92 @@ fn r10_a_hold_names_its_subject() {
     let mut f = fixture();
     // A hold on a host and one on a finding, a hold on a task alone, and one written before schema 24 that names
     // a unit by the property `unit`: its subject, unit and intent are null.
-    hold(&mut f, "h-host", "active", "2026-11-17T09:00:00Z", json!({"subject": oid("host", "pc"), "scope": "the PC"}));
-    hold(&mut f, "h-finding", "active", "2026-11-17T09:30:00Z", json!({"subject": oid("finding", "f-info")}));
-    hold(&mut f, "h-old", "active", "2026-11-17T10:00:00Z", json!({"unit": oid("unit", "u-run")}));
+    hold(
+        &mut f,
+        "h-host",
+        "active",
+        "2026-11-17T09:00:00Z",
+        json!({"subject": oid("host", "pc"), "scope": "the PC"}),
+    );
+    hold(
+        &mut f,
+        "h-finding",
+        "active",
+        "2026-11-17T09:30:00Z",
+        json!({"subject": oid("finding", "f-info")}),
+    );
+    hold(
+        &mut f,
+        "h-old",
+        "active",
+        "2026-11-17T10:00:00Z",
+        json!({"unit": oid("unit", "u-run")}),
+    );
     let v = run(&mut f, &Call::Overview);
     let row = |key: &str| {
-        v["holds"].as_array().unwrap().iter().find(|h| h["hold"] == key).unwrap().clone()
+        v["holds"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|h| h["hold"] == key)
+            .unwrap()
+            .clone()
     };
     let named = |h: Value| [h["subject"].clone(), h["unit"].clone(), h["intent"].clone()];
-    assert_eq!(named(row("h-host")), [json!({"type": "host", "key": "pc"}), Value::Null, Value::Null]);
-    assert_eq!(named(row("h-finding")), [json!({"type": "finding", "key": "f-info"}), Value::Null, Value::Null]);
-    assert_eq!(named(row("h-unit")), [json!({"type": "unit", "key": "u-run"}), json!("u-run"), Value::Null]);
-    assert_eq!(named(row("h-intent")), [json!({"type": "intent", "key": "alpha-report"}), Value::Null, json!("alpha-report")]);
+    assert_eq!(
+        named(row("h-host")),
+        [
+            json!({"type": "host", "key": "pc"}),
+            Value::Null,
+            Value::Null
+        ]
+    );
+    assert_eq!(
+        named(row("h-finding")),
+        [
+            json!({"type": "finding", "key": "f-info"}),
+            Value::Null,
+            Value::Null
+        ]
+    );
+    assert_eq!(
+        named(row("h-unit")),
+        [
+            json!({"type": "unit", "key": "u-run"}),
+            json!("u-run"),
+            Value::Null
+        ]
+    );
+    assert_eq!(
+        named(row("h-intent")),
+        [
+            json!({"type": "intent", "key": "alpha-report"}),
+            Value::Null,
+            json!("alpha-report")
+        ]
+    );
     assert_eq!(named(row("h-old")), [Value::Null, Value::Null, Value::Null]);
     // The text forms print a subject of another type where a unit is printed.
     let text = text_of(&Call::Overview, &v);
-    assert!(text.contains("effect of h-host until a condition host pc\n"), "{text}");
-    assert!(text.contains("effect of h-finding until a condition finding f-info\n"), "{text}");
-    assert!(text.contains("effect of h-unit until a condition unit u-run\n"), "{text}");
+    assert!(
+        text.contains("effect of h-host until a condition host pc\n"),
+        "{text}"
+    );
+    assert!(
+        text.contains("effect of h-finding until a condition finding f-info\n"),
+        "{text}"
+    );
+    assert!(
+        text.contains("effect of h-unit until a condition unit u-run\n"),
+        "{text}"
+    );
     let lines = brief(&mut f, "alpha-report");
-    assert!(lines.iter().any(|l| l == "hold effect of h-host until a condition host pc scope the PC"), "{lines:?}");
+    assert!(
+        lines
+            .iter()
+            .any(|l| l == "hold effect of h-host until a condition host pc scope the PC"),
+        "{lines:?}"
+    );
     // The unit's own page lists the holds that name it, and the host's hold is not among them.
     let unit = run(&mut f, &key("u-run"));
     assert_eq!(strs(&column(&unit["holds"], "hold")), ["h-unit"]);

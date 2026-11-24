@@ -180,11 +180,10 @@ impl F {
             })
         };
         let routed = |k: &str, to: &Value| {
-            self.the(&p[k], "request")
-                .is_some_and(|r| {
-                    (r["route"] == "intent" && &r["intent"] == to)
-                        || (r["route"] == "subject" && &r["subject"] == to)
-                })
+            self.the(&p[k], "request").is_some_and(|r| {
+                (r["route"] == "intent" && &r["intent"] == to)
+                    || (r["route"] == "subject" && &r["subject"] == to)
+            })
         };
         let lead = role == Some("lead");
         let living = |state: &str| {
@@ -1663,7 +1662,12 @@ fn r18_show_reads_the_intent_its_criteria_and_its_requests_and_writes_nothing() 
     // Only the requests routed to this intent, by the time they were said.
     assert_eq!(
         keys(&v, "requests"),
-        [json!("q-start"), json!("q-name"), json!("q-yes"), json!("q-free")]
+        [
+            json!("q-start"),
+            json!("q-name"),
+            json!("q-yes"),
+            json!("q-free")
+        ]
     );
     // Every page, sorted by time then key.
     let mut f = led();

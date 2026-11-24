@@ -809,7 +809,11 @@ pub fn capacity(s: &mut impl System, store: &str, p: &Value) -> Result<Value, Fa
             None => Value::Null,
         };
         let held = held_hosts.contains(key.as_str());
-        let free = if held { json!(false) } else { f["free"].clone() };
+        let free = if held {
+            json!(false)
+        } else {
+            f["free"].clone()
+        };
         rows.push(json!({"host": key, "node": f["node"], "machine": f["machine"], "answers": answers,
             "stale": stale, "observed_at": f["observed_at"], "seen_at": f["seen_at"], "cpus": f["cpus"],
             "load_x100": f["load_x100"], "available_mb": f["available_mb"], "free": free, "held": held}));

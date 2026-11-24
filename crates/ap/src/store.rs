@@ -984,7 +984,10 @@ pub fn intent_shown(
     let mut requests = at(search(s, store, "request", all), "requests")?;
     requests.retain(|(_, f)| f["intent"]["native_key"] == key);
     // Schema version 24 on: a request routed to the intent as its subject.
-    let all = vec![eq("status", json!("current")), eq("route", json!("subject"))];
+    let all = vec![
+        eq("status", json!("current")),
+        eq("route", json!("subject")),
+    ];
     let mut routed = at(search(s, store, "request", all), "requests")?;
     routed.retain(|(_, f)| {
         f["subject"]["object_type"] == "intent" && f["subject"]["native_key"] == key

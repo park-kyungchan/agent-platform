@@ -1202,7 +1202,10 @@ fn r32_findings_of_host_name_the_host_local() {
     // `reopen_finding` of a closed finding that had no subject sets it.
     let mut f = F::quiet();
     f.df = " Avail\n10239M\n".into();
-    f.plant(&kd, stored("host", "disk floor: x", "act", "closed", BASE - 7_200));
+    f.plant(
+        &kd,
+        stored("host", "disk floor: x", "act", "closed", BASE - 7_200),
+    );
     assert!(f.finding(&kd).get("subject").is_none());
     f.pass();
     let bodies = f.bodies();
@@ -1216,7 +1219,11 @@ fn r32_findings_of_host_name_the_host_local() {
     pc_policy(&mut f);
     f.at(15);
     let now = f.now();
-    put(&mut f, CHECKS_LOG, &[checks_line(now - 600, "local", json!("pc_unreachable"))]);
+    put(
+        &mut f,
+        CHECKS_LOG,
+        &[checks_line(now - 600, "local", json!("pc_unreachable"))],
+    );
     f.pass();
     let bodies = f.bodies();
     assert_eq!(
@@ -1243,7 +1250,11 @@ fn r32_findings_of_host_name_the_host_local() {
     f.at(5);
     f.pass();
     assert_eq!(f.bodies()[0]["action_type"], "close_finding");
-    assert_eq!(subject_of(&f.bodies()[0]), None, "a close of a host finding carries none");
+    assert_eq!(
+        subject_of(&f.bodies()[0]),
+        None,
+        "a close of a host finding carries none"
+    );
 }
 
 // spec: specs/ap/watch.md#R6

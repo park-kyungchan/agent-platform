@@ -653,7 +653,10 @@ impl F {
         for k in ["unit", "task", "subject"] {
             if let Some(key) = p[k]["native_key"].as_str().map(str::to_owned) {
                 // A subject carries its own type.
-                let kind = p[k]["object_type"].as_str().filter(|_| k == "subject").unwrap_or(k);
+                let kind = p[k]["object_type"]
+                    .as_str()
+                    .filter(|_| k == "subject")
+                    .unwrap_or(k);
                 p[k] = self.eid(kind, &key);
             }
         }
@@ -755,7 +758,10 @@ impl F {
             }
             // Schema 24: the take-over reads the active holds by one search of `hold` by `status`.
             "search" if input["object_type"] == "hold" => {
-                assert_eq!(input["where"], json!({"all": [{"eq": ["status", "active"]}]}));
+                assert_eq!(
+                    input["where"],
+                    json!({"all": [{"eq": ["status", "active"]}]})
+                );
                 let found: Vec<Value> = (self.objects.iter())
                     .filter(|((t, _), v)| t == "hold" && v["status"] == "active")
                     .map(|((_, key), h)| json!({"id": oid("hold", key), "head": {"fields": Self::wrap(h)}}))
@@ -1819,16 +1825,25 @@ fn r6_a_hold_on_the_unit_refuses_the_take_over() {
     // The subject is the unit: refused `held`, the detail the hold's key; the intent of the unit: the same.
     hold(&mut f, "h-unit", "active", oid("unit", KEY));
     let e = f.refusal();
-    assert_eq!((code(&e), &e.detail), (("held", "unit", 2), &json!("h-unit")));
+    assert_eq!(
+        (code(&e), &e.detail),
+        (("held", "unit", 2), &json!("h-unit"))
+    );
     let searches: Vec<_> = f.calls.iter().filter(|c| c.1[0] == "search").collect();
     assert_eq!(searches.len(), 1);
     assert_eq!(searches[0].2["object_type"], "hold");
-    assert_eq!(searches[0].2["where"], json!({"all": [{"eq": ["status", "active"]}]}));
+    assert_eq!(
+        searches[0].2["where"],
+        json!({"all": [{"eq": ["status", "active"]}]})
+    );
     f.objects.remove(&k("hold", "h-unit"));
     let intent = f.unit()["intent"].clone();
     hold(&mut f, "h-intent", "active", intent);
     let e = f.refusal();
-    assert_eq!((code(&e), &e.detail), (("held", "unit", 2), &json!("h-intent")));
+    assert_eq!(
+        (code(&e), &e.detail),
+        (("held", "unit", 2), &json!("h-intent"))
+    );
     f.objects.remove(&k("hold", "h-intent"));
     assert!(f.actions().is_empty(), "the refusals applied nothing");
     // A hold on another unit, on a host or a finding, a lifted one, one on a task alone, and one written before
@@ -1838,7 +1853,11 @@ fn r6_a_hold_on_the_unit_refuses_the_take_over() {
     hold(&mut f, "h-finding", "active", oid("finding", "f"));
     hold(&mut f, "h-lifted", "lifted", oid("unit", KEY));
     hold(&mut f, "h-task", "active", Value::Null);
-    f.put("hold", "h-old", json!({"status": "active", "effect": "old", "unit": oid("unit", KEY)}));
+    f.put(
+        "hold",
+        "h-old",
+        json!({"status": "active", "effect": "old", "unit": oid("unit", KEY)}),
+    );
     f.steps(&["implement", "accept"]);
     let (a, _) = f.ok();
     assert_ne!(a["refused"], "held", "{a}");

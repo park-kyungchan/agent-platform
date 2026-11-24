@@ -363,7 +363,11 @@ fn subject(detector: &str, sig: &Signal) -> Option<Value> {
     if detector != "host" {
         return None;
     }
-    let host = if sig.signature == "pc down" { "pc" } else { "local" };
+    let host = if sig.signature == "pc down" {
+        "pc"
+    } else {
+        "local"
+    };
     store::subject_of("host", host).map(|s| s.to_value())
 }
 impl Pass {
