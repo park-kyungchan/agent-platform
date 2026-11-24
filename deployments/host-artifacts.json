@@ -12,12 +12,6 @@
     "sanitization": "none; existing environment placeholders preserved"
   },
   {
-    "source": "/docker/hindsight/compose.yaml",
-    "destination": "deployments/hindsight/compose.yaml",
-    "sha256": "6868cd55e24f0a1e47a8fde8237ddce5376b706e1a42a9f2c2e781032cf9d249",
-    "sanitization": "none; existing environment placeholders preserved"
-  },
-  {
     "source": "/docker/tsidp/compose.yaml",
     "destination": "deployments/tsidp/compose.yaml",
     "sha256": "e443d39ade6d9c247a7aca24cd59e68d1b7e00fa7c5eefebc77755ddf2d1f006",
