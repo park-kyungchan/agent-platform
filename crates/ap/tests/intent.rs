@@ -136,6 +136,10 @@ impl F {
             json!({"route": "intent", "intent": oid("intent", intent)}),
         );
     }
+    /// Schema 24: a request routed to the subject `to` (`route_request`).
+    fn route_subject(&mut self, request: &str, to: Value) {
+        self.modify(request, json!({"route": "subject", "subject": to}));
+    }
     fn o(&self, key: &str) -> &Value {
         &self.objects[key]
     }
@@ -177,7 +181,10 @@ impl F {
         };
         let routed = |k: &str, to: &Value| {
             self.the(&p[k], "request")
-                .is_some_and(|r| r["route"] == "intent" && &r["intent"] == to)
+                .is_some_and(|r| {
+                    (r["route"] == "intent" && &r["intent"] == to)
+                        || (r["route"] == "subject" && &r["subject"] == to)
+                })
         };
         let lead = role == Some("lead");
         let living = |state: &str| {
@@ -1609,6 +1616,10 @@ fn r18_show_reads_the_intent_its_criteria_and_its_requests_and_writes_nothing() 
     let mut f = led();
     f.route("q-yes", "widget-report");
     f.route("q-two", "other-one");
+    // Schema 24: a request routed to the intent as its subject is shown too; one routed to a unit of the same key is not.
+    f.route_subject("q-free", oid("intent", "widget-report"));
+    f.route_subject("q-stop", oid("unit", "widget-report"));
+    f.route_subject("q-waive", oid("intent", "other-one"));
     f.calls.clear();
     let v = show(&mut f);
     assert_eq!(
@@ -1616,6 +1627,7 @@ fn r18_show_reads_the_intent_its_criteria_and_its_requests_and_writes_nothing() 
         [
             "get intent",
             "search criterion",
+            "search request",
             "search request",
             "log add_criterion"
         ]
@@ -1627,6 +1639,10 @@ fn r18_show_reads_the_intent_its_criteria_and_its_requests_and_writes_nothing() 
     assert_eq!(
         f.calls[2].1["where"],
         json!({"all": [{"eq": ["status", "current"]}, {"eq": ["route", "intent"]}]})
+    );
+    assert_eq!(
+        f.calls[3].1["where"],
+        json!({"all": [{"eq": ["status", "current"]}, {"eq": ["route", "subject"]}]})
     );
     assert!(f.applies().is_empty());
     let keys = |v: &Value, k: &str| {
@@ -1647,7 +1663,7 @@ fn r18_show_reads_the_intent_its_criteria_and_its_requests_and_writes_nothing() 
     // Only the requests routed to this intent, by the time they were said.
     assert_eq!(
         keys(&v, "requests"),
-        [json!("q-start"), json!("q-name"), json!("q-yes")]
+        [json!("q-start"), json!("q-name"), json!("q-yes"), json!("q-free")]
     );
     // Every page, sorted by time then key.
     let mut f = led();
