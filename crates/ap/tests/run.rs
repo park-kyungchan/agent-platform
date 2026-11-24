@@ -6452,6 +6452,136 @@ fn g8_a_resume_across_runtimes_is_refused_in_both_directions() {
     assert_eq!(f.launches.len(), before + 1);
 }
 
+fn g_step_delta(index: u64, state: &str, delta: &str) -> Value {
+    json!({"event":"step_update","step_update":{"conversation_id":"@CID@",
+           "step_index":index,"state":state,"step_type":"agent_response","text_delta":delta}})
+}
+
+// spec: specs/ap/run.md#R51
+#[test]
+fn agy_multi_step_response_uses_last_non_empty_agent_response_step() {
+    let mut f = Fake::new();
+    let lines = vec![
+        g_init(),
+        g_step(0, "user_input", "DONE"),
+        g_step(5, "tool", "DONE"),
+        g_step_delta(6, "ACTIVE", "Waiting...\n"),
+        g_step(6, "agent_response", "DONE"),
+        g_step_delta(8, "ACTIVE", "Still waiting...\n"),
+        g_step(8, "agent_response", "DONE"),
+        g_step_delta(10, "ACTIVE", "Verdict: accept\n"),
+        g_step_delta(10, "ACTIVE", "deadbeef"),
+        g_step_delta(10, "DONE", "\n"),
+        g_result(
+            "SUCCESS",
+            json!("Waiting...\nStill waiting...\nVerdict: accept\ndeadbeef\n"),
+            g_usage(100, 20, 5, 40),
+            json!(1),
+        ),
+    ];
+    f.agy_lines(&lines);
+    let mut r = f.agy("multi.md");
+    r["expect"] = json!({"first_line": "Verdict: *", "second_line": "deadbeef"});
+    let (v, status) = f.run(&r).unwrap();
+    assert_eq!(
+        (status, v["state"].as_str(), v["expect_met"].as_bool()),
+        (0, Some("ok"), Some(true)),
+        "{v}"
+    );
+    assert_eq!(
+        std::fs::read(f.p("multi.md")).unwrap(),
+        b"Verdict: accept\ndeadbeef\n"
+    );
+
+    // Trailing newline differences between `result.response` and the final step's text still match.
+    let mut lines_no_nl = lines;
+    *lines_no_nl.last_mut().unwrap() = g_result(
+        "SUCCESS",
+        json!("Waiting...\nStill waiting...\nVerdict: accept\ndeadbeef"),
+        g_usage(100, 20, 5, 40),
+        json!(1),
+    );
+    f.agy_lines(&lines_no_nl);
+    let mut r = f.agy("multi_nl.md");
+    r["expect"] = json!({"first_line": "Verdict: *", "second_line": "deadbeef"});
+    let (v, status) = f.run(&r).unwrap();
+    assert_eq!(
+        (status, v["state"].as_str(), v["expect_met"].as_bool()),
+        (0, Some("ok"), Some(true)),
+        "{v}"
+    );
+    assert_eq!(
+        std::fs::read(f.p("multi_nl.md")).unwrap(),
+        b"Verdict: accept\ndeadbeef\n"
+    );
+}
+
+// spec: specs/ap/run.md#R51
+#[test]
+fn agy_step_delta_edge_cases_keep_existing_result_behavior() {
+    let mut f = Fake::new();
+
+    // 1. Stream with no `text_delta`: keeps `result.response` as-is.
+    f.agy_lines(&g_run("Verdict: accept\nabc\n"));
+    let mut r = f.agy("no_delta.md");
+    r["expect"] = json!({"first_line": "Verdict: *", "second_line": "abc"});
+    let (v, status) = f.run(&r).unwrap();
+    assert_eq!(
+        (status, v["state"].as_str(), v["expect_met"].as_bool()),
+        (0, Some("ok"), Some(true)),
+        "{v}"
+    );
+    assert_eq!(
+        std::fs::read(f.p("no_delta.md")).unwrap(),
+        b"Verdict: accept\nabc\n"
+    );
+
+    // 2. Empty `result.response` stays `no_result` (`unmet: "answer"`) even after `text_delta` steps.
+    f.agy_lines(&[
+        g_init(),
+        g_step_delta(6, "DONE", "Verdict: accept\n"),
+        g_result("SUCCESS", json!(""), g_usage(1, 1, 1, 1), json!(1)),
+    ]);
+    let (v, status) = f.run(&f.agy("empty_resp.md")).unwrap();
+    assert_eq!(
+        (status, v["state"].as_str(), v["unmet"].as_str()),
+        (3, Some("no_result"), Some("answer")),
+        "{v}"
+    );
+    assert!(v["answer"].is_null() && !Path::new(&f.p("empty_resp.md")).exists());
+
+    // 3. Whitespace-only final `text_delta`: falls back to `result.response`.
+    let resp_ws = "Verdict: accept\n   \n";
+    f.agy_lines(&[
+        g_init(),
+        g_step_delta(6, "DONE", "Verdict: accept\n"),
+        g_step_delta(8, "DONE", "   \n"),
+        g_result("SUCCESS", json!(resp_ws), g_usage(1, 1, 1, 1), json!(1)),
+    ]);
+    let (v, status) = f.run(&f.agy("ws_delta.md")).unwrap();
+    assert_eq!((status, v["state"].as_str()), (0, Some("ok")), "{v}");
+    assert_eq!(std::fs::read(f.p("ws_delta.md")).unwrap(), resp_ws.as_bytes());
+
+    // 4. `result.response` not ending with `last_text`: falls back to `result.response`.
+    let resp_mismatch = "Different summary\n";
+    f.agy_lines(&[
+        g_init(),
+        g_step_delta(6, "DONE", "Earlier step\n"),
+        g_result(
+            "SUCCESS",
+            json!(resp_mismatch),
+            g_usage(1, 1, 1, 1),
+            json!(1),
+        ),
+    ]);
+    let (v, status) = f.run(&f.agy("mismatch.md")).unwrap();
+    assert_eq!((status, v["state"].as_str()), (0, Some("ok")), "{v}");
+    assert_eq!(
+        std::fs::read(f.p("mismatch.md")).unwrap(),
+        resp_mismatch.as_bytes()
+    );
+}
+
 // ---- notes of earlier verifiers on `ap run`, taken by unit AGY1 -------------------------------
 
 // spec: specs/ap/run.md#R26
