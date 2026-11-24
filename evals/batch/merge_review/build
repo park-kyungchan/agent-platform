@@ -1,0 +1,279 @@
+#!/usr/bin/env -S python3 -I -B
+"""The merge-review job's builder: one Message Batch request per unit merged in a UTC date window, with the diff of
+its merged commit against its first parent, its page from the store, and the numbered requirements of each spec file
+the page names, routed to a model of another family than its verifier's (and --strong for protected paths).
+
+  build --repo <owner>/<name>=<clone> [--repo ...] --since <YYYY-MM-DD> --until <YYYY-MM-DD>
+        --model <id> --strong <id> --out <dir> [--results <file>]... [--max-tokens <n>]
+        [--max-requests <n>] [--store <path>]
+
+Writes requests-model.jsonl, requests-strong.jsonl and items.json into --out and prints one JSON line. Calls no model
+and no network; starts no program but git and the engine (ONT_BIN, default `ont`). Reads no file of a checkout and
+changes no clone. Every refusal is {"status":"<code>"} with exit 2; a store failure is {"status":"store_failed"} with
+exit 3. Contract: evals/batch/merge_review/README.md.
+"""
+import importlib.machinery
+import importlib.util
+import json
+import os
+import sys
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+
+
+def load(name, path):
+    loader = importlib.machinery.SourceFileLoader(name, path)
+    mod = importlib.util.module_from_spec(importlib.util.spec_from_loader(name, loader))
+    loader.exec_module(mod)
+    return mod
+
+
+L = load("batch_lib", os.path.join(HERE, "..", "lib.py"))
+M = load("mining_common", os.path.join(HERE, "..", "mining", "common.py"))
+X = load("merge_review_common", os.path.join(HERE, "common.py"))
+X.bind(L, M)
+
+REQ_RE = X.REQ_RE
+
+
+def parse(argv):
+    p = M.Parser(add_help=False, allow_abbrev=False)
+    p.add_argument("--repo", action="append", required=True)
+    p.add_argument("--since", required=True)
+    p.add_argument("--until", required=True)
+    p.add_argument("--model", required=True)
+    p.add_argument("--strong", required=True)
+    p.add_argument("--out", required=True)
+    p.add_argument("--results", action="append", default=[])
+    p.add_argument("--max-tokens", default="8000")
+    p.add_argument("--max-requests", default="100")
+    p.add_argument("--store")
+    a = p.parse_args(argv)
+    repos = []
+    seen = set()
+    for r in a.repo:
+        name, sep, clone = r.partition("=")
+        if not sep or not X.REPO_NAME.match(name) or not clone or name in seen:
+            raise L.Refuse("usage")
+        seen.add(name)
+        repos.append((name, clone))
+    if not a.out or any(not r for r in a.results) or a.store == "":
+        raise L.Refuse("usage")
+    a.since, a.until, _ = M.window(a.since, a.until)
+    a.model_fam = X.model_family(a.model)
+    a.strong_fam = X.model_family(a.strong)
+    if not a.model_fam or not a.strong_fam or a.model_fam == a.strong_fam:
+        raise L.Refuse("usage")
+    a.max_tokens = M.integer(a.max_tokens, 1024, 8000)
+    a.max_requests = M.integer(a.max_requests, 1, 100)
+    a.repos = repos
+    return a
+
+
+def format_member(name, value):
+    if value is None:
+        return None
+    if name == "acceptance":
+        if not isinstance(value, list) or not value:
+            return None
+        lines = []
+        for idx, c in enumerate(value, 1):
+            if isinstance(c, dict):
+                kind = c.get("kind") or ""
+                check = c.get("check") or ""
+                lines.append(f"{idx}. [{kind}] {check}")
+        return "\n".join(lines) if lines else None
+    if name in ("write_set", "read_first", "specs"):
+        if not isinstance(value, list) or not value:
+            return None
+        entries = []
+        for e in value:
+            if not isinstance(e, str) or not e:
+                continue
+            if name == "specs" and L.is_academy(e.split("#", 1)[0].strip()):
+                continue
+            entries.append(f"- {e}")
+        return "\n".join(entries) if entries else None
+    if isinstance(value, str) and value:
+        return value
+    return None
+
+
+def user_text(repo, pr, ukey, u, commit, is_protected, spec_entries, diff_text):
+    parts = [
+        f"Repository: {repo}",
+        f"Pull request: #{pr}",
+        f"Unit: {ukey}",
+        f"Class: {u.get('class') or ''}",
+        f"Lane: {u.get('lane') or ''}",
+        f"Commit: {commit}",
+        f"Protected: {'yes' if is_protected else 'no'}",
+    ]
+    for name in X.PAGE_MEMBERS:
+        body = format_member(name, u.get(name))
+        if body is not None:
+            parts.append(f"\n## {name}\n\n{body}")
+    if spec_entries:
+        spec_blocks = ["\n## Specification requirements"]
+        for sp, req_lines in spec_entries:
+            if req_lines is None:
+                spec_blocks.append(f"\n### {sp}\nmissing")
+            elif req_lines:
+                spec_blocks.append(f"\n### {sp}\n" + "\n".join(req_lines))
+            else:
+                spec_blocks.append(f"\n### {sp}\n")
+        parts.append("\n".join(spec_blocks))
+    parts.append("\n## Diff\n\n" + diff_text)
+    return "\n".join(parts) + "\n"
+
+
+def run(argv):
+    a = parse(argv)
+    # Academy rule before any read, write, or subprocess call: raw strings first, then resolve.
+    for name, clone in a.repos:
+        L.refuse_academy(name)
+        L.refuse_academy(clone)
+    L.refuse_academy(a.out)
+    for r in a.results:
+        L.refuse_academy(r)
+    if a.store is not None:
+        L.refuse_academy(a.store)
+
+    clones_resolved = [(name, L.resolve(clone)) for name, clone in a.repos]
+    out = L.resolve(a.out)
+    results = [L.resolve(r) for r in a.results]
+    store = L.resolve(a.store) if a.store is not None else None
+
+    counts = {
+        "academy_skipped": 0,
+        "academy_paths": 0,
+        "repo_not_given": 0,
+        "commit_missing": 0,
+        "result_lines_skipped": 0,
+    }
+    settled = M.settled_keys(results, counts)
+    clones = {name: X.Clone(name, path) for name, path in clones_resolved}
+
+    eng = X.engine(store)
+    units = M.search_units(eng)
+    intents = M.search_intents(eng)
+    academy = M.Academy(units, intents)
+
+    system = X.load_text("prompt.md")
+    schema = X.load_json("verdict.schema.json")
+
+    candidates = []
+    for ukey, u in units.items():
+        if u.get("state") != "merged":
+            continue
+        if not M.in_window(u.get("ended_at"), a.since, a.until):
+            continue
+        pr = u.get("pull_request")
+        mc = u.get("merged_commit")
+        if not (isinstance(pr, int) and not isinstance(pr, bool) and pr > 0 and isinstance(mc, str) and mc):
+            continue
+        candidates.append((u["ended_at"], ukey, u))
+    candidates.sort(key=lambda c: (c[0], c[1]))
+
+    items, model_lines, strong_lines = [], [], []
+    requested = 0
+    for _, ukey, u in candidates:
+        repo = u.get("repository")
+        ik = M.ref_key(u.get("intent"))
+        if academy.holds(repo, ukey, [ik] if ik else []):
+            counts["academy_skipped"] += 1
+            continue
+        if not isinstance(repo, str) or repo not in clones:
+            counts["repo_not_given"] += 1
+            continue
+        clone = clones[repo]
+        resolved_pair = clone.resolve_commit(u["merged_commit"])
+        if resolved_pair is None:
+            counts["commit_missing"] += 1
+            continue
+        parent, commit = resolved_pair
+
+        changed = clone.changed_paths(parent, commit)
+        kept_paths = []
+        for p in changed:
+            if L.is_academy(p):
+                counts["academy_paths"] += 1
+            else:
+                kept_paths.append(p)
+        diff_text = clone.diff(parent, commit, kept_paths) if kept_paths else ""
+        is_protected = any(X.protected(p) for p in kept_paths)
+
+        spec_entries = []
+        kept_specs = []
+        for sp in X.spec_paths_of(u):
+            if L.is_academy(sp):
+                counts["academy_paths"] += 1
+                continue
+            kept_specs.append(sp)
+            spec_entries.append((sp, clone.spec_requirements(commit, sp)))
+
+        v_obj = u.get("verifier")
+        verifier_model = v_obj.get("model") if isinstance(v_obj, dict) and isinstance(v_obj.get("model"), str) and v_obj.get("model") else None
+        reader = X.choose_reader(is_protected, verifier_model, a.model_fam, a.strong_fam)
+        model_id = a.strong if reader == "strong" else a.model
+
+        text = user_text(repo, u["pull_request"], ukey, u, commit, is_protected, spec_entries, diff_text)
+        params = M.request_params(model_id, a.max_tokens, system, text, schema)
+        k = L.key(params)
+        if len(text.encode("utf-8")) > X.TEXT_LIMIT:
+            state = "too_large"
+        elif k in settled:
+            state = "settled"
+        elif requested < a.max_requests:
+            state = "requested"
+            requested += 1
+            line = L.request_line(params)
+            if reader == "strong":
+                strong_lines.append(line)
+            else:
+                model_lines.append(line)
+        else:
+            state = "over_max"
+
+        items.append({
+            "unit": ukey,
+            "repository": repo,
+            "pull_request": u["pull_request"],
+            "commit": commit,
+            "verifier": verifier_model,
+            "protected": is_protected,
+            "reader": reader,
+            "specs": kept_specs,
+            "key": k,
+            "state": state,
+        })
+
+    doc = {
+        "job": X.JOB,
+        "since": a.since,
+        "until": a.until,
+        "model": a.model,
+        "strong": a.strong,
+        "items": items,
+    }
+    L.write_files(out, [
+        ("requests-model.jsonl", "".join(x + "\n" for x in model_lines).encode("utf-8")),
+        ("requests-strong.jsonl", "".join(x + "\n" for x in strong_lines).encode("utf-8")),
+        ("items.json", (json.dumps(doc, indent=1, ensure_ascii=False) + "\n").encode("utf-8")),
+    ])
+    states = [it["state"] for it in items]
+    return {
+        "status": "ok",
+        "out": out,
+        "items": len(items),
+        "requested": states.count("requested"),
+        "settled": states.count("settled"),
+        "too_large": states.count("too_large"),
+        "over_max": states.count("over_max"),
+        "protected": sum(1 for it in items if it["protected"]),
+        **counts,
+    }, 0
+
+
+if __name__ == "__main__":
+    sys.exit(L.main(run))
