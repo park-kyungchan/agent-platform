@@ -1252,14 +1252,22 @@ fn written(path: &str, before: &Value) -> bool {
         && (now["sha256"] != before["sha256"] || now["modified"] != before["modified"])
 }
 fn request(s: &mut impl System, r: &Value) -> Result<Request, Failure> {
-    request_at(s, r, true)
+    request_at(s, r, true, true)
 }
 /// Every check of a request but those that need its `cwd` to exist: for a caller that admits a
 /// stage before the stage's worktree exists (`ap unit`).
 pub(crate) fn admit_stage(s: &mut impl System, r: &Value) -> Result<(), Failure> {
-    request_at(s, r, false).map(|_| ())
+    request_at(s, r, false, false).map(|_| ())
 }
-fn request_at(s: &mut impl System, r: &Value, at_cwd: bool) -> Result<Request, Failure> {
+/// `at_cwd`: the stage's `cwd` is checked as it exists now; `agy_authors`: an `agy` implementer or
+/// fixer is admitted (R47). A caller of `admit_stage` (`ap unit`'s case and a verifier's look)
+/// admits an `agy` stage as a reviewer alone, as it did before R47 admitted more.
+fn request_at(
+    s: &mut impl System,
+    r: &Value,
+    at_cwd: bool,
+    agy_authors: bool,
+) -> Result<Request, Failure> {
     let object = r
         .as_object()
         .ok_or_else(|| error("invalid_input", "stdin"))?;
@@ -1270,6 +1278,7 @@ fn request_at(s: &mut impl System, r: &Value, at_cwd: bool) -> Result<Request, F
     let role = text(r, "role")?;
     // Not built for every runtime: some roles (Codex has no reviewer, `agy` only one) and these members.
     require!(runtime.role_ok(role) => "invalid_input", "role");
+    require!(agy_authors || runtime != Runtime::Agy || role == "reviewer" => "invalid_input", "role");
     if let Some(k) = (runtime.unbuilt().iter()).find(|k| r.get(**k).is_some()) {
         return Err(error("invalid_input", k));
     }
