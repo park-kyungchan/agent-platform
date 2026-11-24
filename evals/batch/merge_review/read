@@ -1,0 +1,94 @@
+#!/usr/bin/env -S python3 -I -B
+"""The merge-review job's reader: result files of merge-review requests read against items.json into at most ten new
+findings of detector `batch:merge-review`, kind `drift`, severity `info`, and one comment per read pull request.
+
+  read --items <items.json> --results <file> [--results <file>]... [--store <path>]
+
+The engine is ONT_BIN (default `ont`), started with the caller's environment (ONT_ROLE included and unchanged; no member
+role in any request). GitHub calls use GH_BIN (default `gh`). Prints one JSON line; writes no file. Calls no model and
+runs no command a model wrote. Every refusal is {"status":"<code>"} with exit 2; a store search failure is
+{"status":"store_failed"} with exit 3. Contract: evals/batch/merge_review/README.md.
+"""
+import importlib.machinery
+import importlib.util
+import os
+import sys
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+
+
+def load(name, path):
+    loader = importlib.machinery.SourceFileLoader(name, path)
+    mod = importlib.util.module_from_spec(importlib.util.spec_from_loader(name, loader))
+    loader.exec_module(mod)
+    return mod
+
+
+L = load("batch_lib", os.path.join(HERE, "..", "lib.py"))
+M = load("mining_common", os.path.join(HERE, "..", "mining", "common.py"))
+X = load("merge_review_common", os.path.join(HERE, "common.py"))
+X.bind(L, M)
+
+ORDER = (
+    "status", "lines", "read", "refused", "errored", "unreadable", "stale", "duplicate", "skipped",
+    "defects", "opened", "seen", "left", "over_cap", "already_applied", "commented", "comment_present", "failed",
+)
+
+
+def parse(argv):
+    p = M.Parser(add_help=False, allow_abbrev=False)
+    p.add_argument("--items", required=True)
+    p.add_argument("--results", action="append", required=True)
+    p.add_argument("--store")
+    a = p.parse_args(argv)
+    if not a.items or any(not r for r in a.results) or a.store == "":
+        raise L.Refuse("usage")
+    return a
+
+
+def run(argv):
+    a = parse(argv)
+    # Academy rule before any read, write, or subprocess call: raw strings first, then resolve.
+    L.refuse_academy(a.items)
+    for r in a.results:
+        L.refuse_academy(r)
+    if a.store is not None:
+        L.refuse_academy(a.store)
+
+    items_path = L.resolve(a.items)
+    results_paths = [L.resolve(r) for r in a.results]
+    store = L.resolve(a.store) if a.store is not None else None
+
+    doc = X.load_items(items_path)
+    lines = M.read_results(results_paths)
+    schema = X.load_json("verdict.schema.json")
+    counts, verdicts = M.count_lines(lines, {it["key"] for it in doc["items"]}, schema)
+
+    read_items = [it for it in doc["items"] if it["key"] in verdicts]
+    total_defects = sum(len(verdicts[it["key"]]["defects"]) for it in read_items)
+
+    eng = X.engine(store)
+    stored = X.read_findings(eng)
+    done = X.finding_pass(eng, doc, read_items, verdicts, stored)
+    commented, comment_present, gh_failed = X.post_comments(doc, read_items, verdicts)
+    failed = done["failed"] + gh_failed
+
+    answer = {
+        "status": "ok",
+        "lines": len(lines),
+        **{w: counts[w] for w in X.COUNT_WORDS},
+        "defects": total_defects,
+        "opened": done["opened"],
+        "seen": done["seen"],
+        "left": done["left"],
+        "over_cap": done["over_cap"],
+        "already_applied": done["already_applied"],
+        "commented": commented,
+        "comment_present": comment_present,
+        "failed": failed,
+    }
+    return {k: answer[k] for k in ORDER}, (1 if failed else 0)
+
+
+if __name__ == "__main__":
+    sys.exit(L.main(run))

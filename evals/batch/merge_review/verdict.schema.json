@@ -1,0 +1,22 @@
+{
+ "type": "object",
+ "properties": {
+  "defects": {
+   "type": "array",
+   "items": {
+    "type": "object",
+    "properties": {
+     "title": {"type": "string"},
+     "where": {"type": "string"},
+     "clause": {"type": "string"},
+     "command": {"type": "string"},
+     "why": {"type": "string"}
+    },
+    "required": ["title", "where", "clause", "command", "why"],
+    "additionalProperties": false
+   }
+  }
+ },
+ "required": ["defects"],
+ "additionalProperties": false
+}
