@@ -655,11 +655,15 @@ impl F {
                     assert!(p[field].as_str().unwrap().len() <= max, "{field}");
                 }
                 self.findings.insert(
-                    k,
+                    k.clone(),
                     json!({"kind": p["kind"], "detector": p["detector"], "summary": p["summary"],
                     "evidence": p["evidence"], "severity": p["severity"], "state": "open",
                     "first_seen_at": now, "last_seen_at": now}),
                 );
+                // Schema 24: the rule sets `subject` when it is given.
+                if p.get("subject").is_some() {
+                    self.findings.get_mut(&k).unwrap()["subject"] = p["subject"].clone();
+                }
             }
             "see_finding_again" => {
                 if !live {
@@ -671,6 +675,9 @@ impl F {
                     f["severity"] = p["severity"].clone();
                 }
                 f["last_seen_at"] = json!(now);
+                if p.get("subject").is_some() {
+                    f["subject"] = p["subject"].clone();
+                }
             }
             "reopen_finding" => {
                 if live || state.is_none() {
@@ -680,6 +687,9 @@ impl F {
                 let f = self.findings.get_mut(&k).unwrap();
                 (f["evidence"], f["state"], f["last_seen_at"]) =
                     (p["evidence"].clone(), json!("open"), json!(now));
+                if p.get("subject").is_some() {
+                    f["subject"] = p["subject"].clone();
+                }
             }
             "close_finding" => {
                 if !live {
@@ -1155,6 +1165,85 @@ fn r5_a_closed_finding_is_reopened_and_a_dismissed_one_gets_nothing() {
             .contains("Result=exit-code")
     );
     assert_eq!(f.finding(&kb)["state"], "dismissed");
+}
+
+/// The `subject` an applied action carried: its type and native key, or none.
+fn subject_of(body: &Value) -> Option<(String, String)> {
+    let s = body["parameters"].get("subject")?;
+    Some((
+        s["object_type"].as_str().unwrap().to_owned(),
+        s["native_key"].as_str().unwrap().to_owned(),
+    ))
+}
+// spec: specs/ap/watch.md#R32
+#[test]
+fn r32_findings_of_host_name_the_host_local() {
+    let host = |key: &str| Some(("host".to_owned(), key.to_owned()));
+    let kd = k("host", "disk floor");
+    // `open_finding`, then `see_finding_again` an hour later, for a signal of the detector `host`.
+    let mut f = F::quiet();
+    f.df = " Avail\n10239M\n".into();
+    f.pass();
+    let bodies = f.bodies();
+    assert_eq!(bodies.len(), 1);
+    assert_eq!(
+        (bodies[0]["action_type"].as_str(), subject_of(&bodies[0])),
+        (Some("open_finding"), host("local"))
+    );
+    assert_eq!(f.finding(&kd)["subject"]["native_key"], "local");
+    f.reset();
+    f.at(60);
+    f.pass();
+    let bodies = f.bodies();
+    assert_eq!(
+        (bodies[0]["action_type"].as_str(), subject_of(&bodies[0])),
+        (Some("see_finding_again"), host("local"))
+    );
+    // `reopen_finding` of a closed finding that had no subject sets it.
+    let mut f = F::quiet();
+    f.df = " Avail\n10239M\n".into();
+    f.plant(&kd, stored("host", "disk floor: x", "act", "closed", BASE - 7_200));
+    assert!(f.finding(&kd).get("subject").is_none());
+    f.pass();
+    let bodies = f.bodies();
+    assert_eq!(
+        (bodies[0]["action_type"].as_str(), subject_of(&bodies[0])),
+        (Some("reopen_finding"), host("local"))
+    );
+    assert_eq!(f.finding(&kd)["subject"]["native_key"], "local");
+    // `pc down` (R30) names the host `pc`.
+    let mut f = F::quiet();
+    pc_policy(&mut f);
+    f.at(15);
+    let now = f.now();
+    put(&mut f, CHECKS_LOG, &[checks_line(now - 600, "local", json!("pc_unreachable"))]);
+    f.pass();
+    let bodies = f.bodies();
+    assert_eq!(
+        (bodies[0]["action_type"].as_str(), subject_of(&bodies[0])),
+        (Some("open_finding"), host("pc"))
+    );
+    // The action of another detector carries none, and nor does a close.
+    let mut f = F::quiet();
+    probe(&mut f, "watch-probe-1.service");
+    f.pass();
+    assert_eq!(subject_of(&f.bodies()[0]), None);
+    assert!(f.bodies()[0]["parameters"].get("subject").is_none());
+    f.reset();
+    f.failed_units.clear();
+    f.at(10);
+    f.pass();
+    assert_eq!(f.bodies()[0]["action_type"], "close_finding");
+    assert_eq!(subject_of(&f.bodies()[0]), None);
+    let mut f = F::quiet();
+    f.df = " Avail\n10239M\n".into();
+    f.pass();
+    f.reset();
+    f.df = " Avail\n10240M\n".into();
+    f.at(5);
+    f.pass();
+    assert_eq!(f.bodies()[0]["action_type"], "close_finding");
+    assert_eq!(subject_of(&f.bodies()[0]), None, "a close of a host finding carries none");
 }
 
 // spec: specs/ap/watch.md#R6
