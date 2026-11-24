@@ -1,7 +1,7 @@
 //! `ap unit run` (`specs/ap/unit-run.md`) against fakes: a fake of `ont` that answers the reads and the
 //! actions of the run, of `ap run` and of the page as the engine does (submission criteria, request ids
 //! replayed as `already_applied` or refused `request_id_reused`, the key of a start derived from the
-//! agent and the request id, the views `reviews_of_unit` and `holds_on_work`); a fake hosting service
+//! agent and the request id, the view `reviews_of_unit` and the search of `hold`); a fake hosting service
 //! that reads a pull request's head from a bare origin; the fake `claude` of
 //! tests/fixtures/fake-claude.sh in mode `script` with the stages of tests/fixtures/unit_run/stage.sh;
 //! `systemctl` and the unit launcher replaced as in tests/unit_review.rs, a check's `systemd-run`
