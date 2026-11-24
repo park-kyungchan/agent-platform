@@ -26,3 +26,5 @@ Moved from crates/ont/README.md ("binary install script", "Usage and input diagn
 
 - R13: A render consumer records the required block count N and always passes `ont render --check FILE --expect-blocks N`; a mismatch refuses with `render_block_count`, `expected`, and `found`, including a balanced fence that hides a real block from the parser.
 
+The tailnet HTTP server subcommand `ont serve` is specified in `specs/ont/serve.md`.
+

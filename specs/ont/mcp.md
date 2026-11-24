@@ -47,3 +47,7 @@ Choose an action and its parameter names from `ont_action_list`, and object ids 
 - R18: The action schemas reject additional properties; `agent`, `session` and `role` match `^[A-Za-z0-9._:-]{1,64}$`, and validate accepts `expected` basis revisions.
 - R19: If an apply answer exceeds the response bound after commit, `response_too_large` retains `action_id` and `outcome` so the caller can identify the committed change.
 
+### Remote MCP over HTTP (`ont serve`)
+
+- R20: Over `ont serve` (`POST /mcp`, serve.md R13 to R14), each request carries one JSON-RPC 2.0 message up to `MAX_LINE` bytes (larger returns HTTP `413` with JSON-RPC `-32600` `request_too_large`), answers `200 OK` with JSON-RPC output or `202 Accepted` with empty body for notifications, uses the Tailscale-authenticated peer `EngineIdentity` and remote attribution headers (`X-Ont-Client`, `X-Ont-Agent`, `X-Ont-Role`, default client `remote` with `cli` mapped to `remote`, never inheriting server `ONT_ROLE` or `ONT_AGENT`), and refuses `ont_index` with `operation_not_served` while keeping `ont_action_apply` available.
+

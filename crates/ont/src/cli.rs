@@ -58,6 +58,8 @@ struct Cli {
     from_path: Option<String>,
     sources: Vec<String>,
     client: Option<String>,
+    bind: Option<String>,
+    tailscale_socket: Option<String>,
     command: Vec<String>,
     render_options: std::collections::BTreeMap<String, String>,
     render_args: std::collections::BTreeMap<String, String>,
@@ -88,6 +90,8 @@ fn parse_args(args: &[String]) -> Result<Cli, Refusal> {
         from_path: None,
         sources: Vec::new(),
         client: None,
+        bind: None,
+        tailscale_socket: None,
         command: Vec::new(),
         render_options: Default::default(),
         render_args: Default::default(),
@@ -155,6 +159,16 @@ fn parse_args(args: &[String]) -> Result<Cli, Refusal> {
                 cli.client = Some(
                     it.next()
                         .ok_or_else(|| invalid_argument("--client"))?
+                        .clone(),
+                );
+            }
+            "--bind" => {
+                cli.bind = Some(it.next().ok_or_else(|| invalid_argument("--bind"))?.clone());
+            }
+            "--tailscale-socket" => {
+                cli.tailscale_socket = Some(
+                    it.next()
+                        .ok_or_else(|| invalid_argument("--tailscale-socket"))?
                         .clone(),
                 );
             }
@@ -293,7 +307,7 @@ pub enum Op {
 fn writes(cli: &Cli) -> bool {
     use crate::usage::Command::*;
     match crate::usage::resolve(&cli.command) {
-        Ok(SchemaInstall | Backup | Index | ActionApply) => true,
+        Ok(SchemaInstall | Backup | Index | ActionApply | Serve) => true,
         Ok(Render) => cli.render_options.contains_key("--write"),
         _ => false,
     }
@@ -472,8 +486,8 @@ fn dispatch(cli: &Cli, stdin: impl Read, ctx: &Context) -> Result<Answer, Failur
             ctx,
             &crate::function::FnRequest::parse_stdin(&cli.command[1], &read_request(stdin)?)?,
         ),
-        // `run` answers these two before `dispatch`.
-        SchemaGen | Mcp => Err(invalid_argument("command").into()),
+        // `run` answers these three before `dispatch`.
+        SchemaGen | Mcp | Serve => Err(invalid_argument("command").into()),
     }
 }
 
@@ -603,6 +617,9 @@ pub fn run(args: &[String], stdin: impl Read, real_uid: u32, effective_uid: u32)
     if crate::usage::resolve(&cli.command).is_ok_and(|c| c == crate::usage::Command::Mcp) {
         return run_mcp(&cli, stdin, read_only);
     }
+    if crate::usage::resolve(&cli.command).is_ok_and(|c| c == crate::usage::Command::Serve) {
+        return run_serve(&cli);
+    }
     let now = cli.now.unwrap_or_else(now_seconds);
     let is_action_cmd = crate::usage::resolve(&cli.command).is_ok_and(|c| {
         matches!(
@@ -684,6 +701,95 @@ fn run_mcp(cli: &Cli, stdin: impl Read, read_only: bool) -> Outcome {
             code: 0,
         },
         Err(_) => render(Err(Failure::Internal(crate::internal!("mcp_io_failed"))), 0),
+    }
+}
+
+/// `ont serve --bind ADDR:PORT [--tailscale-socket PATH] [--client NAME]`:
+/// HTTP/1.1 tailnet server authenticated by Tailscale LocalAPI whois.
+fn run_serve(cli: &Cli) -> Outcome {
+    if let Err(r) = check_options(cli, crate::usage::Command::Serve) {
+        return render(Err(r.into()), 0);
+    }
+    let Some(bind_raw) = cli.bind.as_deref() else {
+        return render(
+            Err(crate::usage::invalid("--bind", "required ADDR:PORT on a Tailscale IP").into()),
+            0,
+        );
+    };
+    let Ok(addr) = bind_raw.parse::<std::net::SocketAddr>() else {
+        return render(
+            Err(crate::usage::invalid("--bind", "ADDR:PORT socket address").into()),
+            0,
+        );
+    };
+    if !crate::serve::is_tailnet_ip(addr.ip()) {
+        return render(
+            Err(Refusal::input(
+                "bind_not_tailnet",
+                "--bind",
+                "IP must be in Tailscale range 100.64.0.0/10 or fd7a:115c:a1e0::/48",
+            )
+            .into()),
+            0,
+        );
+    }
+    let socket_raw = cli
+        .tailscale_socket
+        .as_deref()
+        .unwrap_or(crate::serve::DEFAULT_TAILSCALE_SOCKET);
+    if socket_raw.is_empty()
+        || socket_raw.as_bytes().contains(&0)
+        || !std::path::Path::new(socket_raw).is_absolute()
+    {
+        return render(
+            Err(crate::usage::invalid("--tailscale-socket", "an absolute path without NUL").into()),
+            0,
+        );
+    }
+    let client = match cli.client.as_deref() {
+        None => "",
+        Some(client) if crate::mcp::valid_client(client) => client,
+        Some(_) => {
+            return render(
+                Err(Refusal::input(
+                    "invalid_request",
+                    "--client",
+                    "1 to 32 ASCII characters: lowercase letter or digit first; then lowercase letters, digits, or hyphen",
+                )
+                .into()),
+                0,
+            );
+        }
+    };
+    match crate::refusal::open_store(&cli.store, false) {
+        Ok(store) => drop(store),
+        Err(failure) => return render(Err(failure), 0),
+    }
+    let Ok(listener) = std::net::TcpListener::bind(addr) else {
+        return render(
+            Err(Failure::Internal(crate::internal!("serve_bind_failed"))),
+            0,
+        );
+    };
+    crate::mcp::install_panic_recorder();
+    let config = crate::serve::Config {
+        store: cli.store.clone(),
+        now: cli.now,
+        client: client.to_string(),
+    };
+    let resolver: std::sync::Arc<dyn crate::serve::PeerIdentityResolver> =
+        std::sync::Arc::new(crate::serve::TailscaleWhois::new(PathBuf::from(socket_raw)));
+    let shutdown = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+    match crate::serve::serve_listener(listener, config, resolver, shutdown) {
+        Ok(()) => Outcome {
+            stdout: String::new(),
+            stderr: String::new(),
+            code: 0,
+        },
+        Err(_) => render(
+            Err(Failure::Internal(crate::internal!("serve_io_failed"))),
+            0,
+        ),
     }
 }
 

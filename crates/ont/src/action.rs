@@ -2,9 +2,7 @@
 //! Ontology-owned types: grant check, parameter typing, expected-head
 //! check, criteria, observations and the `action_log` row in ONE
 //! IMMEDIATE transaction, then the `edits.jsonl` append after commit.
-use crate::principal::{
-    EngineIdentity, Principal, RoleResolver, engine_identity, not_granted, role_checked,
-};
+use crate::principal::{EngineIdentity, Principal, RoleResolver, not_granted, role_checked};
 use crate::refusal::{open_store, st, store_err};
 use crate::{Answer, Context, Failure, Refusal, internal, sha256_hex};
 use ont_core::schema::{
@@ -2818,7 +2816,7 @@ fn admit_action(
 
 pub fn validate_action(ctx: &Context, req: &ValidateActionRequest) -> Result<Answer, Failure> {
     // Read once, before any refusal: the one identity this call uses.
-    let identity = engine_identity()?;
+    let identity = ctx.identity()?;
     let mut store = open_store(&ctx.store, false)?;
     let set = st!(store.schema_set()).clone();
     let (schema, at) = resolve_action_type(&set, &req.action_type, req.domain.as_deref())?;
@@ -3001,7 +2999,7 @@ fn records_refusal(code: &str) -> bool {
 pub fn apply_action(ctx: &Context, req: &ApplyActionRequest) -> Result<Answer, Failure> {
     // Read once, before any refusal: the one identity this call uses, in the
     // criteria, the log row, the `edits.jsonl` line and the refusal line.
-    let identity = engine_identity()?;
+    let identity = ctx.identity()?;
     crate::refuse_read_only(ctx)?;
     let mut found: Option<(String, u64)> = None;
     let result = apply_found(ctx, &identity, req, &mut found);

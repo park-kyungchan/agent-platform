@@ -11,7 +11,7 @@
 //! `poll` loop in the calling thread. A program over its time or its answer
 //! bound has its process group killed before it is reaped.
 use crate::action::{DeclaredParameter, check_parameter_values};
-use crate::principal::{Principal, RoleResolver, engine_identity, not_granted, role_checked};
+use crate::principal::{Principal, RoleResolver, not_granted, role_checked};
 use crate::refusal::{open_store, st};
 use crate::{Answer, Context, Failure, READ_ONLY_ENV, Refusal, internal};
 use ont_core::schema::FunctionDef;
@@ -157,7 +157,7 @@ fn admit_function(
     name: &str,
 ) -> Result<(), Failure> {
     crate::action::check_actor_bounds(ctx, &None, &None)?;
-    let identity = engine_identity()?;
+    let identity = ctx.identity()?;
     let roles = RoleResolver::new(&ctx.store, &identity.principal, ctx.role.as_deref());
     let refusal = match roles.resolve(schema) {
         Err(refusal) => refusal,

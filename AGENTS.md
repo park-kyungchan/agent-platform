@@ -40,4 +40,4 @@ Code with a real effect, the authoritative state and the commands every CLI call
 
 ## Not here
 
-No daemon, no scheduler, no second copy of the action log, no domain parser. No student data, credentials or host paths of private data in source, tests or fixtures: fixtures are synthetic.
+No daemon, no scheduler, no second copy of the action log, no domain parser. `ont serve` is the single tailnet listener exception to "No daemon". No student data, credentials or host paths of private data in source, tests or fixtures: fixtures are synthetic.

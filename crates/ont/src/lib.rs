@@ -42,6 +42,7 @@ pub mod refusal;
 pub mod render;
 pub mod schema;
 pub mod search;
+pub mod serve;
 pub(crate) mod sources;
 mod usage;
 
@@ -115,6 +116,10 @@ pub struct Context {
     /// function's program): every operation that writes refuses
     /// `read_only_call`. `Context::new` leaves it false.
     pub read_only: bool,
+    /// Authenticated peer identity propagated exclusively by `crate::serve`.
+    /// Local calls and external library callers leave this `None` and read
+    /// `principal::engine_identity()` from the kernel.
+    pub(crate) peer_identity: Option<crate::principal::EngineIdentity>,
 }
 thread_local! {
     static TEST_SNAPSHOT_BOUNDS: std::cell::Cell<Option<(usize, usize)>> = const { std::cell::Cell::new(None) };
@@ -144,7 +149,16 @@ impl Context {
             snapshot_page_size: page,
             snapshot_max_heads: max,
             read_only: false,
+            peer_identity: None,
         }
+    }
+    /// The identity of this call: the peer identity authenticated by
+    /// `crate::serve` when set, else the kernel identity of this process.
+    pub(crate) fn identity(&self) -> Result<crate::principal::EngineIdentity, Failure> {
+        if let Some(identity) = &self.peer_identity {
+            return Ok(identity.clone());
+        }
+        crate::principal::engine_identity()
     }
     /// Test-only constructor: a small snapshot page size (and hard head
     /// bound) without a global.
