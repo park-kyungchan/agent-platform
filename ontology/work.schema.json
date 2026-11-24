@@ -1,7 +1,7 @@
 {
   "format": "ontology-schema/v1",
   "domain": "work",
-  "version": 24,
+  "version": 25,
   "namespace": {
     "instance": "vps://palantirkc",
     "account": "root"
@@ -109,6 +109,8 @@
     "unit_lane": {"base": "string", "enum": ["small", "objective"]},
     "unit_class": {"base": "string", "enum": ["plain", "contract", "effect"]},
     "unit_state": {"base": "string", "enum": ["draft", "ready", "running", "accepted", "stopped", "merged", "done", "dropped"]},
+    "unit_kind": {"base": "string", "enum": ["rust", "schema", "instructions", "removal", "script", "typescript", "config", "import"]},
+    "unit_approver": {"base": "string", "enum": ["lead", "policy"]},
     "acceptance_kind": {"base": "string", "enum": ["fails_on_base", "invariant"]},
     "run_status": {"base": "string", "enum": ["running", "closed"]},
     "finding_kind": {"base": "string", "enum": ["incident", "lesson", "drift", "security", "note", "bottleneck"]},
@@ -1267,7 +1269,15 @@
         "waits_on": {"type": "string", "required": false, "max_bytes": 300, "description": "The constraint a ready unit waits on, as the dispatch pass last saw it."},
         "evidence": {"type": "string", "required": false, "max_bytes": 1500, "description": "What shows a unit without a pull request is done; its SHA-256 is the head."},
         "delivered_lines": {"type": "integer", "required": false, "description": "The changed lines delivered."},
-        "drop_reason": {"type": "string", "required": false, "max_bytes": 600, "description": "Why the unit was dropped."}
+        "drop_reason": {"type": "string", "required": false, "max_bytes": 600, "description": "Why the unit was dropped."},
+        "kind": {"type": {"value_type": "unit_kind"}, "required": false, "description": "What the unit changes: rust, schema, instructions, removal, script, typescript, config or import."},
+        "use": {"type": "string", "required": false, "max_bytes": 600, "description": "The real run that shows the first use of the result; \"none:\" and the reason where there is none."},
+        "used_at": {"type": {"value_type": "utc_time"}, "required": false, "description": "When record_use applied."},
+        "use_evidence": {"type": "string", "required": false, "max_bytes": 1000, "description": "What the run of the first use showed (record_use)."},
+        "depends_delivered": {"type": {"array": {"ref": "unit"}}, "required": false, "description": "Units whose result must be delivered, not only merged, before this one starts."},
+        "deferred_by": {"type": {"ref": "request"}, "required": false, "description": "The user's request that deferred the unit (defer_unit); while it is set the unit is not made ready."},
+        "approved_by": {"type": {"value_type": "unit_approver"}, "required": false, "description": "Who approved approved_head: lead (approve_unit) or policy (approve_unit_by_policy)."},
+        "guarded": {"type": "boolean", "required": false, "description": "Whether the head changes a guarded path, as record_head last said; only false lets the policy approve."}
       }
     },
     "run": {
@@ -2164,626 +2174,6 @@
         }
       ]
     },
-    "start_worker_run": {
-      "description": "Start a worker: task identifies its task, name identifies the run, tier its judgment level, runtime the CLI, session its session id, packet its assignment reference. Application time is generated automatically. Actions take the full Id from search; view arguments take the native key.",
-      "parameters": {
-        "task": {
-          "type": {
-            "ref": "task"
-          },
-          "required": true,
-          "description": "Reference to the task owning the new object."
-        },
-        "name": {
-          "type": "string",
-          "required": true,
-          "max_bytes": 80,
-          "description": "Worker name, unique among running workers within its task."
-        },
-        "tier": {
-          "type": {
-            "value_type": "worker_tier"
-          },
-          "required": true,
-          "description": "Worker judgment level: mechanical, bounded, open or review."
-        },
-        "runtime": {
-          "type": "string",
-          "required": true,
-          "max_bytes": 120,
-          "description": "CLI or executor used by this worker run, for example codex."
-        },
-        "session": {
-          "type": "string",
-          "required": false,
-          "max_bytes": 200,
-          "description": "Optional runtime session identifier for locating the worker session; not an authenticated identity."
-        },
-        "packet": {
-          "type": {
-            "ref": "packet"
-          },
-          "required": true,
-          "description": "File Id from search; or {\"object_type\":\"packet\",\"namespace\":{\"instance\":\"vps://palantirkc\",\"account\":\"root\"},\"native_key\":\"<path below /home/palantirkc/work/>\"}. May remain unresolved when key is wrong; get on the Id shows whether the file object exists."
-        },
-        "thread": {
-          "type": {"ref": "thread"},
-          "required": true
-        },
-        "layer": {
-          "type": {"value_type": "worker_layer"},
-          "required": true
-        },
-        "plan": {
-          "type": {"ref": "plan"},
-          "required": true
-        },
-        "write_set": {"type": {"array": {
-          "value_type": "write_pattern"
-        }}, "required": false, "description": "Each member must match write_pattern: ASCII path part at most 297 bytes, optional trailing /** (300 bytes total); only the caller bounds the count to 64; the schema has no member-count bound."}
-      },
-      "submission_criteria": [
-        {
-          "code": "unknown_task",
-          "message": "Search task and pass its full Id; choose a task that exists and is not retracted.",
-          "all": [
-            {
-              "exists": "$task"
-            }
-          ]
-        },
-        {
-          "code": "duplicate_running_worker",
-          "message": "Close the running worker of this name before starting another.",
-          "none": [
-            {
-              "linked": {
-                "from": "$task",
-                "link": "running_worker_runs",
-                "where": {
-                  "all": [
-                    {
-                      "eq": [
-                        "name",
-                        "$name"
-                      ]
-                    }
-                  ]
-                }
-              }
-            }
-          ]
-        },
-        {
-          "code": "unknown_thread",
-          "message": "Choose an existing thread.",
-          "all": [{"exists": "$thread"}]
-        },
-        {
-          "code": "thread_of_other_task",
-          "message": "Use a thread belonging to this task.",
-          "all": [{"exists": "$thread"}, {"eq": ["$thread.task", "$task"]}]
-        },
-        {
-          "code": "engine_without_domain_consumer",
-          "message": "Engine work requires a domain_route consumer.",
-          "all": [{"exists": "$thread"}, {"any": [{"ne": ["$layer", "engine"]}, {"eq": ["$thread.consumer_kind", "domain_route"]}]}]
-        },
-        {"code": "plan_missing", "message": "Choose an existing plan.", "all": [{"exists": "$plan"}]},
-        {
-          "code": "plan_of_other_thread",
-          "message": "Use the plan belonging to this thread.",
-          "all": [{"exists": "$plan"}, {"eq": ["$plan.thread", "$thread"]}]
-        },
-        {
-          "code": "missing_first_use",
-          "message": "Name a consumer kind and its first observed use.",
-          "all": [{"exists": "$thread"}, {"ne": ["$thread.consumer_kind", "none"]}, {"ne": ["$thread.first_use", ""]}]
-        },
-        {
-          "code": "plan_over_limit",
-          "message": "Record an independent scope/design review covering the current size, or dispatch a reviewer.",
-          "all": [{"exists": "$plan"}, {"any": [{"le": ["$plan.current_lines", "$plan.limit_lines"]}, {"all": [{"present": "$plan.reviewed_lines"}, {"le": ["$plan.current_lines", "$plan.reviewed_lines"]}]}, {"eq": ["$tier", "review"]}]}]
-        }
-      ],
-      "rules": [
-        {
-          "create_object": "worker_run",
-          "set": {
-            "task": "$task",
-            "name": "$name",
-            "tier": "$tier",
-            "runtime": "$runtime",
-            "session": "$session",
-            "started_at": "$now",
-            "status": "running",
-            "packet": "$packet",
-            "thread": "$thread",
-            "layer": "$layer",
-            "plan": "$plan",
-            "write_set": "$write_set",
-            "running_in": "$task"
-          }
-        }
-      ]
-    },
-    "note_worker_run": {
-      "description": "Record note as the running worker_run progress; optional report links its report file. This does not change the final result. Actions take the full Id from search; view arguments take the native key.",
-      "parameters": {
-        "worker_run": {
-          "type": {
-            "ref": "worker_run"
-          },
-          "required": true,
-          "description": "Reference to the running worker being noted or closed."
-        },
-        "note": {
-          "type": "string",
-          "required": true,
-          "max_bytes": 600,
-          "description": "Current worker progress; stored separately from the final result."
-        },
-        "report": {
-          "type": {
-            "ref": "report"
-          },
-          "required": false,
-          "description": "File Id from search; or {\"object_type\":\"report\",\"namespace\":{\"instance\":\"vps://palantirkc\",\"account\":\"root\"},\"native_key\":\"<path below /home/palantirkc/work/>\"}. May remain unresolved when key is wrong; get on the Id shows whether the file object exists."
-        }
-      },
-      "submission_criteria": [
-        {
-          "code": "worker_run_not_running",
-          "message": "Read worker_run and choose one whose status is running.",
-          "all": [
-            {
-              "eq": [
-                "$worker_run.status",
-                "running"
-              ]
-            }
-          ]
-        }
-      ],
-      "rules": [
-        {
-          "modify_object": "worker_run",
-          "set": {
-            "last_note": "$note",
-            "report": "$report"
-          }
-        }
-      ]
-    },
-    "close_worker_run": {
-      "description": "Close running worker_run with required final result and optional report reference; status and application time change automatically. Actions take the full Id from search; view arguments take the native key.",
-      "parameters": {
-        "worker_run": {
-          "type": {
-            "ref": "worker_run"
-          },
-          "required": true,
-          "description": "Reference to the running worker being noted or closed."
-        },
-        "result": {
-          "type": "string",
-          "required": true,
-          "max_bytes": 600,
-          "description": "Required final outcome; do not use a progress note as a closing result."
-        },
-        "report": {
-          "type": {
-            "ref": "report"
-          },
-          "required": false,
-          "description": "File Id from search; or {\"object_type\":\"report\",\"namespace\":{\"instance\":\"vps://palantirkc\",\"account\":\"root\"},\"native_key\":\"<path below /home/palantirkc/work/>\"}. May remain unresolved when key is wrong; get on the Id shows whether the file object exists."
-        }
-      },
-      "submission_criteria": [
-        {
-          "code": "worker_run_not_running",
-          "message": "Read worker_run and choose one whose status is running.",
-          "all": [
-            {
-              "eq": [
-                "$worker_run.status",
-                "running"
-              ]
-            }
-          ]
-        }
-      ],
-      "rules": [
-        {
-          "modify_object": "worker_run",
-          "set": {
-            "result": "$result",
-            "closed_at": "$now",
-            "status": "closed",
-            "report": "$report"
-          }
-        },
-        {
-          "clear_reference": {
-            "object_type": "worker_run",
-            "property": "running_in"
-          }
-        }
-      ]
-    },
-    "mark_memory_record_pending": {
-      "description": "Create a pending record or return a pending/ready record to pending with a new hash; superseded is final.",
-      "parameters": {
-        "record": {
-          "type": {
-            "ref": "memory_record"
-          },
-          "required": true,
-          "description": "Full Id in the work namespace; native_key is the stable record id. May be absent on first pending publication."
-        },
-        "document_id": {
-          "type": "string",
-          "required": true,
-          "description": "Stable record id, also used as the server document id and record native_key.",
-          "max_bytes": 200
-        },
-        "body_hash": {
-          "type": {
-            "value_type": "memory_body_hash"
-          },
-          "required": true,
-          "description": "SHA-256 of the exact Git original bytes selected from a commit on main.",
-          "max_bytes": 64
-        },
-        "supersedes": {
-          "type": {
-            "ref": "memory_record"
-          },
-          "required": false,
-          "description": "Optional predecessor when creating a distinct successor; omit on ordinary same-record corrections."
-        }
-      },
-      "submission_criteria": [
-        {
-          "code": "memory_record_already_superseded",
-          "message": "A superseded record id is final; use a new record id.",
-          "none": [
-            {
-              "all": [
-                {
-                  "exists": "$record"
-                },
-                {
-                  "eq": [
-                    "$record.status",
-                    "superseded"
-                  ]
-                }
-              ]
-            }
-          ]
-        },
-        {
-          "code": "memory_successor_is_self",
-          "message": "A record cannot name itself as predecessor.",
-          "none": [
-            {
-              "all": [
-                {
-                  "present": "$supersedes"
-                },
-                {
-                  "eq": [
-                    "$record",
-                    "$supersedes"
-                  ]
-                }
-              ]
-            }
-          ]
-        }
-      ],
-      "rules": [
-        {
-          "create_or_modify_object": "memory_record",
-          "set": {
-            "document_id": "$document_id",
-            "body_hash": "$body_hash",
-            "status": "pending",
-            "supersedes": "$supersedes"
-          }
-        }
-      ]
-    },
-    "mark_memory_record_ready": {
-      "description": "Record completed document/fact/page readback for the current pending record; does not perform remote readback.",
-      "parameters": {
-        "record": {
-          "type": {
-            "ref": "memory_record"
-          },
-          "required": true,
-          "description": "Full Id in the work namespace; native_key is the stable record id. May be absent on first pending publication."
-        }
-      },
-      "submission_criteria": [
-        {
-          "code": "memory_record_not_pending",
-          "message": "Ready requires an existing pending record.",
-          "all": [
-            {
-              "exists": "$record"
-            },
-            {
-              "eq": [
-                "$record.status",
-                "pending"
-              ]
-            }
-          ]
-        },
-        {
-          "code": "memory_predecessor_ready",
-          "message": "Withdraw the ready predecessor before completing its successor.",
-          "none": [
-            {
-              "linked": {
-                "from": "$record",
-                "link": "memory_predecessor",
-                "where": {
-                  "all": [
-                    {
-                      "eq": [
-                        "status",
-                        "ready"
-                      ]
-                    }
-                  ]
-                }
-              }
-            }
-          ]
-        },
-        {
-          "code": "memory_record_has_successor",
-          "message": "Complete or withdraw its current successor before making this record ready.",
-          "none": [
-            {
-              "linked": {
-                "from": "$record",
-                "link": "memory_successors",
-                "where": {
-                  "all": [
-                    {
-                      "in": [
-                        "status",
-                        [
-                          "pending",
-                          "ready"
-                        ]
-                      ]
-                    }
-                  ]
-                }
-              }
-            }
-          ]
-        }
-      ],
-      "rules": [
-        {
-          "modify_object": "memory_record",
-          "set": {
-            "status": "ready"
-          }
-        }
-      ]
-    },
-    "mark_memory_record_superseded": {
-      "description": "Record a predecessor as superseded only after its named successor is ready and links back through supersedes.",
-      "parameters": {
-        "record": {
-          "type": {
-            "ref": "memory_record"
-          },
-          "required": true,
-          "description": "Full Id in the work namespace; native_key is the stable record id. May be absent on first pending publication."
-        },
-        "successor": {
-          "type": {
-            "ref": "memory_record"
-          },
-          "required": true,
-          "description": "Full Id of the ready successor whose supersedes reference names record."
-        }
-      },
-      "submission_criteria": [
-        {
-          "code": "memory_record_already_superseded",
-          "message": "Supersede only a pending or ready record.",
-          "all": [
-            {
-              "exists": "$record"
-            },
-            {
-              "in": [
-                "$record.status",
-                [
-                  "pending",
-                  "ready"
-                ]
-              ]
-            }
-          ]
-        },
-        {
-          "code": "memory_successor_not_ready",
-          "message": "The named successor must be ready.",
-          "all": [
-            {
-              "exists": "$successor"
-            },
-            {
-              "eq": [
-                "$successor.status",
-                "ready"
-              ]
-            }
-          ]
-        },
-        {
-          "code": "memory_successor_not_linked",
-          "message": "The named successor must link back to this record.",
-          "all": [
-            {
-              "exists": "$successor"
-            },
-            {
-              "present": "$successor.supersedes"
-            },
-            {
-              "eq": [
-                "$successor.supersedes",
-                "$record"
-              ]
-            }
-          ]
-        }
-      ],
-      "rules": [
-        {
-          "modify_object": "memory_record",
-          "target": "$record",
-          "set": {
-            "status": "superseded"
-          }
-        }
-      ]
-    },
-    "withdraw_memory_record": {
-      "description": "Withdraw a pending or ready record to final superseded status; preserve every predecessor reference.",
-      "parameters": {
-        "record": {
-          "type": {
-            "ref": "memory_record"
-          },
-          "required": true,
-          "description": "Full Id of the pending or ready record whose original was removed or reverted on main."
-        }
-      },
-      "submission_criteria": [
-        {
-          "code": "memory_record_already_superseded",
-          "message": "Withdraw only a pending or ready record.",
-          "all": [
-            {
-              "exists": "$record"
-            },
-            {
-              "in": [
-                "$record.status",
-                [
-                  "pending",
-                  "ready"
-                ]
-              ]
-            }
-          ]
-        }
-      ],
-      "rules": [
-        {
-          "modify_object": "memory_record",
-          "set": {
-            "status": "superseded"
-          }
-        }
-      ]
-    },
-    "amend_plan": {
-      "description": "Amend current_lines and clear scope_reviewed, preserving the opening estimates. Actions take the full Id from search; view arguments take the native key.",
-      "parameters": {
-        "plan": {"type": {"ref": "plan"}, "required": true},
-        "current_lines": {"type": "integer", "required": true},
-        "amended_by_family": {"type": "string", "required": true, "max_bytes": 120}
-      },
-      "submission_criteria": [
-        {"code": "unknown_plan", "message": "Choose an existing plan.", "all": [{"exists": "$plan"}]}
-      ],
-      "rules": [
-        {"modify_object": "plan", "set": {"current_lines": "$current_lines", "scope_reviewed": false, "amended_by_family": "$amended_by_family"}}
-      ]
-    },
-    "open_plan": {
-      "description": "Open the sole plan; Lead supplies limit_lines as 1.5 times first_lines. Actions take the full Id from search; view arguments take the native key.",
-      "parameters": {
-        "thread": {"type": {"ref": "thread"}, "required": true},
-        "first_lines": {"type": "integer", "required": true},
-        "limit_lines": {"type": "integer", "required": true},
-        "current_lines": {"type": "integer", "required": true},
-        "amended_by_family": {"type": "string", "required": true, "max_bytes": 120}
-      },
-      "submission_criteria": [
-        {"code": "unknown_thread", "message": "Choose an existing thread.", "all": [{"exists": "$thread"}]},
-        {"code": "duplicate_plan", "message": "Amend the existing plan.", "none": [{"linked": {"from": "$thread", "link": "plans"}}]}
-      ],
-      "rules": [
-        {"create_object": "plan", "set": {"thread": "$thread", "first_lines": "$first_lines", "limit_lines": "$limit_lines", "current_lines": "$current_lines", "scope_reviewed": false, "amended_by_family": "$amended_by_family"}}
-      ]
-    },
-    "amend_thread": {
-      "description": "Amend consumer and first use with a required reason; retain prior values in object history. Actions take the full Id from search; view arguments take the native key.",
-      "parameters": {
-        "thread": {"type": {"ref": "thread"}, "required": true},
-        "consumer": {"type": "string", "required": true, "max_bytes": 1000},
-        "consumer_kind": {"type": {"value_type": "consumer_kind"}, "required": true},
-        "first_use": {"type": "string", "required": true, "max_bytes": 1000},
-        "reason": {"type": "string", "required": true, "max_bytes": 600}
-      },
-      "submission_criteria": [
-        {"code": "unknown_thread", "message": "Choose an existing thread.", "all": [{"exists": "$thread"}]}
-      ],
-      "rules": [
-        {"modify_object": "thread", "set": {"consumer": "$consumer", "consumer_kind": "$consumer_kind", "first_use": "$first_use", "reason": "$reason"}}
-      ]
-    },
-    "open_thread": {
-      "description": "Open one task/key thread with its consumer and first observed use. Actions take the full Id from search; view arguments take the native key.",
-      "parameters": {
-        "task": {"type": {"ref": "task"}, "required": true},
-        "key": {"type": "string", "required": true, "max_bytes": 120},
-        "consumer": {"type": "string", "required": true, "max_bytes": 1000},
-        "consumer_kind": {"type": {"value_type": "consumer_kind"}, "required": true},
-        "first_use": {"type": "string", "required": true, "max_bytes": 1000}
-      },
-      "submission_criteria": [
-        {"code": "unknown_task", "message": "Choose an existing task.", "all": [{"exists": "$task"}]},
-        {"code": "duplicate_thread", "message": "Amend the existing task/key thread.", "none": [{"linked": {"from": "$task", "link": "threads", "where": {"all": [{"eq": ["key", "$key"]}]}}}]}
-      ],
-      "rules": [
-        {"create_object": "thread", "set": {"task": "$task", "key": "$key", "consumer": "$consumer", "consumer_kind": "$consumer_kind", "first_use": "$first_use"}}
-      ]
-    },
-    "record_scope_review": {
-      "description": "Record scope/design review; family values are retained without comparison. Actions take the full Id from search; view arguments take the native key.",
-      "parameters": {
-        "plan": {"type": {"ref": "plan"}, "required": true},
-        "reviewed_lines": {"type": "integer", "required": true},
-        "reviewer_family": {"type": "string", "required": true, "max_bytes": 120},
-        "review_report": {"type": "string", "required": true, "max_bytes": 1000},
-        "review": {"type": {"ref": "review"}, "required": false}
-      },
-      "submission_criteria": [
-        {"code": "unknown_plan", "message": "Choose an existing plan.", "all": [{"exists": "$plan"}]},
-        {"code": "reviewed_lines_below_current", "message": "Review must cover at least current_lines.", "all": [{"exists": "$plan"}, {"ge": ["$reviewed_lines", "$plan.current_lines"]}]},
-        {"code": "review_not_closed", "message": "Supply a closed review or omit it.", "any": [{"none": [{"present": "$review"}]}, {"all": [{"present": "$review"}, {"exists": "$review"}, {"eq": ["$review.status", "closed"]}]}]}
-      ],
-      "rules": [
-        {"modify_object": "plan", "set": {"scope_reviewed": true, "reviewed_lines": "$reviewed_lines", "reviewer_family": "$reviewer_family", "review_report": "$review_report",
-            "review": "$review"
-          }}
-      ]
-    },
     "start_review": {
       "description": "Start a review of an existing task and exact head.",
       "parameters": {
@@ -2992,150 +2382,6 @@
         }
       ]
     },
-    "state_objective": {
-      "description": "State an objective of a task from a current row of the user with words.",
-      "parameters": {
-        "task": {"type": {"ref": "task"}, "required": true},
-        "name": {"type": {"value_type": "nonempty_text"}, "required": true, "max_bytes": 60},
-        "statement": {"type": {"value_type": "nonempty_text"}, "required": true, "max_bytes": 600},
-        "check": {"type": {"value_type": "nonempty_text"}, "required": false, "max_bytes": 400},
-        "rank": {"type": "integer", "required": true},
-        "source": {"type": {"ref": "decision"}, "required": true}
-      },
-      "submission_criteria": [
-        {"code": "unknown_task", "message": "Choose an existing task.", "all": [{"exists": "$task"}]},
-        {"code": "source_not_user_words", "message": "Name a current row of the user with words of this task.", "all": [{"exists": "$source"}, {"eq": ["$source.status", "current"]}, {"eq": ["$source.decided_by", "user"]}, {"present": "$source.user_words"}, {"eq": ["$source.task", "$task"]}]},
-        {"code": "name_used", "message": "Choose a name no objective of the task ever had.", "none": [{"linked": {"from": "$task", "link": "objectives", "where": {"all": [{"eq": ["name", "$name"]}]}}}]}
-      ],
-      "rules": [
-        {
-          "create_object": "objective",
-          "set": {
-            "task": "$task",
-            "name": "$name",
-            "statement": "$statement",
-            "check": "$check",
-            "rank": "$rank",
-            "status": "stated",
-            "source": "$source",
-            "stated_at": "$now"
-          }
-        }
-      ]
-    },
-    "restate_objective": {
-      "description": "Restate an objective in place: new statement and source, status stated, confirmation cleared.",
-      "parameters": {
-        "objective": {"type": {"ref": "objective"}, "required": true},
-        "statement": {"type": {"value_type": "nonempty_text"}, "required": true, "max_bytes": 600},
-        "source": {"type": {"ref": "decision"}, "required": true}
-      },
-      "submission_criteria": [
-        {"code": "objective_not_live", "message": "Choose a stated or confirmed objective.", "all": [{"exists": "$objective"}, {"in": ["$objective.status", ["stated", "confirmed"]]}]},
-        {"code": "source_not_user_words", "message": "Name a current row of the user with words of the objective's task.", "all": [{"exists": "$source"}, {"eq": ["$source.status", "current"]}, {"eq": ["$source.decided_by", "user"]}, {"present": "$source.user_words"}, {"eq": ["$source.task", "$objective.task"]}]},
-        {"code": "confirmed_needs_later_row", "message": "A confirmed objective changes only with a row of the user decided after its confirmation.", "any": [{"ne": ["$objective.status", "confirmed"]}, {"all": [{"present": "$objective.confirmed_at"}, {"gt": ["$source.decided_at", "$objective.confirmed_at"]}]}]}
-      ],
-      "rules": [
-        {
-          "modify_object": "objective",
-          "set": {
-            "statement": "$statement",
-            "source": "$source",
-            "status": "stated",
-            "stated_at": "$now"
-          }
-        },
-        {
-          "clear_reference": {"object_type": "objective", "property": "confirmed_by"}
-        }
-      ]
-    },
-    "confirm_objective": {
-      "description": "Confirm a stated objective by a later row of the user that is not its source.",
-      "parameters": {
-        "objective": {"type": {"ref": "objective"}, "required": true},
-        "row": {"type": {"ref": "decision"}, "required": true}
-      },
-      "submission_criteria": [
-        {"code": "objective_not_stated", "message": "Choose a stated objective.", "all": [{"exists": "$objective"}, {"eq": ["$objective.status", "stated"]}]},
-        {"code": "row_not_user_words", "message": "Name a current row of the user with words of the objective's task.", "all": [{"exists": "$row"}, {"eq": ["$row.status", "current"]}, {"eq": ["$row.decided_by", "user"]}, {"present": "$row.user_words"}, {"eq": ["$row.task", "$objective.task"]}]},
-        {"code": "row_is_source_or_earlier", "message": "Name a row other than the source, decided after the statement.", "all": [{"ne": ["$row", "$objective.source"]}, {"gt": ["$row.decided_at", "$objective.stated_at"]}]}
-      ],
-      "rules": [
-        {
-          "modify_object": "objective",
-          "set": {
-            "status": "confirmed",
-            "confirmed_by": "$row",
-            "confirmed_at": "$now"
-          }
-        }
-      ]
-    },
-    "amend_objective": {
-      "description": "Change rank or check only, with a current decision row of the task.",
-      "parameters": {
-        "objective": {"type": {"ref": "objective"}, "required": true},
-        "rank": {"type": "integer", "required": false},
-        "check": {"type": {"value_type": "nonempty_text"}, "required": false, "max_bytes": 400},
-        "decision": {"type": {"ref": "decision"}, "required": true}
-      },
-      "submission_criteria": [
-        {"code": "objective_not_live", "message": "Choose a stated or confirmed objective.", "all": [{"exists": "$objective"}, {"in": ["$objective.status", ["stated", "confirmed"]]}]},
-        {"code": "row_not_current", "message": "Name a current decision row of the objective's task.", "all": [{"exists": "$decision"}, {"eq": ["$decision.status", "current"]}, {"eq": ["$decision.task", "$objective.task"]}]},
-        {"code": "nothing_to_amend", "message": "Supply rank or check.", "any": [{"present": "$rank"}, {"present": "$check"}]}
-      ],
-      "rules": [
-        {
-          "modify_object": "objective",
-          "set": {"rank": "$rank", "check": "$check"}
-        }
-      ]
-    },
-    "retire_objective": {
-      "description": "Retire an objective with a reason; a confirmed one needs a row of the user later than its confirmation.",
-      "parameters": {
-        "objective": {"type": {"ref": "objective"}, "required": true},
-        "reason": {"type": {"value_type": "nonempty_text"}, "required": true, "max_bytes": 400},
-        "row": {"type": {"ref": "decision"}, "required": false}
-      },
-      "submission_criteria": [
-        {"code": "objective_not_live", "message": "Choose a stated or confirmed objective.", "all": [{"exists": "$objective"}, {"in": ["$objective.status", ["stated", "confirmed"]]}]},
-        {"code": "confirmed_needs_later_row", "message": "Name a current row of the user with words decided after the confirmation.", "any": [{"ne": ["$objective.status", "confirmed"]}, {"all": [{"present": "$row"}, {"exists": "$row"}, {"eq": ["$row.status", "current"]}, {"eq": ["$row.decided_by", "user"]}, {"present": "$row.user_words"}, {"eq": ["$row.task", "$objective.task"]}, {"present": "$objective.confirmed_at"}, {"gt": ["$row.decided_at", "$objective.confirmed_at"]}]}]}
-      ],
-      "rules": [
-        {
-          "modify_object": "objective",
-          "set": {
-            "status": "retired",
-            "retire_reason": "$reason",
-            "retired_at": "$now"
-          }
-        }
-      ]
-    },
-    "record_check": {
-      "description": "Record the last result of the objective's check.",
-      "parameters": {
-        "objective": {"type": {"ref": "objective"}, "required": true},
-        "exit": {"type": "integer", "required": true},
-        "line": {"type": "string", "required": true, "max_bytes": 200}
-      },
-      "submission_criteria": [
-        {"code": "objective_not_live", "message": "Choose a stated or confirmed objective.", "all": [{"exists": "$objective"}, {"in": ["$objective.status", ["stated", "confirmed"]]}]},
-        {"code": "objective_without_check", "message": "Record a result only for an objective that has a check command.", "all": [{"present": "$objective.check"}]}
-      ],
-      "rules": [
-        {
-          "modify_object": "objective",
-          "set": {
-            "last_exit": "$exit",
-            "last_line": "$line",
-            "last_checked_at": "$now"
-          }
-        }
-      ]
-    },
     "add_item": {
       "description": "Add a queued item to a task's backlog.",
       "parameters": {
@@ -3216,22 +2462,6 @@
             "branch": "$branch",
             "started_at": "$now"
           }
-        }
-      ]
-    },
-    "release_item": {
-      "description": "in_work back to queued with a reason (a unit closed without a merge).",
-      "parameters": {
-        "item": {"type": {"ref": "item"}, "required": true},
-        "reason": {"type": {"value_type": "nonempty_text"}, "required": true, "max_bytes": 400}
-      },
-      "submission_criteria": [
-        {"code": "item_not_in_work", "message": "Choose an in-work item.", "all": [{"exists": "$item"}, {"eq": ["$item.state", "in_work"]}]}
-      ],
-      "rules": [
-        {
-          "modify_object": "item",
-          "set": {"state": "queued", "release_reason": "$reason"}
         }
       ]
     },
@@ -3482,6 +2712,22 @@
         {"clear_reference": {"object_type": "intent", "property": "confirmed_by"}}
       ]
     },
+    "answer_questions": {
+      "description": "Record the user's answers to an open intent's questions, by the user's word routed to it. The intent keeps its status and its confirmation.",
+      "parameters": {
+        "intent": {"type": {"ref": "intent"}, "required": true, "description": "The intent: its full Id, with the intent's key as native_key."},
+        "questions": {"type": {"array": {"struct": {"question": {"value_type": "nonempty_text"}, "default": {"value_type": "nonempty_text"}, "answer": "string"}}}, "required": true, "description": "The whole list of questions, each with its default and the user's answer; replaces the list."},
+        "by": {"type": {"ref": "request"}, "required": true, "description": "The user's current order, decision or answer, routed to this intent, that answers."}
+      },
+      "submission_criteria": [
+        {"code": "intent_closed", "message": "Name an intent that exists and is neither met nor retired; for new work draft a new intent.", "all": [{"exists": "$intent"}, {"none": [{"in": ["$intent.status", ["met", "retired"]]}]}]},
+        {"code": "by_not_the_users_word", "message": "by must be a current request of kind order, decision or answer: the user's own word.", "all": [{"exists": "$by"}, {"eq": ["$by.status", "current"]}, {"in": ["$by.kind", ["order", "decision", "answer"]]}]},
+        {"code": "by_not_routed_here", "message": "Route the request to this intent first (route_request), then answer with it.", "all": [{"exists": "$by"}, {"any": [{"all": [{"eq": ["$by.route", "intent"]}, {"present": "$by.intent"}, {"eq": ["$by.intent", "$intent"]}]}, {"all": [{"eq": ["$by.route", "subject"]}, {"present": "$by.subject"}, {"eq": ["$by.subject", "$intent"]}]}]}]}
+      ],
+      "rules": [
+        {"modify_object": "intent", "set": {"questions": "$questions"}}
+      ]
+    },
     "note_intent": {
       "description": "Replace the Lead's notes of an open intent for the next Lead; nothing else changes.",
       "parameters": {
@@ -3666,7 +2912,10 @@
         "depends_on": {"type": {"array": {"ref": "unit"}}, "required": false, "description": "Units that must be merged or done before this one starts."},
         "clauses": {"type": {"array": {"ref": "clause"}}, "required": false, "description": "The sentences of the specifications the page names."},
         "wave": {"type": "integer", "required": false, "description": "The Lead's number of the wave the unit belongs to."},
-        "page_digest": {"type": {"value_type": "sha256_hex"}, "required": false, "description": "The digest of the page as this action leaves it (ap unit page <key> --digest)."}
+        "page_digest": {"type": {"value_type": "sha256_hex"}, "required": false, "description": "The digest of the page as this action leaves it (ap unit page <key> --digest)."},
+        "kind": {"type": {"value_type": "unit_kind"}, "required": false, "description": "What the unit changes: rust, schema, instructions, removal, script, typescript, config or import."},
+        "use": {"type": "string", "required": false, "max_bytes": 600, "description": "The real run that shows the first use of the result; \"none:\" and the reason where there is none."},
+        "depends_delivered": {"type": {"array": {"ref": "unit"}}, "required": false, "description": "Units whose result must be delivered, not only merged, before this one starts."}
       },
       "submission_criteria": [
         {"code": "intent_required", "message": "A unit of the lane objective names its intent.", "none": [{"all": [{"eq": ["$lane", "objective"]}, {"none": [{"present": "$intent"}]}]}]},
@@ -3680,7 +2929,7 @@
         {"code": "depends_on_itself", "message": "Remove the unit itself from depends_on.", "none": [{"all": [{"present": "$depends_on"}, {"in": ["$unit", "$depends_on"]}]}]}
       ],
       "rules": [
-        {"create_object": "unit", "set": {"lane": "$lane", "class": "$class", "intent": "$intent", "origin": "$origin", "objective": "$objective", "interface": "$interface", "invariants": "$invariants", "acceptance": "$acceptance", "not_built": "$not_built", "write_set": "$write_set", "read_first": "$read_first", "specs": "$specs", "notes": "$notes", "verifier_questions": "$verifier_questions", "report": "$report", "repository": "$repository", "branch": "$branch", "implementer": "$implementer", "verifier": "$verifier", "estimate_lines": "$estimate_lines", "depends_on": "$depends_on", "clauses": "$clauses", "wave": "$wave", "page_digest": "$page_digest", "state": "draft", "rounds": 0, "writers": [], "added_at": "$now", "amended_at": "$now"}}
+        {"create_object": "unit", "set": {"lane": "$lane", "class": "$class", "intent": "$intent", "origin": "$origin", "objective": "$objective", "interface": "$interface", "invariants": "$invariants", "acceptance": "$acceptance", "not_built": "$not_built", "write_set": "$write_set", "read_first": "$read_first", "specs": "$specs", "notes": "$notes", "verifier_questions": "$verifier_questions", "report": "$report", "repository": "$repository", "branch": "$branch", "implementer": "$implementer", "verifier": "$verifier", "estimate_lines": "$estimate_lines", "depends_on": "$depends_on", "clauses": "$clauses", "wave": "$wave", "page_digest": "$page_digest", "kind": "$kind", "use": "$use", "depends_delivered": "$depends_delivered", "state": "draft", "rounds": 0, "writers": [], "added_at": "$now", "amended_at": "$now"}}
       ]
     },
     "amend_unit": {
@@ -3707,7 +2956,10 @@
         "depends_on": {"type": {"array": {"ref": "unit"}}, "required": false, "description": "Units that must be merged or done before this one starts."},
         "clauses": {"type": {"array": {"ref": "clause"}}, "required": false, "description": "The sentences of the specifications the page names."},
         "wave": {"type": "integer", "required": false, "description": "The Lead's number of the wave the unit belongs to."},
-        "page_digest": {"type": {"value_type": "sha256_hex"}, "required": true, "description": "The digest of the page as this action leaves it (ap unit page <key> --digest)."}
+        "page_digest": {"type": {"value_type": "sha256_hex"}, "required": true, "description": "The digest of the page as this action leaves it (ap unit page <key> --digest)."},
+        "kind": {"type": {"value_type": "unit_kind"}, "required": false, "description": "What the unit changes: rust, schema, instructions, removal, script, typescript, config or import."},
+        "use": {"type": "string", "required": false, "max_bytes": 600, "description": "The real run that shows the first use of the result; \"none:\" and the reason where there is none."},
+        "depends_delivered": {"type": {"array": {"ref": "unit"}}, "required": false, "description": "Units whose result must be delivered, not only merged, before this one starts."}
       },
       "submission_criteria": [
         {"code": "unit_not_amendable", "message": "Only a draft, ready or stopped unit is amended; stop a running one first (stop_unit).", "all": [{"exists": "$unit"}, {"in": ["$unit.state", ["draft", "ready", "stopped"]]}]},
@@ -3716,7 +2968,7 @@
         {"code": "depends_on_itself", "message": "Remove the unit itself from depends_on.", "none": [{"all": [{"present": "$depends_on"}, {"in": ["$unit", "$depends_on"]}]}]}
       ],
       "rules": [
-        {"modify_object": "unit", "set": {"class": "$class", "objective": "$objective", "interface": "$interface", "invariants": "$invariants", "acceptance": "$acceptance", "not_built": "$not_built", "write_set": "$write_set", "read_first": "$read_first", "specs": "$specs", "notes": "$notes", "verifier_questions": "$verifier_questions", "report": "$report", "repository": "$repository", "branch": "$branch", "implementer": "$implementer", "verifier": "$verifier", "estimate_lines": "$estimate_lines", "depends_on": "$depends_on", "clauses": "$clauses", "wave": "$wave", "page_digest": "$page_digest", "state": "draft", "amended_at": "$now"}}
+        {"modify_object": "unit", "set": {"class": "$class", "objective": "$objective", "interface": "$interface", "invariants": "$invariants", "acceptance": "$acceptance", "not_built": "$not_built", "write_set": "$write_set", "read_first": "$read_first", "specs": "$specs", "notes": "$notes", "verifier_questions": "$verifier_questions", "report": "$report", "repository": "$repository", "branch": "$branch", "implementer": "$implementer", "verifier": "$verifier", "estimate_lines": "$estimate_lines", "depends_on": "$depends_on", "clauses": "$clauses", "wave": "$wave", "page_digest": "$page_digest", "kind": "$kind", "use": "$use", "depends_delivered": "$depends_delivered", "state": "draft", "amended_at": "$now"}}
       ]
     },
     "ready_unit": {
@@ -3737,10 +2989,38 @@
         {"code": "intent_parameter_required", "message": "A unit of the lane objective names its intent in the parameter intent.", "none": [{"all": [{"exists": "$unit"}, {"eq": ["$unit.lane", "objective"]}, {"none": [{"present": "$intent"}]}]}]},
         {"code": "plan_not_reviewed", "message": "Review the intent's plan first: a review of kind plan of the intent, started after the unit was added, closed accept.", "none": [{"all": [{"exists": "$unit"}, {"eq": ["$unit.lane", "objective"]}, {"present": "$intent"}, {"none": [{"linked": {"from": "$intent", "link": "intent_reviews", "where": {"all": [{"eq": ["kind", "plan"]}, {"eq": ["status", "closed"]}, {"eq": ["verdict", "accept"]}, {"gt": ["started_at", "$unit.added_at"]}]}}}]}]}]},
         {"code": "page_digest_differs", "message": "Give the digest the unit stores, or amend the unit (amend_unit stores the digest of its page).", "none": [{"all": [{"present": "$page_digest"}, {"exists": "$unit"}, {"present": "$unit.page_digest"}, {"ne": ["$page_digest", "$unit.page_digest"]}]}]},
-        {"code": "page_not_reviewed", "message": "Review the page first: a review of kind page of the unit, closed accept, whose head is the page_digest the unit stores.", "none": [{"all": [{"exists": "$unit"}, {"in": ["$unit.class", ["contract", "effect"]]}, {"none": [{"linked": {"from": "$unit", "link": "unit_reviews", "where": {"all": [{"eq": ["kind", "page"]}, {"eq": ["status", "closed"]}, {"eq": ["verdict", "accept"]}, {"present": "$unit.page_digest"}, {"eq": ["head", "$unit.page_digest"]}]}}}]}]}]}
+        {"code": "page_not_reviewed", "message": "Review the page first: a review of kind page of the unit, closed accept, whose head is the page_digest the unit stores.", "none": [{"all": [{"exists": "$unit"}, {"in": ["$unit.class", ["contract", "effect"]]}, {"none": [{"linked": {"from": "$unit", "link": "unit_reviews", "where": {"all": [{"eq": ["kind", "page"]}, {"eq": ["status", "closed"]}, {"eq": ["verdict", "accept"]}, {"present": "$unit.page_digest"}, {"eq": ["head", "$unit.page_digest"]}]}}}]}]}]},
+        {"code": "deferred", "message": "The user deferred the unit: undefer it first (undefer_unit).", "none": [{"all": [{"exists": "$unit"}, {"present": "$unit.deferred_by"}]}]}
       ],
       "rules": [
         {"modify_object": "unit", "set": {"state": "ready", "ready_at": "$now"}}
+      ]
+    },
+    "defer_unit": {
+      "description": "Defer a draft, ready or stopped unit by the user's word: it returns to draft and is not made ready until undefer_unit.",
+      "parameters": {
+        "unit": {"type": {"ref": "unit"}, "required": true, "description": "The unit: an Id of type unit whose native_key is the unit's key."},
+        "by": {"type": {"ref": "request"}, "required": true, "description": "The user's current decision, order or answer that says so."}
+      },
+      "submission_criteria": [
+        {"code": "unit_not_deferrable", "message": "Only a draft, ready or stopped unit is deferred; stop a running one first (stop_unit).", "all": [{"exists": "$unit"}, {"in": ["$unit.state", ["draft", "ready", "stopped"]]}]},
+        {"code": "by_not_the_users_word", "message": "by must be a current request of kind decision, order or answer: the user's own word.", "all": [{"exists": "$by"}, {"eq": ["$by.status", "current"]}, {"in": ["$by.kind", ["decision", "order", "answer"]]}]}
+      ],
+      "rules": [
+        {"modify_object": "unit", "set": {"deferred_by": "$by", "state": "draft"}}
+      ]
+    },
+    "undefer_unit": {
+      "description": "Lift the deferral of a unit by the user's word: ready_unit admits it again.",
+      "parameters": {
+        "unit": {"type": {"ref": "unit"}, "required": true, "description": "The unit: an Id of type unit whose native_key is the unit's key."},
+        "by": {"type": {"ref": "request"}, "required": true, "description": "The user's current decision, order or answer that says so."}
+      },
+      "submission_criteria": [
+        {"code": "by_not_the_users_word", "message": "by must be a current request of kind decision, order or answer: the user's own word.", "all": [{"exists": "$by"}, {"eq": ["$by.status", "current"]}, {"in": ["$by.kind", ["decision", "order", "answer"]]}]}
+      ],
+      "rules": [
+        {"clear_reference": {"object_type": "unit", "property": "deferred_by"}}
       ]
     },
     "start_unit": {
@@ -3770,13 +3050,14 @@
         "writers": {"type": {"array": "string"}, "required": true, "description": "Every session that wrote to the unit's branch so far: the whole new list."},
         "pull_request": {"type": "integer", "required": false, "description": "The number of the unit's pull request."},
         "rounds": {"type": "integer", "required": false, "description": "The new number of verifier rounds."},
-        "delivered_lines": {"type": "integer", "required": false, "description": "The changed lines delivered."}
+        "delivered_lines": {"type": "integer", "required": false, "description": "The changed lines delivered."},
+        "guarded": {"type": "boolean", "required": false, "description": "Whether the head changes a guarded path of the unit; absent keeps the stored value."}
       },
       "submission_criteria": [
         {"code": "unit_not_running", "message": "Choose a running or stopped unit.", "all": [{"exists": "$unit"}, {"in": ["$unit.state", ["running", "stopped"]]}]}
       ],
       "rules": [
-        {"modify_object": "unit", "set": {"head": "$head", "writers": "$writers", "pull_request": "$pull_request", "rounds": "$rounds", "delivered_lines": "$delivered_lines"}}
+        {"modify_object": "unit", "set": {"head": "$head", "writers": "$writers", "pull_request": "$pull_request", "rounds": "$rounds", "delivered_lines": "$delivered_lines", "guarded": "$guarded"}}
       ]
     },
     "stop_unit": {
@@ -3840,7 +3121,24 @@
         {"code": "reason_empty", "message": "Give the reason in words.", "all": [{"ne": ["$reason", ""]}]}
       ],
       "rules": [
-        {"modify_object": "unit", "set": {"approved_head": "$head"}}
+        {"modify_object": "unit", "set": {"approved_head": "$head", "approved_by": "lead"}}
+      ]
+    },
+    "approve_unit_by_policy": {
+      "description": "The driver approves by policy the accepted head of a contract unit whose head changes no guarded path (specs/ap/roles.md R2).",
+      "parameters": {
+        "unit": {"type": {"ref": "unit"}, "required": true, "description": "The unit: an Id of type unit whose native_key is the unit's key."},
+        "head": {"type": {"value_type": "commit_or_digest"}, "required": true, "description": "The accepted head the policy read."}
+      },
+      "submission_criteria": [
+        {"code": "unit_not_accepted", "message": "Choose an accepted unit.", "all": [{"exists": "$unit"}, {"in": ["$unit.state", ["accepted"]]}]},
+        {"code": "head_differs", "message": "Give the unit's current head (record_head records a new one).", "all": [{"exists": "$unit"}, {"present": "$unit.head"}, {"eq": ["$unit.head", "$head"]}]},
+        {"code": "class_not_contract", "message": "The policy approves a unit of class contract only; the Lead approves the others (approve_unit).", "all": [{"exists": "$unit"}, {"eq": ["$unit.class", "contract"]}]},
+        {"code": "guarded", "message": "The head changes a guarded path, or record_head did not say: the Lead approves it (approve_unit).", "all": [{"exists": "$unit"}, {"present": "$unit.guarded"}, {"eq": ["$unit.guarded", false]}]},
+        {"code": "not_dispatch", "message": "Only the driver applies this, with the role dispatch; the Lead approves with approve_unit.", "all": [{"actor": {"role": "dispatch"}}]}
+      ],
+      "rules": [
+        {"modify_object": "unit", "set": {"approved_head": "$head", "approved_by": "policy"}}
       ]
     },
     "merge_unit": {
@@ -3863,6 +3161,21 @@
       ],
       "rules": [
         {"modify_object": "unit", "set": {"state": "merged", "merged_commit": "$merged_commit", "ended_at": "$now"}}
+      ]
+    },
+    "record_use": {
+      "description": "Record the first real use of a merged or done unit's result: the run its use names, and what it showed.",
+      "parameters": {
+        "unit": {"type": {"ref": "unit"}, "required": true, "description": "The unit: an Id of type unit whose native_key is the unit's key."},
+        "evidence": {"type": "string", "required": true, "max_bytes": 1000, "description": "What the run of the first use showed."}
+      },
+      "submission_criteria": [
+        {"code": "unit_not_merged", "message": "Choose a merged or done unit.", "all": [{"exists": "$unit"}, {"in": ["$unit.state", ["merged", "done"]]}]},
+        {"code": "use_not_named", "message": "The unit names no use: its use is absent or begins with none:.", "all": [{"exists": "$unit"}, {"present": "$unit.use"}, {"none": [{"all": [{"ge": ["$unit.use", "none:"]}, {"lt": ["$unit.use", "none;"]}]}]}]},
+        {"code": "evidence_empty", "message": "Give the evidence in words.", "all": [{"ne": ["$evidence", ""]}]}
+      ],
+      "rules": [
+        {"modify_object": "unit", "set": {"used_at": "$now", "use_evidence": "$evidence"}}
       ]
     },
     "close_unit": {
@@ -4427,7 +3740,8 @@
       "parameters": {
         "intent": {"type": "string", "required": true},
         "since": {"type": "string", "required": true},
-        "until": {"type": "string", "required": true}
+        "until": {"type": "string", "required": true},
+        "by": {"type": "string", "required": false}
       },
       "program": "/usr/local/bin/ap",
       "answer_bytes": 65536,
@@ -4557,12 +3871,11 @@
         "add_unit",
         "amend_intent",
         "amend_item",
-        "amend_objective",
-        "amend_plan",
         "amend_principle",
-        "amend_thread",
         "amend_unit",
+        "answer_questions",
         "approve_unit",
+        "approve_unit_by_policy",
         "assume_intent",
         "carry_review",
         "check_criterion",
@@ -4574,11 +3887,10 @@
         "close_run",
         "close_unit",
         "close_unit_review",
-        "close_worker_run",
         "confirm_intent",
         "confirm_intent_delegated",
-        "confirm_objective",
         "declare_host",
+        "defer_unit",
         "define_kpi",
         "dismiss_finding",
         "draft_intent",
@@ -4587,38 +3899,28 @@
         "end_delegation",
         "extend_session",
         "lift_hold",
-        "mark_memory_record_pending",
-        "mark_memory_record_ready",
-        "mark_memory_record_superseded",
         "measure_run",
         "merge_unit",
         "name_lead",
         "note_intent",
         "note_unit_wait",
-        "note_worker_run",
         "observe_account",
         "observe_host",
         "open_finding",
-        "open_plan",
-        "open_thread",
         "plan_finding_as_intent",
         "plan_finding_as_unit",
         "ready_unit",
-        "record_check",
         "record_decision",
         "record_head",
         "record_measurement",
         "record_principle",
         "record_request",
-        "record_scope_review",
         "record_session",
-        "release_item",
+        "record_use",
         "reopen_finding",
         "reopen_unit",
-        "restate_objective",
         "resume_unit",
         "retire_intent",
-        "retire_objective",
         "retire_principle",
         "revoke_review",
         "route_request",
@@ -4635,15 +3937,13 @@
         "start_run",
         "start_unit",
         "start_unit_review",
-        "start_worker_run",
         "state_allowance",
-        "state_objective",
         "stop_unit",
         "supersede_decision",
         "supersede_request",
         "triage_decision",
-        "waive_criterion",
-        "withdraw_memory_record"
+        "undefer_unit",
+        "waive_criterion"
       ],
       "functions": [
         "api_spend",
@@ -4700,11 +4000,13 @@
       "actions": [
         "accept_unit",
         "amend_unit",
+        "approve_unit_by_policy",
         "carry_review",
         "close_run",
         "close_unit_review",
         "merge_unit",
         "note_unit_wait",
+        "open_finding",
         "record_head",
         "reopen_unit",
         "resume_unit",
@@ -4858,13 +4160,17 @@
       ],
       "derive": [],
       "actions": [
+        "close_finding",
         "declare_host",
         "extend_session",
         "measure_run",
         "observe_account",
         "observe_host",
+        "open_finding",
         "record_measurement",
-        "record_session"
+        "record_session",
+        "reopen_finding",
+        "see_finding_again"
       ],
       "functions": [
         "api_spend",
@@ -5103,155 +4409,6 @@
         {
           "header": "Undo",
           "property": "undo"
-        }
-      ]
-    },
-    "live_workers": {
-      "object_type": "worker_run",
-      "args": [
-        "task"
-      ],
-      "filter": {
-        "all": [
-          {
-            "eq": [
-              "task",
-              "$task"
-            ]
-          },
-          {
-            "eq": [
-              "status",
-              "running"
-            ]
-          }
-        ]
-      },
-      "order": [
-        {
-          "property": "started_at",
-          "direction": "asc"
-        }
-      ],
-      "columns": [
-        {
-          "header": "Worker",
-          "property": "name"
-        },
-        {
-          "header": "Tier",
-          "property": "tier"
-        },
-        {
-          "header": "Runtime",
-          "property": "runtime"
-        },
-        {
-          "header": "Session",
-          "property": "session"
-        },
-        {
-          "header": "Packet",
-          "property": "packet"
-        },
-        {
-          "header": "Started",
-          "property": "started_at"
-        },
-        {
-          "header": "Note",
-          "property": "last_note"
-        }
-      ]
-    },
-    "closed_workers": {
-      "object_type": "worker_run",
-      "args": [
-        "task"
-      ],
-      "filter": {
-        "all": [
-          {
-            "eq": [
-              "task",
-              "$task"
-            ]
-          },
-          {
-            "eq": [
-              "status",
-              "closed"
-            ]
-          }
-        ]
-      },
-      "order": [
-        {
-          "property": "closed_at",
-          "direction": "desc"
-        }
-      ],
-      "columns": [
-        {
-          "header": "Worker",
-          "property": "name"
-        },
-        {
-          "header": "Packet",
-          "property": "packet"
-        },
-        {
-          "header": "Report",
-          "property": "report"
-        },
-        {
-          "header": "Closed",
-          "property": "closed_at"
-        },
-        {
-          "header": "Result",
-          "property": "result"
-        }
-      ]
-    },
-    "current_memory_records": {
-      "object_type": "memory_record",
-      "args": [],
-      "filter": {
-        "all": [
-          {
-            "in": [
-              "status",
-              [
-                "pending",
-                "ready"
-              ]
-            ]
-          }
-        ]
-      },
-      "order": [
-        {
-          "property": "document_id",
-          "direction": "asc"
-        }
-      ],
-      "columns": [
-        {
-          "header": "Record id",
-          "property": "$key"
-        },
-        {
-          "header": "Document id",
-          "property": "document_id"
-        },
-        {
-          "header": "Body hash",
-          "property": "body_hash"
-        },
-        {
-          "header": "Status",
-          "property": "status"
         }
       ]
     },

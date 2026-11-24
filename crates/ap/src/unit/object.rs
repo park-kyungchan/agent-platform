@@ -763,6 +763,7 @@ fn add_action(p: &Value) -> Result<actions::AddUnit, Failure> {
         branch: text_of(p, "branch"),
         class: required(class, "class")?,
         clauses: ids_of(p, "clauses"),
+        depends_delivered: None,
         depends_on: ids_of(p, "depends_on"),
         estimate_lines: number_of(p, "estimate_lines"),
         implementer: tier("implementer").map(|[effort, model, runtime]| {
@@ -775,6 +776,7 @@ fn add_action(p: &Value) -> Result<actions::AddUnit, Failure> {
         intent: id_member(p, "intent"),
         interface: text_of(p, "interface"),
         invariants: text_of(p, "invariants"),
+        kind: None,
         lane: required(lane, "lane")?,
         not_built: text_of(p, "not_built"),
         notes: text_of(p, "notes"),
@@ -786,6 +788,7 @@ fn add_action(p: &Value) -> Result<actions::AddUnit, Failure> {
         repository: text_of(p, "repository"),
         specs: texts_of(p, "specs"),
         unit: required(unit, "unit")?,
+        r#use: None,
         verifier: tier("verifier").map(|[effort, model, runtime]| actions::AddUnitVerifier {
             effort,
             model,
@@ -813,6 +816,7 @@ fn amend_action(p: &Value) -> Result<actions::AmendUnit, Failure> {
             .map(|_| required(class, "class"))
             .transpose()?,
         clauses: ids_of(p, "clauses"),
+        depends_delivered: None,
         depends_on: ids_of(p, "depends_on"),
         estimate_lines: number_of(p, "estimate_lines"),
         implementer: tier("implementer").map(|[effort, model, runtime]| {
@@ -824,6 +828,7 @@ fn amend_action(p: &Value) -> Result<actions::AmendUnit, Failure> {
         }),
         interface: text_of(p, "interface"),
         invariants: text_of(p, "invariants"),
+        kind: None,
         not_built: text_of(p, "not_built"),
         notes: text_of(p, "notes"),
         objective: text_of(p, "objective"),
@@ -833,6 +838,7 @@ fn amend_action(p: &Value) -> Result<actions::AmendUnit, Failure> {
         repository: text_of(p, "repository"),
         specs: texts_of(p, "specs"),
         unit: required(unit, "unit")?,
+        r#use: None,
         verifier: tier("verifier").map(|[effort, model, runtime]| actions::AmendUnitVerifier {
             effort,
             model,
