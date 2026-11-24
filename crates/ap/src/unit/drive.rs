@@ -8,7 +8,7 @@ use super::object::{self, branch_ok, clone_of};
 use super::page_review::{self, key_ok, stage_unit, unit_ended};
 use super::render::{self, Role};
 use super::scan;
-use crate::host::{Failure, Host, System, args, digest, error, fail, id, new_session_id};
+use crate::host::{Failure, Host, System, args, digest, error, fail, new_session_id};
 use crate::review::{self, DIFF_OPTIONS, GIT_SAFE};
 use crate::store::work::{self, Action, Id, ObjectType, actions, objects, properties, values};
 use crate::store::{self, Actor, Applied, at};
@@ -2571,22 +2571,19 @@ impl Run {
         if count == 0 || !count.is_multiple_of(every) {
             return;
         }
-        let finding = format!("policy-sample-{}", self.key);
-        let subject = store::subject_of("unit", &self.key).map(|u| u.to_value());
-        let summary = format!(
-            "sample: read the merged diff of {}, pull request {n}",
-            self.key
-        );
-        let p = json!({"finding": id("finding", &finding), "kind": "note", "detector": "ap-unit",
-            "severity": "act", "subject": subject, "summary": summary});
-        let rid = self.rid();
-        let actor = Actor {
-            agent: "ap-unit",
-            session: &self.session,
-            role: "dispatch",
+        let action = actions::OpenFinding {
+            detector: "ap-unit".to_owned(),
+            evidence: None,
+            finding: Id::new(format!("policy-sample-{}", self.key)),
+            kind: values::FindingKind::Note,
+            severity: values::FindingSeverity::Act,
+            subject: store::subject_of("unit", &self.key),
+            summary: format!(
+                "sample: read the merged diff of {}, pull request {n}",
+                self.key
+            ),
         };
-        let opened = store::unit_action(s, self.store(), &actor, "open_finding", rid, p);
-        self.applied |= opened.is_ok();
+        let _ = self.apply(s, &action);
     }
     /// `reopen_unit` with `cause`; the store's refusal ends the call with the unit `accepted` (R30).
     fn reopen(&mut self, s: &mut impl System, cause: &str) -> Step {
