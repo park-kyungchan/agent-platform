@@ -1,0 +1,27 @@
+[Unit]
+Description=ont serve: tailnet HTTP/1.1 and MCP server for the Ontology store
+Documentation=https://github.com/park-kyungchan/agent-platform/blob/main/deploy/README.md
+Wants=tailscaled.service network-online.target
+After=tailscaled.service network-online.target
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/ont serve --bind 100.95.133.99:7432
+Restart=on-failure
+RestartSec=5
+Nice=10
+Environment=TZ=UTC
+NoNewPrivileges=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectKernelTunables=yes
+ProtectControlGroups=yes
+ProtectHostname=yes
+LockPersonality=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+SystemCallArchitectures=native
+ProtectSystem=full
+
+[Install]
+WantedBy=multi-user.target
