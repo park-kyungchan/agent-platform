@@ -34,6 +34,9 @@ const PAGES: &str = "aptestpg";
 const SLICE: &str = "aptest.slice";
 const CPU_STAT: &str = "/sys/fs/cgroup/aptest.slice/cpu.stat";
 const UUID: &str = "0123abcd-4567-89ef-0123-456789abcdef";
+/// The request of delivery, and the record of its default state directory (R26).
+const DELIVER: &str = "/etc/agent-platform/deliver.json";
+const DEFAULT_RECORD: &str = "/var/lib/agent-platform/deliver/last.json";
 
 fn reply(success: bool, v: &Value) -> Answer {
     let bytes = serde_json::to_vec(v).unwrap();
@@ -106,6 +109,10 @@ struct W {
     listed_pages: String,
     /// Every call of `ont` fails.
     broken: bool,
+    /// The bytes of the request of delivery (`/etc/agent-platform/deliver.json`); None: absent.
+    deliver: Option<String>,
+    /// The pairs `(clone, commit, tip)` for which `git merge-base --is-ancestor` succeeds.
+    ancestors: BTreeSet<(String, String, String)>,
 }
 impl W {
     fn new() -> Self {
@@ -149,6 +156,8 @@ impl W {
             others: BTreeMap::new(),
             listed_pages: String::new(),
             broken: false,
+            deliver: None,
+            ancestors: BTreeSet::new(),
         };
         w.policy_with(json!({}));
         w
@@ -438,6 +447,25 @@ impl System for W {
         match (program, &words[..]) {
             ("ont", _) => self.ont(args, input),
             ("git", ["check-ref-format", "--branch", _]) => text(true, ""),
+            (
+                "git",
+                [
+                    "--no-replace-objects",
+                    "-C",
+                    clone,
+                    "-c",
+                    "core.hooksPath=/dev/null",
+                    "-c",
+                    "core.fsmonitor=false",
+                    "merge-base",
+                    "--is-ancestor",
+                    commit,
+                    tip,
+                ],
+            ) => {
+                let pair = ((*clone).to_owned(), (*commit).to_owned(), (*tip).to_owned());
+                text(self.ancestors.contains(&pair), "")
+            }
             ("systemctl", ["list-units", "--all", "--plain", "--no-legend", pattern])
                 if *pattern == format!("{PAGES}-*") =>
             {
@@ -467,6 +495,12 @@ impl System for W {
         self.reads.borrow_mut().push(path.to_owned());
         match path {
             "/proc/sys/kernel/random/uuid" => Ok(format!("{UUID}\n").into_bytes()),
+            DELIVER => self
+                .deliver
+                .clone()
+                .map(String::into_bytes)
+                .ok_or_else(|| ErrorKind::NotFound.into()),
+            DEFAULT_RECORD => Err(ErrorKind::NotFound.into()),
             "/proc/stat" => {
                 let next = self.proc.borrow_mut().pop_front();
                 Ok(next.expect("one reading too many").into_bytes())
@@ -1982,5 +2016,291 @@ fn r25_the_member_pages_only_in_a_pass_of_the_writers() {
     assert_eq!(
         tree(&w.dir.join("pages")),
         BTreeSet::from(["c1/".to_owned(), "c1/started".to_owned()])
+    );
+}
+
+/// The commits of the delivery trials: a dependency's merge, and the tips of the record.
+const MERGED: &str = "1111111111111111111111111111111111111111";
+const TIP: &str = "2222222222222222222222222222222222222222";
+const ETC_TIP: &str = "3333333333333333333333333333333333333333";
+impl W {
+    /// The request of delivery over `o/r` with the configuration repository `o/etc`, its state
+    /// directory under the trial's, and the record `record` there (None: no record).
+    fn delivery(&mut self, record: Option<Value>) {
+        let state = self.p("deliver");
+        let request = json!({"repository": "o/r", "url": "https://invented.example/o/r.git",
+            "state": state, "etc": {"repository": "o/etc", "url": "https://invented.example/o/etc.git"}});
+        self.deliver = Some(request.to_string());
+        std::fs::create_dir_all(&state).unwrap();
+        let last = self.dir.join("deliver/last.json");
+        let _ = std::fs::remove_file(&last);
+        if let Some(r) = record {
+            std::fs::write(last, r.to_string()).unwrap();
+        }
+    }
+    /// A record of delivery that ended `end` with the target `target`, `etc` ended `etc`.
+    fn record(end: &str, target: &str, etc: &str) -> Value {
+        json!({"at": "2026-11-24T10:00:00Z", "end": end, "target": target, "repository": "o/r",
+            "tip": TIP, "etc": {"repository": "o/etc", "tip": ETC_TIP, "result": etc}})
+    }
+    /// `MERGED` is in the tip of `repo`'s clone of delivery.
+    fn ancestor(&mut self, name: &str, tip: &str) {
+        let clone = self.p(&format!("deliver/{name}"));
+        self.ancestors
+            .insert((clone, MERGED.to_owned(), tip.to_owned()));
+    }
+    /// A dependency of `repository` (None: without one) in `state`, with `MERGED` as its commit.
+    fn dependency(&mut self, key: &str, repository: Option<&str>, state: &str) {
+        let mut f = json!({"lane": "small", "class": "plain", "objective": "invented",
+            "write_set": [format!("{key}/**")], "state": state, "merged_commit": MERGED});
+        if let Some(r) = repository {
+            f["repository"] = json!(r);
+        }
+        self.put(key, f);
+    }
+    /// The ready unit `b1` of `o/r` that waits for the delivery of `deps`.
+    fn dependent(&mut self, deps: &[&str]) {
+        self.ready("b1", &["b/**"], 1);
+        let deps: Vec<Value> = deps.iter().map(|d| uid(d)).collect();
+        self.set("b1", json!({ "depends_delivered": deps }));
+    }
+    /// The pass's end for `b1`: started, or what it waits on.
+    fn end_of_b1(&mut self) -> String {
+        self.reset();
+        let v = self.ok();
+        if keys(&v["started"]).contains(&"b1".to_owned()) {
+            return "started".into();
+        }
+        let all = waiting(&v);
+        let found = all.iter().find(|(k, _)| k == "b1");
+        found.map(|(_, w)| w.clone()).unwrap_or_default()
+    }
+    /// A fresh trial: the request and record of delivery, the dependency `a1` and `b1`.
+    fn delivery_trial(record: Option<Value>, repository: Option<&str>, state: &str) -> Self {
+        let mut w = W::new();
+        w.delivery(record);
+        w.dependency("a1", repository, state);
+        w.dependent(&["a1"]);
+        w
+    }
+}
+
+// spec: specs/ap/work.md#R26
+#[test]
+fn r26_not_delivered_until_the_newest_record_holds_the_merge_in_its_tip() {
+    let ap = "/usr/local/bin/ap";
+    // Delivered: merged, the record current or installed for `ap`, the merge in its tip.
+    for end in ["current", "installed"] {
+        let mut w = W::delivery_trial(Some(W::record(end, ap, "same")), Some("o/r"), "merged");
+        w.ancestor("r", TIP);
+        assert_eq!(w.end_of_b1(), "started");
+        let git = w.calls_of("git");
+        assert!(
+            git.iter().any(|g| g.contains(&"--is-ancestor".to_owned())),
+            "{git:?}"
+        );
+    }
+    // `done` counts as merged.
+    let mut w = W::delivery_trial(Some(W::record("current", ap, "same")), Some("o/r"), "done");
+    w.ancestor("r", TIP);
+    assert_eq!(w.end_of_b1(), "started");
+    // The merge not in the tip, or an ancestry that cannot be read: not delivered.
+    let mut w = W::delivery_trial(
+        Some(W::record("current", ap, "same")),
+        Some("o/r"),
+        "merged",
+    );
+    assert_eq!(w.end_of_b1(), "not delivered: a1");
+    assert_eq!(w.f("b1")["waits_on"], "not delivered: a1");
+    // A record of another end, or of the engine's install.
+    for (end, target) in [
+        ("refused", ap),
+        ("failed", ap),
+        ("not_started", ap),
+        ("current", "/usr/local/bin/ont"),
+        ("installed", "/usr/local/bin/ont"),
+    ] {
+        let mut w = W::delivery_trial(Some(W::record(end, target, "same")), Some("o/r"), "merged");
+        w.ancestor("r", TIP);
+        assert_eq!(w.end_of_b1(), "not delivered: a1", "{end} {target}");
+    }
+    // A dependency of a covered repository that has not merged: no Git is run for it.
+    let mut w = W::delivery_trial(
+        Some(W::record("current", ap, "same")),
+        Some("o/r"),
+        "accepted",
+    );
+    w.ancestor("r", TIP);
+    assert_eq!(w.end_of_b1(), "not delivered: a1");
+    assert!(
+        w.calls_of("git")
+            .iter()
+            .all(|g| !g.contains(&"--is-ancestor".to_owned()))
+    );
+}
+
+// spec: specs/ap/work.md#R26
+#[test]
+fn r26_not_delivered_without_a_record_or_a_readable_request() {
+    let ap = "/usr/local/bin/ap";
+    // No record.
+    let mut w = W::delivery_trial(None, Some("o/r"), "merged");
+    w.ancestor("r", TIP);
+    assert_eq!(w.end_of_b1(), "not delivered: a1");
+    // A record that is no JSON object.
+    let mut w = W::delivery_trial(None, Some("o/r"), "merged");
+    w.ancestor("r", TIP);
+    std::fs::write(w.dir.join("deliver/last.json"), "[1]").unwrap();
+    assert_eq!(w.end_of_b1(), "not delivered: a1");
+    // A request that is absent or cannot be read: not delivered, whatever the repository.
+    for request in [None, Some("{not json".to_owned()), Some("[]".to_owned())] {
+        for repository in ["o/r", "o/s"] {
+            let mut w = W::delivery_trial(
+                Some(W::record("current", ap, "same")),
+                Some(repository),
+                "merged",
+            );
+            w.ancestor("r", TIP);
+            w.deliver = request.clone();
+            assert_eq!(
+                w.end_of_b1(),
+                "not delivered: a1",
+                "{request:?} {repository}"
+            );
+        }
+    }
+}
+
+// spec: specs/ap/work.md#R26
+#[test]
+fn r26_not_delivered_after_a_failed_configuration_step() {
+    let ap = "/usr/local/bin/ap";
+    // The configuration repository is delivered by the record's member `etc`, its tip in its own clone.
+    for result in ["same", "installed"] {
+        let mut w = W::delivery_trial(
+            Some(W::record("current", ap, result)),
+            Some("o/etc"),
+            "merged",
+        );
+        w.ancestor("etc", ETC_TIP);
+        assert_eq!(w.end_of_b1(), "started", "{result}");
+    }
+    // Its step failed, or never ran: not delivered.
+    for result in ["fetch_failed", "install_failed", "check_failed"] {
+        let mut w = W::delivery_trial(
+            Some(W::record("current", ap, result)),
+            Some("o/etc"),
+            "merged",
+        );
+        w.ancestor("etc", ETC_TIP);
+        assert_eq!(w.end_of_b1(), "not delivered: a1", "{result}");
+    }
+    let mut record = W::record("current", ap, "same");
+    record["etc"] = Value::Null;
+    let mut w = W::delivery_trial(Some(record), Some("o/etc"), "merged");
+    w.ancestor("etc", ETC_TIP);
+    assert_eq!(w.end_of_b1(), "not delivered: a1");
+    // The tip of the main repository does not deliver the configuration repository.
+    let mut w = W::delivery_trial(
+        Some(W::record("current", ap, "same")),
+        Some("o/etc"),
+        "merged",
+    );
+    w.ancestor("etc", TIP);
+    w.ancestor("r", TIP);
+    assert_eq!(w.end_of_b1(), "not delivered: a1");
+}
+
+// spec: specs/ap/work.md#R26
+#[test]
+fn r26_not_delivered_a_dropped_dependency_and_repositories_delivery_does_not_cover() {
+    let ap = "/usr/local/bin/ap";
+    // A dropped dependency, and a dependency the store does not hold.
+    let mut w = W::delivery_trial(
+        Some(W::record("current", ap, "same")),
+        Some("o/r"),
+        "dropped",
+    );
+    assert_eq!(w.end_of_b1(), "dependency dropped: a1");
+    assert_eq!(w.f("b1")["waits_on"], "dependency dropped: a1");
+    let mut w = W::new();
+    w.delivery(Some(W::record("current", ap, "same")));
+    w.dependent(&["gone"]);
+    assert_eq!(w.end_of_b1(), "not delivered: gone");
+    // A repository the request does not cover: released by the merge, with no Git.
+    for (state, end) in [
+        ("merged", "started"),
+        ("done", "started"),
+        ("accepted", "not delivered: a1"),
+    ] {
+        let mut w = W::delivery_trial(None, Some("o/s"), state);
+        assert_eq!(w.end_of_b1(), end, "{state}");
+        assert!(
+            w.calls_of("git")
+                .iter()
+                .all(|g| !g.contains(&"--is-ancestor".to_owned()))
+        );
+    }
+    // No repository: released by `done` alone.
+    for (state, end) in [("done", "started"), ("merged", "not delivered: a1")] {
+        let mut w = W::delivery_trial(None, None, state);
+        assert_eq!(w.end_of_b1(), end, "{state}");
+    }
+    // The first dependency that is not delivered names the wait.
+    let mut w = W::new();
+    w.delivery(Some(W::record("current", ap, "same")));
+    w.dependency("a1", Some("o/s"), "merged");
+    w.dependency("a2", Some("o/r"), "merged");
+    w.dependency("a3", Some("o/r"), "dropped");
+    w.dependent(&["a1", "a2", "a3"]);
+    assert_eq!(w.end_of_b1(), "not delivered: a2");
+    w.ancestor("r", TIP);
+    assert_eq!(w.end_of_b1(), "dependency dropped: a3");
+}
+
+// spec: specs/ap/work.md#R26
+// spec: specs/ap/work.md#R10
+#[test]
+fn r26_not_delivered_comes_after_the_validate_and_is_read_only_for_such_a_candidate() {
+    let ap = "/usr/local/bin/ap";
+    // A failed validate of `start_unit` names the wait first.
+    let mut w = W::delivery_trial(None, Some("o/r"), "merged");
+    w.refuse.insert("b1".into(), vec!["held".into()]);
+    assert_eq!(w.end_of_b1(), "held");
+    // A unit without `depends_delivered` reads neither file of delivery and runs no Git for it.
+    let mut w = W::new();
+    w.delivery(Some(W::record("current", ap, "same")));
+    w.ready("c1", &["c/**"], 1);
+    w.reset();
+    let v = w.ok();
+    assert_eq!(keys(&v["started"]), ["c1"]);
+    let reads = w.reads.borrow().clone();
+    assert!(
+        !reads
+            .iter()
+            .any(|r| r == DELIVER || r.ends_with("last.json")),
+        "{reads:?}"
+    );
+    assert!(
+        w.calls_of("git")
+            .iter()
+            .all(|g| !g.contains(&"--is-ancestor".to_owned()))
+    );
+    // Two candidates with `depends_delivered` read the files once.
+    let mut w = W::delivery_trial(
+        Some(W::record("current", ap, "same")),
+        Some("o/r"),
+        "merged",
+    );
+    w.ready("b2", &["b2/**"], 2);
+    w.set("b2", json!({"depends_delivered": [uid("a1")]}));
+    w.reset();
+    let v = w.ok();
+    assert_eq!(waiting(&v).len(), 2, "{v}");
+    let reads = w.reads.borrow().clone();
+    assert_eq!(
+        reads.iter().filter(|r| *r == DELIVER).count(),
+        1,
+        "{reads:?}"
     );
 }

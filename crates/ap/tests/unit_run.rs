@@ -771,6 +771,24 @@ impl F {
                     &json!({"status": "ok", "now": epoch, "result": {"basis": {"qualified": true}, "objects": found, "continuation": null}}),
                 )
             }
+            // Schema 25: the sample of R48 counts the units the policy approved that merged.
+            "search" if input["object_type"] == "unit" => {
+                let want = json!({"all": [{"eq": ["approved_by", "policy"]},
+                    {"in": ["state", ["merged", "done"]]}]});
+                assert_eq!(input["where"], want);
+                let found: Vec<Value> = (self.objects.iter())
+                    .filter(|((t, _), v)| {
+                        t == "unit"
+                            && v["approved_by"] == "policy"
+                            && (v["state"] == "merged" || v["state"] == "done")
+                    })
+                    .map(|((_, key), u)| json!({"id": oid("unit", key), "head": {"fields": Self::wrap(u)}}))
+                    .collect();
+                reply(
+                    true,
+                    &json!({"status": "ok", "now": epoch, "result": {"basis": {"qualified": true}, "objects": found, "continuation": null}}),
+                )
+            }
             "action" if args[1] == "validate" => self.validate(input),
             "action" => self.apply(input),
             other => panic!("ont {other} {input}"),
@@ -939,6 +957,16 @@ impl F {
                     }
                 }
                 if failed.is_empty() {
+                    // The engine sets `guarded` to the parameter, and an absent one leaves none.
+                    if action == "record_head" {
+                        let o = self.objects.get_mut(&k("unit", KEY)).unwrap();
+                        match p.get("guarded").filter(|g| g.is_boolean()) {
+                            Some(g) => o["guarded"] = g.clone(),
+                            None => {
+                                o.as_object_mut().unwrap().remove("guarded");
+                            }
+                        }
+                    }
                     let set = match action.as_str() {
                         "record_head" => json!({"head": p["head"], "writers": p["writers"],
                             "pull_request": p["pull_request"], "rounds": p["rounds"]}),
@@ -1001,6 +1029,35 @@ impl F {
                     self.set_unit(json!({"approved_head": p["head"]}));
                 }
                 json!([{"change": "update", "id": oid("unit", KEY)}])
+            }
+            // Schema 25: the criteria of `approve_unit_by_policy` in their order.
+            "approve_unit_by_policy" => {
+                if state != "accepted" {
+                    failed.push("unit_not_accepted");
+                }
+                if p["head"] != u["head"] {
+                    failed.push("head_differs");
+                }
+                if u["class"] != "contract" {
+                    failed.push("class_not_contract");
+                }
+                if u["guarded"] != false {
+                    failed.push("guarded");
+                }
+                if body["role"] != "dispatch" {
+                    failed.push("not_dispatch");
+                }
+                if failed.is_empty() {
+                    self.set_unit(json!({"approved_head": p["head"], "approved_by": "policy"}));
+                }
+                json!([{"change": "update", "id": oid("unit", KEY)}])
+            }
+            "open_finding" => {
+                let key = p["finding"]["native_key"].as_str().unwrap().to_owned();
+                let mut o = p.clone();
+                o["state"] = json!("open");
+                self.put("finding", &key, o);
+                json!([{"change": "initial", "id": oid("finding", &key)}])
             }
             "start_unit_review" => {
                 let key = Self::made_key(
@@ -6336,4 +6393,266 @@ fn r45_a_second_look_after_one_on_the_pc_starts_a_fresh_session() {
     assert!(records[1]["resumes"].is_null(), "{}", records[1]);
     assert_eq!(records[1]["host_reason"], "pc_unreachable");
     assert_eq!(f.capacity_calls, 2);
+}
+
+impl F {
+    /// The policy with `units.approval` set to `approval`.
+    fn approval(&self, approval: Value) {
+        let units = json!({"directory": self.p("units"), "github": self.github(None),
+            "approval": approval});
+        self.policy(json!({ "units": units }));
+    }
+    /// The parameter `guarded` of every `record_head`, in order, with its head.
+    fn guarded_heads(&self) -> Vec<(Value, Option<Value>)> {
+        let heads = self.bodies("record_head");
+        heads
+            .iter()
+            .map(|b| {
+                let p = &b["parameters"];
+                (p["head"].clone(), p.get("guarded").cloned())
+            })
+            .collect()
+    }
+}
+
+// spec: specs/ap/unit-run.md#R46
+#[test]
+fn r46_policy_head_guarded_is_recorded_once_more_after_the_checks_pass() {
+    // Without the member: no `record_head` passes `guarded`, and the unit holds none.
+    let mut f = F::new();
+    f.steps(&["implement", "accept"]);
+    let (a, _) = f.ok();
+    assert_eq!(a["state"], "merged", "{a}");
+    let heads = f.guarded_heads();
+    assert_eq!(heads.len(), 1, "{heads:?}");
+    assert!(heads.iter().all(|(_, g)| g.is_none()), "{heads:?}");
+    assert!(f.unit().get("guarded").is_none());
+    // With it: the head the checks passed on is recorded again, `guarded` true when a changed path
+    // meets a pattern, after the acceptance checks and before the verifier's round.
+    for (patterns, want) in [
+        (json!(["ci/**", "src/widgets.rs"]), true),
+        (json!(["ci/**", "src"]), false),
+    ] {
+        let mut f = F::new();
+        f.approval(json!({"contract": "lead", "guarded": patterns, "sample": 2}));
+        f.steps(&["implement", "accept"]);
+        let (a, _) = f.ok();
+        assert_eq!(a["state"], "merged", "{a}");
+        let heads = f.guarded_heads();
+        assert_eq!(heads.len(), 2, "{heads:?}");
+        assert_eq!(heads[0], (a["head"].clone(), None));
+        assert_eq!(heads[1], (a["head"].clone(), Some(json!(want))));
+        assert_eq!(f.unit()["guarded"], want);
+        let check = f.first(|c| {
+            c.0 == "systemd-run" && c.1.iter().any(|w| w.contains("test -f src/widgets.rs"))
+        });
+        let recorded = f
+            .first(|c| {
+                c.0 == "ont"
+                    && c.2["action_type"] == "record_head"
+                    && c.2["parameters"].get("guarded").is_some()
+            })
+            .unwrap();
+        let review = f
+            .first(|c| {
+                c.0 == "ont" && c.1[1] == "apply" && c.2["action_type"] == "start_unit_review"
+            })
+            .unwrap();
+        assert!(
+            check.unwrap() < recorded,
+            "the guard came before the checks"
+        );
+        assert!(recorded < review);
+        // The plain unit merged as on the base: no approval of any kind.
+        let actions = f.actions();
+        assert!(
+            !actions.iter().any(|a| a.starts_with("approve_unit")),
+            "{actions:?}"
+        );
+    }
+}
+
+// spec: specs/ap/unit-run.md#R47
+#[test]
+fn r47_policy_approval_merges_an_unguarded_contract_unit_in_the_call_that_accepts_it() {
+    let mut f = F::new();
+    f.set_unit(json!({"class": "contract"}));
+    f.approval(json!({"contract": "verifier", "guarded": ["ci/**"], "sample": 100}));
+    f.steps(&["implement", "accept"]);
+    let (a, status) = f.ok();
+    assert_eq!((a["state"].as_str(), status), (Some("merged"), 0), "{a}");
+    assert!(a.get("waits_for").is_none(), "{a}");
+    let u = f.unit();
+    assert_eq!(
+        (&u["approved_head"], &u["approved_by"]),
+        (&a["head"], &json!("policy"))
+    );
+    let actions = f.actions();
+    assert!(!actions.contains(&"approve_unit".to_owned()), "{actions:?}");
+    let at = |name: &str| actions.iter().position(|a| a == name).unwrap();
+    assert!(at("accept_unit") < at("approve_unit_by_policy"));
+    assert!(at("approve_unit_by_policy") < at("merge_unit"));
+    let body = f.bodies("approve_unit_by_policy")[0].clone();
+    assert_eq!(
+        (&body["role"], &body["agent"], &body["parameters"]["head"]),
+        (&json!("dispatch"), &json!("ap-unit"), &a["head"])
+    );
+    assert_eq!(f.merges(), (1, 0));
+}
+
+// spec: specs/ap/unit-run.md#R47
+#[test]
+fn r47_policy_approval_leaves_to_the_lead_a_guarded_head_an_effect_unit_and_the_member_lead() {
+    let cases = [
+        (
+            "contract",
+            json!({"contract": "verifier", "guarded": ["src/**"], "sample": 2}),
+        ),
+        (
+            "effect",
+            json!({"contract": "verifier", "guarded": ["ci/**"], "sample": 2}),
+        ),
+        (
+            "contract",
+            json!({"contract": "lead", "guarded": ["ci/**"], "sample": 2}),
+        ),
+    ];
+    for (class, approval) in cases {
+        let mut f = F::new();
+        f.set_unit(json!({ "class": class }));
+        f.approval(approval.clone());
+        f.steps(&["implement", "accept"]);
+        let (a, status) = f.ok();
+        assert_eq!(
+            (a["state"].as_str(), a["waits_for"].as_str(), status),
+            (Some("accepted"), Some("approve"), 0),
+            "{class} {approval}: {a}"
+        );
+        let actions = f.actions();
+        assert!(
+            !actions.iter().any(|a| a.starts_with("approve_unit")),
+            "{actions:?}"
+        );
+        assert_eq!(f.merges(), (0, 0));
+    }
+}
+
+// spec: specs/ap/unit-run.md#R47
+#[test]
+fn r47_policy_approval_refused_or_cut_waits_for_the_lead() {
+    // The store refuses the approval: the unit answers accepted and waits for the Lead.
+    let mut f = F::new();
+    f.set_unit(json!({"class": "contract"}));
+    f.approval(json!({"contract": "verifier", "guarded": ["ci/**"], "sample": 2}));
+    f.refuse = Some(("approve_unit_by_policy", "guarded"));
+    f.steps(&["implement", "accept"]);
+    let (a, status) = f.ok();
+    assert_eq!(
+        (a["state"].as_str(), a["waits_for"].as_str(), status),
+        (Some("accepted"), Some("approve"), 0),
+        "{a}"
+    );
+    assert!(a.get("refused").is_none(), "{a}");
+    assert_eq!(f.merges(), (0, 0));
+    // A landing cut between `accept_unit` and the approval: the next call finds `guarded` false
+    // stored by the call before, and never approves on it.
+    let mut f = F::new();
+    f.set_unit(json!({"class": "contract"}));
+    f.approval(json!({"contract": "verifier", "guarded": ["ci/**"], "sample": 2}));
+    f.die_after = Some("accept_unit");
+    f.steps(&["implement", "accept"]);
+    let _ = f.run();
+    (f.dead, f.die_after) = (false, None);
+    assert_eq!(
+        (&f.unit()["state"], &f.unit()["guarded"]),
+        (&json!("accepted"), &json!(false))
+    );
+    let (a, status) = f.ok();
+    assert_eq!(
+        (a["state"].as_str(), a["waits_for"].as_str(), status),
+        (Some("accepted"), Some("approve"), 0),
+        "{a}"
+    );
+    assert!(!f.actions().iter().any(|a| a.starts_with("approve_unit")));
+    assert_eq!(f.merges(), (0, 0));
+}
+
+// spec: specs/ap/unit-run.md#R48
+#[test]
+fn r48_policy_sample_opens_a_finding_on_every_sampleth_merge_the_policy_approved() {
+    // One unit approved by the policy merged before: this merge is the second, and `sample` 2
+    // opens the finding; the store refusing it changes nothing of the answer.
+    for refused in [false, true] {
+        let mut f = F::new();
+        f.put(
+            "unit",
+            "earlier-unit",
+            json!({"state": "done", "approved_by": "policy"}),
+        );
+        f.put(
+            "unit",
+            "lead-unit",
+            json!({"state": "merged", "approved_by": "lead"}),
+        );
+        f.set_unit(json!({"class": "contract"}));
+        f.approval(json!({"contract": "verifier", "guarded": ["ci/**"], "sample": 2}));
+        if refused {
+            f.refuse = Some(("open_finding", "revision_conflict"));
+        }
+        f.steps(&["implement", "accept"]);
+        let (a, status) = f.ok();
+        assert_eq!((a["state"].as_str(), status), (Some("merged"), 0), "{a}");
+        assert!(a.get("refused").is_none(), "{a}");
+        let n = a["pull_request"].as_u64().unwrap();
+        let actions = f.actions();
+        let at = |name: &str| actions.iter().rposition(|a| a == name);
+        assert!(at("merge_unit") < at("open_finding"), "{actions:?}");
+        let opened = f
+            .calls
+            .iter()
+            .filter(|c| c.0 == "ont" && c.2["action_type"] == "open_finding")
+            .map(|c| c.2.clone())
+            .collect::<Vec<_>>();
+        assert_eq!(opened.len(), 1);
+        let p = &opened[0]["parameters"];
+        assert_eq!(p["finding"]["native_key"], format!("policy-sample-{KEY}"));
+        assert_eq!(p["subject"]["native_key"], KEY);
+        assert_eq!(
+            (
+                &p["detector"],
+                &p["kind"],
+                &p["severity"],
+                &opened[0]["role"]
+            ),
+            (
+                &json!("ap-unit"),
+                &json!("note"),
+                &json!("act"),
+                &json!("dispatch")
+            )
+        );
+        assert_eq!(
+            p["summary"],
+            format!("sample: read the merged diff of {KEY}, pull request {n}")
+        );
+        // The cleanup of R32 came before it.
+        assert_eq!(a["cleanup"]["worktree"], "removed", "{a}");
+    }
+    // The first merge of `sample` 2, and a plain unit's merge: no finding.
+    for (class, earlier) in [("contract", false), ("plain", true)] {
+        let mut f = F::new();
+        if earlier {
+            f.put(
+                "unit",
+                "earlier-unit",
+                json!({"state": "done", "approved_by": "policy"}),
+            );
+        }
+        f.set_unit(json!({ "class": class }));
+        f.approval(json!({"contract": "verifier", "guarded": ["ci/**"], "sample": 2}));
+        f.steps(&["implement", "accept"]);
+        let (a, status) = f.ok();
+        assert_eq!((a["state"].as_str(), status), (Some("merged"), 0), "{a}");
+        assert!(!f.actions().contains(&"open_finding".to_owned()));
+    }
 }

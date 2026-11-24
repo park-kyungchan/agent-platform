@@ -616,3 +616,81 @@ fn r13_the_command_prints_the_answer_and_writes_nothing() {
     assert_eq!(listing(&dir), before, "the check wrote a file");
     let _ = std::fs::remove_dir_all(&dir);
 }
+
+// spec: specs/ap/policy.md#R20
+// spec: specs/ap/unit-run.md#R3
+#[test]
+fn r20_approval_member_of_units_is_read_by_its_form() {
+    let good = json!({"contract": "verifier", "guarded": ["ci/**", "check", "crates/ap/src/unit/drive.rs"], "sample": 2});
+    for approval in [
+        good.clone(),
+        json!({"contract": "lead", "guarded": ["a"], "sample": 100}),
+    ] {
+        let mut p = host();
+        p["units"]["approval"] = approval;
+        let fake = Fake::json(&p);
+        assert_eq!(check(&fake, None).unwrap()["status"], "ok");
+        assert!(fake.calls.is_empty());
+    }
+    let many: Vec<String> = (0..61).map(|i| format!("p{i}")).collect();
+    let cases = [
+        (json!("verifier"), "units.approval is not an object"),
+        (
+            json!({"contract": "verifier", "guarded": ["a"], "sample": 2, "more": 1}),
+            "units.approval.more is not a member of this form",
+        ),
+        (
+            json!({"guarded": ["a"], "sample": 2}),
+            "units.approval.contract is not lead or verifier",
+        ),
+        (
+            json!({"contract": "policy", "guarded": ["a"], "sample": 2}),
+            "units.approval.contract is not lead or verifier",
+        ),
+        (
+            json!({"contract": "lead", "sample": 2}),
+            "units.approval.guarded is not 1 to 60 patterns of the write set",
+        ),
+        (
+            json!({"contract": "lead", "guarded": [], "sample": 2}),
+            "units.approval.guarded is not 1 to 60 patterns of the write set",
+        ),
+        (
+            json!({"contract": "lead", "guarded": many, "sample": 2}),
+            "units.approval.guarded is not 1 to 60 patterns of the write set",
+        ),
+        (
+            json!({"contract": "lead", "guarded": ["crates/ap/src/*"], "sample": 2}),
+            "units.approval.guarded is not 1 to 60 patterns of the write set",
+        ),
+        (
+            json!({"contract": "lead", "guarded": ["a", 1], "sample": 2}),
+            "units.approval.guarded is not 1 to 60 patterns of the write set",
+        ),
+        (
+            json!({"contract": "lead", "guarded": ["a"]}),
+            "units.approval.sample is not an integer of 2 to 100",
+        ),
+        (
+            json!({"contract": "lead", "guarded": ["a"], "sample": 1}),
+            "units.approval.sample is not an integer of 2 to 100",
+        ),
+        (
+            json!({"contract": "lead", "guarded": ["a"], "sample": 101}),
+            "units.approval.sample is not an integer of 2 to 100",
+        ),
+        (
+            json!({"contract": "lead", "guarded": ["a"], "sample": "3"}),
+            "units.approval.sample is not an integer of 2 to 100",
+        ),
+    ];
+    for (approval, detail) in cases {
+        let mut units = host()["units"].clone();
+        units["approval"] = approval.clone();
+        assert_eq!(
+            refused("units", units),
+            policy_invalid("units", detail),
+            "{approval}"
+        );
+    }
+}

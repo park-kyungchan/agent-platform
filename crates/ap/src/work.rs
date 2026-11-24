@@ -6,6 +6,7 @@
 use crate::host::{Failure, Host, LIMIT, System, error, fail, id, new_session_id};
 use crate::quota;
 use crate::run::KEEP;
+use crate::status;
 use crate::store::{self, Actor};
 use crate::unit::drive::{self, key_form};
 use crate::unit::{object, page_write, render};
@@ -251,6 +252,7 @@ pub fn execute(s: &mut impl System, store: Option<&str>) -> Result<Value, Box<Re
         started: vec![],
         load: None,
         pages,
+        delivery: None,
     };
     pass.run(s).map_err(|f| {
         Box::new(Refusal {
@@ -435,6 +437,8 @@ struct Pass {
     load: Option<(i64, i64, i64)>,
     /// The pages directory, in a pass that reaches the writers (R24).
     pages: Option<PathBuf>,
+    /// The delivery's files, read once by the first candidate with `depends_delivered` (R26).
+    delivery: Option<status::DeliveryFiles>,
 }
 /// A candidate's end in this pass.
 enum End {
@@ -744,6 +748,10 @@ impl Pass {
             if !failed.is_empty() {
                 return Ok(Some(failed.join(", ")));
             }
+            // R26: right after the validate of `start_unit`, the delivered dependencies.
+            if let Some(why) = self.undelivered(s, f)? {
+                return Ok(Some(why));
+            }
         } else {
             p["head"] = f["head"].clone();
             p["merged_commit"] = json!("0".repeat(40));
@@ -788,6 +796,41 @@ impl Pass {
             return Ok(Some("cpu outside".into()));
         }
         Ok(None)
+    }
+
+    /// The first unit of `depends_delivered` that is not delivered, as its `waits_on` (R26). The
+    /// delivery's files are read and Git runs only for a candidate that names one.
+    fn undelivered(&mut self, s: &mut impl System, f: &Value) -> Result<Option<String>, Failure> {
+        let all = f["depends_delivered"].as_array().into_iter().flatten();
+        let keys: Vec<&str> = all.filter_map(|d| d["native_key"].as_str()).collect();
+        if keys.is_empty() {
+            return Ok(None);
+        }
+        let files = match self.delivery.take() {
+            Some(d) => d,
+            None => status::delivery_files(s),
+        };
+        let mut why = None;
+        for key in keys {
+            let dep = store::get(s, self.store(), "unit", key);
+            let dep = match store::at(dep, "depends_delivered") {
+                Ok(dep) => dep,
+                Err(e) => {
+                    self.delivery = Some(files);
+                    return Err(e);
+                }
+            };
+            if dep.as_ref().is_some_and(|d| d["state"] == "dropped") {
+                why = Some(format!("dependency dropped: {key}"));
+                break;
+            }
+            if !dep.is_some_and(|d| delivered(s, &files, &d)) {
+                why = Some(format!("not delivered: {key}"));
+                break;
+            }
+        }
+        self.delivery = Some(files);
+        Ok(why)
     }
 
     /// The start of one unit (R14, R15).
@@ -884,6 +927,54 @@ impl Pass {
     }
 }
 /// An `accepted` unit that waits only for its merge run: class `plain`, or approved at its head (R8).
+/// Whether the unit `d` of a `depends_delivered` is delivered (R26). In a repository the request of
+/// delivery covers (its `repository`, or `etc.repository`): `merged` or `done`, the newest record
+/// ended `current` or `installed` with the target of `ap` (and for the `etc` repository its member
+/// `etc` ended `same` or `installed`), and the merged commit an ancestor of or equal to that record's
+/// tip in delivery's own clone. Elsewhere its merge releases it, and without a repository its state
+/// `done`. A request that cannot be read, and an ancestry that cannot be read, is not delivered.
+fn delivered(s: &mut impl System, files: &status::DeliveryFiles, d: &Value) -> bool {
+    let merged = d["state"] == "merged" || d["state"] == "done";
+    let Some(repository) = d["repository"].as_str().filter(|r| !r.is_empty()) else {
+        return d["state"] == "done";
+    };
+    let Some(request) = &files.request else {
+        return false;
+    };
+    let main = request["repository"].as_str() == Some(repository);
+    let etc = !main && request["etc"]["repository"].as_str() == Some(repository);
+    if !main && !etc {
+        return merged;
+    }
+    let Some(record) = files.record.as_ref().filter(|_| merged) else {
+        return false;
+    };
+    let ended = matches!(record["end"].as_str(), Some("current" | "installed"));
+    if !ended || record["target"] != status::AP_TARGET {
+        return false;
+    }
+    let tip = match etc {
+        false => record["tip"].as_str(),
+        true => {
+            let e = &record["etc"];
+            let done = e.is_object() && matches!(e["result"].as_str(), Some("same" | "installed"));
+            e["tip"].as_str().filter(|_| done)
+        }
+    };
+    let hex = |t: &&str| t.len() == 40 && t.bytes().all(|c| c.is_ascii_hexdigit());
+    let (Some(tip), Some(commit)) = (tip.filter(hex), d["merged_commit"].as_str().filter(hex))
+    else {
+        return false;
+    };
+    let name = repository.split_once('/').map(|(_, n)| n);
+    let name = name.filter(|n| !n.is_empty() && !n.contains('/') && *n != "." && *n != "..");
+    let Some(name) = name else {
+        return false;
+    };
+    let clone = format!("{}/{name}", files.state);
+    let words = ["merge-base", "--is-ancestor", commit, tip];
+    crate::review::git(s, &clone, &words).is_ok()
+}
 fn merge_only(f: &Value) -> bool {
     f["class"] == "plain" || (!f["head"].is_null() && f["approved_head"] == f["head"])
 }
