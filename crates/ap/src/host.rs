@@ -244,6 +244,17 @@ pub trait System {
     fn way_out(&self) -> Arc<dyn WayOut> {
         Arc::new(HostWay)
     }
+    /// `AP_STORE_URL` for remote-enabled client verbs (`specs/ap/client.md` R1, R2): none on test
+    /// fakes unless overridden; `Host` reads `std::env::var_os("AP_STORE_URL")`.
+    fn store_url_env(&self) -> Option<OsString> {
+        None
+    }
+    /// The policy file path for remote client `store_url` resolution (`specs/ap/client.md` R1,
+    /// R3): none on test fakes unless overridden so fakes that set `policy_file()` for other rules
+    /// never trigger client policy reads; `Host` delegates to `self.policy_file()`.
+    fn client_policy_file(&self) -> Option<PathBuf> {
+        None
+    }
 }
 /// The home of the passwd entry whose user id is the effective one of a `/proc/<pid>/status` text
 /// (its line `Uid:`, the second number): the sixth field of the first such line of the passwd text.
@@ -381,6 +392,12 @@ impl System for Host {
     }
     fn policy_file(&self) -> Option<PathBuf> {
         Some(policy_path(std::env::var_os("AP_POLICY_FILE")))
+    }
+    fn store_url_env(&self) -> Option<OsString> {
+        std::env::var_os("AP_STORE_URL")
+    }
+    fn client_policy_file(&self) -> Option<PathBuf> {
+        self.policy_file()
     }
     fn git_hooks(&self) -> Option<PathBuf> {
         Some(PathBuf::from(GIT_HOOKS))

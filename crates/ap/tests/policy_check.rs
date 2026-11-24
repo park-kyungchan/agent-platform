@@ -82,7 +82,8 @@ fn host() -> Value {
                 "drift": {"cap_usd": 60, "models": ["claude-sonnet-5-5", "claude-opus-5-5"], "max_tokens": 8000, "max_requests": 100},
                 "merge-review": {"cap_usd": 45, "models": ["claude-opus-5-5", "claude-fable-5-2"], "max_tokens": 8000, "max_requests": 100},
                 "mining": {"cap_usd": 18, "models": ["claude-sonnet-5-5", "claude-fable-5-2"], "max_tokens": 8000, "max_requests": 400},
-                "evals": {"cap_usd": 39, "models": ["claude-haiku-5-5", "claude-sonnet-5-5", "claude-opus-5-5", "claude-fable-5-2"], "max_tokens": 8000, "max_requests": 300}}}
+                "evals": {"cap_usd": 39, "models": ["claude-haiku-5-5", "claude-sonnet-5-5", "claude-opus-5-5", "claude-fable-5-2"], "max_tokens": 8000, "max_requests": 300}}},
+        "store_url": "http://100.95.133.99:7432"
     })
 }
 
@@ -125,7 +126,7 @@ fn r12_the_host_shape_passes_every_reader_after_one_read() {
     assert_eq!(
         answer,
         json!({"status": "ok", "path": PATH, "sha256": digest,
-            "readers": ["models", "quota", "units", "reviews", "repositories", "work", "check", "writer", "api"]})
+            "readers": ["models", "quota", "units", "reviews", "repositories", "work", "check", "writer", "api", "client"]})
     );
     assert_eq!(fake.reads.get(), 1);
     assert!(fake.calls.is_empty());
@@ -140,6 +141,7 @@ fn r12_the_host_shape_passes_every_reader_after_one_read() {
         "hosts",
         "writer",
         "api",
+        "store_url",
     ] {
         p.as_object_mut().unwrap().remove(m);
     }
@@ -265,6 +267,71 @@ fn r14_one_planted_fault_per_reader_is_refused_by_that_reader() {
             "api.jobs.drift.models is not 1 to 8 distinct Claude API model identifiers with an input and an output price"
         )
     );
+    assert_eq!(
+        refused("store_url", json!("http://127.0.0.1:7432")),
+        policy_invalid("client", "store_url is not http://<tailnet-ip>:<port>")
+    );
+}
+
+// spec: specs/ap/policy.md#R12
+// spec: specs/ap/policy.md#R13
+// spec: specs/ap/policy.md#R19
+#[test]
+fn r19_store_url_is_validated_by_client_after_api() {
+    for valid in [
+        "http://100.64.0.1:1",
+        "http://100.95.133.99:7432",
+        "http://100.127.255.254:65535",
+        "http://[fd7a:115c:a1e0::1]:7432",
+        "http://[fd7a:115c:a1e0:ab12::34cd]:80",
+    ] {
+        let mut p = host();
+        p["store_url"] = json!(valid);
+        let ans = check(&Fake::json(&p), None).unwrap();
+        assert_eq!(ans["status"], "ok", "{valid}");
+    }
+    for bad in [
+        json!(7432),
+        json!(null),
+        json!(true),
+        json!(["http://100.95.133.99:7432"]),
+        json!({"url": "http://100.95.133.99:7432"}),
+        json!(""),
+        json!("http://127.0.0.1:7432"),
+        json!("http://0.0.0.0:7432"),
+        json!("http://100.63.255.255:7432"),
+        json!("http://100.128.0.0:7432"),
+        json!("https://100.95.133.99:7432"),
+        json!("http://vps.ts.net:7432"),
+        json!("http://100.95.133.99:7432/v1"),
+        json!("http://100.95.133.99:7432?x=1"),
+        json!("http://100.95.133.99:7432#frag"),
+        json!("http://user@100.95.133.99:7432"),
+        json!("http://100.95.133.99:0"),
+        json!("http://100.95.133.99:65536"),
+        json!("http://100.95.133.99:07432"),
+        json!("http://[::1]:7432"),
+        json!("http://[fd7a:115c:a1e1::1]:7432"),
+        json!("http://100.95.133.99:7432 "),
+        json!("http://100.95.133.99:7432\n"),
+    ] {
+        let (reader, code, field, detail) = refused("store_url", bad.clone());
+        assert_eq!(
+            (reader, code.as_str(), field.as_str()),
+            (Some("client"), "policy_invalid", "policy"),
+            "{bad}"
+        );
+        assert!(
+            detail.as_str().unwrap().starts_with("store_url"),
+            "{bad}: {detail}"
+        );
+    }
+    // `client` runs after `api`: a fault in both `api` and `store_url` is refused by `api`.
+    let mut p = host();
+    p["api"] = json!("bad");
+    p["store_url"] = json!("http://127.0.0.1:7432");
+    let Refusal { reader, .. } = check(&Fake::json(&p), None).unwrap_err();
+    assert_eq!(reader, Some("api"));
 }
 
 // spec: specs/ap/policy.md#R17

@@ -49,3 +49,5 @@ pub mod resource;
 pub mod api;
 
 pub mod measure;
+
+pub mod client;

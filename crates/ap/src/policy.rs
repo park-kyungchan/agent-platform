@@ -12,7 +12,7 @@ use std::{
 };
 
 /// The readers, in the order the check runs them (R12).
-const READERS: [&str; 9] = [
+const READERS: [&str; 10] = [
     "models",
     "quota",
     "units",
@@ -22,6 +22,7 @@ const READERS: [&str; 9] = [
     "check",
     "writer",
     "api",
+    "client",
 ];
 
 /// The file as read once: every reader meets this answer for the path, never the file system.
@@ -105,6 +106,7 @@ pub fn check(s: &impl System, file: Option<&Path>) -> Result<Value, Refusal> {
     at("check", crate::check::hosts(&value).map(drop))?;
     at("writer", page_write::writer(&value).map(drop))?;
     at("api", crate::api::config(&value).map(drop))?;
+    at("client", crate::client::config(&value).map(drop))?;
     let path = w.file.to_str().unwrap_or_default();
     Ok(json!({"status": "ok", "path": path, "sha256": sha256, "readers": READERS}))
 }

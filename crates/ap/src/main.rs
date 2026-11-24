@@ -140,6 +140,9 @@ fn fail(code: &str, field: &str, status: u8) -> ExitCode {
 
 fn main() -> ExitCode {
     let args: Vec<_> = std::env::args_os().skip(1).collect();
+    if let Some(code) = ap::client::guard_cli(&args) {
+        return code;
+    }
     if args.len() == 1 && (args[0] == "--version" || args[0] == "version") {
         let line = format!("ap {} {}\n", env!("CARGO_PKG_VERSION"), BUILD_REVISION);
         return if io::stdout().lock().write_all(line.as_bytes()).is_ok() {
