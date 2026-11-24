@@ -132,6 +132,16 @@ else
   fail "install_etc_test_missing@scripts/test-install-etc.sh"
 fi
 
+# (g) The tests of the retirement script: a scratch root, a stand-in docker program and a tar wrapper;
+# no docker, no root, no host file.
+if [[ -f scripts/test-retire-hindsight.sh ]]; then
+  if ! bash scripts/test-retire-hindsight.sh; then
+    fail "retire_hindsight_test_failed@scripts/test-retire-hindsight.sh"
+  fi
+else
+  fail "retire_hindsight_test_missing@scripts/test-retire-hindsight.sh"
+fi
+
 if [[ $failures -ne 0 ]]; then
   printf 'check: failed (%d)\n' "$failures" >&2
   exit 1

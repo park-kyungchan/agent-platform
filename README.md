@@ -16,6 +16,9 @@ built here. Agents follow [`AGENTS.md`](AGENTS.md).
 | `etc/agent-platform/policy.json` | The source of the host's `/etc/agent-platform/policy.json` (section "The policy file") |
 | `scripts/install-etc.sh` | Installs the policy file from a merged commit, checks it against the host, or puts a kept copy back |
 | `scripts/test-install-etc.sh` | The tests of `install-etc.sh`, run by `./check` |
+| `scripts/retire-hindsight.sh` | Retires the legacy long-term memory service from the host: `check`, `copy`, `delete <copy directory>`, `verify <copy directory>` (section "Retiring the legacy memory service") |
+| `scripts/retire-hindsight.json` | The script's list: the containers, volumes, network, directory, copy root and settings entries it removes, and the settings files it only scans |
+| `scripts/test-retire-hindsight.sh` | The tests of `retire-hindsight.sh` against a scratch root and a stand-in docker program, run by `./check` |
 | `git/` | The system Git configuration for the engineering scopes: the roster check (`git/hooks/pre-commit`), the configuration files and the alias `git task-new` (section "Git configuration") |
 | `scripts/test-git-config.sh` | The tests of `git/`, run by `./check` |
 | `deployments/host-firewall/` | The nftables table of the public interface `eth0` and the unit that loads it at boot; its `README.md` maps each file to its host path |
@@ -29,7 +32,9 @@ directory's `README.md` maps its files to their host paths.
 The Lead reads these records. `ap deliver` runs `scripts/install-etc.sh` (`check`,
 then `install` of a merged commit), because the host's `/etc/agent-platform/deliver.json`
 has the member `etc` since 2026-11-21 22:39Z; the Lead runs it by hand only for a
-rollback or a fast-path order. The watch's drift detector compares the host's policy
+rollback or a fast-path order. The Lead runs `scripts/retire-hindsight.sh` by hand, once,
+in the order of the section "Retiring the legacy memory service"; it reads its list
+`scripts/retire-hindsight.json` and nothing runs it on its own. The watch's drift detector compares the host's policy
 file with `etc/`. The recorded copies under `deployments/` change on the host only by
 the Lead's hand under the procedure in `AGENTS.md`.
 
@@ -44,7 +49,9 @@ host path. It parses every tracked JSON file, runs `bash -n` on every tracked sh
 script, verifies that every inventory row's copy exists and matches its recorded
 SHA-256, and fails on a file under `deployments/` that is not the inventory, a row's
 copy or a `README.md`, and runs
-`scripts/test-git-config.sh` and `scripts/test-install-etc.sh`. The GitHub Actions job
+`scripts/test-git-config.sh`, `scripts/test-install-etc.sh` and
+`scripts/test-retire-hindsight.sh` (the four words of the retirement script against a
+scratch root, a stand-in docker program and a tar wrapper; no docker and no host file). The GitHub Actions job
 `rust` runs the same command and is the required check of `main`.
 
 The check compares each copy with its recorded digest, never with the host. A copy
@@ -74,6 +81,54 @@ refuses with a code on stderr and exit 2 before any write (`busy`, `not_forward`
 tests. `ap deliver` and the Lead run it; `deliver.json` is not installed from here (its source
 is `agent-platform` `deploy/deliver.json`). `AGENTS.md` states the rules, including
 the fast path for a change that must take effect at once.
+
+## Retiring the legacy memory service
+
+The user ordered on 2026-11-24 that the legacy long-term memory service be deleted
+from the host; a new service is deployed later from nothing.
+`scripts/retire-hindsight.sh` does it, and touches only what
+`scripts/retire-hindsight.json` lists: the two containers, their two volumes, the
+network, the directory `/docker/hindsight`, the images the copy's manifest records
+from the two containers (by id), each volume's data directory where
+`docker volume inspect` places it (read only), the copy root
+`/root/.hindsight-recovery` and the entries that register the service's MCP server
+or its skills in the CLIs' settings and in the Academy workspace. The settings files
+of the list's `scanned` member are read and never changed: a mention of the service
+inside their listed key paths (hook commands, MCP servers at the top and under each
+project, permission entries) is a hit, printed as the file and the key's path; a
+mention anywhere else is none. The service's banks are the data of the two volumes.
+
+| Word | What it does |
+| --- | --- |
+| `check` | One line a target, `present` or `absent` (a container with its state and image id), and the scan's hits; changes nothing, exit 0 |
+| `copy` | Refuses `container_running`. Makes `<copy root>/final-<UTC time>/` (mode `0700`, and the copy root with mode `0700` when it is missing) with a tar archive of each volume's data directory and of the directory (numeric owners kept), a copy of each settings file an entry names and of the launcher, and `MANIFEST.sha256` over them, which also records each container's image id. It reads every archive back whole (member list and digest), then prints `copy <directory>` and `manifest_sha256 <digest>`; on a failed read-back it removes that directory and exits 1 |
+| `delete <copy directory>` | Refuses `copy_not_verified` (not a `final-*` directory directly under the copy root, a manifest that does not verify now, or a target present now that it does not list), `container_running` and `json_unreadable` before any removal. Then removes, in order, the entries, the containers, the network, the volumes, each recorded image by its id (an image docker refuses is printed `kept`), and the directory, one line a step; a target already gone is `gone`; a failed removal stops the call with exit 1 |
+| `verify <copy directory>` | Refuses as `delete` does; exit 0 when no container, network, volume, directory or entry of the list is left and the scan has no hit (a recorded image still present is printed `kept` and is no failure), else exit 1 with what is left |
+
+`--root <dir>` puts every path of the list under `<dir>` (for the tests); `--docker
+<program>` names the program used as docker. The archives hold the directory's `.env`
+files; the script prints paths, names, ids and digests only.
+
+**The Lead's order**, on the host, from a clean worktree at the merge commit:
+
+1. open a finding that names the user's request as the user's word for the listed
+   paths in the Academy workspace, and lift the hold on them by that request;
+2. `scripts/retire-hindsight.sh check`;
+3. `scripts/retire-hindsight.sh copy`;
+4. add the copy directory and the manifest's sha256 to the finding;
+5. `scripts/retire-hindsight.sh delete <copy directory>`, while no session of a CLI
+   whose settings file is an entry runs (it would write the file back from its memory);
+6. `scripts/retire-hindsight.sh verify <copy directory>`; a hit in a scanned file is the
+   Lead's to remove by hand and to name in the finding.
+
+**Restore** from the copy directory (`sha256sum -c MANIFEST.sha256` there first):
+for each volume, `docker volume create <name>`, then
+`tar --numeric-owner -xpf volume-<name>.tar -C <its mountpoint>`; the directory with
+`tar --numeric-owner -xpf directory.tar -C /docker`, which brings back the compose
+file; each settings file or launcher from its `file-<n>-<name>` copy, with the mode
+and owner its manifest record names. The images are not in the copy: `docker compose
+pull` pulls them again by the names the compose file gives. The copy root stays until
+the user says otherwise.
 
 ## Not changed here
 
