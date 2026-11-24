@@ -6560,7 +6560,10 @@ fn agy_step_delta_edge_cases_keep_existing_result_behavior() {
     ]);
     let (v, status) = f.run(&f.agy("ws_delta.md")).unwrap();
     assert_eq!((status, v["state"].as_str()), (0, Some("ok")), "{v}");
-    assert_eq!(std::fs::read(f.p("ws_delta.md")).unwrap(), resp_ws.as_bytes());
+    assert_eq!(
+        std::fs::read(f.p("ws_delta.md")).unwrap(),
+        resp_ws.as_bytes()
+    );
 
     // 4. `result.response` not ending with `last_text`: falls back to `result.response`.
     let resp_mismatch = "Different summary\n";
