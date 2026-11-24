@@ -650,9 +650,11 @@ impl F {
     }
     /// An action of the Lead's side of the walk (another agent and session than the run's), applied.
     fn engine_apply(&mut self, action: &str, mut p: Value) -> Value {
-        for k in ["unit", "task"] {
+        for k in ["unit", "task", "subject"] {
             if let Some(key) = p[k]["native_key"].as_str().map(str::to_owned) {
-                p[k] = self.eid(k, &key);
+                // A subject carries its own type.
+                let kind = p[k]["object_type"].as_str().filter(|_| k == "subject").unwrap_or(k);
+                p[k] = self.eid(kind, &key);
             }
         }
         let rid = format!("walk-{}", NEXT.fetch_add(1, Ordering::SeqCst));
@@ -751,22 +753,17 @@ impl F {
                     &rows,
                 )
             }
-            "render" if input["view"] == "holds_on_work" => {
-                let cell = |v: &Value| v["native_key"].as_str().unwrap_or("(absent)").to_owned();
-                let rows: Vec<String> = self
-                    .objects
-                    .iter()
+            // Schema 24: the take-over reads the active holds by one search of `hold` by `status`.
+            "search" if input["object_type"] == "hold" => {
+                assert_eq!(input["where"], json!({"all": [{"eq": ["status", "active"]}]}));
+                let found: Vec<Value> = (self.objects.iter())
                     .filter(|((t, _), v)| t == "hold" && v["status"] == "active")
-                    .map(|(_, h)| {
-                        format!(
-                            "| {} | an invented \\| condition | {} | {} |  |",
-                            h["effect"].as_str().unwrap(),
-                            cell(&h["unit"]),
-                            cell(&h["intent"])
-                        )
-                    })
+                    .map(|((_, key), h)| json!({"id": oid("hold", key), "head": {"fields": Self::wrap(h)}}))
                     .collect();
-                Self::table("| Effect | Until | Unit | Intent | Scope |", &rows)
+                reply(
+                    true,
+                    &json!({"status": "ok", "now": epoch, "result": {"basis": {"qualified": true}, "objects": found, "continuation": null}}),
+                )
             }
             "action" if args[1] == "validate" => self.validate(input),
             "action" => self.apply(input),
@@ -857,7 +854,7 @@ impl F {
         self.objects.iter().any(|((t, _), h)| {
             t == "hold"
                 && h["status"] == "active"
-                && (h["unit"]["native_key"] == KEY || h["intent"] == u["intent"])
+                && (h["subject"] == oid("unit", KEY) || h["subject"] == u["intent"])
         })
     }
     fn apply(&mut self, body: &Value) -> Answer {
@@ -1808,12 +1805,52 @@ fn r5_one_run_per_unit_by_an_advisory_lock() {
 
 // spec: specs/ap/unit-run.md#R6
 #[test]
+fn r6_a_hold_on_the_unit_refuses_the_take_over() {
+    // A cut run (`running`) is taken over without an apply; the active holds are read by one search of `hold`.
+    let mut f = F::new();
+    f.set_unit(json!({"state": "running"}));
+    let hold = |f: &mut F, key: &str, status: &str, subject: Value| {
+        let mut h = json!({"status": status, "effect": "no work", "task": oid("task", "walk")});
+        if !subject.is_null() {
+            h["subject"] = subject;
+        }
+        f.put("hold", key, h);
+    };
+    // The subject is the unit: refused `held`, the detail the hold's key; the intent of the unit: the same.
+    hold(&mut f, "h-unit", "active", oid("unit", KEY));
+    let e = f.refusal();
+    assert_eq!((code(&e), &e.detail), (("held", "unit", 2), &json!("h-unit")));
+    let searches: Vec<_> = f.calls.iter().filter(|c| c.1[0] == "search").collect();
+    assert_eq!(searches.len(), 1);
+    assert_eq!(searches[0].2["object_type"], "hold");
+    assert_eq!(searches[0].2["where"], json!({"all": [{"eq": ["status", "active"]}]}));
+    f.objects.remove(&k("hold", "h-unit"));
+    let intent = f.unit()["intent"].clone();
+    hold(&mut f, "h-intent", "active", intent);
+    let e = f.refusal();
+    assert_eq!((code(&e), &e.detail), (("held", "unit", 2), &json!("h-intent")));
+    f.objects.remove(&k("hold", "h-intent"));
+    assert!(f.actions().is_empty(), "the refusals applied nothing");
+    // A hold on another unit, on a host or a finding, a lifted one, one on a task alone, and one written before
+    // schema 24 (`unit` and no `subject`) refuse nothing.
+    hold(&mut f, "h-other", "active", oid("unit", "another-unit"));
+    hold(&mut f, "h-host", "active", oid("host", "pc"));
+    hold(&mut f, "h-finding", "active", oid("finding", "f"));
+    hold(&mut f, "h-lifted", "lifted", oid("unit", KEY));
+    hold(&mut f, "h-task", "active", Value::Null);
+    f.put("hold", "h-old", json!({"status": "active", "effect": "old", "unit": oid("unit", KEY)}));
+    f.steps(&["implement", "accept"]);
+    let (a, _) = f.ok();
+    assert_ne!(a["refused"], "held", "{a}");
+}
+// spec: specs/ap/unit-run.md#R6
+#[test]
 fn r6_what_the_state_read_decides() {
     let mut f = F::new();
     f.put(
         "hold",
         "h1",
-        json!({"status": "active", "effect": "no starts", "intent": oid("intent", "widgets")}),
+        json!({"status": "active", "effect": "no starts", "subject": oid("intent", "widgets")}),
     );
     assert_eq!(code(&f.refusal()), ("held", "start_unit", 2));
     assert_eq!(
@@ -1826,11 +1863,11 @@ fn r6_what_the_state_read_decides() {
     f.put(
         "hold",
         "h2",
-        json!({"status": "active", "effect": "no work", "unit": oid("unit", KEY)}),
+        json!({"status": "active", "effect": "no work", "subject": oid("unit", KEY)}),
     );
     let e = f.refusal();
     assert_eq!(code(&e), ("held", "unit", 2));
-    assert_eq!(e.detail["Until"], "an invented | condition");
+    assert_eq!(e.detail, json!("h2"));
     f.objects.remove(&k("hold", "h2"));
     for state in ["draft", "done"] {
         f.set_unit(json!({"state": state}));
@@ -3184,7 +3221,7 @@ fn r30_a_head_or_main_moved_under_an_accepted_unit() {
     f.put(
         "hold",
         "h1",
-        json!({"status": "active", "effect": "no work", "unit": oid("unit", KEY)}),
+        json!({"status": "active", "effect": "no work", "subject": oid("unit", KEY)}),
     );
     let (c, status) = f.ok();
     assert_eq!(
@@ -3207,7 +3244,7 @@ fn r31_a_merge_refused_at_the_validate_or_not_made() {
     f.put(
         "hold",
         "h1",
-        json!({"status": "active", "effect": "no merge", "intent": oid("intent", "widgets")}),
+        json!({"status": "active", "effect": "no merge", "subject": oid("intent", "widgets")}),
     );
     let (b, status) = f.ok();
     assert_eq!(
@@ -3661,9 +3698,9 @@ fn walk_with_the_real_engine() {
     let _ = f.refusal();
     f.cut(&f.home().join("1.implementer.md.run.json"));
     let hold = f.engine_apply(
-        "set_hold_on",
+        "set_hold",
         json!({"task": oid("task", "ontology-operational-base"),
-        "effect": "no walk", "until": "the walk ends", "unit": oid("unit", KEY)}),
+        "effect": "no walk", "until": "the walk ends", "subject": oid("unit", KEY)}),
     );
     let e = f.refusal();
     println!(
@@ -3820,9 +3857,9 @@ fn walk_the_merge_with_the_real_engine() {
     let r = json!({"request_id": "walk-approve-2", "head": a["head"], "reason": "Read."});
     f.decide("approve", "lead-1", r).unwrap();
     f.engine_apply(
-        "set_hold_on",
+        "set_hold",
         json!({"task": oid("task", "ontology-operational-base"),
-        "effect": "no merge", "until": "the walk ends", "unit": oid("unit", KEY)}),
+        "effect": "no merge", "until": "the walk ends", "subject": oid("unit", KEY)}),
     );
     let a = run("hold-at-validate", &mut f);
     assert_eq!(a["refused"], "held");
