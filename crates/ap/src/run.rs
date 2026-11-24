@@ -2098,6 +2098,9 @@ struct Seen {
     /// A Muse stream: the last `run_usage` and the first other model that served the stage.
     usage: Option<Value>,
     served: Option<String>,
+    /// An `agy` stream: the current `agent_response` step index and its accumulated `text_delta`.
+    agy_step: Option<u64>,
+    agy_text: String,
 }
 impl Seen {
     fn done(&self) -> bool {
@@ -2173,15 +2176,47 @@ impl Seen {
                 let id = e["conversation_id"].as_str().filter(|id| !id.is_empty());
                 self.thread = self.thread.take().or(id.map(str::to_owned));
             }
-            Some("step_update") => self.worked |= e["step_update"]["step_type"] == "tool",
+            Some("step_update") => {
+                let su = &e["step_update"];
+                self.worked |= su["step_type"] == "tool";
+                if su["step_type"] == "agent_response"
+                    && let (Some(idx), Some(delta)) =
+                        (su["step_index"].as_u64(), su["text_delta"].as_str())
+                    && !delta.is_empty()
+                {
+                    if self.agy_step != Some(idx) {
+                        self.agy_step = Some(idx);
+                        self.agy_text.clear();
+                    }
+                    self.agy_text.push_str(delta);
+                }
+            }
             Some("result") => {
+                let last_text = std::mem::take(&mut self.agy_text);
+                self.agy_step = None;
                 let r = &e["result"];
                 let n = |k: &str| r["usage"][k].as_u64().unwrap_or(0);
                 let own = |v: u64, i: usize| self.spent.map(|s| v.saturating_sub(s[i]));
                 let done = r["status"] == "SUCCESS";
+                let result = if done {
+                    if r["response"].as_str().is_some_and(|resp| {
+                        !resp.is_empty()
+                            && !last_text.trim().is_empty()
+                            && (resp.ends_with(&last_text)
+                                || resp
+                                    .trim_end_matches('\n')
+                                    .ends_with(last_text.trim_end_matches('\n')))
+                    }) {
+                        Value::String(last_text)
+                    } else {
+                        r["response"].clone()
+                    }
+                } else {
+                    r["error"].clone()
+                };
                 self.results
                     .push(json!({"type": "result", "is_error": !done,
-                    "result": if done { &r["response"] } else { &r["error"] },
+                    "result": result,
                     "num_turns": r["num_turns"], "permission_denials": [],
                     "usage": {"input_tokens": own(n("input_tokens"), 0),
                         "output_tokens": own(n("output_tokens"), 1),
