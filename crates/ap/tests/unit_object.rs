@@ -2733,7 +2733,8 @@ fn r33_the_frames_and_the_change() {
     assert!(verifier.ends_with(&change), "{verifier}");
     assert!(include_str!("../src/unit/frames/implementer.md").contains("page_cannot_hold"));
     // The door's two functions and the page's `## Use` in the frames of the stages.
-    let route = "echo '{\"parameters\":{\"words\":\"<what you look for>\",\"limit\":5}}' | ap fn route";
+    let route =
+        "echo '{\"parameters\":{\"words\":\"<what you look for>\",\"limit\":5}}' | ap fn route";
     let clause = "echo '{\"parameters\":{\"key\":\"<owner>/<name>:<path>#R<n>\"}}' | ap fn clause";
     let reads = "Read a requirement the page cites with clause instead of opening the specification whole; ask route before a search over the repository.";
     for frame in [
