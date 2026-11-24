@@ -1649,6 +1649,7 @@ impl Run {
         let name = actions::RecordHead::NAME;
         let action = actions::RecordHead {
             delivered_lines: None,
+            guarded: None,
             head: values::CommitOrDigest(head.to_owned()),
             pull_request: Some(store::integer(n, name)?),
             rounds: Some(store::integer(rounds, name)?),

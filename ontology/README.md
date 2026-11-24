@@ -2153,3 +2153,107 @@ request routed to the intent by `route_request` apply, and by one routed to a un
 `see_finding_again` and `reopen_finding` set the subject of a finding that had none; `ont around` from the host reaches
 its findings through `subject_findings` and its holds through `subject_holds`. The last line of standard output of the
 rehearsal is `v24 subjects: ok`.
+
+## Version 25: the unit of the v3 driver
+Version 24 remains pinned at
+`3401de353f4a1a22f3fc93f47cb9710de7ac35d7:ontology/work.schema.json`,
+sha256 `f5b88e9fac560fbb75181acad0a4cc5234ae6867d7ecc9b5842208282bc11b8b`.
+Version 25 removes 19 action types and 3 views that no session applied since 2026-11-17 and that no source of `ap`
+names, and gives a unit the fields the v3 driver reads, with five actions that set them. Every value type, object type,
+link type, action type, view, source, function and grant not named below reads as on version 24 in canonical JSON. The
+point of the version: the description an agent reads (`ont_describe`) carries no action that nobody applies, and the
+units v3-unit-object, v3-pass-approval, v3-intent-answers and v3-flow-by-tier compile against generated types that hold
+a unit's kind, its first use, its delivery dependencies, its deferral and the approver of its head. `ENGINE-PIN` is
+unchanged.
+
+1. Removed action types, each also taken out of every grant: `start_worker_run`, `note_worker_run`, `close_worker_run`,
+   `mark_memory_record_pending`, `mark_memory_record_ready`, `mark_memory_record_superseded`, `withdraw_memory_record`,
+   `open_plan`, `amend_plan`, `record_scope_review`, `open_thread`, `amend_thread`, `state_objective`,
+   `restate_objective`, `confirm_objective`, `amend_objective`, `retire_objective`, `record_check` and `release_item`. As
+   on version 24, the object types, properties, value types and link types they wrote (`worker_run`, `memory_record`,
+   `thread`, `plan`, `objective`, `item` and theirs) stay for the objects written before, and no action sets them.
+2. Removed views: `live_workers` and `closed_workers` (over `worker_run`) and `current_memory_records` (over
+   `memory_record`). `ontology/memory-index-walk.py`, the walk of the removed `memory_record` actions and of that view,
+   is removed with them; its commands in "Version 3" above no longer run.
+3. Value types: `unit_kind`, one of `rust`, `schema`, `instructions`, `removal`, `script`, `typescript`, `config`,
+   `import`; `unit_approver`, one of `lead`, `policy`.
+4. The optional properties of `unit`: `kind` (`unit_kind`); `use` (string, 600 bytes: the real run that shows the first
+   use, or `none:` and the reason); `used_at` (`utc_time`); `use_evidence` (string, 1,000 bytes);
+   `depends_delivered` (an array of references to `unit`); `deferred_by` (a reference to `request`); `approved_by`
+   (`unit_approver`); `guarded` (boolean). No link type is added: no criterion reads them through a link.
+5. `add_unit` and `amend_unit` take the optional parameters `kind`, `use` and `depends_delivered` and set them (absent:
+   `amend_unit` keeps the stored value). `record_head` takes the optional parameter `guarded` and sets it.
+   `approve_unit` also sets `approved_by` to `lead`.
+6. `record_use` (`unit`, `evidence` of at most 1,000 bytes): criteria `unit_not_merged` (the state is `merged` or
+   `done`), `use_not_named` (the unit's `use` is present and does not begin with `none:`: the engine of the pin has no
+   prefix operator, so the criterion refuses a `use` that is `ge` `none:` and `lt` `none;`, which are exactly the texts
+   that begin with `none:`), `evidence_empty`; the rule sets `used_at` to the time of the apply and `use_evidence`.
+7. `defer_unit` (`unit`, `by`, a request): criteria `unit_not_deferrable` (the state is `draft`, `ready` or `stopped`)
+   and `by_not_the_users_word` (as `waive_criterion`'s); the rule sets `deferred_by` and the state `draft`.
+   `undefer_unit` takes the same parameters and the same criterion on `by`, and clears `deferred_by`. `ready_unit`
+   gains its last criterion, `deferred`: it fails while `deferred_by` is present.
+8. `approve_unit_by_policy` (`unit`, `head`): criteria `unit_not_accepted` and `head_differs` (as `approve_unit`),
+   `class_not_contract` (the class is `contract`), `guarded` (the unit's `guarded` is present and false) and
+   `not_dispatch` (the actor's role is `dispatch`); the rule sets `approved_head` and `approved_by` `policy`. The
+   policy's approval rule of `ap unit run` applies it (unit v3-pass-approval); `merge_unit` and `close_unit` read
+   `approved_head` as before, whoever set it.
+9. `answer_questions` (`intent`, `questions`, the whole list in the form `amend_intent` takes, and `by`, a request):
+   criteria `intent_closed` (as `amend_intent`), `by_not_the_users_word` and `by_not_routed_here` (as
+   `confirm_intent`); the rule sets `questions` and leaves `status`, `amended_at`, `confirmed_by` and
+   `confirmed_delegated`: an answer does not send a confirmed intent back to draft.
+10. The function `flow` takes the optional parameter `by` (a string). Its program reads it from the unit
+    v3-flow-by-tier on.
+11. The grants. Every grant loses the removed actions. `lead` gains the five new actions; `dispatch` gains
+    `approve_unit_by_policy` and `open_finding`; `measure` gains `open_finding`, `see_finding_again`, `close_finding`
+    and `reopen_finding` (`specs/ap/roles.md` R2: the policy's approval rule of `ap unit run` and the routing pass, which
+    the units v3-pass-approval and v3-routing-map build). A caller of the role `lead` reaches
+    `approve_unit_by_policy`'s criteria and is refused `not_dispatch`.
+
+### What the store does not check
+- That a unit of `depends_delivered` is delivered, or that it exists: no criterion reads the list; the driver does
+  (unit v3-unit-object).
+- That `guarded` says the truth: `record_head` stores what its caller says; a head recorded without it leaves the unit
+  to the Lead (`guarded` refuses an absent value).
+- A `use` that begins with `None:` or with a space before `none:` is a named use: the comparison is of bytes.
+- `record_use` applies again on a unit that has a use and replaces `used_at` and `use_evidence`.
+- `undefer_unit` of a unit that is not deferred applies and changes nothing; of a unit that does not exist the engine
+  refuses it `rule_reference_unavailable` before any criterion (no code of the action). `defer_unit` keeps `ready_at`.
+- An answer of `answer_questions` may be empty, and the number of questions is not bounded, as in `amend_intent`.
+- `approved_by` of a head approved before this version is absent.
+
+### The migration and the rehearsal
+`ontology/migrate` knows version 25; its step is empty. `HIGHEST = 25`; `25 26` is a pair it does not know (exit 2);
+the pairs refused on the version 10 part of the rehearsal are (9, 26), (10, 10) and (10, 9), the walk of versions 22
+and 23 refuses 23 26 and the walk of version 24 24 26. The rows of the first store from its install over version 9 on
+(the install attempts, the rows of version 9, which apply `state_objective`, `restate_objective`, `confirm_objective`,
+`amend_objective`, `retire_objective`, `record_check` and `release_item`, and its comparison of the views of version 9,
+`live_workers`, `closed_workers` and `current_memory_records` among them) run on version 24 installed from Git by the
+commit and digest above, as does the walk of version 24 on the second store; both ran on the repository's file before.
+The rehearsal no longer runs `ontology/memory-index-walk.py`, which is removed.
+
+The rehearsal then installs the repository's file over the objects the walk of version 24 made: every object reads the
+same, the 20 views that stay read the same but for their version, the three removed views are `unavailable` and each
+removed action is `unknown_action`; the schema differs from version 24 only by points 1 to 11 (the changed names of
+each section are compared, the five unit actions that stay are those of version 24 but for their additions, and each
+grant is that of version 24 less the removed actions plus the new ones); `ont describe` names version 25;
+`ont_describe` and `ont_action_list` stay within 262,144 bytes and `ont_describe` is smaller than version 24's
+measured in the same run (the line `v25_mcp_bytes=` was 242,806 and 138,844 when this section was written, against
+256,410 and 155,646 for version 24); `ontology/migrate` runs 24 25 and 23 25 (exit 0, the store unchanged) and
+25 26 (exit 2).
+
+The walk of version 25, each refusal before the action it guards: `add_unit` sets `kind`, `use` and
+`depends_delivered`, and `amend_unit` changes `kind` and `depends_delivered` and keeps `use`; `record_use` is refused
+`unit_not_merged` on a draft, then, the unit merged after a `record_head` with `guarded` true, `evidence_empty`, and
+applies; it is refused `use_not_named` on a merged unit without a use and on one whose use begins with `none:`;
+`defer_unit` is refused `unit_not_deferrable` (a running unit) and `by_not_the_users_word` (a preference), and applies on
+a ready unit, which returns to draft; `ready_unit` is refused `deferred`; `undefer_unit` is refused
+`by_not_the_users_word` and, for a unit that does not exist, `rule_reference_unavailable`, and applies, after which
+`ready_unit` applies; `approve_unit_by_policy` of an accepted contract unit is refused `guarded` (its head recorded
+`guarded` true), then, the unit reopened and its new head recorded with `guarded` false, `unit_not_accepted` (running),
+`head_differs`, `not_dispatch` (role `lead`), `not_granted` (role `watch`) and `class_not_contract` (an accepted plain
+unit), and applies under `dispatch` (`approved_by` `policy`); `approve_unit` then sets `approved_by` `lead` and the unit
+merges; `answer_questions` is refused `intent_closed` (a retired intent), `by_not_the_users_word` (a preference routed
+to the intent) and `by_not_routed_here` (an answer routed to another intent), and applies: the confirmed intent's
+`questions` change and no other field; `flow` with `by` answers under `lead`; `open_finding` under `dispatch` and the
+four finding actions under `measure` apply. The last line of standard output of the rehearsal is
+`v25 driver fields: ok`.

@@ -537,15 +537,19 @@ for name in ('ont_describe', 'ont_action_list'):
     sizes.append(len(answer['content'][0]['text'].encode())); assert sizes[-1] <= 262144, (name, sizes[-1])
 print('gate_row=v9-mcp-sizes expected=admitted bytes=' + ','.join(map(str, sizes)))
 # installed_artifact is owned by a source of four paths under /usr/local/bin that need not exist where the
-# rehearsal runs. The rows from here on run on the repository's file, as the one copy that also moves those paths
-# (two files of this store's directory) and the host's work directory (see the top of this file); it keeps the
-# file's own version, installed over version 9.
-repository_schema = json.loads(pathlib.Path(repo, 'ontology/work.schema.json').read_text())
+# rehearsal runs. The rows from here on run on version 24, pinned in Git by the commit of main that holds it (they
+# apply actions and read views that version 25 removed), as the one copy that also moves those paths (two files of
+# this store's directory) and the host's work directory (see the top of this file); it keeps its own version,
+# installed over version 9.
+V24_PIN = ('3401de353f4a1a22f3fc93f47cb9710de7ac35d7', 'f5b88e9fac560fbb75181acad0a4cc5234ae6867d7ecc9b5842208282bc11b8b')
+v24 = pathlib.Path(store).with_name('v24.json')
+v24.write_bytes(subprocess.check_output(['git', '-C', repo, 'show', V24_PIN[0] + ':ontology/work.schema.json'], timeout=10))
+assert hashlib.sha256(v24.read_bytes()).hexdigest() == V24_PIN[1]
 binaries = [pathlib.Path(store).with_name(n) for n in ('installed-a', 'installed-b')]
 for b in binaries: b.write_bytes(b'fixture\n')
-fixture, copy = redirect.make(pathlib.Path(repo, 'ontology/work.schema.json'), work, copies, 'repository-installed-paths.json', [str(b) for b in binaries])
-assert copy['version'] > 9
-# Every object and view asserted under version 9 reads the same after the install of the repository's file.
+fixture, copy = redirect.make(v24, work, copies, 'pinned-v24-installed-paths.json', [str(b) for b in binaries])
+assert copy['version'] == 24
+# Every object and view asserted under version 9 reads the same after the install of version 24.
 v9_objects = v8_objects + [after_v9]
 v9_before = [obj(i) for i in v9_objects]
 v9_views = {view: call(['render'], dict(view=view, args={} if view in ('current_memory_records', 'installs') else dict(task=task['native_key']))) for view in json.loads(v9.read_text())['views']}
@@ -628,7 +632,7 @@ print(view['markdown'])
 print('gate_row=v8-view-installs expected=admitted')
 assert call(['render'], dict(view='reviews', args=dict(task=task['native_key'])))['rows'] > 0
 print('v8_gate_rows_complete')
-# Version 17 on (the repository's file is installed here): an install names its host, a reference no criterion reads.
+# Version 17 on (version 24 is installed here): an install names its host, a reference no criterion reads.
 with_host = created(gate('start_install', 'v17-install-host', dict(ip, attempt=3, host=oid('host', 'fixture-host'))), 'install')
 assert fields(with_host)['host'] == oid('host', 'fixture-host') and fields(with_host)['status'] == 'running'
 apply('close_install', 'v17-close-install-host', dict(install=with_host, outcome='installed', to='2' * 40))
@@ -869,8 +873,6 @@ gate('add_item', 'multiline-title', dict(item_params, key='k-multiline', title='
 print('v9_gate_rows_complete')
 PY
 
-python3 -I -B "$repo/ontology/memory-index-walk.py" "$ont_binary" "$rehearsal_root/memory-walk" --records 2
-
 # Version 10 on a second store: the user's rows of version 9 carried by ontology/migrate, then the walk of the
 # requests, intents and criteria, on version 10 pinned in Git. Then version 11, pinned in Git, over the objects
 # made under version 10, and the walk of the units, runs and findings. Then version 12, pinned in Git, over the
@@ -979,7 +981,7 @@ apply('triage_decision', 'v9-after-carry', dict(decision=third, triage='none', r
 unchanged = fingerprint()
 assert migrate(9, 10) == dict(carried=0, already=3)
 assert fingerprint() == unchanged and fields(third_request)['route_reason'] == 'carried from version 9'
-for before, after in [(9, 25), (10, 10), (10, 9)]:
+for before, after in [(9, 26), (10, 10), (10, 9)]:
     assert migrate(before, after, 2) == dict(status='unknown_pair')
 assert fingerprint() == unchanged
 assert migrate(9, 10) == dict(carried=0, already=3)
@@ -2744,7 +2746,7 @@ unchanged = fingerprint()
 assert migrate(21, 23) == dict(carried=0, already=0)
 assert migrate(20, 23) == dict(carried=0, already=0)
 assert migrate(22, 23) == dict(carried=0, already=0)
-assert migrate(23, 25, 2) == dict(status='unknown_pair')
+assert migrate(23, 26, 2) == dict(status='unknown_pair')
 assert fingerprint() == unchanged and [obj(i) for i in v21_objects] == v21_before
 print('v22_migration_rows_complete')
 phase = 'v22'
@@ -2805,7 +2807,7 @@ assert fn('cost', 'verifier', dict(since='2026-11-01', until='2026-11-02'), 2)['
 assert fn('clause', 'nosuch', dict(key='o/r:specs/ap/unit.md#R11'), 2)['code'] == 'role_not_admitted'
 print('v22_gate_rows_complete')
 print('v22 roles: ok')
-# Version 24, the repository's file, over the objects made under version 23 (pinned in Git above). The schema differs from
+# Version 24, pinned in Git by the commit of main that holds it, over the objects made under version 23 (pinned in Git above). The schema differs from
 # version 23 only by points 1 to 6 of ontology/README.md, "Version 24: subjects": the interface and its four types, the hold, the
 # finding and the request with their links, the actions that act on a subject and the two views.
 v23_schema = schema
@@ -2824,7 +2826,11 @@ tick(); legacy_unit_request = word21('legacy-unit', 'order'); apply('route_reque
 assert fields(legacy_intent_request)['route'] == 'intent' and fields(legacy_unit_request)['route'] == 'unit'
 v23_objects += [legacy_intent_request, legacy_unit_request]
 v23_before = [obj(i) for i in v23_objects]
-schema = json.loads(pathlib.Path(repo, 'ontology/work.schema.json').read_text())
+V24_PIN = ('3401de353f4a1a22f3fc93f47cb9710de7ac35d7', 'f5b88e9fac560fbb75181acad0a4cc5234ae6867d7ecc9b5842208282bc11b8b')
+v24_bytes = subprocess.check_output(['git', '-C', repo, 'show', V24_PIN[0] + ':ontology/work.schema.json'], timeout=10)
+assert hashlib.sha256(v24_bytes).hexdigest() == V24_PIN[1]
+v24_path = pathlib.Path(store).with_name('pinned-' + V24_PIN[0] + '.json'); v24_path.write_bytes(v24_bytes)
+schema = json.loads(v24_bytes)
 assert schema['version'] == 24
 head = json.loads(json.dumps(schema))
 old = v23_schema
@@ -2848,7 +2854,7 @@ for g_new, g_old in zip(head['grants'], old['grants']):
     assert g_new == dict(g_old, **({'actions': [a for a in g_old['actions'] if a not in REMOVED24]} if 'actions' in g_old else {})), g_new.get('role')
 assert len(head['grants']) == len(old['grants']) and not any(REMOVED24 & set(g.get('actions', [])) for g in head['grants'])
 print('gate_row=v24-only-points-1-to-6 expected=admitted object_types=' + str(len(schema['object_types'])) + ' actions=' + str(len(schema['action_types'])))
-copy24 = cases_copy(pathlib.Path(repo, 'ontology/work.schema.json'), 'repository.json', 'repository-cases.json')
+copy24 = cases_copy(v24_path, 'pinned-v24.json', 'pinned-v24-route.json')
 copy24_schema = json.loads(copy24.read_text())
 for fn_ in copy24_schema['functions'].values(): fn_['program'] = str(fake_fn)
 copy24.write_text(json.dumps(copy24_schema))
@@ -2874,7 +2880,7 @@ assert 'subject' in (listed_interfaces if isinstance(listed_interfaces, dict) el
 unchanged = fingerprint()
 assert migrate(23, 24) == dict(carried=0, already=0)
 assert migrate(22, 24) == dict(carried=0, already=0)
-assert migrate(24, 25, 2) == dict(status='unknown_pair')
+assert migrate(24, 26, 2) == dict(status='unknown_pair')
 assert fingerprint() == unchanged and [obj(i) for i in v23_objects] == v23_before
 print('v24_migration_rows_complete')
 # The walk. Each refusal row is before the action it guards; a refusal writes nothing.
@@ -2965,4 +2971,200 @@ reached = json.dumps(around('subject_holds'))
 assert hold_host['native_key'] in reached and hold_both['native_key'] in reached and hold_task['native_key'] not in reached and hold_unit['native_key'] not in reached, reached
 print('v24_gate_rows_complete')
 print('v24 subjects: ok')
+# Version 25, the repository's file, over the objects made under version 24 (pinned in Git above). The schema differs from
+# version 24 only by points 1 to 11 of ontology/README.md, "Version 25: the unit of the driver": 19 actions and 3 views
+# removed, two value types, eight properties of unit, five actions, the additions to five unit actions, flow's by and the grants.
+v24_schema, v24_sizes = schema, sizes
+TYPES25 = ('task', 'decision', 'request', 'intent', 'criterion', 'unit', 'review', 'run', 'finding', 'hold', 'principle', 'host', 'account', 'kpi', 'case')
+v24_objects = [o['id'] for t in TYPES25 for o in call(['search'], dict(object_type=t, limit=1000))['objects']]
+v24_before = [obj(i) for i in v24_objects]
+REMOVED25 = {'start_worker_run', 'note_worker_run', 'close_worker_run', 'mark_memory_record_pending', 'mark_memory_record_ready',
+             'mark_memory_record_superseded', 'withdraw_memory_record', 'open_plan', 'amend_plan', 'record_scope_review', 'open_thread',
+             'amend_thread', 'state_objective', 'restate_objective', 'confirm_objective', 'amend_objective', 'retire_objective',
+             'record_check', 'release_item'}
+REMOVED_VIEWS25 = {'live_workers', 'closed_workers', 'current_memory_records'}
+NEW25 = {'record_use', 'defer_unit', 'undefer_unit', 'approve_unit_by_policy', 'answer_questions'}
+v24_all_views = [(name, {a: ARGS22[a] for a in body.get('args', [])}) for name, body in v24_schema['views'].items()]
+v24_views = [(view, args, call(['render'], dict(view=view, args=args))) for view, args in v24_all_views if view not in REMOVED_VIEWS25]
+removed_views = [(view, args) for view, args in v24_all_views if view in REMOVED_VIEWS25]
+assert len(v24_views) == 20 and len(removed_views) == 3 and all(call(['render'], dict(view=v, args=a))['status'] == 'ok' for v, a in removed_views)
+phase = 'v25'
+schema = json.loads(pathlib.Path(repo, 'ontology/work.schema.json').read_text())
+assert schema['version'] == 25
+head, old = json.loads(json.dumps(schema)), v24_schema
+changed = lambda sec: {k for k in set(head[sec]) | set(old[sec]) if head[sec].get(k) != old[sec].get(k)}
+# 2, 3: the removed actions and views; nothing else leaves the schema.
+assert set(old['action_types']) - set(head['action_types']) == REMOVED25 and set(head['action_types']) - set(old['action_types']) == NEW25
+assert changed('action_types') == REMOVED25 | NEW25 | {'add_unit', 'amend_unit', 'record_head', 'approve_unit', 'ready_unit'}, changed('action_types')
+assert changed('views') == REMOVED_VIEWS25 and set(head['views']) < set(old['views'])
+assert changed('link_types') == set() and changed('sources') == set() and head['interfaces'] == old['interfaces']
+# 4: the value types.
+assert changed('value_types') == {'unit_kind', 'unit_approver'} and not ({'unit_kind', 'unit_approver'} & set(old['value_types']))
+assert head['value_types']['unit_kind'] == dict(base='string', enum=['rust', 'schema', 'instructions', 'removal', 'script', 'typescript', 'config', 'import'])
+assert head['value_types']['unit_approver'] == dict(base='string', enum=['lead', 'policy'])
+# 5: the properties of unit; every object type, property and link of version 24 reads as before.
+assert changed('object_types') == {'unit'}
+new_unit, old_unit = head['object_types']['unit'], old['object_types']['unit']
+assert {k: v for k, v in new_unit.items() if k != 'properties'} == {k: v for k, v in old_unit.items() if k != 'properties'}
+PROPS25 = dict(kind={'value_type': 'unit_kind'}, use='string', used_at={'value_type': 'utc_time'}, use_evidence='string', depends_delivered={'array': {'ref': 'unit'}},
+               deferred_by={'ref': 'request'}, approved_by={'value_type': 'unit_approver'}, guarded='boolean')
+assert {k: new_unit['properties'][k] for k in old_unit['properties']} == old_unit['properties'] and set(new_unit['properties']) - set(old_unit['properties']) == set(PROPS25)
+assert all(new_unit['properties'][k]['type'] == t and new_unit['properties'][k]['required'] is False for k, t in PROPS25.items())
+assert new_unit['properties']['use']['max_bytes'] == 600 and new_unit['properties']['use_evidence']['max_bytes'] == 1000
+# 6, 8: the unit actions that stay change only by their additions.
+for name in ('add_unit', 'amend_unit'):
+    a = json.loads(json.dumps(head['action_types'][name]))
+    for k in ('kind', 'use', 'depends_delivered'):
+        p_ = a['parameters'].pop(k); assert p_['type'] == PROPS25[k] and p_['required'] is False and a['rules'][0]['set'].pop(k) == '$' + k, (name, k)
+    assert a == old['action_types'][name], name
+a = json.loads(json.dumps(head['action_types']['record_head']))
+assert a['parameters'].pop('guarded')['type'] == 'boolean' and a['rules'][0]['set'].pop('guarded') == '$guarded' and a == old['action_types']['record_head']
+a = json.loads(json.dumps(head['action_types']['approve_unit']))
+assert a['rules'][0]['set'].pop('approved_by') == 'lead' and a == old['action_types']['approve_unit']
+a = json.loads(json.dumps(head['action_types']['ready_unit']))
+assert a['submission_criteria'].pop()['code'] == 'deferred' and a == old['action_types']['ready_unit']
+# 7 to 10: the new actions, their parameters and their criteria in order.
+CODES25 = dict(record_use=['unit_not_merged', 'use_not_named', 'evidence_empty'], defer_unit=['unit_not_deferrable', 'by_not_the_users_word'],
+               undefer_unit=['by_not_the_users_word'], approve_unit_by_policy=['unit_not_accepted', 'head_differs', 'class_not_contract', 'guarded', 'not_dispatch'],
+               answer_questions=['intent_closed', 'by_not_the_users_word', 'by_not_routed_here'])
+PARAMS25 = dict(record_use=['unit', 'evidence'], defer_unit=['unit', 'by'], undefer_unit=['unit', 'by'], approve_unit_by_policy=['unit', 'head'], answer_questions=['intent', 'questions', 'by'])
+for name in NEW25:
+    a = head['action_types'][name]
+    assert [c['code'] for c in a['submission_criteria']] == CODES25[name] and list(a['parameters']) == PARAMS25[name] and all(p_['required'] for p_ in a['parameters'].values()), name
+waive_by = next(c for c in old['action_types']['waive_criterion']['submission_criteria'] if c['code'] == 'by_not_the_users_word')
+assert head['action_types']['defer_unit']['submission_criteria'][1] == waive_by and head['action_types']['undefer_unit']['submission_criteria'] == [waive_by]
+confirm_by = {c['code']: c for c in old['action_types']['confirm_intent']['submission_criteria']}
+asked = head['action_types']['answer_questions']['submission_criteria']
+assert asked[0] == next(c for c in old['action_types']['amend_intent']['submission_criteria'] if c['code'] == 'intent_closed') and asked[1] == confirm_by['by_not_the_users_word']
+assert {k: v for k, v in asked[2].items() if k != 'message'} == {k: v for k, v in confirm_by['by_not_routed_here'].items() if k != 'message'}
+assert head['action_types']['answer_questions']['parameters']['questions']['type'] == old['action_types']['amend_intent']['parameters']['questions']['type']
+assert head['action_types']['answer_questions']['rules'] == [{'modify_object': 'intent', 'set': {'questions': '$questions'}}]
+# 11: flow takes by.
+assert changed('functions') == {'flow'} and head['functions']['flow'] == dict(old['functions']['flow'], parameters=dict(old['functions']['flow']['parameters'], by={'type': 'string', 'required': False}))
+# The grants: those of version 24 less the removed actions, plus the new ones (specs/ap/roles.md R2).
+ADDED25 = {'lead': NEW25, 'dispatch': {'approve_unit_by_policy', 'open_finding'}, 'measure': {'open_finding', 'see_finding_again', 'close_finding', 'reopen_finding'}}
+assert len(head['grants']) == len(old['grants'])
+for g_new, g_old in zip(head['grants'], old['grants']):
+    assert g_new == dict(g_old, actions=sorted(set(g_old['actions']) - REMOVED25 | ADDED25.get(g_old.get('role'), set()))), g_new.get('role')
+held25 = {g['role']: g for g in head['grants'] if 'role' in g}
+assert held25['lead']['actions'] == sorted(head['action_types']) and not any(REMOVED25 & set(g['actions']) for g in head['grants'])
+assert [r for r, g in held25.items() if 'approve_unit_by_policy' in g['actions']] == ['lead', 'dispatch']
+print('gate_row=v25-only-points-1-to-11 expected=admitted actions=' + str(len(schema['action_types'])) + ' views=' + str(len(schema['views'])))
+copy25 = cases_copy(pathlib.Path(repo, 'ontology/work.schema.json'), 'repository.json', 'repository-route.json')
+copy25_schema = json.loads(copy25.read_text())
+for fn_ in copy25_schema['functions'].values(): fn_['program'] = str(fake_fn)
+copy25.write_text(json.dumps(copy25_schema))
+call(['schema', 'install', str(copy25)])
+redirect.trace(work, copies)
+assert [obj(i) for i in v24_objects] == v24_before
+for view, args, before in v24_views:
+    answer = call(['render'], dict(view=view, args=args))
+    assert answer['rows'] == before['rows'] and answer['markdown'] == before['markdown'].replace('schema=work@24', 'schema=work@25'), view
+for view, args in removed_views: assert call(['render'], dict(view=view, args=args), 2)['code'] == 'unavailable', view
+print('gate_row=v25-v24-objects-and-views-unchanged expected=admitted objects=' + str(len(v24_objects)) + ' views=' + str(len(v24_views)))
+sizes = []
+for name in ('ont_describe', 'ont_action_list'):
+    wire = subprocess.run([binary, '--store', store, 'mcp'], input=json.dumps(dict(jsonrpc='2.0', id=1, method='tools/call', params=dict(name=name, arguments={}))) + '\n', text=True, capture_output=True, timeout=60)
+    answer = json.loads(wire.stdout.splitlines()[0])['result']; assert wire.returncode == 0 and not answer['isError'], answer
+    sizes.append(len(answer['content'][0]['text'].encode())); assert sizes[-1] <= 262144, (name, sizes[-1])
+assert sizes[0] < v24_sizes[0] and sizes[0] < 256410, (sizes, v24_sizes)
+print('v25_mcp_bytes=' + ','.join(map(str, sizes)) + ' v24=' + ','.join(map(str, v24_sizes)), file=sys.stderr)
+described = subprocess.run([binary, '--store', store, 'describe'], input='{}', text=True, capture_output=True, timeout=60, env=env)
+assert described.returncode == 0 and json.loads(described.stdout)['schema']['work']['version'] == 25, described.stdout[:300]
+unchanged = fingerprint()
+assert migrate(24, 25) == dict(carried=0, already=0)
+assert migrate(23, 25) == dict(carried=0, already=0)
+assert migrate(25, 26, 2) == dict(status='unknown_pair')
+assert fingerprint() == unchanged and [obj(i) for i in v24_objects] == v24_before
+print('v25_migration_rows_complete')
+# The removed actions are unknown to the store.
+for name in sorted(REMOVED25): apply(name, 'removed', {}, 'unknown_action')
+# The walk. Each refusal row is before the action it guards; a refusal writes nothing.
+tick(); said25 = word21('v25-said', 'decision'); preference25 = word21('v25-preference', 'preference')
+USE = 'The fixture reader opens the board once.'
+def small_unit(key, **extra):
+    tick(); origin_ = word21(key + '-origin', 'order'); u = unit(key)
+    apply('add_unit', key, dict(page, unit=u, lane='small', origin=origin_, **{'class': 'plain'}, **extra))
+    return u
+def to_accepted(u, key, head_, **recorded):
+    apply('ready_unit', key, dict(unit=u)); apply('start_unit', key, dict(unit=u))
+    apply('record_head', key, dict(unit=u, head=head_, writers=['fixture-implementer'], **recorded))
+    review(key + '-packet', 'packet', head_, unit=u, repository=REPO); apply('accept_unit', key, dict(unit=u, head=head_))
+# 5, 6: add_unit and amend_unit set kind, use and depends_delivered; record_head sets guarded.
+used = small_unit('v25-used', kind='rust', use=USE, depends_delivered=[unit_a])
+f = fields(used); assert f['kind'] == 'rust' and f['use'] == USE and f['depends_delivered'] == [unit_a] and f.get('used_at') is None and f.get('approved_by') is None, f
+apply('amend_unit', 'used-kind', dict(unit=used, kind='schema', depends_delivered=[unit_a, plain_ready], page_digest=digest('v25 page')))
+f = fields(used); assert f['kind'] == 'schema' and f['use'] == USE and f['depends_delivered'] == [unit_a, plain_ready] and f['page_digest'] == digest('v25 page'), f
+# 7: record_use.
+apply('record_use', 'draft', dict(unit=used, evidence='ran it'), 'unit_not_merged')
+to_accepted(used, 'used', H1, guarded=True); assert fields(used)['guarded'] is True
+apply('merge_unit', 'used', dict(unit=used, head=H1, merged_commit=MERGED))
+apply('record_use', 'evidence-empty', dict(unit=used, evidence=''), 'evidence_empty')
+apply('record_use', 'used', dict(unit=used, evidence='The board opened with 3 widgets.'))
+f = fields(used); assert f['used_at'] == stamp() and f['use_evidence'] == 'The board opened with 3 widgets.' and f['state'] == 'merged', f
+for key, extra in (('v25-no-use', {}), ('v25-use-none', dict(use='none: a removal has no first user'))):
+    u = small_unit(key, **extra); to_accepted(u, key, H1); apply('merge_unit', key, dict(unit=u, head=H1, merged_commit=MERGED))
+    apply('record_use', key, dict(unit=u, evidence='ran it'), 'use_not_named'); assert fields(u).get('used_at') is None
+# 8: defer_unit, undefer_unit and ready_unit's deferred.
+deferred = small_unit('v25-deferred'); apply('ready_unit', 'deferred-first', dict(unit=deferred))
+apply('defer_unit', 'running', dict(unit=plain_ready, by=said25), 'unit_not_deferrable')
+apply('defer_unit', 'preference', dict(unit=deferred, by=preference25), 'by_not_the_users_word')
+apply('defer_unit', 'deferred', dict(unit=deferred, by=said25))
+f = fields(deferred); assert f['state'] == 'draft' and f['deferred_by'] == said25, f
+apply('ready_unit', 'deferred', dict(unit=deferred), 'deferred')
+apply('undefer_unit', 'preference', dict(unit=deferred, by=preference25), 'by_not_the_users_word')
+apply('undefer_unit', 'absent', dict(unit=unit('absent-v25-unit'), by=said25), 'rule_reference_unavailable')
+apply('undefer_unit', 'deferred', dict(unit=deferred, by=said25))
+f = fields(deferred); assert f.get('deferred_by') is None and f['state'] == 'draft', f
+apply('ready_unit', 'undeferred', dict(unit=deferred)); assert fields(deferred)['state'] == 'ready'
+# 9: approve_unit_by_policy, applied by the role dispatch alone; approve_unit sets approved_by lead.
+contract25 = unit('v25-contract')
+tick(); apply('add_unit', 'contract', dict(page, unit=contract25, lane='objective', intent=conf, page_digest=digest('v25 contract page'), **{'class': 'contract'}))
+review('v25-contract-page', 'page', digest('v25 contract page'), unit=contract25)
+review('v25-conf-plan', 'plan', digest('the v25 plan'), intent=conf)
+apply('ready_unit', 'contract', dict(unit=contract25, intent=conf)); apply('start_unit', 'contract', dict(unit=contract25, intent=conf))
+apply('record_head', 'contract-h1', dict(unit=contract25, head=H1, writers=['fixture-implementer'], guarded=True))
+review('v25-contract-h1', 'packet', H1, unit=contract25, repository=REPO); apply('accept_unit', 'contract-h1', dict(unit=contract25, head=H1))
+apply('approve_unit_by_policy', 'guarded', dict(unit=contract25, head=H1), 'guarded', role='dispatch')
+apply('reopen_unit', 'contract', dict(unit=contract25, cause='main_moved', intent=conf))
+apply('record_head', 'contract-h2', dict(unit=contract25, head=H2, writers=['fixture-implementer'], rounds=1, guarded=False))
+assert fields(contract25)['guarded'] is False
+apply('approve_unit_by_policy', 'running', dict(unit=contract25, head=H2), 'unit_not_accepted', role='dispatch')
+review('v25-contract-h2', 'packet', H2, unit=contract25, repository=REPO); apply('accept_unit', 'contract-h2', dict(unit=contract25, head=H2))
+apply('approve_unit_by_policy', 'old-head', dict(unit=contract25, head=H1), 'head_differs', role='dispatch')
+apply('approve_unit_by_policy', 'lead', dict(unit=contract25, head=H2), 'not_dispatch', role='lead')
+apply('approve_unit_by_policy', 'watch', dict(unit=contract25, head=H2), 'not_granted', role='watch')
+plain25 = small_unit('v25-plain'); to_accepted(plain25, 'plain', H1, guarded=False)
+apply('approve_unit_by_policy', 'plain', dict(unit=plain25, head=H1), 'class_not_contract', role='dispatch')
+apply('approve_unit_by_policy', 'contract', dict(unit=contract25, head=H2), role='dispatch')
+f = fields(contract25); assert f['approved_head'] == H2 and f['approved_by'] == 'policy', f
+apply('approve_unit', 'contract', dict(unit=contract25, head=H2, reason='The Lead read the diff.'))
+f = fields(contract25); assert f['approved_head'] == H2 and f['approved_by'] == 'lead', f
+apply('merge_unit', 'contract', dict(unit=contract25, head=H2, merged_commit=MERGED, intent=conf)); assert fields(contract25)['state'] == 'merged'
+# 10: answer_questions sets the questions and leaves the status and the confirmation.
+QUESTIONS = [dict(question='Which board comes first?', default='The widget board.', answer='The gadget board.')]
+retired25 = oid('intent', 'widget-retire'); assert fields(retired25)['status'] == 'retired'
+tick(); to_retired = word21('v25-to-retired', 'answer'); route_to('v25-to-retired', to_retired, retired25)
+apply('answer_questions', 'retired', dict(intent=retired25, questions=QUESTIONS, by=to_retired), 'intent_closed')
+tick(); route_to('v25-preference', preference25, conf)
+apply('answer_questions', 'preference', dict(intent=conf, questions=QUESTIONS, by=preference25), 'by_not_the_users_word')
+tick(); to_twin = word21('v25-to-twin', 'answer'); route_to('v25-to-twin', to_twin, twin_intent)
+apply('answer_questions', 'elsewhere', dict(intent=conf, questions=QUESTIONS, by=to_twin), 'by_not_routed_here')
+before_answer = fields(conf)
+tick(); answer25 = word21('v25-answer', 'answer'); route_to('v25-answer', answer25, conf)
+apply('answer_questions', 'conf', dict(intent=conf, questions=QUESTIONS, by=answer25))
+f = fields(conf); assert f['questions'] == QUESTIONS and f == dict(before_answer, questions=QUESTIONS), (f, before_answer)
+assert f['status'] == 'confirmed' and f['confirmed_by'] == said_conf
+# 11: flow takes by; 9: the roles dispatch and measure apply the finding actions.
+assert fn('flow', 'lead', dict(intent='v24-conf', since='2026-11-01', until='2026-11-02', by='tier'))['answer'] == dict(ok=True)
+FINDING25 = dict(kind='note', detector='fixture-timer', summary='v25', evidence='v25', severity='act')
+claim('open_finding', 'v25-dispatch', dict(FINDING25, finding=oid('finding', 'v25-dispatch')), 'dispatch')
+measured = oid('finding', 'v25-measure')
+claim('open_finding', 'v25-measure', dict(FINDING25, finding=measured), 'measure')
+claim('see_finding_again', 'v25-measure', dict(finding=measured, evidence='v25 again'), 'measure')
+claim('close_finding', 'v25-measure', dict(finding=measured, reason='v25 gone'), 'measure')
+claim('reopen_finding', 'v25-measure', dict(finding=measured, evidence='v25 back'), 'measure')
+assert fields(measured)['state'] == 'open'
+print('v25_gate_rows_complete')
+print('v25 driver fields: ok')
 PY
