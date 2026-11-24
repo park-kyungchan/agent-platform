@@ -529,6 +529,8 @@ struct Done {
     credentials: Vec<Value>,
     /// The answer file of the newest fixer stage of this call (R19).
     fixer_answer: Option<String>,
+    /// The head whose checks passed in this call and the `guarded` recorded for it (R46, R47).
+    guarded: Option<(String, bool)>,
 }
 /// The heads this call's own fixer and updates moved, one after the other, from the head `from`
 /// (R19).
@@ -557,6 +559,8 @@ struct Run {
     timeouts: Map<String, Value>,
     /// The file of the repository's stage token, when `units.github.stage_tokens` names it (R41).
     token_file: Option<String>,
+    /// `units.approval` of the policy (R46 to R48).
+    approval: Option<Approval>,
     base: String,
     applied: bool,
     done: Done,
@@ -585,6 +589,9 @@ pub(crate) fn units(policy: &Value) -> Result<(String, Map<String, Value>), Fail
             }
             ("github", g) => {
                 github_member(g)?;
+            }
+            ("approval", a) => {
+                approval_member(a)?;
             }
             ("timeouts", Value::Object(t)) => {
                 for (name, n) in t {
@@ -667,6 +674,67 @@ fn github_member(g: &Value) -> Result<Github, Failure> {
         }
     }
     Ok(out)
+}
+/// The member `units.approval` (`specs/ap/policy.md` R20; R46 to R48): who approves an accepted
+/// head of a `contract` unit, the paths that leave it to the Lead, and how often a merge so approved
+/// opens a finding.
+#[derive(Clone, Debug)]
+pub(crate) struct Approval {
+    /// `contract` is `verifier`: the run approves a `contract` unit's unguarded head (R47).
+    pub by_verifier: bool,
+    pub guarded: Vec<String>,
+    pub sample: u64,
+}
+/// `units.approval` read by its form: exactly `contract`, `guarded` and `sample`.
+fn approval_member(v: &Value) -> Result<Approval, Failure> {
+    let m = v
+        .as_object()
+        .ok_or_else(|| invalid("units.approval", "is not an object"))?;
+    for k in m.keys() {
+        if !["contract", "guarded", "sample"].contains(&k.as_str()) {
+            let member = format!("units.approval.{k}");
+            return Err(invalid(&member, "is not a member of this form"));
+        }
+    }
+    let by_verifier = match m.get("contract").and_then(Value::as_str) {
+        Some("verifier") => true,
+        Some("lead") => false,
+        _ => {
+            return Err(invalid(
+                "units.approval.contract",
+                "is not lead or verifier",
+            ));
+        }
+    };
+    let list = m.get("guarded").and_then(Value::as_array);
+    let list = list.filter(|l| (1..=60).contains(&l.len()));
+    let patterns: Option<Vec<String>> = list.and_then(|l| {
+        l.iter()
+            .map(|p| p.as_str().filter(|t| review::write_set_pattern(t).grammar))
+            .map(|p| p.map(str::to_owned))
+            .collect()
+    });
+    let Some(guarded) = patterns else {
+        let why = "is not 1 to 60 patterns of the write set";
+        return Err(invalid("units.approval.guarded", why));
+    };
+    let sample = m.get("sample").and_then(Value::as_u64);
+    let Some(sample) = sample.filter(|n| (2..=100).contains(n)) else {
+        let why = "is not an integer of 2 to 100";
+        return Err(invalid("units.approval.sample", why));
+    };
+    Ok(Approval {
+        by_verifier,
+        guarded,
+        sample,
+    })
+}
+/// `units.approval` of the policy, or none (R46 to R48).
+pub(crate) fn approval(policy: &Value) -> Result<Option<Approval>, Failure> {
+    match policy.get("units").and_then(|u| u.get("approval")) {
+        None => Ok(None),
+        Some(a) => approval_member(a).map(Some),
+    }
 }
 /// `units.github` of the policy, or none (R3, R41).
 pub(crate) fn github(policy: &Value) -> Result<Github, Failure> {
@@ -756,6 +824,7 @@ pub(crate) struct Checked {
     implementer: Value,
     verifier: Value,
     github: Github,
+    approval: Option<Approval>,
 }
 /// The checks `ap unit run` makes on the unit `u` of the key `key` before any action (R2 to R4): the
 /// key, the repository, the branch, the policy's entries and the tiers. The dispatch pass
@@ -783,10 +852,12 @@ pub(crate) fn checked(s: &mut impl System, key: &str, u: &Value) -> Result<Check
         .to_owned();
     let (directory, timeouts) = units(&policy)?;
     let github = github(&policy)?;
+    let approval = approval(&policy)?;
     let implementer = tier(u, "implementer", "implementer", &policy)?;
     let verifier = tier(u, "verifier", "reviewer", &policy)?;
     Ok(Checked {
         github,
+        approval,
         repo: repo.to_owned(),
         branch,
         clone,
@@ -834,6 +905,7 @@ fn prepare(s: &mut impl System, store: Option<&str>, key: &str) -> Result<(Run, 
         verifier: c.verifier,
         timeouts: c.timeouts,
         token_file,
+        approval: c.approval,
         u,
         base: String::new(),
         applied: false,
@@ -1631,6 +1703,7 @@ impl Run {
         n: u64,
         head: &str,
         extra: Option<&str>,
+        guarded: Option<bool>,
     ) -> Step {
         let held = self.u["writers"].as_array().into_iter().flatten();
         let mut writers: Vec<String> = held.filter_map(|w| w.as_str().map(str::to_owned)).collect();
@@ -1649,7 +1722,7 @@ impl Run {
         let name = actions::RecordHead::NAME;
         let action = actions::RecordHead {
             delivered_lines: None,
-            guarded: None,
+            guarded,
             head: values::CommitOrDigest(head.to_owned()),
             pull_request: Some(store::integer(n, name)?),
             rounds: Some(store::integer(rounds, name)?),
@@ -1667,8 +1740,9 @@ impl Run {
             false => stop("worktree_dirty", t.shown()),
         }
     }
-    /// The deterministic checks on the head (R16).
-    fn checks(&mut self, s: &mut impl System, head: &str) -> Step {
+    /// The deterministic checks on the head (R16); with `units.approval`, whether a changed path
+    /// meets a guarded pattern (R46).
+    fn checks(&mut self, s: &mut impl System, head: &str) -> Step<Option<bool>> {
         self.clean_at(s, head)?;
         let (wt, base) = (self.wt.as_str(), self.base.as_str());
         let mut words = vec!["diff"];
@@ -1677,6 +1751,8 @@ impl Run {
         let paths: Vec<&str> = diff.split_terminator('\0').collect();
         let set = self.u["write_set"].as_array().into_iter().flatten();
         let set: Vec<String> = set.filter_map(|p| p.as_str().map(str::to_owned)).collect();
+        let guarded = (self.approval.as_ref())
+            .map(|a| review::outside(&a.guarded, &paths).len() != paths.len());
         let outside = review::outside(&set, &paths);
         if !outside.is_empty() {
             let shown: Vec<&&str> = outside.iter().take(10).collect();
@@ -1723,7 +1799,8 @@ impl Run {
             let tail = String::from_utf8_lossy(&bytes[from..]);
             return stop(cause, json!({"index": i, "status": status, "output": tail}));
         }
-        self.clean_at(s, head)
+        self.clean_at(s, head)?;
+        Ok(guarded)
     }
     /// The required check on the hosting service, without the automatic reviewer (R17).
     fn gate(&mut self, s: &mut impl System, number: u64, head: &str) -> Step {
@@ -1976,7 +2053,7 @@ impl Run {
         };
         if !t.clean || t.head != head || now != head || !t.on_branch || state != "OPEN" {
             self.close(s, &review, abandon())?;
-            self.record_head(s, number, &now, session.as_deref())?;
+            self.record_head(s, number, &now, session.as_deref(), None)?;
             let detail = json!({"review": review, "head": now, "worktree": t.shown()});
             return stop("verifier_wrote", detail);
         }
@@ -2256,7 +2333,7 @@ impl Run {
                 continue;
             }
             if self.u["head"] != *head || self.u["pull_request"] != number {
-                self.record_head(s, number, &head, None)?;
+                self.record_head(s, number, &head, None, None)?;
             }
             // A head judged `repair` goes to its author before any update (R29).
             let v = self.verdicts(s)?;
@@ -2271,7 +2348,11 @@ impl Run {
                 self.update(s, number, &head, pending, &t)?;
                 continue;
             }
-            self.checks(s, &head)?;
+            // R46: the head's checks passed; with `units.approval`, its `guarded` is recorded.
+            if let Some(guarded) = self.checks(s, &head)? {
+                self.record_head(s, number, &head, None, Some(guarded))?;
+                self.done.guarded = Some((head.clone(), guarded));
+            }
             self.gate(s, number, &head)?;
             let v = self.verdicts(s)?;
             let (verdict, review) = match v.of(&head) {
@@ -2291,8 +2372,9 @@ impl Run {
                 };
                 self.apply(s, &accepted)?;
                 self.reread(s)?;
-                // A `plain` unit goes on to its merge in this call (R18, R30).
-                if self.u["class"] != "plain" {
+                // A `plain` unit goes on to its merge in this call (R18, R30), and so does a
+                // `contract` unit when the policy's verifier approves it (R47).
+                if self.u["class"] != "plain" && !self.by_verifier() {
                     return Ok(Outcome::default());
                 }
                 continue;
@@ -2343,7 +2425,7 @@ impl Run {
         let writers = self.u["writers"].as_array();
         let known = writers.is_some_and(|w| w.iter().any(|w| *w == *word));
         if self.u["head"] != *head || !known {
-            self.record_head(s, number, head, Some(&word))?;
+            self.record_head(s, number, head, Some(&word), None)?;
         }
         let to = format!("HEAD:refs/heads/{}", self.branch);
         let push = [
@@ -2420,14 +2502,88 @@ impl Run {
             "OPEN" if *now != *head => self.reopen(s, "head_moved").map(|()| None),
             "OPEN" if !self.contains_base(s, &head) => self.reopen(s, "main_moved").map(|()| None),
             "OPEN" if self.u["class"] == "plain" || self.u["approved_head"] == *head => {
-                self.merge(s, n, &head).map(Some)
+                self.merged(s, n, &head).map(Some)
             }
+            "OPEN" if self.unguarded(&head) => match self.approve_by_policy(s, &head)? {
+                true => self.merged(s, n, &head).map(Some),
+                false => Ok(Some(Outcome::default())),
+            },
             "OPEN" => Ok(Some(Outcome::default())),
             _ => stop(
                 "pull_request_not_open",
                 json!({"pull_request": n, "state": state, "head": now}),
             ),
         }
+    }
+    /// A `contract` unit whose accepted head the policy's verifier approves (R47).
+    fn by_verifier(&self) -> bool {
+        self.u["class"] == "contract" && self.approval.as_ref().is_some_and(|a| a.by_verifier)
+    }
+    /// This call ran the checks of R16 on `head` and recorded `guarded` false for it (R46, R47): a
+    /// stored `guarded` another call recorded never approves.
+    fn unguarded(&self, head: &str) -> bool {
+        self.by_verifier()
+            && self
+                .done
+                .guarded
+                .as_ref()
+                .is_some_and(|(h, g)| h == head && !*g)
+    }
+    /// `approve_unit_by_policy` on the head: true when applied, false when the store refuses it, and
+    /// the unit then waits for the Lead's approve (R47).
+    fn approve_by_policy(&mut self, s: &mut impl System, head: &str) -> Step<bool> {
+        let action = actions::ApproveUnitByPolicy {
+            head: values::CommitOrDigest(head.to_owned()),
+            unit: Id::new(&self.key),
+        };
+        match self.apply(s, &action) {
+            Err(f) if f.code == store::REFUSED => Ok(false),
+            other => {
+                other?;
+                self.reread(s)?;
+                Ok(true)
+            }
+        }
+    }
+    /// The merge of R31, then, for a unit the policy approved, the sample of R48.
+    fn merged(&mut self, s: &mut impl System, n: u64, head: &str) -> Step<Outcome> {
+        let out = self.merge(s, n, head)?;
+        if out.cleanup.is_some() && self.u["approved_by"] == "policy" {
+            self.sample(s, n);
+        }
+        Ok(out)
+    }
+    /// R48: after a merge the policy approved, the units so approved that are `merged` or `done`
+    /// are counted; every `sample`-th opens a finding for the Lead's reading. Nothing of it changes
+    /// the call's answer or exit.
+    fn sample(&mut self, s: &mut impl System, n: u64) {
+        let Some(every) = self.approval.as_ref().map(|a| a.sample) else {
+            return;
+        };
+        let all = vec![
+            json!({"eq": ["approved_by", "policy"]}),
+            json!({"in": ["state", ["merged", "done"]]}),
+        ];
+        let Ok(found) = store::search_of::<objects::Unit>(s, self.store(), all) else {
+            return;
+        };
+        let count = found.len() as u64;
+        if count == 0 || !count.is_multiple_of(every) {
+            return;
+        }
+        let action = actions::OpenFinding {
+            detector: "ap-unit".to_owned(),
+            evidence: None,
+            finding: Id::new(format!("policy-sample-{}", self.key)),
+            kind: values::FindingKind::Note,
+            severity: values::FindingSeverity::Act,
+            subject: store::subject_of("unit", &self.key),
+            summary: format!(
+                "sample: read the merged diff of {}, pull request {n}",
+                self.key
+            ),
+        };
+        let _ = self.apply(s, &action);
     }
     /// `reopen_unit` with `cause`; the store's refusal ends the call with the unit `accepted` (R30).
     fn reopen(&mut self, s: &mut impl System, cause: &str) -> Step {

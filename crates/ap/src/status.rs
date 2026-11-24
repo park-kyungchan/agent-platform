@@ -287,25 +287,49 @@ fn open_findings(s: &mut impl System, store: Option<&str>) -> Result<Vec<Found>,
     list(s, store, "finding", "findings", all)
 }
 
-/// The record of the last delivery, read through the host: the path from the request of delivery.
-fn delivery(s: &impl System) -> Option<Value> {
-    let state = s.read(DELIVER).ok();
-    let state = state.and_then(|b| serde_json::from_slice::<Value>(&b).ok());
-    let state = state.and_then(|v| {
+/// The file of `ap` that a delivery record names as its `target` when the call delivered `ap`, not
+/// the engine (`specs/ap/work.md` R26).
+pub(crate) const AP_TARGET: &str = "/usr/local/bin/ap";
+/// What this host's delivery files hold: the request of delivery (one JSON object, or none when it
+/// cannot be read), the state directory it names (the default without one), and the record of the
+/// last delivery (one JSON object, or none). The delivery line reads it, and the dispatch pass for a
+/// unit with `depends_delivered` (`specs/ap/work.md` R26).
+#[derive(Clone, Debug)]
+pub(crate) struct DeliveryFiles {
+    pub request: Option<Value>,
+    pub state: String,
+    pub record: Option<Value>,
+}
+/// The two files read through the host: the request, then the record at the path it names.
+pub(crate) fn delivery_files(s: &impl System) -> DeliveryFiles {
+    let request = s.read(DELIVER).ok();
+    let request = request.and_then(|b| serde_json::from_slice::<Value>(&b).ok());
+    let request = request.filter(Value::is_object);
+    let state = request.as_ref().and_then(|v| {
         v["state"]
             .as_str()
             .filter(|p| p.starts_with('/'))
             .map(str::to_owned)
     });
-    let path = format!(
-        "{}/last.json",
-        state.as_deref().unwrap_or(STATE).trim_end_matches('/')
-    );
-    let record: Value = serde_json::from_slice(&s.read(&path).ok()?).ok()?;
+    let state = state
+        .as_deref()
+        .unwrap_or(STATE)
+        .trim_end_matches('/')
+        .to_owned();
+    let path = format!("{state}/last.json");
+    let record = s.read(&path).ok();
+    let record = record.and_then(|b| serde_json::from_slice::<Value>(&b).ok());
+    DeliveryFiles {
+        request,
+        state,
+        record: record.filter(Value::is_object),
+    }
+}
+/// The record of the last delivery, read through the host: the path from the request of delivery.
+fn delivery(s: &impl System) -> Option<Value> {
+    let record = delivery_files(s).record?;
     let at = |k: &str| record[k].clone();
-    record.is_object().then(
-        || json!({"at": at("at"), "end": at("end"), "tip": at("tip"), "target": at("target")}),
-    )
+    Some(json!({"at": at("at"), "end": at("end"), "tip": at("tip"), "target": at("target")}))
 }
 
 fn overview(s: &mut impl System, store: Option<&str>, remote: bool) -> Result<Value, Failure> {
