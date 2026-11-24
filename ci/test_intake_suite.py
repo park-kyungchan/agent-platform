@@ -174,7 +174,7 @@ def draft(cid):
 
 
 def route(cid):
-    return {"type": "route_request", "id": "ro-" + cid, "params": {"request": "@request", "intent": SEED_ID}}
+    return {"type": "route_request", "id": "ro-" + cid, "params": {"request": "@request", "subject": SEED_ID}}
 
 
 def unit(cid, **kw):
