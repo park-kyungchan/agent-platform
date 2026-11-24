@@ -1,8 +1,10 @@
-//! The detector `drift` of `ap watch` (`specs/ap/watch.md` R20, R27 to R29): compares host files
+//! The detector `drift` of `ap watch` (`specs/ap/watch.md` R20, R27 to R29, R33): compares host files
 //! named in `deployments/host-artifacts.json` at `origin/main` of `agent-vps-operations` against their
 //! recorded SHA-256 digests (R27), the unit files of `deploy/` at the commit the installed `ap` names
-//! (R28), and the files of `etc/` at the tip delivery's last fetch of the operations repository read
-//! (R29). It only reads: no clone or checkout is fetched, checked out or written.
+//! (R28), the files of `etc/` at the tip delivery's last fetch of the operations repository read
+//! (R29), and when the policy names `hosts.pc.ssh` (`apcheck@...`) and the PC is reachable, the
+//! checks account's `ont` binary against `/usr/local/bin/ont` (R33). It only reads: no clone or
+//! checkout is fetched, checked out or written.
 use super::detect::output;
 use super::{Read, Reading, Signal};
 use crate::host::{System, digest};
@@ -13,6 +15,10 @@ pub const VPS_OPS_REPO: &str = "/home/palantirkc/platforms/agent-vps-operations"
 pub const INVENTORY_PATH: &str = "deployments/host-artifacts.json";
 /// The installed `ap`, whose `--version` names the commit delivery installed (R28).
 pub const INSTALLED_AP: &str = "/usr/local/bin/ap";
+/// The installed `ont`, whose digest and `--version` the PC checks binary is compared against (R33).
+pub const INSTALLED_ONT: &str = "/usr/local/bin/ont";
+/// Default remote binary path on the PC checks account when `deploy/deliver.json` names none (R33).
+pub const DEFAULT_PC_ONT: &str = "/home/apcheck/.cargo/bin/ont";
 /// Delivery's clone of agent-platform and of the operations repository: `<state>/<name>` of
 /// `deploy/deliver.json`, its `repository` and its `etc.repository` (R28, R29).
 pub const DELIVER_CLONE: &str = "/var/lib/agent-platform/deliver/agent-platform";
@@ -20,6 +26,8 @@ pub const ETC_CLONE: &str = "/var/lib/agent-platform/deliver/agent-vps-operation
 /// The host's directory of the unit files delivery installs (`specs/ap/deliver.md` R48).
 pub const UNIT_DIR: &str = "/etc/systemd/system";
 const MS: u64 = 10_000;
+const PC_PROBE_MS: u64 = 15_000;
+const PC_DIGEST_SCRIPT: &str = r#"p=$1; if [ ! -e "$p" ] && [ ! -L "$p" ]; then printf 'ABSENT\n'; elif [ -f "$p" ] && [ ! -L "$p" ]; then sha256sum -- "$p" | awk '{print $1}'; else printf 'NOT_REGULAR\n'; fi"#;
 
 fn valid_destination(dest: &str) -> bool {
     dest.starts_with("deployments/")
@@ -49,8 +57,9 @@ fn is_blob(s: &mut impl System, commit: &str, dest: &str) -> Result<bool, String
     Ok(reply.success && String::from_utf8_lossy(&reply.stdout).trim() == "blob")
 }
 
-/// `drift` (R20, R27): compares host files against the inventory at `origin/main`.
-pub(crate) fn detect(s: &mut impl System) -> Reading {
+/// `drift` (R20, R27 to R29, R33): compares host files against the inventory at `origin/main`,
+/// unit files, configuration files, and the PC checks account's `ont` binary.
+pub(crate) fn detect(s: &mut impl System, policy: &Result<Option<Value>, String>) -> Reading {
     let commit = output(
         s,
         "git",
@@ -135,8 +144,9 @@ pub(crate) fn detect(s: &mut impl System) -> Reading {
             }
         }
     }
-    units(s, &mut r)?;
+    let k = units(s, &mut r)?;
     configuration(s, &mut r)?;
+    pc_ont(s, &mut r, policy, &k)?;
     Ok(r)
 }
 /// The standard output of one `git -C <clone>` call that ran and succeeded, as bytes; else the cause.
@@ -195,8 +205,8 @@ fn compare(
     }
 }
 /// R28: the unit files of the commit K the installed `ap` names, read from delivery's clone, against
-/// their copies under `/etc/systemd/system`.
-fn units(s: &mut impl System, r: &mut Read) -> Result<(), String> {
+/// their copies under `/etc/systemd/system`. Returns K.
+fn units(s: &mut impl System, r: &mut Read) -> Result<String, String> {
     let version = output(s, INSTALLED_AP, &["--version"])?;
     let words: Vec<&str> = version
         .lines()
@@ -216,7 +226,7 @@ fn units(s: &mut impl System, r: &mut Read) -> Result<(), String> {
         let host = format!("{UNIT_DIR}/{name}");
         compare(s, r, &format!("deploy/{name}"), &host, &want, &k)?;
     }
-    Ok(())
+    Ok(k)
 }
 /// A path of `etc/` the watch compares: ASCII letters, digits, `/`, `.`, `_`, `@` and `-`, with no
 /// empty, `.` or `..` component.
@@ -271,6 +281,108 @@ fn configuration(s: &mut impl System, r: &mut Read) -> Result<(), String> {
         }
         let want = git_bytes(s, ETC_CLONE, &["show", &format!("{tip}:{path}")])?;
         compare(s, r, path, &format!("/{path}"), &want, &tip)?;
+    }
+    Ok(())
+}
+
+fn hex64(t: &str) -> bool {
+    t.len() == 64 && t.bytes().all(|b| matches!(b, b'0'..=b'9' | b'a'..=b'f'))
+}
+
+/// R33: read-only SHA-256 drift check of the checks account's `ont` binary when the pass's policy
+/// reading holds a valid `apcheck@<node>` `hosts.pc.ssh` and the PC answers within 15 seconds.
+fn pc_ont(
+    s: &mut impl System,
+    r: &mut Read,
+    policy: &Result<Option<Value>, String>,
+    k: &str,
+) -> Result<(), String> {
+    let Ok(Some(policy)) = policy else {
+        return Ok(());
+    };
+    let Ok(Some(pc)) = crate::check::hosts(policy) else {
+        return Ok(());
+    };
+    if !crate::deliver::valid_pc_ssh(&pc.ssh) {
+        return Ok(());
+    }
+    let bin = git_bytes(
+        s,
+        DELIVER_CLONE,
+        &["show", &format!("{k}:deploy/deliver.json")],
+    )
+    .ok()
+    .and_then(|b| serde_json::from_slice::<Value>(&b).ok())
+    .and_then(|v| {
+        v.pointer("/pc/bin")
+            .and_then(Value::as_str)
+            .map(str::to_owned)
+    })
+    .filter(|b| crate::deliver::valid_pc_bin(b))
+    .unwrap_or_else(|| DEFAULT_PC_ONT.to_owned());
+    let cmd = format!(
+        "sh -c {} ap-watch-pc {}",
+        crate::check::quote(PC_DIGEST_SCRIPT),
+        crate::check::quote(&bin)
+    );
+    let env = s.environment();
+    let scratch = std::env::temp_dir();
+    let Some((true, out, _)) = crate::deliver::tailscale_ssh(
+        s,
+        &crate::deliver::SshCall {
+            env: &env,
+            cwd: "/",
+            ssh: &pc.ssh,
+            cmd: &cmd,
+            stdin: None,
+            ms: PC_PROBE_MS,
+            scratch: &scratch,
+        },
+    ) else {
+        return Ok(());
+    };
+    let answer = out.lines().next().map(str::trim).unwrap_or_default();
+    let absent = answer == "ABSENT";
+    let actual = if absent {
+        None
+    } else if hex64(answer) {
+        Some(answer.to_owned())
+    } else if answer == "NOT_REGULAR" {
+        Some("not_regular".to_owned())
+    } else {
+        return Ok(());
+    };
+    let local_bytes = s
+        .read(INSTALLED_ONT)
+        .map_err(|_| format!("{INSTALLED_ONT} cannot be read"))?;
+    let expected = digest(&local_bytes);
+    let version = output(s, INSTALLED_ONT, &["--version"])?;
+    let words: Vec<&str> = version
+        .lines()
+        .next()
+        .unwrap_or_default()
+        .split_whitespace()
+        .collect();
+    let commit = match words.as_slice() {
+        ["ont", _, c] if hex40(c) => (*c).to_owned(),
+        _ => return Err(format!("{INSTALLED_ONT} --version names no commit")),
+    };
+    if absent {
+        r.signals.push(Signal::new(
+            "drift pc ont absent".to_owned(),
+            "act",
+            &format!("PC checks binary {bin} is absent"),
+            format!("expected {expected}, absent, commit {commit}"),
+        ));
+    } else if let Some(actual) = actual
+        && actual != expected
+    {
+        r.signals.push(Signal::new(
+            "drift pc ont".to_owned(),
+            "act",
+            &format!("PC checks binary {bin} differs from {commit}"),
+            format!("expected {expected}, actual {actual}, commit {commit}"),
+        ));
     }
     Ok(())
 }

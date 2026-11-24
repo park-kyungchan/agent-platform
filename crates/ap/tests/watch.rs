@@ -12,7 +12,8 @@ use ap::watch::RUNTIMES;
 use ap::watch::checks::{GITHUB_APPLY, GITHUB_REPOSITORIES};
 use ap::watch::detect::{APT, BACKUP, CHECKS_LOG, DELIVERY, DOOR_LOG, MEMORY_EVENTS};
 use ap::watch::drift::{
-    DELIVER_CLONE, ETC_CLONE, INSTALLED_AP, INVENTORY_PATH, UNIT_DIR, VPS_OPS_REPO,
+    DEFAULT_PC_ONT, DELIVER_CLONE, ETC_CLONE, INSTALLED_AP, INSTALLED_ONT, INVENTORY_PATH,
+    UNIT_DIR, VPS_OPS_REPO,
 };
 use ap::watch::runtimes::flag_on_line;
 use ap::watch::{epoch, execute, family, key, utc};
@@ -165,6 +166,15 @@ struct F {
     git_cat_file: BTreeMap<String, Answer>,
     /// `/usr/local/bin/ap --version` (R28).
     ap_version: Answer,
+    /// `/usr/local/bin/ont --version` (R33).
+    ont_version: Answer,
+    /// `tailscale ssh` response for R33 (`Ok((exit, stdout))` or `Err(())` to hang/timeout).
+    pc_ssh: Result<(i32, String), ()>,
+    /// Extra environment variables visible via `System::environment()`.
+    extra_env: Vec<(String, String)>,
+    /// Virtual clock offset for fast timeout tests.
+    clock_offset: Cell<Duration>,
+    advance_on_pause: Duration,
     /// `deploy/` at the commit the installed `ap` names, in delivery's clone: name, mode, type, bytes.
     deploy: BTreeMap<String, (String, String, Vec<u8>)>,
     /// `etc/` at the fetched tip of delivery's clone of the operations repository, by path; and the
@@ -227,6 +237,11 @@ impl F {
             git_show: ok("[]"),
             git_cat_file: BTreeMap::new(),
             ap_version: ok(&format!("ap 0.1.0 {}\n", installed())),
+            ont_version: ok(&format!("ont 0.1.0 {}\n", installed())),
+            pc_ssh: Ok((0, format!("{}\n", sha("ont-binary\n")))),
+            extra_env: vec![],
+            clock_offset: Cell::new(Duration::ZERO),
+            advance_on_pause: Duration::ZERO,
             deploy: BTreeMap::new(),
             etc: BTreeMap::new(),
             etc_ref: ok(&format!("{}\n", ops_tip())),
@@ -334,6 +349,8 @@ impl F {
                 .insert(name.into(), ("100644".into(), "blob".into(), bytes.clone()));
             f.files.insert(format!("{UNIT_DIR}/{name}"), bytes);
         }
+        f.files
+            .insert(INSTALLED_ONT.into(), b"ont-binary\n".to_vec());
         f.files
             .insert("/proc/uptime".into(), b"100000.00 190000.00\n".to_vec());
         f.files
@@ -466,7 +483,10 @@ impl F {
                 let name = spec
                     .strip_prefix(&format!("{}:deploy/", installed()))
                     .unwrap_or_else(|| panic!("unexpected show {spec}"));
-                bytes(&self.deploy[name].2)
+                match self.deploy.get(name) {
+                    Some((_, _, b)) => bytes(b),
+                    None => failed("fatal: path not found\n"),
+                }
             }
             (
                 ETC_CLONE,
@@ -819,6 +839,10 @@ impl System for F {
                 assert_eq!(args, ["--version"]);
                 dup(&self.ap_version)
             }
+            INSTALLED_ONT => {
+                assert_eq!(args, ["--version"]);
+                dup(&self.ont_version)
+            }
             "git" => {
                 assert_eq!(args[0], "-C");
                 assert_eq!(args[1], VPS_OPS_REPO);
@@ -890,6 +914,66 @@ impl System for F {
     }
     fn wall(&self) -> SystemTime {
         UNIX_EPOCH + Duration::from_secs(self.now())
+    }
+    fn now(&self) -> std::time::Instant {
+        std::time::Instant::now() + self.clock_offset.get()
+    }
+    fn pause(&mut self, duration: Duration) {
+        if self.advance_on_pause.is_zero() {
+            std::thread::sleep(duration);
+        } else {
+            self.clock_offset
+                .set(self.clock_offset.get() + self.advance_on_pause);
+        }
+    }
+    fn environment(&self) -> Vec<(String, String)> {
+        vec![
+            ("PATH".into(), std::env::var("PATH").unwrap_or_default()),
+            ("HOME".into(), "/root".into()),
+            ("USER".into(), "root".into()),
+            ("LOGNAME".into(), "root".into()),
+        ]
+        .into_iter()
+        .chain(self.extra_env.clone())
+        .collect()
+    }
+    fn launch(
+        &mut self,
+        argv: &[String],
+        env: &[(String, String)],
+        cwd: &str,
+        files: [std::fs::File; 3],
+    ) -> std::io::Result<Child> {
+        let env_map: serde_json::Map<String, Value> =
+            env.iter().map(|(k, v)| (k.clone(), json!(v))).collect();
+        self.calls.borrow_mut().push((
+            argv[0].clone(),
+            argv[1..].to_vec(),
+            json!({"cwd": cwd, "env": env_map}),
+        ));
+        assert_eq!(argv[0], "tailscale", "unexpected launch {argv:?}");
+        let [stdin, stdout, stderr] = files;
+        match &self.pc_ssh {
+            Ok((exit, out)) => Command::new("sh")
+                .args([
+                    "-c",
+                    "printf '%s' \"$1\"; exit \"$2\"",
+                    "sh",
+                    out,
+                    &exit.to_string(),
+                ])
+                .env_clear()
+                .stdin(stdin)
+                .stdout(stdout)
+                .stderr(stderr)
+                .spawn(),
+            Err(()) => Command::new("sh")
+                .args(["-c", "sleep 60"])
+                .stdin(stdin)
+                .stdout(stdout)
+                .stderr(stderr)
+                .spawn(),
+        }
     }
 }
 impl Drop for F {
@@ -2310,11 +2394,20 @@ fn r19_a_pass_only_reads_and_writes_only_its_directory() {
     let mut f = F::quiet();
     probe(&mut f, "watch-probe-3.service");
     ops(&mut f);
+    set_policy(
+        &mut f,
+        json!({"hosts": {"pc": {"ssh": "apcheck@ap-checks", "work": "/invented/work", "busy_load": 0.5}}}),
+    );
     f.pass();
     assert!(
         f.programs()
             .iter()
             .any(|(p, a)| p == "git" && a[2] == "for-each-ref")
+    );
+    assert!(
+        f.programs()
+            .iter()
+            .any(|(p, a)| p == "tailscale" && a[0] == "ssh" && a[1] == "apcheck@ap-checks")
     );
     for (program, a) in f.programs() {
         match program.as_str() {
@@ -2331,7 +2424,11 @@ fn r19_a_pass_only_reads_and_writes_only_its_directory() {
                     .contains(&a[2].as_str()),
                 "{a:?}"
             ),
-            INSTALLED_AP => assert_eq!(a, ["--version"]),
+            INSTALLED_AP | INSTALLED_ONT => assert_eq!(a, ["--version"]),
+            "tailscale" => assert!(
+                a.len() == 3 && a[0] == "ssh" && a[1].starts_with("apcheck@"),
+                "{a:?}"
+            ),
             "claude" | "muse" | "agy" => assert!(
                 a == ["--version"] || a == ["--help"] || a == ["exec", "--help"],
                 "{a:?}"
@@ -4324,4 +4421,156 @@ fn credit_unknown_without_api() {
     assert_eq!(v["closed"], json!([]), "{v}");
     assert!(!v["seen"].as_array().unwrap().contains(&json!(ks)), "{v}");
     assert_eq!(f.finding(&ks)["state"], "open");
+}
+
+// ---- PC checks account ont drift (R33).
+
+fn apcheck_policy(f: &mut F) {
+    set_policy(
+        f,
+        json!({"hosts": {"pc": {"ssh": "apcheck@ap-checks", "work": "/invented/work", "busy_load": 0.5}}}),
+    );
+}
+
+// spec: specs/ap/watch.md#R33
+// spec: specs/ap/watch.md#R19
+#[test]
+fn r33_pc_ont_drift_detects_absent_and_altered_and_skips_offline_or_unconfigured() {
+    // 1. Without policy, with unparsable policy, or with non-apcheck ssh: skipped silently, no tailscale.
+    let mut f = F::quiet();
+    f.pc_ssh = Ok((0, "ABSENT\n".into()));
+    let v = f.pass();
+    assert_eq!((drift_state(&v), opened(&v)), ("ok", vec![]));
+    assert!(!f.programs().iter().any(|(p, _)| p == "tailscale"));
+
+    pc_policy(&mut f); // agent@ap-checks (not apcheck@)
+    f.reset();
+    f.at(5);
+    let v = f.pass();
+    assert_eq!((drift_state(&v), opened(&v)), ("ok", vec![]));
+    assert!(!f.programs().iter().any(|(p, _)| p == "tailscale"));
+
+    // 2. Valid apcheck@ policy with matching SHA-256 -> no drift signal, reads deploy/deliver.json
+    //    pc.bin, passes only TAILSCALE_ENV, and reads the policy file only once per pass (R30).
+    let mut f = F::quiet();
+    apcheck_policy(&mut f);
+    f.extra_env = vec![
+        ("LANG".into(), "C.UTF-8".into()),
+        ("SSH_AUTH_SOCK".into(), "/tmp/agent.sock".into()),
+    ];
+    let custom_bin = "/home/apcheck/custom/ont";
+    f.deploy.insert(
+        "deliver.json".into(),
+        (
+            "100644".into(),
+            "blob".into(),
+            json!({"pc": {"host": "pc", "ssh": "apcheck@ap-checks", "bin": custom_bin}})
+                .to_string()
+                .into_bytes(),
+        ),
+    );
+    f.pc_ssh = Ok((0, format!("{}\n", sha("ont-binary\n"))));
+    f.reset();
+    f.at(5);
+    let v = f.pass();
+    assert_eq!((drift_state(&v), opened(&v)), ("ok", vec![]), "{v}");
+    let policy_reads = f
+        .reads
+        .borrow()
+        .iter()
+        .filter(|p| p.as_str() == "/invented/policy.json")
+        .count();
+    assert_eq!(policy_reads, 1, "policy must be read once per pass");
+    let ts_call = f
+        .calls
+        .borrow()
+        .iter()
+        .find(|(p, _, _)| p == "tailscale")
+        .unwrap()
+        .clone();
+    assert_eq!(ts_call.1[0], "ssh");
+    assert_eq!(ts_call.1[1], "apcheck@ap-checks");
+    assert!(ts_call.1[2].contains(custom_bin), "{}", ts_call.1[2]);
+    let mut env_keys: Vec<&str> = ts_call.2["env"]
+        .as_object()
+        .unwrap()
+        .keys()
+        .map(String::as_str)
+        .collect();
+    env_keys.sort();
+    assert_eq!(env_keys, ["HOME", "LOGNAME", "PATH", "USER"]);
+
+    // 3. Fallback to DEFAULT_PC_ONT when deploy/deliver.json is absent; remote ABSENT -> opens
+    //    `drift pc ont absent`.
+    let mut f = F::quiet();
+    apcheck_policy(&mut f);
+    f.pc_ssh = Ok((0, "ABSENT\n".into()));
+    f.at(5);
+    let v = f.pass();
+    let ka = k("drift", "drift pc ont absent");
+    assert_eq!(
+        (drift_state(&v), opened(&v)),
+        ("ok", vec![ka.clone()]),
+        "{v}"
+    );
+    let found = f.finding(&ka);
+    assert_eq!(
+        (&found["kind"], &found["severity"]),
+        (&json!("drift"), &json!("act"))
+    );
+    assert_eq!(
+        found["evidence"],
+        format!(
+            "expected {}, absent, commit {}",
+            sha("ont-binary\n"),
+            installed()
+        )
+    );
+    assert!(
+        f.calls
+            .borrow()
+            .iter()
+            .any(|(p, a, _)| p == "tailscale" && a[2].contains(DEFAULT_PC_ONT))
+    );
+
+    // 4. Remote tampered digest -> opens `drift pc ont`, closes `drift pc ont absent`.
+    let bad_sha = sha("tampered-ont\n");
+    f.pc_ssh = Ok((0, format!("{bad_sha}\n")));
+    f.at(10);
+    let v = f.pass();
+    let kd = k("drift", "drift pc ont");
+    assert_eq!(opened(&v), vec![kd.clone()], "{v}");
+    assert_eq!(v["closed"], json!([ka]), "{v}");
+    let found = f.finding(&kd);
+    assert_eq!(
+        found["evidence"],
+        format!(
+            "expected {}, actual {}, commit {}",
+            sha("ont-binary\n"),
+            bad_sha,
+            installed()
+        )
+    );
+
+    // 5. Next pass with matching digest closes `drift pc ont`.
+    f.pc_ssh = Ok((0, format!("{}\n", sha("ont-binary\n"))));
+    f.at(15);
+    let v = f.pass();
+    assert_eq!(v["closed"], json!([kd]), "{v}");
+
+    // 6. PC offline (non-zero exit or 15 s timeout) emits NO drift signal.
+    let mut f = F::quiet();
+    apcheck_policy(&mut f);
+    f.pc_ssh = Ok((255, String::new()));
+    f.at(5);
+    let v = f.pass();
+    assert_eq!((drift_state(&v), opened(&v)), ("ok", vec![]), "{v}");
+
+    let mut f = F::quiet();
+    apcheck_policy(&mut f);
+    f.pc_ssh = Err(());
+    f.advance_on_pause = Duration::from_secs(20);
+    f.at(5);
+    let v = f.pass();
+    assert_eq!((drift_state(&v), opened(&v)), ("ok", vec![]), "{v}");
 }

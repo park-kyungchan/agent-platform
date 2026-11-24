@@ -21,14 +21,107 @@ use std::{
     time::SystemTime,
 };
 
-const MEMBERS: &str = "repository url state build_lock build_wait_seconds by reason past rollback engine etc checkouts";
+const MEMBERS: &str = "repository url state build_lock build_wait_seconds by reason past rollback engine etc checkouts pc";
 const TARGET: &str = "/usr/local/bin/ap";
 const ENGINE: &str = "/usr/local/bin/ont";
+const DEFAULT_ENGINE_REPO: &str = "park-kyungchan/ontology-platform";
 const MARKER: &str = "migrate.pending";
 const SCHEMA: &str = "ontology/work.schema.json";
 const MAIN: &str = "+refs/heads/main:refs/remotes/origin/main";
 const CLIENT: [&str; 4] = ["action", "apply", "--client", "ap-deliver"];
 const FREE_MIB: u64 = 10_240;
+const PC_PROBE_MS: u64 = 15_000;
+const PC_PUSH_MS: u64 = 60_000;
+const PC_PROBE_SCRIPT: &str = r#"p=$1; if [ ! -e "$p" ] && [ ! -L "$p" ]; then printf 'ABSENT\n'; exit 0; fi; if [ ! -f "$p" ] || [ -L "$p" ]; then printf 'NOT_REGULAR\n'; exit 0; fi; h=$(sha256sum -- "$p" 2>/dev/null | awk '{print $1}') || exit 1; v=$("$p" --version </dev/null 2>/dev/null | head -n 1) || v=; printf 'SHA256 %s\nVERSION %s\n' "$h" "$v""#;
+const PC_INSTALL_SCRIPT: &str = r#"set -eu
+bin=$1
+want_sha=$2
+want_commit=$3
+dir=$(dirname -- "$bin")
+mkdir -p -- "$dir" || { printf 'RESULT failed_restored mkdir_failed\n'; exit 1; }
+if [ -L "$bin" ] || { [ -e "$bin" ] && [ ! -f "$bin" ]; }; then
+  printf 'RESULT failed_restored target_not_regular\n'
+  exit 1
+fi
+tmp="${bin}.new.$$"
+trap 'rm -f -- "$tmp"' EXIT
+umask 022
+cat > "$tmp" || { printf 'RESULT failed_restored write_failed\n'; exit 1; }
+chmod 0755 -- "$tmp" || { printf 'RESULT failed_restored chmod_failed\n'; exit 1; }
+got_sha=$(sha256sum -- "$tmp" | awk '{print $1}')
+if [ "$got_sha" != "$want_sha" ]; then
+  printf 'RESULT failed_restored sha256_mismatch\n'
+  exit 1
+fi
+backup=
+old_sha=
+if [ -f "$bin" ] && [ ! -L "$bin" ]; then
+  old_sha=$(sha256sum -- "$bin" | awk '{print $1}')
+  old_12=$(printf '%s' "$old_sha" | cut -c1-12)
+  backup="${bin}.before-${old_12}"
+  bk_tmp="${backup}.tmp.$$"
+  if ! ( cp -p -- "$bin" "$bk_tmp" && chmod 0755 -- "$bk_tmp" && mv -f -- "$bk_tmp" "$backup" ); then
+    rm -f -- "$bk_tmp"
+    printf 'RESULT failed_restored backup_failed\n'
+    exit 1
+  fi
+fi
+if ! mv -f -- "$tmp" "$bin"; then
+  printf 'RESULT failed_restored rename_failed %s\n' "$backup"
+  exit 1
+fi
+after_sha=$(sha256sum -- "$bin" 2>/dev/null | awk '{print $1}' || true)
+after_ver=$("$bin" --version </dev/null 2>/dev/null | head -n 1 || true)
+ver_ok=0
+set -f
+set -- $after_ver
+set +f
+if [ "$#" -eq 3 ] && [ "$1" = "ont" ] && [ "$3" = "$want_commit" ]; then
+  ver_ok=1
+fi
+if [ "$after_sha" = "$want_sha" ] && [ "$ver_ok" = 1 ]; then
+  printf 'RESULT installed ok %s\n' "$backup"
+  exit 0
+fi
+if [ -n "$backup" ] && [ -f "$backup" ]; then
+  rb_tmp="${bin}.rb.$$"
+  if cp -p -- "$backup" "$rb_tmp" && chmod 0755 -- "$rb_tmp" && mv -f -- "$rb_tmp" "$bin"; then
+    rb_sha=$(sha256sum -- "$bin" 2>/dev/null | awk '{print $1}' || true)
+    if [ "$rb_sha" = "$old_sha" ]; then
+      printf 'RESULT failed_restored readback_failed %s\n' "$backup"
+      exit 1
+    fi
+  fi
+  rm -f -- "$rb_tmp"
+  printf 'RESULT failed readback_restore_failed %s\n' "$backup"
+  exit 1
+fi
+rm -f -- "$bin" 2>/dev/null || true
+if [ ! -e "$bin" ]; then
+  printf 'RESULT failed_restored readback_failed\n'
+  exit 1
+fi
+printf 'RESULT failed readback_failed\n'
+exit 1"#;
+
+/// The optional `pc` member of a delivery request (`specs/ap/deliver.md` R60).
+#[derive(Clone)]
+struct Pc {
+    host: String,
+    ssh: String,
+    bin: String,
+}
+
+/// Parameters for one bounded `tailscale ssh` call through `System::launch` (R62, `watch.md` R33).
+pub(crate) struct SshCall<'a> {
+    pub env: &'a [(String, String)],
+    pub cwd: &'a str,
+    pub ssh: &'a str,
+    pub cmd: &'a str,
+    pub stdin: Option<&'a [u8]>,
+    pub ms: u64,
+    pub scratch: &'a Path,
+}
 
 /// A refusal: its code and its `detail`.
 struct No(&'static str, Value);
@@ -61,6 +154,8 @@ struct Call<'a> {
     engine: Option<(String, String, String)>,
     /// With `etc`: the clone of the operations repository, `<state>/<etc name>` (R53).
     etc: Option<String>,
+    /// With `pc`: the PC checks account target (R60).
+    pc: Option<Pc>,
 }
 /// What one installer did: its exit (128 plus the signal for a signal), its code, and for the
 /// content installer the tarball it printed.
@@ -72,6 +167,67 @@ struct Ran {
 
 fn hex40(s: &str) -> bool {
     s.len() == 40 && s.bytes().all(|c| matches!(c, b'0'..=b'9' | b'a'..=b'f'))
+}
+fn hex64(s: &str) -> bool {
+    s.len() == 64 && s.bytes().all(|c| matches!(c, b'0'..=b'9' | b'a'..=b'f'))
+}
+fn valid_pc_host(s: &str) -> bool {
+    (1..=59).contains(&s.len())
+        && s != "local"
+        && matches!(s.as_bytes()[0], b'a'..=b'z' | b'0'..=b'9')
+        && s.bytes()
+            .all(|b| matches!(b, b'a'..=b'z' | b'0'..=b'9' | b'-'))
+}
+/// `apcheck@<node>` where `<node>` is 1..=128 `[A-Za-z0-9.-]` starting with alphanumeric (R60).
+pub(crate) fn valid_pc_ssh(s: &str) -> bool {
+    let Some(node) = s.strip_prefix("apcheck@") else {
+        return false;
+    };
+    (1..=128).contains(&node.len())
+        && node.as_bytes()[0].is_ascii_alphanumeric()
+        && node
+            .bytes()
+            .all(|b| b.is_ascii_alphanumeric() || b == b'.' || b == b'-')
+}
+/// Absolute path, 2..=400 printable ASCII bytes without space, NUL or `..` components (R60).
+pub(crate) fn valid_pc_bin(s: &str) -> bool {
+    s.starts_with('/')
+        && (2..=400).contains(&s.len())
+        && s.bytes().all(|b| (0x21..=0x7e).contains(&b))
+        && !Path::new(s).components().any(|c| c == Component::ParentDir)
+}
+fn check_pc(v: Option<&Value>) -> Result<(), String> {
+    let Some(v) = v else {
+        return Ok(());
+    };
+    let o = v.as_object().ok_or_else(|| "pc".to_owned())?;
+    for k in o.keys() {
+        if !["host", "ssh", "bin"].contains(&k.as_str()) {
+            return Err(format!("pc.{k}"));
+        }
+    }
+    if !o
+        .get("host")
+        .and_then(Value::as_str)
+        .is_some_and(valid_pc_host)
+    {
+        return Err("pc.host".to_owned());
+    }
+    if !o
+        .get("ssh")
+        .and_then(Value::as_str)
+        .is_some_and(valid_pc_ssh)
+    {
+        return Err("pc.ssh".to_owned());
+    }
+    if !o
+        .get("bin")
+        .and_then(Value::as_str)
+        .is_some_and(valid_pc_bin)
+    {
+        return Err("pc.bin".to_owned());
+    }
+    Ok(())
 }
 fn absolute(p: &str) -> bool {
     let path = Path::new(p);
@@ -167,7 +323,7 @@ fn check(r: &Value) -> Result<(), String> {
     ];
     match checks.iter().find(|(_, ok)| !ok) {
         Some((k, _)) => Err((*k).to_owned()),
-        None => Ok(()),
+        None => check_pc(r.get("pc")),
     }
 }
 /// A variable of the installers, as they read it: unset or empty takes the default.
@@ -234,6 +390,18 @@ fn strs(v: &Value) -> Vec<&str> {
 /// A string property of an object of a search's answer, empty when absent.
 fn prop(o: &Value, k: &str) -> String {
     field(o, k).as_str().unwrap_or_default().to_owned()
+}
+/// The native key of an `install` object's `host` reference, if present.
+fn host_key(o: &Value) -> Option<&str> {
+    field(o, "host")["native_key"].as_str()
+}
+/// Whether an `install` object belongs to the local VPS (`host` is `local` or absent for legacy records, R61).
+fn is_local_host(o: &Value) -> bool {
+    matches!(host_key(o), None | Some("local"))
+}
+/// Whether an `install` object belongs to the named non-local host (R61).
+fn is_host(o: &Value, host: &str) -> bool {
+    host_key(o) == Some(host)
 }
 /// The commit `ap --version` of the installed file names.
 fn version(s: &mut impl System, c: &Call) -> Option<String> {
@@ -822,10 +990,16 @@ fn deliver(s: &mut impl System, c: &mut Call) -> Step<()> {
     )?;
     let schema = answer["schema"]["work"]["version"].clone();
     let started = |o: &&Value| prop(o, "started_at");
-    if let Some(a) = running.iter().max_by_key(started)
+    if let Some(a) = running
+        .iter()
+        .filter(|a| is_local_host(a))
+        .max_by_key(started)
         && dead(s, c, a)?
     {
         return Ok(());
+    }
+    if c.engine.is_some() || c.pc.is_some() {
+        pc_dead(s, c)?;
     }
     if c.engine.is_some() && engine_dead(s, c)? {
         return Ok(());
@@ -991,7 +1165,7 @@ fn deliver_pair(
         "install",
         &[("target", target.clone()), ("commit", json!(tip))],
     )?;
-    let attempt = same.len() + 1;
+    let attempt = same.iter().filter(|a| is_local_host(a)).count() + 1;
     let from_sha256 = s.read(&format!("{}/ap", c.dir)).map(|b| digest(&b));
     let Ok(from_sha256) = from_sha256 else {
         return Err(differs(s, c, target));
@@ -1003,7 +1177,14 @@ fn deliver_pair(
     if !past.is_empty() {
         p["past"] = json!(past.join(" "));
     }
-    start(s, c, format!("ap.{tip}.{attempt}"), p, attempt)?;
+    start(
+        s,
+        c,
+        id("host", "local"),
+        format!("ap.{tip}.{attempt}"),
+        p,
+        attempt,
+    )?;
     // 9. The installers, then 10. the reads decide the outcome: is the pair at the tip, is it at
     // `from`; each rollback on its own question.
     let mut ran = vec![installer(s, c, "ap", &["install", &tip])];
@@ -1055,15 +1236,17 @@ fn deliver_pair(
     Ok(())
 }
 /// `start_install` (absent members dropped); only an answer `applied` that names the created
-/// attempt goes on.
+/// attempt goes on. Local attempts also populate the call record's `install` and `attempt` (R61).
 fn start(
     s: &mut impl System,
     c: &mut Call,
+    host: Value,
     request: String,
     mut p: Value,
     attempt: usize,
-) -> Step<()> {
-    p["host"] = id("host", "local");
+) -> Step<Value> {
+    let local = host["native_key"] == "local";
+    p["host"] = host;
     drop_nulls(&mut p);
     let v = apply(s, c, "start_install", request, p)?;
     let edit = &v["result"]["edits"][0];
@@ -1073,15 +1256,33 @@ fn start(
     if !created {
         return Err(store_unreadable(Value::Null));
     }
-    (c.rec["install"], c.rec["attempt"]) = (edit["id"].clone(), json!(attempt));
-    Ok(())
+    if local {
+        (c.rec["install"], c.rec["attempt"]) = (edit["id"].clone(), json!(attempt));
+    }
+    Ok(edit["id"].clone())
 }
-/// The timer's limits, from the attempts of the target newest first (README "Delivery").
-/// Every attempt of the target, newest first, as the view `installs` orders them.
+/// Every attempt of the target for one host (`None` = local VPS or legacy absent host; `Some(h)` =
+/// host `h`), newest first, as the view `installs` orders them (R61).
+fn attempts_for(
+    s: &mut impl System,
+    c: &Call,
+    target: &Value,
+    host: Option<&str>,
+) -> Step<Vec<Value>> {
+    let (all, _) = search(s, c, "install", &[("target", target.clone())])?;
+    let mut filtered: Vec<Value> = all
+        .into_iter()
+        .filter(|a| match host {
+            None => is_local_host(a),
+            Some(h) => is_host(a, h),
+        })
+        .collect();
+    filtered.sort_by_key(|a| std::cmp::Reverse((prop(a, "started_at"), prop(a, "closed_at"))));
+    Ok(filtered)
+}
+/// The timer's limits, from the local attempts of the target newest first (README "Delivery").
 fn attempts(s: &mut impl System, c: &Call, target: &Value) -> Step<Vec<Value>> {
-    let (mut all, _) = search(s, c, "install", &[("target", target.clone())])?;
-    all.sort_by_key(|a| std::cmp::Reverse((prop(a, "started_at"), prop(a, "closed_at"))));
-    Ok(all)
+    attempts_for(s, c, target, None)
 }
 /// `pair_differs`; for the timer it names the newest attempt that did not end `not_started` (exit 3).
 fn differs(s: &mut impl System, c: &Call, target: &Value) -> No {
@@ -1095,9 +1296,8 @@ fn differs(s: &mut impl System, c: &Call, target: &Value) -> No {
     let newest = all.iter().find(ended).map(|a| json!({"install": a["id"]}));
     No("pair_differs", newest.unwrap_or(Value::Null))
 }
-/// With no `tip` (the pair is at T already) only the two limits that are not about T.
-fn limits(s: &mut impl System, c: &Call, target: &Value, tip: Option<&str>) -> Step<()> {
-    let all = attempts(s, c, target)?;
+/// Timer attempt limits over an already-filtered, newest-first slice of attempts (R32, R41, R62).
+fn limits_over(all: &[Value], tip: Option<&str>) -> Step<()> {
     let is = |a: &Value, k: &str, v: &[&str]| v.contains(&prop(a, k).as_str());
     let no = |code, a: &Value| Err(No(code, json!({"install": a["id"]})));
     let ended = ["installed", "failed_restored", "failed"];
@@ -1128,6 +1328,11 @@ fn limits(s: &mut impl System, c: &Call, target: &Value, tip: Option<&str>) -> S
         _ => Ok(()),
     }
 }
+/// With no `tip` (the pair is at T already) only the two limits that are not about T.
+fn limits(s: &mut impl System, c: &Call, target: &Value, tip: Option<&str>) -> Step<()> {
+    let all = attempts(s, c, target)?;
+    limits_over(&all, tip)
+}
 /// A Lead's rollback of the newest install (README "Delivery"): the content first, the file only
 /// after the content step exited 0.
 fn rollback(s: &mut impl System, c: &mut Call, target: &Value) -> Step<()> {
@@ -1151,7 +1356,9 @@ fn rollback(s: &mut impl System, c: &mut Call, target: &Value) -> Step<()> {
             kind("forward"),
         ],
     )?;
-    let a = found.iter().filter(|a| prop(a, "outcome") == "installed");
+    let a = found
+        .iter()
+        .filter(|a| is_local_host(a) && prop(a, "outcome") == "installed");
     let a = a
         .max_by_key(|a| prop(a, "started_at"))
         .ok_or_else(nothing)?;
@@ -1176,14 +1383,14 @@ fn rollback(s: &mut impl System, c: &mut Call, target: &Value) -> Step<()> {
             kind("rollback"),
         ],
     )?;
-    let attempt = same.len() + 1;
+    let attempt = same.iter().filter(|a| is_local_host(a)).count() + 1;
     let from_sha256 = s.read(&format!("{}/ap", c.dir)).map(|b| digest(&b));
     let from_sha256 = from_sha256.map_err(|_| No("pair_differs", Value::Null))?;
     let p = json!({"target": target, "kind": "rollback", "repository": c.r["repository"], "commit": back,
         "attempt": attempt, "from": here, "from_sha256": from_sha256, "rolls_back": a["id"], "by": c.by,
         "reason": c.r["reason"]});
     let request = format!("ap.{back}.rb{attempt}");
-    start(s, c, request.clone(), p, attempt)?;
+    start(s, c, id("host", "local"), request.clone(), p, attempt)?;
     let mut ran = vec![];
     if let Some(t) = &tar {
         ran.push(installer(s, c, "content-rollback", &["rollback", t]));
@@ -1248,7 +1455,11 @@ fn engine_dead(s: &mut impl System, c: &mut Call) -> Step<bool> {
     let target = id("installed_artifact", ENGINE);
     let filter = [("target", target), ("status", json!("running"))];
     let (running, _) = search(s, c, "install", &filter)?;
-    let Some(a) = running.iter().max_by_key(|o| prop(o, "started_at")) else {
+    let Some(a) = running
+        .iter()
+        .filter(|a| is_local_host(a))
+        .max_by_key(|o| prop(o, "started_at"))
+    else {
         return Ok(false);
     };
     let f = |k: &str| prop(a, k);
@@ -1342,7 +1553,12 @@ fn engine_install(s: &mut impl System, c: &mut Call, pin: &str, from: &str) -> S
     }
     c.rec["index"] = json!({"before": index(s, c), "after": null});
     let filter = [("target", target.clone()), ("commit", json!(pin))];
-    let attempt = search(s, c, "install", &filter)?.0.len() + 1;
+    let attempt = search(s, c, "install", &filter)?
+        .0
+        .iter()
+        .filter(|a| is_local_host(a))
+        .count()
+        + 1;
     let dir = c.engine.as_ref().map_or("", |e| e.1.as_str());
     let from_sha256 = s.read(&format!("{dir}/ont")).map(|b| digest(&b));
     let from_sha256 =
@@ -1351,7 +1567,7 @@ fn engine_install(s: &mut impl System, c: &mut Call, pin: &str, from: &str) -> S
         "attempt": attempt, "from": from, "from_sha256": from_sha256, "by": c.by, "reason": c.r["reason"],
         "head": head, "review": review, "reviews": reviews});
     let request = format!("ont.{pin}.{attempt}");
-    start(s, c, request.clone(), p, attempt)?;
+    start(s, c, id("host", "local"), request.clone(), p, attempt)?;
     let mut ran = vec![installer(s, c, "ont", &["install", pin])];
     let (outcome, to) = match engine_at(s, c) {
         Some(v) if v == pin => ("installed", pin),
@@ -1734,6 +1950,521 @@ fn configuration(s: &mut impl System, c: &mut Call) -> Value {
     (out["result"], out["code"]) = (json!(result), first_code(&ran));
     out
 }
+
+fn scratch_file(dir: &Path) -> Option<File> {
+    use std::os::unix::fs::OpenOptionsExt;
+    static SEQ: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+    let pid = std::process::id();
+    for _ in 0..16 {
+        let n = SEQ.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        let p = dir.join(format!(".ap-ts-{pid}-{n}.tmp"));
+        if let Ok(f) = OpenOptions::new()
+            .read(true)
+            .write(true)
+            .create_new(true)
+            .mode(0o600)
+            .open(&p)
+        {
+            let _ = std::fs::remove_file(&p);
+            return Some(f);
+        }
+    }
+    None
+}
+
+/// Runs `tailscale ssh <ssh> <cmd>` via `System::launch` with only `TAILSCALE_ENV` and a hard
+/// deadline (`specs/ap/deliver.md` R62, `specs/ap/watch.md` R33). Returns `Some((success, stdout,
+/// stderr))`, or `None` when spawn failed or the deadline elapsed.
+pub(crate) fn tailscale_ssh(
+    s: &mut impl System,
+    call: &SshCall<'_>,
+) -> Option<(bool, String, String)> {
+    let stdin_file = match call.stdin {
+        Some(bytes) => {
+            let mut f = scratch_file(call.scratch)?;
+            f.write_all(bytes).ok()?;
+            f.rewind().ok()?;
+            f
+        }
+        None => File::open("/dev/null").ok()?,
+    };
+    let out = scratch_file(call.scratch)?;
+    let err = scratch_file(call.scratch)?;
+    let files = [stdin_file, out.try_clone().ok()?, err.try_clone().ok()?];
+    let ts_env: Vec<(String, String)> = call
+        .env
+        .iter()
+        .filter(|(k, _)| crate::check::TAILSCALE_ENV.contains(&k.as_str()))
+        .cloned()
+        .collect();
+    let argv = args(&["tailscale", "ssh", call.ssh, call.cmd]);
+    let mut child = s.launch(&argv, &ts_env, call.cwd, files).ok()?;
+    let deadline = s.now() + std::time::Duration::from_millis(call.ms);
+    let status = loop {
+        match child.try_wait() {
+            Ok(Some(status)) => break status,
+            Ok(None) if s.now() < deadline => s.pause(std::time::Duration::from_millis(10)),
+            _ => {
+                let _ = child.kill();
+                let _ = child.wait();
+                return None;
+            }
+        }
+    };
+    let read_capped = |mut f: File| -> String {
+        let mut b = vec![];
+        let _ = f.rewind().and_then(|()| f.take(LIMIT).read_to_end(&mut b));
+        String::from_utf8_lossy(&b).into_owned()
+    };
+    Some((status.success(), read_capped(out), read_capped(err)))
+}
+
+fn ont_version_commit(out: &str) -> Option<String> {
+    let words: Vec<&str> = out.lines().next()?.split_whitespace().collect();
+    (words.len() == 3 && words[0] == "ont" && hex40(words[2])).then(|| words[2].to_owned())
+}
+
+fn ont_local(s: &mut impl System, c: &Call) -> Option<(Vec<u8>, String, String)> {
+    let dir = var(&c.env, "ONT_INSTALL_BIN_DIR", "/usr/local/bin");
+    let path = format!("{dir}/ont");
+    let bytes = s.read(&path).ok()?;
+    let sha = digest(&bytes);
+    let out = run(s, &path, args(&["--version"]), 10_000)?;
+    let commit = ont_version_commit(&out)?;
+    Some((bytes, sha, commit))
+}
+
+enum RemoteOnt {
+    Absent,
+    NotRegular,
+    Present {
+        sha256: String,
+        commit: Option<String>,
+    },
+}
+
+fn pc_probe(s: &mut impl System, c: &Call, pc: &Pc) -> Option<RemoteOnt> {
+    let cmd = format!(
+        "sh -c {} ap-deliver-pc-probe {}",
+        crate::check::quote(PC_PROBE_SCRIPT),
+        crate::check::quote(&pc.bin)
+    );
+    let (ok, out, _) = tailscale_ssh(
+        s,
+        &SshCall {
+            env: &c.env,
+            cwd: &c.state,
+            ssh: &pc.ssh,
+            cmd: &cmd,
+            stdin: None,
+            ms: PC_PROBE_MS,
+            scratch: Path::new(&c.state),
+        },
+    )?;
+    if !ok {
+        return None;
+    }
+    let mut lines = out.lines();
+    let first = lines.next()?.trim();
+    if first == "ABSENT" {
+        return Some(RemoteOnt::Absent);
+    }
+    if first == "NOT_REGULAR" {
+        return Some(RemoteOnt::NotRegular);
+    }
+    let sha = first.strip_prefix("SHA256 ")?.trim();
+    if !hex64(sha) {
+        return None;
+    }
+    let ver = lines
+        .next()
+        .and_then(|l| l.strip_prefix("VERSION "))
+        .and_then(ont_version_commit);
+    Some(RemoteOnt::Present {
+        sha256: sha.to_owned(),
+        commit: ver,
+    })
+}
+
+/// Step 2 for PC install attempts (R61): closes every running `install` attempt of
+/// `/usr/local/bin/ont` whose `host` is neither `local` nor absent, so `install_running` never
+/// deadlocks local VPS delivery or a new PC push.
+fn pc_dead(s: &mut impl System, c: &mut Call) -> Step<()> {
+    let target = id("installed_artifact", ENGINE);
+    let filter = [("target", target), ("status", json!("running"))];
+    let (running, _) = search(s, c, "install", &filter)?;
+    let dead_pc: Vec<Value> = running
+        .into_iter()
+        .filter(|a| host_key(a).is_some_and(|h| h != "local"))
+        .collect();
+    if dead_pc.is_empty() {
+        return Ok(());
+    }
+    let zeros = "0".repeat(40);
+    let mut probed: Option<Option<RemoteOnt>> = None;
+    let mut local_ont: Option<Option<(String, String)>> = None;
+    for a in &dead_pc {
+        let Some(host) = host_key(a) else { continue };
+        let (commit, from, from_sha) = (prop(a, "commit"), prop(a, "from"), prop(a, "from_sha256"));
+        let request = format!("pc.{host}.{commit}.{}", field(a, "attempt"));
+        let mut p = json!({"install": a["id"]});
+        let matches_req = c.pc.as_ref().filter(|pc| pc.host == host).cloned();
+        if let Some(pc) = matches_req {
+            let probe = &*probed.get_or_insert_with(|| pc_probe(s, c, &pc));
+            let local =
+                &*local_ont.get_or_insert_with(|| ont_local(s, c).map(|(_, sha, ver)| (sha, ver)));
+            let at_commit = matches!(
+                (probe, local),
+                (
+                    Some(RemoteOnt::Present { sha256, commit: Some(rc) }),
+                    Some((lsha, lcommit)),
+                ) if *rc == commit && *lcommit == commit && sha256 == lsha
+            );
+            let at_from = match probe {
+                Some(RemoteOnt::Absent) => from == zeros && from_sha.is_empty(),
+                Some(RemoteOnt::Present { sha256, commit: rc }) => {
+                    if from == zeros {
+                        !from_sha.is_empty() && *sha256 == from_sha
+                    } else {
+                        rc.as_deref() == Some(from.as_str())
+                            && (from_sha.is_empty() || *sha256 == from_sha)
+                    }
+                }
+                _ => false,
+            };
+            if at_commit {
+                (p["outcome"], p["to"]) = (json!("installed"), json!(commit));
+            } else if at_from {
+                (p["outcome"], p["code"], p["to"]) =
+                    (json!("not_started"), json!("dead_call"), json!(from));
+            } else {
+                (p["outcome"], p["code"], p["to"]) =
+                    (json!("failed"), json!("dead_call"), json!("neither"));
+            }
+        } else {
+            (p["outcome"], p["code"], p["to"]) =
+                (json!("failed"), json!("dead_call"), json!("neither"));
+        }
+        apply(s, c, "close_install", format!("{request}.close"), p)
+            .map_err(|_| No("attempt_running", json!({"install": a["id"]})))?;
+    }
+    Ok(())
+}
+
+/// Resolves the closed accepting packet review for `ontology-platform` commit `pin` (R63): first
+/// from the newest closed `installed` attempt of `/usr/local/bin/ont` on host `local` at `pin`,
+/// else via `accepted()` on the engine clone (where `head` is `pin^2`).
+fn pc_accepted(
+    s: &mut impl System,
+    c: &Call,
+    same_commit: &[Value],
+    pin: &str,
+) -> Result<Option<(String, Value, Vec<Value>)>, No> {
+    let mut local_installed: Vec<&Value> = same_commit
+        .iter()
+        .filter(|a| {
+            is_local_host(a) && prop(a, "status") == "closed" && prop(a, "outcome") == "installed"
+        })
+        .collect();
+    local_installed
+        .sort_by_key(|a| std::cmp::Reverse((prop(a, "started_at"), prop(a, "closed_at"))));
+    for a in local_installed {
+        let head = prop(a, "head");
+        let review = field(a, "review");
+        if hex40(&head) && complete_id(review) {
+            let reviews: Vec<Value> = field(a, "reviews")
+                .as_array()
+                .filter(|v| !v.is_empty())
+                .cloned()
+                .unwrap_or_else(|| vec![review.clone()]);
+            return Ok(Some((head, review.clone(), reviews)));
+        }
+    }
+    let Some((eclone, _, _)) = &c.engine else {
+        return Ok(None);
+    };
+    let repository = c.r["engine"]["repository"]
+        .as_str()
+        .unwrap_or(DEFAULT_ENGINE_REPO);
+    let Some(line) = git_at(s, eclone, &["rev-list", "--parents", "-n", "1", pin]) else {
+        return Ok(None);
+    };
+    let words: Vec<&str> = line.split_whitespace().collect();
+    let Some(parent) = words.get(1) else {
+        return Ok(None);
+    };
+    let chain = Chain {
+        clone: eclone,
+        repository,
+        past: vec![],
+        code: "not_accepted",
+    };
+    match accepted(s, c, &chain, parent, pin) {
+        Ok(found) => Ok(Some(found)),
+        Err(No("store_unreadable", detail)) => Err(No("store_unreadable", detail)),
+        Err(_) => Ok(None),
+    }
+}
+
+/// Pushes the local VPS `ont` binary to the PC checks account (`specs/ap/deliver.md` R62, R63).
+/// Returns the record's `pc` object; never changes VPS `end`, `code` or exit.
+fn pc_push(s: &mut impl System, c: &mut Call) -> Value {
+    let Some(pc) = c.pc.clone() else {
+        return Value::Null;
+    };
+    let make =
+        |from: Value, to: Value, sha256: Value, install: Value, result: &str, code: Value| {
+            json!({
+                "host": pc.host,
+                "target": pc.bin,
+                "from": from,
+                "to": to,
+                "sha256": sha256,
+                "install": install,
+                "result": result,
+                "code": code,
+            })
+        };
+    let Some((ont_bytes, local_sha, pin)) = ont_local(s, c) else {
+        return make(
+            Value::Null,
+            Value::Null,
+            Value::Null,
+            Value::Null,
+            "failed",
+            json!("engine_unreadable"),
+        );
+    };
+    let Some(remote) = pc_probe(s, c, &pc) else {
+        return make(
+            Value::Null,
+            Value::Null,
+            Value::Null,
+            Value::Null,
+            "unreachable",
+            json!("pc_unreachable"),
+        );
+    };
+    let (remote_sha, remote_commit) = match remote {
+        RemoteOnt::Present { sha256, commit } => (Some(sha256), commit),
+        RemoteOnt::Absent | RemoteOnt::NotRegular => (None, None),
+    };
+    if remote_sha.as_deref() == Some(local_sha.as_str())
+        && remote_commit.as_deref() == Some(pin.as_str())
+    {
+        return make(
+            json!(pin),
+            json!(pin),
+            json!(local_sha),
+            Value::Null,
+            "same",
+            Value::Null,
+        );
+    }
+    let target = id("installed_artifact", ENGINE);
+    if c.r.get("by").is_none() {
+        let all = match attempts_for(s, c, &target, Some(&pc.host)) {
+            Ok(all) => all,
+            Err(_) => {
+                return make(
+                    json!(remote_commit),
+                    json!(remote_commit),
+                    json!(remote_sha),
+                    Value::Null,
+                    "store_unreadable",
+                    json!("store_unreadable"),
+                );
+            }
+        };
+        if let Err(No(reason, _)) = limits_over(&all, Some(&pin)) {
+            return make(
+                json!(remote_commit),
+                json!(remote_commit),
+                json!(remote_sha),
+                Value::Null,
+                "suppressed",
+                json!(reason),
+            );
+        }
+    }
+    let same_commit = match search(
+        s,
+        c,
+        "install",
+        &[("target", target.clone()), ("commit", json!(pin))],
+    ) {
+        Ok((rows, _)) => rows,
+        Err(_) => {
+            return make(
+                json!(remote_commit),
+                json!(remote_commit),
+                json!(remote_sha),
+                Value::Null,
+                "store_unreadable",
+                json!("store_unreadable"),
+            );
+        }
+    };
+    let (head, review, reviews) = match pc_accepted(s, c, &same_commit, &pin) {
+        Ok(Some(v)) => v,
+        Ok(None) => {
+            return make(
+                json!(remote_commit),
+                json!(remote_commit),
+                json!(remote_sha),
+                Value::Null,
+                "not_accepted",
+                json!("not_accepted"),
+            );
+        }
+        Err(_) => {
+            return make(
+                json!(remote_commit),
+                json!(remote_commit),
+                json!(remote_sha),
+                Value::Null,
+                "store_unreadable",
+                json!("store_unreadable"),
+            );
+        }
+    };
+    let attempt = same_commit.iter().filter(|a| is_host(a, &pc.host)).count() + 1;
+    let repository =
+        c.r.get("engine")
+            .and_then(|e| e["repository"].as_str())
+            .unwrap_or(DEFAULT_ENGINE_REPO);
+    let from_param = remote_commit.clone().unwrap_or_else(|| "0".repeat(40));
+    let request = format!("pc.{}.{pin}.{attempt}", pc.host);
+    let p = json!({
+        "target": target,
+        "kind": "forward",
+        "repository": repository,
+        "commit": pin,
+        "attempt": attempt,
+        "from": from_param,
+        "from_sha256": remote_sha,
+        "by": c.by,
+        "reason": c.r["reason"],
+        "head": head,
+        "review": review,
+        "reviews": reviews,
+    });
+    let install_id = match start(s, c, id("host", &pc.host), request.clone(), p, attempt) {
+        Ok(id) => id,
+        Err(No("store_unreadable", _)) => {
+            return make(
+                json!(remote_commit),
+                json!(remote_commit),
+                json!(remote_sha),
+                Value::Null,
+                "store_unreadable",
+                json!("store_unreadable"),
+            );
+        }
+        Err(No(code, _)) => {
+            return make(
+                json!(remote_commit),
+                json!(remote_commit),
+                json!(remote_sha),
+                Value::Null,
+                "failed",
+                json!(code),
+            );
+        }
+    };
+    let install_cmd = format!(
+        "sh -c {} ap-deliver-pc {} {} {}",
+        crate::check::quote(PC_INSTALL_SCRIPT),
+        crate::check::quote(&pc.bin),
+        crate::check::quote(&local_sha),
+        crate::check::quote(&pin),
+    );
+    let pushed = tailscale_ssh(
+        s,
+        &SshCall {
+            env: &c.env,
+            cwd: &c.state,
+            ssh: &pc.ssh,
+            cmd: &install_cmd,
+            stdin: Some(&ont_bytes),
+            ms: PC_PUSH_MS,
+            scratch: Path::new(&c.state),
+        },
+    );
+    let parsed = pushed.and_then(|(ok, out, _)| {
+        let line = out.lines().rev().find(|l| l.starts_with("RESULT "))?;
+        let parts: Vec<&str> = line.split_whitespace().collect();
+        let outcome = (*parts.get(1)?).to_owned();
+        let code = (*parts.get(2)?).to_owned();
+        let backup = parts
+            .get(3)
+            .filter(|b| b.starts_with('/') && b.len() <= 400)
+            .map(|b| (*b).to_owned());
+        Some((ok, outcome, code, backup))
+    });
+    let (outcome, close_to, rec_to, close_code, backup, after_sha) = match parsed {
+        Some((true, ref o, _, backup)) if o == "installed" => (
+            "installed",
+            pin.clone(),
+            json!(pin),
+            Value::Null,
+            backup,
+            json!(local_sha),
+        ),
+        Some((_, ref o, code, backup)) if o == "failed_restored" => (
+            "failed_restored",
+            from_param.clone(),
+            json!(remote_commit),
+            json!(code),
+            backup,
+            json!(remote_sha),
+        ),
+        Some((_, ref o, code, backup)) if o == "failed" => (
+            "failed",
+            "neither".to_owned(),
+            json!("neither"),
+            json!(code),
+            backup,
+            Value::Null,
+        ),
+        _ => (
+            "failed",
+            "neither".to_owned(),
+            json!("neither"),
+            json!("pc_push_failed"),
+            None,
+            Value::Null,
+        ),
+    };
+    let mut close_p = json!({
+        "install": install_id,
+        "outcome": outcome,
+        "to": close_to,
+        "code": close_code,
+        "rollback_binary": backup,
+    });
+    drop_nulls(&mut close_p);
+    let closed = apply(s, c, "close_install", format!("{request}.close"), close_p).is_ok();
+    if closed {
+        make(
+            json!(remote_commit),
+            rec_to,
+            after_sha,
+            install_id,
+            outcome,
+            close_code,
+        )
+    } else {
+        make(
+            json!(remote_commit),
+            rec_to,
+            after_sha,
+            install_id,
+            "store_unreadable",
+            json!("store_unreadable"),
+        )
+    }
+}
 /// A host entry under `AP_UNIT_DIR`: none, a regular file and its bytes, or anything else (a link, a
 /// directory, a file that cannot be read).
 enum Entry {
@@ -2026,6 +2757,7 @@ pub fn execute(s: &mut impl System, r: &Value) -> (Value, u8) {
         sums: RefCell::default(),
         engine: None,
         etc: None,
+        pc: None,
         env,
     };
     if let Some(e) = r.get("engine") {
@@ -2050,6 +2782,14 @@ pub fn execute(s: &mut impl System, r: &Value) -> (Value, u8) {
     }
     if r.get("checkouts").is_some() {
         c.rec["checkouts"] = Value::Null;
+    }
+    if let Some(p) = r.get("pc") {
+        c.pc = Some(Pc {
+            host: p["host"].as_str().unwrap_or_default().to_owned(),
+            ssh: p["ssh"].as_str().unwrap_or_default().to_owned(),
+            bin: p["bin"].as_str().unwrap_or_default().to_owned(),
+        });
+        c.rec["pc"] = Value::Null;
     }
     (c.rec["by"], c.rec["repository"]) = (c.by.clone(), r["repository"].clone());
     let made = std::fs::create_dir_all(&c.state).is_ok();
@@ -2097,6 +2837,9 @@ pub fn execute(s: &mut impl System, r: &Value) -> (Value, u8) {
             .map(|p| forward(s, p))
             .collect();
         c.rec["checkouts"] = json!(rows);
+    }
+    if ended && r.get("rollback").is_none() && c.pc.is_some() {
+        c.rec["pc"] = pc_push(s, &mut c);
     }
     if made {
         let _ = write(

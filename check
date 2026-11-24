@@ -13,6 +13,7 @@ mode=${1:-all}
 
 python3 -I -B ci/check-content.py
 bash scripts/test-install-content.sh
+bash scripts/test-pc-pull.sh
 bash scripts/test-backup-store.sh
 python3 -I -B -m unittest discover -s github -p 'test_*.py'
 python3 -I -B ci/check-map.py crates/ ci/ content/ deploy/ evals/ github/ ontology/ scripts/ specs/ .github/ check rust-toolchain.toml Cargo.toml Cargo.lock
