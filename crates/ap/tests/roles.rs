@@ -401,6 +401,12 @@ fn every_apply_of_ap_claims_its_role() {
     for (file, want) in table {
         assert_eq!(claims(file), want, "{file}");
     }
+    // R3 names the words of `ap unit` that claim `lead`, the deferral and the use among them (`specs/ap/unit.md`
+    // R50); their applies are asserted in `unit_object.rs`.
+    let roles = fs::read_to_string(repo("specs/ap/roles.md")).unwrap();
+    assert!(
+        roles.contains("`ap unit add|amend|ready|drop|defer|undefer|used|review|approve|reject`")
+    );
     // `ap unit write` amends and looks as `dispatch`; the stage's runs are claimed once, in the store module.
     assert!(claims("unit/page_write.rs").contains(&"dispatch".to_owned()));
     let write = fs::read_to_string(repo("crates/ap/src/unit/page_write.rs")).unwrap();

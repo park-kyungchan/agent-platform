@@ -1,5 +1,5 @@
-//! The unit object, `ap unit add|amend|ready|drop|page` (`specs/ap/unit.md`), against a fake of `ont` that
-//! answers as the engine does: the schema's four unit actions with their refusals, request ids replayed as
+//! The unit object, `ap unit add|amend|ready|drop|page|defer|undefer|used` (`specs/ap/unit.md`), against a fake
+//! of `ont` that answers as the engine does: the schema's seven unit actions with their refusals, request ids replayed as
 //! `already_applied` whatever their `expected`, `expected` revisions, and the view `reviews_of_unit` as the
 //! engine renders it. Git and `sh` run for real on scratch repositories under a temporary directory; the
 //! fake's `units()` is false except in the tests that read the `systemd-run` command line, which the fake
@@ -49,7 +49,15 @@ fn refused(mut v: Value) -> Answer {
     v["status"] = json!("refused");
     reply(false, v)
 }
-const ACTIONS: [&str; 4] = ["add_unit", "amend_unit", "ready_unit", "drop_unit"];
+const ACTIONS: [&str; 7] = [
+    "add_unit",
+    "amend_unit",
+    "ready_unit",
+    "drop_unit",
+    "defer_unit",
+    "undefer_unit",
+    "record_use",
+];
 /// The schema's value type `write_pattern`: `^[A-Za-z0-9._][A-Za-z0-9._/+@-]{0,296}(/\*\*)?$`.
 fn write_pattern(v: &Value) -> bool {
     let Some(t) = v.as_str() else { return false };
@@ -392,6 +400,30 @@ impl F {
                     (class != "contract" && class != "effect") || page,
                     "page_not_reviewed",
                 );
+                // Version 25: a deferred unit is not made ready.
+                need(u("deferred_by").is_null(), "deferred");
+            }
+            "defer_unit" | "undefer_unit" => {
+                let state = u("state");
+                need(
+                    action == "undefer_unit"
+                        || ["draft", "ready", "stopped"].iter().any(|s| state == *s),
+                    "unit_not_deferrable",
+                );
+                let word = self.the(&p["by"], "request").is_some_and(|q| {
+                    q["status"] == "current"
+                        && ["decision", "order", "answer"]
+                            .iter()
+                            .any(|k| q["kind"] == *k)
+                });
+                need(word, "by_not_the_users_word");
+            }
+            "record_use" => {
+                let state = u("state");
+                need(state == "merged" || state == "done", "unit_not_merged");
+                let named = u("use").as_str().is_some_and(|t| !t.starts_with("none:"));
+                need(named, "use_not_named");
+                need(p["evidence"] != "", "evidence_empty");
             }
             "drop_unit" => {
                 let state = u("state");
@@ -462,11 +494,26 @@ impl F {
                 self.modify("unit", &key, set);
             }
             "ready_unit" => self.modify("unit", &key, json!({"state": "ready", "ready_at": now})),
-            _ => self.modify(
+            "defer_unit" => self.modify(
+                "unit",
+                &key,
+                json!({"deferred_by": p["by"], "state": "draft"}),
+            ),
+            "undefer_unit" => {
+                self.forget("unit", &key, "deferred_by");
+                self.modify("unit", &key, json!({}));
+            }
+            "record_use" => self.modify(
+                "unit",
+                &key,
+                json!({"used_at": now, "use_evidence": p["evidence"]}),
+            ),
+            "drop_unit" => self.modify(
                 "unit",
                 &key,
                 json!({"state": "dropped", "drop_reason": p["reason"], "ended_at": now}),
             ),
+            other => panic!("action {other}"),
         }
         let change = if action == "add_unit" {
             "initial"
@@ -708,12 +755,14 @@ fn without(mut v: Value, name: &str) -> Value {
 fn writer(rid: &str) -> Value {
     json!({"request_id": rid, "agent": "lead", "session": "s-lead"})
 }
+/// The use of the units `added` makes (R48).
+const USE: &str = "The Lead lists the widgets with the new list.";
 /// An `add` of a unit of the lane `objective` with every property a page can have, invented.
 fn added(key: &str) -> Value {
     with(
         writer(&format!("a-{key}")),
         json!({"unit": key, "lane": "objective", "class": "plain", "intent": "widgets",
-            "objective": "The widget list holds every widget once.",
+            "objective": "The widget list holds every widget once.", "use": USE,
             "acceptance": [{"check": "test -f list.txt", "kind": "fails_on_base"}],
             "write_set": ["src/list/**"],
             "implementer": {"runtime": "claude", "model": "m", "effort": "high"},
@@ -758,6 +807,9 @@ fn r1_the_five_words_and_their_arguments() {
         vec!["page", "k", "--store", "/s", "--for", "verifier"],
         vec!["page", "k", "--for", "reviewer"],
         vec!["page", "k", "--digest"],
+        vec!["defer"],
+        vec!["undefer", "--store", "/s"],
+        vec!["used"],
     ] {
         assert!(parse(&good).is_ok(), "{good:?}");
     }
@@ -778,6 +830,8 @@ fn r1_the_five_words_and_their_arguments() {
         vec!["page", "k", "--digest", "--for", "reviewer"],
         vec!["page", "k", "--digest", "--digest"],
         vec!["page", "k", "x"],
+        vec!["defer", "k"],
+        vec!["used", "--digest"],
     ] {
         let e = parse(&bad).expect_err(&format!("{bad:?}"));
         assert_eq!((e.code, e.field.as_str()), ("usage", "args"), "{bad:?}");
@@ -2451,8 +2505,10 @@ fn fixture() -> (F, Repo) {
             "verifier_questions": "1. Is every widget listed once?", "report": "The pull request's number."}),
     );
     yes(&mut f, &["add"], page);
-    // The golden pages are those of a unit without clauses (R45); `## Clauses` has its own test.
+    // The golden pages are those of a unit without clauses (R45) and of one added before its use (R48):
+    // `## Clauses` and `## Use` have their own tests.
     f.forget("unit", "page-fixture", "clauses");
+    f.forget("unit", "page-fixture", "use");
     f.edit(
         "unit",
         "page-fixture",
@@ -3512,7 +3568,12 @@ fn r40_the_page_of_a_plain_unit_lists_the_protected_paths() {
     for key in ["page-fixture", "u-norepo"] {
         let line = text(&mut f, &["page", key, "--digest"]);
         let part = page_part(key, f.unit(key), true);
-        let hashed = part.replacen("Depends on: base-unit\n", "", 1);
+        // Neither the dependencies nor the use enter the digest (R34, R49).
+        let hashed = (part.replacen("Depends on: base-unit\n", "", 1)).replacen(
+            &format!("\n## Use\n\n{USE}\n"),
+            "",
+            1,
+        );
         assert_eq!(
             line,
             format!("{:x}\n", Sha256::digest(hashed.as_bytes())),
@@ -4372,4 +4433,506 @@ fn r46_a_unit_without_a_repository_and_a_unit_not_draft_are_not_judged() {
         "{:?}",
         f.names()
     );
+}
+
+/// A writing request of `unit` with the members of `rest`.
+fn on(rid: &str, rest: Value) -> Value {
+    with(writer(rid), rest)
+}
+
+// spec: specs/ap/unit.md#R47
+#[test]
+fn r47_unit_kind_is_a_value_of_the_schema_and_is_stored() {
+    let mut f = F::new();
+    yes(
+        &mut f,
+        &["add"],
+        with(added("u-one"), json!({"kind": "rust"})),
+    );
+    assert_eq!(f.applies()[0]["parameters"]["kind"], "rust");
+    assert_eq!(f.unit("u-one")["kind"], "rust");
+    for kind in [
+        "schema",
+        "instructions",
+        "removal",
+        "script",
+        "typescript",
+        "config",
+        "import",
+    ] {
+        f.calls.clear();
+        let v = yes(
+            &mut f,
+            &["amend"],
+            on(&format!("k-{kind}"), json!({"unit": "u-one", "kind": kind})),
+        );
+        assert_eq!(v["outcome"], "applied");
+        assert_eq!(f.applies()[0]["parameters"]["kind"], kind);
+        assert_eq!(f.unit("u-one")["kind"], kind);
+    }
+    for (bad, rule) in [
+        (json!("go"), "one_of"),
+        (json!("Rust"), "one_of"),
+        (json!(""), "required"),
+        (json!(3), "form"),
+        (Value::Null, "form"),
+    ] {
+        for op in ["add", "amend"] {
+            f.calls.clear();
+            let r = match op {
+                "add" => with(added("u-two"), json!({"kind": bad})),
+                _ => on("kb", json!({"unit": "u-one", "kind": bad})),
+            };
+            let e = no(&mut f, &[op], r);
+            assert_eq!(
+                (e.code.as_str(), e.field.as_str()),
+                ("invalid_input", "kind"),
+                "{op} {bad}"
+            );
+            assert_eq!(e.fields.unwrap(), json!([entry("kind", rule, None, None)]));
+            assert!(f.calls.is_empty(), "{op} {bad}");
+        }
+    }
+    // A unit added without a kind has none, and an amendment without one keeps it.
+    yes(&mut f, &["add"], added("u-none"));
+    assert!(f.unit("u-none").get("kind").is_none());
+    yes(
+        &mut f,
+        &["amend"],
+        on("kn", json!({"unit": "u-one", "notes": "n"})),
+    );
+    assert_eq!(f.unit("u-one")["kind"], "import");
+}
+
+// spec: specs/ap/unit.md#R47
+#[test]
+fn r47_depends_delivered_names_units_that_exist_as_depends_on_does() {
+    let mut f = F::new();
+    yes(&mut f, &["add"], added("u-dep"));
+    yes(&mut f, &["add"], added("u-dep2"));
+    f.calls.clear();
+    let keys = json!([oid("unit", "u-dep"), oid("unit", "u-dep2")]);
+    yes(
+        &mut f,
+        &["add"],
+        with(
+            added("u-one"),
+            json!({"depends_delivered": ["u-dep", "u-dep2"]}),
+        ),
+    );
+    assert_eq!(
+        f.names(),
+        ["get unit", "get unit", "apply add_unit", "get unit"],
+        "each key read once before the apply"
+    );
+    assert_eq!(f.applies()[0]["parameters"]["depends_delivered"], keys);
+    assert_eq!(f.unit("u-one")["depends_delivered"], keys);
+    // A key the store does not have: refused with the list's name, after the keys of `depends_on`.
+    f.calls.clear();
+    let e = no(
+        &mut f,
+        &["add"],
+        with(
+            added("u-two"),
+            json!({"depends_on": ["u-dep"], "depends_delivered": ["u-dep", "u-gone"]}),
+        ),
+    );
+    assert_eq!(
+        (e.code.as_str(), e.field.as_str(), &e.detail, &e.after),
+        (
+            "unknown_dependency",
+            "depends_delivered",
+            &json!("u-gone"),
+            &None
+        )
+    );
+    assert!(e.fields.is_none());
+    assert_eq!(f.names(), ["get unit", "get unit", "get unit"]);
+    let e = no(
+        &mut f,
+        &["amend"],
+        on(
+            "m1",
+            json!({"unit": "u-one", "depends_delivered": ["u-gone"]}),
+        ),
+    );
+    assert_eq!(
+        (e.code.as_str(), e.field.as_str()),
+        ("unknown_dependency", "depends_delivered")
+    );
+    assert_eq!(f.unit("u-one")["depends_delivered"], keys);
+    // The forms of the list, as those of `depends_on`.
+    let many: Vec<String> = (0..21).map(|i| format!("u-{i}")).collect();
+    for (bad, want) in [
+        (
+            json!(many),
+            entry("depends_delivered", "max_entries", None, Some(20)),
+        ),
+        (
+            json!([""]),
+            entry("depends_delivered.0", "required", None, None),
+        ),
+        (
+            json!(["u-dep", "k".repeat(513)]),
+            entry("depends_delivered.1", "max_bytes", Some(513), Some(512)),
+        ),
+        (json!([3]), entry("depends_delivered.0", "form", None, None)),
+        (
+            json!("u-dep"),
+            entry("depends_delivered", "form", None, None),
+        ),
+    ] {
+        f.calls.clear();
+        let e = no(
+            &mut f,
+            &["amend"],
+            on("m2", json!({"unit": "u-one", "depends_delivered": bad})),
+        );
+        assert_eq!(e.code, "invalid_input", "{bad}");
+        assert_eq!(e.fields.unwrap(), json!([want]), "{bad}");
+        assert!(f.calls.is_empty());
+    }
+    // An amendment replaces the list; an empty one leaves none.
+    yes(
+        &mut f,
+        &["amend"],
+        on("m3", json!({"unit": "u-one", "depends_delivered": []})),
+    );
+    assert_eq!(f.unit("u-one")["depends_delivered"], json!([]));
+}
+
+// spec: specs/ap/unit.md#R48
+#[test]
+fn r48_use_named_is_required_in_the_lane_objective_and_none_gives_a_reason() {
+    let mut f = F::new();
+    yes(&mut f, &["add"], added("u-one"));
+    assert_eq!(f.applies()[0]["parameters"]["use"], USE);
+    assert_eq!(f.unit("u-one")["use"], USE);
+    let reason = "none: a change of a document that no run reads";
+    for (bad, want) in [
+        (None, entry("use", "required", None, None)),
+        (Some(json!("")), entry("use", "required", None, None)),
+        (
+            Some(json!("u".repeat(601))),
+            entry("use", "max_bytes", Some(601), Some(600)),
+        ),
+        (Some(json!(7)), entry("use", "form", None, None)),
+        (Some(json!("none:")), entry("use", "form", None, None)),
+        (Some(json!("none:  ")), entry("use", "form", None, None)),
+    ] {
+        f.calls.clear();
+        let r = without(added("u-two"), "use");
+        let r = match &bad {
+            Some(v) => with(r, json!({"use": v})),
+            None => r,
+        };
+        let e = no(&mut f, &["add"], r);
+        assert_eq!(
+            (e.code.as_str(), e.field.as_str()),
+            ("invalid_input", "use"),
+            "{bad:?}"
+        );
+        assert_eq!(e.fields.unwrap(), json!([want]), "{bad:?}");
+        assert!(f.calls.is_empty());
+    }
+    for (key, ok) in [("u-none", reason.to_owned()), ("u-long", "u".repeat(600))] {
+        yes(&mut f, &["add"], with(added(key), json!({"use": ok})));
+        assert_eq!(f.unit(key)["use"], json!(ok));
+    }
+    // The lane small needs none.
+    f.policy = None;
+    let small = on(
+        "s1",
+        json!({"unit": "u-small", "lane": "small", "class": "plain", "origin": "q-small", "objective": "o",
+            "repository": "invented/widgets", "write_set": ["a"]}),
+    );
+    yes(&mut f, &["add"], small);
+    assert!(f.unit("u-small").get("use").is_none());
+    // `amend` does not require it, and takes it under the same rules.
+    yes(
+        &mut f,
+        &["amend"],
+        on("m1", json!({"unit": "u-one", "notes": "n"})),
+    );
+    assert_eq!(f.unit("u-one")["use"], USE);
+    yes(
+        &mut f,
+        &["amend"],
+        on("m2", json!({"unit": "u-small", "use": reason})),
+    );
+    assert_eq!(f.unit("u-small")["use"], reason);
+    let e = no(
+        &mut f,
+        &["amend"],
+        on("m3", json!({"unit": "u-one", "use": "none:"})),
+    );
+    assert_eq!(
+        (e.code.as_str(), e.field.as_str()),
+        ("invalid_input", "use")
+    );
+}
+
+// spec: specs/ap/unit.md#R49
+#[test]
+fn r49_kind_delivered_and_use_are_printed_outside_digest() {
+    let mut f = F::new();
+    yes(&mut f, &["add"], added("u-dep"));
+    yes(&mut f, &["add"], added("u-dep2"));
+    let set = json!({"class": "contract", "depends_on": ["u-dep"], "kind": "rust",
+        "depends_delivered": ["u-dep", "u-dep2"]});
+    yes(&mut f, &["add"], with(added("u-one"), set));
+    let head = format!(
+        "# Unit u-one: contract, lane objective, no repository\nDepends on: u-dep\nKind: rust\n\
+         Delivered before start: u-dep, u-dep2\n\n## Objective\n\nThe widget list holds every widget once.\n\n\
+         ## Use\n\n{USE}\n\n## Acceptance checks\n"
+    );
+    let page = text(&mut f, &["page", "u-one"]);
+    assert!(page.starts_with(&head), "{page}");
+    let reviewer = text(&mut f, &["page", "u-one", "--for", "reviewer"]);
+    assert!(reviewer.starts_with(&head), "{reviewer}");
+    // The digest is of the page part without the three, as it is without the dependencies.
+    let part = page_part("u-one", f.unit("u-one"), true);
+    let hashed = part
+        .replacen("Depends on: u-dep\n", "", 1)
+        .replacen("Kind: rust\n", "", 1)
+        .replacen("Delivered before start: u-dep, u-dep2\n", "", 1)
+        .replacen(&format!("\n## Use\n\n{USE}\n"), "", 1);
+    assert_eq!(part.len() - hashed.len(), head.len() - "# Unit u-one: contract, lane objective, no repository\n\n## Objective\n\nThe widget list holds every widget once.\n\n## Acceptance checks\n".len());
+    let line = text(&mut f, &["page", "u-one", "--digest"]);
+    assert_eq!(line, format!("{:x}\n", Sha256::digest(hashed.as_bytes())));
+    let digest = line.trim_end().to_owned();
+    assert_eq!(f.unit("u-one")["page_digest"], json!(digest));
+    // A reviewed contract unit: an amendment of only the kind, the use and the units delivered before the start
+    // keeps the stored digest and the accept, and the unit is made ready.
+    f.page_review("rv-1", "u-one", &digest, true, "accept");
+    for (rid, change) in [
+        (
+            "m1",
+            json!({"kind": "schema", "use": "none: the schema alone", "depends_delivered": ["u-dep2"]}),
+        ),
+        ("m2", json!({"kind": "config"})),
+        ("m3", json!({"use": "The Lead runs the list once."})),
+        ("m4", json!({"depends_delivered": []})),
+    ] {
+        let mut r = on(rid, json!({"unit": "u-one"}));
+        r.as_object_mut()
+            .unwrap()
+            .extend(change.as_object().unwrap().clone());
+        let v = yes(&mut f, &["amend"], r);
+        assert_eq!(v["page_review_outdated"], false, "{change}");
+        assert_eq!(f.unit("u-one")["page_digest"], json!(digest), "{change}");
+    }
+    let page = text(&mut f, &["page", "u-one"]);
+    assert!(page.contains("\nKind: config\n") && !page.contains("Delivered before start"));
+    assert!(page.contains("\n## Use\n\nThe Lead runs the list once.\n"));
+    let v: Value = serde_json::from_str(&ready(&mut f, "u-one").unwrap()).unwrap();
+    assert_eq!(v["state"], "ready");
+    // The notes stay in the digest: a stage reads them as instructions.
+    let v = yes(
+        &mut f,
+        &["amend"],
+        on("m5", json!({"unit": "u-one", "notes": "Other notes."})),
+    );
+    assert_eq!(v["page_review_outdated"], true);
+    assert_ne!(f.unit("u-one")["page_digest"], json!(digest));
+}
+
+/// The deferral of `unit` by the request `by`, or its end with `undefer`.
+fn defer(f: &mut F, op: &str, rid: &str, unit: &str, by: &str) -> Result<String, Box<Refusal>> {
+    call(f, &[op], on(rid, json!({"unit": unit, "by": by})))
+}
+
+// spec: specs/ap/unit.md#R50
+#[test]
+fn r50_defer_and_undefer_apply_their_actions_by_the_users_word() {
+    let mut f = F::new();
+    yes(&mut f, &["add"], added("u-one"));
+    f.calls.clear();
+    let v: Value =
+        serde_json::from_str(&defer(&mut f, "defer", "df1", "u-one", "q-small").unwrap()).unwrap();
+    assert_eq!(
+        v,
+        json!({"unit": "u-one", "outcome": "applied", "state": "draft"})
+    );
+    assert_eq!(f.names(), ["get unit", "apply defer_unit", "get unit"]);
+    let b = f.applies()[0].clone();
+    assert_eq!(
+        (&b["request_id"], &b["role"], &b["agent"], &b["session"]),
+        (
+            &json!("df1-defer"),
+            &json!("lead"),
+            &json!("lead"),
+            &json!("s-lead")
+        )
+    );
+    assert_eq!(
+        b["parameters"],
+        json!({"unit": oid("unit", "u-one"), "by": oid("request", "q-small")})
+    );
+    assert_eq!(f.unit("u-one")["deferred_by"], oid("request", "q-small"));
+    // A repeat answers as the store does; a deferred unit is not made ready (the store's refusal, passed on).
+    let v: Value =
+        serde_json::from_str(&defer(&mut f, "defer", "df1", "u-one", "q-small").unwrap()).unwrap();
+    assert_eq!(v["outcome"], "already_applied");
+    let e = ready(&mut f, "u-one").unwrap_err();
+    assert_eq!((e.code.as_str(), &e.after), ("deferred", &None));
+    // A `by` that is not the user's word: the store's code, passed on.
+    f.put(
+        "request",
+        "q-old",
+        json!({"status": "superseded", "kind": "order", "words": "w"}),
+    );
+    let e = defer(&mut f, "undefer", "un0", "u-one", "q-old").unwrap_err();
+    assert_eq!(
+        (e.code.as_str(), e.field.as_str(), &e.after),
+        ("by_not_the_users_word", "undefer", &None)
+    );
+    assert_eq!(e.detail["code"], "submission_criteria");
+    f.calls.clear();
+    let v: Value =
+        serde_json::from_str(&defer(&mut f, "undefer", "un1", "u-one", "q-small").unwrap())
+            .unwrap();
+    assert_eq!(
+        v,
+        json!({"unit": "u-one", "outcome": "applied", "state": "draft"})
+    );
+    let b = f.applies()[0].clone();
+    assert_eq!(
+        (&b["action_type"], &b["request_id"], &b["role"]),
+        (
+            &json!("undefer_unit"),
+            &json!("un1-undefer"),
+            &json!("lead")
+        )
+    );
+    assert!(f.unit("u-one").get("deferred_by").is_none());
+    let v: Value = serde_json::from_str(&ready(&mut f, "u-one").unwrap()).unwrap();
+    assert_eq!(v["state"], "ready");
+    // A ready unit deferred returns to draft.
+    let v: Value =
+        serde_json::from_str(&defer(&mut f, "defer", "df2", "u-one", "q-small").unwrap()).unwrap();
+    assert_eq!(v["state"], "draft");
+    // A unit the store does not have, a malformed request, and ONT_ROLE=lead: nothing applied.
+    f.calls.clear();
+    let e = defer(&mut f, "defer", "df3", "u-gone", "q-small").unwrap_err();
+    assert_eq!(
+        (e.code.as_str(), e.field.as_str(), &e.after),
+        ("unknown_unit", "unit", &None)
+    );
+    for op in ["defer", "undefer"] {
+        for (r, want) in [
+            (
+                on("x", json!({"unit": "u-one"})),
+                entry("by", "required", None, None),
+            ),
+            (
+                on("x", json!({"unit": "u-one", "by": "q".repeat(513)})),
+                entry("by", "max_bytes", Some(513), Some(512)),
+            ),
+            (
+                on(
+                    "x",
+                    json!({"unit": "u-one", "by": "q-small", "reason": "r"}),
+                ),
+                entry("reason", "unknown_member", None, None),
+            ),
+        ] {
+            let e = no(&mut f, &[op], r);
+            assert_eq!(e.code, "invalid_input", "{op}");
+            assert_eq!(e.fields.unwrap(), json!([want]), "{op}");
+        }
+    }
+    assert_eq!(f.names(), ["get unit"]);
+    f.calls.clear();
+    f.env.push(("ONT_ROLE".into(), "lead".into()));
+    for op in ["defer", "undefer"] {
+        let e = defer(&mut f, op, "df4", "u-one", "q-small").unwrap_err();
+        assert_eq!(
+            (e.code.as_str(), e.field.as_str()),
+            ("role_in_environment", "ONT_ROLE")
+        );
+    }
+    assert!(f.calls.is_empty());
+}
+
+// spec: specs/ap/unit.md#R50
+#[test]
+fn r50_use_recorded_by_used_on_a_merged_unit() {
+    let mut f = F::new();
+    yes(&mut f, &["add"], added("u-one"));
+    let used = |f: &mut F, rid: &str, unit: &str, evidence: Value| {
+        call(
+            f,
+            &["used"],
+            on(rid, json!({"unit": unit, "evidence": evidence})),
+        )
+    };
+    let shown = "The Lead's run listed 12 widgets, each once.";
+    // Not merged: the store's refusal, passed on with its code.
+    let e = used(&mut f, "u1", "u-one", json!(shown)).unwrap_err();
+    assert_eq!(
+        (e.code.as_str(), e.field.as_str(), &e.after),
+        ("unit_not_merged", "used", &None)
+    );
+    f.edit("unit", "u-one", json!({"state": "merged"}));
+    f.calls.clear();
+    let v: Value =
+        serde_json::from_str(&used(&mut f, "u2", "u-one", json!(shown)).unwrap()).unwrap();
+    assert_eq!(
+        v,
+        json!({"unit": "u-one", "outcome": "applied", "state": "merged"})
+    );
+    assert_eq!(f.names(), ["get unit", "apply record_use", "get unit"]);
+    let b = f.applies()[0].clone();
+    assert_eq!(
+        (&b["request_id"], &b["role"]),
+        (&json!("u2-used"), &json!("lead"))
+    );
+    assert_eq!(
+        b["parameters"],
+        json!({"unit": oid("unit", "u-one"), "evidence": shown})
+    );
+    assert_eq!(f.unit("u-one")["use_evidence"], shown);
+    // A unit whose use is `none:` names no use: the store refuses it.
+    yes(
+        &mut f,
+        &["add"],
+        with(added("u-doc"), json!({"use": "none: a document alone"})),
+    );
+    f.edit("unit", "u-doc", json!({"state": "merged"}));
+    let e = used(&mut f, "u3", "u-doc", json!(shown)).unwrap_err();
+    assert_eq!(e.code, "use_not_named");
+    // The evidence is 1 to 1,000 bytes; a unit the store does not have is unknown_unit.
+    f.calls.clear();
+    for (bad, want) in [
+        (json!(""), entry("evidence", "required", None, None)),
+        (
+            json!("e".repeat(1001)),
+            entry("evidence", "max_bytes", Some(1001), Some(1000)),
+        ),
+        (json!(5), entry("evidence", "form", None, None)),
+    ] {
+        let e = used(&mut f, "u4", "u-one", bad.clone()).unwrap_err();
+        assert_eq!(
+            (e.code.as_str(), e.field.as_str()),
+            ("invalid_input", "evidence")
+        );
+        assert_eq!(e.fields.unwrap(), json!([want]), "{bad}");
+    }
+    let e = no(&mut f, &["used"], on("u5", json!({"unit": "u-one"})));
+    assert_eq!(
+        e.fields.unwrap(),
+        json!([entry("evidence", "required", None, None)])
+    );
+    assert!(f.calls.is_empty());
+    yes(
+        &mut f,
+        &["used"],
+        on("u6", json!({"unit": "u-one", "evidence": "e".repeat(1000)})),
+    );
+    let e = used(&mut f, "u7", "u-gone", json!(shown)).unwrap_err();
+    assert_eq!((e.code.as_str(), &e.after), ("unknown_unit", &None));
+    f.env.push(("ONT_ROLE".into(), "lead".into()));
+    let e = used(&mut f, "u8", "u-one", json!(shown)).unwrap_err();
+    assert_eq!(e.code, "role_in_environment");
 }

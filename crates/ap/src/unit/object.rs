@@ -1,5 +1,6 @@
 //! `ap unit add|amend|ready|drop|page`: a unit's page as an object of the store, made ready only after
-//! its acceptance checks ended on the base as their kinds require (`specs/ap/unit.md`).
+//! its acceptance checks ended on the base as their kinds require; `ap unit defer|undefer|used`: the user's
+//! deferral of a unit and its first use (`specs/ap/unit.md`).
 use super::drive::{protected, protected_tree};
 use super::render::{self, Role};
 use crate::host::{Failure, Host, LIMIT, System, error, fail, new_session_id};
@@ -17,7 +18,9 @@ use std::{
 };
 
 /// The first arguments that select this module; a page's path is absolute, so none is one.
-pub const WORDS: [&str; 5] = ["add", "amend", "ready", "drop", "page"];
+pub const WORDS: [&str; 8] = [
+    "add", "amend", "ready", "drop", "page", "defer", "undefer", "used",
+];
 /// The bound of a whole action request: the engine takes 65,536 bytes.
 const PAGE_LIMIT: usize = 60_000;
 /// The texts of the page with the schema's bounds.
@@ -33,7 +36,10 @@ const TEXTS: [(&str, usize); 9] = [
     ("branch", 200),
 ];
 /// The page properties `amend` takes; `add` takes `lane`, `intent` and `origin` too.
-const PAGE: &str = "class objective interface invariants acceptance not_built write_set read_first specs notes verifier_questions report repository branch implementer verifier estimate_lines depends_on wave";
+const PAGE: &str = "class objective interface invariants acceptance not_built write_set read_first specs notes verifier_questions report repository branch implementer verifier estimate_lines depends_on wave kind use depends_delivered";
+/// The most bytes of `use` (R47) and of the evidence of `used` (R50).
+const USE_BYTES: usize = 600;
+const EVIDENCE_BYTES: usize = 1000;
 /// The bounds of `wave` (R41).
 const WAVES: std::ops::RangeInclusive<u64> = 1..=99;
 /// Runs the command after the output file with both outputs into that file and standard input from
@@ -763,7 +769,7 @@ fn add_action(p: &Value) -> Result<actions::AddUnit, Failure> {
         branch: text_of(p, "branch"),
         class: required(class, "class")?,
         clauses: ids_of(p, "clauses"),
-        depends_delivered: None,
+        depends_delivered: ids_of(p, "depends_delivered"),
         depends_on: ids_of(p, "depends_on"),
         estimate_lines: number_of(p, "estimate_lines"),
         implementer: tier("implementer").map(|[effort, model, runtime]| {
@@ -776,7 +782,7 @@ fn add_action(p: &Value) -> Result<actions::AddUnit, Failure> {
         intent: id_member(p, "intent"),
         interface: text_of(p, "interface"),
         invariants: text_of(p, "invariants"),
-        kind: None,
+        kind: kind_of(p),
         lane: required(lane, "lane")?,
         not_built: text_of(p, "not_built"),
         notes: text_of(p, "notes"),
@@ -788,7 +794,7 @@ fn add_action(p: &Value) -> Result<actions::AddUnit, Failure> {
         repository: text_of(p, "repository"),
         specs: texts_of(p, "specs"),
         unit: required(unit, "unit")?,
-        r#use: None,
+        r#use: text_of(p, "use"),
         verifier: tier("verifier").map(|[effort, model, runtime]| actions::AddUnitVerifier {
             effort,
             model,
@@ -816,7 +822,7 @@ fn amend_action(p: &Value) -> Result<actions::AmendUnit, Failure> {
             .map(|_| required(class, "class"))
             .transpose()?,
         clauses: ids_of(p, "clauses"),
-        depends_delivered: None,
+        depends_delivered: ids_of(p, "depends_delivered"),
         depends_on: ids_of(p, "depends_on"),
         estimate_lines: number_of(p, "estimate_lines"),
         implementer: tier("implementer").map(|[effort, model, runtime]| {
@@ -828,7 +834,7 @@ fn amend_action(p: &Value) -> Result<actions::AmendUnit, Failure> {
         }),
         interface: text_of(p, "interface"),
         invariants: text_of(p, "invariants"),
-        kind: None,
+        kind: kind_of(p),
         not_built: text_of(p, "not_built"),
         notes: text_of(p, "notes"),
         objective: text_of(p, "objective"),
@@ -838,7 +844,7 @@ fn amend_action(p: &Value) -> Result<actions::AmendUnit, Failure> {
         repository: text_of(p, "repository"),
         specs: texts_of(p, "specs"),
         unit: required(unit, "unit")?,
-        r#use: None,
+        r#use: text_of(p, "use"),
         verifier: tier("verifier").map(|[effort, model, runtime]| actions::AmendUnitVerifier {
             effort,
             model,
@@ -850,6 +856,37 @@ fn amend_action(p: &Value) -> Result<actions::AmendUnit, Failure> {
             .map(|l| l.into_iter().map(values::WritePattern).collect()),
     })
 }
+/// The kind of the checked parameters, a value of the schema's `unit_kind` (R47).
+fn kind_of(p: &Value) -> Option<values::UnitKind> {
+    text_of(p, "kind").and_then(|t| values::UnitKind::parse(&t))
+}
+/// The request of `defer_unit` or `undefer_unit` from its parameters (R50).
+fn by_of(p: &Value) -> Result<(Id<objects::Request>, Id<objects::Unit>), Failure> {
+    Ok((
+        required(id_member(p, "by"), "by")?,
+        required(id_member(p, "unit"), "unit")?,
+    ))
+}
+fn defer_action(p: &Value) -> Result<actions::DeferUnit, Failure> {
+    let (by, unit) = by_of(p)?;
+    Ok(actions::DeferUnit { by, unit })
+}
+fn undefer_action(p: &Value) -> Result<actions::UndeferUnit, Failure> {
+    let (by, unit) = by_of(p)?;
+    Ok(actions::UndeferUnit { by, unit })
+}
+/// The request of `record_use` from its parameters (R50).
+fn use_action(p: &Value) -> Result<actions::RecordUse, Failure> {
+    Ok(actions::RecordUse {
+        evidence: required(text_of(p, "evidence"), "evidence")?,
+        unit: required(id_member(p, "unit"), "unit")?,
+    })
+}
+/// A use that begins `none:` names a reason after it (R48).
+fn use_ok(t: &str) -> bool {
+    t.strip_prefix("none:")
+        .is_none_or(|reason| !reason.trim().is_empty())
+}
 /// The request of `drop_unit` from its parameters.
 fn drop_action(p: &Value) -> Result<actions::DropUnit, Failure> {
     Ok(actions::DropUnit {
@@ -857,9 +894,12 @@ fn drop_action(p: &Value) -> Result<actions::DropUnit, Failure> {
         unit: required(id_member(p, "unit"), "unit")?,
     })
 }
+/// The keys a request names that must be units of the store, each with its list's name (R16, R47).
+type Dependencies = Vec<(&'static str, String)>;
 /// The parameters of `add_unit` or `amend_unit` from the request, every rule but the dependencies'
-/// existence checked, each member that breaks one noted in `b`; the keys of `depends_on`.
-fn page_parameters(b: &mut Breaks, r: &Value, op: &str, key: &str) -> (Value, Vec<String>) {
+/// existence checked, each member that breaks one noted in `b`; the keys of `depends_on` and then of
+/// `depends_delivered`.
+fn page_parameters(b: &mut Breaks, r: &Value, op: &str, key: &str) -> (Value, Dependencies) {
     let mut p = Map::from_iter([("unit".to_owned(), id::<objects::Unit>(key))]);
     let add = op == "add";
     if add {
@@ -938,19 +978,49 @@ fn page_parameters(b: &mut Breaks, r: &Value, op: &str, key: &str) -> (Value, Ve
         }
     }
     let mut depends = vec![];
-    if r.get("depends_on").is_some()
-        && let Some(list) = b.list(r, "depends_on", 20)
-    {
-        for (i, d) in list.iter().enumerate() {
-            let field = format!("depends_on.{i}");
-            if let Some(d) = b.text(sized(d, &field, 512), Some(d), 512) {
-                depends.push(d.to_owned());
-            }
+    if r.get("depends_on").is_some() {
+        keys(b, r, "depends_on", &mut p, &mut depends);
+    }
+    // The kind, the use and the units delivered before the start (R47, R48).
+    if let Some(v) = r.get("kind") {
+        let kind = v.as_str().filter(|t| values::UnitKind::parse(t).is_some());
+        if let Some(t) = b.take(kind.ok_or_else(|| bad("kind")), choice_rule(Some(v))) {
+            p.insert("kind".into(), json!(t));
         }
-        let ids: Vec<Value> = depends.iter().map(|d| id::<objects::Unit>(d)).collect();
-        p.insert("depends_on".into(), json!(ids));
+    }
+    if r.get("use").is_some() || (add && r["lane"] == "objective") {
+        let checked = sized(&r["use"], "use", USE_BYTES);
+        let checked = checked.and_then(|t| use_ok(t).then_some(t).ok_or_else(|| bad("use")));
+        if let Some(t) = b.text(checked, r.get("use"), USE_BYTES) {
+            p.insert("use".into(), json!(t));
+        }
+    }
+    if r.get("depends_delivered").is_some() {
+        keys(b, r, "depends_delivered", &mut p, &mut depends);
     }
     (p.into(), depends)
+}
+/// A list `k` of at most 20 keys of units, each of 1 to 512 bytes (R16, R47): their ids into `p`, the keys
+/// into `depends` with the list's name.
+fn keys(
+    b: &mut Breaks,
+    r: &Value,
+    k: &'static str,
+    p: &mut Map<String, Value>,
+    depends: &mut Dependencies,
+) {
+    let Some(list) = b.list(r, k, 20) else {
+        return;
+    };
+    let mut ids = vec![];
+    for (i, d) in list.iter().enumerate() {
+        let field = format!("{k}.{i}");
+        if let Some(d) = b.text(sized(d, &field, 512), Some(d), 512) {
+            depends.push((k, d.to_owned()));
+            ids.push(id::<objects::Unit>(d));
+        }
+    }
+    p.insert(k.into(), json!(ids));
 }
 /// The clauses the entries `<path>#R<n>` of `specs` name in the unit's own `repository`, each once, in the
 /// entries' order, as references of type `clause` (R43); none without a repository.
@@ -979,6 +1049,9 @@ fn page_size(call: &work::Call, op: &str, p: &Value) -> Result<(), Failure> {
         "add" => store::request_bytes(call, &add_action(p)?),
         "amend" => store::request_bytes(call, &amend_action(p)?),
         "drop" => store::request_bytes(call, &drop_action(p)?),
+        "defer" => store::request_bytes(call, &defer_action(p)?),
+        "undefer" => store::request_bytes(call, &undefer_action(p)?),
+        "used" => store::request_bytes(call, &use_action(p)?),
         _ => {
             let unit = id_member(p, "unit");
             let ready = actions::ReadyUnit {
@@ -1010,6 +1083,8 @@ fn members(op: &str) -> String {
         "add" => format!("unit lane intent origin {PAGE}"),
         "amend" => format!("unit {PAGE}"),
         "ready" => "unit".into(),
+        "defer" | "undefer" => "unit by".into(),
+        "used" => "unit evidence".into(),
         _ => "unit reason".into(),
     }
 }
@@ -1053,6 +1128,20 @@ fn write(
                 vec![],
             )
         }
+        "defer" | "undefer" => {
+            let by = b.text(sized(&r["by"], "by", 512), r.get("by"), 512);
+            let by = id::<objects::Request>(by.unwrap_or_default());
+            (json!({"unit": id::<objects::Unit>(key), "by": by}), vec![])
+        }
+        "used" => {
+            let evidence = sized(&r["evidence"], "evidence", EVIDENCE_BYTES);
+            let evidence = b.text(evidence, r.get("evidence"), EVIDENCE_BYTES);
+            let evidence = evidence.unwrap_or_default();
+            (
+                json!({"unit": id::<objects::Unit>(key), "evidence": evidence}),
+                vec![],
+            )
+        }
         _ => (json!({"unit": id::<objects::Unit>(key)}), vec![]),
     };
     if let Some((first, all)) = b.refusal() {
@@ -1088,7 +1177,8 @@ fn write(
     if op == "add" {
         plain_writes_protected(p["class"].as_str(), &patterns(p.get("write_set")))?;
     }
-    // `amend` and `drop` of a unit the store does not have: the actions would answer another refusal.
+    // `amend`, `drop`, `defer`, `undefer` and `used` of a unit the store does not have: the actions would
+    // answer another refusal.
     let mut revision = None;
     if op != "add" {
         let Some((read, stored)) = at(store::head_of::<objects::Unit>(s, store, key), "unit")?
@@ -1116,9 +1206,9 @@ fn write(
             page_size(&call, op, &p)?;
         }
     }
-    for d in &depends {
-        if at(store::get_of::<objects::Unit>(s, store, d), "depends_on")?.is_none() {
-            return Err(fail("unknown_dependency", "depends_on", json!(d)));
+    for (list, d) in &depends {
+        if at(store::get_of::<objects::Unit>(s, store, d), list)?.is_none() {
+            return Err(fail("unknown_dependency", list, json!(d)));
         }
     }
     let applied = match op {
@@ -1128,6 +1218,9 @@ fn write(
             let call = work::Call { expected, ..call };
             (amend_action(&p)).and_then(|a| store::apply_action(s, store, &call, &a))
         }
+        "defer" => (defer_action(&p)).and_then(|a| store::apply_action(s, store, &call, &a)),
+        "undefer" => (undefer_action(&p)).and_then(|a| store::apply_action(s, store, &call, &a)),
+        "used" => (use_action(&p)).and_then(|a| store::apply_action(s, store, &call, &a)),
         _ => (drop_action(&p)).and_then(|a| store::apply_action(s, store, &call, &a)),
     };
     let applied = match at(applied, op) {
@@ -1138,6 +1231,10 @@ fn write(
     };
     *after = Some(op.to_owned());
     let back = read_back(s, store, key)?;
+    if ["defer", "undefer", "used"].contains(&op) {
+        // The deferral and the use answer the unit, the outcome and the state as read back (R50).
+        return Ok(json!({"unit": key, "outcome": applied.outcome, "state": back["state"]}));
+    }
     let mut answer = json!({"unit": key, "outcome": applied.outcome, "state": back["state"],
         "amended_at": back["amended_at"]});
     if op == "amend" {
