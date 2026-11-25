@@ -15,6 +15,28 @@ case "$mode" in
   all|content|lint|test) ;;
   *) echo "usage: ./check [all|content|lint|test]" >&2; exit 2 ;;
 esac
+# The declared skips (ci/skips.json, specs/ap/check.md R22): a step that cannot run here appends its row's id as one
+# line to the file CHECK_SKIPS names, and the line `check: skipped <id> ...` before the last line names them. The file
+# lies in a directory of its own, so that a step under sudo appends to it too (fs.protected_regular refuses root's
+# append to another user's file in /tmp). The re-exec under the lock keeps the file of the first process, known by
+# CHECK_SKIPS_KEEP, which it removes from its environment before its first step; any other ./check makes its own.
+# Only a file of the form this script makes is kept, so the removal at the exit never takes another directory.
+if [ -n "${CHECK_SKIPS_KEEP:-}" ] && [ "$CHECK_SKIPS_KEEP" = "${CHECK_SKIPS:-}" ] && [ -f "$CHECK_SKIPS" ] \
+  && [[ "$(basename -- "$(dirname -- "$CHECK_SKIPS")")/$(basename -- "$CHECK_SKIPS")" == check-skips.*/ids.* ]]; then
+  skips_dir=$(dirname -- "$CHECK_SKIPS")
+else
+  skips_dir=$(mktemp -d "${TMPDIR:-/tmp}/check-skips.XXXXXXXX")
+  CHECK_SKIPS=$(mktemp "$skips_dir/ids.XXXXXXXX")
+fi
+unset CHECK_SKIPS_KEEP
+export CHECK_SKIPS
+trap 'rm -rf -- "$skips_dir"' EXIT
+# The line of the skips, each id once in the order of its first line; nothing when no step skipped.
+say_skips() {
+  local ids
+  ids=$(awk 'NF && !seen[$0]++' "$CHECK_SKIPS" | paste -sd ' ' -)
+  if [ -n "$ids" ]; then echo "check: skipped $ids"; fi
+}
 
 if [ "$mode" != test ]; then
 python3 -I -B ci/check-content.py
@@ -26,6 +48,8 @@ python3 -I -B ci/check-map.py crates/ ci/ content/ deploy/ evals/ github/ ontolo
 python3 -I -B ci/check-spec-trace.py
 # The work schema declares no action type and no view that the code, the content and the host's scripts do not name.
 python3 -I -B ci/check-schema-use.py
+# Every skip site appends a declared id of ci/skips.json, and every declared id has its site.
+python3 -I -B ci/skips.py declared
 # Every ci/test_*.py in sorted order, but those that build their stores with the engine: each of these has a step
 # of its own after the build.
 after_build="test_lesson_replay.py test_intake_suite.py test_cases_engine.py"
@@ -34,7 +58,7 @@ for test in $(cd ci && printf '%s\n' test_*.py | LC_ALL=C sort); do
   python3 -I -B -m unittest discover -s ci -p "$test"
 done
 fi
-if [ "$mode" = content ]; then echo "check: ok (content)"; exit 0; fi
+if [ "$mode" = content ]; then say_skips; echo "check: ok (content)"; exit 0; fi
 
 if [ "${CI:-}" != true ] && [ -z "${CHECK_LOCKED:-}" ]; then
   lock=${HOST_CARGO_LOCK:-/var/lib/agent-platform/build.lock}
@@ -45,6 +69,7 @@ if [ "${CI:-}" != true ] && [ -z "${CHECK_LOCKED:-}" ]; then
       exit 3
     fi
     export CHECK_LOCKED=1 CARGO_INCREMENTAL=0 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0
+    export CHECK_SKIPS_KEEP="${CHECK_SKIPS:-}"
     export CARGO_BUILD_JOBS="${CARGO_BUILD_JOBS:-2}" RUST_TEST_THREADS="${RUST_TEST_THREADS:-2}"
     exec flock "$lock" "$self" "$@"
   fi
@@ -64,12 +89,12 @@ if [ "$mode" != test ]; then
   cargo fmt --all -- --check
   CARGO_BUILD_WARNINGS=deny cargo clippy --workspace --all-targets --locked
 fi
-if [ "$mode" = lint ]; then echo "check: ok (lint)"; exit 0; fi
+if [ "$mode" = lint ]; then say_skips; echo "check: ok (lint)"; exit 0; fi
 # The review tests need a private root that this check creates and removes.
 AP_S03_TEST_ROOT=$(mktemp -d "$PWD/.ap-rust-test.XXXXXXXX")
 export AP_S03_TEST_ROOT
 chmod 0700 "$AP_S03_TEST_ROOT"
-trap 'rmdir -- "$AP_S03_TEST_ROOT"' EXIT
+trap 'rm -rf -- "$skips_dir"; rmdir -- "$AP_S03_TEST_ROOT"' EXIT
 cargo test --workspace --locked
 # `ap run` against the real systemd: skipped, saying so, where systemctl is absent or this caller
 # cannot start a transient unit in the system manager (the hosted runner is not root).
@@ -82,7 +107,7 @@ bash ci/host-run-scope.sh "${CARGO_TARGET_DIR:-$PWD/target}/debug/ap"
 # the host's work directory; the rehearsal reads fixture files of the repository (ontology/fixtures/work) that it
 # copies under its own temporary root, and makes nothing under /home/palantirkc/work.
 if [ "${CI:-}" = true ] && [ "$(id -u)" != 0 ]; then
-  sudo env "PATH=$PATH" GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=safe.directory "GIT_CONFIG_VALUE_0=$PWD" \
+  sudo env "PATH=$PATH" "CHECK_SKIPS=$CHECK_SKIPS" GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=safe.directory "GIT_CONFIG_VALUE_0=$PWD" \
     bash ontology/rehearsal.sh "$ont_bin" > /dev/null
 else
   bash ontology/rehearsal.sh "$ont_bin" > /dev/null
@@ -99,16 +124,16 @@ engine_tests=$(cargo test --locked -p ap --test route_engine --test clause --tes
 [ "$(printf '%s\n' "$engine_tests" | grep -c .)" = 6 ] || { echo "engine_tests_missing@check" >&2; exit 1; }
 for route_tests in $engine_tests; do
   if [ "${CI:-}" = true ] && [ "$(id -u)" != 0 ]; then
-    sudo env "PATH=$PATH" "ONT_BIN=$ont_bin" "$route_tests" --ignored --test-threads=1 --quiet
+    sudo env "PATH=$PATH" "ONT_BIN=$ont_bin" "CHECK_SKIPS=$CHECK_SKIPS" "$route_tests" --ignored --test-threads=1 --quiet
   else
     ONT_BIN="$ont_bin" "$route_tests" --ignored --test-threads=1 --quiet
   fi
 done
 # The tests of evals/lesson/replay, of evals/intake/run and of evals/cases build their stores with that engine (which also admits only uid 0).
 if [ "${CI:-}" = true ] && [ "$(id -u)" != 0 ]; then
-  sudo env "ONT_BIN=$ont_bin" python3 -I -B -m unittest discover -s ci -p 'test_lesson_replay.py'
-  sudo env "ONT_BIN=$ont_bin" python3 -I -B -m unittest discover -s ci -p 'test_intake_suite.py'
-  sudo env "ONT_BIN=$ont_bin" python3 -I -B -m unittest discover -s ci -p 'test_cases_engine.py'
+  sudo env "ONT_BIN=$ont_bin" "CHECK_SKIPS=$CHECK_SKIPS" python3 -I -B -m unittest discover -s ci -p 'test_lesson_replay.py'
+  sudo env "ONT_BIN=$ont_bin" "CHECK_SKIPS=$CHECK_SKIPS" python3 -I -B -m unittest discover -s ci -p 'test_intake_suite.py'
+  sudo env "ONT_BIN=$ont_bin" "CHECK_SKIPS=$CHECK_SKIPS" python3 -I -B -m unittest discover -s ci -p 'test_cases_engine.py'
 else
   ONT_BIN="$ont_bin" python3 -I -B -m unittest discover -s ci -p 'test_lesson_replay.py'
   ONT_BIN="$ont_bin" python3 -I -B -m unittest discover -s ci -p 'test_intake_suite.py'
@@ -122,5 +147,6 @@ if [ "${CI:-}" = true ] && { [ -e /home/palantirkc/work ] || [ -L /home/palantir
   echo "work_directory_exists@check: /home/palantirkc/work was made during the check" >&2
   exit 1
 fi
-if [ "$mode" = test ]; then echo "check: ok (test)"; exit 0; fi
+if [ "$mode" = test ]; then say_skips; echo "check: ok (test)"; exit 0; fi
+say_skips
 echo "check: ok"

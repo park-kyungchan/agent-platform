@@ -200,6 +200,7 @@ if HOST.exists():
                 fail("agents_path_missing", f"AGENTS.md:{number}", f"{path}: name a path that exists, or write it as a pattern (<name> or *)")
 else:
     print(f"agents paths: skipped, {HOST} is absent (not this host)")
+    with open(os.environ.get("CHECK_SKIPS") or os.devnull, "a", encoding="utf-8") as skips: skips.write("content-agents-paths\n")
 
 # The route table of the design sources (OFFICIAL-DOCS.md section 4): every line range inside its file. The corpus is on
 # the host only, so this runs where it is present (./check on the host) and is skipped in GitHub's CI.
@@ -235,6 +236,9 @@ if CORPUS.is_dir() and len(section) == 2:
                 if not (1 <= int(first) <= int(last) <= lines):
                     fail("design_route_out_of_range", ROUTES, f"{current}:{first}-{last} (the file has {lines} lines)")
     print(f"design routes: {checked} line ranges checked against {CORPUS}")
+if not CORPUS.is_dir():
+    print(f"corpus routes: skipped, {CORPUS} is absent")
+    with open(os.environ.get("CHECK_SKIPS") or os.devnull, "a", encoding="utf-8") as skips: skips.write("content-corpus-routes\n")
 
 for e in errors:
     print(e)

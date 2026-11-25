@@ -6719,3 +6719,144 @@ fn gh_retry_a_404_stops_at_once() {
     f.stopped("github_unreadable");
     assert_eq!(f.gh_flaky, ["HTTP 503"]);
 }
+
+impl F {
+    /// `ci/skips.json` on `main` with `text`.
+    fn seed_skips(&self, text: &str) {
+        let seed = self.t.join("seed");
+        std::fs::create_dir_all(seed.join("ci")).unwrap();
+        std::fs::write(seed.join("ci/skips.json"), text).unwrap();
+        git(&seed, &["add", "-A"]);
+        git(&seed, &["commit", "--quiet", "-m", "invented skips"]);
+        let origin = self.t.join("origin.git");
+        git(
+            &seed,
+            &["push", "--quiet", origin.to_str().unwrap(), "main"],
+        );
+    }
+}
+/// A table of one declared skip that covers `covers` and runs on `runs_on`.
+fn skips_table(covers: &str, runs_on: &str) -> String {
+    json!({"rows": [{"id": "invented-skip", "file": "ci/invented.sh", "covers": [covers],
+        "runs_on": runs_on, "how": "bash ci/invented.sh"}]})
+    .to_string()
+}
+
+// spec: specs/ap/unit-run.md#R49
+#[test]
+fn r49_a_head_is_guarded_by_skip_rows_of_the_base_and_the_head() {
+    let last = |f: &F| f.guarded_heads().last().cloned().map(|(_, g)| g);
+    // A changed path that meets the covers of a row not run in CI makes the head guarded; a row of
+    // `ci`, or one whose covers it does not meet, does not; with `vps-root` as with `vps`.
+    for (covers, runs_on, want) in [
+        ("src/widgets.rs", "vps", true),
+        ("src/**", "vps-root", true),
+        ("src/widgets.rs", "ci", false),
+        ("docs/**", "vps", false),
+    ] {
+        let mut f = F::new();
+        f.set_unit(json!({"class": "contract"}));
+        f.approval(json!({"contract": "lead", "guarded": ["ci/**"], "sample": 2}));
+        f.seed_skips(&skips_table(covers, runs_on));
+        f.steps(&["implement", "accept"]);
+        let (a, _) = f.ok();
+        assert_eq!(a["state"], "accepted", "{covers} {runs_on}: {a}");
+        assert_eq!(last(&f), Some(Some(json!(want))), "{covers} {runs_on}");
+        assert_eq!(f.unit()["guarded"], want, "{covers} {runs_on}");
+    }
+    // Without the policy's member nothing changes: no `guarded`, and a contract head is not held by it.
+    let mut f = F::new();
+    f.set_unit(json!({"class": "contract"}));
+    f.seed_skips(&skips_table("src/widgets.rs", "vps"));
+    f.steps(&["implement", "accept"]);
+    let (a, _) = f.ok();
+    assert_eq!(a["state"], "accepted", "{a}");
+    assert!(f.guarded_heads().iter().all(|(_, g)| g.is_none()));
+    // A head cannot free itself: removing the row, narrowing its covers or making it `ci` at the head
+    // leaves the base's row, which still counts.
+    for head_table in [
+        r#"{"rows": []}"#.to_owned(),
+        skips_table("docs/x", "vps"),
+        skips_table("src/widgets.rs", "ci"),
+    ] {
+        let mut f = F::new();
+        f.approval(json!({"contract": "lead", "guarded": ["docs/**"], "sample": 2}));
+        f.seed_skips(&skips_table("src/widgets.rs", "vps"));
+        let edit = format!("mkdir -p src; echo x > src/widgets.rs; printf '%s' '{head_table}' > ci/skips.json");
+        let (a, _) = f.edit("contract", json!(["src/**", "ci/**"]), &[], &edit);
+        assert_eq!(a["state"], "accepted", "{head_table}: {a}");
+        assert_eq!(last(&f), Some(Some(json!(true))), "{head_table}");
+    }
+    // A row the head adds counts as well.
+    let mut f = F::new();
+    f.approval(json!({"contract": "lead", "guarded": ["docs/**"], "sample": 2}));
+    let edit = format!(
+        "mkdir -p src ci; echo x > src/widgets.rs; printf '%s' '{}' > ci/skips.json",
+        skips_table("src/**", "vps")
+    );
+    let (a, _) = f.edit("contract", json!(["src/**", "ci/**"]), &[], &edit);
+    assert_eq!(a["state"], "accepted", "{a}");
+    assert_eq!(last(&f), Some(Some(json!(true))));
+    // A table that is not of its form, at the base or at the head, makes the head guarded.
+    for table in [
+        "invented\n".to_owned(),
+        r#"{"rows": [{"id": "Upper", "file": "ci/x.sh", "covers": ["docs/x"], "runs_on": "ci", "how": "x"}]}"#.to_owned(),
+        r#"{"rows": [{"id": "x", "file": "ci/x.sh", "covers": [], "runs_on": "ci", "how": "x"}]}"#.to_owned(),
+        r#"{"rows": [{"id": "x", "file": "ci/x.sh", "covers": ["docs/*"], "runs_on": "ci", "how": "x"}]}"#.to_owned(),
+        r#"{"rows": [{"id": "x", "file": "ci/x.sh", "covers": ["docs/x"], "runs_on": "pc", "how": "x"}]}"#.to_owned(),
+        r#"{"rows": [{"id": "x", "file": "ci/x.sh", "covers": ["docs/x"], "runs_on": "ci"}]}"#.to_owned(),
+        r#"{"rows": [], "more": 1}"#.to_owned(),
+    ] {
+        let mut f = F::new();
+        f.set_unit(json!({"class": "contract"}));
+        f.approval(json!({"contract": "lead", "guarded": ["docs/**"], "sample": 2}));
+        f.seed_skips(&table);
+        f.steps(&["implement", "accept"]);
+        let (a, _) = f.ok();
+        assert_eq!(a["state"], "accepted", "{table}: {a}");
+        assert_eq!(last(&f), Some(Some(json!(true))), "{table}");
+    }
+}
+
+// spec: specs/ap/unit-run.md#R50
+// spec: specs/ap/unit-run.md#R36
+#[test]
+fn r50_plain_stopped_by_skip_rows_on_a_path_they_cover() {
+    // A path that meets the covers of a row not run in CI is a protected path for a plain unit, with
+    // or without the policy's member.
+    for approval in [false, true] {
+        let mut f = F::new();
+        if approval {
+            f.approval(json!({"contract": "lead", "guarded": ["docs/**"], "sample": 2}));
+        }
+        f.seed_skips(&skips_table("src/widgets.rs", "vps"));
+        f.steps(&["implement", "accept"]);
+        let a = f.stopped("protected_path_changed");
+        let detail = a["stop_detail"].as_str().unwrap();
+        assert!(detail.contains("src/widgets.rs"), "{a}");
+        assert!(f.packets().is_empty());
+        assert_eq!(f.merges(), (0, 0));
+    }
+    // A row run in CI, or one whose covers the head does not meet, leaves the plain unit as before.
+    for (covers, runs_on) in [("src/widgets.rs", "ci"), ("docs/**", "vps")] {
+        let mut f = F::new();
+        f.seed_skips(&skips_table(covers, runs_on));
+        f.steps(&["implement", "accept"]);
+        let (a, status) = f.ok();
+        assert_eq!((a["state"].as_str(), status), (Some("merged"), 0), "{a}");
+    }
+    // A table that is not of its form stops it the same way, with the path ci/skips.json.
+    let mut f = F::new();
+    f.seed_skips("invented\n");
+    f.steps(&["implement", "accept"]);
+    let a = f.stopped("protected_path_changed");
+    let detail = a["stop_detail"].as_str().unwrap();
+    assert!(detail.contains("ci/skips.json") && !detail.contains("src/"), "{a}");
+    // A contract unit whose write set names the path goes on.
+    let mut f = F::new();
+    f.set_unit(json!({"class": "contract"}));
+    f.seed_skips(&skips_table("src/widgets.rs", "vps"));
+    f.steps(&["implement", "accept"]);
+    let (a, _) = f.ok();
+    assert_eq!(a["state"], "accepted", "{a}");
+}

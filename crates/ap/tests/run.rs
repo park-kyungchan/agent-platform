@@ -30,6 +30,19 @@ use std::{
     time::Instant,
 };
 
+/// The variable that names the file of the skips of `./check` (`specs/ap/check.md` R22).
+const CHECK_SKIPS: &str = "CHECK_SKIPS";
+/// A test that cannot run here notes its row's id (`ci/skips.json`) as one line of the file `var`
+/// names, when that is set and not empty (`specs/ap/check.md` R22).
+fn skipped(var: &str, id: &str) {
+    let Some(path) = std::env::var_os(var).filter(|p| !p.is_empty()) else {
+        return;
+    };
+    let options = std::fs::OpenOptions::new().append(true).create(true).open(path);
+    let mut file = options.expect(var);
+    std::io::Write::write_all(&mut file, format!("{id}\n").as_bytes()).expect(var);
+}
+
 mod roles_file;
 static NEXT: AtomicU32 = AtomicU32::new(0);
 const FAKE: &str = include_str!("fixtures/fake-claude.sh");
@@ -7006,6 +7019,7 @@ fn policy_the_member_quota_is_not_read_by_a_stage() {
 fn policy_the_built_binary_reads_the_file_the_variable_names() {
     if !Path::new("/run/systemd/system").is_dir() {
         eprintln!("skipped: systemd is not this host's init");
+        skipped(CHECK_SKIPS, "run-systemd");
         return;
     }
     use std::os::unix::ffi::{OsStrExt, OsStringExt};

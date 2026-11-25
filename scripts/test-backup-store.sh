@@ -258,6 +258,7 @@ AP_BACKUP_CONFIG= bash "$script" > /dev/null 2>&1; [ "$?" -eq 2 ] && ok "an empt
 # socket path is bounded), removed at exit with its agent.
 if [ -z "$realgpg" ]; then
   echo "skip round trip: gpg is not on PATH"
+  [ -z "${CHECK_SKIPS:-}" ] || echo backup-round-trip >> "$CHECK_SKIPS"
 else
   # /tmp when it is writable; else the scratch TMPDIR (a stage's view), where the path may be too long for the socket.
   gh=$(mktemp -d /tmp/bkgpg.XXXXXX 2> /dev/null || mktemp -d "${TMPDIR:-/tmp}/g.XXXXXX"); chmod 700 "$gh"

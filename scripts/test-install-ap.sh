@@ -242,11 +242,14 @@ path_passes_check() {
 # scratch repository, so its `git worktree prune` touches no real repository.
 if [[ -z "${HOME:-}" ]]; then
   printf 'skip build_dir_created build_dir_leftover_removed: HOME is unset\n'
+  [ -z "${CHECK_SKIPS:-}" ] || echo install-ap-build-dir >> "$CHECK_SKIPS"
 elif ! HOME_ROOT="$(mktemp -d -p "$HOME" 2>/dev/null)"; then
   HOME_ROOT=""
   printf 'skip build_dir_created build_dir_leftover_removed: mktemp -d under HOME failed\n'
+  [ -z "${CHECK_SKIPS:-}" ] || echo install-ap-build-dir >> "$CHECK_SKIPS"
 elif ! path_passes_check "$HOME_ROOT"; then
   printf 'skip build_dir_created build_dir_leftover_removed: the path of a directory under HOME fails the build base check\n'
+  [ -z "${CHECK_SKIPS:-}" ] || echo install-ap-build-dir >> "$CHECK_SKIPS"
 else
   SCRATCH_REPO="$HOME_ROOT/repo"
   mkdir -p "$SCRATCH_REPO/scripts"

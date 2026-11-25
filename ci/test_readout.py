@@ -49,6 +49,10 @@ class Readout(unittest.TestCase):
         old = datetime.datetime(2026, 11, 10, 11, tzinfo=datetime.timezone.utc).timestamp()  # the day before the window
         os.utime(self.tmp / "acct1" / "projects" / "p9" / "s-early.jsonl", (old, old))
         readout.run_gh = lambda repo, since, until: PRS.get(repo, [])
+        # The fixture's sessions under this test's temporary directory are temporary, as under /tmp, where the directory
+        # lies outside a stage; a stage's TMPDIR, and so the directory, lies elsewhere.
+        self.addCleanup(setattr, readout, "TEMP_ROOTS", readout.TEMP_ROOTS)
+        readout.TEMP_ROOTS = (*readout.TEMP_ROOTS, tempfile.gettempdir())
 
     def run_readout(self, *extra, lead_flag=True, stage_dirs=None):
         out = io.StringIO()

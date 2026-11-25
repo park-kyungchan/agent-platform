@@ -24,8 +24,13 @@ READ_BY_THE_CHECK = (
 TARGET = "runtime-references/NAMING.md"
 
 
-def run_check(root, corpus=None, host=None):
+def run_check(root, corpus=None, host=None, skips=None):
+    """The check on a scratch copy; it skips on purpose, so CHECK_SKIPS of a ./check around it is removed, and `skips`
+    names the file it appends to instead."""
     env = dict(os.environ, CONTENT_CHECK_CORPUS=str(corpus or (root / "no-corpus")), CONTENT_CHECK_HOST=str(host or (root / "no-host")))
+    env.pop("CHECK_SKIPS", None)
+    if skips is not None:
+        env["CHECK_SKIPS"] = str(skips)
     done = subprocess.run([sys.executable, "-I", "-B", str(root / "ci/check-content.py")], capture_output=True, text=True, timeout=120, env=env)
     return done.returncode, done.stdout
 
@@ -240,9 +245,19 @@ class PathsAndDesignRoutes(Scratch, unittest.TestCase):
     def test_without_the_corpus_the_routes_are_not_read(self):
         root = self.fixture()
         self.add_route(root, "| A question | `docs/area/one.md:2-50` | — |")
-        code, out = run_check(root)
+        skips = root / "skips"
+        skips.write_text("")
+        code, out = run_check(root, skips=skips)
         self.assertEqual(code, 0, out)
         self.assertNotIn("design routes:", out)
+        # The skip says so, and appends the ids of its rows of ci/skips.json (specs/ap/check.md R22).
+        self.assertIn(f"corpus routes: skipped, {root / 'no-corpus'} is absent", out)
+        self.assertEqual(skips.read_text(), "content-agents-paths\ncontent-corpus-routes\n")
+        # With the corpus, no such line and no id of it.
+        skips.write_text("")
+        code, out = run_check(root, self.corpus(root), skips=skips)
+        self.assertNotIn("corpus routes: skipped", out)
+        self.assertEqual(skips.read_text(), "content-agents-paths\n")
 
     def test_bare_ranges_and_several_ranges_in_a_cell_are_checked(self):
         root = self.fixture()

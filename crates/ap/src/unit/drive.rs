@@ -118,6 +118,69 @@ pub(super) fn protected(path: &str) -> bool {
         || protected_tree(&path)
         || config
 }
+/// The table of the declared skips of `./check` in a unit's repository (`specs/ap/check.md` R23).
+pub(super) const SKIPS: &str = "ci/skips.json";
+/// One row of `ci/skips.json` as the run reads it: its id, whether its `runs_on` is not `ci`, and its
+/// covers (`specs/ap/unit-run.md` R49).
+pub(super) type SkipRow = (String, bool, Vec<String>);
+/// The rows of a text of `ci/skips.json`, or `None` when the text is not of its form: exactly
+/// `{"rows": [...]}`, each row exactly `id` (lower-case letters, digits and hyphens, unique), `file`
+/// (an exact path of the write-set grammar), `covers` (1 to 20 patterns of that grammar), `runs_on`
+/// (`vps-root`, `vps` or `ci`) and `how` (one line, not blank) (`specs/ap/check.md` R23).
+pub(super) fn skip_rows(text: &str) -> Option<Vec<SkipRow>> {
+    let table: Value = serde_json::from_str(text).ok()?;
+    let table = table.as_object().filter(|m| m.len() == 1)?;
+    let mut seen = std::collections::BTreeSet::new();
+    let mut rows = vec![];
+    for row in table.get("rows")?.as_array()? {
+        let r = row.as_object().filter(|r| r.len() == 5)?;
+        let id = r.get("id")?.as_str()?;
+        let id_ok = !id.is_empty()
+            && (id.bytes()).all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'-');
+        if !id_ok || !seen.insert(id) {
+            return None;
+        }
+        let file = r.get("file")?.as_str()?;
+        if !review::write_set_pattern(file).grammar || file.ends_with("/**") {
+            return None;
+        }
+        let covers = r.get("covers")?.as_array()?;
+        if !(1..=20).contains(&covers.len()) {
+            return None;
+        }
+        let covers = (covers.iter())
+            .map(|c| c.as_str().filter(|c| review::write_set_pattern(c).grammar))
+            .map(|c| c.map(str::to_owned))
+            .collect::<Option<Vec<String>>>()?;
+        let runs_on = r.get("runs_on")?.as_str()?;
+        if !["vps-root", "vps", "ci"].contains(&runs_on) {
+            return None;
+        }
+        let how = r.get("how")?.as_str()?;
+        if how.trim().is_empty() || how.chars().any(char::is_control) {
+            return None;
+        }
+        rows.push((id.to_owned(), runs_on != "ci", covers));
+    }
+    Some(rows)
+}
+/// The changed paths that meet the covers of a row whose `runs_on` is not `ci`, the rows of the base
+/// and of the head taken together: an id of both counts when either is not `ci`, with the covers of
+/// both (R49, R50). `None` when the table of either is not of its form.
+pub(super) fn skip_hits<'p>(
+    at_base: Option<Vec<SkipRow>>,
+    at_head: Option<Vec<SkipRow>>,
+    paths: &[&'p str],
+) -> Option<Vec<&'p str>> {
+    let rows: Vec<SkipRow> = at_base?.into_iter().chain(at_head?).collect();
+    let host = |id: &str| rows.iter().any(|(i, h, _)| i == id && *h);
+    let covers: Vec<String> = (rows.iter())
+        .filter(|(id, _, _)| host(id))
+        .flat_map(|(_, _, c)| c.iter().cloned())
+        .collect();
+    let outside = review::outside(&covers, paths);
+    Some(paths.iter().filter(|p| !outside.contains(p)).copied().collect())
+}
 /// `gh pr merge` with `words`: `Err` with the redacted reply when it failed (no reply: empty).
 fn merge_call(s: &mut impl System, words: &str) -> Result<(), String> {
     match s.call("gh", &args(&w(words)), &Value::Null, 120_000) {
@@ -1781,7 +1844,7 @@ impl Run {
         let paths: Vec<&str> = diff.split_terminator('\0').collect();
         let set = self.u["write_set"].as_array().into_iter().flatten();
         let set: Vec<String> = set.filter_map(|p| p.as_str().map(str::to_owned)).collect();
-        let guarded = (self.approval.as_ref())
+        let by_policy = (self.approval.as_ref())
             .map(|a| review::outside(&a.guarded, &paths).len() != paths.len());
         let outside = review::outside(&set, &paths);
         if !outside.is_empty() {
@@ -1791,16 +1854,39 @@ impl Run {
                 json!({"paths": shown, "count": outside.len()}),
             );
         }
-        if self.u["class"] == "plain" {
-            let hit: Vec<&&str> = paths.iter().filter(|p| protected(p)).collect();
+        let plain = self.u["class"] == "plain";
+        // R49, R50: the rows of `ci/skips.json` at the base and at the head, read from the clone.
+        let skips = match plain || self.approval.is_some() {
+            true => {
+                let base = self.base.clone();
+                let at_base = self.skip_rows_at(s, &base)?;
+                let at_head = self.skip_rows_at(s, head)?;
+                Some(skip_hits(at_base, at_head, &paths))
+            }
+            false => None,
+        };
+        if plain {
+            let by_skip = |p: &str| matches!(&skips, Some(Some(h)) if h.contains(&p));
+            let mut hit: Vec<&str> = (paths.iter().copied())
+                .filter(|p| protected(p) || by_skip(p))
+                .collect();
+            if matches!(skips, Some(None)) && !hit.contains(&SKIPS) {
+                hit.push(SKIPS);
+            }
             if !hit.is_empty() {
-                let shown: Vec<&&&str> = hit.iter().take(10).collect();
+                let shown: Vec<&&str> = hit.iter().take(10).collect();
                 return stop(
                     "protected_path_changed",
                     json!({"paths": shown, "count": hit.len()}),
                 );
             }
         }
+        let by_skip = match &skips {
+            Some(Some(hit)) => !hit.is_empty(),
+            Some(None) => true,
+            None => false,
+        };
+        let guarded = by_policy.map(|g| g || by_skip);
         // R44: the lines the head adds, before the acceptance checks, the gate and the verifier.
         let notes = self.u["notes"].as_str().unwrap_or_default();
         if let Err(e) = scan::scan(s, wt, base, head, notes) {
@@ -1831,6 +1917,20 @@ impl Run {
         }
         self.clean_at(s, head)?;
         Ok(guarded)
+    }
+    /// The rows of `ci/skips.json` at `commit` in the clone (R49): none without the file, `None` when
+    /// it is not of its form (`specs/ap/check.md` R23) or is not a regular file there.
+    fn skip_rows_at(&self, s: &mut impl System, commit: &str) -> Step<Option<Vec<SkipRow>>> {
+        let clone = self.clone.as_str();
+        let listed = self.git(s, clone, &["ls-tree", "-z", commit, "--", SKIPS])?;
+        if listed.is_empty() {
+            return Ok(Some(vec![]));
+        }
+        if !listed.starts_with("100644 blob ") && !listed.starts_with("100755 blob ") {
+            return Ok(None);
+        }
+        let shown = review::git(s, clone, &["show", &format!("{commit}:{SKIPS}")]);
+        Ok(shown.ok().and_then(|text| skip_rows(&text)))
     }
     /// The required check on the hosting service, without the automatic reviewer (R17).
     fn gate(&mut self, s: &mut impl System, number: u64, head: &str) -> Step {
