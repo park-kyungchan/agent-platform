@@ -1386,6 +1386,84 @@ fn d3_same_content_failed_build_is_failed_restored() {
     assert_eq!(w.launched(), ["ap"]);
 }
 
+/// A failed install keeps the tail of what the failed installer wrote: `<state>/output/<key>.log`,
+/// mode 0600 in a directory 0700, at most 65,536 bytes, the files beyond the 20 newest removed first;
+/// the record names the path, and no text of it is in the record or the store.
+// spec: specs/ap/deliver.md#R65
+#[test]
+fn failed_install_keeps_output() {
+    use std::os::unix::fs::{MetadataExt, PermissionsExt};
+    let mut w = W::new();
+    let dir = w.t.join("state/output");
+    std::fs::create_dir_all(&dir).unwrap();
+    let base = std::time::SystemTime::now() - std::time::Duration::from_secs(10_000);
+    for n in 0..22u64 {
+        let f = std::fs::File::create(dir.join(format!("old-{n:02}.log"))).unwrap();
+        f.set_modified(base + std::time::Duration::from_secs(n * 10))
+            .unwrap();
+    }
+    let ap = w.inst.get_mut("ap").unwrap();
+    let noise = "x".repeat(70_000);
+    (ap.file, ap.exit) = (None, 1);
+    ap.out = "stdout line\n".into();
+    ap.err = format!("{noise}error[E0432]: unresolved import\nbuild_failed@install-ap.sh:151\n");
+    let (v, exit) = w.run();
+    assert_eq!(
+        (end(&v), exit),
+        (("failed_restored", "build_failed"), 3),
+        "{v}"
+    );
+    let key = format!("act-ap.{}.1", c(2));
+    let path = w.p(&format!("state/output/{key}.log"));
+    assert_eq!(v["output"], json!(path), "{v}");
+    assert_eq!(w.last().as_ref(), Some(&v));
+    let kept = std::fs::read_to_string(&path).unwrap();
+    assert_eq!(kept.len(), 65_536);
+    assert!(kept.ends_with("error[E0432]: unresolved import\nbuild_failed@install-ap.sh:151\n"));
+    assert!(!kept.contains("stdout line"));
+    assert_eq!(std::fs::metadata(&path).unwrap().mode() & 0o777, 0o600);
+    assert_eq!(
+        std::fs::metadata(&dir).unwrap().permissions().mode() & 0o777,
+        0o700
+    );
+    // The 20 newest of the earlier files stay, the two oldest go, and the new file is the 21st.
+    let mut names: Vec<String> = std::fs::read_dir(&dir)
+        .unwrap()
+        .map(|e| e.unwrap().file_name().into_string().unwrap())
+        .collect();
+    names.sort();
+    assert_eq!(names.len(), 21, "{names:?}");
+    assert!(!names.contains(&"old-00.log".to_owned()) && !names.contains(&"old-01.log".to_owned()));
+    assert!(names.contains(&"old-02.log".to_owned()) && names.contains(&format!("{key}.log")));
+    // Nothing of the text is in the record or in any call to the store.
+    assert!(!v.to_string().contains("unresolved import"));
+    assert!(
+        w.calls
+            .iter()
+            .all(|(_, _, b)| !b.to_string().contains("unresolved import"))
+    );
+}
+
+/// An attempt that ends installed keeps no file and has `output` null; so does a call refused before
+/// its installers ran.
+// spec: specs/ap/deliver.md#R65
+#[test]
+fn installed_keeps_no_output() {
+    let mut w = W::new();
+    let ap = w.inst.get_mut("ap").unwrap();
+    (ap.out, ap.err) = ("compiling\n".into(), "warning: noise\n".into());
+    let (v, exit) = w.run();
+    assert_eq!((end(&v), exit), (("installed", ""), 0), "{v}");
+    assert_eq!(v["output"], Value::Null);
+    assert!(!w.t.join("state/output").exists());
+    let mut w = W::new();
+    w.free = 1;
+    let (v, _) = w.run();
+    assert_eq!(end(&v), ("refused", "disk_low"), "{v}");
+    assert_eq!(v["output"], Value::Null);
+    assert!(!w.t.join("state/output").exists());
+}
+
 /// The file is at the tip and the content installer refuses or fails and restores: the tree it
 /// leaves passes the tip's manifest too, so the pair is at the tip.
 // spec: specs/ap/deliver.md#R15
@@ -2845,7 +2923,7 @@ fn d2_exit_codes_of_the_limits() {
 
 // ---- D7 the record -----------------------------------------------------------------------------
 
-const MEMBERS: [&str; 19] = [
+const MEMBERS: [&str; 20] = [
     "at",
     "by",
     "repository",
@@ -2865,6 +2943,7 @@ const MEMBERS: [&str; 19] = [
     "index",
     "closed",
     "units",
+    "output",
 ];
 fn members(v: &Value) -> Vec<String> {
     let mut keys: Vec<String> = v.as_object().unwrap().keys().cloned().collect();
