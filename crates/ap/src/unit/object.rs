@@ -37,6 +37,17 @@ const TEXTS: [(&str, usize); 9] = [
 ];
 /// The page properties `amend` takes; `add` takes `lane`, `intent` and `origin` too.
 const PAGE: &str = "class objective interface invariants acceptance not_built write_set read_first specs notes verifier_questions report repository branch implementer verifier estimate_lines depends_on wave kind use depends_delivered";
+/// The members of a request that the unit's block of the plan is built from (R52).
+const PLAN_FIELDS: [&str; 6] = [
+    "objective",
+    "depends_on",
+    "write_set",
+    "specs",
+    "class",
+    "repository",
+];
+/// The most bytes of a design record (R53).
+const DESIGN_BYTES: u64 = 60_000;
 /// The most bytes of `use` (R47) and of the evidence of `used` (R50).
 const USE_BYTES: usize = 600;
 const EVIDENCE_BYTES: usize = 1000;
@@ -789,6 +800,7 @@ fn add_action(p: &Value) -> Result<actions::AddUnit, Failure> {
         objective: required(text_of(p, "objective"), "objective")?,
         origin: id_member(p, "origin"),
         page_digest: text_of(p, "page_digest").map(values::Sha256Hex),
+        plan_digest: text_of(p, "plan_digest").map(values::Sha256Hex),
         read_first: texts_of(p, "read_first"),
         report: text_of(p, "report"),
         repository: text_of(p, "repository"),
@@ -839,6 +851,7 @@ fn amend_action(p: &Value) -> Result<actions::AmendUnit, Failure> {
         notes: text_of(p, "notes"),
         objective: text_of(p, "objective"),
         page_digest: values::Sha256Hex(required(text_of(p, "page_digest"), "page_digest")?),
+        plan_digest: text_of(p, "plan_digest").map(values::Sha256Hex),
         read_first: texts_of(p, "read_first"),
         report: text_of(p, "report"),
         repository: text_of(p, "repository"),
@@ -1168,6 +1181,10 @@ fn write(
         _ => {}
     }
     page_size(&call, op, &p)?;
+    // The digest of the unit's block of the plan, added after the size is measured (R52).
+    if op == "add" {
+        p["plan_digest"] = json!(render::plan_digest(key, &p));
+    }
     if lead_in_environment(s) {
         return Err(error("role_in_environment", "ONT_ROLE"));
     }
@@ -1206,6 +1223,11 @@ fn write(
             }
             p["page_digest"] = json!(render::page_digest(key, &page));
             page_size(&call, op, &p)?;
+            // The block of the plan as the amendment leaves it, when the unit has a digest or the request
+            // gives a field of the block; else none, and the unit keeps the rule without one (R52).
+            if stored["plan_digest"].is_string() || PLAN_FIELDS.iter().any(|k| r.get(k).is_some()) {
+                p["plan_digest"] = json!(render::plan_digest(key, &page));
+            }
             routed = page;
         }
     }
@@ -1279,6 +1301,7 @@ fn ready(
             let detail = json!({"digest": digest, "stored": stored});
             return Err(fail("page_digest_differs", "unit", detail));
         }
+        design_reviewed(s, store, &u)?;
         if (u["class"] == "contract" || u["class"] == "effect")
             && !accepted_page(s, store, key, &digest)?
         {
@@ -1311,6 +1334,60 @@ fn ready(
         json!({"unit": key, "outcome": applied.outcome, "state": back["state"], "base": base,
         "checks": checks}),
     )
+}
+/// A draft unit of the lane `objective` whose intent names a design record: the record's bytes as read now have
+/// the digest the intent's last accepting plan review marked, else `design_not_reviewed` (R53).
+fn design_reviewed(s: &mut impl System, store: Option<&str>, u: &Value) -> Result<(), Failure> {
+    let intent = u["intent"]["native_key"].as_str().filter(|_| u["lane"] == "objective");
+    let Some(intent) = intent else {
+        return Ok(());
+    };
+    let read = at(store::get_of::<objects::Intent>(s, store, intent), "intent")?;
+    let Some(path) = read.as_ref().and_then(|i| i["design"].as_str()) else {
+        return Ok(());
+    };
+    let reviewed = read.as_ref().and_then(|i| i["plan_design"].as_str());
+    let now = design_record(path).ok().map(|r| crate::host::digest(r.as_bytes()));
+    match (now, reviewed) {
+        (Some(now), Some(reviewed)) if now == reviewed => Ok(()),
+        _ => Err(fail(
+            "design_not_reviewed",
+            "unit",
+            json!({"design": path, "reviewed": reviewed}),
+        )),
+    }
+}
+/// The design record at `path` (R53, `specs/ap/unit-review.md` R26): a regular file, a link as its last component
+/// not followed, valid UTF-8, at most 60,000 bytes; else the word of what it is: `absent`, `not_a_file`,
+/// `too_large`, `not_utf8` or `unreadable`. It is only read.
+pub(super) fn design_record(path: &str) -> Result<String, &'static str> {
+    use rustix::fs::{Mode, OFlags};
+    use std::io::ErrorKind;
+    let meta = std::fs::symlink_metadata(path).map_err(|e| match e.kind() {
+        ErrorKind::NotFound => "absent",
+        _ => "unreadable",
+    })?;
+    if !meta.file_type().is_file() {
+        return Err("not_a_file");
+    }
+    let flags = OFlags::RDONLY | OFlags::NOFOLLOW | OFlags::NONBLOCK | OFlags::CLOEXEC;
+    let fd = rustix::fs::open(path, flags, Mode::empty()).map_err(|e| match e {
+        rustix::io::Errno::NOENT => "absent",
+        rustix::io::Errno::LOOP => "not_a_file",
+        _ => "unreadable",
+    })?;
+    let file = std::fs::File::from(fd);
+    let meta = file.metadata().map_err(|_| "unreadable")?;
+    if !meta.file_type().is_file() {
+        return Err("not_a_file");
+    }
+    let mut bytes = vec![];
+    let read = file.take(DESIGN_BYTES + 1).read_to_end(&mut bytes);
+    read.map_err(|_| "unreadable")?;
+    if bytes.len() as u64 > DESIGN_BYTES {
+        return Err("too_large");
+    }
+    String::from_utf8(bytes).map_err(|_| "not_utf8")
 }
 /// Some review of kind `page` of the unit, closed `accept`, names `digest` as its head, whenever it
 /// started (R17, R21).

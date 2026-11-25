@@ -620,6 +620,16 @@ fn look_at(
     // The text and its digest, from the one read of the subject (R6, R7).
     let repository = text_of(&subject, "repository").filter(|_| look.page);
     let mut read_only = vec![];
+    let mut blocks = vec![];
+    // The design record the intent names, read once before the text is built (R26).
+    let design = match text_of(&subject, "design").filter(|_| !look.page) {
+        Some(path) => {
+            let record = object::design_record(&path);
+            let record = record.map_err(|why| fail("design_unreadable", "intent", json!(why)))?;
+            Some((path, record))
+        }
+        None => None,
+    };
     let (mut text, head, copy) = if look.page {
         let clone = repository.as_deref().map(|r| clone_of(s, r)).transpose()?;
         if let Some(clone) = &clone {
@@ -633,9 +643,11 @@ fn look_at(
             clone.zip(commit),
         )
     } else {
-        let (part, rest, clones) = plan(s, look.store, look.key, &subject)?;
-        read_only = clones;
-        let head = digest(part.as_bytes());
+        let at = design.as_ref().map(|(p, r)| (p.as_str(), r.as_str()));
+        let planned = plan(s, look.store, look.key, &subject, at)?;
+        (read_only, blocks) = (planned.clones, planned.blocks);
+        let head = digest(planned.part.as_bytes());
+        let (part, rest) = (planned.part, planned.rest);
         (format!("{part}\n{rest}\n{PLAN_REVIEWER}"), head, None)
     };
     // The checks `ap unit ready` runs on the base, at the commit the text names (R23).
@@ -824,7 +836,49 @@ fn look_at(
     remove_tree(&wd);
     let mut ending = judge(rec.as_ref(), &out, &head, look.actor.session);
     close(s, look, &review, &mut ending, "close", trace)?;
-    answer(s, look, (&review, &head, json!(round)), &ending, trace)
+    let mut a = answer(s, look, (&review, &head, json!(round)), &ending, trace)?;
+    if !look.page && ending.verdict == "accept" {
+        let record = design.as_ref().map(|(_, r)| digest(r.as_bytes()));
+        a.0["marks"] = marks(s, look, &review, &blocks, record);
+    }
+    Ok(a)
+}
+/// The marks of an accepted plan (R25): `mark_plan_reviewed` of every unit of the plan part with the digest of
+/// the block the text held, then `mark_design_reviewed` with the digest of the design record read. A mark
+/// refused or failed is named and changes neither the verdict nor the exit.
+fn marks(
+    s: &mut impl System,
+    look: &Look,
+    review: &str,
+    blocks: &[(String, String)],
+    design: Option<String>,
+) -> Value {
+    let (mut applied, mut failed) = (0, vec![]);
+    for (n, (unit, block)) in blocks.iter().enumerate() {
+        let action = actions::MarkPlanReviewed {
+            digest: values::Sha256Hex(block.clone()),
+            review: Id::new(review),
+            unit: Id::new(unit),
+        };
+        let call = look.actor.call(format!("{}-m{}", look.rid, n + 1));
+        match store::apply_action(s, look.store, &call, &action) {
+            Ok(_) => applied += 1,
+            Err(_) => failed.push(unit.clone()),
+        }
+    }
+    if let Some(digest) = design {
+        let action = actions::MarkDesignReviewed {
+            digest: values::Sha256Hex(digest),
+            intent: Id::new(look.key),
+            review: Id::new(review),
+        };
+        let call = look.actor.call(format!("{}-md", look.rid));
+        match store::apply_action(s, look.store, &call, &action) {
+            Ok(_) => applied += 1,
+            Err(_) => failed.push("design".into()),
+        }
+    }
+    json!({"applied": applied, "failed": failed})
 }
 /// The list read for `round` and the answer, kept for a refusal.
 fn reviews_of(s: &mut impl System, look: &Look, trace: &mut Trace) -> Result<Vec<Found>, Failure> {
@@ -1197,14 +1251,26 @@ fn dependencies(s: &mut impl System, store: Option<&str>, u: &Value) -> Result<S
     }
     Ok(out)
 }
-/// The plan part and the rest (`## Repositories`, `## States now`) of the intent `key` read as `intent` (R7).
-/// Also the clones its `## Repositories` names, in its order (R13).
+/// What the text of a plan review is built from (R7, R25, R26).
+struct Planned {
+    /// The plan part, whose digest is the review's head.
+    part: String,
+    /// `## Repositories` and `## States now`.
+    rest: String,
+    /// The clones `## Repositories` names, in its order (R13).
+    clones: Vec<String>,
+    /// Each unit of the plan part in its order, with the digest of its block (R25).
+    blocks: Vec<(String, String)>,
+}
+/// The plan part and the rest of the intent `key` read as `intent` (R7), with the section `## Design record`
+/// when the intent names one, its path and the bytes read (R26).
 fn plan(
     s: &mut impl System,
     store: Option<&str>,
     key: &str,
     intent: &Value,
-) -> Result<(String, String, Vec<String>), Failure> {
+    design: Option<(&str, &str)>,
+) -> Result<Planned, Failure> {
     let eq = |k: &str, v: Value| json!({"eq": [k, v]});
     let by = |o: &Found| {
         (
@@ -1266,32 +1332,28 @@ fn plan(
         );
         part.push_str(&ended_line(&line));
     }
+    if let Some((path, record)) = design {
+        part.push_str(&format!("\n## Design record\n\nPath: {path}\n-----\n"));
+        part.push_str(record);
+        if !record.ends_with('\n') {
+            part.push('\n');
+        }
+        part.push_str("-----\n");
+    }
     part.push_str("\n## Units\n");
     if placed.is_empty() {
         part.push_str("\nNo unit yet.\n");
     }
+    let mut blocks = vec![];
     for (i, (k, u)) in placed.iter().enumerate() {
         if i == cycle {
             part.push_str(&format!("\n{CYCLE}\n"));
         }
-        let field = |n: &str| text(u, n).unwrap_or_default().to_owned();
-        let repository = text(u, "repository").unwrap_or("no repository");
-        part.push_str(&format!(
-            "\n### {k}: {}, lane {}, {repository}\n\n",
-            field("class"),
-            field("lane")
-        ));
-        if let Some(o) = text(u, "objective") {
-            part.push_str(&ended_line(o));
-        }
-        let list = |n: &str| {
-            let l = u[n]
-                .as_array()
-                .into_iter()
-                .flatten()
-                .filter_map(Value::as_str);
-            l.collect::<Vec<_>>().join(", ")
-        };
+        // The unit's block, whose digest its mark carries (R25), then the lines the block leaves out.
+        let block = render::plan_block(k, u);
+        blocks.push((k.clone(), digest(block.as_bytes())));
+        part.push('\n');
+        part.push_str(&block);
         let tier = |n: &str| {
             let t = &u[n];
             let w = ["runtime", "model", "effort"].map(|m| t[m].as_str().unwrap_or_default());
@@ -1303,9 +1365,6 @@ fn plan(
         };
         let estimate = u["estimate_lines"].as_u64().map(|n| format!("{n} lines"));
         for (label, value) in [
-            ("Depends on", deps(u).join(", ")),
-            ("Write set", list("write_set")),
-            ("Specifications", list("specs")),
             ("Estimate", estimate.unwrap_or_default()),
             ("Implementer", tier("implementer")),
             ("Verifier", tier("verifier")),
@@ -1343,5 +1402,10 @@ fn plan(
             c["state"].as_str().unwrap_or_default()
         ));
     }
-    Ok((part, rest, clones))
+    Ok(Planned {
+        part,
+        rest,
+        clones,
+        blocks,
+    })
 }

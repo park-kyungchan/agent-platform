@@ -33,7 +33,8 @@ fn refused(v: Value) -> Answer {
     v["status"] = json!("refused");
     reply(false, v)
 }
-const WRITERS: [&str; 14] = [
+const WRITERS: [&str; 15] = [
+    "name_design",
     "draft_intent",
     "amend_intent",
     "answer_questions",
@@ -224,6 +225,10 @@ impl F {
                 need(routed("by", &p["intent"]), "by_not_routed_here");
             }
             "note_intent" => need(open, "intent_closed"),
+            "name_design" => {
+                need(open, "intent_closed");
+                need(p["design"] != "", "design_empty");
+            }
             "name_lead" => {
                 need(open, "intent_closed");
                 need(
@@ -425,6 +430,7 @@ impl F {
                     }
                     "answer_questions" => json!({"questions": p["questions"]}),
                     "note_intent" => json!({"notes": p["notes"]}),
+                    "name_design" => json!({"design": p["design"]}),
                     "name_lead" => json!({"lead_session": p["session"], "lead_named_by": p["by"]}),
                     "assume_intent" => json!({"status": "assumed", "assumed_reason": p["reason"]}),
                     "confirm_intent" => json!({"status": "confirmed", "confirmed_by": p["by"],

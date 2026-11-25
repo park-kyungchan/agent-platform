@@ -1,7 +1,7 @@
 {
   "format": "ontology-schema/v1",
   "domain": "work",
-  "version": 26,
+  "version": 27,
   "namespace": {
     "instance": "vps://palantirkc",
     "account": "root"
@@ -1186,7 +1186,9 @@
         "notes": {"type": "string", "required": false, "max_bytes": 4000, "description": "The Lead's free text for the next Lead: the state, the next step, where things are. Replaced whole by note_intent."},
         "closed_at": {"type": {"value_type": "utc_time"}, "required": false, "description": "When the intent was closed met or retired."},
         "closed_reason": {"type": "string", "required": false, "max_bytes": 600, "description": "Why it was closed: how the outcome was shown, or why it was retired."},
-        "principles": {"type": {"array": {"ref": "principle"}}, "required": false, "description": "The principles the intent obeys; set whole by set_intent_principles."}
+        "principles": {"type": {"array": {"ref": "principle"}}, "required": false, "description": "The principles the intent obeys; set whole by set_intent_principles."},
+        "design": {"type": "string", "required": false, "max_bytes": 300, "description": "The absolute path of the intent's design record, where it is (name_design); a plan review reads it."},
+        "plan_design": {"type": {"value_type": "sha256_hex"}, "required": false, "description": "The digest of the design record's bytes the last accepting plan review read (mark_design_reviewed)."}
       }
     },
     "principle": {
@@ -1277,7 +1279,9 @@
         "depends_delivered": {"type": {"array": {"ref": "unit"}}, "required": false, "description": "Units whose result must be delivered, not only merged, before this one starts."},
         "deferred_by": {"type": {"ref": "request"}, "required": false, "description": "The user's request that deferred the unit (defer_unit); while it is set the unit is not made ready."},
         "approved_by": {"type": {"value_type": "unit_approver"}, "required": false, "description": "Who approved approved_head: lead (approve_unit) or policy (approve_unit_by_policy)."},
-        "guarded": {"type": "boolean", "required": false, "description": "Whether the head changes a guarded path, as record_head last said; only false lets the policy approve."}
+        "guarded": {"type": "boolean", "required": false, "description": "Whether the head changes a guarded path, as record_head last said; only false lets the policy approve."},
+        "plan_digest": {"type": {"value_type": "sha256_hex"}, "required": false, "description": "The digest of the unit's block of the plan as add_unit or amend_unit left it."},
+        "plan_reviewed": {"type": {"value_type": "sha256_hex"}, "required": false, "description": "The plan_digest an accepting plan review read (mark_plan_reviewed)."}
       }
     },
     "run": {
@@ -1335,7 +1339,8 @@
         "intent": {"type": {"ref": "intent"}, "required": false, "description": "The intent it was planned into."},
         "subject": {"type": {"ref": "subject"}, "required": false, "description": "What the finding is about (open_finding, see_finding_again, reopen_finding); may name no object."},
         "reason": {"type": "string", "required": false, "max_bytes": 600, "description": "Why it was dismissed or closed."},
-        "ended_at": {"type": {"value_type": "utc_time"}, "required": false, "description": "When it was dismissed or closed."}
+        "ended_at": {"type": {"value_type": "utc_time"}, "required": false, "description": "When it was dismissed or closed."},
+        "prevented_by": {"type": "string", "required": false, "max_bytes": 300, "description": "What prevents the lesson from coming back (close_finding)."}
       }
     },
     "section": {
@@ -2293,6 +2298,20 @@
         {"modify_object": "intent", "set": {"notes": "$notes"}}
       ]
     },
+    "name_design": {
+      "description": "Name the design record of an open intent: the absolute path of the file where it is, which a plan review of the intent reads. Another path replaces it; the intent keeps its status and its confirmation.",
+      "parameters": {
+        "intent": {"type": {"ref": "intent"}, "required": true, "description": "The intent: its full Id, with the intent's key as native_key."},
+        "design": {"type": "string", "required": true, "max_bytes": 300, "description": "The absolute path of the design record."}
+      },
+      "submission_criteria": [
+        {"code": "intent_closed", "message": "Name an intent that exists and is neither met nor retired; for new work draft a new intent.", "all": [{"exists": "$intent"}, {"none": [{"in": ["$intent.status", ["met", "retired"]]}]}]},
+        {"code": "design_empty", "message": "Give the path of the design record.", "all": [{"ne": ["$design", ""]}]}
+      ],
+      "rules": [
+        {"modify_object": "intent", "set": {"design": "$design"}}
+      ]
+    },
     "name_lead": {
       "description": "Record the session that leads an open intent, named by the user's request routed to it.",
       "parameters": {
@@ -2467,7 +2486,8 @@
         "page_digest": {"type": {"value_type": "sha256_hex"}, "required": false, "description": "The digest of the page as this action leaves it (ap unit page <key> --digest)."},
         "kind": {"type": {"value_type": "unit_kind"}, "required": false, "description": "What the unit changes: rust, schema, instructions, removal, script, typescript, config or import."},
         "use": {"type": "string", "required": false, "max_bytes": 600, "description": "The real run that shows the first use of the result; \"none:\" and the reason where there is none."},
-        "depends_delivered": {"type": {"array": {"ref": "unit"}}, "required": false, "description": "Units whose result must be delivered, not only merged, before this one starts."}
+        "depends_delivered": {"type": {"array": {"ref": "unit"}}, "required": false, "description": "Units whose result must be delivered, not only merged, before this one starts."},
+        "plan_digest": {"type": {"value_type": "sha256_hex"}, "required": false, "description": "The digest of the unit's block of the plan as this action leaves it; absent keeps the stored value."}
       },
       "submission_criteria": [
         {"code": "intent_required", "message": "A unit of the lane objective names its intent.", "none": [{"all": [{"eq": ["$lane", "objective"]}, {"none": [{"present": "$intent"}]}]}]},
@@ -2481,7 +2501,7 @@
         {"code": "depends_on_itself", "message": "Remove the unit itself from depends_on.", "none": [{"all": [{"present": "$depends_on"}, {"in": ["$unit", "$depends_on"]}]}]}
       ],
       "rules": [
-        {"create_object": "unit", "set": {"lane": "$lane", "class": "$class", "intent": "$intent", "origin": "$origin", "objective": "$objective", "interface": "$interface", "invariants": "$invariants", "acceptance": "$acceptance", "not_built": "$not_built", "write_set": "$write_set", "read_first": "$read_first", "specs": "$specs", "notes": "$notes", "verifier_questions": "$verifier_questions", "report": "$report", "repository": "$repository", "branch": "$branch", "implementer": "$implementer", "verifier": "$verifier", "estimate_lines": "$estimate_lines", "depends_on": "$depends_on", "clauses": "$clauses", "wave": "$wave", "page_digest": "$page_digest", "kind": "$kind", "use": "$use", "depends_delivered": "$depends_delivered", "state": "draft", "rounds": 0, "writers": [], "added_at": "$now", "amended_at": "$now"}}
+        {"create_object": "unit", "set": {"lane": "$lane", "class": "$class", "intent": "$intent", "origin": "$origin", "objective": "$objective", "interface": "$interface", "invariants": "$invariants", "acceptance": "$acceptance", "not_built": "$not_built", "write_set": "$write_set", "read_first": "$read_first", "specs": "$specs", "notes": "$notes", "verifier_questions": "$verifier_questions", "report": "$report", "repository": "$repository", "branch": "$branch", "implementer": "$implementer", "verifier": "$verifier", "estimate_lines": "$estimate_lines", "depends_on": "$depends_on", "clauses": "$clauses", "wave": "$wave", "page_digest": "$page_digest", "kind": "$kind", "use": "$use", "depends_delivered": "$depends_delivered", "plan_digest": "$plan_digest", "state": "draft", "rounds": 0, "writers": [], "added_at": "$now", "amended_at": "$now"}}
       ]
     },
     "amend_unit": {
@@ -2511,7 +2531,8 @@
         "page_digest": {"type": {"value_type": "sha256_hex"}, "required": true, "description": "The digest of the page as this action leaves it (ap unit page <key> --digest)."},
         "kind": {"type": {"value_type": "unit_kind"}, "required": false, "description": "What the unit changes: rust, schema, instructions, removal, script, typescript, config or import."},
         "use": {"type": "string", "required": false, "max_bytes": 600, "description": "The real run that shows the first use of the result; \"none:\" and the reason where there is none."},
-        "depends_delivered": {"type": {"array": {"ref": "unit"}}, "required": false, "description": "Units whose result must be delivered, not only merged, before this one starts."}
+        "depends_delivered": {"type": {"array": {"ref": "unit"}}, "required": false, "description": "Units whose result must be delivered, not only merged, before this one starts."},
+        "plan_digest": {"type": {"value_type": "sha256_hex"}, "required": false, "description": "The digest of the unit's block of the plan as this action leaves it; absent keeps the stored value."}
       },
       "submission_criteria": [
         {"code": "unit_not_amendable", "message": "Only a draft, ready or stopped unit is amended; stop a running one first (stop_unit).", "all": [{"exists": "$unit"}, {"in": ["$unit.state", ["draft", "ready", "stopped"]]}]},
@@ -2520,7 +2541,7 @@
         {"code": "depends_on_itself", "message": "Remove the unit itself from depends_on.", "none": [{"all": [{"present": "$depends_on"}, {"in": ["$unit", "$depends_on"]}]}]}
       ],
       "rules": [
-        {"modify_object": "unit", "set": {"class": "$class", "objective": "$objective", "interface": "$interface", "invariants": "$invariants", "acceptance": "$acceptance", "not_built": "$not_built", "write_set": "$write_set", "read_first": "$read_first", "specs": "$specs", "notes": "$notes", "verifier_questions": "$verifier_questions", "report": "$report", "repository": "$repository", "branch": "$branch", "implementer": "$implementer", "verifier": "$verifier", "estimate_lines": "$estimate_lines", "depends_on": "$depends_on", "clauses": "$clauses", "wave": "$wave", "page_digest": "$page_digest", "kind": "$kind", "use": "$use", "depends_delivered": "$depends_delivered", "state": "draft", "amended_at": "$now"}}
+        {"modify_object": "unit", "set": {"class": "$class", "objective": "$objective", "interface": "$interface", "invariants": "$invariants", "acceptance": "$acceptance", "not_built": "$not_built", "write_set": "$write_set", "read_first": "$read_first", "specs": "$specs", "notes": "$notes", "verifier_questions": "$verifier_questions", "report": "$report", "repository": "$repository", "branch": "$branch", "implementer": "$implementer", "verifier": "$verifier", "estimate_lines": "$estimate_lines", "depends_on": "$depends_on", "clauses": "$clauses", "wave": "$wave", "page_digest": "$page_digest", "kind": "$kind", "use": "$use", "depends_delivered": "$depends_delivered", "plan_digest": "$plan_digest", "state": "draft", "amended_at": "$now"}}
       ]
     },
     "ready_unit": {
@@ -2539,13 +2560,43 @@
         {"code": "intent_not_open_for_units", "message": "The unit's intent must be confirmed or assumed: confirm it (confirm_intent) or let the Lead assume it (assume_intent).", "none": [{"all": [{"exists": "$unit"}, {"eq": ["$unit.lane", "objective"]}, {"present": "$intent"}, {"none": [{"all": [{"exists": "$intent"}, {"in": ["$intent.status", ["confirmed", "assumed"]]}]}]}]}]},
         {"code": "intent_differs", "message": "Give the unit's own intent, or none in the lane small.", "none": [{"all": [{"present": "$intent"}, {"none": [{"all": [{"exists": "$unit"}, {"present": "$unit.intent"}, {"eq": ["$unit.intent", "$intent"]}]}]}]}]},
         {"code": "intent_parameter_required", "message": "A unit of the lane objective names its intent in the parameter intent.", "none": [{"all": [{"exists": "$unit"}, {"eq": ["$unit.lane", "objective"]}, {"none": [{"present": "$intent"}]}]}]},
-        {"code": "plan_not_reviewed", "message": "Review the intent's plan first: a review of kind plan of the intent, started after the unit was added, closed accept.", "none": [{"all": [{"exists": "$unit"}, {"eq": ["$unit.lane", "objective"]}, {"present": "$intent"}, {"none": [{"linked": {"from": "$intent", "link": "intent_reviews", "where": {"all": [{"eq": ["kind", "plan"]}, {"eq": ["status", "closed"]}, {"eq": ["verdict", "accept"]}, {"gt": ["started_at", "$unit.added_at"]}]}}}]}]}]},
+        {"code": "plan_not_reviewed", "message": "No accepting plan review counts for this unit's plan as it stands: run ap unit review with the intent.", "none": [{"all": [{"exists": "$unit"}, {"eq": ["$unit.lane", "objective"]}, {"present": "$intent"}, {"none": [{"any": [{"all": [{"present": "$unit.plan_digest"}, {"present": "$unit.plan_reviewed"}, {"eq": ["$unit.plan_reviewed", "$unit.plan_digest"]}]}, {"all": [{"none": [{"present": "$unit.plan_digest"}]}, {"linked": {"from": "$intent", "link": "intent_reviews", "where": {"all": [{"eq": ["kind", "plan"]}, {"eq": ["status", "closed"]}, {"eq": ["verdict", "accept"]}, {"gt": ["started_at", "$unit.added_at"]}]}}}]}]}]}]}]},
         {"code": "page_digest_differs", "message": "Give the digest the unit stores, or amend the unit (amend_unit stores the digest of its page).", "none": [{"all": [{"present": "$page_digest"}, {"exists": "$unit"}, {"present": "$unit.page_digest"}, {"ne": ["$page_digest", "$unit.page_digest"]}]}]},
         {"code": "page_not_reviewed", "message": "Review the page first: a review of kind page of the unit, closed accept, whose head is the page_digest the unit stores.", "none": [{"all": [{"exists": "$unit"}, {"in": ["$unit.class", ["contract", "effect"]]}, {"none": [{"linked": {"from": "$unit", "link": "unit_reviews", "where": {"all": [{"eq": ["kind", "page"]}, {"eq": ["status", "closed"]}, {"eq": ["verdict", "accept"]}, {"present": "$unit.page_digest"}, {"eq": ["head", "$unit.page_digest"]}]}}}]}]}]},
         {"code": "deferred", "message": "The user deferred the unit: undefer it first (undefer_unit).", "none": [{"all": [{"exists": "$unit"}, {"present": "$unit.deferred_by"}]}]}
       ],
       "rules": [
         {"modify_object": "unit", "set": {"state": "ready", "ready_at": "$now"}}
+      ]
+    },
+    "mark_plan_reviewed": {
+      "description": "Mark the unit's block of the plan as read by an accepting plan review of its intent: plan_reviewed becomes the digest of the block the review read. Any state; nothing else changes.",
+      "parameters": {
+        "unit": {"type": {"ref": "unit"}, "required": true, "description": "The unit: an Id of type unit whose native_key is the unit's key."},
+        "review": {"type": {"ref": "review"}, "required": true, "description": "The plan review that read the unit's block."},
+        "digest": {"type": {"value_type": "sha256_hex"}, "required": true, "description": "The digest of the unit's block of the plan as the review read it."}
+      },
+      "submission_criteria": [
+        {"code": "review_not_accepting", "message": "Give a review of kind plan, closed with the verdict accept.", "all": [{"exists": "$review"}, {"eq": ["$review.kind", "plan"]}, {"eq": ["$review.status", "closed"]}, {"present": "$review.verdict"}, {"eq": ["$review.verdict", "accept"]}]},
+        {"code": "review_of_another_intent", "message": "Give a plan review of the unit's own intent.", "all": [{"exists": "$review"}, {"exists": "$unit"}, {"present": "$review.intent"}, {"present": "$unit.intent"}, {"eq": ["$review.intent", "$unit.intent"]}]}
+      ],
+      "rules": [
+        {"modify_object": "unit", "set": {"plan_reviewed": "$digest"}}
+      ]
+    },
+    "mark_design_reviewed": {
+      "description": "Mark the intent's design record as read by an accepting plan review of the intent: plan_design becomes the digest of the bytes the review read. Any state; nothing else changes.",
+      "parameters": {
+        "intent": {"type": {"ref": "intent"}, "required": true, "description": "The intent: its full Id, with the intent's key as native_key."},
+        "review": {"type": {"ref": "review"}, "required": true, "description": "The plan review that read the design record."},
+        "digest": {"type": {"value_type": "sha256_hex"}, "required": true, "description": "The SHA-256 of the design record's bytes as the review read them."}
+      },
+      "submission_criteria": [
+        {"code": "review_not_accepting", "message": "Give a review of kind plan, closed with the verdict accept.", "all": [{"exists": "$review"}, {"eq": ["$review.kind", "plan"]}, {"eq": ["$review.status", "closed"]}, {"present": "$review.verdict"}, {"eq": ["$review.verdict", "accept"]}]},
+        {"code": "review_of_another_intent", "message": "Give a plan review of this intent.", "all": [{"exists": "$review"}, {"present": "$review.intent"}, {"eq": ["$review.intent", "$intent"]}]}
+      ],
+      "rules": [
+        {"modify_object": "intent", "set": {"plan_design": "$digest"}}
       ]
     },
     "defer_unit": {
@@ -2986,17 +3037,19 @@
       ]
     },
     "close_finding": {
-      "description": "Close an open or planned finding: the change is made.",
+      "description": "Close an open or planned finding: the change is made. A lesson names what prevents it in prevented_by, in one of three forms: \"unit:<key>\" (a refusal or a check that unit delivered), \"eval:<suite>/<case>\" (a case of a suite under evals/) or \"text:<path>#<section>\" (a sentence of an instruction file, for a lesson nothing can check).",
       "parameters": {
         "finding": {"type": {"ref": "finding"}, "required": true, "description": "The finding: an Id of type finding whose native_key is the finding's key."},
-        "reason": {"type": "string", "required": true, "max_bytes": 600, "description": "What changed, and where it shows."}
+        "reason": {"type": "string", "required": true, "max_bytes": 600, "description": "What changed, and where it shows."},
+        "prevented_by": {"type": {"value_type": "nonempty_text"}, "required": false, "max_bytes": 300, "description": "What prevents the lesson; required for a finding of kind lesson, in a form of the action's description."}
       },
       "submission_criteria": [
         {"code": "finding_not_live", "message": "Choose an open or planned finding; reopen a closed or dismissed one (reopen_finding).", "all": [{"exists": "$finding"}, {"in": ["$finding.state", ["open", "planned"]]}]},
-        {"code": "reason_empty", "message": "Give the reason in words.", "all": [{"ne": ["$reason", ""]}]}
+        {"code": "reason_empty", "message": "Give the reason in words.", "all": [{"ne": ["$reason", ""]}]},
+        {"code": "lesson_needs_prevention", "message": "A lesson closes with what prevents it: give prevented_by (unit:<key>, eval:<suite>/<case> or text:<path>#<section>).", "none": [{"all": [{"exists": "$finding"}, {"eq": ["$finding.kind", "lesson"]}, {"none": [{"present": "$prevented_by"}]}]}]}
       ],
       "rules": [
-        {"modify_object": "finding", "set": {"state": "closed", "reason": "$reason", "ended_at": "$now"}}
+        {"modify_object": "finding", "set": {"state": "closed", "reason": "$reason", "ended_at": "$now", "prevented_by": "$prevented_by"}}
       ]
     },
     "record_principle": {
@@ -3425,8 +3478,11 @@
         "end_delegation",
         "extend_session",
         "lift_hold",
+        "mark_design_reviewed",
+        "mark_plan_reviewed",
         "measure_run",
         "merge_unit",
+        "name_design",
         "name_lead",
         "note_intent",
         "note_unit_wait",

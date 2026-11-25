@@ -121,6 +121,13 @@ fn questions(q: &Value) -> Result<Value, Failure> {
         .collect::<Result<Vec<_>, Failure>>()
         .map(Value::from)
 }
+/// The path of a design record (R25): absolute, 1 to 300 bytes, no component `..`. The file is not read.
+fn design(r: &Value) -> Result<&str, Failure> {
+    let path = r["design"].as_str().filter(|p| {
+        p.starts_with('/') && p.len() <= 300 && !p.split('/').any(|c| c == "..")
+    });
+    path.ok_or_else(|| bad("design"))
+}
 /// The substance of `draft` (`required`) or `amend` into the parameters `p`.
 fn substance(r: &Value, p: &mut Map<String, Value>, required: bool) -> Result<(), Failure> {
     for (i, (k, max)) in SUBSTANCE.into_iter().enumerate() {
@@ -237,6 +244,11 @@ fn plan<S: System>(op: &str, r: &Value) -> Result<Plan<S>, Failure> {
             p["notes"] = json!(need(r, "notes", 4000)?);
             Plan::on(Act::Plain(store::note_intent), "note", p, k()?)
         }
+        "design" => {
+            let mut p = on(k()?);
+            p["design"] = json!(design(r)?);
+            Plan::on(Act::Plain(store::name_design), "design", p, k()?)
+        }
         "lead" => {
             let mut p = on(k()?);
             p["session"] = json!(shaped(r, "lead_session", 64, "._:-")?);
@@ -334,6 +346,7 @@ fn members(op: &str, r: &Value) -> Result<&'static str, Failure> {
         "answer" => "intent by answers",
         "note" => "intent notes",
         "lead" => "intent lead_session by",
+        "design" => "intent design",
         "assume" | "close" | "retire" => "intent reason",
         "confirm" => "intent by delegation reason",
         "criterion" => match r["do"].as_str() {
@@ -532,6 +545,12 @@ pub fn text_of(v: &Value) -> String {
     }
     if v["notes"].is_string() {
         out.push_str(&format!("notes: {}\n", g("notes")));
+    }
+    if v["design"].is_string() {
+        out.push_str(&format!("design: {}\n", g("design")));
+    }
+    if v["plan_design"].is_string() {
+        out.push_str(&format!("plan design: {}\n", g("plan_design")));
     }
     out
 }
