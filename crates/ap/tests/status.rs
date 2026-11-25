@@ -58,6 +58,8 @@ struct F {
     log_page: usize,
     withheld: BTreeMap<&'static str, u64>,
     log_loops: bool,
+    /// The working directory of the process; none cannot be read.
+    cwd: Option<String>,
 }
 impl F {
     fn empty() -> Self {
@@ -77,6 +79,7 @@ impl F {
             log_page: 100,
             withheld: BTreeMap::new(),
             log_loops: false,
+            cwd: None,
         }
     }
     fn put(&mut self, kind: &str, key: &str, fields: Value) {
@@ -331,6 +334,12 @@ impl System for F {
         }
     }
     fn pause(&mut self, _: std::time::Duration) {}
+    fn cwd(&self) -> std::io::Result<std::path::PathBuf> {
+        match &self.cwd {
+            Some(d) => Ok(d.into()),
+            None => Err(std::io::ErrorKind::NotFound.into()),
+        }
+    }
 }
 
 fn run(f: &mut F, call: &Call) -> Value {
@@ -1011,17 +1020,16 @@ fn r7_r17_r45_a_unit_with_a_wave_shows_it_after_its_class() {
     let lines: Vec<&str> = text.lines().collect();
     assert!(lines.contains(&"u-run running plain w3 o/r#7"), "{text}");
     assert!(lines.contains(&"u-acc accepted plain o/r#9"), "{text}");
-    // R45: the brief's line of a unit.
+    // R45: the brief's line of a unit has no wave.
     let lines = brief(&mut f, "alpha-report");
     assert!(
-        lines.iter().any(|l| l == "unit u-run running plain w3"),
+        lines.iter().any(|l| l == "unit u-run running plain - min"),
         "{lines:?}"
     );
     assert!(
-        lines
+        !lines
             .iter()
-            .any(|l| l.starts_with("unit u-draft draft plain w12")),
-        "{lines:?}"
+            .any(|l| l.contains(" w3") || l.contains(" w12"))
     );
     assert!(
         lines
@@ -3717,7 +3725,7 @@ fn count_of(v: &Value) -> usize {
 
 // spec: specs/ap/status.md#R43
 #[test]
-fn r43_the_brief_takes_one_intent_and_a_store_and_only_reads() {
+fn r43_the_brief_takes_an_intent_or_a_directory_and_a_store_and_only_reads() {
     for ok in [
         vec!["--brief", "alpha-report"],
         vec!["--store", "/s", "--brief", "alpha-report"],
@@ -3725,19 +3733,43 @@ fn r43_the_brief_takes_one_intent_and_a_store_and_only_reads() {
     ] {
         assert!(matches!(args(&ok).unwrap().call, Call::Brief(_)), "{ok:?}");
     }
+    for (ok, directory) in [
+        (vec!["--brief"], None),
+        (vec!["--brief", "--store", "/s"], None),
+        (vec!["--store", "/s", "--brief"], None),
+        (vec!["--brief", "--directory", "/w/a"], Some("/w/a")),
+        (vec!["--directory", "/w/a/", "--brief"], Some("/w/a/")),
+    ] {
+        match args(&ok).unwrap().call {
+            Call::Open(d) => assert_eq!(d.as_deref(), directory, "{ok:?}"),
+            _ => panic!("{ok:?}"),
+        }
+    }
     let bad: Vec<Vec<&str>> = vec![
-        vec!["--brief"],
-        vec!["--brief", "--store", "/s"],
         vec!["--brief", "-x"],
+        vec!["--brief", ""],
         vec!["--brief", "a\u{1}b"],
         vec!["--brief", "a", "--brief", "b"],
+        vec!["--brief", "--brief"],
         vec!["--brief", "a", "--text"],
+        vec!["--brief", "--text"],
         vec!["--brief", "a", "b"],
+        vec!["--brief", "--term", "unit"],
         vec!["--brief", "a", "--term", "unit"],
         vec!["--brief", "a", "--wait", "b"],
         vec!["--brief", "a", "--timeout", "40"],
         vec!["--brief", "a", "--indicators"],
         vec!["--brief", "a", "--requests"],
+        vec!["k", "--brief"],
+        // An intent together with a directory, a directory alone, a relative one and a repeated one.
+        vec!["--brief", "a", "--directory", "/w"],
+        vec!["--directory", "/w", "--brief", "a"],
+        vec!["--directory", "/w"],
+        vec!["--directory", "/w", "--text"],
+        vec!["--brief", "--directory"],
+        vec!["--brief", "--directory", "w"],
+        vec!["--brief", "--directory", "/a\n"],
+        vec!["--brief", "--directory", "/a", "--directory", "/b"],
     ];
     for a in &bad {
         // Refused before any call: `PATH` names no program.
@@ -3752,22 +3784,26 @@ fn r43_the_brief_takes_one_intent_and_a_store_and_only_reads() {
     }
     // Only reads, of the store and of delivery's two files; the store is forwarded to every call.
     let mut f = fixture();
-    execute(
-        &mut f,
-        Some("/tmp/scratch/s.sqlite"),
-        &Call::Brief("alpha-report".into()),
-    )
-    .unwrap();
-    assert!(
-        f.stores
-            .iter()
-            .all(|s| s.as_deref() == Some("/tmp/scratch/s.sqlite"))
-    );
-    let names = f.names();
-    assert!(
-        names.iter().all(|n| ["get", "search"].contains(n)),
-        "{names:?}"
-    );
+    f.cwd = Some("/w/alpha".into());
+    for call in [
+        Call::Brief("alpha-report".into()),
+        Call::Open(Some("/w/alpha".into())),
+        Call::Open(None),
+    ] {
+        f.calls.clear();
+        f.stores.clear();
+        execute(&mut f, Some("/tmp/scratch/s.sqlite"), &call).unwrap();
+        assert!(
+            f.stores
+                .iter()
+                .all(|s| s.as_deref() == Some("/tmp/scratch/s.sqlite"))
+        );
+        let names = f.names();
+        assert!(
+            names.iter().all(|n| ["get", "search"].contains(n)),
+            "{names:?}"
+        );
+    }
     assert!(f.reads.borrow().iter().all(|p| p == CONFIG || p == LAST));
     assert!(f.reads.borrow().iter().any(|p| p == LAST));
     // A key that is no intent, or that names only a unit, is `unknown_intent` with exit 2.
@@ -3782,6 +3818,68 @@ fn r43_the_brief_takes_one_intent_and_a_store_and_only_reads() {
     }
 }
 
+// spec: specs/ap/status.md#R43
+#[test]
+fn r43_the_brief_directory_form_takes_the_open_intents_of_one_directory() {
+    let mut f = fixture();
+    for (k, d) in [
+        ("alpha-report", "/w/one"),
+        ("beta-index", "/w/one/"),
+        ("delta-draft", "/w/two"),
+        ("gamma-done", "/w/one"),
+    ] {
+        let mut o = f_object(&f, "intent", k);
+        o["directory"] = json!(d);
+        f.put("intent", k, o);
+    }
+    // The working directory is the default; a final `/` is dropped from each side, by key; a closed intent
+    // (gamma-done is met) is not there.
+    f.cwd = Some("/w/one".into());
+    for call in [Call::Open(None), Call::Open(Some("/w/one/".into()))] {
+        let lines = brief_of(&mut f, &call);
+        let heads: Vec<&String> = lines.iter().filter(|l| l.starts_with("status ")).collect();
+        assert_eq!(
+            heads,
+            [
+                "status alpha-report assumed, confirmed no",
+                "status lead -",
+                "status beta-index confirmed, confirmed by delegation",
+                "status lead s-lead",
+            ]
+        );
+        // Two blocks, one empty line between them, at most 40 lines each.
+        let at = lines.iter().position(String::is_empty).unwrap();
+        assert!((1..=40).contains(&at) && (1..=40).contains(&(lines.len() - at - 1)));
+        assert_eq!(lines.iter().filter(|l| l.is_empty()).count(), 1);
+        assert!(lines.last().unwrap().starts_with("delivery "));
+        assert!(!lines.iter().any(|l| l.contains("delta-draft")));
+    }
+    // Compared byte for byte: a sub-directory or another case is not the directory.
+    for d in ["/w/one/x", "/w/ONE", "/w", "/w/one//", ""] {
+        let lines = brief_of(&mut f, &Call::Open(Some(d.into())));
+        assert_eq!(lines, [format!("status no open intent of {d}")], "{d}");
+    }
+    // No intent: the one line, cut at 120 bytes with its break, a control character a space.
+    let long = format!("/{}\u{3042}", "d".repeat(150));
+    let lines = brief_of(&mut f, &Call::Open(Some(long)));
+    assert_eq!(lines.len(), 1);
+    assert!(lines[0].len() < 120 && lines[0].starts_with("status no open intent of /ddd"));
+    // A working directory that cannot be read is `io_error` (field directory).
+    f.cwd = None;
+    let e = refusal(&mut f, &Call::Open(None));
+    assert_eq!((e.code, e.field.as_str()), ("io_error", "directory"));
+    assert_eq!(ap::status::exit_code(false, &e), 2);
+}
+fn f_object(f: &F, kind: &str, key: &str) -> Value {
+    f.objects[&(kind.to_owned(), key.to_owned())].clone()
+}
+fn brief_of(f: &mut F, call: &Call) -> Vec<String> {
+    let v = run(f, call);
+    let text = text_of(call, &v);
+    assert!(text.ends_with('\n'));
+    text.lines().map(str::to_owned).collect()
+}
+
 // spec: specs/ap/status.md#R45
 #[test]
 fn r45_the_brief_has_the_sections_in_their_order_with_their_lines() {
@@ -3792,25 +3890,21 @@ fn r45_the_brief_has_the_sections_in_their_order_with_their_lines() {
         [
             "status alpha-report assumed, confirmed no",
             "status lead -",
-            "criterion c1 open",
-            "criterion c2 pass",
-            "criterion c3 pass",
-            "unit u-run running plain",
+            "next -",
+            "criterion open 1, pass 2",
+            "unit running 1, ready 1, draft 1, merged 1",
+            "unit u-run running plain - min",
             "unit u-ready ready contract waits on a unit; a limit",
-            "unit u-draft draft plain",
-            "needs finding f-urgent: Summary of f-urgent.",
-            "needs finding f-act-new: Summary of f-act-new.",
-            "needs finding f-act-old: Summary of f-act-old.",
-            "needs request q-a: unrouted since 2026-11-15T10:30:00Z",
+            "needs (+3 elsewhere: ap status)",
             "hold effect of h-intent until a condition intent alpha-report",
             "hold effect of h-unit until a condition unit u-run scope one unit",
-            "hold effect of h-user until a condition",
+            "hold (+2 elsewhere)",
             "delivery 2026-11-17T11:30:00Z current tip 0123abc target /usr/local/bin/ap",
         ]
     );
     // The Lead and who confirmed it; a delegated intent.
     f.put("intent", "alpha-report", {
-        let mut o = f.objects[&("intent".to_owned(), "alpha-report".to_owned())].clone();
+        let mut o = f_object(&f, "intent", "alpha-report");
         o["status"] = json!("confirmed");
         o["lead_session"] = json!("s-lead");
         o["confirmed_delegated"] = json!(true);
@@ -3824,44 +3918,18 @@ fn r45_the_brief_has_the_sections_in_their_order_with_their_lines() {
             "status lead s-lead"
         ]
     );
-    // A dependency that is not merged or done is named for a unit that is not `ready`; a `ready` one
-    // says what it waits on, a stopped one why it stopped.
-    unit(
-        &mut f,
-        "u-late",
-        "running",
-        json!({"intent": oid("intent", "alpha-report"), "depends_on": [oid("unit", "u-ready"), oid("unit", "u-merged"), oid("unit", "u-gone")]}),
-    );
-    unit(
-        &mut f,
-        "u-halt",
-        "stopped",
-        json!({"intent": oid("intent", "alpha-report"), "stop_cause": "ci_failed", "depends_on": [oid("unit", "u-ready")]}),
-    );
-    let lines = brief(&mut f, "alpha-report");
-    let units: Vec<&String> = lines.iter().filter(|l| l.starts_with("unit ")).collect();
-    assert_eq!(
-        units,
-        [
-            "unit u-halt stopped plain stopped: ci_failed",
-            "unit u-late running plain blocked by u-ready (ready), u-gone (missing)",
-            "unit u-run running plain",
-            "unit u-ready ready contract waits on a unit; a limit",
-            "unit u-draft draft plain",
-        ]
-    );
-    // An intent with nothing else still has its status, Lead and delivery.
+    // An intent with nothing else still has its status, Lead, next, counts and delivery; no `(+0 ...)` line.
     intent(&mut f, "empty-one", "draft", json!({}));
     assert_eq!(
         brief(&mut f, "empty-one"),
         [
             "status empty-one draft, confirmed no",
             "status lead -",
-            "needs finding f-urgent: Summary of f-urgent.",
-            "needs finding f-act-new: Summary of f-act-new.",
-            "needs finding f-act-old: Summary of f-act-old.",
-            "needs request q-a: unrouted since 2026-11-15T10:30:00Z",
-            "hold effect of h-user until a condition",
+            "next -",
+            "criterion none",
+            "unit none",
+            "needs (+3 elsewhere: ap status)",
+            "hold (+4 elsewhere)",
             "delivery 2026-11-17T11:30:00Z current tip 0123abc target /usr/local/bin/ap",
         ]
     );
@@ -3874,174 +3942,404 @@ fn r45_the_brief_has_the_sections_in_their_order_with_their_lines() {
 
 // spec: specs/ap/status.md#R45
 #[test]
-fn r45_a_section_over_its_share_is_cut_and_the_units_take_the_lines_left() {
+fn r45_the_next_lines_are_the_notes_cut_at_a_character_boundary() {
     let mut f = fixture();
-    for n in 4..=12 {
-        criterion(&mut f, &format!("c{n:02}"), "alpha-report", "open");
-    }
-    let a = || oid("intent", "alpha-report");
-    for n in 0..30 {
-        unit(
-            &mut f,
-            &format!("u-more-{n:02}"),
-            "ready",
-            json!({"intent": a(), "waits_on": "a limit"}),
-        );
-    }
-    let lines = brief(&mut f, "alpha-report");
-    let of = |label: &str| lines.iter().filter(|l| l.starts_with(label)).count();
-    // 12 criteria: 7 and the line that says 5 more.
-    assert_eq!(of("criterion"), 8);
-    assert!(lines.contains(&"criterion (+5 more)".to_owned()));
-    // 4 needs and 3 holds leave 2 and 2 lines to the units.
-    assert_eq!(of("needs"), 4);
-    assert_eq!(of("hold"), 3);
-    assert_eq!(of("unit"), 16 + 2 + 2);
-    assert!(lines.contains(&"unit (+14 more)".to_owned()), "{lines:?}");
-    assert_eq!(lines.len(), 2 + 8 + 20 + 4 + 3 + 1);
-    // Needs and holds over their shares.
-    for n in 0..10 {
-        finding(
-            &mut f,
-            &format!("f-more-{n}"),
-            "act",
-            "open",
-            "2026-11-17T09:00:00Z",
-            json!({}),
-        );
-        hold(
-            &mut f,
-            &format!("h-more-{n}"),
-            "active",
-            "2026-11-17T09:00:00Z",
-            json!({"subject": a()}),
-        );
-    }
-    let lines = brief(&mut f, "alpha-report");
-    let of = |label: &str| lines.iter().filter(|l| l.starts_with(label)).count();
-    assert_eq!((of("needs"), of("hold"), of("unit")), (6, 5, 16));
-    assert!(lines.contains(&"needs (+9 more)".to_owned()), "{lines:?}");
-    assert!(lines.contains(&"hold (+9 more)".to_owned()), "{lines:?}");
-    assert_eq!(lines.len(), 38);
-    // The order of the sections.
-    let order: Vec<&str> = lines.iter().map(|l| l.split(' ').next().unwrap()).collect();
-    let mut seen: Vec<&str> = vec![];
-    for l in order {
-        if seen.last() != Some(&l) {
-            seen.push(l);
-        }
-    }
+    let notes = |f: &mut F, notes: &str| {
+        let mut o = f_object(f, "intent", "alpha-report");
+        o["notes"] = json!(notes);
+        f.put("intent", "alpha-report", o);
+        let lines = brief(f, "alpha-report");
+        lines
+            .into_iter()
+            .filter(|l| l.starts_with("next"))
+            .collect::<Vec<_>>()
+    };
     assert_eq!(
-        seen,
-        ["status", "criterion", "unit", "needs", "hold", "delivery"]
+        notes(&mut f, "Next: merge the page.\nThen\tstop."),
+        ["next Next: merge the page. Then stop."]
+    );
+    // Three lines of 114 bytes of the notes, the first byte first; the rest is not shown.
+    let long = "a".repeat(114) + &"b".repeat(114) + &"c".repeat(114) + "dropped";
+    let lines = notes(&mut f, &long);
+    assert_eq!(lines.len(), 3);
+    assert_eq!(lines[0], format!("next {}", "a".repeat(114)));
+    assert_eq!(lines[2], format!("next {}", "c".repeat(114)));
+    // Characters of three bytes: a line is cut back to a boundary and never over 119 bytes.
+    let wide = "\u{3042}".repeat(300);
+    let lines = notes(&mut f, &wide);
+    assert_eq!(lines.len(), 3);
+    for l in &lines {
+        assert_eq!(l.len(), 5 + 114, "{l}");
+        assert!(l[5..].chars().all(|c| c == '\u{3042}'));
+    }
+    assert_eq!(notes(&mut f, "  \n "), ["next -"]);
+}
+
+// spec: specs/ap/status.md#R45
+#[test]
+fn r45_the_brief_counts_the_criteria_and_lists_those_that_fail() {
+    let mut f = fixture();
+    let lines = |f: &mut F| {
+        let all = brief(f, "alpha-report");
+        all.into_iter()
+            .filter(|l| l.starts_with("criterion"))
+            .collect::<Vec<_>>()
+    };
+    criterion(&mut f, "c-fail-b", "alpha-report", "fail");
+    criterion(&mut f, "c-wave", "alpha-report", "waived");
+    assert_eq!(
+        lines(&mut f),
+        [
+            "criterion open 1, pass 2, fail 1, waived 1",
+            "criterion c-fail-b fail"
+        ]
+    );
+    // Three that fail fit the four lines; four do not: two and the line for the other two.
+    criterion(&mut f, "c-fail-a", "alpha-report", "fail");
+    criterion(&mut f, "c-fail-c", "alpha-report", "fail");
+    assert_eq!(lines(&mut f).len(), 4);
+    criterion(&mut f, "c-fail-d", "alpha-report", "fail");
+    let shown = lines(&mut f);
+    assert_eq!(
+        shown,
+        [
+            "criterion open 1, pass 2, fail 4, waived 1",
+            "criterion c-fail-a fail",
+            "criterion c-fail-b fail",
+            "criterion (+2 more)",
+        ]
+    );
+}
+
+// spec: specs/ap/status.md#R45
+#[test]
+fn r45_the_brief_units_say_what_is_stopped_waits_is_owed_runs_and_is_ready() {
+    let mut f = fixture();
+    let a = || oid("intent", "alpha-report");
+    let more = |f: &mut F, k: &str, state: &str, class: &str, extra: Value| {
+        let mut o = json!({"intent": a(), "class": class});
+        for (n, v) in extra.as_object().unwrap() {
+            o[n] = v.clone();
+        }
+        unit(f, k, state, o);
+    };
+    more(
+        &mut f,
+        "u-s1",
+        "stopped",
+        "plain",
+        json!({"stop_cause": "ci_failed"}),
+    );
+    more(&mut f, "u-s2", "stopped", "effect", json!({}));
+    // Accepted: a contract or an effect waits for the Lead unless the approved head is the head.
+    more(
+        &mut f,
+        "u-a1",
+        "accepted",
+        "contract",
+        json!({"head": "0123456789abcdef"}),
+    );
+    more(
+        &mut f,
+        "u-a2",
+        "accepted",
+        "effect",
+        json!({"head": "aaaaaaaaaa", "approved_head": "bbbbbbbbbb"}),
+    );
+    more(
+        &mut f,
+        "u-a3",
+        "accepted",
+        "contract",
+        json!({"head": "cccccccccc", "approved_head": "cccccccccc"}),
+    );
+    more(
+        &mut f,
+        "u-a4",
+        "accepted",
+        "plain",
+        json!({"head": "dddddddddd"}),
+    );
+    more(&mut f, "u-a5", "accepted", "effect", json!({}));
+    // Merged with a use: owed unless it says `none:` or the use was recorded.
+    more(
+        &mut f,
+        "u-m1",
+        "merged",
+        "plain",
+        json!({"use": "a real run"}),
+    );
+    more(
+        &mut f,
+        "u-m2",
+        "merged",
+        "plain",
+        json!({"use": "none: no user"}),
+    );
+    more(
+        &mut f,
+        "u-m3",
+        "merged",
+        "plain",
+        json!({"use": "a real run", "used_at": "2026-11-17T11:00:00Z"}),
+    );
+    more(&mut f, "u-m4", "merged", "plain", json!({}));
+    // A running unit with its minutes; a deferred one is left out of the counts and every list but its line.
+    more(
+        &mut f,
+        "u-r1",
+        "running",
+        "plain",
+        json!({"started_at": "2026-11-17T10:30:00Z"}),
+    );
+    more(
+        &mut f,
+        "u-d1",
+        "draft",
+        "plain",
+        json!({"deferred_by": oid("request", "q-start")}),
+    );
+    more(
+        &mut f,
+        "u-d2",
+        "ready",
+        "plain",
+        json!({"deferred_by": oid("request", "q-start"), "waits_on": "x"}),
+    );
+    let lines = brief(&mut f, "alpha-report");
+    let units: Vec<&str> = lines
+        .iter()
+        .filter(|l| l.starts_with("unit"))
+        .map(String::as_str)
+        .collect();
+    assert_eq!(
+        units,
+        [
+            "unit stopped 2, accepted 5, running 2, ready 1, draft 1, merged 5, deferred 2",
+            "unit u-s1 stopped plain stopped: ci_failed",
+            "unit u-s2 stopped effect stopped: -",
+            "unit u-a1 accepted contract waits lead: approve 0123456",
+            "unit u-a2 accepted effect waits lead: approve aaaaaaa",
+            "unit u-a3 accepted contract waits: merge",
+            "unit u-a4 accepted plain waits: merge",
+            "unit u-a5 accepted effect waits lead: approve -",
+            "unit u-m1 use owed",
+            "unit u-r1 running plain 90 min",
+            "unit u-run running plain - min",
+            "unit u-ready ready contract waits on a unit; a limit",
+            "unit u-d1 deferred",
+            "unit u-d2 deferred",
+        ]
+    );
+}
+
+// spec: specs/ap/status.md#R45
+#[test]
+fn r45_a_unit_section_over_its_cap_drops_the_ready_then_the_running_the_owed_the_waiting_then_the_stopped()
+ {
+    let mut f = fixture();
+    let a = || oid("intent", "alpha-report");
+    let add = |f: &mut F, n: usize, state: &str, extra: Value| {
+        for i in 0..n {
+            let mut o = json!({"intent": a(), "class": "plain"});
+            for (k, v) in extra.as_object().unwrap() {
+                o[k] = v.clone();
+            }
+            unit(f, &format!("u-{state}-{i:02}"), state, o);
+        }
+    };
+    let section = |f: &mut F| {
+        let all = brief(f, "alpha-report");
+        all.into_iter()
+            .filter(|l| l.starts_with("unit ") || l.starts_with("unit("))
+            .collect::<Vec<_>>()
+    };
+    add(&mut f, 10, "ready", json!({}));
+    // 1 counts line, 2 here (u-run, u-ready of the fixture) and 10 more: 13 lines, all shown.
+    assert_eq!(section(&mut f).len(), 13);
+    add(&mut f, 6, "stopped", json!({"stop_cause": "x"}));
+    // 1 + 6 stopped + u-run + 11 ready = 19 lines: two ready ones give way, and the line that says so.
+    let s = section(&mut f);
+    assert_eq!(s.len(), 18, "{s:?}");
+    assert_eq!(s[17], "unit (+2 more)");
+    assert_eq!(s.iter().filter(|l| l.contains(" stopped plain")).count(), 6);
+    assert!(s.iter().any(|l| l.starts_with("unit u-run running")));
+    assert_eq!(s.iter().filter(|l| l.contains(" ready plain")).count(), 8);
+    // The stopped, the waiting and the owed stay while the running and the ready are dropped.
+    add(&mut f, 8, "accepted", json!({}));
+    add(&mut f, 2, "merged", json!({"use": "a run"}));
+    let s = section(&mut f);
+    assert_eq!(s.len(), 18);
+    assert_eq!(s[17], "unit (+12 more)");
+    assert_eq!(s.iter().filter(|l| l.contains(" stopped plain")).count(), 6);
+    assert_eq!(
+        s.iter().filter(|l| l.contains(" accepted plain")).count(),
+        8
+    );
+    assert_eq!(s.iter().filter(|l| l.contains("use owed")).count(), 2);
+    assert!(
+        !s[1..]
+            .iter()
+            .any(|l| l.contains(" running ") || l.contains(" ready "))
+    );
+    // With 25 stopped the stopped ones themselves are cut from the end.
+    add(&mut f, 19, "stopped", json!({"stop_cause": "y"}));
+    let s = section(&mut f);
+    assert_eq!(s.len(), 18);
+    assert!(s[1].starts_with("unit u-stopped-00 stopped"));
+    assert!(s[16].starts_with("unit u-stopped-15 stopped"));
+    assert!(
+        s[17].starts_with("unit (+") && s[17].ends_with(" more)"),
+        "{s:?}"
     );
 }
 
 // spec: specs/ap/status.md#R46
 #[test]
-fn r46_the_brief_names_what_needs_the_lead_the_holds_and_the_delivery_of_the_intent() {
+fn r46_the_brief_names_the_findings_and_holds_of_the_intent_and_counts_the_others() {
     let mut f = fixture();
-    // Stopped and accepted units of the intent come between the urgent and the act findings.
     let a = || oid("intent", "alpha-report");
-    unit(
+    // Findings whose subject is the intent or one of its units, or that were planned into them, newest first;
+    // those of another intent, of a unit of another intent and of a state but open are not the intent's.
+    finding(
         &mut f,
-        "u-s",
-        "stopped",
-        json!({"intent": a(), "stop_cause": "ci_failed"}),
+        "f-m1",
+        "info",
+        "open",
+        "2026-11-17T08:00:00Z",
+        json!({"subject": a()}),
     );
-    unit(&mut f, "u-a", "accepted", json!({"intent": a()}));
-    // A finding that names another intent or one of its units, and an old request, are not the intent's.
+    finding(
+        &mut f,
+        "f-m2",
+        "urgent",
+        "open",
+        "2026-11-17T09:00:00Z",
+        json!({"subject": oid("unit", "u-run")}),
+    );
+    finding(
+        &mut f,
+        "f-m3",
+        "act",
+        "open",
+        "2026-11-17T10:00:00Z",
+        json!({"intent": a()}),
+    );
     finding(
         &mut f,
         "f-beta",
         "urgent",
         "open",
         "2026-11-17T09:00:00Z",
-        json!({"intent": oid("intent", "beta-index")}),
+        json!({"subject": oid("intent", "beta-index")}),
     );
     finding(
         &mut f,
         "f-beta-unit",
-        "act",
+        "info",
         "open",
         "2026-11-17T09:00:00Z",
-        json!({"unit": oid("unit", "u-stop")}),
+        json!({"subject": oid("unit", "u-stop")}),
     );
     finding(
         &mut f,
-        "f-mine",
+        "f-closed",
         "urgent",
-        "open",
-        "2026-11-17T08:00:00Z",
-        json!({"unit": oid("unit", "u-run")}),
+        "closed",
+        "2026-11-17T09:00:00Z",
+        json!({"subject": a()}),
     );
-    finding(
-        &mut f,
-        "f-mine-intent",
-        "act",
-        "open",
-        "2026-11-17T07:00:00Z",
-        json!({"intent": a()}),
-    );
-    f.put("request", "q-named", json!({"topic": "t", "kind": "order", "said_at": "2026-11-01T00:00:00Z", "status": "current", "route": "unrouted", "unit": oid("unit", "u-ready"), "words_verified": true}));
-    // Eight needs, the share is six: five and the line that counts the other three.
     let lines = brief(&mut f, "alpha-report");
-    let needs: Vec<&str> = lines
-        .iter()
-        .filter(|l| l.starts_with("needs"))
-        .map(String::as_str)
-        .collect();
+    let section = |label: &str, lines: &[String]| -> Vec<String> {
+        lines
+            .iter()
+            .filter(|l| l.starts_with(label))
+            .cloned()
+            .collect()
+    };
+    // The four of the fixture and f-beta count as elsewhere; f-beta-unit is info and does not.
     assert_eq!(
-        needs,
+        section("needs", &lines),
         [
-            "needs finding f-urgent: Summary of f-urgent.",
-            "needs finding f-mine: Summary of f-mine.",
-            "needs unit u-s: ci_failed",
-            "needs unit u-a: waits for the Lead's reading or merge",
-            "needs finding f-act-new: Summary of f-act-new.",
-            "needs (+3 more)",
+            "needs finding f-m3 act: Summary of f-m3.",
+            "needs finding f-m2 urgent: Summary of f-m2.",
+            "needs finding f-m1 info: Summary of f-m1.",
+            "needs (+4 elsewhere: ap status)",
         ]
     );
-    // Without the findings and the request that name nothing, all that remain fit.
-    for k in ["f-act-new", "f-act-old"] {
+    // Eight own findings against six lines: four, the line that counts the other four, and the elsewhere line.
+    for n in 0..5 {
+        let at = format!("2026-11-17T07:0{n}:00Z");
+        finding(
+            &mut f,
+            &format!("f-x{n}"),
+            "info",
+            "open",
+            &at,
+            json!({"subject": a()}),
+        );
+    }
+    let lines = brief(&mut f, "alpha-report");
+    assert_eq!(
+        section("needs", &lines),
+        [
+            "needs finding f-m3 act: Summary of f-m3.",
+            "needs finding f-m2 urgent: Summary of f-m2.",
+            "needs finding f-m1 info: Summary of f-m1.",
+            "needs finding f-x4 info: Summary of f-x4.",
+            "needs (+4 more)",
+            "needs (+4 elsewhere: ap status)",
+        ]
+    );
+    // Without a finding elsewhere the section has no such line and gives its line to its own entries.
+    for k in ["f-info", "f-act-old", "f-act-new", "f-urgent", "f-beta"] {
         f.objects.remove(&("finding".to_owned(), k.to_owned()));
     }
-    f.objects.remove(&("request".to_owned(), "q-a".to_owned()));
     let lines = brief(&mut f, "alpha-report");
-    let needs: Vec<&str> = lines
-        .iter()
-        .filter(|l| l.starts_with("needs"))
-        .map(String::as_str)
-        .collect();
-    assert_eq!(
-        needs,
-        [
-            "needs finding f-urgent: Summary of f-urgent.",
-            "needs finding f-mine: Summary of f-mine.",
-            "needs unit u-s: ci_failed",
-            "needs unit u-a: waits for the Lead's reading or merge",
-            "needs finding f-mine-intent: Summary of f-mine-intent.",
-        ]
+    let needs = section("needs", &lines);
+    assert_eq!(needs.len(), 6);
+    assert_eq!(needs[5], "needs (+3 more)");
+    // Holds: those of the intent, its units and a host, oldest first; the others are counted.
+    hold(
+        &mut f,
+        "h-host",
+        "active",
+        "2026-11-17T03:00:00Z",
+        json!({"subject": oid("host", "pc"), "scope": "the PC"}),
     );
-    assert!(
-        !lines
-            .iter()
-            .any(|l| l.contains("f-beta") || l.contains("q-named"))
-    );
-    // Holds: those that name the intent or its units, then those that name neither.
-    let holds: Vec<&str> = lines
-        .iter()
-        .filter(|l| l.starts_with("hold "))
-        .map(String::as_str)
-        .collect();
+    let lines = brief(&mut f, "alpha-report");
     assert_eq!(
-        holds,
+        section("hold", &lines),
         [
+            "hold effect of h-host until a condition host pc scope the PC",
             "hold effect of h-intent until a condition intent alpha-report",
             "hold effect of h-unit until a condition unit u-run scope one unit",
-            "hold effect of h-user until a condition",
+            "hold (+2 elsewhere)",
         ]
     );
+    // Eight holds of the intent: five, the line for the three the cap cut and none for the others once gone.
+    for n in 0..8 {
+        let at = format!("2026-11-17T09:0{n}:00Z");
+        hold(
+            &mut f,
+            &format!("h-m{n}"),
+            "active",
+            &at,
+            json!({"subject": a()}),
+        );
+    }
+    for k in ["h-user", "h-other"] {
+        f.objects.remove(&("hold".to_owned(), k.to_owned()));
+    }
+    let lines = brief(&mut f, "alpha-report");
+    let holds = section("hold", &lines);
+    assert_eq!(holds.len(), 6);
+    assert_eq!(
+        holds[0],
+        "hold effect of h-host until a condition host pc scope the PC"
+    );
+    assert_eq!(holds[5], "hold (+6 more)");
+    assert!(!holds.iter().any(|l| l.contains("elsewhere")));
     assert!(
         lines
             .last()
@@ -4058,22 +4356,11 @@ fn r44_the_brief_is_at_most_forty_lines_of_at_most_120_bytes_whatever_the_store_
     // Long values, line breaks, control characters and characters of three bytes.
     let wide = "\u{3042}".repeat(200);
     let nasty = format!("first\nsecond\u{7}third {wide}");
+    let mut o = f_object(&f, "intent", "alpha-report");
+    o["notes"] = json!(nasty.repeat(3));
+    f.put("intent", "alpha-report", o);
     for n in 0..30 {
-        criterion(&mut f, &format!("c-{n:02}-{wide}"), "alpha-report", "open");
-        unit(
-            &mut f,
-            &format!("u-{n:02}"),
-            "ready",
-            json!({"intent": a(), "waits_on": nasty}),
-        );
-        finding(
-            &mut f,
-            &format!("f-{n:02}"),
-            "urgent",
-            "open",
-            "2026-11-17T09:00:00Z",
-            json!({"summary": nasty}),
-        );
+        criterion(&mut f, &format!("c-{n:02}-{wide}"), "alpha-report", "fail");
         hold(
             &mut f,
             &format!("h-{n:02}"),
@@ -4082,18 +4369,63 @@ fn r44_the_brief_is_at_most_forty_lines_of_at_most_120_bytes_whatever_the_store_
             json!({"subject": a(), "effect": nasty, "until": nasty}),
         );
     }
-    unit(
-        &mut f,
-        "u-stop-nasty",
-        "stopped",
-        json!({"intent": a(), "stop_cause": nasty}),
-    );
+    // 60 units of which 25 stopped, 200 findings and 30 holds of the intent.
+    for n in 0..60 {
+        let (state, extra) = match n % 12 {
+            0 | 1 => ("stopped", json!({"stop_cause": nasty})),
+            2 => ("accepted", json!({"class": "contract", "head": nasty})),
+            3 => ("merged", json!({"use": nasty})),
+            4 => ("running", json!({})),
+            5 => ("draft", json!({"deferred_by": oid("request", "q-start")})),
+            _ => ("ready", json!({"waits_on": nasty})),
+        };
+        let mut o = json!({"intent": a()});
+        for (k, v) in extra.as_object().unwrap() {
+            o[k] = v.clone();
+        }
+        unit(&mut f, &format!("u-{n:02}-{wide}"), state, o);
+    }
+    for n in 0..5 {
+        unit(
+            &mut f,
+            &format!("u-more-{n}"),
+            "stopped",
+            json!({"intent": a(), "stop_cause": nasty}),
+        );
+    }
+    for n in 0..200 {
+        let on = if n % 2 == 0 {
+            json!({"subject": a()})
+        } else {
+            json!({})
+        };
+        finding(
+            &mut f,
+            &format!("f-{n:03}"),
+            "urgent",
+            "open",
+            "2026-11-17T09:00:00Z",
+            {
+                let mut o = on;
+                o["summary"] = json!(nasty);
+                o
+            },
+        );
+    }
     let call = Call::Brief("alpha-report".into());
     let v = run(&mut f, &call);
     let text = text_of(&call, &v);
     let lines: Vec<&str> = text.split_inclusive('\n').collect();
-    assert!((20..=40).contains(&lines.len()), "{}", lines.len());
-    let labels = ["status", "criterion", "unit", "needs", "hold", "delivery"];
+    assert!((30..=40).contains(&lines.len()), "{}", lines.len());
+    let labels = [
+        "status",
+        "next",
+        "criterion",
+        "unit",
+        "needs",
+        "hold",
+        "delivery",
+    ];
     for l in &lines {
         assert!(l.len() <= 120, "{} bytes: {l}", l.len());
         assert!(l.ends_with('\n'));
@@ -4103,12 +4435,33 @@ fn r44_the_brief_is_at_most_forty_lines_of_at_most_120_bytes_whatever_the_store_
             labels.iter().any(|b| body.split(' ').next() == Some(*b)),
             "{body:?}"
         );
+        assert!(!body.contains("(+0 "), "{body:?}");
     }
     // The cut line is at a character boundary: three bytes to a character, never a half.
     assert!(lines.iter().any(|l| l.contains('\u{3042}')));
     // A stored value with a line break is one line.
     assert!(text.contains("first second third "));
-    // Well under the 4800 bytes the lines allow.
+    // The sections keep their caps: 2, 3, 4, 18, 6, 6 and 1.
+    let of = |label: &str| {
+        lines
+            .iter()
+            .filter(|l| l.split(' ').next() == Some(label))
+            .count()
+    };
+    assert_eq!(
+        [
+            of("status"),
+            of("next"),
+            of("criterion"),
+            of("unit"),
+            of("needs"),
+            of("hold"),
+            of("delivery")
+        ],
+        [2, 3, 4, 18, 6, 6, 1]
+    );
+    assert_eq!(lines.len(), 40);
+    // The page's reading of the same intent is the same lines.
     assert!(text.len() <= 40 * 120);
 }
 

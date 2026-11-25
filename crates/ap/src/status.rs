@@ -50,6 +50,9 @@ pub enum Call {
     Indicators(Option<String>),
     /// `--brief <intent>`: the forty lines a Lead reads first.
     Brief(String),
+    /// `--brief` without an intent, with `--directory <path>` or without: the block of each open intent of
+    /// that directory, or of the working directory.
+    Open(Option<String>),
     /// `--page`: the status page, `--text`'s lines then every open intent's brief, flow and cost, and the
     /// flow, the credit's spend and the capacity of all.
     Page,
@@ -61,16 +64,17 @@ pub struct Args {
 }
 /// `--store <absolute path>`, `--text`, `--term <word>`, one key and `--requests` (with a key only), each at
 /// most once; or `--wait <intent>` with `--timeout <seconds>` and `--store`; or `--indicators` with an optional
-/// intent, `--text` and `--store`; or `--brief <intent>` with `--store` alone; or `--page` with `--store` alone.
+/// intent, `--text` and `--store`; or `--brief` with an intent or with `--directory <absolute path>`, and
+/// `--store`; or `--page` with `--store` alone.
 pub fn parse(argv: &[OsString]) -> Result<Args, Failure> {
     let usage = || error("usage", "args");
     let (mut store, mut text, mut term, mut key) = (None, false, None, None);
     let (mut wait, mut timeout, mut indicators) = (None, None, false);
-    let (mut brief, mut requests, mut page) = (None, false, false);
+    let (mut brief, mut requests, mut page, mut directory) = (None, false, false, None);
     let plain = |k: &str| {
         !k.starts_with('-') && (1..=512).contains(&k.len()) && !k.chars().any(char::is_control)
     };
-    let mut it = argv.iter().map(|a| a.to_str());
+    let mut it = argv.iter().map(|a| a.to_str()).peekable();
     while let Some(arg) = it.next() {
         match arg.ok_or_else(usage)? {
             "--text" if !text => text = true,
@@ -95,7 +99,15 @@ pub fn parse(argv: &[OsString]) -> Result<Args, Failure> {
             "--requests" if !requests => requests = true,
             "--page" if !page => page = true,
             "--brief" if brief.is_none() => {
-                brief = Some(it.next().flatten().filter(|k| plain(k)).ok_or_else(usage)?);
+                let named = it.next_if(|a| !a.is_some_and(|a| a.starts_with('-')));
+                brief = Some(match named {
+                    Some(a) => Some(a.filter(|k| plain(k)).ok_or_else(usage)?),
+                    None => None,
+                });
+            }
+            "--directory" if directory.is_none() => {
+                let absolute = |d: &&str| d.starts_with('/') && !d.chars().any(char::is_control);
+                directory = Some(it.next().flatten().filter(absolute).ok_or_else(usage)?);
             }
             "--wait" if wait.is_none() => {
                 wait = Some(it.next().flatten().filter(|k| plain(k)).ok_or_else(usage)?);
@@ -110,6 +122,9 @@ pub fn parse(argv: &[OsString]) -> Result<Args, Failure> {
             _ => return Err(usage()),
         }
     }
+    if directory.is_some() && brief.is_none() {
+        return Err(usage());
+    }
     let call = match (term, key, wait, timeout, indicators, brief, requests, page) {
         (None, None, None, None, false, None, false, false) => Call::Overview,
         (None, Some(k), None, None, false, None, false, false) => Call::Key(k),
@@ -119,8 +134,13 @@ pub fn parse(argv: &[OsString]) -> Result<Args, Failure> {
             Call::Wait(i.to_owned(), t.unwrap_or(14_400))
         }
         (None, k, None, None, true, None, false, false) => Call::Indicators(k),
-        (None, None, None, None, false, Some(i), false, false) if !text => {
+        (None, None, None, None, false, Some(Some(i)), false, false)
+            if !text && directory.is_none() =>
+        {
             Call::Brief(i.to_owned())
+        }
+        (None, None, None, None, false, Some(None), false, false) if !text => {
+            Call::Open(directory.map(str::to_owned))
         }
         (None, None, None, None, false, None, false, true) if !text => Call::Page,
         _ => return Err(usage()),
@@ -559,13 +579,21 @@ fn unit_in_full(
 /// The lines of the brief, and the bytes of one with its line break.
 const BRIEF_LINES: usize = 40;
 const BRIEF_BYTES: usize = 120;
-/// The lines of the sections that keep a share; the units take the rest (their own share is 16).
-const SHARE_CRITERIA: usize = 8;
-const SHARE_UNITS: usize = 16;
-const SHARE_NEEDS: usize = 6;
-const SHARE_HOLDS: usize = 5;
+/// The lines each section of a block may use; they sum to `BRIEF_LINES` (R44, R45).
+const CAP_STATUS: usize = 2;
+const CAP_NEXT: usize = 3;
+const CAP_CRITERIA: usize = 4;
+const CAP_UNITS: usize = 18;
+const CAP_NEEDS: usize = 6;
+const CAP_HOLDS: usize = 6;
+const CAP_DELIVERY: usize = 1;
+const _: () = assert!(
+    CAP_STATUS + CAP_NEXT + CAP_CRITERIA + CAP_UNITS + CAP_NEEDS + CAP_HOLDS + CAP_DELIVERY
+        == BRIEF_LINES
+);
 
-/// A section's lines cut to `cap`: past it, the last line is `<label> (+N more)` for the entries not shown.
+/// A section's lines cut to `cap`: past it, the last line is `<label> (+N more)` for the entries not shown,
+/// and it counts inside the cap.
 fn capped(label: &str, mut lines: Vec<String>, cap: usize) -> Vec<String> {
     if lines.len() > cap {
         let keep = cap.saturating_sub(1);
@@ -575,63 +603,103 @@ fn capped(label: &str, mut lines: Vec<String>, cap: usize) -> Vec<String> {
     }
     lines
 }
-/// `ap status --brief <intent>`: at most `BRIEF_LINES` lines of `BRIEF_BYTES` bytes, in sections: the status
-/// and the Lead, the criteria, the units that are not ended, what needs the Lead, the holds and the last
-/// delivery. It reads what `ap status <intent>` and `ap status` read, and writes nothing.
-fn brief(
-    s: &mut impl System,
-    store: Option<&str>,
-    key: &str,
-    remote: bool,
-) -> Result<Value, Failure> {
-    let Some(i) = at(store::get(s, store, "intent", key), "intent")? else {
-        return Err(error("unknown_intent", "intent"));
-    };
+/// The own entries of a section cut to `cap` less the line that counts what lies elsewhere, which follows them
+/// only when it is given (R45).
+fn sectioned(label: &str, own: Vec<String>, elsewhere: Option<String>, cap: usize) -> Vec<String> {
+    let room = cap - usize::from(elsewhere.is_some());
+    let mut lines = capped(label, own, room);
+    lines.extend(elsewhere);
+    lines
+}
+/// The states in `order` with their counts, as `<state> <n>` joined by `, `, then `deferred <n>` when `off` is
+/// above 0; `none` for nothing.
+fn counted<'a>(order: &[&str], states: impl Iterator<Item = &'a Value>, off: usize) -> String {
+    let states: Vec<&Value> = states.collect();
+    let mut parts: Vec<String> = order
+        .iter()
+        .filter_map(|o| {
+            let n = states.iter().filter(|s| **s == *o).count();
+            (n > 0).then(|| format!("{o} {n}"))
+        })
+        .collect();
+    if off > 0 {
+        parts.push(format!("deferred {off}"));
+    }
+    match parts.is_empty() {
+        true => "none".to_owned(),
+        false => parts.join(", "),
+    }
+}
+/// What a block reads besides its intent: the units, findings and holds of the store, the delivery record
+/// and the store's clock.
+struct Facts {
+    now: u64,
+    units: Vec<Found>,
+    findings: Vec<Found>,
+    holds: Vec<Found>,
+    delivered: Option<Value>,
+}
+fn facts(s: &mut impl System, store: Option<&str>, remote: bool) -> Result<Facts, Failure> {
     let mut seen = Seen::default();
-    let unrouted = vec![eq("status", "current"), eq("route", "unrouted")];
-    let mut requests = at(
-        store::search_seen(s, store, "request", unrouted, &mut seen),
-        "requests",
+    let mut units = at(
+        store::search_seen(s, store, "unit", vec![any("state", &UNITS)], &mut seen),
+        "units",
     )?;
     let now = seen
         .now
         .ok_or_else(|| error("store_answer_unreadable", "now"))?;
-    requests.sort_by_key(|(k, f)| (text(&f["said_at"]).to_owned(), k.clone()));
-    let mine = vec![json!({"eq": ["intent", crate::host::id("intent", key)]})];
-    let mut criteria = list(s, store, "criterion", "criteria", mine)?;
-    criteria.sort_by_key(|(k, f)| (text(&f["added_at"]).to_owned(), k.clone()));
-    let mut every = all_units(s, store)?;
-    sort_units(&mut every);
-    let mut findings = open_findings(s, store)?;
-    sort_findings(&mut findings);
+    sort_units(&mut units);
+    let mut findings: Vec<Found> = open_findings(s, store)?
+        .into_iter()
+        .filter(|f| f.1["state"] == "open")
+        .collect();
+    findings.sort_by_key(|(k, f)| (Reverse(text(&f["last_seen_at"]).to_owned()), k.clone()));
     let mut holds = active_holds(s, store)?;
     sort_holds(&mut holds);
     let delivered = if remote { None } else { delivery(s) };
-
-    let mut names: Vec<&String> = vec![];
-    let units: Vec<&Found> = every
-        .iter()
-        .filter(|(_, u)| u["intent"]["native_key"] == key)
-        .inspect(|u| names.push(&u.0))
-        .collect();
-    let mine = |f: &Found| {
-        f.1["unit"]["native_key"]
-            .as_str()
-            .is_some_and(|u| names.iter().any(|n| *n == u))
-            || f.1["intent"]["native_key"] == key
-    };
-    let neither = |f: &Found| f.1["unit"].is_null() && f.1["intent"].is_null();
-    // A hold names the intent or one of its units by its subject (R46); a subject of another type, or none,
-    // is neither.
-    let hold_mine = |f: &Found| {
-        names_of(&f.1, "intent", key)
-            || subject_of(&f.1).is_some_and(|(t, u)| t == "unit" && names.iter().any(|n| *n == u))
-    };
-    let hold_neither =
-        |f: &Found| !subject_of(&f.1).is_some_and(|(t, _)| t == "unit" || t == "intent");
+    Ok(Facts {
+        now,
+        units,
+        findings,
+        holds,
+        delivered,
+    })
+}
+/// The notes cut into at most `CAP_NEXT` lines: each a `next ` and the next bytes of the notes, cut back to a
+/// character boundary; `next -` for none.
+fn next_lines(notes: &Value) -> Vec<String> {
+    let all = one(notes.as_str().unwrap_or_default());
+    let mut rest = all.as_str();
+    let mut lines = vec![];
+    while lines.len() < CAP_NEXT && !rest.is_empty() {
+        let (head, _) = cut(rest, BRIEF_BYTES - 1 - "next ".len());
+        rest = &rest[head.len()..];
+        if !head.trim().is_empty() {
+            lines.push(format!("next {}", head.trim_end()));
+        }
+    }
+    if lines.is_empty() {
+        lines.push("next -".to_owned());
+    }
+    lines
+}
+/// One block of the brief: the sections of R45 for the intent `key`, whose stored fields are `i`.
+fn brief_block(
+    s: &mut impl System,
+    store: Option<&str>,
+    key: &str,
+    i: &Value,
+    facts: &Facts,
+) -> Result<Vec<String>, Failure> {
+    let mine = vec![json!({"eq": ["intent", crate::host::id("intent", key)]})];
+    let criteria = list(s, store, "criterion", "criteria", mine)?;
     let value = |v: &Value| one(v.as_str().unwrap_or("-"));
+    let units: Vec<&Found> = (facts.units.iter())
+        .filter(|(_, u)| u["intent"]["native_key"] == key)
+        .collect();
+    let named = |u: &str| units.iter().any(|n| n.0 == u);
 
-    let confirmed = store::confirmed(&i);
+    let confirmed = store::confirmed(i);
     let status = vec![
         format!(
             "status {key} {}, confirmed {confirmed}",
@@ -639,99 +707,131 @@ fn brief(
         ),
         format!("status lead {}", value(&i["lead_session"])),
     ];
-    let criteria: Vec<String> = (criteria.iter())
-        .map(|(k, c)| format!("criterion {} {}", one(k), value(&c["state"])))
+    let next = next_lines(&i["notes"]);
+
+    let states = ["open", "pass", "fail", "waived"];
+    let mut failed: Vec<&Found> = criteria.iter().filter(|c| c.1["state"] == "fail").collect();
+    failed.sort_by_key(|(k, c)| (text(&c["added_at"]).to_owned(), k.clone()));
+    let failed: Vec<String> = (failed.iter())
+        .map(|(k, _)| format!("criterion {} fail", one(k)))
         .collect();
-    let open: Vec<String> = units
-        .iter()
-        .filter(|(_, u)| {
-            !["merged", "done", "dropped"]
-                .iter()
-                .any(|e| u["state"] == *e)
+    let mut criterion = vec![format!(
+        "criterion {}",
+        counted(&states, criteria.iter().map(|c| &c.1["state"]), 0)
+    )];
+    criterion.extend(capped("criterion", failed, CAP_CRITERIA - 1));
+
+    // The units: counts, then what is stopped, waits, is owed, runs and is ready, each by key.
+    let deferred = |u: &&Found| !u.1["deferred_by"].is_null();
+    let live: Vec<&Found> = units.iter().copied().filter(|u| !deferred(u)).collect();
+    let on = |state: &'static str| live.iter().filter(move |u| u.1["state"] == state);
+    let class = |u: &Found| value(&u.1["class"]);
+    let stopped = on("stopped").map(|u| {
+        let cause = u.1["stop_cause"].as_str().filter(|c| !c.is_empty());
+        let cause = one(cause.unwrap_or("-"));
+        format!("unit {} stopped {} stopped: {cause}", one(&u.0), class(u))
+    });
+    let accepted = on("accepted").map(|u| {
+        let (head, approved) = (u.1["head"].as_str(), u.1["approved_head"].as_str());
+        let by_lead = ["contract", "effect"].iter().any(|c| u.1["class"] == *c);
+        let wait = match by_lead && (approved.is_none() || approved != head) {
+            true => {
+                let short: String = head.unwrap_or("-").chars().take(7).collect();
+                format!("waits lead: approve {}", one(&short))
+            }
+            false => "waits: merge".to_owned(),
+        };
+        format!("unit {} accepted {} {wait}", one(&u.0), class(u))
+    });
+    let owed = on("merged")
+        .filter(|u| {
+            let given = u.1["use"].as_str().filter(|t| !t.is_empty());
+            given.is_some_and(|t| !t.starts_with("none:")) && u.1["used_at"].is_null()
         })
-        .map(|(k, u)| {
-            let more = match u["state"].as_str() {
-                Some("ready") => match u["waits_on"].as_str() {
-                    Some(w) => format!(" waits on {}", one(w)),
-                    None => String::new(),
-                },
-                Some("stopped") => format!(" stopped: {}", value(&u["stop_cause"])),
-                _ => {
-                    let blocked: Vec<String> = (u["depends_on"].as_array().into_iter().flatten())
-                        .map(|d| text(&d["native_key"]))
-                        .filter_map(|d| {
-                            let state = every.iter().find(|e| e.0 == d).map(|e| &e.1["state"]);
-                            let done = state.is_some_and(|st| st == "merged" || st == "done");
-                            let state = state.map_or("missing", |st| text(st));
-                            (!done).then(|| format!("{} ({state})", one(d)))
-                        })
-                        .collect();
-                    match blocked.is_empty() {
-                        true => String::new(),
-                        false => format!(" blocked by {}", blocked.join(", ")),
-                    }
-                }
-            };
+        .map(|u| format!("unit {} use owed", one(&u.0)));
+    let running = on("running").map(|u| {
+        let began = u.1["started_at"].as_str().and_then(epoch);
+        let minutes = began.map_or("-".to_owned(), |t| {
+            (facts.now.saturating_sub(t) / 60).to_string()
+        });
+        format!("unit {} running {} {minutes} min", one(&u.0), class(u))
+    });
+    let ready = on("ready").map(|u| {
+        let waits = match u.1["waits_on"].as_str() {
+            Some(w) => format!(" waits on {}", one(w)),
+            None => String::new(),
+        };
+        format!("unit {} ready {}{waits}", one(&u.0), class(u))
+    });
+    let mut off: Vec<&Found> = units.iter().copied().filter(|u| deferred(u)).collect();
+    off.sort_by_key(|u| u.0.clone());
+    let put_off = off.iter().map(|u| format!("unit {} deferred", one(&u.0)));
+    let entries: Vec<String> = stopped
+        .chain(accepted)
+        .chain(owed)
+        .chain(running)
+        .chain(ready)
+        .chain(put_off)
+        .collect();
+    let mut unit = vec![format!(
+        "unit {}",
+        counted(
+            &UNITS,
+            live.iter().map(|u| &u.1["state"]),
+            units.len() - live.len()
+        )
+    )];
+    unit.extend(capped("unit", entries, CAP_UNITS - 1));
+
+    // The findings of the intent, newest first, and how many others of severity act or urgent are open.
+    let about = |f: &Found| {
+        let subject = subject_of(&f.1)
+            .is_some_and(|(t, k)| (t == "intent" && k == key) || (t == "unit" && named(k)));
+        let planned = f.1["unit"]["native_key"].as_str().is_some_and(named)
+            || f.1["intent"]["native_key"] == key;
+        subject || planned
+    };
+    let (own, other): (Vec<&Found>, Vec<&Found>) = facts.findings.iter().partition(|f| about(f));
+    let found: Vec<String> = (own.iter())
+        .map(|(k, f)| {
             format!(
-                "unit {} {} {}{}{more}",
+                "needs finding {} {}: {}",
                 one(k),
-                value(&u["state"]),
-                value(&u["class"]),
-                wave(&u["wave"])
+                value(&f["severity"]),
+                one(text(&f["summary"]))
             )
         })
         .collect();
+    let others = (other.iter())
+        .filter(|f| f.1["severity"] == "act" || f.1["severity"] == "urgent")
+        .count();
+    let elsewhere = (others > 0).then(|| format!("needs (+{others} elsewhere: ap status)"));
+    let needs = sectioned("needs", found, elsewhere, CAP_NEEDS);
 
-    let mut need = vec![];
-    let mut push = |kind: &str, key: &str, why: &str| {
-        need.push(format!("needs {kind} {}: {}", one(key), one(why)));
-    };
-    let severe = |f: &&Found, v: &str| f.1["severity"] == v && f.1["state"] == "open";
-    let near: Vec<&Found> = findings.iter().filter(|f| mine(f) || neither(f)).collect();
-    near.iter()
-        .filter(|f| severe(f, "urgent"))
-        .for_each(|f| push("finding", &f.0, text(&f.1["summary"])));
-    for state in ["stopped", "accepted"] {
-        let why = match state {
-            "stopped" => None,
-            _ => Some("waits for the Lead's reading or merge"),
-        };
-        for u in units.iter().filter(|u| u.1["state"] == state) {
-            push("unit", &u.0, why.unwrap_or(text(&u.1["stop_cause"])));
-        }
-    }
-    near.iter()
-        .filter(|f| severe(f, "act"))
-        .for_each(|f| push("finding", &f.0, text(&f.1["summary"])));
-    for r in requests.iter().filter(|r| neither(r)) {
-        if epoch(text(&r.1["said_at"])).is_some_and(|t| t + DAY < now) {
-            push(
-                "request",
-                &r.0,
-                &format!("unrouted since {}", text(&r.1["said_at"])),
-            );
-        }
-    }
+    // The holds of the intent, its units and the hosts, oldest first.
+    let (own, other): (Vec<&Found>, Vec<&Found>) = facts.holds.iter().partition(|h| {
+        names_of(&h.1, "intent", key)
+            || subject_of(&h.1).is_some_and(|(t, k)| t == "host" || (t == "unit" && named(k)))
+    });
+    let held: Vec<String> = (own.iter())
+        .map(|h| {
+            let scope = match h.1["scope"].as_str() {
+                Some(x) => format!(" scope {}", one(x)),
+                None => String::new(),
+            };
+            let subject =
+                subject_of(&h.1).map_or(String::new(), |(t, k)| format!(" {t} {}", one(k)));
+            format!(
+                "hold {} until {}{subject}{scope}",
+                value(&h.1["effect"]),
+                value(&h.1["until"])
+            )
+        })
+        .collect();
+    let elsewhere = (!other.is_empty()).then(|| format!("hold (+{} elsewhere)", other.len()));
+    let holds = sectioned("hold", held, elsewhere, CAP_HOLDS);
 
-    let hold_line = |h: &Found| {
-        let scope = match h.1["scope"].as_str() {
-            Some(x) => format!(" scope {}", one(x)),
-            None => String::new(),
-        };
-        let subject = subject_of(&h.1).map_or(String::new(), |(t, k)| format!(" {t} {}", one(k)));
-        format!(
-            "hold {} until {}{subject}{scope}",
-            value(&h.1["effect"]),
-            value(&h.1["until"])
-        )
-    };
-    let (here, rest): (Vec<&Found>, Vec<&Found>) = holds
-        .iter()
-        .filter(|h| hold_mine(h) || hold_neither(h))
-        .partition(|h| hold_mine(h));
-    let held: Vec<String> = here.into_iter().chain(rest).map(hold_line).collect();
-
-    let last = vec![match &delivered {
+    let last = vec![match &facts.delivered {
         Some(d) => format!(
             "delivery {} {} tip {} target {}",
             value(&d["at"]),
@@ -741,20 +841,67 @@ fn brief(
         ),
         None => "delivery unreadable".to_owned(),
     }];
-
-    let criteria = capped("criterion", criteria, SHARE_CRITERIA);
-    let need = capped("needs", need, SHARE_NEEDS);
-    let held = capped("hold", held, SHARE_HOLDS);
-    // A section that does not use its lines gives them to the units.
-    let spare =
-        (SHARE_CRITERIA - criteria.len()) + (SHARE_NEEDS - need.len()) + (SHARE_HOLDS - held.len());
-    let open = capped("unit", open, SHARE_UNITS + spare);
-    let lines: Vec<String> = [status, criteria, open, need, held, last]
+    debug_assert!(
+        status.len() <= CAP_STATUS && next.len() <= CAP_NEXT && last.len() <= CAP_DELIVERY
+    );
+    Ok([status, next, criterion, unit, needs, holds, last]
         .into_iter()
         .flatten()
         .take(BRIEF_LINES)
         .map(|l| cut(&l, BRIEF_BYTES - 1).0.to_owned())
-        .collect();
+        .collect())
+}
+/// `ap status --brief <intent>`: one block of at most `BRIEF_LINES` lines of `BRIEF_BYTES` bytes, in the
+/// sections of R45. It reads what `ap status <intent>` and `ap status` read, and writes nothing.
+fn brief(
+    s: &mut impl System,
+    store: Option<&str>,
+    key: &str,
+    remote: bool,
+) -> Result<Value, Failure> {
+    let Some(i) = at(store::get(s, store, "intent", key), "intent")? else {
+        return Err(error("unknown_intent", "intent"));
+    };
+    let facts = facts(s, store, remote)?;
+    Ok(json!({"brief": brief_block(s, store, key, &i, &facts)?}))
+}
+/// `ap status --brief` without an intent: the block of each open intent whose directory is the one asked, or
+/// the working directory, a final `/` dropped from each, by key and separated by an empty line.
+fn open_briefs(
+    s: &mut impl System,
+    store: Option<&str>,
+    directory: Option<&str>,
+    remote: bool,
+) -> Result<Value, Failure> {
+    let dir = match directory {
+        Some(d) => d.to_owned(),
+        None => {
+            let io = || error("io_error", "directory");
+            let cwd = s.cwd().map_err(|_| io())?;
+            cwd.to_str().ok_or_else(io)?.to_owned()
+        }
+    };
+    let trimmed = |d: &str| d.strip_suffix('/').unwrap_or(d).to_owned();
+    let status = any("status", &["draft", "assumed", "confirmed"]);
+    let mut intents = list(s, store, "intent", "intents", vec![status])?;
+    intents.retain(|(_, i)| {
+        i["directory"]
+            .as_str()
+            .is_some_and(|d| trimmed(d) == trimmed(&dir))
+    });
+    intents.sort_by_key(|(k, _)| k.clone());
+    if intents.is_empty() {
+        let line = format!("status no open intent of {}", one(&dir));
+        return Ok(json!({"brief": [cut(&line, BRIEF_BYTES - 1).0]}));
+    }
+    let facts = facts(s, store, remote)?;
+    let mut lines: Vec<String> = vec![];
+    for (n, (key, i)) in intents.iter().enumerate() {
+        if n > 0 {
+            lines.push(String::new());
+        }
+        lines.extend(brief_block(s, store, key, i, &facts)?);
+    }
     Ok(json!({"brief": lines}))
 }
 
@@ -920,6 +1067,7 @@ fn dispatch(
         Call::Key(key) => keyed(s, store, key, false),
         Call::KeyAll(key) => keyed(s, store, key, true),
         Call::Brief(intent) => brief(s, store, intent, remote),
+        Call::Open(directory) => open_briefs(s, store, directory.as_deref(), remote),
         Call::Term(word) => term(s, store, word),
         Call::Wait(intent, timeout) => wait(s, store, intent, *timeout, remote),
         Call::Indicators(intent) => indicators(s, store, intent.as_deref()),
@@ -1828,7 +1976,7 @@ pub fn text_of(call: &Call, v: &Value) -> String {
         Call::Indicators(_) => indicators_text(v),
         Call::Overview => overview_text(v),
         Call::Wait(..) => format!("{v}\n"),
-        Call::Brief(_) => {
+        Call::Brief(_) | Call::Open(_) => {
             let lines = v["brief"].as_array().into_iter().flatten();
             lines.map(|l| format!("{}\n", text(l))).collect()
         }
@@ -1884,11 +2032,13 @@ pub fn cli(argv: &[OsString]) -> ExitCode {
         .is_ok_and(|(a, _)| matches!(a.call, Call::Wait(..)));
     let result = configured.and_then(|(a, remote)| {
         let v = execute_with(&mut Host, a.store.as_deref(), &a.call, remote)?;
-        Ok(if a.text || matches!(a.call, Call::Brief(_) | Call::Page) {
-            text_of(&a.call, &v)
-        } else {
-            format!("{v}\n")
-        })
+        Ok(
+            if a.text || matches!(a.call, Call::Brief(_) | Call::Open(_) | Call::Page) {
+                text_of(&a.call, &v)
+            } else {
+                format!("{v}\n")
+            },
+        )
     });
     let (written, status) = match result {
         Ok(out) => (std::io::stdout().write_all(out.as_bytes()), 0),
