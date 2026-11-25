@@ -1109,6 +1109,33 @@ fn first_at<'a>(l: &'a store::Logged, unit: &'a str) -> Option<&'a str> {
     row.and_then(|r| r["submitted_at"].as_str())
         .filter(|_| l.withheld == 0)
 }
+/// The messages a run counts: the sum of its `days`' `messages`, 0 for a run without days (R35).
+fn messages_of(run: &Value) -> u64 {
+    let days = run["days"].as_array().into_iter().flatten();
+    days.filter_map(|d| d["messages"].as_u64()).sum()
+}
+/// Who ran a unit's implementer work (R35): `{runtime, model}` of its run of role `implementer` with the most
+/// messages, then the latest `started_at`, then the smallest key; the model is `served_by` when the run has one.
+/// Null when the unit has no such run.
+fn ran_of(runs: &[Found]) -> Value {
+    let order = |a: &&Found, b: &&Found| {
+        messages_of(&a.1)
+            .cmp(&messages_of(&b.1))
+            .then_with(|| text(&a.1["started_at"]).cmp(text(&b.1["started_at"])))
+            .then_with(|| b.0.cmp(&a.0))
+    };
+    let implementer = runs.iter().filter(|r| r.1["role"] == "implementer");
+    match implementer.max_by(order) {
+        Some((_, r)) => {
+            let model = match text(&r["served_by"]) {
+                "" => r["model"].clone(),
+                served => json!(served),
+            };
+            json!({"runtime": r["runtime"], "model": model})
+        }
+        None => Value::Null,
+    }
+}
 /// The indicators of one merged unit, read from its log rows, reviews and runs (README "The status").
 fn indicator(
     s: &mut impl System,
@@ -1154,6 +1181,7 @@ fn indicator(
         "implementer": match u["implementer"].is_object() {
             true => json!({"runtime": u["implementer"]["runtime"], "model": u["implementer"]["model"], "effort": u["implementer"]["effort"]}),
             false => Value::Null },
+        "ran": ran_of(&runs), "kind": u["kind"].clone(),
         "started_at": started_at, "merged_at": merged_at, "minutes": minutes, "rounds": rounds,
         "repairs": runs.iter().filter(|r| r.1["role"] == "fixer").count(),
         "first_verdict": reviews.first().map(|r| r.1["verdict"].clone()), "stops": stops, "tokens": tokens});
