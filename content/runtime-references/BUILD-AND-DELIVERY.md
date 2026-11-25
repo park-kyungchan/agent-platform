@@ -71,7 +71,7 @@ Every platform repository has one workflow, `.github/workflows/rust.yml`, with o
 | After the merge | `git -C <main checkout> fetch origin`; move a main checkout only with `merge --ff-only`, and not at all while it holds someone's uncommitted edits |
 | Worktree and branch | Remove only your own merged worktree, without force, then its branch |
 
-The rulesets of the three platform repositories require the commit status `lead-review` on the head beside the check `rust`. It is posted by the Lead's accept (`ap unit`, section "One unit" of `crates/ap/README.md` in `agent-platform`), never by a worker.
+The rulesets of the three platform repositories require the commit status `lead-review` on the head beside the check `rust`; `ap unit run` posts it at the merge, never a worker. A unit of class `plain` is merged once its verifier accepted the head, and one of class `contract` or `effect` waits for the Lead's `ap unit approve` of the head the Lead read, or `ap unit reject` (`agent-platform` `specs/ap/unit-run.md` R33, R34). Where the policy's `units.approval.contract` is `verifier`, `ap unit run` approves a `contract` unit itself when the head it checked changes no path of `units.approval.guarded` (R46, R47). Every `units.approval.sample`-th unit so approved and merged opens a finding `policy-sample-<unit>`, and the Lead reads that merged diff (R48).
 
 Commit, push, merge and installation are four effects; each needs the task's authority.
 
@@ -94,6 +94,6 @@ Install from a clean checkout of the merged commit, never from a branch.
 1. Find the source: `CLI-RUNTIMES.md` section 7 names the repository of each skill; `AGENTS.md` and `runtime-references/` are in `agent-platform` `content/`. Never edit only the installed copy.
 2. One home per fact (skill `lead` section 4), and no changing value in always-loaded text (`agent-platform` `specs/content/agents-file.md`).
 3. In `agent-platform`, a file added to or removed from `content/` is also added to or removed from `content/SHA256SUMS`, in the same order; every changed file gets its new checksum.
-4. Run `python3 -I -B ci/check-content.py`. It refuses a checksum mismatch, a route to a missing file or section, a verb of `ap` or a section of its README that does not exist, a word the glossary replaces, a model name, and a file over its limit.
+4. Run `python3 -I -B ci/check-content.py`. It refuses a checksum mismatch, a route to a missing file or section, a verb of `ap` or a section of its README that does not exist, a retired name, a model name, and a file over its limit.
 5. Deliver through sections 3 to 5. The review is by a fresh session whose tier is not below the writer's.
 6. A change of `AGENTS.md`, of a reference or of a skill that shapes how a Lead decides or speaks is judged by the Lead suite (`agent-platform` `evals/README.md`, "The Lead suite"): the answers of its cases under the instructions of `main` and under those of the change's head, scored blind. The pull request carries the public sheet; the Lead reads every case the sheet lists as lost before the merge.
