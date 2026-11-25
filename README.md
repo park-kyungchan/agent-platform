@@ -74,7 +74,9 @@ only that one file:
 | `rollback <kept file>` | Puts one kept `policy.json.before-<stamp>` back, after `ap policy check`, keeping the current bytes first |
 
 The policy's v3 members: `units.approval` says which unit of class contract merges on its verifier's accept (its head meets no path of `guarded`, and `sample` sets how many accepted merges are drawn for a later look); `work.slots` is how many units the dispatch pass runs at once (6); and `routing` holds the tier `order`, the `large_lines` bound, the `map` of implementer and verifier tiers by kind and size, and the `bar` a tier must meet.
+The member `routing.order` names two AGY pairs: `["agy","gemini-4-hydrogen-high"]` stands directly after `["claude","sonnet"]` and `["agy","gemini-4-neon-high"]` directly after `["claude","opus"]`. The order decides: a tier is admitted where its pair stands at or after the row's pair, so Neon is admitted wherever the map gives Sonnet or Opus, and Hydrogen only where it gives Sonnet or a pair before it; no row of the map changes.
 A unit whose tier names a runtime outside `routing.order` is refused `tier_not_in_order` until a later policy unit adds it.
+Muse left the policy on the user's word of 2026-11-24: its models and its account are no longer in the file.
 
 The script works in its own clone, `/var/lib/agent-platform/clones/agent-vps-operations`
 (never in a main checkout), holds the lock `/var/lib/agent-platform/etc/lock`, and
