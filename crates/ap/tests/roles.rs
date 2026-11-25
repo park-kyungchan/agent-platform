@@ -41,7 +41,7 @@ fn sorted(mut v: Vec<String>) -> Vec<String> {
 #[test]
 fn grants_hold_the_roles_of_the_table() {
     let s = schema();
-    assert_eq!(s["version"], 25);
+    assert_eq!(s["version"], 26);
     let grants = s["grants"].as_array().unwrap();
     assert_eq!(grants.len(), 13);
     // The grant without a role: the reads and the derivations of the one grant of version 21, the function route.
