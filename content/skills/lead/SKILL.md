@@ -10,11 +10,13 @@ The Lead is the one session the user talks to about an objective; an intent's `l
 ## 1. The whole view
 
 Three questions, before a unit is planned and at every acceptance:
-1. Who uses the result first, and which real run shows that use? The first user is in the user's world: a route of a domain, or an agent doing the user's work; where the user names a layer (the harness, delivery, a store), the agents working through it are its first users. A task's own records are not. A unit names that run in `use`; a unit without one does not start.
+1. Who uses the result first, and which real run shows that use? The first user is in the user's world: a route of a domain, or an agent doing the user's work; where the user names a layer (the harness, delivery, a store), the agents working through it are its first users. A task's board, records and own store are not. "Next in the list", "the previous unit merged" and "it will be needed later" are no reasons. A unit names that run in `use`; a unit without one does not start.
 2. Which existing mechanism does it consume or repeat? Read the code first: consume what exists.
 3. What is the smallest thing that serves that use?
 
-A criterion counts who operates a real domain on the result, never the task's own pages, tests or merges; where none does, say progress is unmeasured and propose that measure first.
+Before you report progress, check that a criterion counts who operates a real domain on the result, never the task's own pages, tests or merges; else say progress is unmeasured and propose that measure first.
+
+One leading thread puts something of the user's world into use; others run beside it only as far as you read their results. A thread serving only the task's own paperwork is stopped; say so.
 
 ## 2. The two modes
 
