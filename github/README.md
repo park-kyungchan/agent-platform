@@ -88,8 +88,10 @@ file `units.github.lead_app.key` names. `ap` names the key by its path to `opens
 each status gets a fresh installation token, which reaches the statuses of that one repository.
 
 (iii) The stage tokens. Per repository one fine-grained personal access token: `Repository access` that
-repository; `Contents: read and write` and `Pull requests: read and write`, nothing else; with an expiry.
-It is in the file `units.github.stage_tokens` names for that repository, and it is replaced by writing
+repository; `Contents: read and write`, `Pull requests: read and write`, `Workflows: read and write`,
+`Actions: read-only` and `Commit statuses: read-only`, nothing else (GitHub adds `Metadata: read-only`
+itself); with an expiry. `Workflows` is there for the push of a workflow change, `Actions` for reading a
+run's logs and jobs, and `Commit statuses` for reading the statuses of a head. It is in the file `units.github.stage_tokens` names for that repository, and it is replaced by writing
 that file again: the run reads it anew before each author stage. An implementer or a fixer of that
 repository pushes and writes to its pull request with it (`GH_TOKEN`) and does not see the host's login;
 no verifier holds a login or a token: `ap unit run` gives it the pull request's description as a file and
@@ -141,15 +143,19 @@ request of it.
 (vi) What a stage token still reaches: every branch and pull request of its repository, another unit's
 too (a push, a close, a branch deleted, a tag created). None of that reaches `main`, which takes only a
 pull request: `ap unit run` posts `lead-review` on the judged head alone, merges with
-`--match-head-commit <that head>` and judges a moved head again (`specs/ap/unit-run.md` R30, R31).
+`--match-head-commit <that head>` and judges a moved head again (`specs/ap/unit-run.md` R30, R31). With `Workflows`, a stage can change a
+workflow on its own branch, and that workflow runs on its push or pull request with the repository's
+Actions secrets, before `ap unit run`'s protected-path stop reads the diff; `main` still takes only a pull
+request that passes `lead-review` and the required checks.
 
-(vii) What it does not reach: another repository, a commit status, and a push that changes
-`.github/workflows/` (refused without the permission `Workflows`). Expected, not measured: an author's
-push of its merge of `origin/main` after `main` gained a workflow change (the frames order that merge
-first) is refused too; the unit then stops `no_pull_request` (an implementer) or `head_not_seen` (a
-fixer), and the Lead pushes that branch once from its worktree with the host's login, never forced, and
-runs the unit again. The run's own update (R26) pushes with the host's login, which holds the OAuth scope
-`workflow`, so it is expected, not measured, not to be refused.
+(vii) What it does not reach: another repository and writing a commit status (it only reads them). A push
+that changes `.github/workflows/` is reached with `Workflows`. For a token that lacks `Workflows`, e.g. a
+repository whose token is replaced without it, such a push is refused, and the Lead pushes that branch
+once from its worktree with the host's login, never forced, and runs the unit again; the unit stops
+`no_pull_request` (an implementer) or `head_not_seen` (a fixer). Expected, not measured, under that same
+condition: an author's push of its merge of `origin/main` after `main` gained a workflow change (the
+frames order that merge first) is refused too. The run's own update (R26) pushes with the host's login,
+which holds the OAuth scope `workflow`, so it is expected, not measured, not to be refused.
 
 ## What an undo does not take back
 
