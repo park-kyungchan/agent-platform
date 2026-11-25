@@ -934,8 +934,15 @@ fn r5_a_runs_model_is_not_synthetic_while_it_has_another() {
     let line = bed.pass(&mut f, "2026-11-18");
     assert_eq!(line["runs"]["recorded"], 2);
     let run = f.run_of("session", "s-code");
-    assert_eq!(days(&run), [("2026-11-18".to_owned(), 4)], "the code-mode lines are messages");
-    assert_eq!(run["model"], OPUS, "the model of most messages but <synthetic>");
+    assert_eq!(
+        days(&run),
+        [("2026-11-18".to_owned(), 4)],
+        "the code-mode lines are messages"
+    );
+    assert_eq!(
+        run["model"], OPUS,
+        "the model of most messages but <synthetic>"
+    );
     assert_eq!(
         f.run_of("session", "s-only")["model"],
         "<synthetic>",
@@ -1645,9 +1652,7 @@ fn r10_cost_of_an_intent_counts_the_run_of_its_lead_session() {
             .map(|g| (g["key"].clone(), g["usd"].clone(), g["runs"].clone()))
             .collect()
     };
-    let window = |intent: &str, by: &str| {
-        json!({"since": "2026-11-16", "until": "2026-11-22", "intent": intent, "by": by})
-    };
+    let window = |intent: &str, by: &str| json!({"since": "2026-11-16", "until": "2026-11-22", "intent": intent, "by": by});
     let other = cost(&mut f, window("other", "role"));
     assert_eq!(
         keys(&other),
