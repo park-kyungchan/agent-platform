@@ -28,7 +28,10 @@ fn skipped(var: &str, id: &str) {
     let Some(path) = std::env::var_os(var).filter(|p| !p.is_empty()) else {
         return;
     };
-    let options = std::fs::OpenOptions::new().append(true).create(true).open(path);
+    let options = std::fs::OpenOptions::new()
+        .append(true)
+        .create(true)
+        .open(path);
     let mut file = options.expect(var);
     std::io::Write::write_all(&mut file, format!("{id}\n").as_bytes()).expect(var);
 }
@@ -679,7 +682,11 @@ fn r5_wrapped_command_is_locked_and_an_unwrapped_one_is_not() {
     let check = fs::read_to_string(check).unwrap();
     let opening = "if [ \"${CI:-}\" != true ] && [ -z \"${CHECK_LOCKED:-}\" ]; then\n";
     let start = check.find(opening).expect("the lock block of ./check");
-    let end = start + check[start..].find("\nfi\n").expect("the end of the lock block") + 4;
+    let end = start
+        + check[start..]
+            .find("\nfi\n")
+            .expect("the end of the lock block")
+        + 4;
     write(&w.p("inner"), "#!/bin/sh\necho inner ran\n", 0o755);
     let copy = format!(
         "set -euo pipefail\nself={}\n{}echo past the lock\n",
@@ -708,7 +715,11 @@ fn r5_wrapped_command_is_locked_and_an_unwrapped_one_is_not() {
         .output()
         .unwrap();
     assert_eq!(lines(&out.stdout), ["locked=1"], "{out:?}");
-    write(&w.repo.join("check"), &format!("#!/bin/sh\n{show}\n"), 0o755);
+    write(
+        &w.repo.join("check"),
+        &format!("#!/bin/sh\n{show}\n"),
+        0o755,
+    );
     let out = w.command(&[&d]).env("CHECK_LOCKED", "1").output().unwrap();
     assert_eq!(lines(&out.stdout), ["locked=unset"], "{out:?}");
     fs::remove_file(w.p("build.lock")).unwrap();

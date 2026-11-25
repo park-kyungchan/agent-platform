@@ -179,7 +179,13 @@ pub(super) fn skip_hits<'p>(
         .flat_map(|(_, _, c)| c.iter().cloned())
         .collect();
     let outside = review::outside(&covers, paths);
-    Some(paths.iter().filter(|p| !outside.contains(p)).copied().collect())
+    Some(
+        paths
+            .iter()
+            .filter(|p| !outside.contains(p))
+            .copied()
+            .collect(),
+    )
 }
 /// `gh pr merge` with `words`: `Err` with the redacted reply when it failed (no reply: empty).
 fn merge_call(s: &mut impl System, words: &str) -> Result<(), String> {

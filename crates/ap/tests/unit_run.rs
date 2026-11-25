@@ -6782,7 +6782,9 @@ fn r49_a_head_is_guarded_by_skip_rows_of_the_base_and_the_head() {
         let mut f = F::new();
         f.approval(json!({"contract": "lead", "guarded": ["docs/**"], "sample": 2}));
         f.seed_skips(&skips_table("src/widgets.rs", "vps"));
-        let edit = format!("mkdir -p src; echo x > src/widgets.rs; printf '%s' '{head_table}' > ci/skips.json");
+        let edit = format!(
+            "mkdir -p src; echo x > src/widgets.rs; printf '%s' '{head_table}' > ci/skips.json"
+        );
         let (a, _) = f.edit("contract", json!(["src/**", "ci/**"]), &[], &edit);
         assert_eq!(a["state"], "accepted", "{head_table}: {a}");
         assert_eq!(last(&f), Some(Some(json!(true))), "{head_table}");
@@ -6851,7 +6853,10 @@ fn r50_plain_stopped_by_skip_rows_on_a_path_they_cover() {
     f.steps(&["implement", "accept"]);
     let a = f.stopped("protected_path_changed");
     let detail = a["stop_detail"].as_str().unwrap();
-    assert!(detail.contains("ci/skips.json") && !detail.contains("src/"), "{a}");
+    assert!(
+        detail.contains("ci/skips.json") && !detail.contains("src/"),
+        "{a}"
+    );
     // A contract unit whose write set names the path goes on.
     let mut f = F::new();
     f.set_unit(json!({"class": "contract"}));

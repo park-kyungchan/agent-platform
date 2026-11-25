@@ -38,7 +38,10 @@ fn skipped(var: &str, id: &str) {
     let Some(path) = std::env::var_os(var).filter(|p| !p.is_empty()) else {
         return;
     };
-    let options = std::fs::OpenOptions::new().append(true).create(true).open(path);
+    let options = std::fs::OpenOptions::new()
+        .append(true)
+        .create(true)
+        .open(path);
     let mut file = options.expect(var);
     std::io::Write::write_all(&mut file, format!("{id}\n").as_bytes()).expect(var);
 }
