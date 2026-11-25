@@ -34,6 +34,20 @@ use std::{
 
 static NEXT: AtomicU32 = AtomicU32::new(0);
 const BWRAP: &str = "/usr/bin/bwrap";
+const CHECK_SKIPS: &str = "CHECK_SKIPS";
+/// A test that cannot run here notes its row's id (`ci/skips.json`) as one line of the file `var`
+/// names, when that is set and not empty (`specs/ap/check.md` R22).
+fn skipped(var: &str, id: &str) {
+    let Some(path) = std::env::var_os(var).filter(|p| !p.is_empty()) else {
+        return;
+    };
+    let options = std::fs::OpenOptions::new()
+        .append(true)
+        .create(true)
+        .open(path);
+    let mut file = options.expect(var);
+    std::io::Write::write_all(&mut file, format!("{id}\n").as_bytes()).expect(var);
+}
 
 /// The fake CLI of a stage: notes its environment and whether its door is a socket, runs the file
 /// `then` when there is one (its output, errors and status kept), waits for `go` while `wait`
@@ -136,6 +150,7 @@ fn on_pc() -> bool {
     if pc {
         // Through the handle, not `eprintln!`, which the test harness would hold back.
         let _ = writeln!(std::io::stderr(), "door: skipped (pc)");
+        skipped(CHECK_SKIPS, "door-pc");
     }
     pc
 }
