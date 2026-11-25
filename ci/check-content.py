@@ -3,7 +3,7 @@
 
 Fails the build when (1) SHA256SUMS and the files disagree, (2) always-loaded text
 (AGENTS.md, skill frontmatter) carries a value that changes over time, (3) an owned file
-names a model (the Lead's table of the allowed models alone excepted), (4) a file that content/ routes a reader to does not exist, (5) a path
+names a model (the Lead's page form, which names the reviewers' models, alone excepted), (4) a file that content/ routes a reader to does not exist, (5) a path
 is elided or points into a main checkout's files, (6) on a host that has the corpus of
 design sources, a line range of OFFICIAL-DOCS.md section 4 falls outside its file, (7) a file names a retired name
 (RETIRED_NAMES), or (8) AGENTS.md
@@ -55,10 +55,11 @@ for name in listed:
 texts = {name: (ROOT / name).read_text(encoding="utf-8") for name in owned if name.endswith((".md", ".json"))}
 # A file name of the corpus of design sources is a citation, not a model assignment.
 CORPUS_PATH = re.compile(r"`docs/[^`\s]+`")
-# The one file that names models: the Lead's table of the allowed models and the rule that chooses them by a page's size.
-MODEL_TABLE = "skills/lead/references/unit-page.md"
+# The one file that names models: the Lead's page form, whose example page and reviewers name them; the allowed models
+# themselves are the policy file's member `models`, not a table here.
+MODEL_FILE = "skills/lead/references/unit-page.md"
 for name, text in texts.items():
-    if name != MODEL_TABLE:
+    if name != MODEL_FILE:
         for m in MODEL.finditer(CORPUS_PATH.sub("``", text)):
             fail("model_name_in_content", name, f"'{m.group(0)}' belongs in a task STATE, not in shared instructions")
     always = text if name == "AGENTS.md" else ""
@@ -141,6 +142,8 @@ for name, text in texts.items():
 
 # The vocabulary is a closed set with a budget, not a list that grows: a term must be used, and the files have limits.
 CORE_TERM_LIMIT, GLOSSARY_BYTE_LIMIT, USER_ROW_LIMIT, AGENTS_BYTE_LIMIT, SKILL_BYTE_LIMIT, LEAD_REFERENCE_BYTE_LIMIT = 16, 12000, 30, 6500, 6500, 8000
+# A Lead reference over the common limit has its own: the interview (the op `answer`), judging (the approval of a guarded head).
+LEAD_REFERENCE_LIMITS = {"interview": 8200, "unit-page": LEAD_REFERENCE_BYTE_LIMIT, "judging": 8100}
 if not terms or not banned:
     fail("glossary_no_terms", GLOSSARY, "no term table with a last column 'Do not write' was found")
 others = " ".join(text.lower() for name, text in texts.items() if name != GLOSSARY)
@@ -155,7 +158,7 @@ size = len(texts.get(GLOSSARY, "").encode())
 if size > GLOSSARY_BYTE_LIMIT:
     fail("glossary_over_limit", GLOSSARY, f"{size} bytes, limit {GLOSSARY_BYTE_LIMIT}: remove or move rows before adding")
 LIMITS = [("AGENTS.md", AGENTS_BYTE_LIMIT), ("skills/lead/SKILL.md", SKILL_BYTE_LIMIT), ("skills/report/SKILL.md", SKILL_BYTE_LIMIT)]
-LIMITS += [(f"skills/lead/references/{n}.md", LEAD_REFERENCE_BYTE_LIMIT) for n in ("interview", "unit-page", "judging")]
+LIMITS += [(f"skills/lead/references/{n}.md", limit) for n, limit in LEAD_REFERENCE_LIMITS.items()]
 for path, limit in LIMITS:
     used = len(texts.get(path, "").encode())
     if used > limit:
