@@ -1,0 +1,1290 @@
+//! Synthetic `ontology-schema/v1` tests.
+#![allow(clippy::unwrap_used)]
+use ont_core::schema::{Owner, Schema, SchemaSet};
+use ont_core::{Change, Coverage, Error, Knowledge, Lineage, Observation};
+use serde_json::{Value, json};
+use std::collections::{BTreeMap, BTreeSet};
+
+const EXAMPLE: &[u8] = include_bytes!("schema-fixtures/example.json");
+const EXAMPLE_SHA256: &str = "1f7c885dc163d8d6ffbaceb573f178bc239d890069effe93c8f1626ee0132ad0";
+
+fn fixture(name: &str) -> Vec<u8> {
+    std::fs::read(format!(
+        "{}/tests/schema-fixtures/{name}",
+        env!("CARGO_MANIFEST_DIR")
+    ))
+    .unwrap()
+}
+fn violations(name: &str, others: &[&str]) -> Vec<ont_core::schema::Violation> {
+    let others: BTreeSet<String> = others.iter().map(|s| (*s).to_string()).collect();
+    Schema::check_bytes(&fixture(name), &others).unwrap_err()
+}
+
+#[test]
+fn example_parses_checks_clean_and_pin_matches_sha256sum() {
+    let checked = Schema::check_bytes(EXAMPLE, &BTreeSet::new()).unwrap();
+    let pin = checked.pin();
+    assert_eq!(pin.domain, "work");
+    assert_eq!(pin.version, 1);
+    assert_eq!(pin.sha256, EXAMPLE_SHA256);
+    let schema = Schema::parse(EXAMPLE).unwrap();
+    assert!(schema.check(&BTreeSet::new()).is_empty());
+    assert_eq!(checked.schema(), &schema);
+}
+
+#[test]
+fn negative_fixtures_refuse_with_exact_violations() {
+    type FixtureCase = (
+        &'static str,
+        &'static [(&'static str, &'static str)],
+        &'static [&'static str],
+    );
+    let cases: &[FixtureCase] = &[
+        ("invalid_format.json", &[("invalid_format", "/format")], &[]),
+        ("unknown_field.json", &[("unknown_field", "/bogus")], &[]),
+        (
+            "invalid_name.json",
+            &[("invalid_name", "/object_types/Thing")],
+            &[],
+        ),
+        (
+            "duplicate_type_name.json",
+            &[("duplicate_type_name", "/object_types/thing")],
+            &["thing"],
+        ),
+        (
+            "ontology_property_from.json",
+            &[(
+                "ontology_property_from",
+                "/object_types/thing/properties/name/from",
+            )],
+            &[],
+        ),
+        (
+            "action_edits_source_owned.json",
+            &[(
+                "action_edits_source_owned",
+                "/action_types/act/rules/0/create_object",
+            )],
+            &[],
+        ),
+        (
+            "reference_edits_source_owned.json",
+            &[(
+                "action_edits_source_owned",
+                "/action_types/act/rules/0/set_reference/object_type",
+            )],
+            &[],
+        ),
+        (
+            "owner_unknown_key.json",
+            &[("invalid_schema", "/object_types/thing/owner")],
+            &[],
+        ),
+        (
+            "unknown_type.json",
+            &[("unknown_type", "/object_types/thing/properties/other/type")],
+            &[],
+        ),
+        (
+            "unknown_property.json",
+            &[("unknown_property", "/object_types/thing/title")],
+            &[],
+        ),
+        (
+            "unknown_value_type.json",
+            &[(
+                "unknown_value_type",
+                "/object_types/thing/properties/name/type",
+            )],
+            &[],
+        ),
+        (
+            "unknown_source.json",
+            &[("unknown_source", "/object_types/thing/owner/source")],
+            &[],
+        ),
+        (
+            "unknown_link.json",
+            &[(
+                "unknown_link",
+                "/action_types/act/submission_criteria/0/all/0/linked/link",
+            )],
+            &[],
+        ),
+        (
+            "unknown_parameter.json",
+            &[("unknown_parameter", "/action_types/act/rules/0/set/name")],
+            &[],
+        ),
+        (
+            "invalid_primary_key.json",
+            &[(
+                "invalid_primary_key",
+                "/object_types/thing/primary_key/from",
+            )],
+            &[],
+        ),
+        (
+            "struct_in_struct.json",
+            &[(
+                "struct_in_struct",
+                "/object_types/thing/properties/name/type/struct/deep",
+            )],
+            &[],
+        ),
+        (
+            "required_property_without_from.json",
+            &[(
+                "required_property_without_from",
+                "/object_types/thing/properties/name",
+            )],
+            &[],
+        ),
+        (
+            "unknown_interface.json",
+            &[("unknown_interface", "/object_types/thing/implements/1")],
+            &[],
+        ),
+        (
+            "missing_interface_property.json",
+            &[(
+                "missing_interface_property",
+                "/object_types/thing/implements/0",
+            )],
+            &[],
+        ),
+    ];
+    for (file, expected, others) in cases {
+        let found_vec = violations(file, others);
+        let found: Vec<(&str, &str)> = found_vec
+            .iter()
+            .map(|x| (x.code, x.pointer.as_str()))
+            .collect();
+        assert_eq!(&found, expected, "{file}");
+    }
+}
+
+fn base_value() -> Value {
+    json!({
+        "format":"ontology-schema/v1","domain":"work","version":1,
+        "namespace":{"instance":"vps://palantirkc","account":"root"},
+        "scope_keys":["class_key"],
+        "value_types":{},
+        "sources":{"src":{"kind":"markdown_fields","glob":"/tmp/*.md","fresh_for_s":1}},
+        "object_types":{"thing":{"owner":"ontology","primary_key":{"from":"$action_id"},"title":"name",
+            "properties":{"name":{"type":"string","required":true}}}},
+        "link_types":{},"action_types":{},"functions":{},
+        "grants":[{"principal":"agent","scope":{"class_key":"C1"},"read":["thing"],"derive":[],"actions":[]}]
+    })
+}
+/// A source-owned `thing`: a source-owned type is refused when the schema has
+/// scope keys, so the scope key and the grant's scope key are dropped.
+fn source_owned(m: &mut Value) {
+    m["scope_keys"] = json!([]);
+    m["grants"][0]["scope"] = json!({});
+    m["object_types"]["thing"]["owner"] = json!({"source":"src"});
+    m["object_types"]["thing"]["primary_key"] = json!({"from":"/path"});
+    m["object_types"]["thing"]["properties"]["name"] =
+        json!({"type":"string","required":true,"from":"/stem"});
+}
+fn check_of(v: Value) -> Vec<ont_core::schema::Violation> {
+    let schema: Schema = serde_json::from_value(v).unwrap();
+    schema.check(&BTreeSet::new())
+}
+fn pairs(v: &[ont_core::schema::Violation]) -> Vec<(&str, &str)> {
+    v.iter().map(|x| (x.code, x.pointer.as_str())).collect()
+}
+
+#[test]
+fn one_test_per_check_code() {
+    assert!(check_of(base_value()).is_empty());
+    type Case = (Value, Vec<(&'static str, &'static str)>);
+    let cases: Vec<Case> = {
+        let mut v = Vec::new();
+        let mut m = base_value();
+        m["version"] = json!(0);
+        v.push((m, vec![("invalid_version", "/version")]));
+        let mut m = base_value();
+        m["namespace"]["account"] = json!("");
+        v.push((m, vec![("invalid_namespace", "/namespace/account")]));
+        let mut m = base_value();
+        m["domain"] = json!("program");
+        v.push((m, vec![("reserved_domain", "/domain")]));
+        let mut m = base_value();
+        m["namespace"]["instance"] = json!("x".repeat(513));
+        v.push((m, vec![("invalid_namespace", "/namespace/instance")]));
+        let mut m = base_value();
+        m["scope_keys"] = json!(["class_key", "class_key"]);
+        v.push((m, vec![("duplicate_scope_key", "/scope_keys/1")]));
+        let mut m = base_value();
+        m["sources"]["src"]["kind"] = json!("bogus");
+        v.push((m, vec![("unknown_source_kind", "/sources/src/kind")]));
+        let mut m = base_value();
+        m["grants"][0]["actions"] = json!(["missing"]);
+        v.push((m, vec![("unknown_action", "/grants/0/actions/0")]));
+        let mut m = base_value();
+        m["grants"][0]["scope"] = json!({"bogus": "x"});
+        v.push((m, vec![("unknown_scope_key", "/grants/0/scope/bogus")]));
+        let mut m = base_value();
+        m["grants"][0]["scope"] = json!({"class_key": ""});
+        v.push((m, vec![("invalid_grant_scope", "/grants/0/scope")]));
+        let mut m = base_value();
+        m["grants"][0]["principal"] = json!("");
+        v.push((m, vec![("invalid_principal", "/grants/0/principal")]));
+        let mut m = base_value();
+        source_owned(&mut m);
+        m["object_types"]["thing"]["properties"]["name"]["from"] = json!("name");
+        v.push((
+            m,
+            vec![(
+                "invalid_from_pointer",
+                "/object_types/thing/properties/name/from",
+            )],
+        ));
+        let mut m = base_value();
+        source_owned(&mut m);
+        m["object_types"]["thing"]["properties"]["other"] =
+            json!({"type":"string","required":false,"from":"/stem"});
+        m["link_types"] = json!({"l":{"from":"thing","via":"other","to":"thing",
+            "cardinality":"many_to_one","names":{"forward":"to_thing","reverse":"from_thing"}}});
+        v.push((m, vec![("invalid_link_backing", "/link_types/l/via")]));
+        let mut m = base_value();
+        source_owned(&mut m);
+        m["object_types"]["thing"]["properties"]["other"] =
+            json!({"type":{"ref":"thing"},"required":false,"from":"/stem"});
+        m["link_types"] = json!({"l":{"from":"thing","via":"other","to":"thing",
+            "cardinality":"many_to_one","names":{"forward":"same","reverse":"same"}}});
+        v.push((
+            m,
+            vec![("duplicate_link_name", "/link_types/l/names/reverse")],
+        ));
+        // Ontology-owned thing for rule/criterion cases.
+        let owned = |m: &mut Value| {
+            m["object_types"]["thing"]["owner"] = json!("ontology");
+            m["object_types"]["thing"]["primary_key"] = json!({"from":"$action_id"});
+            m["object_types"]["thing"]["properties"]["name"] =
+                json!({"type":"string","required":true});
+        };
+        let mut m = base_value();
+        owned(&mut m);
+        m["action_types"] = json!({"act":{"parameters":{},
+            "submission_criteria":[],"rules":[{"set_reference":{"object_type":"thing","property":"name"}}]}});
+        v.push((
+            m,
+            vec![(
+                "invalid_reference_property",
+                "/action_types/act/rules/0/set_reference/property",
+            )],
+        ));
+        let mut m = base_value();
+        owned(&mut m);
+        m["action_types"] = json!({"act":{"parameters":{"x":{"type":{"ref":"thing"},"required":true}},
+            "submission_criteria":[
+                {"code":"c1","message":"m","all":[{"exists":"$x"}],"any":[{"exists":"$x"}]}],
+            "rules":[]}});
+        v.push((
+            m,
+            vec![(
+                "invalid_criterion",
+                "/action_types/act/submission_criteria/0",
+            )],
+        ));
+        let mut m = base_value();
+        owned(&mut m);
+        m["action_types"] = json!({"act":{"parameters":{"x":{"type":{"ref":"thing"},"required":true}},
+            "submission_criteria":[
+                {"code":"c1","message":"m","all":[{"exists":"$x"}]},
+                {"code":"c1","message":"m","all":[{"exists":"$x"}]}],
+            "rules":[]}});
+        v.push((
+            m,
+            vec![(
+                "duplicate_criterion_code",
+                "/action_types/act/submission_criteria/1/code",
+            )],
+        ));
+        let mut m = base_value();
+        owned(&mut m);
+        m["action_types"] = json!({"act":{"parameters":{},"submission_criteria":[],"rules":[{}]}});
+        v.push((m, vec![("invalid_rule", "/action_types/act/rules/0")]));
+        v
+    };
+    for (input, expected) in &cases {
+        let found = check_of(input.clone());
+        assert_eq!(&pairs(&found), expected, "input {input}");
+        for (code, _) in expected {
+            assert!(
+                ont_core::schema::codes::ALL.contains(code),
+                "code {code} not in codes::ALL"
+            );
+        }
+    }
+    // duplicate_domain via SchemaSet; missing_field via check_bytes.
+    let checked = Schema::check_bytes(EXAMPLE, &BTreeSet::new()).unwrap();
+    let err = SchemaSet::new(vec![checked.clone(), checked]).unwrap_err();
+    assert_eq!(pairs(&err), vec![("duplicate_domain", "/domain")]);
+    let mut obj = base_value();
+    obj.as_object_mut().unwrap().remove("version");
+    let err =
+        Schema::check_bytes(&serde_json::to_vec(&obj).unwrap(), &BTreeSet::new()).unwrap_err();
+    assert_eq!(pairs(&err), vec![("missing_field", "")]);
+}
+
+#[test]
+fn value_type_definitions_checked_completely() {
+    let cases: Vec<(Value, &str)> = vec![
+        (
+            {
+                let mut m = base_value();
+                m["value_types"] = json!({"vt":{"base":"integer","pattern":"[0-9]+"}});
+                m
+            },
+            "/value_types/vt/pattern",
+        ),
+        (
+            {
+                let mut m = base_value();
+                m["value_types"] = json!({"vt":{"base":"boolean","min":true}});
+                m
+            },
+            "/value_types/vt/min",
+        ),
+        (
+            {
+                let mut m = base_value();
+                m["value_types"] = json!({"vt":{"base":"integer","min":"0"}});
+                m
+            },
+            "/value_types/vt/min",
+        ),
+        (
+            {
+                let mut m = base_value();
+                m["value_types"] = json!({"vt":{"base":"integer","enum":["a"]}});
+                m
+            },
+            "/value_types/vt/enum",
+        ),
+        (
+            {
+                let mut m = base_value();
+                m["value_types"] = json!({"vt":{"base":"integer","min":10,"max":0}});
+                m
+            },
+            "/value_types/vt/max",
+        ),
+    ];
+    for (input, pointer) in cases {
+        let found = check_of(input);
+        assert_eq!(
+            pairs(&found),
+            vec![("invalid_value_type_definition", pointer)]
+        );
+    }
+}
+
+fn rich_schema() -> Schema {
+    serde_json::from_value(json!({
+        "format":"ontology-schema/v1","domain":"work","version":1,
+        "namespace":{"instance":"vps://palantirkc","account":"root"},
+        "scope_keys":[],
+        "value_types":{"status":{"base":"string","enum":["active","lifted"],"pattern":"^a.*$"},
+                         "score":{"base":"integer","min":0,"max":10}},
+        "sources":{},
+        "object_types":{
+          "other":{"owner":"ontology","primary_key":{"from":"$action_id"},
+            "properties":{"name":{"type":"string","required":true}}},
+          "thing":{"owner":"ontology","primary_key":{"from":"$action_id"},
+            "properties":{
+              "s":{"type":"string","required":true},
+              "i":{"type":"integer","required":true},
+              "b":{"type":"boolean","required":true},
+              "d":{"type":"decimal","required":true},
+              "t":{"type":"timestamp","required":true},
+              "day":{"type":"date","required":true},
+              "r":{"type":{"ref":"other"},"required":true},
+              "arr":{"type":{"array":"integer"},"required":true},
+              "st":{"type":{"struct":{"x":"string","n":"integer"}},"required":true},
+              "vt":{"type":{"value_type":"status"},"required":true},
+              "num":{"type":{"value_type":"score"},"required":false},
+              "short":{"type":"string","required":false,"max_bytes":3}
+            }}},
+        "link_types":{},"action_types":{},"functions":{},"grants":[]
+    }))
+    .unwrap()
+}
+fn set_of(schema: Schema) -> SchemaSet {
+    let bytes = serde_json::to_vec(&schema).unwrap();
+    let checked = Schema::check_bytes(&bytes, &BTreeSet::new()).unwrap();
+    SchemaSet::new(vec![checked]).unwrap()
+}
+fn value_fields() -> BTreeMap<String, Knowledge> {
+    let id = json!({"object_type":"other","namespace":{"instance":"vps://palantirkc","account":"root"},"native_key":"k1"});
+    BTreeMap::from([
+        ("s".into(), Knowledge::Value(json!("x"))),
+        ("i".into(), Knowledge::Value(json!(3))),
+        ("b".into(), Knowledge::Value(json!(true))),
+        ("d".into(), Knowledge::Value(json!("1.50"))),
+        ("t".into(), Knowledge::Value(json!(1700000000))),
+        ("day".into(), Knowledge::Value(json!("2026-02-28"))),
+        ("r".into(), Knowledge::Value(id)),
+        ("arr".into(), Knowledge::Value(json!([1, 2]))),
+        ("st".into(), Knowledge::Value(json!({"x":"a","n":1}))),
+        ("vt".into(), Knowledge::Value(json!("active"))),
+    ])
+}
+
+#[test]
+fn value_validation_accepts_each_type_and_non_value_states() {
+    let schema = rich_schema();
+    assert!(
+        schema.check(&BTreeSet::new()).is_empty(),
+        "{:?}",
+        schema.check(&BTreeSet::new())
+    );
+    let set = set_of(schema);
+    assert_eq!(set.validate_fields("thing", &value_fields()), Ok(()));
+    // Accepted min/max-bounded value and max_bytes-conforming value.
+    let mut fields = value_fields();
+    fields.insert("num".into(), Knowledge::Value(json!(5)));
+    fields.insert("short".into(), Knowledge::Value(json!("abc")));
+    assert_eq!(set.validate_fields("thing", &fields), Ok(()));
+    for state in [
+        Knowledge::Missing,
+        Knowledge::Null,
+        Knowledge::Blank,
+        Knowledge::Unknown,
+        Knowledge::NotPerformed,
+    ] {
+        let mut fields = value_fields();
+        fields.insert("s".into(), state);
+        assert_eq!(set.validate_fields("thing", &fields), Ok(()));
+    }
+}
+
+#[test]
+fn value_validation_refusals() {
+    let schema = set_of(rich_schema());
+    let mut fields = value_fields();
+    fields.insert("nope".into(), Knowledge::Value(json!(1)));
+    assert_eq!(
+        schema.validate_fields("thing", &fields).unwrap_err().code,
+        "undeclared_property"
+    );
+    let mut fields = value_fields();
+    fields.remove("s");
+    assert_eq!(
+        schema.validate_fields("thing", &fields).unwrap_err().code,
+        "missing_required_property"
+    );
+    let mut fields = value_fields();
+    fields.insert("i".into(), Knowledge::Value(json!("three")));
+    assert_eq!(
+        schema.validate_fields("thing", &fields).unwrap_err().code,
+        "wrong_value_type"
+    );
+    let mut fields = value_fields();
+    fields.insert("vt".into(), Knowledge::Value(json!("bogus")));
+    assert_eq!(
+        schema.validate_fields("thing", &fields).unwrap_err().code,
+        "value_constraint_violation"
+    );
+    let mut fields = value_fields();
+    fields.insert("num".into(), Knowledge::Value(json!(99)));
+    assert_eq!(
+        schema.validate_fields("thing", &fields).unwrap_err().code,
+        "value_constraint_violation"
+    );
+    // Decimal as a JSON number, timestamp as a string, bad dates.
+    for (key, val) in [
+        ("d", json!(1.5)),
+        ("t", json!("1700000000")),
+        ("day", json!("2026-02-30")),
+        ("day", json!("2026-+1-+1")),
+        ("d", json!("+1")),
+        ("d", json!(".5")),
+        ("d", json!("1.")),
+    ] {
+        let mut fields = value_fields();
+        fields.insert(key.into(), Knowledge::Value(val.clone()));
+        assert_eq!(
+            schema.validate_fields("thing", &fields).unwrap_err().code,
+            "wrong_value_type",
+            "{key}={val}"
+        );
+    }
+    // Ref with the wrong object_type, struct missing/extra field, bad array
+    // item, and a max_bytes violation.
+    let mut fields = value_fields();
+    fields.insert(
+        "r".into(),
+        Knowledge::Value(
+            json!({"object_type":"thing","namespace":{"instance":"vps://palantirkc","account":"root"},"native_key":"k1"}),
+        ),
+    );
+    assert_eq!(
+        schema.validate_fields("thing", &fields).unwrap_err().code,
+        "wrong_value_type"
+    );
+    for st in [json!({"x":"a"}), json!({"x":"a","n":1,"z":2})] {
+        let mut fields = value_fields();
+        fields.insert("st".into(), Knowledge::Value(st));
+        assert_eq!(
+            schema.validate_fields("thing", &fields).unwrap_err().code,
+            "wrong_value_type"
+        );
+    }
+    let mut fields = value_fields();
+    fields.insert("arr".into(), Knowledge::Value(json!([1, "x"])));
+    assert_eq!(
+        schema.validate_fields("thing", &fields).unwrap_err().code,
+        "wrong_value_type"
+    );
+    let mut fields = value_fields();
+    fields.insert("short".into(), Knowledge::Value(json!("toolong")));
+    assert_eq!(
+        schema.validate_fields("thing", &fields).unwrap_err().code,
+        "value_constraint_violation"
+    );
+}
+
+fn pattern_schema(pattern: &str) -> Schema {
+    serde_json::from_value(json!({
+        "format":"ontology-schema/v1","domain":"work","version":1,
+        "namespace":{"instance":"vps://palantirkc","account":"root"},
+        "value_types":{"code":{"base":"string","pattern":pattern}},
+        "object_types":{"thing":{"owner":"ontology","primary_key":{"from":"$action_id"},
+            "properties":{"code":{"type":{"value_type":"code"},"required":true}}}}
+    }))
+    .unwrap()
+}
+
+#[test]
+fn pattern_must_match_the_whole_value() {
+    let schema = set_of(pattern_schema("[a-z]+"));
+    let fields = |v: &str| BTreeMap::from([("code".to_string(), Knowledge::Value(json!(v)))]);
+    // Matching value.
+    assert_eq!(schema.validate_fields("thing", &fields("abc")), Ok(()));
+    // Non-matching value.
+    assert_eq!(
+        schema
+            .validate_fields("thing", &fields("ABC"))
+            .unwrap_err()
+            .code,
+        "value_constraint_violation"
+    );
+    // A value that matches only a part must refuse (whole-value semantics).
+    assert_eq!(
+        schema
+            .validate_fields("thing", &fields("abc1"))
+            .unwrap_err()
+            .code,
+        "value_constraint_violation"
+    );
+}
+
+#[test]
+fn pattern_alternation_anchors_and_flags_are_whole_value() {
+    let fields = |v: &str| BTreeMap::from([("code".to_string(), Knowledge::Value(json!(v)))]);
+    let refuse = |set: &SchemaSet, v: &str| {
+        assert_eq!(
+            set.validate_fields("thing", &fields(v)).unwrap_err().code,
+            "value_constraint_violation",
+            "value {v:?}"
+        );
+    };
+    // Alternation: accepts exactly `a` or `b`, refuses partial matches.
+    let set = set_of(pattern_schema("a|b"));
+    assert_eq!(set.validate_fields("thing", &fields("a")), Ok(()));
+    assert_eq!(set.validate_fields("thing", &fields("b")), Ok(()));
+    refuse(&set, "ax");
+    refuse(&set, "xb");
+    // A pattern with its own anchors still behaves as a whole-value match.
+    let set = set_of(pattern_schema("^a$"));
+    assert_eq!(set.validate_fields("thing", &fields("a")), Ok(()));
+    refuse(&set, "aa");
+    refuse(&set, "xa");
+    // An inline flag applies to the whole value.
+    let set = set_of(pattern_schema("(?i)ab"));
+    assert_eq!(set.validate_fields("thing", &fields("AB")), Ok(()));
+    assert_eq!(set.validate_fields("thing", &fields("ab")), Ok(()));
+    refuse(&set, "xab");
+    refuse(&set, "abx");
+}
+
+#[test]
+fn pattern_compiling_only_inside_the_wrapper_is_refused() {
+    // Before the repair this compiled (as `^(?:a)|(b)$`) and `ax` matched.
+    let schema = pattern_schema("a)|(b");
+    let found = schema.check(&BTreeSet::new());
+    assert_eq!(
+        pairs(&found),
+        vec![("invalid_value_type_definition", "/value_types/code/pattern")]
+    );
+    let bytes = serde_json::to_vec(&schema).unwrap();
+    assert!(Schema::check_bytes(&bytes, &BTreeSet::new()).is_err());
+}
+
+#[test]
+fn pattern_longer_than_limit_is_refused() {
+    let schema = pattern_schema(&"a".repeat(1_025));
+    let found = schema.check(&BTreeSet::new());
+    assert_eq!(
+        pairs(&found),
+        vec![("invalid_value_type_definition", "/value_types/code/pattern")]
+    );
+    let ok = pattern_schema(&"a".repeat(1_024));
+    assert!(ok.check(&BTreeSet::new()).is_empty());
+}
+
+#[test]
+fn pattern_that_does_not_compile_refuses_at_check() {
+    let schema = pattern_schema("(");
+    let found = schema.check(&BTreeSet::new());
+    assert!(
+        found
+            .iter()
+            .any(|x| x.code == "invalid_value_type_definition"
+                && x.pointer == "/value_types/code/pattern"),
+        "{found:?}"
+    );
+}
+
+#[test]
+fn schema_set_answers_declaration_properties_owner_and_links() {
+    let checked = Schema::check_bytes(EXAMPLE, &BTreeSet::new()).unwrap();
+    let pin = checked.pin().clone();
+    let set = SchemaSet::new(vec![checked]).unwrap();
+    assert!(set.object_type("task").is_some());
+    assert!(set.properties("hold").unwrap().contains_key("status"));
+    assert_eq!(set.owner("task"), Some(Owner::Source("task_states".into())));
+    assert_eq!(set.owner("hold"), Some(Owner::Ontology));
+    assert_eq!(set.link_types_from("hold").len(), 1);
+    assert_eq!(set.link_types_to("task").len(), 1);
+    assert_eq!(set.link_types_from("task").len(), 0);
+    assert_eq!(set.pin("work"), Some(&pin));
+    assert_eq!(
+        set.validate_fields("hold", &BTreeMap::new())
+            .unwrap_err()
+            .code,
+        "missing_required_property"
+    );
+}
+
+#[test]
+fn duplicate_type_across_domains_refused_by_schema_set() {
+    let a = Schema::check_bytes(EXAMPLE, &BTreeSet::new()).unwrap();
+    let b_bytes = String::from_utf8(EXAMPLE.to_vec())
+        .unwrap()
+        .replacen("\"domain\": \"work\"", "\"domain\": \"other\"", 1)
+        .into_bytes();
+    let b = Schema::check_bytes(&b_bytes, &BTreeSet::new()).unwrap();
+    let err = SchemaSet::new(vec![a, b]).unwrap_err();
+    assert!(
+        err.iter().any(|x| x.code == "duplicate_type_name"),
+        "{err:?}"
+    );
+}
+
+fn observation(change: Change, supersedes: Option<&str>, empty: bool) -> Observation {
+    Observation {
+        revision: "r2".into(),
+        source_revision: "s2".into(),
+        observed_at: 10,
+        fresh_until: 20,
+        change,
+        supersedes: supersedes.map(str::to_string),
+        coverage: Coverage::Complete,
+        fields: if empty {
+            BTreeMap::new()
+        } else {
+            BTreeMap::from([("x".into(), Knowledge::Value(json!(1)))])
+        },
+        lineage: Lineage {
+            artifact_sha256: "0".repeat(64),
+            pointer: "/0".into(),
+        },
+    }
+}
+
+#[test]
+fn new_change_kinds_serialize_and_validate() {
+    for (change, wire) in [
+        (Change::Update, "update"),
+        (Change::Refresh, "refresh"),
+        (Change::Retraction, "retraction"),
+    ] {
+        assert_eq!(
+            serde_json::to_value(&change).unwrap(),
+            Value::String(wire.into())
+        );
+        assert_eq!(
+            serde_json::from_value::<Change>(Value::String(wire.into())).unwrap(),
+            change
+        );
+    }
+    assert!(
+        observation(Change::Update, Some("r1"), false)
+            .validate()
+            .is_ok()
+    );
+    assert!(
+        observation(Change::Refresh, Some("r1"), false)
+            .validate()
+            .is_ok()
+    );
+    assert!(observation(Change::Update, None, false).validate().is_err());
+    assert!(
+        observation(Change::Refresh, None, false)
+            .validate()
+            .is_err()
+    );
+    assert!(
+        observation(Change::Retraction, Some("r1"), true)
+            .validate()
+            .is_ok()
+    );
+    assert!(
+        observation(Change::Retraction, Some("r1"), false)
+            .validate()
+            .is_err()
+    );
+    assert!(
+        observation(Change::Retraction, None, true)
+            .validate()
+            .is_err()
+    );
+    assert_eq!(Error::SchemaViolation.code(), "schema_violation");
+    assert_eq!(Schema::parse(b"{\"nope\":1}"), Err(Error::SchemaViolation));
+}
+
+#[test]
+fn duplicate_json_keys_are_refused_with_pointer() {
+    let cases: &[(&[u8], &str)] = &[
+        (
+            br#"{"format":"ontology-schema/v1","domain":"work","version":1,"namespace":{"instance":"vps://palantirkc","account":"root"},"object_types":{"thing":{"owner":"ontology","primary_key":{"from":"$action_id"},"properties":{}},"thing":{"owner":"ontology","primary_key":{"from":"$action_id"},"properties":{}}}}"#,
+            "/object_types/thing",
+        ),
+        // Inside an array of objects: the pointer carries the index.
+        (
+            br#"{"format":"ontology-schema/v1","domain":"work","version":1,"namespace":{"instance":"vps://palantirkc","account":"root"},"grants":[{"principal":"agent","principal":"agent"}]}"#,
+            "/grants/0/principal",
+        ),
+        // A key containing `/` is escaped as `~1` in the pointer.
+        (
+            br#"{"format":"ontology-schema/v1","domain":"work","version":1,"namespace":{"instance":"vps://palantirkc","account":"root"},"sources":{"src":{"kind":"markdown_fields","a/b":1,"a/b":2}}}"#,
+            "/sources/src/a~1b",
+        ),
+        // A key containing `~` is escaped as `~0` in the pointer.
+        (
+            br#"{"format":"ontology-schema/v1","domain":"work","version":1,"namespace":{"instance":"vps://palantirkc","account":"root"},"sources":{"src":{"kind":"markdown_fields","a~b":1,"a~b":2}}}"#,
+            "/sources/src/a~0b",
+        ),
+        // An escaped duplicate: `"ab"` written with a unicode escape.
+        (
+            br#"{"format":"ontology-schema/v1","domain":"work","version":1,"namespace":{"instance":"vps://palantirkc","account":"root"},"sources":{"src":{"kind":"markdown_fields","ab":1,"a\u0062":2}}}"#,
+            "/sources/src/ab",
+        ),
+    ];
+    for (bytes, pointer) in cases {
+        let err = Schema::check_bytes(bytes, &BTreeSet::new()).unwrap_err();
+        assert_eq!(err.len(), 1, "{err:?}");
+        assert_eq!(err[0].code, "duplicate_field");
+        assert_eq!(err[0].pointer, *pointer);
+    }
+}
+
+#[test]
+fn deeply_nested_document_is_refused_by_the_parser_not_the_scan() {
+    // 100,000 opening brackets: the scan stops at its depth limit and
+    // serde_json refuses; the test process must not abort.
+    let bytes = vec![b'['; 100_000];
+    let err = Schema::check_bytes(&bytes, &BTreeSet::new()).unwrap_err();
+    assert_eq!(err.len(), 1, "{err:?}");
+    assert!(
+        [
+            "invalid_schema",
+            "unknown_field",
+            "duplicate_field",
+            "missing_field"
+        ]
+        .contains(&err[0].code),
+        "parse-level code expected, got {err:?}"
+    );
+}
+
+#[test]
+fn valid_document_nested_100_deep_in_source_options_checks() {
+    let mut nested = json!(1);
+    for _ in 0..100 {
+        nested = json!([nested]);
+    }
+    let mut doc = base_value();
+    doc["sources"]["src"]["nested"] = nested;
+    let bytes = serde_json::to_vec(&doc).unwrap();
+    // No kind that stays takes a free option.
+    let err = Schema::check_bytes(&bytes, &BTreeSet::new()).unwrap_err();
+    assert_eq!(
+        pairs(&err),
+        vec![("invalid_source_option", "/sources/src/nested")]
+    );
+}
+
+#[test]
+fn grant_role_and_functions_are_checked() {
+    // spec: specs/ont/schema-language.md#R28
+    let program =
+        json!({"parameters":{},"program":"/usr/bin/true","answer_bytes":16,"timeout_ms":100});
+    let mut m = base_value();
+    m["functions"] = json!({"count_things":program});
+    m["grants"][0]["role"] = json!("Writer");
+    m["grants"][0]["functions"] = json!(["count_things", "missing_fn"]);
+    let found = check_of(m);
+    assert_eq!(
+        pairs(&found),
+        vec![
+            ("invalid_name", "/grants/0/role"),
+            ("unknown_function", "/grants/0/functions/1"),
+        ]
+    );
+    assert!(ont_core::schema::codes::ALL.contains(&"unknown_function"));
+    // A valid role and declared functions check clean and keep their values.
+    let mut m = base_value();
+    m["functions"] = json!({"count_things":program});
+    m["grants"][0]["role"] = json!("writer_2");
+    m["grants"][0]["functions"] = json!(["count_things"]);
+    assert!(check_of(m.clone()).is_empty());
+    let schema: Schema = serde_json::from_value(m).unwrap();
+    assert_eq!(schema.grants[0].role.as_deref(), Some("writer_2"));
+    assert_eq!(schema.grants[0].functions, vec!["count_things".to_string()]);
+    // A role that is not a string is a parse fault of the member.
+    let mut m = base_value();
+    m["grants"][0]["role"] = json!(7);
+    let bytes = serde_json::to_vec(&m).unwrap();
+    assert!(Schema::check_bytes(&bytes, &BTreeSet::new()).is_err());
+    // A schema without the two members is unchanged: it checks clean, its
+    // grant has no role and no function, and it serializes without them.
+    let schema: Schema = serde_json::from_value(base_value()).unwrap();
+    assert!(schema.check(&BTreeSet::new()).is_empty());
+    assert_eq!(schema.grants[0].role, None);
+    assert!(schema.grants[0].functions.is_empty());
+    let back = serde_json::to_value(&schema.grants[0]).unwrap();
+    assert!(
+        back.get("role").is_none() && back.get("functions").is_none(),
+        "{back}"
+    );
+    let checked = Schema::check_bytes(EXAMPLE, &BTreeSet::new()).unwrap();
+    assert_eq!(checked.pin().sha256, EXAMPLE_SHA256);
+}
+
+/// A schema with the interface `subject`, implemented by `intent` and `unit`,
+/// a type `host` that does not implement it, and `hold`, whose `subject`
+/// references the interface.
+fn interface_value() -> Value {
+    json!({
+        "format":"ontology-schema/v1","domain":"work","version":1,
+        "namespace":{"instance":"vps://palantirkc","account":"root"},
+        "interfaces":{"subject":{"description":"Something work is about.",
+            "properties":{"title":{"type":"string","required":true},
+                          "size":{"type":"integer"}}}},
+        "object_types":{
+            "intent":{"owner":"ontology","primary_key":{"from":"/native_key"},"implements":["subject"],
+                "properties":{"title":{"type":"string","required":true},"size":{"type":"integer"}}},
+            "unit":{"owner":"ontology","primary_key":{"from":"/native_key"},"implements":["subject"],
+                "properties":{"title":{"type":"string","required":true},"size":{"type":"integer"}}},
+            "host":{"owner":"ontology","primary_key":{"from":"/native_key"},
+                "properties":{"title":{"type":"string","required":true}}},
+            "hold":{"owner":"ontology","primary_key":{"from":"$action_id"},
+                "properties":{"subject":{"type":{"ref":"subject"},"required":true},
+                              "others":{"type":{"array":{"ref":"subject"}}},
+                              "pair":{"type":{"struct":{"one":{"ref":"subject"}}}}}}},
+        "link_types":{"hold_subject":{"from":"hold","via":"subject","to":"subject",
+            "cardinality":"many_to_one","names":{"forward":"subject","reverse":"holds"}}},
+        "grants":[{"principal":"agent","read":["intent","unit","host","hold"]}]
+    })
+}
+fn id_of(object_type: &str) -> Value {
+    json!({"object_type":object_type,"namespace":{"instance":"vps://palantirkc","account":"root"},"native_key":"k1"})
+}
+
+#[test]
+fn interfaces_check_and_a_schema_without_them_is_unchanged() {
+    // spec: specs/ont/schema-language.md#R31
+    // spec: specs/ont/schema-language.md#R32
+    assert!(check_of(interface_value()).is_empty());
+    let schema: Schema = serde_json::from_value(interface_value()).unwrap();
+    assert_eq!(schema.interfaces["subject"].properties.len(), 2);
+    assert_eq!(schema.object_types["unit"].implements, vec!["subject"]);
+    assert_eq!(
+        schema
+            .implementers("subject")
+            .into_iter()
+            .cloned()
+            .collect::<Vec<_>>(),
+        vec!["intent".to_string(), "unit".to_string()]
+    );
+    // Names, types and a name equal to an object type of the same schema.
+    let mut m = interface_value();
+    m["interfaces"]["Bad"] = json!({"properties":{"Title":{"type":"string"},
+        "a":{"type":{"ref":"missing"}},"b":{"type":{"value_type":"missing"}},
+        "c":{"type":{"struct":{"d":{"struct":{"e":"string"}}}}}}});
+    m["interfaces"]["host"] = json!({"properties":{}});
+    assert_eq!(
+        pairs(&check_of(m)),
+        vec![
+            ("invalid_name", "/interfaces/Bad"),
+            ("invalid_name", "/interfaces/Bad/properties/Title"),
+            ("unknown_type", "/interfaces/Bad/properties/a"),
+            ("unknown_value_type", "/interfaces/Bad/properties/b"),
+            ("struct_in_struct", "/interfaces/Bad/properties/c"),
+            ("duplicate_type_name", "/interfaces/host"),
+        ]
+    );
+    // Members: an unknown one, and a missing `properties`.
+    for (patch, code) in [
+        (json!({"properties":{},"bogus":1}), "unknown_field"),
+        (json!({"description":"x"}), "missing_field"),
+        (
+            json!({"properties":{"title":{"type":"string","from":"/x"}}}),
+            "unknown_field",
+        ),
+    ] {
+        let mut m = interface_value();
+        m["interfaces"]["subject"] = patch;
+        let err = Schema::check_bytes(m.to_string().as_bytes(), &BTreeSet::new()).unwrap_err();
+        assert_eq!(err[0].code, code, "{err:?}");
+    }
+    // Implements: an unknown name, and each way a property can be missing.
+    let mut m = interface_value();
+    m["object_types"]["intent"]["implements"] = json!(["subject", "nothing", "host"]);
+    m["object_types"]["unit"]["properties"]["title"]["required"] = json!(false);
+    m["object_types"]["unit"]["properties"]["size"]["type"] = json!("string");
+    let found = check_of(m);
+    assert_eq!(
+        pairs(&found),
+        vec![
+            ("unknown_interface", "/object_types/intent/implements/1"),
+            ("unknown_interface", "/object_types/intent/implements/2"),
+            (
+                "missing_interface_property",
+                "/object_types/unit/implements/0"
+            ),
+            (
+                "missing_interface_property",
+                "/object_types/unit/implements/0"
+            ),
+        ]
+    );
+    assert!(found[2].message.as_deref().unwrap().contains("size"));
+    assert!(found[3].message.as_deref().unwrap().contains("title"));
+    let mut m = interface_value();
+    m["object_types"]["intent"]["properties"] = json!({"title":{"type":"string","required":true}});
+    let found = check_of(m);
+    assert_eq!(
+        pairs(&found),
+        vec![(
+            "missing_interface_property",
+            "/object_types/intent/implements/0"
+        )]
+    );
+    assert!(found[0].message.as_deref().unwrap().contains("size"));
+    for code in [
+        "unknown_interface",
+        "missing_interface_property",
+        "interface_reference_from_source",
+    ] {
+        assert!(ont_core::schema::codes::ALL.contains(&code), "{code}");
+    }
+    // Installed bytes exempt none of them.
+    let mut m = interface_value();
+    m["object_types"]["intent"]["implements"] = json!(["nothing"]);
+    let err =
+        Schema::check_installed_bytes(m.to_string().as_bytes(), &BTreeSet::new()).unwrap_err();
+    assert_eq!(
+        pairs(&err),
+        vec![("unknown_interface", "/object_types/intent/implements/0")]
+    );
+    // A schema without the two members serializes without them.
+    let schema: Schema = serde_json::from_value(base_value()).unwrap();
+    assert!(schema.interfaces.is_empty());
+    let back = serde_json::to_value(&schema).unwrap();
+    assert!(back.get("interfaces").is_none(), "{back}");
+    assert!(
+        back["object_types"]["thing"].get("implements").is_none(),
+        "{back}"
+    );
+    let checked = Schema::check_bytes(EXAMPLE, &BTreeSet::new()).unwrap();
+    assert_eq!(checked.pin().sha256, EXAMPLE_SHA256);
+}
+
+#[test]
+fn a_reference_to_an_interface_admits_the_implementing_types() {
+    // spec: specs/ont/schema-language.md#R33
+    let set = set_of(serde_json::from_value(interface_value()).unwrap());
+    let schema = set.schema("work").unwrap();
+    let field = |ty: &str| schema.object_types["hold"].properties[ty].ty.clone();
+    for ty in ["intent", "unit"] {
+        assert!(
+            schema.validate_value(&field("subject"), &id_of(ty)).is_ok(),
+            "{ty}"
+        );
+        assert!(
+            schema
+                .validate_value(&field("others"), &json!([id_of(ty)]))
+                .is_ok()
+        );
+        assert!(
+            schema
+                .validate_value(&field("pair"), &json!({"one":id_of(ty)}))
+                .is_ok()
+        );
+    }
+    for ty in ["host", "hold", "subject", "missing"] {
+        assert_eq!(
+            schema
+                .validate_value(&field("subject"), &id_of(ty))
+                .unwrap_err()
+                .code,
+            "wrong_value_type",
+            "{ty}"
+        );
+        assert_eq!(
+            schema
+                .validate_value(&field("others"), &json!([id_of("unit"), id_of(ty)]))
+                .unwrap_err()
+                .code,
+            "wrong_value_type"
+        );
+    }
+    assert_eq!(
+        set.implementers("subject"),
+        vec![&"intent".to_string(), &"unit".to_string()]
+    );
+    assert!(set.interface("subject").is_some());
+    assert_eq!(set.schema_of_interface("subject").unwrap().domain, "work");
+    assert!(set.schema_of("subject").is_none());
+    // A link's `from` stays an object type; a grant reads object types only.
+    let mut m = interface_value();
+    m["link_types"]["back"] = json!({"from":"subject","via":"subject","to":"hold",
+        "cardinality":"many_to_one","names":{"forward":"back","reverse":"backs"}});
+    m["grants"][0]["read"] = json!(["intent", "subject"]);
+    m["grants"][0]["derive"] = json!(["subject"]);
+    assert_eq!(
+        pairs(&check_of(m)),
+        vec![
+            ("unknown_type", "/link_types/back/from"),
+            ("unknown_type", "/grants/0/read/1"),
+            ("unknown_type", "/grants/0/derive/0"),
+        ]
+    );
+    // A link into an interface is backed as a link into a type.
+    let mut m = interface_value();
+    m["link_types"]["hold_subject"]["cardinality"] = json!("many_to_many");
+    m["link_types"]["many"] = json!({"from":"hold","via":"others","to":"subject",
+        "cardinality":"many_to_many","names":{"forward":"others","reverse":"other_holds"}});
+    m["link_types"]["wrong"] = json!({"from":"hold","via":"subject","to":"unit",
+        "cardinality":"many_to_one","names":{"forward":"wrong","reverse":"wrongs"}});
+    assert_eq!(
+        pairs(&check_of(m)),
+        vec![
+            (
+                "invalid_link_backing",
+                "/link_types/hold_subject/cardinality"
+            ),
+            ("invalid_link_backing", "/link_types/wrong/via"),
+        ]
+    );
+    // A source-owned reference to an interface cannot be built from a source.
+    let mut m = interface_value();
+    m["sources"] = json!({"src":{"kind":"markdown_fields","glob":"/tmp/*.md","fresh_for_s":1}});
+    m["object_types"]["note"] = json!({"owner":{"source":"src"},"primary_key":{"from":"/path"},
+        "properties":{"about":{"type":{"ref":"subject"},"from":"/stem"},
+                      "near":{"type":{"ref":"subject"},"template":"{stem}"},
+                      "unit":{"type":{"ref":"unit"},"from":"/stem"}}});
+    assert_eq!(
+        pairs(&check_of(m)),
+        vec![
+            (
+                "interface_reference_from_source",
+                "/object_types/note/properties/about/from"
+            ),
+            (
+                "interface_reference_from_source",
+                "/object_types/note/properties/near/template"
+            ),
+        ]
+    );
+    // A view filter compares an interface reference with a literal id only.
+    let mut m = interface_value();
+    m["views"] = json!({
+        "by_arg":{"object_type":"hold","args":["key"],"filter":{"eq":["subject","$key"]},
+            "order":[{"property":"$key","direction":"asc"}],"columns":[{"header":"K","property":"$key"}]},
+        "by_id":{"object_type":"hold","filter":{"eq":["subject",id_of("unit")]},
+            "order":[{"property":"$key","direction":"asc"}],"columns":[{"header":"K","property":"$key"}]},
+        "by_host":{"object_type":"hold","filter":{"eq":["subject",id_of("host")]},
+            "order":[{"property":"$key","direction":"asc"}],"columns":[{"header":"K","property":"$key"}]}
+    });
+    assert_eq!(
+        pairs(&check_of(m)),
+        vec![
+            ("invalid_schema", "/views/by_arg/filter"),
+            ("invalid_schema", "/views/by_host/filter"),
+        ]
+    );
+}
+
+#[test]
+fn one_name_is_one_type_or_one_interface_across_domains() {
+    // spec: specs/ont/schema-language.md#R34
+    let a =
+        Schema::check_bytes(interface_value().to_string().as_bytes(), &BTreeSet::new()).unwrap();
+    // `schema check` with the store: an interface named like an object type
+    // of another domain.
+    let others = BTreeSet::from(["subject".to_string()]);
+    let err = Schema::check_bytes(interface_value().to_string().as_bytes(), &others).unwrap_err();
+    assert_eq!(
+        pairs(&err),
+        vec![("duplicate_type_name", "/interfaces/subject")]
+    );
+    // The composition: an object type named like an interface of another
+    // domain, and an interface named like one.
+    let mut b = base_value();
+    b["domain"] = json!("other");
+    b["object_types"]["subject"] = b["object_types"]["thing"].clone();
+    b["grants"] = json!([]);
+    let b = Schema::check_bytes(b.to_string().as_bytes(), &BTreeSet::new()).unwrap();
+    let err = SchemaSet::new(vec![a.clone(), b]).unwrap_err();
+    assert_eq!(
+        pairs(&err),
+        vec![("duplicate_type_name", "/interfaces/subject")]
+    );
+    let mut c = base_value();
+    c["domain"] = json!("other");
+    c["object_types"] = json!({});
+    c["grants"] = json!([]);
+    c["interfaces"] = json!({"subject":{"properties":{}}});
+    let c = Schema::check_bytes(c.to_string().as_bytes(), &BTreeSet::new()).unwrap();
+    let err = SchemaSet::new(vec![a.clone(), c]).unwrap_err();
+    assert_eq!(
+        pairs(&err),
+        vec![("duplicate_type_name", "/interfaces/subject")]
+    );
+    // Without a collision the two domains compose.
+    let mut d = base_value();
+    d["domain"] = json!("other");
+    d["grants"] = json!([]);
+    let d = Schema::check_bytes(d.to_string().as_bytes(), &BTreeSet::new()).unwrap();
+    assert!(SchemaSet::new(vec![a, d]).is_ok());
+}
+
+#[test]
+fn actions_read_no_property_through_an_interface() {
+    // spec: specs/ont/action.md#R116
+    let with = |parameters: Value, criteria: Value, rules: Value| {
+        let mut m = interface_value();
+        m["action_types"] = json!({"act":{"parameters":parameters,
+            "submission_criteria":criteria,"rules":rules}});
+        m["grants"][0]["actions"] = json!(["act"]);
+        pairs(&check_of(m))
+            .into_iter()
+            .map(|(c, p)| (c.to_string(), p.to_string()))
+            .collect::<Vec<_>>()
+    };
+    let crit = |cond: Value| json!([{"code":"c","message":"m","all":[cond]}]);
+    let s = json!({"type":{"ref":"subject"},"required":true});
+    let u = json!({"type":{"ref":"unit"},"required":true});
+    let p = "/action_types/act/submission_criteria/0/all/0";
+    let own = |v: Vec<(&str, String)>| {
+        v.into_iter()
+            .map(|(c, p)| (c.to_string(), p))
+            .collect::<Vec<_>>()
+    };
+    // `$parameter.property` through an interface, in a comparison, `present`
+    // and a rule value.
+    assert_eq!(
+        with(
+            json!({"s":s}),
+            crit(json!({"eq":["$s.title","x"]})),
+            json!([])
+        ),
+        own(vec![("unknown_property", format!("{p}/eq/0"))])
+    );
+    assert_eq!(
+        with(
+            json!({"s":s}),
+            crit(json!({"present":"$s.title"})),
+            json!([])
+        ),
+        own(vec![("unknown_property", format!("{p}/present"))])
+    );
+    assert_eq!(
+        with(
+            json!({"s":s}),
+            json!([]),
+            json!([{"create_object":"hold","set":{"subject":"$s","others":["$s.title"]}}])
+        ),
+        own(vec![(
+            "unknown_property",
+            "/action_types/act/rules/0/set/others/0".to_string()
+        )])
+    );
+    // A bare name: one interface reference alone, or beside a type reference.
+    assert_eq!(
+        with(json!({"s":s}), crit(json!({"eq":["title","x"]})), json!([])),
+        own(vec![("unknown_property", format!("{p}/eq/0"))])
+    );
+    assert_eq!(
+        with(
+            json!({"s":s,"u":u}),
+            crit(json!({"eq":["title","x"]})),
+            json!([])
+        ),
+        own(vec![("invalid_criterion", format!("{p}/eq/0"))])
+    );
+    // `linked`: the reverse name of a link into an interface the type of the
+    // parameter implements; a bare name after it names a property of `hold`.
+    assert_eq!(
+        with(
+            json!({"u":u}),
+            crit(json!({"linked":{"from":"$u","link":"holds",
+                "where":{"all":[{"eq":["subject",id_of("unit")]}]}}})),
+            json!([])
+        ),
+        own(vec![])
+    );
+    assert_eq!(
+        with(
+            json!({"u":u}),
+            crit(json!({"linked":{"from":"$u","link":"holds",
+                "where":{"all":[{"eq":["title","x"]}]}}})),
+            json!([])
+        ),
+        own(vec![(
+            "unknown_property",
+            format!("{p}/linked/where/all/0/eq/0")
+        )])
+    );
+    // The forward name of a link into an interface: no property after it.
+    let h = json!({"type":{"ref":"hold"},"required":true});
+    assert_eq!(
+        with(
+            json!({"h":h}),
+            crit(json!({"linked":{"from":"$h","link":"subject",
+                "where":{"all":[{"eq":["title","x"]}]}}})),
+            json!([])
+        ),
+        own(vec![(
+            "unknown_property",
+            format!("{p}/linked/where/all/0/eq/0")
+        )])
+    );
+    // Never a create key, never a rule target.
+    let mut m = interface_value();
+    m["action_types"] = json!({"act":{"parameters":{"s":s},
+        "rules":[{"modify_object":"unit","target":"$s","set":{"title":"x"}}]}});
+    assert_eq!(
+        pairs(&check_of(m)),
+        vec![("invalid_rule_target", "/action_types/act/rules/0/target")]
+    );
+}

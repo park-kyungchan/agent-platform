@@ -1,0 +1,2090 @@
+//! Synthetic format-3 (Schema mode) tests; temporary files only.
+use super::schema_mode::{ActionLogEntry, InstallArgs, StoreRefusal, append_schema_in};
+use super::*;
+use ont_core::{Coverage, Knowledge, Lineage, Namespace};
+use serde_json::{Value, json};
+use std::collections::BTreeMap;
+use std::path::PathBuf;
+use std::sync::atomic::{AtomicU64, Ordering};
+
+struct Temp(PathBuf);
+impl Temp {
+    fn new() -> Self {
+        static NEXT: AtomicU64 = AtomicU64::new(0);
+        let nonce = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let dir = std::env::temp_dir().join(format!(
+            "ont-store-v3-{}-{nonce}-{}",
+            std::process::id(),
+            NEXT.fetch_add(1, Ordering::Relaxed)
+        ));
+        std::fs::create_dir(&dir).unwrap();
+        Self(dir)
+    }
+}
+impl Drop for Temp {
+    fn drop(&mut self) {
+        let _ = std::fs::remove_dir_all(&self.0);
+    }
+}
+
+fn ns() -> Namespace {
+    Namespace {
+        instance: "vps://synthetic".into(),
+        account: "root".into(),
+    }
+}
+fn ns2() -> Namespace {
+    Namespace {
+        instance: "vps://other".into(),
+        account: "root".into(),
+    }
+}
+fn work_bytes(version: u64) -> Vec<u8> {
+    serde_json::to_vec(&json!({
+        "format":"ontology-schema/v1","domain":"work","version":version,
+        "namespace":{"instance":"vps://synthetic","account":"root"},
+        "scope_keys":["tenant"],
+        "object_types":{
+          "thing":{"owner":"ontology","primary_key":{"from":"$action_id"},"title":"name",
+            "properties":{
+              "name":{"type":"string","required":true},
+              "other":{"type":{"ref":"other"},"required":false},
+              "score":{"type":"integer","required":false}}},
+          "other":{"owner":"ontology","primary_key":{"from":"$action_id"},
+            "properties":{"label":{"type":"string","required":true}}}
+        },
+        "grants":[{"principal":"agent","scope":{"tenant":"t1"},"read":["thing","other"],"derive":[],"actions":[]}]
+    }))
+    .unwrap()
+}
+fn academy_bytes(with_thing: bool) -> Vec<u8> {
+    let types = if with_thing {
+        json!({"thing":{"owner":"ontology","primary_key":{"from":"$action_id"},
+            "properties":{"name":{"type":"string","required":true}}}})
+    } else {
+        json!({"student":{"owner":"ontology","primary_key":{"from":"$action_id"},
+            "properties":{"label":{"type":"string","required":true}}}})
+    };
+    serde_json::to_vec(&json!({
+        "format":"ontology-schema/v1","domain":"academy","version":1,
+        "namespace":{"instance":"vps://synthetic2","account":"root"},
+        "object_types":types
+    }))
+    .unwrap()
+}
+fn scope() -> Scope {
+    Scope::domain(
+        ns(),
+        "work",
+        BTreeMap::from([("tenant".into(), "t1".into())]),
+    )
+    .unwrap()
+}
+fn id(object_type: &str, key: &str) -> Id {
+    Id {
+        object_type: object_type.into(),
+        namespace: ns(),
+        native_key: key.into(),
+    }
+}
+fn fields(pairs: &[(&str, Value)]) -> BTreeMap<String, Knowledge> {
+    pairs
+        .iter()
+        .map(|(k, v)| (k.to_string(), Knowledge::Value(v.clone())))
+        .collect()
+}
+fn obs(
+    revision: &str,
+    change: Change,
+    supersedes: Option<&str>,
+    fields: BTreeMap<String, Knowledge>,
+) -> Observation {
+    Observation {
+        revision: revision.into(),
+        source_revision: format!("s-{revision}"),
+        observed_at: 10,
+        fresh_until: 20,
+        change,
+        supersedes: supersedes.map(str::to_string),
+        coverage: Coverage::Complete,
+        fields,
+        lineage: Lineage {
+            artifact_sha256: "a".repeat(64),
+            pointer: "/synthetic".into(),
+        },
+    }
+}
+fn append(object_id: &Id, observation: Observation) -> Append {
+    Append {
+        id: object_id.clone(),
+        scope: scope(),
+        observation,
+    }
+}
+fn name_obs(revision: &str, change: Change, supersedes: Option<&str>, name: &str) -> Observation {
+    obs(
+        revision,
+        change,
+        supersedes,
+        fields(&[("name", json!(name))]),
+    )
+}
+fn store_with_work() -> Store {
+    let mut store = Store::memory_schema().unwrap();
+    store
+        .install_schema(
+            &work_bytes(1),
+            InstallArgs {
+                installed_at: 100,
+                ..Default::default()
+            },
+        )
+        .unwrap();
+    store
+}
+
+#[test]
+fn format4_refuses_old_files_and_old_modes_refuse_format4() {
+    // spec: specs/ont/read.md#R53
+    // spec: specs/ont/store.md#R27
+    let temp = Temp::new();
+    let v1 = temp.0.join("v1.sqlite");
+    drop(super::tests::raw_v1(Some(&v1)));
+    let before = std::fs::read(&v1).unwrap();
+    assert_eq!(Store::open_schema(&v1).err().unwrap().code, "store_failure");
+    assert_eq!(std::fs::read(&v1).unwrap(), before);
+    let v2 = temp.0.join("v2.sqlite");
+    drop(Store::open_program(&v2).unwrap());
+    let before = std::fs::read(&v2).unwrap();
+    assert_eq!(Store::open_schema(&v2).err().unwrap().code, "store_failure");
+    assert_eq!(std::fs::read(&v2).unwrap(), before);
+    let v4 = temp.0.join("v4.sqlite");
+    drop(Store::open_schema(&v4).unwrap());
+    let before = std::fs::read(&v4).unwrap();
+    assert!(matches!(Store::open_program(&v4), Err(Error::StoreFailure)));
+    assert_eq!(std::fs::read(&v4).unwrap(), before);
+    let store = Store::open_schema(&v4).unwrap();
+    let version: i64 = store
+        .connection
+        .query_row("PRAGMA user_version", [], |r| r.get(0))
+        .unwrap();
+    assert_eq!(version, 4);
+}
+
+#[test]
+fn schema_install_rules() {
+    // spec: specs/ont/store.md#R33
+    // spec: specs/ont/store.md#R34
+    let mut store = Store::memory_schema().unwrap();
+    let pin = store
+        .install_schema(
+            &work_bytes(1),
+            InstallArgs {
+                installed_at: 100,
+                ..Default::default()
+            },
+        )
+        .unwrap();
+    assert_eq!(store.schema_pins().unwrap().get("work"), Some(&pin));
+    // Same bytes again: no-op, still one row.
+    assert_eq!(
+        store
+            .install_schema(
+                &work_bytes(1),
+                InstallArgs {
+                    installed_at: 101,
+                    ..Default::default()
+                }
+            )
+            .unwrap(),
+        pin
+    );
+    let rows: i64 = store
+        .connection
+        .query_row("SELECT count(*) FROM schema_installs", [], |r| r.get(0))
+        .unwrap();
+    assert_eq!(rows, 1);
+    // Same (domain, version) with different bytes refuses.
+    let mut changed = serde_json::from_slice::<Value>(&work_bytes(1)).unwrap();
+    changed["object_types"]["thing"]["description"] = json!("changed");
+    let changed = serde_json::to_vec(&changed).unwrap();
+    assert_eq!(
+        store
+            .install_schema(
+                &changed,
+                InstallArgs {
+                    installed_at: 102,
+                    ..Default::default()
+                }
+            )
+            .unwrap_err()
+            .code,
+        "schema_version_conflict"
+    );
+    // A type name already declared by another installed domain refuses.
+    let err = store
+        .install_schema(
+            &academy_bytes(true),
+            InstallArgs {
+                installed_at: 103,
+                ..Default::default()
+            },
+        )
+        .unwrap_err();
+    assert_eq!(err.code, "schema_violation");
+    assert_eq!(err.violation.unwrap().code, "duplicate_type_name");
+    // The version only grows.
+    let pin2 = store
+        .install_schema(
+            &work_bytes(2),
+            InstallArgs {
+                installed_at: 104,
+                ..Default::default()
+            },
+        )
+        .unwrap();
+    assert_eq!(pin2.version, 2);
+    assert_eq!(store.schema_pins().unwrap().get("work"), Some(&pin2));
+    // Only the exact bytes of the latest version are a no-op (A10); old
+    // bytes and different old-version bytes refuse.
+    assert_eq!(
+        store
+            .install_schema(
+                &work_bytes(1),
+                InstallArgs {
+                    installed_at: 105,
+                    ..Default::default()
+                }
+            )
+            .unwrap_err()
+            .code,
+        "schema_version_conflict"
+    );
+    assert_eq!(
+        store
+            .install_schema(
+                &changed,
+                InstallArgs {
+                    installed_at: 106,
+                    ..Default::default()
+                }
+            )
+            .unwrap_err()
+            .code,
+        "schema_version_conflict"
+    );
+    assert_eq!(
+        store
+            .install_schema(
+                &work_bytes(2),
+                InstallArgs {
+                    installed_at: 108,
+                    ..Default::default()
+                }
+            )
+            .unwrap(),
+        pin2
+    );
+    // A second domain with fresh type names installs fine.
+    store
+        .install_schema(
+            &academy_bytes(false),
+            InstallArgs {
+                installed_at: 107,
+                ..Default::default()
+            },
+        )
+        .unwrap();
+    assert!(store.schema_pins().unwrap().contains_key("academy"));
+}
+
+#[test]
+fn tampered_stored_bytes_refuse_the_open() {
+    // spec: specs/ont/store.md#R35
+    // spec: specs/ont/schema-language.md#R18
+    let temp = Temp::new();
+    let path = temp.0.join("v3.sqlite");
+    let mut store = Store::open_schema(&path).unwrap();
+    store
+        .install_schema(
+            &work_bytes(1),
+            InstallArgs {
+                installed_at: 100,
+                ..Default::default()
+            },
+        )
+        .unwrap();
+    drop(store);
+    let conn = rusqlite::Connection::open(&path).unwrap();
+    // Same domain, changed bytes: the stored sha no longer matches.
+    let mut changed = serde_json::from_slice::<Value>(&work_bytes(1)).unwrap();
+    changed["object_types"]["thing"]["description"] = serde_json::json!("tampered");
+    conn.execute(
+        "UPDATE schema_installs SET bytes=?1",
+        rusqlite::params![serde_json::to_vec(&changed).unwrap()],
+    )
+    .unwrap();
+    drop(conn);
+    assert_eq!(
+        Store::open_schema(&path).err().unwrap().code,
+        "schema_pin_mismatch"
+    );
+}
+
+#[test]
+fn typed_ingest_refusals_have_exact_codes() {
+    // spec: specs/ont/store.md#R40
+    // spec: specs/ont/store.md#R43
+    let mut store = store_with_work();
+    let thing = id("thing", "k1");
+    store
+        .append_schema(
+            &[append(&thing, name_obs("r1", Change::Initial, None, "a"))],
+            7,
+        )
+        .unwrap();
+    let check = |item: Append, code: &str, vcode: &str, pointer: &str| {
+        let mut store = store_with_work();
+        let thing = id("thing", "k1");
+        store
+            .append_schema(
+                &[append(&thing, name_obs("r1", Change::Initial, None, "a"))],
+                7,
+            )
+            .unwrap();
+        let err = store.append_schema(&[item], 8).unwrap_err();
+        assert_eq!(err.code, code, "{err:?}");
+        let v = err.violation.expect("violation");
+        assert_eq!((v.code, v.pointer.as_str()), (vcode, pointer));
+    };
+    // Undeclared type.
+    check(
+        append(
+            &id("ghost", "k9"),
+            name_obs("r1", Change::Initial, None, "a"),
+        ),
+        "schema_violation",
+        "unknown_type",
+        "/object_types/ghost",
+    );
+    // Wrong-typed value.
+    check(
+        append(
+            &id("thing", "k2"),
+            obs("r1", Change::Initial, None, fields(&[("name", json!(3))])),
+        ),
+        "schema_violation",
+        "wrong_value_type",
+        "/fields/name",
+    );
+    // Non-Domain scope, wrong domain, wrong namespace, wrong key set.
+    let mut item = append(
+        &id("thing", "k2"),
+        name_obs("r1", Change::Initial, None, "a"),
+    );
+    item.scope = Scope::education(ns(), "C1", "001").unwrap();
+    check(item, "schema_violation", "scope_domain_mismatch", "/scope");
+    let mut item = append(
+        &id("thing", "k2"),
+        name_obs("r1", Change::Initial, None, "a"),
+    );
+    item.scope = Scope::domain(
+        ns(),
+        "academy",
+        BTreeMap::from([("tenant".into(), "t1".into())]),
+    )
+    .unwrap();
+    check(
+        item,
+        "schema_violation",
+        "scope_domain_mismatch",
+        "/scope/domain",
+    );
+    let mut item = append(
+        &id("thing", "k2"),
+        name_obs("r1", Change::Initial, None, "a"),
+    );
+    item.scope = Scope::domain(
+        ns2(),
+        "work",
+        BTreeMap::from([("tenant".into(), "t1".into())]),
+    )
+    .unwrap();
+    check(
+        item,
+        "schema_violation",
+        "scope_namespace_mismatch",
+        "/scope/namespace",
+    );
+    let mut item = append(
+        &id("thing", "k2"),
+        name_obs("r1", Change::Initial, None, "a"),
+    );
+    item.scope = Scope::domain(ns(), "work", BTreeMap::new()).unwrap();
+    check(
+        item,
+        "schema_violation",
+        "scope_keys_mismatch",
+        "/scope/keys",
+    );
+    // Object Id in a foreign namespace.
+    let mut foreign = id("thing", "k2");
+    foreign.namespace = ns2();
+    check(
+        append(&foreign, name_obs("r1", Change::Initial, None, "a")),
+        "schema_violation",
+        "id_namespace_mismatch",
+        "/id/namespace",
+    );
+    // Ref value whose Id is in a foreign namespace.
+    let ref_id = Id {
+        object_type: "other".into(),
+        namespace: ns2(),
+        native_key: "x".into(),
+    };
+    check(
+        append(
+            &id("thing", "k2"),
+            obs(
+                "r1",
+                Change::Initial,
+                None,
+                fields(&[
+                    ("name", json!("a")),
+                    ("other", serde_json::to_value(&ref_id).unwrap()),
+                ]),
+            ),
+        ),
+        "schema_violation",
+        "ref_namespace_mismatch",
+        "/fields/other",
+    );
+    // Backfill is not a schema-mode change kind.
+    check(
+        append(&thing, name_obs("r2", Change::Backfill, Some("r1"), "a")),
+        "schema_violation",
+        "invalid_change_kind",
+        "/change",
+    );
+    // A ref to an object that does not exist is accepted.
+    let ghost_ref = Id {
+        object_type: "other".into(),
+        namespace: ns(),
+        native_key: "ghost".into(),
+    };
+    let mut store = store_with_work();
+    store
+        .append_schema(
+            &[append(
+                &id("thing", "k2"),
+                obs(
+                    "r1",
+                    Change::Initial,
+                    None,
+                    fields(&[
+                        ("name", json!("a")),
+                        ("other", serde_json::to_value(&ghost_ref).unwrap()),
+                    ]),
+                ),
+            )],
+            7,
+        )
+        .unwrap();
+    // Whole batch or nothing.
+    let mut store = store_with_work();
+    let good = append(
+        &id("thing", "good"),
+        name_obs("r1", Change::Initial, None, "a"),
+    );
+    let bad = append(
+        &id("thing", "bad"),
+        obs("r1", Change::Initial, None, fields(&[("name", json!(3))])),
+    );
+    assert!(store.append_schema(&[good, bad], 7).is_err());
+    assert_eq!(store.scan_heads("thing", 10, None).unwrap().len(), 0);
+}
+
+#[test]
+fn change_kinds_and_retraction_lifecycle() {
+    // spec: specs/ont/store.md#R44
+    // spec: specs/ont/store.md#R45
+    // spec: specs/ont/store.md#R47
+    // spec: specs/ont/store.md#R48
+    let mut store = store_with_work();
+    let thing = id("thing", "k1");
+    let heads = |store: &mut Store| store.scan_heads("thing", 10, None).unwrap().len();
+    store
+        .append_schema(
+            &[append(&thing, name_obs("r1", Change::Initial, None, "a"))],
+            7,
+        )
+        .unwrap();
+    assert_eq!(
+        store
+            .append_schema(
+                &[append(&thing, name_obs("rx", Change::Initial, None, "a"))],
+                8
+            )
+            .unwrap_err()
+            .code,
+        "revision_conflict"
+    );
+    assert_eq!(
+        store
+            .append_schema(
+                &[append(
+                    &thing,
+                    name_obs("r2", Change::Update, Some("nope"), "b")
+                )],
+                8
+            )
+            .unwrap_err()
+            .code,
+        "revision_conflict"
+    );
+    store
+        .append_schema(
+            &[append(
+                &thing,
+                name_obs("r2", Change::Update, Some("r1"), "b"),
+            )],
+            8,
+        )
+        .unwrap();
+    let err = store
+        .append_schema(
+            &[append(
+                &thing,
+                name_obs("r3", Change::Refresh, Some("r2"), "c"),
+            )],
+            9,
+        )
+        .unwrap_err();
+    assert_eq!(err.code, "schema_violation");
+    assert_eq!(err.violation.unwrap().code, "refresh_fields_differ");
+    store
+        .append_schema(
+            &[append(
+                &thing,
+                name_obs("r3", Change::Refresh, Some("r2"), "b"),
+            )],
+            9,
+        )
+        .unwrap();
+    store
+        .append_schema(
+            &[append(
+                &thing,
+                name_obs("r4", Change::Correction, Some("r3"), "d"),
+            )],
+            10,
+        )
+        .unwrap();
+    store
+        .append_schema(
+            &[append(
+                &thing,
+                obs("r5", Change::Retraction, Some("r4"), BTreeMap::new()),
+            )],
+            11,
+        )
+        .unwrap();
+    let head = store.head(&thing).unwrap().unwrap();
+    assert!(head.retracted);
+    assert_eq!(head.head.observation.revision, "r5");
+    assert_eq!(head.head.ingested_at, 11);
+    assert_eq!(heads(&mut store), 0);
+    // Full history is kept, and the unchanged Snapshot get still returns it.
+    let history = store.history(&thing).unwrap().unwrap();
+    assert_eq!(history.observations.len(), 5);
+    assert!(history.retracted);
+    let object = store
+        .snapshot(|s| ont_core::Snapshot::get(s, &thing))
+        .unwrap()
+        .unwrap();
+    assert_eq!(object.observations.len(), 5);
+    // After retraction an update refuses; a fresh initial revives the object.
+    assert_eq!(
+        store
+            .append_schema(
+                &[append(
+                    &thing,
+                    name_obs("r6", Change::Update, Some("r5"), "e")
+                )],
+                12
+            )
+            .unwrap_err()
+            .code,
+        "revision_conflict"
+    );
+    store
+        .append_schema(
+            &[append(&thing, name_obs("r6", Change::Initial, None, "e"))],
+            12,
+        )
+        .unwrap();
+    assert_eq!(heads(&mut store), 1);
+    assert_eq!(
+        store.history(&thing).unwrap().unwrap().observations.len(),
+        6
+    );
+    let head = store.head(&thing).unwrap().unwrap();
+    assert!(!head.retracted);
+    assert_eq!(head.schema_pin.domain, "work");
+    assert_eq!(
+        head.head.schema_pin.sha256,
+        store.schema_pins().unwrap().get("work").unwrap().sha256
+    );
+}
+
+#[test]
+fn reopen_keeps_installs_rows_and_heads() {
+    let temp = Temp::new();
+    let path = temp.0.join("v3.sqlite");
+    let thing = id("thing", "k1");
+    let pin;
+    {
+        let mut store = Store::open_schema(&path).unwrap();
+        pin = store
+            .install_schema(
+                &work_bytes(1),
+                InstallArgs {
+                    installed_at: 100,
+                    ..Default::default()
+                },
+            )
+            .unwrap();
+        store
+            .append_schema(
+                &[append(&thing, name_obs("r1", Change::Initial, None, "a"))],
+                7,
+            )
+            .unwrap();
+    }
+    let mut store = Store::open_schema(&path).unwrap();
+    assert_eq!(store.schema_pins().unwrap().get("work"), Some(&pin));
+    let head = store.head(&thing).unwrap().unwrap();
+    assert_eq!(head.head.observation.revision, "r1");
+    assert_eq!(
+        store.history(&thing).unwrap().unwrap().observations.len(),
+        1
+    );
+}
+
+#[test]
+fn head_scan_orders_limits_and_continues() {
+    // spec: specs/ont/store.md#R49
+    let mut store = store_with_work();
+    let items: Vec<Append> = (0..25)
+        .map(|i| {
+            append(
+                &id("thing", &format!("k{i:02}")),
+                name_obs("r1", Change::Initial, None, "a"),
+            )
+        })
+        .collect();
+    store.append_schema(&items, 7).unwrap();
+    let page1 = store.scan_heads("thing", 10, None).unwrap();
+    assert_eq!(page1.len(), 10);
+    assert_eq!(page1[0].id.native_key, "k00");
+    assert_eq!(page1[9].id.native_key, "k09");
+    let after = page1.last().unwrap().id.clone();
+    let page2 = store.scan_heads("thing", 10, Some(&after)).unwrap();
+    assert_eq!(page2.len(), 10);
+    assert_eq!(page2[0].id.native_key, "k10");
+    let after = page2.last().unwrap().id.clone();
+    let page3 = store.scan_heads("thing", 10, Some(&after)).unwrap();
+    assert_eq!(page3.len(), 5);
+    // Retracted heads are hidden from the scan.
+    let k07 = id("thing", "k07");
+    store
+        .append_schema(
+            &[append(
+                &k07,
+                obs("r2", Change::Retraction, Some("r1"), BTreeMap::new()),
+            )],
+            8,
+        )
+        .unwrap();
+    let all = store.scan_heads("thing", 100, None).unwrap();
+    assert_eq!(all.len(), 24);
+    assert!(all.iter().all(|h| h.id.native_key != "k07"));
+    assert_eq!(
+        store
+            .scan_heads("ghost", 10, None)
+            .unwrap_err()
+            .violation
+            .unwrap()
+            .code,
+        "unknown_type"
+    );
+}
+
+#[test]
+fn action_log_assigns_seq_and_reads_back() {
+    let mut store = store_with_work();
+    let entry = ActionLogEntry {
+        action_id: "act-1".into(),
+        action_type: "set_hold".into(),
+        domain: "work".into(),
+        schema_domain: "work".into(),
+        schema_version: 1,
+        actor: json!({"principal":"agent","agent":"lead"}),
+        submitted_at: 42,
+        parameters: json!({"effect":"x"}),
+        basis: json!([]),
+        edits: json!([{"id":"hold/1","revision":"r1"}]),
+        outcome: "applied".into(),
+    };
+    assert_eq!(store.append_action_log(&entry).unwrap(), 1);
+    let mut second = entry.clone();
+    second.action_id = "act-2".into();
+    assert_eq!(store.append_action_log(&second).unwrap(), 2);
+    let log = store.action_log().unwrap();
+    assert_eq!(log.len(), 2);
+    assert_eq!(log[0].1, entry);
+    assert_eq!(log[1].1.action_id, "act-2");
+}
+
+#[test]
+fn reader_sees_committed_state_and_second_writer_gets_store_busy() {
+    // spec: specs/ont/store.md#R52
+    let temp = Temp::new();
+    let path = temp.0.join("v3.sqlite");
+    let mut first =
+        Store::open_schema_with_busy_timeout(&path, std::time::Duration::from_secs(10)).unwrap();
+    first
+        .install_schema(
+            &work_bytes(1),
+            InstallArgs {
+                installed_at: 100,
+                ..Default::default()
+            },
+        )
+        .unwrap();
+    let thing = id("thing", "held");
+    let schemas = first.schemas.clone();
+    let tx = first
+        .connection
+        .transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)
+        .unwrap();
+    append_schema_in(
+        &tx,
+        &schemas,
+        &append(&thing, name_obs("r1", Change::Initial, None, "a")),
+        5,
+    )
+    .unwrap();
+    // A reader on a second connection still sees the previous committed
+    // state (the held object is not there yet).
+    let mut reader =
+        Store::open_schema_with_busy_timeout(&path, std::time::Duration::from_millis(100)).unwrap();
+    assert_eq!(reader.head(&thing).unwrap(), None);
+    // A second writer cannot take the lock within its short timeout.
+    let err = reader
+        .append_schema(
+            &[append(
+                &id("thing", "other"),
+                name_obs("r1", Change::Initial, None, "a"),
+            )],
+            6,
+        )
+        .unwrap_err();
+    assert_eq!(err.code, "store_busy");
+    drop(tx);
+    assert_eq!(reader.head(&thing).unwrap(), None);
+}
+
+#[test]
+fn schema_apis_refuse_old_modes_and_legacy_paths_refuse_schema_mode() {
+    // spec: specs/ont/store.md#R27
+    // spec: specs/ont/store.md#R42
+    let mut legacy = Store::memory_program().unwrap();
+    assert_eq!(
+        legacy
+            .install_schema(
+                &work_bytes(1),
+                InstallArgs {
+                    installed_at: 1,
+                    ..Default::default()
+                }
+            )
+            .unwrap_err()
+            .code,
+        "store_failure"
+    );
+    assert_eq!(
+        legacy
+            .append_schema(
+                &[append(
+                    &id("thing", "k"),
+                    name_obs("r1", Change::Initial, None, "a")
+                )],
+                1
+            )
+            .unwrap_err()
+            .code,
+        "store_failure"
+    );
+    let mut store = store_with_work();
+    assert_eq!(
+        store.append_batch(&[append(
+            &id("thing", "k"),
+            name_obs("r1", Change::Initial, None, "a")
+        )]),
+        Err(Error::SchemaViolation)
+    );
+}
+
+fn install(store: &mut Store, bytes: &[u8], at: u64) -> ont_core::schema::SchemaPin {
+    store
+        .install_schema(
+            bytes,
+            InstallArgs {
+                installed_at: at,
+                ..Default::default()
+            },
+        )
+        .unwrap()
+}
+fn work_value() -> Value {
+    serde_json::from_slice(&work_bytes(1)).unwrap()
+}
+fn log_entry(action_id: &str) -> ActionLogEntry {
+    ActionLogEntry {
+        action_id: action_id.into(),
+        action_type: "set_hold".into(),
+        domain: "work".into(),
+        schema_domain: "work".into(),
+        schema_version: 1,
+        actor: json!({"principal":"agent"}),
+        submitted_at: 42,
+        parameters: json!({}),
+        basis: json!([]),
+        edits: json!([]),
+        outcome: "applied".into(),
+    }
+}
+
+#[test]
+fn second_connection_install_refreshes_first_connections_next_append() {
+    // spec: specs/ont/store.md#R36
+    let temp = Temp::new();
+    let path = temp.0.join("v3.sqlite");
+    let mut a = Store::open_schema(&path).unwrap();
+    install(&mut a, &work_bytes(1), 100);
+    let mut b = Store::open_schema(&path).unwrap();
+    let mut v2 = work_value();
+    v2["version"] = json!(2);
+    v2["object_types"]["thing"]["properties"]["score"]["required"] = json!(true);
+    install(&mut b, &serde_json::to_vec(&v2).unwrap(), 101);
+    // A's cache still holds v1, but its next append validates against v2.
+    let err = a
+        .append_schema(
+            &[append(
+                &id("thing", "k1"),
+                name_obs("r1", Change::Initial, None, "a"),
+            )],
+            7,
+        )
+        .unwrap_err();
+    assert_eq!(err.code, "schema_violation");
+    assert_eq!(err.violation.unwrap().code, "missing_required_property");
+    let with_score = obs(
+        "r1",
+        Change::Initial,
+        None,
+        fields(&[("name", json!("a")), ("score", json!(1))]),
+    );
+    a.append_schema(&[append(&id("thing", "k1"), with_score)], 7)
+        .unwrap();
+    assert_eq!(
+        a.head(&id("thing", "k1"))
+            .unwrap()
+            .unwrap()
+            .schema_pin
+            .version,
+        2
+    );
+}
+
+#[test]
+fn two_connections_installing_clashing_types_second_refuses_and_store_opens() {
+    // spec: specs/ont/store.md#R34
+    let temp = Temp::new();
+    let path = temp.0.join("v3.sqlite");
+    let mut a = Store::open_schema(&path).unwrap();
+    let mut b = Store::open_schema(&path).unwrap();
+    install(&mut a, &work_bytes(1), 100);
+    let err = b
+        .install_schema(
+            &academy_bytes(true),
+            InstallArgs {
+                installed_at: 101,
+                ..Default::default()
+            },
+        )
+        .unwrap_err();
+    assert_eq!(err.code, "schema_violation");
+    assert_eq!(err.violation.unwrap().code, "duplicate_type_name");
+    let mut reopened = Store::open_schema(&path).unwrap();
+    assert!(reopened.schema_pins().unwrap().contains_key("work"));
+    assert!(!reopened.schema_pins().unwrap().contains_key("academy"));
+}
+
+#[test]
+fn older_pin_stays_readable_after_v2_and_removed_type_refuses_new_writes() {
+    // spec: specs/ont/store.md#R32
+    let mut store = Store::memory_schema().unwrap();
+    let pin1 = install(&mut store, &work_bytes(1), 100);
+    let other = id("other", "o1");
+    store
+        .append_schema(
+            &[append(
+                &other,
+                obs(
+                    "r1",
+                    Change::Initial,
+                    None,
+                    fields(&[("label", json!("x"))]),
+                ),
+            )],
+            7,
+        )
+        .unwrap();
+    let mut v2 = work_value();
+    v2["version"] = json!(2);
+    v2["object_types"].as_object_mut().unwrap().remove("other");
+    v2["grants"][0]["read"] = serde_json::json!(["thing"]);
+    v2["object_types"]["thing"]["properties"]
+        .as_object_mut()
+        .unwrap()
+        .remove("other");
+    let pin2 = install(&mut store, &serde_json::to_vec(&v2).unwrap(), 101);
+    assert_ne!(pin1.sha256, pin2.sha256);
+    let head = store.head(&other).unwrap().unwrap();
+    assert_eq!(head.schema_pin, pin1);
+    assert_eq!(store.history(&other).unwrap().unwrap().schema_pin, pin1);
+    let err = store
+        .append_schema(
+            &[append(
+                &id("other", "o2"),
+                obs(
+                    "r1",
+                    Change::Initial,
+                    None,
+                    fields(&[("label", json!("y"))]),
+                ),
+            )],
+            8,
+        )
+        .unwrap_err();
+    assert_eq!(err.violation.unwrap().code, "unknown_type");
+    assert_eq!(
+        store
+            .scan_heads("other", 10, None)
+            .unwrap_err()
+            .violation
+            .unwrap()
+            .code,
+        "unknown_type"
+    );
+    store
+        .append_schema(
+            &[append(
+                &id("thing", "k1"),
+                name_obs("r1", Change::Initial, None, "a"),
+            )],
+            8,
+        )
+        .unwrap();
+    assert_eq!(
+        store.head(&id("thing", "k1")).unwrap().unwrap().schema_pin,
+        pin2
+    );
+}
+
+#[test]
+fn write_transaction_is_atomic_and_sees_its_own_appends() {
+    // spec: specs/ont/store.md#R38
+    let mut store = store_with_work();
+    let thing = id("thing", "k1");
+    store
+        .write(20, |tx| {
+            tx.append(&append(&thing, name_obs("r1", Change::Initial, None, "a")))?;
+            tx.append(&append(
+                &thing,
+                name_obs("r2", Change::Update, Some("r1"), "b"),
+            ))?;
+            assert_eq!(tx.log_action(&log_entry("act-1"))?, 1);
+            let head = tx.head(&thing)?.unwrap();
+            assert_eq!(head.head.observation.revision, "r2");
+            Ok(())
+        })
+        .unwrap();
+    assert_eq!(
+        store.history(&thing).unwrap().unwrap().observations.len(),
+        2
+    );
+    assert_eq!(store.action_log().unwrap().len(), 1);
+    let err = store
+        .write(21, |tx| {
+            tx.append(&append(
+                &id("thing", "k2"),
+                name_obs("r1", Change::Initial, None, "a"),
+            ))?;
+            tx.log_action(&log_entry("act-2"))?;
+            Err::<(), _>(StoreRefusal::new("test_abort"))
+        })
+        .unwrap_err();
+    assert_eq!(err.code, "test_abort");
+    assert_eq!(store.head(&id("thing", "k2")).unwrap(), None);
+    assert_eq!(store.action_log().unwrap().len(), 1);
+}
+
+#[test]
+fn corrupt_head_or_history_is_store_failure_not_absent() {
+    // spec: specs/ont/store.md#R47
+    let temp = Temp::new();
+    let path = temp.0.join("v3.sqlite");
+    let thing = id("thing", "k1");
+    let mut store = Store::open_schema(&path).unwrap();
+    install(&mut store, &work_bytes(1), 100);
+    store
+        .append_schema(
+            &[append(&thing, name_obs("r1", Change::Initial, None, "a"))],
+            7,
+        )
+        .unwrap();
+    drop(store);
+    let raw = rusqlite::Connection::open(&path).unwrap();
+    raw.execute("DELETE FROM observations WHERE revision='r1'", [])
+        .unwrap();
+    drop(raw);
+    let mut store = Store::open_schema(&path).unwrap();
+    assert_eq!(store.head(&thing).unwrap_err().code, "store_failure");
+    assert_eq!(store.history(&thing).unwrap_err().code, "store_failure");
+    // A head pointer that no observation carries is also corruption.
+    let raw = rusqlite::Connection::open(&path).unwrap();
+    raw.execute_batch(
+        "INSERT INTO observations(object_type,instance,account,native_key,revision,ordinal,payload,ingested_at,schema_domain,schema_version,change_kind) SELECT object_type,instance,account,native_key,'r1',0,'{}',7,'work',1,'initial' FROM objects",
+    )
+    .unwrap();
+    drop(raw);
+    assert_eq!(store.history(&thing).unwrap_err().code, "store_failure");
+}
+
+#[test]
+fn scan_continues_by_primary_key_across_namespaces_and_special_keys() {
+    // spec: specs/ont/store.md#R49
+    // spec: specs/ont/store.md#R50
+    let mut store = Store::memory_schema().unwrap();
+    install(&mut store, &work_bytes(1), 100);
+    for key in ["k%", "k_", "ké", "k~"] {
+        store
+            .append_schema(
+                &[append(
+                    &id("thing", key),
+                    name_obs("r1", Change::Initial, None, "a"),
+                )],
+                7,
+            )
+            .unwrap();
+    }
+    // A v2 schema for the same domain in another namespace.
+    let mut v2 = work_value();
+    v2["version"] = json!(2);
+    v2["namespace"] = json!({"instance":"vps://other","account":"root"});
+    install(&mut store, &serde_json::to_vec(&v2).unwrap(), 101);
+    let scope2 = Scope::domain(
+        ns2(),
+        "work",
+        BTreeMap::from([("tenant".into(), "t1".into())]),
+    )
+    .unwrap();
+    for key in ["a1", "k%"] {
+        let mut item = append(
+            &id("thing", key),
+            name_obs("r1", Change::Initial, None, "a"),
+        );
+        item.id.namespace = ns2();
+        item.scope = scope2.clone();
+        store.append_schema(&[item], 8).unwrap();
+    }
+    let mut seen: Vec<(String, String)> = Vec::new();
+    let mut after: Option<Id> = None;
+    loop {
+        let page = store.scan_heads("thing", 2, after.as_ref()).unwrap();
+        if page.is_empty() {
+            break;
+        }
+        after = page.last().map(|h| h.id.clone());
+        seen.extend(
+            page.iter()
+                .map(|h| (h.id.namespace.instance.clone(), h.id.native_key.clone())),
+        );
+    }
+    assert_eq!(seen.len(), 6, "{seen:?}");
+    let unique: std::collections::BTreeSet<_> = seen.iter().collect();
+    assert_eq!(unique.len(), 6);
+    let mut sorted = seen.clone();
+    sorted.sort();
+    assert_eq!(seen, sorted, "primary-key order");
+    assert_eq!(
+        store.scan_heads("thing", 10_001, None).unwrap_err().code,
+        "limit_too_large"
+    );
+    let mut big = append(
+        &id("thing", "big"),
+        name_obs("r1", Change::Initial, None, "a"),
+    );
+    big.id.namespace = ns2();
+    big.scope = scope2.clone();
+    assert_eq!(
+        store.append_schema(&[big], u64::MAX).unwrap_err().code,
+        "value_out_of_range"
+    );
+}
+
+#[test]
+fn busy_open_with_exclusive_lock_is_store_busy() {
+    // spec: specs/ont/store.md#R26
+    // spec: specs/ont/store.md#R51
+    let temp = Temp::new();
+    let path = temp.0.join("v3.sqlite");
+    drop(Store::open_schema(&path).unwrap());
+    let raw = rusqlite::Connection::open(&path).unwrap();
+    raw.execute_batch("BEGIN EXCLUSIVE").unwrap();
+    let err = Store::open_schema_with_busy_timeout(&path, std::time::Duration::from_millis(100))
+        .err()
+        .unwrap();
+    assert_eq!(err.code, "store_busy");
+    raw.execute_batch("ROLLBACK").unwrap();
+}
+
+#[test]
+fn duplicate_action_id_outcome_check_and_install_source_are_recorded() {
+    // spec: specs/ont/store.md#R46
+    // spec: specs/ont/store.md#R55
+    // spec: specs/ont/schema-language.md#R17
+    let mut store = Store::memory_schema().unwrap();
+    let pin = store
+        .install_schema(
+            &work_bytes(1),
+            InstallArgs {
+                installed_at: 5,
+                source_repository: Some("park-kyungchan/ontology-platform".into()),
+                source_commit: Some("abc123".into()),
+            },
+        )
+        .unwrap();
+    assert_eq!(pin.domain, "work");
+    let (repo, commit): (Option<String>, Option<String>) = store
+        .connection
+        .query_row(
+            "SELECT source_repository, source_commit FROM schema_installs WHERE domain='work'",
+            [],
+            |r| Ok((r.get(0)?, r.get(1)?)),
+        )
+        .unwrap();
+    assert_eq!(repo.as_deref(), Some("park-kyungchan/ontology-platform"));
+    assert_eq!(commit.as_deref(), Some("abc123"));
+    assert_eq!(store.append_action_log(&log_entry("act-1")).unwrap(), 1);
+    assert_eq!(
+        store
+            .append_action_log(&log_entry("act-1"))
+            .unwrap_err()
+            .code,
+        "duplicate_action_id"
+    );
+    let mut bad = log_entry("act-2");
+    bad.outcome = "bogus".into();
+    assert_eq!(
+        store.append_action_log(&bad).unwrap_err().code,
+        "store_failure"
+    );
+}
+
+#[test]
+fn scope_conflict_duplicate_revision_seed_and_nested_refs() {
+    // spec: specs/ont/store.md#R40
+    // spec: specs/ont/store.md#R43
+    let mut store = store_with_work();
+    let thing = id("thing", "k1");
+    store
+        .append_schema(
+            &[append(&thing, name_obs("r1", Change::Initial, None, "a"))],
+            7,
+        )
+        .unwrap();
+    // Same object under a different scope value: scope_conflict.
+    let mut item = append(&thing, name_obs("r2", Change::Update, Some("r1"), "b"));
+    item.scope = Scope::domain(
+        ns(),
+        "work",
+        BTreeMap::from([("tenant".into(), "t2".into())]),
+    )
+    .unwrap();
+    assert_eq!(
+        store.append_schema(&[item], 8).unwrap_err().code,
+        "scope_conflict"
+    );
+    // A repeated revision is distinct from a moved head.
+    assert_eq!(
+        store
+            .append_schema(
+                &[append(
+                    &thing,
+                    name_obs("r1", Change::Update, Some("r1"), "b")
+                )],
+                8
+            )
+            .unwrap_err()
+            .code,
+        "duplicate_revision"
+    );
+    // seed on a format 3 store keeps the legacy-path refusal.
+    let object = Object {
+        id: thing.clone(),
+        scope: scope(),
+        head: "r1".into(),
+        observations: vec![name_obs("r1", Change::Initial, None, "a")],
+    };
+    assert_eq!(store.seed(&[object], &[]), Err(Error::SchemaViolation));
+}
+
+#[test]
+fn refs_nested_in_array_and_struct_are_checked() {
+    let mut v = work_value();
+    v["object_types"]["thing"]["properties"]["refs"] =
+        json!({"type":{"array":{"ref":"other"}},"required":false});
+    v["object_types"]["thing"]["properties"]["wrapped"] =
+        json!({"type":{"struct":{"inner":{"ref":"other"}}},"required":false});
+    let mut store = Store::memory_schema().unwrap();
+    install(&mut store, &serde_json::to_vec(&v).unwrap(), 100);
+    let foreign = serde_json::to_value(Id {
+        object_type: "other".into(),
+        namespace: ns2(),
+        native_key: "x".into(),
+    })
+    .unwrap();
+    for (key, extra) in [
+        ("arr", ("refs", json!([foreign.clone()]))),
+        ("str", ("wrapped", json!({"inner": foreign.clone()}))),
+    ] {
+        let item = append(
+            &id("thing", key),
+            obs(
+                "r1",
+                Change::Initial,
+                None,
+                fields(&[("name", json!("a")), extra]),
+            ),
+        );
+        let err = store.append_schema(&[item], 7).unwrap_err();
+        assert_eq!(
+            err.violation.unwrap().code,
+            "ref_namespace_mismatch",
+            "{key}"
+        );
+    }
+    let good_ref = serde_json::to_value(Id {
+        object_type: "other".into(),
+        namespace: ns(),
+        native_key: "ghost".into(),
+    })
+    .unwrap();
+    store
+        .append_schema(
+            &[append(
+                &id("thing", "ok"),
+                obs(
+                    "r1",
+                    Change::Initial,
+                    None,
+                    fields(&[
+                        ("name", json!("a")),
+                        ("refs", json!([good_ref.clone()])),
+                        ("wrapped", json!({"inner": good_ref})),
+                    ]),
+                ),
+            )],
+            7,
+        )
+        .unwrap();
+}
+
+#[test]
+fn two_items_for_one_object_in_one_batch_see_each_other() {
+    let mut store = store_with_work();
+    let thing = id("thing", "k1");
+    store
+        .append_schema(
+            &[
+                append(&thing, name_obs("r1", Change::Initial, None, "a")),
+                append(&thing, name_obs("r2", Change::Update, Some("r1"), "b")),
+            ],
+            7,
+        )
+        .unwrap();
+    let head = store.head(&thing).unwrap().unwrap();
+    assert_eq!(head.head.observation.revision, "r2");
+    assert_eq!(
+        store.history(&thing).unwrap().unwrap().observations.len(),
+        2
+    );
+}
+
+#[test]
+fn busy_writer_holds_transaction_while_reader_reads_committed_row() {
+    let temp = Temp::new();
+    let path = temp.0.join("v3.sqlite");
+    let mut first =
+        Store::open_schema_with_busy_timeout(&path, std::time::Duration::from_secs(10)).unwrap();
+    install(&mut first, &work_bytes(1), 100);
+    let committed = id("thing", "committed");
+    first
+        .append_schema(
+            &[append(
+                &committed,
+                name_obs("r1", Change::Initial, None, "a"),
+            )],
+            7,
+        )
+        .unwrap();
+    let held = id("thing", "held");
+    first
+        .write(30, |tx| {
+            tx.append(&append(&held, name_obs("r1", Change::Initial, None, "a")))?;
+            let mut reader =
+                Store::open_schema_with_busy_timeout(&path, std::time::Duration::from_millis(200))
+                    .unwrap();
+            // The reader sees the previously committed row through the
+            // public path, and the held append is not visible.
+            assert_eq!(
+                reader
+                    .head(&committed)
+                    .unwrap()
+                    .unwrap()
+                    .head
+                    .observation
+                    .revision,
+                "r1"
+            );
+            assert_eq!(reader.head(&held).unwrap(), None);
+            let err = reader
+                .append_schema(
+                    &[append(
+                        &id("thing", "other"),
+                        name_obs("r1", Change::Initial, None, "a"),
+                    )],
+                    31,
+                )
+                .unwrap_err();
+            assert_eq!(err.code, "store_busy");
+            Ok(())
+        })
+        .unwrap();
+    assert!(first.head(&held).unwrap().is_some());
+}
+
+#[test]
+fn panic_inside_write_closure_leaves_nothing_written() {
+    // spec: specs/ont/store.md#R38
+    let mut store = store_with_work();
+    let thing = id("thing", "panic");
+    let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        let _: Result<(), StoreRefusal> = store.write(40, |tx| {
+            tx.append(&append(&thing, name_obs("r1", Change::Initial, None, "a")))?;
+            tx.log_action(&log_entry("act-panic"))?;
+            panic!("simulated closure panic");
+        });
+    }));
+    assert!(result.is_err());
+    assert_eq!(store.head(&thing).unwrap(), None);
+    assert_eq!(store.action_log().unwrap().len(), 0);
+    // The store still works afterwards.
+    store
+        .append_schema(
+            &[append(&thing, name_obs("r1", Change::Initial, None, "a"))],
+            41,
+        )
+        .unwrap();
+}
+
+#[test]
+fn log_action_refuses_domain_and_stale_schema_version() {
+    // spec: specs/ont/store.md#R54
+    let mut store = store_with_work();
+    let mut wrong_domain = log_entry("act-x");
+    wrong_domain.domain = "academy".into();
+    assert_eq!(
+        store.append_action_log(&wrong_domain).unwrap_err().code,
+        "action_domain_mismatch"
+    );
+    let mut stale = log_entry("act-y");
+    stale.schema_version = 99;
+    assert_eq!(
+        store.append_action_log(&stale).unwrap_err().code,
+        "action_schema_mismatch"
+    );
+    assert!(store.action_log().unwrap().is_empty());
+}
+
+#[test]
+fn backup_to_refuses_existing_target_and_copy_opens_with_same_pins() {
+    // spec: specs/ont/store.md#R53
+    let temp = Temp::new();
+    let path = temp.0.join("v3.sqlite");
+    let mut store = Store::open_schema(&path).unwrap();
+    install(&mut store, &work_bytes(1), 100);
+    let target = temp.0.join("copy.sqlite");
+    store.backup_to(&target).unwrap();
+    assert_eq!(
+        store.backup_to(&target).unwrap_err().code,
+        "backup_target_exists"
+    );
+    let mut copy = Store::open_schema(&target).unwrap();
+    assert_eq!(copy.schema_pins().unwrap(), store.schema_pins().unwrap());
+}
+
+fn open_err(path: &std::path::Path) -> &'static str {
+    match Store::open_schema_existing(path) {
+        Ok(_) => panic!("opened"),
+        Err(e) => e.code,
+    }
+}
+
+#[test]
+fn open_schema_existing_never_creates_or_initialises() {
+    // spec: specs/ont/store.md#R29
+    // spec: specs/ont/store.md#R30
+    let temp = Temp::new();
+    // Missing file: refusal, nothing created.
+    let missing = temp.0.join("missing.sqlite");
+    assert_eq!(open_err(&missing), "store_not_found");
+    assert!(!missing.exists());
+    // Empty file: refusal, still zero bytes.
+    let empty = temp.0.join("empty.sqlite");
+    std::fs::write(&empty, b"").unwrap();
+    assert_eq!(open_err(&empty), "store_failure");
+    assert_eq!(std::fs::metadata(&empty).unwrap().len(), 0);
+    // Foreign bytes: refusal, bytes unchanged.
+    let foreign = temp.0.join("foreign.sqlite");
+    std::fs::write(&foreign, b"not a database at all, just text").unwrap();
+    assert_eq!(open_err(&foreign), "store_failure");
+    assert_eq!(
+        std::fs::read(&foreign).unwrap(),
+        b"not a database at all, just text"
+    );
+    // A real format 3 store opens and is read-only.
+    let path = temp.0.join("v3.sqlite");
+    {
+        let mut store = Store::open_schema(&path).unwrap();
+        install(&mut store, &work_bytes(1), 100);
+    }
+    let mut store = Store::open_schema_existing(&path).unwrap();
+    assert_eq!(store.schema_pins().unwrap().len(), 1);
+    assert!(
+        store
+            .install_schema(
+                &work_bytes(2),
+                InstallArgs {
+                    installed_at: 101,
+                    ..InstallArgs::default()
+                }
+            )
+            .is_err()
+    );
+}
+
+#[test]
+fn open_schema_existing_writable_writes_but_never_creates_or_initialises() {
+    // spec: specs/ont/store.md#R30
+    let temp = Temp::new();
+    let missing = temp.0.join("missing.sqlite");
+    assert_eq!(
+        Store::open_schema_existing_writable(&missing)
+            .err()
+            .unwrap()
+            .code,
+        "store_not_found"
+    );
+    assert!(!missing.exists());
+    let empty = temp.0.join("empty.sqlite");
+    std::fs::write(&empty, b"").unwrap();
+    assert_eq!(
+        Store::open_schema_existing_writable(&empty)
+            .err()
+            .unwrap()
+            .code,
+        "store_failure"
+    );
+    assert_eq!(std::fs::metadata(&empty).unwrap().len(), 0);
+    let foreign = temp.0.join("foreign.sqlite");
+    std::fs::write(&foreign, b"not a database at all, just text").unwrap();
+    assert_eq!(
+        Store::open_schema_existing_writable(&foreign)
+            .err()
+            .unwrap()
+            .code,
+        "store_failure"
+    );
+    assert_eq!(
+        std::fs::read(&foreign).unwrap(),
+        b"not a database at all, just text"
+    );
+    // On a real store it may write (an install is a write).
+    let path = temp.0.join("v3.sqlite");
+    {
+        let mut store = Store::open_schema(&path).unwrap();
+        install(&mut store, &work_bytes(1), 100);
+    }
+    let mut store = Store::open_schema_existing_writable(&path).unwrap();
+    install(&mut store, &work_bytes(2), 101);
+    assert_eq!(store.schema_pins().unwrap()["work"].version, 2);
+}
+
+#[test]
+fn creating_sqlite_open_refuses_final_symlink_at_open_time() {
+    // spec: specs/ont/store.md#R7
+    let temp = Temp::new();
+    let target = temp.0.join("target.sqlite");
+    let link = temp.0.join("link.sqlite");
+    std::os::unix::fs::symlink(&target, &link).unwrap();
+    // Bypass any CLI precheck: exercise the creating SQLite open itself.
+    for existing in [false, true] {
+        if existing {
+            drop(Store::open_schema(&target).unwrap());
+        }
+        let before = std::fs::read(&target).ok();
+        assert!(open_file(&link).is_err());
+        assert_eq!(std::fs::read(&target).ok(), before);
+    }
+    assert!(open_file(&target).is_ok());
+}
+
+#[test]
+fn admission_metadata_avoids_payloads_and_rechecks_scope_in_one_read() {
+    let mut store = store_with_work();
+    let target = id("thing", "admission");
+    store
+        .append_schema(
+            &[append(
+                &target,
+                name_obs("r1", Change::Initial, None, "value"),
+            )],
+            100,
+        )
+        .unwrap();
+    let access = store.head_access(&target).unwrap().unwrap();
+    assert_eq!(
+        store.head_after_access(&access).unwrap(),
+        store.head(&target).unwrap()
+    );
+    // A changed scope cannot authorize a payload using the previous admission.
+    let changed_scope = Scope::domain(
+        ns(),
+        "work",
+        BTreeMap::from([("tenant".into(), "other".into())]),
+    )
+    .unwrap();
+    store
+        .connection
+        .execute(
+            "UPDATE objects SET scope=?1",
+            [serde_json::to_string(&changed_scope).unwrap()],
+        )
+        .unwrap();
+    // An undecodable payload proves metadata lookup and a stale-admission
+    // rejection never read/decode the observation payload.
+    store
+        .connection
+        .execute("UPDATE observations SET payload='invalid json'", [])
+        .unwrap();
+    assert!(store.head_after_access(&access).unwrap().is_none());
+    let current = store.head_access(&target).unwrap().unwrap();
+    assert_eq!(current.scope, changed_scope);
+    assert_eq!(
+        store.scan_head_access("thing", 1, None).unwrap(),
+        vec![current.clone()]
+    );
+    assert!(
+        store
+            .scan_head_access("thing", 1, Some(&target))
+            .unwrap()
+            .is_empty()
+    );
+    assert!(store.head(&target).is_err());
+    store
+        .read_schema(|tx| {
+            assert_eq!(tx.schema_set().pin("work").unwrap().version, 1);
+            assert_eq!(tx.head_access(&target).unwrap(), Some(current.clone()));
+            assert_eq!(
+                tx.scan_head_access("thing", 1, None).unwrap(),
+                vec![current.clone()]
+            );
+            assert!(tx.head_after_access(&access).unwrap().is_none());
+            // Only an admitted, matching access attempts to decode the bad payload.
+            assert!(tx.head_after_access(&current).is_err());
+        })
+        .unwrap();
+    // Raw input edits invalidate the projection before any native write closure.
+    assert_eq!(
+        store.write(100, |_| Ok(())).unwrap_err().code,
+        "projection_stale"
+    );
+}
+
+#[test]
+fn admission_queries_seek_exact_keys_and_page_cursor_ranges() {
+    let store = store_with_work();
+    for exact in [false, true] {
+        let sql = format!("EXPLAIN QUERY PLAN {}", schema_mode::access_sql(exact));
+        let mut stmt = store.connection.prepare(&sql).unwrap();
+        let details: Vec<String> = stmt
+            .query_map(
+                params!["thing", "vps://synthetic", "root", "middle", 1],
+                |r| r.get(3),
+            )
+            .unwrap()
+            .map(Result::unwrap)
+            .collect();
+        let objects_plan = details.iter().find(|p| p.contains("SEARCH o ")).unwrap();
+        // A type-prefix-only scan makes repeated admissions quadratic.
+        assert!(
+            objects_plan.contains("instance")
+                && objects_plan.contains("account")
+                && objects_plan.contains("native_key"),
+            "{objects_plan}"
+        );
+        if !exact {
+            assert!(objects_plan.contains('>'), "{objects_plan}");
+        }
+    }
+}
+
+#[test]
+fn find_action_reads_one_row() {
+    let mut store = store_with_work();
+    for id in ["act-1", "act-2", "act-3"] {
+        store.append_action_log(&log_entry(id)).unwrap();
+    }
+    store
+        .write(100, |tx| {
+            assert_eq!(tx.find_action("act-2")?, Some((2, log_entry("act-2"))));
+            assert_eq!(tx.find_action("unknown")?, None);
+            assert_eq!(tx.action_count()?, 3);
+            Ok(())
+        })
+        .unwrap();
+}
+#[test]
+fn action_count_and_log_from() {
+    let mut store = store_with_work();
+    assert_eq!(store.action_count().unwrap(), 0);
+    for id in ["act-1", "act-2", "act-3"] {
+        store.append_action_log(&log_entry(id)).unwrap();
+    }
+    assert_eq!(store.action_count().unwrap(), 3);
+    assert_eq!(
+        store.action_log_from(2).unwrap(),
+        vec![(2, log_entry("act-2")), (3, log_entry("act-3"))]
+    );
+    assert!(store.action_log_from(4).unwrap().is_empty());
+    assert_eq!(
+        store.action_log_from(0).unwrap(),
+        store.action_log().unwrap()
+    );
+}
+
+#[test]
+fn new_store_has_16k_pages() {
+    // spec: specs/ont/store.md#R56
+    let temp = Temp::new();
+    for mode in [StoreMode::Program, StoreMode::Schema] {
+        let path = temp.0.join(format!("mode-{}.sqlite", mode.version()));
+        let mut store = match mode {
+            StoreMode::Program => Store::open_program(&path).unwrap(),
+            StoreMode::Schema => Store::open_schema(&path).unwrap(),
+        };
+        let size: u32 = store
+            .connection
+            .query_row("PRAGMA page_size", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(size, 16384);
+        if mode == StoreMode::Schema {
+            store
+                .install_schema(&work_bytes(1), InstallArgs::default())
+                .unwrap();
+            let rows: Vec<_> = (0..20)
+                .map(|n| {
+                    let mut observation = name_obs("r0", Change::Initial, None, "");
+                    let overhead = serde_json::to_vec(&observation).unwrap().len();
+                    // Size the complete serialized payload, rather than only its string value.
+                    let payload_bytes = 1000 + 900 * (n % 4);
+                    observation.fields.insert(
+                        "name".into(),
+                        Knowledge::Value(json!("x".repeat(payload_bytes - overhead))),
+                    );
+                    assert_eq!(
+                        serde_json::to_vec(&observation).unwrap().len(),
+                        payload_bytes
+                    );
+                    append(&id("thing", &format!("{n}")), observation)
+                })
+                .collect();
+            store.append_schema(&rows, 1).unwrap();
+            let overflow: u64 = store
+                .connection
+                .query_row(
+                    "SELECT count(*) FROM dbstat WHERE name='observations' AND pagetype='overflow'",
+                    [],
+                    |r| r.get(0),
+                )
+                .unwrap();
+            assert_eq!(
+                overflow, 0,
+                "1–4 kB payloads must fit without overflow pages"
+            );
+        }
+    }
+}
+
+#[test]
+fn renewal_preserves_rows_and_payload_except_freshness_and_projects_expiry() {
+    // spec: specs/ont/index.md#R32
+    let mut store = store_with_work();
+    let key = id("thing", "renew");
+    store
+        .append_schema(
+            &[append(&key, name_obs("r0", Change::Initial, None, "a"))],
+            100,
+        )
+        .unwrap();
+    let rows = |store: &Store| -> Vec<Vec<rusqlite::types::Value>> {
+        let mut stmt = store
+            .connection
+            .prepare("SELECT * FROM observations")
+            .unwrap();
+        let columns = stmt.column_count();
+        stmt.query_map([], |r| (0..columns).map(|i| r.get(i)).collect())
+            .unwrap()
+            .map(Result::unwrap)
+            .collect()
+    };
+    let before = rows(&store);
+    let object_before: String = store
+        .connection
+        .query_row("SELECT head FROM objects", [], |r| r.get(0))
+        .unwrap();
+    let before_head = store.head(&key).unwrap().unwrap();
+    store.write(200, |tx| tx.renew(&key, 200, 300)).unwrap();
+    let after = rows(&store);
+    assert_eq!(
+        after.len(),
+        before.len(),
+        "renewal must not append an observation"
+    );
+    let payload_index = store
+        .connection
+        .prepare("SELECT * FROM observations")
+        .unwrap()
+        .column_index("payload")
+        .unwrap();
+    for i in 0..before[0].len() {
+        if i != payload_index {
+            assert_eq!(after[0][i], before[0][i], "column {i}");
+        }
+    }
+    let payload = |row: &[rusqlite::types::Value]| -> Value {
+        let rusqlite::types::Value::Text(text) = &row[payload_index] else {
+            panic!("payload is not text")
+        };
+        serde_json::from_str(text).unwrap()
+    };
+    let mut expected = payload(&before[0]);
+    expected["observed_at"] = json!(200);
+    expected["fresh_until"] = json!(300);
+    assert_eq!(
+        payload(&after[0]),
+        expected,
+        "only the two freshness members change"
+    );
+    let object_after: String = store
+        .connection
+        .query_row("SELECT head FROM objects", [], |r| r.get(0))
+        .unwrap();
+    assert_eq!(object_after, object_before);
+    let mut expected_head = before_head;
+    expected_head.head.observation.observed_at = 200;
+    expected_head.head.observation.fresh_until = 300;
+    assert_eq!(store.head(&key).unwrap().unwrap(), expected_head);
+    let prefixes: Vec<String> = store
+        .connection
+        .prepare("SELECT value FROM head_candidates WHERE property='$stale' ORDER BY length(value)")
+        .unwrap()
+        .query_map([], |r| r.get(0))
+        .unwrap()
+        .map(Result::unwrap)
+        .collect();
+    let expiry = format!("{:016x}", 300);
+    assert_eq!(
+        prefixes,
+        (1..=16)
+            .map(|n| expiry[..n].to_string())
+            .collect::<Vec<_>>(),
+        "postings must use renewed expiry"
+    );
+    store
+        .read_schema(|tx| tx.candidate_access("thing", None, 250, 10, None, &[scope()]))
+        .unwrap()
+        .unwrap();
+    let generation: (i64, i64) = store
+        .connection
+        .query_row(
+            "SELECT mutation,projected FROM candidate_generation",
+            [],
+            |r| Ok((r.get(0)?, r.get(1)?)),
+        )
+        .unwrap();
+    assert_eq!(generation.0, generation.1, "projection is current");
+    let renewed = rows(&store);
+    assert_eq!(
+        store
+            .write(199, |tx| tx.renew(&key, 199, 400))
+            .unwrap_err()
+            .code,
+        "renewal_goes_back"
+    );
+    assert_eq!(rows(&store), renewed, "refused renewal rolls back");
+}
+
+fn renewal_rows(store: &Store) -> Vec<Vec<rusqlite::types::Value>> {
+    let mut stmt = store
+        .connection
+        .prepare(
+            "SELECT * FROM observations ORDER BY object_type,instance,account,native_key,ordinal",
+        )
+        .unwrap();
+    let columns = stmt.column_count();
+    stmt.query_map([], |r| (0..columns).map(|i| r.get(i)).collect())
+        .unwrap()
+        .map(Result::unwrap)
+        .collect()
+}
+
+#[test]
+fn renewed_row_is_the_shared_payload() {
+    // spec: specs/ont/read.md#R12
+    let mut store = store_with_work();
+    let key = id("thing", "renew");
+    let mut expected = name_obs("r0", Change::Initial, None, "a");
+    store
+        .append_schema(&[append(&key, expected.clone())], 100)
+        .unwrap();
+    store.write(200, |tx| tx.renew(&key, 200, 300)).unwrap();
+    expected.observed_at = 200;
+    expected.fresh_until = 300;
+    let payload: String = store
+        .connection
+        .query_row("SELECT payload FROM observations", [], |r| r.get(0))
+        .unwrap();
+    assert_eq!(payload, ont_core::observation_payload(&expected).unwrap());
+}
+
+#[test]
+fn renewal_respects_the_payload_bound() {
+    // spec: specs/ont/read.md#R12
+    // spec: specs/ont/read.md#R13
+    let mut store = store_with_work();
+    let key = id("thing", "renew");
+    let mut observation = name_obs("r0", Change::Initial, None, "");
+    let padding = ont_core::MAX_OBSERVATION_BYTES
+        - 2
+        - ont_core::observation_payload(&observation).unwrap().len();
+    observation
+        .fields
+        .insert("name".into(), Knowledge::Value(json!("x".repeat(padding))));
+    assert_eq!(
+        ont_core::observation_payload(&observation).unwrap().len(),
+        ont_core::MAX_OBSERVATION_BYTES - 2
+    );
+    store
+        .append_schema(&[append(&key, observation.clone())], 100)
+        .unwrap();
+    let before = renewal_rows(&store);
+    let head = store.head(&key).unwrap().unwrap();
+    observation.observed_at = 100_000;
+    observation.fresh_until = 100_010;
+    let append_error = store
+        .append_schema(&[append(&id("thing", "oversized"), observation)], 100_000)
+        .unwrap_err();
+    let error = store
+        .write(100_000, |tx| tx.renew(&key, 100_000, 100_010))
+        .unwrap_err();
+    assert_eq!(error.code, "observation_too_large");
+    assert_eq!(error.code, append_error.code);
+    assert_eq!(
+        renewal_rows(&store),
+        before,
+        "refused renewal keeps all row bytes"
+    );
+    assert_eq!(
+        store.head(&key).unwrap().unwrap(),
+        head,
+        "head stays readable"
+    );
+}
+
+#[test]
+fn renewal_refuses_fresh_until_below_observed_at() {
+    let mut store = store_with_work();
+    let key = id("thing", "renew");
+    let mut observation = name_obs("r0", Change::Initial, None, "a");
+    store
+        .append_schema(&[append(&key, observation.clone())], 100)
+        .unwrap();
+    let before = renewal_rows(&store);
+    let head = store.head(&key).unwrap().unwrap();
+    observation.observed_at = 200;
+    observation.fresh_until = 150;
+    let append_error = store
+        .append_schema(&[append(&id("thing", "invalid"), observation)], 200)
+        .unwrap_err();
+    let error = store.write(200, |tx| tx.renew(&key, 200, 150)).unwrap_err();
+    assert_eq!(error.code, ont_core::Error::InvalidEvidence.code());
+    assert_eq!(error.code, append_error.code);
+    assert_eq!(
+        renewal_rows(&store),
+        before,
+        "refused renewal keeps all row bytes"
+    );
+    assert_eq!(store.head(&key).unwrap().unwrap(), head);
+}
+
+#[test]
+fn renewal_touches_only_the_head_row() {
+    let mut store = store_with_work();
+    let key = id("thing", "renew");
+    let other = id("thing", "other");
+    store
+        .append_schema(
+            &[
+                append(&key, name_obs("r0", Change::Initial, None, "a")),
+                append(&key, name_obs("r1", Change::Update, Some("r0"), "b")),
+                append(&other, name_obs("r0", Change::Initial, None, "other")),
+            ],
+            100,
+        )
+        .unwrap();
+    let before = renewal_rows(&store);
+    let stmt = store
+        .connection
+        .prepare("SELECT * FROM observations")
+        .unwrap();
+    let payload_index = stmt.column_index("payload").unwrap();
+    let key_index = stmt.column_index("native_key").unwrap();
+    let revision_index = stmt.column_index("revision").unwrap();
+    drop(stmt);
+    store.write(200, |tx| tx.renew(&key, 200, 300)).unwrap();
+    let after = renewal_rows(&store);
+    assert_eq!(before.len(), 3);
+    assert_eq!(after.len(), before.len());
+    let mut changed = 0;
+    for (old, new) in before.iter().zip(&after) {
+        if old[key_index] != rusqlite::types::Value::Text("renew".into())
+            || old[revision_index] != rusqlite::types::Value::Text("r1".into())
+        {
+            assert_eq!(new, old, "every non-head row stays byte-equal");
+            continue;
+        }
+        changed += 1;
+        assert_ne!(new[payload_index], old[payload_index]);
+        for i in 0..old.len() {
+            if i != payload_index {
+                assert_eq!(new[i], old[i], "column {i}");
+            }
+        }
+        let rusqlite::types::Value::Text(text) = &old[payload_index] else {
+            panic!()
+        };
+        let mut expected: Observation = serde_json::from_str(text).unwrap();
+        expected.observed_at = 200;
+        expected.fresh_until = 300;
+        assert_eq!(
+            new[payload_index],
+            rusqlite::types::Value::Text(ont_core::observation_payload(&expected).unwrap())
+        );
+    }
+    assert_eq!(changed, 1, "exactly the head row changes");
+}
+
+#[test]
+fn renewal_refuses_missing_and_retracted_heads() {
+    let mut store = store_with_work();
+    let key = id("thing", "renew");
+    assert_eq!(
+        store
+            .write(100, |tx| tx.renew(&key, 100, 200))
+            .unwrap_err()
+            .code,
+        "revision_conflict"
+    );
+    store
+        .append_schema(
+            &[
+                append(&key, name_obs("r0", Change::Initial, None, "a")),
+                append(
+                    &key,
+                    obs("r1", Change::Retraction, Some("r0"), BTreeMap::new()),
+                ),
+            ],
+            100,
+        )
+        .unwrap();
+    let before = store.history(&key).unwrap();
+    assert_eq!(
+        store
+            .write(100, |tx| tx.renew(&key, 100, 200))
+            .unwrap_err()
+            .code,
+        "revision_conflict"
+    );
+    assert_eq!(store.history(&key).unwrap(), before);
+}
+
+#[test]
+fn action_log_queries_use_indexes() {
+    let store = store_with_work();
+    // The exact SQL of SchemaWrite::find_action, action_count_in and
+    // action_log_from_in, read from their definitions rather than substitutes.
+    let source = include_str!("schema_mode.rs");
+    for (function, required) in [
+        (
+            "pub fn find_action(",
+            "USING INDEX sqlite_autoindex_action_log_1",
+        ),
+        ("fn action_count_in(", "USING COVERING INDEX"),
+        ("fn action_log_from_in(", "USING INTEGER PRIMARY KEY"),
+    ] {
+        let body = source.split(function).nth(1).unwrap();
+        let sql = body.split('"').nth(1).unwrap();
+        assert!(sql.starts_with("SELECT"), "{function}: {sql}");
+        let explain = format!("EXPLAIN QUERY PLAN {sql}");
+        let mut stmt = store.connection.prepare(&explain).unwrap();
+        let params = vec![rusqlite::types::Value::Integer(1); stmt.parameter_count()];
+        let plan: Vec<String> = stmt
+            .query_map(rusqlite::params_from_iter(params), |r| r.get(3))
+            .unwrap()
+            .map(Result::unwrap)
+            .collect();
+        assert!(
+            plan.iter().any(|p| p.contains(required)),
+            "{function}: expected {required}, got {plan:?}"
+        );
+    }
+}

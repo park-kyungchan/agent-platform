@@ -144,6 +144,22 @@ class CheckSpecTraceTest(unittest.TestCase):
         self.assertEqual(r.returncode, 0, r.stdout)
         self.assertEqual(r.stdout, "spec-trace: 2 requirements, 2 citations, 0 errors\n")
 
+    def test_every_path_under_engine_is_skipped(self):
+        files = self.base()
+        files["engine/specs/ap/e.md"] = "- R1: the engine's own.\n"
+        files["engine/specs/ont/cli.md"] = "- R1: engine.\n"
+        files["engine/tests/e.rs"] = f"// {cite('specs/ont/cli.md', 1)}\n// {cite('specs/ap/a.md', 9)}\n"
+        root = self.make(files)
+        r = run(str(root))
+        self.assertEqual(r.returncode, 0, r.stdout)
+        self.assertEqual(r.stdout, "spec-trace: 2 requirements, 2 citations, 0 errors\n")
+        # Outside engine/ the same citation is still missing.
+        files["tests/e.rs"] = f"// {cite('specs/ont/cli.md', 1)}\n"
+        root = self.make(files)
+        r = run(str(root))
+        self.assertEqual(r.returncode, 1)
+        self.assertIn("citation_missing@tests/e.rs:1 specs/ont/cli.md#R1\n", r.stdout)
+
     def test_faults_are_sorted(self):
         files = self.base()
         files["specs/ap/b.md"] = "- R1: b.\n"

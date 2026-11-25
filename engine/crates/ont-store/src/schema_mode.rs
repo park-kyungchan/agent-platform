@@ -1,0 +1,1838 @@
+//! Store mode `Schema` (format 4; writable opens upgrade format 3): schema installs, typed ingest,
+//! retraction-aware reads and the action log. Library only; packet O3 adds
+//! the binary that calls this.
+//!
+//! The cached schema set is never trusted across a transaction boundary:
+//! every transaction (read or write) first compares the latest
+//! `schema_installs` rows with the cache and rebuilds the set inside that
+//! transaction when they differ.
+use super::{
+    Append, Store, StoreMode, db, decode, open_file, open_file_no_create, open_file_read_only,
+};
+use ont_core::schema::{PropertyType, Schema, SchemaPin, SchemaSet, Violation, codes};
+use ont_core::{
+    Change, Error, Id, Knowledge, MAX_OBSERVATION_ARRAY_ITEMS, MAX_OBSERVATION_BYTES, Observation,
+    Scope,
+};
+use rusqlite::{Connection, OptionalExtension, Transaction, TransactionBehavior, params};
+use serde_json::Value;
+use std::collections::{BTreeMap, BTreeSet};
+use std::path::Path;
+use std::time::Duration;
+
+#[path = "candidates.rs"]
+mod candidates;
+pub use candidates::CandidateCondition;
+
+/// Maximum recent history window copied by get/history, including the head.
+pub const MAX_HISTORY_OBSERVATIONS: usize = 100;
+
+// CASE short-circuits: do not parse an over-byte-limit legacy payload, and
+// never return either over-bound payload to the Rust row decoder. octet_length
+// reads stored byte-length metadata; length(TEXT) counts Unicode characters,
+// and length(CAST(TEXT AS BLOB)) materializes the body before measuring it.
+fn bounded_payload_sql() -> String {
+    format!("CASE WHEN octet_length(ob.payload) > {MAX_OBSERVATION_BYTES} THEN NULL
+        WHEN EXISTS(SELECT 1 FROM json_tree(ob.payload) j
+            WHERE CASE WHEN j.type='array' THEN json_array_length(j.value) > {MAX_OBSERVATION_ARRAY_ITEMS} ELSE 0 END)
+        THEN NULL ELSE ob.payload END")
+}
+#[cfg(test)]
+thread_local! { static PAYLOAD_COPIES: std::cell::Cell<usize> = const { std::cell::Cell::new(0) }; }
+fn payload_column(row: &rusqlite::Row<'_>, index: usize) -> rusqlite::Result<Option<String>> {
+    #[cfg(test)]
+    if !matches!(row.get_ref(index)?, rusqlite::types::ValueRef::Null) {
+        PAYLOAD_COPIES.set(PAYLOAD_COPIES.get() + 1);
+    }
+    row.get(index)
+}
+fn payload_value(payload: Option<String>) -> Result<String, StoreRefusal> {
+    payload.ok_or_else(|| StoreRefusal::from(Error::ObservationTooLarge))
+}
+
+/// A schema-mode refusal: a stable code, and for `schema_violation` the
+/// first violation (its code and JSON pointer) that caused it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct StoreRefusal {
+    pub code: &'static str,
+    pub violation: Option<Violation>,
+}
+impl StoreRefusal {
+    pub fn new(code: &'static str) -> Self {
+        Self {
+            code,
+            violation: None,
+        }
+    }
+    pub fn schema(violation: Violation) -> Self {
+        Self {
+            code: Error::SchemaViolation.code(),
+            violation: Some(violation),
+        }
+    }
+    pub fn busy() -> Self {
+        Self::new("store_busy")
+    }
+    fn revision_conflict() -> Self {
+        Self::new(Error::RevisionConflict.code())
+    }
+    fn store_failure() -> Self {
+        Self::from(Error::StoreFailure)
+    }
+}
+impl From<Error> for StoreRefusal {
+    fn from(e: Error) -> Self {
+        Self::new(e.code())
+    }
+}
+impl std::fmt::Display for StoreRefusal {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match &self.violation {
+            Some(v) => write!(f, "{}: {}@{}", self.code, v.code, v.pointer),
+            None => f.write_str(self.code),
+        }
+    }
+}
+impl std::error::Error for StoreRefusal {}
+
+fn is_busy(e: &rusqlite::Error) -> bool {
+    matches!(e, rusqlite::Error::SqliteFailure(f, _) if f.code == rusqlite::ffi::ErrorCode::DatabaseBusy)
+}
+fn map_db<T>(r: rusqlite::Result<T>) -> Result<T, StoreRefusal> {
+    r.map_err(|e| {
+        if is_busy(&e) {
+            StoreRefusal::busy()
+        } else {
+            StoreRefusal::from(Error::StoreFailure)
+        }
+    })
+}
+fn violation(code: &'static str, pointer: impl Into<String>) -> Violation {
+    Violation {
+        code,
+        pointer: pointer.into(),
+        message: None,
+    }
+}
+fn esc(s: &str) -> String {
+    s.replace('~', "~0").replace('/', "~1")
+}
+fn change_kind(c: &Change) -> &'static str {
+    match c {
+        Change::Initial => "initial",
+        Change::Correction => "correction",
+        Change::Backfill => "backfill",
+        Change::Update => "update",
+        Change::Refresh => "refresh",
+        Change::Retraction => "retraction",
+    }
+}
+fn to_i64(v: u64) -> Result<i64, StoreRefusal> {
+    i64::try_from(v).map_err(|_| StoreRefusal::new("value_out_of_range"))
+}
+fn to_u64(v: i64) -> Result<u64, StoreRefusal> {
+    u64::try_from(v).map_err(|_| StoreRefusal::store_failure())
+}
+
+pub(crate) fn load_schema_set(connection: &Connection) -> Result<SchemaSet, StoreRefusal> {
+    let mut stmt = map_db(connection.prepare(
+        "SELECT domain,version,sha256,bytes FROM schema_installs ORDER BY domain,version",
+    ))?;
+    let rows = map_db(stmt.query_map([], |r| {
+        Ok((
+            r.get::<_, String>(0)?,
+            r.get::<_, i64>(1)?,
+            r.get::<_, String>(2)?,
+            r.get::<_, Vec<u8>>(3)?,
+        ))
+    }))?;
+    let mut latest: BTreeMap<String, (i64, String, Vec<u8>)> = BTreeMap::new();
+    for row in rows {
+        let (domain, version, sha, bytes) = map_db(row)?;
+        latest.insert(domain, (version, sha, bytes));
+    }
+    let mut parsed: Vec<Schema> = Vec::new();
+    for bytes in latest.values().map(|(_, _, b)| b) {
+        parsed.push(
+            Schema::parse(bytes).map_err(|_| {
+                StoreRefusal::schema(violation(codes::INVALID_SCHEMA, String::new()))
+            })?,
+        );
+    }
+    let mut checked = Vec::new();
+    for ((domain, (version, sha, bytes)), candidate) in latest.iter().zip(parsed.iter()) {
+        let others: BTreeSet<String> = parsed
+            .iter()
+            .filter(|s| s.domain != candidate.domain)
+            .flat_map(|s| s.object_types.keys().cloned())
+            .collect();
+        let c = Schema::check_installed_bytes(bytes, &others).map_err(|v| {
+            StoreRefusal::schema(
+                v.into_iter()
+                    .next()
+                    .unwrap_or(violation(codes::INVALID_SCHEMA, String::new())),
+            )
+        })?;
+        let pin = c.pin();
+        if &pin.domain != domain || pin.version != to_u64(*version)? || &pin.sha256 != sha {
+            return Err(StoreRefusal::new("schema_pin_mismatch"));
+        }
+        checked.push(c);
+    }
+    SchemaSet::new(checked).map_err(|v| {
+        StoreRefusal::schema(
+            v.into_iter()
+                .next()
+                .unwrap_or(violation(codes::INVALID_SCHEMA, String::new())),
+        )
+    })
+}
+
+/// The schema set as read inside `connection`'s transaction: the cached set
+/// when the latest install rows still match it, a rebuilt set otherwise.
+fn refreshed_set(cached: &SchemaSet, connection: &Connection) -> Result<SchemaSet, StoreRefusal> {
+    let mut stmt = map_db(
+        connection
+            .prepare("SELECT domain,version,sha256 FROM schema_installs ORDER BY domain,version"),
+    )?;
+    let rows = map_db(stmt.query_map([], |r| {
+        Ok((
+            r.get::<_, String>(0)?,
+            r.get::<_, i64>(1)?,
+            r.get::<_, String>(2)?,
+        ))
+    }))?;
+    let mut latest: BTreeMap<String, SchemaPin> = BTreeMap::new();
+    for row in rows {
+        let (domain, version, sha) = map_db(row)?;
+        latest.insert(
+            domain.clone(),
+            SchemaPin {
+                domain,
+                version: to_u64(version)?,
+                sha256: sha,
+            },
+        );
+    }
+    if &latest == cached.pins() {
+        Ok(cached.clone())
+    } else {
+        load_schema_set(connection)
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct SchemaObservation {
+    pub observation: Observation,
+    pub ingested_at: u64,
+    pub schema_pin: SchemaPin,
+}
+/// Admission metadata only: no observation payload or reference values.
+#[derive(Debug, Clone, PartialEq)]
+pub struct HeadAccess {
+    pub id: Id,
+    pub scope: Scope,
+    pub retracted: bool,
+}
+#[derive(Debug, Clone, PartialEq)]
+pub struct SchemaHead {
+    pub id: Id,
+    pub scope: Scope,
+    pub head: SchemaObservation,
+    pub retracted: bool,
+    pub schema_pin: SchemaPin,
+}
+#[derive(Debug, Clone, PartialEq)]
+pub struct SchemaHistory {
+    /// Rows older than the recent window; counted without loading payloads.
+    pub older_omitted: u64,
+    /// Over-bound nonhead rows excluded from that window (no backfill).
+    pub oversized_excluded: u64,
+    pub id: Id,
+    pub scope: Scope,
+    pub head: String,
+    pub observations: Vec<SchemaObservation>,
+    pub retracted: bool,
+    pub schema_pin: SchemaPin,
+}
+#[derive(Debug, Clone, PartialEq)]
+pub struct ActionLogEntry {
+    pub action_id: String,
+    pub action_type: String,
+    pub domain: String,
+    pub schema_domain: String,
+    pub schema_version: u64,
+    pub actor: Value,
+    pub submitted_at: u64,
+    pub parameters: Value,
+    pub basis: Value,
+    pub edits: Value,
+    pub outcome: String,
+}
+/// Where an install came from, recorded on the install row.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct InstallArgs {
+    pub installed_at: u64,
+    pub source_repository: Option<String>,
+    pub source_commit: Option<String>,
+}
+
+/// The provenance recorded for the latest install of one domain. `path`
+/// is `None` on a store written before that column existed.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct InstallProvenance {
+    pub repository: Option<String>,
+    pub commit: Option<String>,
+    pub path: Option<String>,
+}
+
+fn has_column(connection: &Connection, table: &str, column: &str) -> Result<bool, StoreRefusal> {
+    let mut stmt = map_db(connection.prepare(&format!("PRAGMA table_info({table})")))?;
+    let rows = map_db(stmt.query_map([], |r| r.get::<_, String>(1)))?;
+    for row in rows {
+        if map_db(row)? == column {
+            return Ok(true);
+        }
+    }
+    Ok(false)
+}
+
+/// A transaction-scoped, read-only schema/head view. Metadata precedes payloads.
+pub struct SchemaRead<'a> {
+    trigger_cache: &'a candidates::TriggerCache,
+    tx: &'a Transaction<'a>,
+    schemas: SchemaSet,
+}
+impl SchemaRead<'_> {
+    /// Call only after admitting identity/scope in this same read snapshot.
+    pub fn history(&self, id: &Id) -> Result<Option<SchemaHistory>, StoreRefusal> {
+        history_in(self.tx, id)
+    }
+    pub fn schema_set(&self) -> &SchemaSet {
+        &self.schemas
+    }
+    pub fn head_access(&self, id: &Id) -> Result<Option<HeadAccess>, StoreRefusal> {
+        access_in(self.tx, Some(id), &id.object_type, 1, None).map(|v| v.into_iter().next())
+    }
+    pub fn scan_head_access(
+        &self,
+        ty: &str,
+        limit: usize,
+        after: Option<&Id>,
+    ) -> Result<Vec<HeadAccess>, StoreRefusal> {
+        access_in(self.tx, None, ty, limit, after)
+    }
+    pub fn head_after_access(
+        &self,
+        access: &HeadAccess,
+    ) -> Result<Option<SchemaHead>, StoreRefusal> {
+        head_after_access_in(self.tx, access)
+    }
+    /// At most `limit` action-log rows with `seq` below `before` (every row
+    /// when `None`), newest first, inside this read snapshot.
+    pub fn action_log_before(
+        &self,
+        before: Option<i64>,
+        limit: usize,
+    ) -> Result<Vec<(i64, ActionLogEntry)>, StoreRefusal> {
+        let mut stmt = map_db(self.tx.prepare("SELECT seq,action_id,action_type,domain,schema_domain,schema_version,actor,submitted_at,parameters,basis,edits,outcome FROM action_log WHERE seq<?1 ORDER BY seq DESC LIMIT ?2"))?;
+        let limit = i64::try_from(limit).unwrap_or(i64::MAX);
+        let mut rows = map_db(stmt.query(params![before.unwrap_or(i64::MAX), limit]))?;
+        let mut out = Vec::new();
+        while let Some(row) = map_db(rows.next())? {
+            out.push(action_log_row(row)?);
+        }
+        Ok(out)
+    }
+}
+
+/// One public write transaction in mode `Schema` (see `Store::write`).
+pub struct SchemaWrite<'a> {
+    tx: &'a Transaction<'a>,
+    schemas: SchemaSet,
+    now: u64,
+}
+impl SchemaWrite<'_> {
+    pub fn append(&mut self, item: &Append) -> Result<(), StoreRefusal> {
+        append_schema_in(self.tx, &self.schemas, item, self.now)
+    }
+    /// Renew only the two freshness timestamps of an existing live head.
+    /// Identity, revision, provenance and every other payload member stay intact.
+    pub fn renew(
+        &mut self,
+        id: &Id,
+        observed_at: u64,
+        fresh_until: u64,
+    ) -> Result<(), StoreRefusal> {
+        let mut head = self.head(id)?.ok_or_else(StoreRefusal::revision_conflict)?;
+        if head.retracted {
+            return Err(StoreRefusal::revision_conflict());
+        }
+        if observed_at < head.head.observation.observed_at {
+            return Err(StoreRefusal::new("renewal_goes_back"));
+        }
+        head.head.observation.observed_at = observed_at;
+        head.head.observation.fresh_until = fresh_until;
+        head.head
+            .observation
+            .validate()
+            .map_err(StoreRefusal::from)?;
+        let payload =
+            ont_core::observation_payload(&head.head.observation).map_err(StoreRefusal::from)?;
+        map_db(self.tx.execute(
+            "UPDATE observations SET payload=?6 WHERE object_type=?1 AND instance=?2 AND account=?3 AND native_key=?4 AND revision=?5",
+            params![id.object_type, id.namespace.instance, id.namespace.account, id.native_key, head.head.observation.revision, payload],
+        ))?;
+        candidates::project(self.tx, &self.schemas, &head)?;
+        Ok(())
+    }
+    pub fn log_action(&mut self, entry: &ActionLogEntry) -> Result<i64, StoreRefusal> {
+        append_action_log_in(self.tx, &self.schemas, entry)
+    }
+    /// Fetch a payload only while its metadata still equals the admitted input.
+    pub fn head_after_access(
+        &self,
+        access: &HeadAccess,
+    ) -> Result<Option<SchemaHead>, StoreRefusal> {
+        head_after_access_in(self.tx, access)
+    }
+    pub fn head_access(&self, id: &Id) -> Result<Option<HeadAccess>, StoreRefusal> {
+        access_in(self.tx, Some(id), &id.object_type, 1, None).map(|v| v.into_iter().next())
+    }
+    pub fn scan_head_access(
+        &self,
+        ty: &str,
+        limit: usize,
+        after: Option<&Id>,
+    ) -> Result<Vec<HeadAccess>, StoreRefusal> {
+        access_in(self.tx, None, ty, limit, after)
+    }
+    pub fn head(&self, id: &Id) -> Result<Option<SchemaHead>, StoreRefusal> {
+        head_in(self.tx, id)
+    }
+    /// Heads of one type inside this transaction (retracted hidden).
+    pub fn scan_heads(
+        &self,
+        object_type: &str,
+        limit: usize,
+    ) -> Result<Vec<SchemaHead>, StoreRefusal> {
+        scan_in(self.tx, &self.schemas, object_type, limit, None)
+    }
+    /// One page of heads of one type inside this transaction, continuing
+    /// after `after` (exclusive) in primary-key order.
+    pub fn scan_heads_after(
+        &self,
+        object_type: &str,
+        limit: usize,
+        after: Option<&Id>,
+    ) -> Result<Vec<SchemaHead>, StoreRefusal> {
+        scan_in(self.tx, &self.schemas, object_type, limit, after)
+    }
+    /// The whole action log inside this transaction, in `seq` order.
+    pub fn action_log(&self) -> Result<Vec<(i64, ActionLogEntry)>, StoreRefusal> {
+        action_log_in(self.tx)
+    }
+    /// Number of applied actions inside this transaction.
+    pub fn action_count(&self) -> Result<usize, StoreRefusal> {
+        action_count_in(self.tx)
+    }
+    /// One action-log row by its action id, inside this transaction.
+    pub fn find_action(
+        &self,
+        action_id: &str,
+    ) -> Result<Option<(i64, ActionLogEntry)>, StoreRefusal> {
+        let mut stmt = map_db(self.tx.prepare(
+            "SELECT seq,action_id,action_type,domain,schema_domain,schema_version,actor,submitted_at,parameters,basis,edits,outcome FROM action_log WHERE action_id=?1",
+        ))?;
+        let mut rows = map_db(stmt.query(params![action_id]))?;
+        map_db(rows.next())?.map(action_log_row).transpose()
+    }
+    pub fn schema_set(&self) -> &SchemaSet {
+        &self.schemas
+    }
+}
+
+/// Reject links present at inspection time in the store path or its SQLite
+/// sidecars/edit log. This is a pre-open check, not a directory/sidecar race
+/// guarantee; SQLite NOFOLLOW separately protects the final database open.
+pub fn check_store_path(path: &Path) -> Result<(), StoreRefusal> {
+    let is_link = |p: &Path| std::fs::symlink_metadata(p).is_ok_and(|m| m.file_type().is_symlink());
+    // Protect the store and the two directory levels immediately above it.
+    // Host-level aliases above those levels are supported.
+    let absolute = std::path::absolute(path).map_err(|_| StoreRefusal::new("store_failure"))?;
+    for component in absolute.ancestors().take(3) {
+        if is_link(component) {
+            return Err(StoreRefusal::new("store_path_is_symlink"));
+        }
+    }
+    for suffix in ["-journal", "-wal", "-shm"] {
+        let mut sidecar = path.as_os_str().to_os_string();
+        sidecar.push(suffix);
+        if is_link(Path::new(&sidecar)) {
+            return Err(StoreRefusal::new("store_path_is_symlink"));
+        }
+    }
+    let parent = path.parent().unwrap_or_else(|| Path::new("."));
+    for name in ["edits.jsonl", "edits.jsonl.lock"] {
+        if is_link(&parent.join(name)) {
+            return Err(StoreRefusal::new("store_path_is_symlink"));
+        }
+    }
+    Ok(())
+}
+
+// SQLite NOFOLLOW also rejects unresolved symlinks above the protected levels.
+// Resolve the parent after the guard, while preserving the final filename so
+// NOFOLLOW still rejects a database link swapped in after inspection.
+fn sqlite_store_path(path: &Path) -> Result<std::path::PathBuf, StoreRefusal> {
+    let parent = path
+        .parent()
+        .filter(|p| !p.as_os_str().is_empty())
+        .unwrap_or_else(|| Path::new("."));
+    let parent = std::fs::canonicalize(parent).map_err(|_| StoreRefusal::new("store_failure"))?;
+    let name = path
+        .file_name()
+        .ok_or_else(|| StoreRefusal::new("store_failure"))?;
+    Ok(parent.join(name))
+}
+
+impl Store {
+    pub fn open_schema(path: &Path) -> Result<Self, StoreRefusal> {
+        Self::open_schema_with_busy_timeout(path, Duration::from_secs(10))
+    }
+    pub fn open_schema_with_busy_timeout(
+        path: &Path,
+        busy: Duration,
+    ) -> Result<Self, StoreRefusal> {
+        check_store_path(path)?;
+        let open_path = sqlite_store_path(path)?;
+        let mut store = Self::configure_with_busy(
+            open_file(&open_path).map_err(StoreRefusal::from)?,
+            StoreMode::Schema,
+            busy,
+            true,
+        )
+        .map_err(StoreRefusal::from)?;
+        store.schemas = load_schema_set(&store.connection)?;
+        candidates::ensure(&mut store.connection, &store.schemas)?;
+        candidates::protected(&store.connection, &store.candidate_triggers)?;
+        Ok(store)
+    }
+    /// Open an existing format 4 store read-only. Format 3 or older projection
+    /// semantics refuse with `store_upgrade_required`; the owner upgrades on a writable open.
+    /// No create flag is used, and an
+    /// empty or foreign file refuses with `store_failure` and keeps its
+    /// bytes. A missing file is `store_not_found`.
+    pub fn open_schema_existing(path: &Path) -> Result<Self, StoreRefusal> {
+        Self::open_schema_existing_with(path, false)
+    }
+    /// Like [`Store::open_schema_existing`] but the connection may write
+    /// (`Store::write`). It has no create flag and never initialises: a
+    /// missing file is `store_not_found`, an empty or foreign file is
+    /// `store_failure` with its bytes unchanged. `open_schema` stays the
+    /// only open that creates or initialises.
+    pub fn open_schema_existing_writable(path: &Path) -> Result<Self, StoreRefusal> {
+        Self::open_schema_existing_with(path, true)
+    }
+    fn open_schema_existing_with(path: &Path, writable: bool) -> Result<Self, StoreRefusal> {
+        check_store_path(path)?;
+        if !path.exists() {
+            return Err(StoreRefusal::new("store_not_found"));
+        }
+        let open_path = sqlite_store_path(path)?;
+        let connection = if writable {
+            open_file_no_create(&open_path)
+        } else {
+            open_file_read_only(&open_path)
+        }
+        .map_err(StoreRefusal::from)?;
+        let mut store = Self::configure_with_busy(
+            connection,
+            StoreMode::Schema,
+            Duration::from_secs(10),
+            false,
+        )
+        .map_err(StoreRefusal::from)?;
+        store.schemas = load_schema_set(&store.connection)?;
+        if !writable && !candidates::semantics_current(&store.connection)? {
+            return Err(StoreRefusal::new("store_upgrade_required"));
+        }
+        if writable {
+            candidates::ensure(&mut store.connection, &store.schemas)?;
+        }
+        candidates::protected(&store.connection, &store.candidate_triggers)?;
+        Ok(store)
+    }
+    pub fn memory_schema() -> Result<Self, StoreRefusal> {
+        let mut store = Self::configure(
+            db(Connection::open_in_memory()).map_err(StoreRefusal::from)?,
+            StoreMode::Schema,
+        )
+        .map_err(StoreRefusal::from)?;
+        store.schemas = load_schema_set(&store.connection)?;
+        candidates::ensure(&mut store.connection, &store.schemas)?;
+        candidates::protected(&store.connection, &store.candidate_triggers)?;
+        Ok(store)
+    }
+    fn require_schema(&self) -> Result<(), StoreRefusal> {
+        if self.mode != StoreMode::Schema {
+            return Err(StoreRefusal::from(Error::StoreFailure));
+        }
+        Ok(())
+    }
+    fn read_tx(&mut self) -> Result<Transaction<'_>, StoreRefusal> {
+        map_db(
+            self.connection
+                .transaction_with_behavior(TransactionBehavior::Deferred),
+        )
+    }
+    fn write_tx(&mut self) -> Result<Transaction<'_>, StoreRefusal> {
+        map_db(
+            self.connection
+                .transaction_with_behavior(TransactionBehavior::Immediate),
+        )
+    }
+    /// Evaluate a read against one SQLite snapshot, including schema refresh.
+    pub fn read_schema<T>(
+        &mut self,
+        read: impl FnOnce(&SchemaRead<'_>) -> T,
+    ) -> Result<T, StoreRefusal> {
+        self.require_schema()?;
+        let trigger_cache = self.candidate_triggers.clone();
+        let cached = self.schemas.clone();
+        let tx = self.read_tx()?;
+        let schemas = refreshed_set(&cached, &tx)?;
+        let result = read(&SchemaRead {
+            trigger_cache: &trigger_cache,
+            tx: &tx,
+            schemas: schemas.clone(),
+        });
+        drop(tx);
+        self.candidate_triggers.set(trigger_cache.get());
+        self.schemas = schemas;
+        Ok(result)
+    }
+
+    /// The current schema set, refreshed inside a read transaction first.
+    pub fn schema_set(&mut self) -> Result<&SchemaSet, StoreRefusal> {
+        self.require_schema()?;
+        let cached = self.schemas.clone();
+        let tx = self.read_tx()?;
+        let set = refreshed_set(&cached, &tx)?;
+        drop(tx);
+        self.schemas = set;
+        Ok(&self.schemas)
+    }
+    pub fn schema_pins(&mut self) -> Result<BTreeMap<String, SchemaPin>, StoreRefusal> {
+        Ok(self.schema_set()?.pins().clone())
+    }
+
+    /// The provenance of the latest install of each domain. A store
+    /// written before the `source_path` column existed still reads, with
+    /// `path: None`.
+    pub fn schema_provenance(
+        &mut self,
+    ) -> Result<BTreeMap<String, InstallProvenance>, StoreRefusal> {
+        self.require_schema()?;
+        let tx = self.read_tx()?;
+        let has_path = has_column(&tx, "schema_installs", "source_path")?;
+        let sql = if has_path {
+            "SELECT domain,source_repository,source_commit,source_path FROM schema_installs ORDER BY domain,version"
+        } else {
+            "SELECT domain,source_repository,source_commit,NULL FROM schema_installs ORDER BY domain,version"
+        };
+        let mut stmt = map_db(tx.prepare(sql))?;
+        let rows = map_db(stmt.query_map([], |r| {
+            Ok((
+                r.get::<_, String>(0)?,
+                r.get::<_, Option<String>>(1)?,
+                r.get::<_, Option<String>>(2)?,
+                payload_column(r, 3)?,
+            ))
+        }))?;
+        let mut out: BTreeMap<String, InstallProvenance> = BTreeMap::new();
+        for row in rows {
+            let (domain, repository, commit, path) = map_db(row)?;
+            out.insert(
+                domain,
+                InstallProvenance {
+                    repository,
+                    commit,
+                    path,
+                },
+            );
+        }
+        Ok(out)
+    }
+
+    /// One IMMEDIATE write transaction: the schema set is refreshed inside
+    /// it, the closure runs, and the transaction commits when the closure
+    /// returns `Ok` (and rolls back otherwise). The cache is replaced only
+    /// after a successful commit. `now` is the caller's trusted clock value,
+    /// recorded as `ingested_at` on appended observations.
+    pub fn write<T>(
+        &mut self,
+        now: u64,
+        f: impl FnOnce(&mut SchemaWrite<'_>) -> Result<T, StoreRefusal>,
+    ) -> Result<T, StoreRefusal> {
+        self.require_schema()?;
+        let trigger_cache = self.candidate_triggers.clone();
+        let cached = self.schemas.clone();
+        let tx = self.write_tx()?;
+        let schemas = refreshed_set(&cached, &tx)?;
+        candidates::require_current(&tx, &trigger_cache)?;
+        let mut handle = SchemaWrite {
+            tx: &tx,
+            schemas: schemas.clone(),
+            now,
+        };
+        let result = f(&mut handle)?;
+        drop(handle);
+        candidates::checkpoint(&tx)?;
+        map_db(tx.commit())?;
+        self.schemas = schemas;
+        Ok(result)
+    }
+
+    /// Install one checked schema file inside one IMMEDIATE transaction.
+    /// A domain's version only grows; different bytes of an installed
+    /// version refuse; installing the exact bytes of the latest installed
+    /// version again leaves the schema unchanged and repairs a stale projection.
+    pub fn install_schema(
+        &mut self,
+        bytes: &[u8],
+        args: InstallArgs,
+    ) -> Result<SchemaPin, StoreRefusal> {
+        self.install_schema_inner(bytes, args, None)
+    }
+
+    /// Like [`Store::install_schema`], also recording the repository path
+    /// of the schema file. Adds the `source_path` column first when a
+    /// store written before it existed does not have it.
+    pub fn install_schema_with_provenance(
+        &mut self,
+        bytes: &[u8],
+        args: InstallArgs,
+        source_path: Option<String>,
+    ) -> Result<SchemaPin, StoreRefusal> {
+        self.install_schema_inner(bytes, args, source_path)
+    }
+
+    fn install_schema_inner(
+        &mut self,
+        bytes: &[u8],
+        args: InstallArgs,
+        source_path: Option<String>,
+    ) -> Result<SchemaPin, StoreRefusal> {
+        self.require_schema()?;
+        let trigger_cache = self.candidate_triggers.clone();
+        let cached = self.schemas.clone();
+        let tx = self.write_tx()?;
+        let set = refreshed_set(&cached, &tx)?;
+        let projection_dirty = !candidates::current(&tx, &trigger_cache)?;
+        if projection_dirty {
+            candidates::repair_triggers(&tx)?;
+        }
+        let candidate_domain = Schema::parse(bytes).map(|s| s.domain).unwrap_or_default();
+        let others: BTreeSet<String> = set
+            .pins()
+            .keys()
+            .filter(|d| **d != candidate_domain)
+            .filter_map(|d| set.schema(d))
+            .flat_map(|s| s.object_types.keys().cloned())
+            .collect();
+        let checked = Schema::check_bytes(bytes, &others).map_err(|v| {
+            StoreRefusal::schema(
+                v.into_iter()
+                    .next()
+                    .unwrap_or(violation(codes::INVALID_SCHEMA, String::new())),
+            )
+        })?;
+        let pin = checked.pin().clone();
+        let mut stmt = map_db(tx.prepare(
+            "SELECT version,sha256 FROM schema_installs WHERE domain=?1 ORDER BY version",
+        ))?;
+        let rows = map_db(stmt.query_map(params![pin.domain], |r| {
+            Ok((r.get::<_, i64>(0)?, r.get::<_, String>(1)?))
+        }))?;
+        let mut existing: Vec<(i64, String)> = Vec::new();
+        for row in rows {
+            existing.push(map_db(row)?);
+        }
+        drop(stmt);
+        let mut has_path = has_column(&tx, "schema_installs", "source_path")?;
+        if !has_path && source_path.is_some() {
+            map_db(tx.execute_batch("ALTER TABLE schema_installs ADD COLUMN source_path TEXT"))?;
+            has_path = true;
+        }
+        if let Some((latest_version, latest_sha)) = existing.last() {
+            if *latest_version == to_i64(pin.version)? && *latest_sha == pin.sha256 {
+                if args.source_repository.is_some()
+                    || args.source_commit.is_some()
+                    || source_path.is_some()
+                {
+                    if has_path {
+                        map_db(tx.execute(
+                            "UPDATE schema_installs SET source_repository=COALESCE(?2,source_repository),source_commit=COALESCE(?3,source_commit),source_path=COALESCE(?4,source_path) WHERE domain=?1 AND version=?5",
+                            params![
+                                pin.domain,
+                                args.source_repository,
+                                args.source_commit,
+                                source_path,
+                                to_i64(pin.version)?
+                            ],
+                        ))?;
+                    } else {
+                        map_db(tx.execute(
+                            "UPDATE schema_installs SET source_repository=COALESCE(?2,source_repository),source_commit=COALESCE(?3,source_commit) WHERE domain=?1 AND version=?4",
+                            params![
+                                pin.domain,
+                                args.source_repository,
+                                args.source_commit,
+                                to_i64(pin.version)?
+                            ],
+                        ))?;
+                    }
+                }
+                if projection_dirty {
+                    candidates::rebuild(&tx, &set)?;
+                }
+                candidates::checkpoint(&tx)?;
+                map_db(tx.commit())?;
+                self.schemas = set;
+                return Ok(pin);
+            }
+            if to_i64(pin.version)? <= *latest_version {
+                return Err(StoreRefusal::new("schema_version_conflict"));
+            }
+        }
+        if has_path {
+            map_db(tx.execute(
+                "INSERT INTO schema_installs(domain,version,sha256,bytes,installed_at,source_repository,source_commit,source_path) VALUES (?1,?2,?3,?4,?5,?6,?7,?8)",
+                params![
+                    pin.domain,
+                    to_i64(pin.version)?,
+                    pin.sha256,
+                    bytes,
+                    to_i64(args.installed_at)?,
+                    args.source_repository,
+                    args.source_commit,
+                    source_path
+                ],
+            ))?;
+        } else {
+            map_db(tx.execute(
+                "INSERT INTO schema_installs(domain,version,sha256,bytes,installed_at,source_repository,source_commit) VALUES (?1,?2,?3,?4,?5,?6,?7)",
+                params![
+                    pin.domain,
+                    to_i64(pin.version)?,
+                    pin.sha256,
+                    bytes,
+                    to_i64(args.installed_at)?,
+                    args.source_repository,
+                    args.source_commit
+                ],
+            ))?;
+        }
+        candidates::rebuild(&tx, &load_schema_set(&tx)?)?;
+        map_db(tx.commit())?;
+        // No reload outside a transaction: reuse the set read in this
+        // transaction plus the new install. If that cannot be built, the
+        // next transaction refreshes from the table anyway.
+        if let Ok(next) = set.with_domain(checked) {
+            self.schemas = next;
+        } else {
+            self.schemas = set;
+        }
+        Ok(pin)
+    }
+
+    /// Typed ingest: `write` with appends only.
+    pub fn append_schema(
+        &mut self,
+        items: &[Append],
+        ingested_at: u64,
+    ) -> Result<(), StoreRefusal> {
+        self.write(ingested_at, |tx| {
+            for item in items {
+                tx.append(item)?;
+            }
+            Ok(())
+        })
+    }
+
+    /// Append one action-log row; returns the store-assigned `seq`.
+    pub fn append_action_log(&mut self, entry: &ActionLogEntry) -> Result<i64, StoreRefusal> {
+        self.write(entry.submitted_at, |tx| tx.log_action(entry))
+    }
+
+    /// The head of one object. A retracted head is returned with
+    /// `retracted: true`, not as absent.
+    pub fn head(&mut self, id: &Id) -> Result<Option<SchemaHead>, StoreRefusal> {
+        self.require_schema()?;
+        let cached = self.schemas.clone();
+        let tx = self.read_tx()?;
+        let set = refreshed_set(&cached, &tx)?;
+        let result = head_in(&tx, id);
+        drop(tx);
+        if result.is_ok() {
+            self.schemas = set;
+        }
+        result
+    }
+
+    /// Recheck admitted metadata and fetch the payload in one read transaction.
+    pub fn head_after_access(
+        &mut self,
+        access: &HeadAccess,
+    ) -> Result<Option<SchemaHead>, StoreRefusal> {
+        self.require_schema()?;
+        let tx = self.read_tx()?;
+        head_after_access_in(&tx, access)
+    }
+
+    /// Read only identity, scope and liveness for admission, never fields.
+    pub fn head_access(&mut self, id: &Id) -> Result<Option<HeadAccess>, StoreRefusal> {
+        self.require_schema()?;
+        access_in(&self.connection, Some(id), &id.object_type, 1, None)
+            .map(|v| v.into_iter().next())
+    }
+    /// Page admission metadata, including retracted rows, without payloads.
+    pub fn scan_head_access(
+        &mut self,
+        ty: &str,
+        limit: usize,
+        after: Option<&Id>,
+    ) -> Result<Vec<HeadAccess>, StoreRefusal> {
+        self.require_schema()?;
+        if limit > 10_000 {
+            return Err(StoreRefusal::new("limit_too_large"));
+        }
+        access_in(&self.connection, None, ty, limit, after)
+    }
+
+    /// Read visible posting candidates in a current, refreshed read snapshot.
+    pub fn candidate_access(
+        &mut self,
+        ty: &str,
+        condition: Option<&CandidateCondition>,
+        now: u64,
+        limit: usize,
+        after: Option<&Id>,
+        scopes: &[Scope],
+    ) -> Result<Vec<HeadAccess>, StoreRefusal> {
+        self.read_schema(|tx| tx.candidate_access(ty, condition, now, limit, after, scopes))?
+    }
+
+    /// The full history of one object, in append order.
+    pub fn history(&mut self, id: &Id) -> Result<Option<SchemaHistory>, StoreRefusal> {
+        self.require_schema()?;
+        let cached = self.schemas.clone();
+        let tx = self.read_tx()?;
+        let set = refreshed_set(&cached, &tx)?;
+        let result = history_in(&tx, id);
+        drop(tx);
+        if result.is_ok() {
+            self.schemas = set;
+        }
+        result
+    }
+
+    /// Heads of one object type (retracted heads hidden), in primary-key
+    /// order `(instance, account, native_key)`; `after` continues from the
+    /// last returned `Id` (exclusive).
+    pub fn scan_heads(
+        &mut self,
+        object_type: &str,
+        limit: usize,
+        after: Option<&Id>,
+    ) -> Result<Vec<SchemaHead>, StoreRefusal> {
+        self.require_schema()?;
+        if limit > 10_000 {
+            return Err(StoreRefusal::new("limit_too_large"));
+        }
+        let cached = self.schemas.clone();
+        let tx = self.read_tx()?;
+        let set = refreshed_set(&cached, &tx)?;
+        let result = scan_in(&tx, &set, object_type, limit, after);
+        drop(tx);
+        if result.is_ok() {
+            self.schemas = set;
+        }
+        result
+    }
+
+    /// Copy the whole store to `target` with `VACUUM INTO` (bound
+    /// parameter). The target must not exist.
+    pub fn backup_to(&mut self, target: &Path) -> Result<(), StoreRefusal> {
+        self.require_schema()?;
+        if target.exists() {
+            return Err(StoreRefusal::new("backup_target_exists"));
+        }
+        let target = target
+            .to_str()
+            .ok_or_else(|| StoreRefusal::from(Error::StoreFailure))?;
+        map_db(self.connection.execute("VACUUM INTO ?1", params![target]))?;
+        Ok(())
+    }
+
+    pub fn action_log(&mut self) -> Result<Vec<(i64, ActionLogEntry)>, StoreRefusal> {
+        self.require_schema()?;
+        let cached = self.schemas.clone();
+        let tx = self.read_tx()?;
+        let set = refreshed_set(&cached, &tx)?;
+        let result = action_log_in(&tx);
+        drop(tx);
+        if result.is_ok() {
+            self.schemas = set;
+        }
+        result
+    }
+    pub fn action_count(&mut self) -> Result<usize, StoreRefusal> {
+        self.require_schema()?;
+        let cached = self.schemas.clone();
+        let tx = self.read_tx()?;
+        let set = refreshed_set(&cached, &tx)?;
+        let result = action_count_in(&tx);
+        drop(tx);
+        if result.is_ok() {
+            self.schemas = set;
+        }
+        result
+    }
+    pub fn action_log_from(
+        &mut self,
+        first_seq: i64,
+    ) -> Result<Vec<(i64, ActionLogEntry)>, StoreRefusal> {
+        self.require_schema()?;
+        let cached = self.schemas.clone();
+        let tx = self.read_tx()?;
+        let set = refreshed_set(&cached, &tx)?;
+        let result = action_log_from_in(&tx, first_seq);
+        drop(tx);
+        if result.is_ok() {
+            self.schemas = set;
+        }
+        result
+    }
+}
+
+fn decode_scope(raw: &str) -> Result<Scope, StoreRefusal> {
+    let scope: Scope = decode(raw).map_err(StoreRefusal::from)?;
+    scope
+        .validate()
+        .map_err(|_| StoreRefusal::store_failure())?;
+    Ok(scope)
+}
+fn decode_observation(payload: &str) -> Result<Observation, StoreRefusal> {
+    let observation: Observation = decode(payload).map_err(StoreRefusal::from)?;
+    observation
+        .validate()
+        .map_err(|_| StoreRefusal::store_failure())?;
+    Ok(observation)
+}
+
+pub(crate) fn access_sql(exact: bool) -> &'static str {
+    if exact {
+        "SELECT o.instance,o.account,o.native_key,o.scope,ob.change_kind FROM objects o LEFT JOIN observations ob ON ob.object_type=o.object_type AND ob.instance=o.instance AND ob.account=o.account AND ob.native_key=o.native_key AND ob.revision=o.head WHERE o.object_type=?1 AND o.instance=?2 AND o.account=?3 AND o.native_key=?4 LIMIT ?5"
+    } else {
+        "SELECT o.instance,o.account,o.native_key,o.scope,ob.change_kind FROM objects o LEFT JOIN observations ob ON ob.object_type=o.object_type AND ob.instance=o.instance AND ob.account=o.account AND ob.native_key=o.native_key AND ob.revision=o.head WHERE o.object_type=?1 AND (o.instance,o.account,o.native_key)>(?2,?3,?4) ORDER BY o.instance,o.account,o.native_key LIMIT ?5"
+    }
+}
+
+fn access_in(
+    connection: &Connection,
+    id: Option<&Id>,
+    ty: &str,
+    limit: usize,
+    after: Option<&Id>,
+) -> Result<Vec<HeadAccess>, StoreRefusal> {
+    let (inst, acc, key) = id
+        .or(after)
+        .map(|i| {
+            (
+                i.namespace.instance.as_str(),
+                i.namespace.account.as_str(),
+                i.native_key.as_str(),
+            )
+        })
+        .unwrap_or(("", "", ""));
+    // Keep exact keys and cursor ranges separate so SQLite can seek the full
+    // primary key, rather than rescan the entire type prefix for every head.
+    let mut stmt = map_db(connection.prepare(access_sql(id.is_some())))?;
+    let rows = map_db(
+        stmt.query_map(params![ty, inst, acc, key, to_i64(limit as u64)?], |r| {
+            Ok((
+                r.get::<_, String>(0)?,
+                r.get::<_, String>(1)?,
+                r.get::<_, String>(2)?,
+                r.get::<_, String>(3)?,
+                r.get::<_, String>(4)?,
+            ))
+        }),
+    )?;
+    let mut out = Vec::new();
+    for row in rows {
+        let (instance, account, native_key, scope, kind) = map_db(row)?;
+        out.push(HeadAccess {
+            id: Id {
+                object_type: ty.to_string(),
+                namespace: ont_core::Namespace { instance, account },
+                native_key,
+            },
+            scope: decode_scope(&scope)?,
+            retracted: kind == "retraction",
+        });
+    }
+    Ok(out)
+}
+
+fn head_after_access_in(
+    connection: &Connection,
+    access: &HeadAccess,
+) -> Result<Option<SchemaHead>, StoreRefusal> {
+    let current = access_in(
+        connection,
+        Some(&access.id),
+        &access.id.object_type,
+        1,
+        None,
+    )?
+    .into_iter()
+    .next();
+    if access.retracted || current.as_ref() != Some(access) {
+        return Ok(None);
+    }
+    head_in(connection, &access.id)
+}
+
+fn head_in(connection: &Connection, id: &Id) -> Result<Option<SchemaHead>, StoreRefusal> {
+    let row = map_db(connection.query_row(
+        "SELECT scope, head FROM objects WHERE object_type=?1 AND instance=?2 AND account=?3 AND native_key=?4",
+        params![id.object_type, id.namespace.instance, id.namespace.account, id.native_key],
+        |r| Ok((r.get::<_, String>(0)?, r.get::<_, String>(1)?)),
+    ).optional())?;
+    let Some((scope_raw, head)) = row else {
+        return Ok(None);
+    };
+    let scope = decode_scope(&scope_raw)?;
+    let row = map_db(connection.query_row(
+        &format!("SELECT {}, ob.ingested_at, ob.change_kind, si.domain, si.version, si.sha256 FROM observations ob JOIN schema_installs si ON si.domain=ob.schema_domain AND si.version=ob.schema_version WHERE ob.object_type=?1 AND ob.instance=?2 AND ob.account=?3 AND ob.native_key=?4 AND ob.revision=?5", bounded_payload_sql()),
+        params![id.object_type, id.namespace.instance, id.namespace.account, id.native_key, head],
+        |r| {
+            Ok((
+                payload_column(r, 0)?,
+                r.get::<_, i64>(1)?,
+                r.get::<_, String>(2)?,
+                r.get::<_, String>(3)?,
+                r.get::<_, i64>(4)?,
+                r.get::<_, String>(5)?,
+            ))
+        },
+    ).optional())?;
+    let Some((payload, ingested_at, kind, domain, version, sha)) = row else {
+        // An objects row whose head observation is missing is corruption,
+        // not absence.
+        return Err(StoreRefusal::store_failure());
+    };
+    let pin = SchemaPin {
+        domain: domain.clone(),
+        version: to_u64(version)?,
+        sha256: sha,
+    };
+    Ok(Some(SchemaHead {
+        retracted: kind == "retraction",
+        schema_pin: pin.clone(),
+        id: id.clone(),
+        scope,
+        head: SchemaObservation {
+            observation: decode_observation(&payload_value(payload)?)?,
+            ingested_at: to_u64(ingested_at)?,
+            schema_pin: pin,
+        },
+    }))
+}
+
+fn history_in(connection: &Connection, id: &Id) -> Result<Option<SchemaHistory>, StoreRefusal> {
+    let row = map_db(connection.query_row(
+        "SELECT scope, head FROM objects WHERE object_type=?1 AND instance=?2 AND account=?3 AND native_key=?4",
+        params![id.object_type, id.namespace.instance, id.namespace.account, id.native_key],
+        |r| Ok((r.get::<_, String>(0)?, r.get::<_, String>(1)?)),
+    ).optional())?;
+    let Some((scope_raw, head)) = row else {
+        return Ok(None);
+    };
+    let scope = decode_scope(&scope_raw)?;
+    let count: u64 = map_db(connection.query_row(
+        "SELECT count(*) FROM observations WHERE object_type=?1 AND instance=?2 AND account=?3 AND native_key=?4",
+        params![id.object_type, id.namespace.instance, id.namespace.account, id.native_key],
+        |r| r.get(0),
+    ))?;
+    let mut stmt = map_db(connection.prepare(
+        &format!("SELECT {}, ob.ingested_at, ob.change_kind, si.domain, si.version, si.sha256, ob.revision FROM observations ob JOIN schema_installs si ON si.domain=ob.schema_domain AND si.version=ob.schema_version WHERE ob.object_type=?1 AND ob.instance=?2 AND ob.account=?3 AND ob.native_key=?4 ORDER BY ob.ordinal DESC LIMIT {}", bounded_payload_sql(), MAX_HISTORY_OBSERVATIONS),
+    ))?;
+    let rows = map_db(stmt.query_map(
+        params![
+            id.object_type,
+            id.namespace.instance,
+            id.namespace.account,
+            id.native_key
+        ],
+        |r| {
+            Ok((
+                payload_column(r, 0)?,
+                r.get::<_, i64>(1)?,
+                r.get::<_, String>(2)?,
+                r.get::<_, String>(3)?,
+                r.get::<_, i64>(4)?,
+                r.get::<_, String>(5)?,
+                r.get::<_, String>(6)?,
+            ))
+        },
+    ))?;
+    let mut observations = Vec::new();
+    let mut retracted = false;
+    let mut pin: Option<SchemaPin> = None;
+    let mut oversized_excluded = 0;
+    for (index, row) in rows.enumerate() {
+        let (payload, ingested_at, kind, domain, version, sha, revision) = map_db(row)?;
+        if index == 0 && revision != head {
+            return Err(StoreRefusal::store_failure());
+        }
+        if payload.is_none() && revision != head {
+            oversized_excluded += 1;
+            continue;
+        }
+        let p = SchemaPin {
+            domain,
+            version: to_u64(version)?,
+            sha256: sha,
+        };
+        if index == 0 {
+            retracted = kind == "retraction";
+            pin = Some(p.clone());
+        }
+        observations.push(SchemaObservation {
+            observation: decode_observation(&payload_value(payload)?)?,
+            ingested_at: to_u64(ingested_at)?,
+            schema_pin: p,
+        });
+    }
+    // Keep the existing append order within the newest window; the head is last.
+    observations.reverse();
+    if observations.last().map(|o| &o.observation.revision) != Some(&head) {
+        return Err(StoreRefusal::store_failure());
+    }
+    Ok(Some(SchemaHistory {
+        older_omitted: count.saturating_sub(MAX_HISTORY_OBSERVATIONS as u64),
+        oversized_excluded,
+        retracted,
+        schema_pin: pin.unwrap_or(SchemaPin {
+            domain: String::new(),
+            version: 0,
+            sha256: String::new(),
+        }),
+        id: id.clone(),
+        scope,
+        head,
+        observations,
+    }))
+}
+
+fn scan_in(
+    connection: &Connection,
+    schemas: &SchemaSet,
+    object_type: &str,
+    limit: usize,
+    after: Option<&Id>,
+) -> Result<Vec<SchemaHead>, StoreRefusal> {
+    let Some(decl) = schemas.schema_of(object_type) else {
+        return Err(StoreRefusal::schema(violation(
+            codes::UNKNOWN_TYPE,
+            format!("/object_types/{}", esc(object_type)),
+        )));
+    };
+    let _ = decl;
+    if limit == 0 {
+        return Ok(Vec::new());
+    }
+    let (inst, acc, key) = match after {
+        Some(id) => (
+            id.namespace.instance.clone(),
+            id.namespace.account.clone(),
+            id.native_key.clone(),
+        ),
+        None => (String::new(), String::new(), String::new()),
+    };
+    let limit_i64 = to_i64(limit as u64)?;
+    let mut stmt = map_db(connection.prepare(
+        &format!("SELECT o.object_type, o.instance, o.account, o.native_key, o.scope, {}, ob.ingested_at, ob.change_kind, si.domain, si.version, si.sha256 FROM objects o JOIN observations ob ON ob.object_type=o.object_type AND ob.instance=o.instance AND ob.account=o.account AND ob.native_key=o.native_key AND ob.revision=o.head JOIN schema_installs si ON si.domain=ob.schema_domain AND si.version=ob.schema_version WHERE o.object_type=?1 AND (o.instance,o.account,o.native_key)>(?2,?3,?4) AND ob.change_kind!='retraction' ORDER BY o.instance,o.account,o.native_key LIMIT ?5", bounded_payload_sql()),
+    ))?;
+    let rows = map_db(
+        stmt.query_map(params![object_type, inst, acc, key, limit_i64], |r| {
+            Ok((
+                r.get::<_, String>(0)?,
+                r.get::<_, String>(1)?,
+                r.get::<_, String>(2)?,
+                r.get::<_, String>(3)?,
+                r.get::<_, String>(4)?,
+                payload_column(r, 5)?,
+                r.get::<_, i64>(6)?,
+                r.get::<_, String>(7)?,
+                r.get::<_, String>(8)?,
+                r.get::<_, i64>(9)?,
+                r.get::<_, String>(10)?,
+            ))
+        }),
+    )?;
+    let mut out = Vec::new();
+    for row in rows {
+        let (ot, inst, acc, key, scope_raw, payload, ingested_at, _kind, domain, version, sha) =
+            map_db(row)?;
+        let pin = SchemaPin {
+            domain,
+            version: to_u64(version)?,
+            sha256: sha,
+        };
+        out.push(SchemaHead {
+            id: Id {
+                object_type: ot,
+                namespace: ont_core::Namespace {
+                    instance: inst,
+                    account: acc,
+                },
+                native_key: key,
+            },
+            scope: decode_scope(&scope_raw)?,
+            head: SchemaObservation {
+                observation: decode_observation(&payload_value(payload)?)?,
+                ingested_at: to_u64(ingested_at)?,
+                schema_pin: pin.clone(),
+            },
+            retracted: false,
+            schema_pin: pin,
+        });
+    }
+    Ok(out)
+}
+
+fn action_log_row(r: &rusqlite::Row<'_>) -> Result<(i64, ActionLogEntry), StoreRefusal> {
+    Ok((
+        map_db(r.get(0))?,
+        ActionLogEntry {
+            action_id: map_db(r.get(1))?,
+            action_type: map_db(r.get(2))?,
+            domain: map_db(r.get(3))?,
+            schema_domain: map_db(r.get(4))?,
+            schema_version: to_u64(map_db(r.get(5))?)?,
+            actor: decode(&map_db(r.get::<_, String>(6))?).map_err(StoreRefusal::from)?,
+            submitted_at: to_u64(map_db(r.get(7))?)?,
+            parameters: decode(&map_db(r.get::<_, String>(8))?).map_err(StoreRefusal::from)?,
+            basis: decode(&map_db(r.get::<_, String>(9))?).map_err(StoreRefusal::from)?,
+            edits: decode(&map_db(r.get::<_, String>(10))?).map_err(StoreRefusal::from)?,
+            outcome: map_db(r.get(11))?,
+        },
+    ))
+}
+fn action_count_in(connection: &Connection) -> Result<usize, StoreRefusal> {
+    let count: i64 =
+        map_db(connection.query_row("SELECT COUNT(*) FROM action_log", [], |r| r.get(0)))?;
+    usize::try_from(count).map_err(|_| StoreRefusal::from(Error::StoreFailure))
+}
+fn action_log_in(connection: &Connection) -> Result<Vec<(i64, ActionLogEntry)>, StoreRefusal> {
+    let mut stmt = map_db(connection.prepare("SELECT seq,action_id,action_type,domain,schema_domain,schema_version,actor,submitted_at,parameters,basis,edits,outcome FROM action_log ORDER BY seq"))?;
+    let mut rows = map_db(stmt.query([]))?;
+    let mut out = Vec::new();
+    while let Some(row) = map_db(rows.next())? {
+        out.push(action_log_row(row)?);
+    }
+    Ok(out)
+}
+fn action_log_from_in(
+    connection: &Connection,
+    first_seq: i64,
+) -> Result<Vec<(i64, ActionLogEntry)>, StoreRefusal> {
+    let mut stmt = map_db(connection.prepare("SELECT seq,action_id,action_type,domain,schema_domain,schema_version,actor,submitted_at,parameters,basis,edits,outcome FROM action_log WHERE seq>=?1 ORDER BY seq"))?;
+    let mut rows = map_db(stmt.query(params![first_seq]))?;
+    let mut out = Vec::new();
+    while let Some(row) = map_db(rows.next())? {
+        out.push(action_log_row(row)?);
+    }
+    Ok(out)
+}
+
+pub(crate) fn append_action_log_in(
+    tx: &Transaction<'_>,
+    schemas: &SchemaSet,
+    entry: &ActionLogEntry,
+) -> Result<i64, StoreRefusal> {
+    if entry.domain != entry.schema_domain {
+        return Err(StoreRefusal::new("action_domain_mismatch"));
+    }
+    let current = schemas.pin(&entry.schema_domain);
+    if current.is_none_or(|p| p.version != entry.schema_version) {
+        return Err(StoreRefusal::new("action_schema_mismatch"));
+    }
+    let exists = map_db(tx.query_row(
+        "SELECT EXISTS(SELECT 1 FROM action_log WHERE action_id=?1)",
+        params![entry.action_id],
+        |r| r.get::<_, bool>(0),
+    ))?;
+    if exists {
+        return Err(StoreRefusal::new("duplicate_action_id"));
+    }
+    let text =
+        |v: &Value| serde_json::to_string(v).map_err(|_| StoreRefusal::from(Error::StoreFailure));
+    let result = tx.execute(
+        "INSERT INTO action_log(action_id,action_type,domain,schema_domain,schema_version,actor,submitted_at,parameters,basis,edits,outcome) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11)",
+        params![
+            entry.action_id,
+            entry.action_type,
+            entry.domain,
+            entry.schema_domain,
+            to_i64(entry.schema_version)?,
+            text(&entry.actor)?,
+            to_i64(entry.submitted_at)?,
+            text(&entry.parameters)?,
+            text(&entry.basis)?,
+            text(&entry.edits)?,
+            entry.outcome
+        ],
+    );
+    match result {
+        Ok(_) => Ok(tx.last_insert_rowid()),
+        Err(rusqlite::Error::SqliteFailure(f, _))
+            if f.extended_code == rusqlite::ffi::SQLITE_CONSTRAINT_UNIQUE =>
+        {
+            Err(StoreRefusal::new("duplicate_action_id"))
+        }
+        Err(e) => map_db(Err(e)),
+    }
+}
+
+fn check_ref_namespaces(
+    schemas: &SchemaSet,
+    ty: &PropertyType,
+    value: &Value,
+    pointer: &str,
+) -> Result<(), StoreRefusal> {
+    match ty {
+        PropertyType::Ref(r) => {
+            let id: Id = serde_json::from_value(value.clone()).map_err(|_| {
+                StoreRefusal::schema(violation(codes::WRONG_VALUE_TYPE, pointer.to_string()))
+            })?;
+            // A reference to an interface is held to the rule of a reference
+            // to its object's type: the implementing types share the
+            // interface's schema (schema-language.md R33).
+            let Some(target) = schemas
+                .schema_of(&r.target)
+                .or_else(|| schemas.schema_of_interface(&r.target))
+            else {
+                return Ok(());
+            };
+            if id.namespace != target.namespace {
+                return Err(StoreRefusal::schema(violation(
+                    codes::REF_NAMESPACE_MISMATCH,
+                    pointer.to_string(),
+                )));
+            }
+            Ok(())
+        }
+        PropertyType::Array(a) => {
+            if let Value::Array(items) = value {
+                for item in items {
+                    check_ref_namespaces(schemas, &a.array, item, pointer)?;
+                }
+            }
+            Ok(())
+        }
+        PropertyType::Struct(s) => {
+            if let Value::Object(map) = value {
+                for (fname, fty) in &s.struct_ {
+                    if let Some(fv) = map.get(fname) {
+                        check_ref_namespaces(schemas, fty, fv, pointer)?;
+                    }
+                }
+            }
+            Ok(())
+        }
+        _ => Ok(()),
+    }
+}
+
+pub(crate) fn append_schema_in(
+    tx: &Transaction<'_>,
+    schemas: &SchemaSet,
+    item: &Append,
+    ingested_at: u64,
+) -> Result<(), StoreRefusal> {
+    let Append {
+        id,
+        scope,
+        observation,
+    } = item;
+    let payload = ont_core::observation_payload(observation).map_err(StoreRefusal::from)?;
+    id.validate().map_err(StoreRefusal::from)?;
+    if observation.change == Change::Initial && observation.supersedes.is_some() {
+        return Err(StoreRefusal::schema(violation(
+            codes::INVALID_CHANGE_KIND,
+            "/supersedes",
+        )));
+    }
+    observation.validate().map_err(StoreRefusal::from)?;
+    let Some(decl) = schemas.schema_of(&id.object_type) else {
+        return Err(StoreRefusal::schema(violation(
+            codes::UNKNOWN_TYPE,
+            format!("/object_types/{}", esc(&id.object_type)),
+        )));
+    };
+    let Scope::Domain {
+        namespace: scope_namespace,
+        domain: scope_domain,
+        keys: scope_keys,
+    } = scope
+    else {
+        return Err(StoreRefusal::schema(violation(
+            codes::SCOPE_DOMAIN_MISMATCH,
+            "/scope",
+        )));
+    };
+    if scope_domain != &decl.domain {
+        return Err(StoreRefusal::schema(violation(
+            codes::SCOPE_DOMAIN_MISMATCH,
+            "/scope/domain",
+        )));
+    }
+    if scope_namespace != &decl.namespace {
+        return Err(StoreRefusal::schema(violation(
+            codes::SCOPE_NAMESPACE_MISMATCH,
+            "/scope/namespace",
+        )));
+    }
+    if scope_keys.iter().any(|(k, v)| k.is_empty() || v.is_empty()) {
+        return Err(StoreRefusal::schema(violation(
+            codes::SCOPE_KEYS_MISMATCH,
+            "/scope/keys",
+        )));
+    }
+    let declared_keys: BTreeSet<&String> = decl.scope_keys.iter().collect();
+    if scope_keys.len() != declared_keys.len()
+        || scope_keys.keys().any(|k| !declared_keys.contains(k))
+    {
+        return Err(StoreRefusal::schema(violation(
+            codes::SCOPE_KEYS_MISMATCH,
+            "/scope/keys",
+        )));
+    }
+    if id.namespace != decl.namespace {
+        return Err(StoreRefusal::schema(violation(
+            codes::ID_NAMESPACE_MISMATCH,
+            "/id/namespace",
+        )));
+    }
+    if observation.change == Change::Backfill {
+        return Err(StoreRefusal::schema(violation(
+            codes::INVALID_CHANGE_KIND,
+            "/change",
+        )));
+    }
+    if observation.change != Change::Retraction {
+        schemas
+            .validate_fields(&id.object_type, &observation.fields)
+            .map_err(StoreRefusal::schema)?;
+        if let Some(props) = schemas.properties(&id.object_type) {
+            for (name, prop) in props {
+                if let Some(Knowledge::Value(v)) = observation.fields.get(name) {
+                    check_ref_namespaces(schemas, &prop.ty, v, &format!("/fields/{}", esc(name)))?;
+                }
+            }
+        }
+    }
+    let pin = schemas
+        .pin(&decl.domain)
+        .ok_or_else(|| StoreRefusal::from(Error::StoreFailure))?;
+    let existing = map_db(tx.query_row(
+        &format!("SELECT o.scope, o.head, ob.change_kind, {} FROM objects o JOIN observations ob ON ob.object_type=o.object_type AND ob.instance=o.instance AND ob.account=o.account AND ob.native_key=o.native_key AND ob.revision=o.head WHERE o.object_type=?1 AND o.instance=?2 AND o.account=?3 AND o.native_key=?4", bounded_payload_sql()),
+        params![id.object_type, id.namespace.instance, id.namespace.account, id.native_key],
+        |r| {
+            Ok((
+                r.get::<_, String>(0)?,
+                r.get::<_, String>(1)?,
+                r.get::<_, String>(2)?,
+                payload_column(r, 3)?,
+            ))
+        },
+    ).optional())?;
+    // An objects row whose head observation is missing is corruption.
+    let object_row: Option<String> = map_db(tx.query_row(
+        "SELECT head FROM objects WHERE object_type=?1 AND instance=?2 AND account=?3 AND native_key=?4",
+        params![id.object_type, id.namespace.instance, id.namespace.account, id.native_key],
+        |r| r.get::<_, String>(0),
+    ).optional())?;
+    if object_row.is_some() && existing.is_none() {
+        return Err(StoreRefusal::store_failure());
+    }
+    let duplicate = map_db(tx.query_row(
+        "SELECT EXISTS(SELECT 1 FROM observations WHERE object_type=?1 AND instance=?2 AND account=?3 AND native_key=?4 AND revision=?5)",
+        params![id.object_type, id.namespace.instance, id.namespace.account, id.native_key, observation.revision],
+        |r| r.get::<_, bool>(0),
+    ))?;
+    if duplicate {
+        return Err(StoreRefusal::new("duplicate_revision"));
+    }
+    match (&existing, &observation.change) {
+        (None, Change::Initial) => {
+            let scope_json = serde_json::to_string(scope).map_err(|_| {
+                StoreRefusal::schema(violation(codes::SCOPE_KEYS_MISMATCH, "/scope/keys"))
+            })?;
+            map_db(tx.execute(
+                "INSERT INTO objects VALUES (?1,?2,?3,?4,?5,?6)",
+                params![
+                    id.object_type,
+                    id.namespace.instance,
+                    id.namespace.account,
+                    id.native_key,
+                    scope_json,
+                    observation.revision
+                ],
+            ))?;
+        }
+        (None, _) => return Err(StoreRefusal::revision_conflict()),
+        (Some((old_scope, head, head_kind, head_payload)), _) => {
+            let old: Scope = decode(old_scope).map_err(StoreRefusal::from)?;
+            if old != *scope {
+                return Err(StoreRefusal::from(Error::ScopeConflict));
+            }
+            if head_kind == "retraction" {
+                if observation.change != Change::Initial {
+                    return Err(StoreRefusal::revision_conflict());
+                }
+            } else {
+                match observation.change {
+                    Change::Initial => return Err(StoreRefusal::revision_conflict()),
+                    Change::Update | Change::Refresh | Change::Correction | Change::Retraction => {
+                        if observation.supersedes.as_ref() != Some(head) {
+                            return Err(StoreRefusal::revision_conflict());
+                        }
+                        if observation.change == Change::Refresh {
+                            let head_obs: Observation =
+                                decode_observation(&payload_value(head_payload.clone())?)?;
+                            if head_obs.fields != observation.fields {
+                                return Err(StoreRefusal::schema(violation(
+                                    codes::REFRESH_FIELDS_DIFFER,
+                                    "/fields",
+                                )));
+                            }
+                        }
+                    }
+                    Change::Backfill => unreachable!(),
+                }
+            }
+        }
+    }
+    map_db(tx.execute(
+        "INSERT INTO observations(object_type,instance,account,native_key,revision,ordinal,payload,ingested_at,schema_domain,schema_version,change_kind) SELECT ?1,?2,?3,?4,?5,COALESCE(MAX(ordinal),-1)+1,?6,?7,?8,?9,?10 FROM observations WHERE object_type=?1 AND instance=?2 AND account=?3 AND native_key=?4",
+        params![
+            id.object_type,
+            id.namespace.instance,
+            id.namespace.account,
+            id.native_key,
+            observation.revision,
+            payload,
+            to_i64(ingested_at)?,
+            decl.domain,
+            to_i64(pin.version)?,
+            change_kind(&observation.change)
+        ],
+    ))?;
+    map_db(tx.execute(
+        "UPDATE objects SET head=?5 WHERE object_type=?1 AND instance=?2 AND account=?3 AND native_key=?4",
+        params![
+            id.object_type,
+            id.namespace.instance,
+            id.namespace.account,
+            id.native_key,
+            observation.revision
+        ],
+    ))?;
+    if let Some(head) = head_in(tx, id)? {
+        candidates::project(tx, schemas, &head)?;
+    }
+    Ok(())
+}
+
+#[cfg(test)]
+mod provenance_tests {
+    use super::*;
+    use std::sync::atomic::{AtomicU64, Ordering};
+
+    fn bytes(version: u64) -> Vec<u8> {
+        serde_json::to_vec(&serde_json::json!({
+            "format":"ontology-schema/v1","domain":"work","version":version,
+            "namespace":{"instance":"vps://synthetic","account":"root"},
+            "object_types":{
+              "thing":{"owner":"ontology","primary_key":{"from":"$action_id"},
+                "properties":{"name":{"type":"string","required":true}}}
+            },
+            "grants":[{"principal":"agent","scope":{},"read":["thing"],"derive":[],"actions":[]}]
+        }))
+        .unwrap()
+    }
+
+    #[test]
+    fn store_without_source_path_column_still_opens_and_gains_it_on_install() {
+        static NEXT: AtomicU64 = AtomicU64::new(0);
+        let dir = std::env::temp_dir().join(format!(
+            "ont-store-prov-{}-{}",
+            std::process::id(),
+            NEXT.fetch_add(1, Ordering::Relaxed)
+        ));
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("old.sqlite");
+        {
+            let mut store = Store::open_schema(&path).unwrap();
+            store
+                .install_schema(
+                    &bytes(1),
+                    InstallArgs {
+                        installed_at: 1,
+                        source_repository: Some("example/repo".into()),
+                        source_commit: Some("a".repeat(40)),
+                    },
+                )
+                .unwrap();
+        }
+        // Remove the column a store written by the base does not have.
+        {
+            let raw = Connection::open(&path).unwrap();
+            raw.execute_batch("ALTER TABLE schema_installs DROP COLUMN source_path")
+                .unwrap();
+        }
+        let mut store = Store::open_schema(&path).unwrap();
+        assert_eq!(store.schema_pins().unwrap()["work"].version, 1);
+        let before = store.schema_provenance().unwrap();
+        assert_eq!(before["work"].repository.as_deref(), Some("example/repo"));
+        assert_eq!(before["work"].path, None);
+        store
+            .install_schema_with_provenance(
+                &bytes(2),
+                InstallArgs {
+                    installed_at: 2,
+                    source_repository: Some("example/repo".into()),
+                    source_commit: Some("b".repeat(40)),
+                },
+                Some("ontology/work.schema.json".into()),
+            )
+            .unwrap();
+        let after = store.schema_provenance().unwrap();
+        assert_eq!(
+            after["work"].path.as_deref(),
+            Some("ontology/work.schema.json")
+        );
+        assert_eq!(
+            after["work"].commit.as_deref(),
+            Some("b".repeat(40).as_str())
+        );
+        drop(store);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+}
+
+#[cfg(test)]
+mod observation_bound_tests {
+    use super::*;
+    #[test]
+    fn over_bound_head_history_and_scan_copy_zero_payloads() {
+        let mut store = Store::memory_schema().unwrap();
+        let schema = serde_json::json!({"format":"ontology-schema/v1","domain":"test","version":1,
+            "namespace":{"instance":"test","account":"root"},"object_types":{"node":{"owner":"ontology","primary_key":{"from":"$action_id"},"properties":{}}}});
+        store
+            .install_schema(schema.to_string().as_bytes(), InstallArgs::default())
+            .unwrap();
+        let id = Id {
+            object_type: "node".into(),
+            namespace: ont_core::Namespace {
+                instance: "test".into(),
+                account: "root".into(),
+            },
+            native_key: "bad".into(),
+        };
+        let scope = Scope::domain(id.namespace.clone(), "test", BTreeMap::new()).unwrap();
+        store
+            .connection
+            .execute(
+                "INSERT INTO objects VALUES ('node','test','root','bad',?1,'legacy')",
+                [serde_json::to_string(&scope).unwrap()],
+            )
+            .unwrap();
+        for payload in [
+            "!".repeat(MAX_OBSERVATION_BYTES + 1),
+            format!("[{}]", vec!["0"; MAX_OBSERVATION_ARRAY_ITEMS + 1].join(",")),
+        ] {
+            store
+                .connection
+                .execute("DELETE FROM observations", [])
+                .unwrap();
+            store.connection.execute("INSERT INTO observations VALUES ('node','test','root','bad','legacy',0,?1,1,'test',1,'initial')", [payload]).unwrap();
+            PAYLOAD_COPIES.set(0);
+            assert_eq!(store.head(&id).unwrap_err().code, "observation_too_large");
+            assert_eq!(
+                store.history(&id).unwrap_err().code,
+                "observation_too_large"
+            );
+            assert_eq!(
+                store.scan_heads("node", 1, None).unwrap_err().code,
+                "observation_too_large"
+            );
+            assert_eq!(PAYLOAD_COPIES.get(), 0);
+        }
+    }
+    #[test]
+    fn sql_byte_guard_reads_column_length_metadata_only() {
+        // spec: specs/ont/read.md#R16
+        let db = Connection::open_in_memory().unwrap();
+        db.execute_batch("CREATE TABLE observations(payload TEXT)")
+            .unwrap();
+        let mut stmt = db
+            .prepare(&format!(
+                "EXPLAIN SELECT {} FROM observations ob",
+                bounded_payload_sql()
+            ))
+            .unwrap();
+        let ops: Vec<(String, u8)> = stmt
+            .query_map([], |r| Ok((r.get(1)?, r.get(6)?)))
+            .unwrap()
+            .map(Result::unwrap)
+            .collect();
+        let first_column = ops.iter().find(|(op, _)| op == "Column").unwrap();
+        // Bundled SQLite's OPFLAG_BYTELENARG=0xc0 asks OP_Column for the
+        // encoded byte length without materializing a TEXT or BLOB body.
+        // length(CAST(payload AS BLOB)) has flag 0 and fails this regression.
+        assert_eq!(first_column.1 & 0xc0, 0xc0);
+    }
+    #[test]
+    fn sql_guard_returns_null_not_an_over_bound_payload() {
+        // spec: specs/ont/read.md#R17
+        let db = Connection::open_in_memory().unwrap();
+        db.execute_batch("CREATE TABLE observations(payload TEXT)")
+            .unwrap();
+        for payload in [
+            "!".repeat(MAX_OBSERVATION_BYTES + 1),
+            format!("[{}]", vec!["0"; MAX_OBSERVATION_ARRAY_ITEMS + 1].join(",")),
+        ] {
+            db.execute("DELETE FROM observations", []).unwrap();
+            db.execute("INSERT INTO observations VALUES (?1)", [payload])
+                .unwrap();
+            // Inspect the SQL result itself: no payload bytes can reach r.get
+            // or the observation decoder when SQLite returns NULL instead.
+            let projected: Option<String> = db
+                .query_row(
+                    &format!("SELECT {} FROM observations ob", bounded_payload_sql()),
+                    [],
+                    |r| r.get(0),
+                )
+                .unwrap();
+            assert_eq!(projected, None);
+        }
+    }
+}
