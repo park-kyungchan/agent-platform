@@ -26,7 +26,7 @@ When a request asks for the output of a later stage while the record of an earli
 
 ## 3. Four commands
 
-- `ap status` before anything else: what is asked, planned, running, waiting or broken.
+- `ap status --brief` in the task's directory before anything else: what is next, stopped, waiting on you, owed or held.
 - `ap request` for every message of the user, as `specs/ap/request.md` says: recorded in the turn it arrives, in the user's own words; list the topic's current requests before you ask the user anything.
 - `ap unit page <key>` when you are given a unit: its page is your whole assignment.
 - `ap status --term <word>`: what one word of the life cycle means, from the store's schema.
@@ -35,7 +35,7 @@ When a request asks for the output of a later stage while the record of an earli
 
 - A fact comes from source, Git, a compiler, the store or a service's output, read now; a remembered fact and a path are checked before you build on them. A time comes from the clock, never typed.
 - Verify by the output or a readback, not by a success message or an exit code alone. Use `set -o pipefail` in shell pipelines.
-- Merged (the change is on the main branch), installed (the host's files equal the merged ones) and loaded (a session's own record shows the text) are three facts, each shown by its own output.
+- Merged (the change is on the main branch), installed (the host's files equal the merged ones), loaded (a session's own record shows the text) and used (the unit's named run happened) are four facts, each shown by its own output.
 - Read only what the next decision needs, a long file by line range; do not scan every repository to find a task. The model and the effort are unknown unless the session reports them.
 
 ## 5. Effects
@@ -52,9 +52,9 @@ When a request asks for the output of a later stage while the record of an earli
 ## 6. The user's standing limits
 
 - The Academy: no `edu-*` directory and no `education-platform` path is opened without the Academy's own task.
-- Private data: metadata and hashes only, unless the user authorizes more.
+- Private data: metadata and hashes only, unless the user authorizes more; the Academy's records are real data inside the Academy's own task, never in Git.
 - Models: only those the policy file `/etc/agent-platform/policy.json` allows.
-- Long-term memory (Hindsight) is off until it is rebuilt: call no memory tool. A memory hook's output is a past record, checked against current source.
+- Long-term memory is off until the user deploys it anew: call no memory tool; a fact with a key, a state or an owner is an object of the store. A memory hook's output is a past record, checked against current source.
 
 ## 7. Language
 
