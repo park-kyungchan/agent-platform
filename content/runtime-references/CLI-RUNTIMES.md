@@ -1,6 +1,6 @@
 # The coding CLIs on this host: files, commands and what a session loads
 
-Read this when you start, run without a terminal UI, resume or configure a CLI (permissions, MCP servers, hooks, compaction, events, usage limit, account), register an MCP server, or must check what a session loaded. The CLIs are Claude Code (`claude`), Codex (`codex`), Muse (`muse`), Antigravity (`agy`) and Grok Build (`grok`). A command below shows the mechanism. It is not permission to launch, authenticate, update or change configuration: that comes from the task's STATE.
+Read this when you start, run without a terminal UI, resume or configure a CLI (permissions, MCP servers, hooks, compaction, events, usage limit, account), register an MCP server, or must check what a session loaded. The CLIs are Claude Code (`claude`) and Antigravity (`agy`). A command below shows the mechanism. It is not permission to launch, authenticate, update or change configuration: that comes from the task's STATE.
 
 | I need | Section |
 | --- | --- |
@@ -11,18 +11,15 @@ Read this when you start, run without a terminal UI, resume or configure a CLI (
 | The rules for MCP servers | 5 |
 | Hooks; skill sources; a CLI's private memory | 6; 7; 8 |
 | A stage or a unit of work on this host (`ap run`, `ap unit`) | 9 |
-| Claude Code, Muse Code or the Antigravity CLI without a terminal UI: the run, permission modes, what loads and how to keep it out of one run, compaction, events, resume, usage limit, account | 10, 11, 12 |
-| Claude Code's code mode, where a turn is one script: the forms of its REPL | 13 |
+| Claude Code or the Antigravity CLI without a terminal UI: the run, permission modes, what loads and how to keep it out of one run, compaction, events, resume, usage limit, account | 10, 11 |
+| Claude Code's code mode, where a turn is one script: the forms of its REPL | 12 |
 
 ## 1. Files per CLI
 
 | CLI | Shared-instruction pointer | Custom MCP servers: file / section | Skills it lists |
 | --- | --- | --- | --- |
 | Claude Code | `~/.claude/CLAUDE.md` (a file that imports the shared file with an `@` line) | `~/.claude.json` / `mcpServers` | `~/.claude/skills/` (symlinks to the shared skills of section 7 that the user chose) |
-| Codex | `~/.codex/AGENTS.md` (symlink) | `~/.codex/config.toml` / `mcp_servers` | `/root/.agents/skills/` directly |
-| Muse | `~/.config/muse/AGENTS.md` (symlink) | `~/.config/muse/settings.json` / `mcpServers` | `/root/.agents/skills/` directly |
 | Antigravity | `~/.gemini/AGENTS.md` and `~/.gemini/GEMINI.md` (symlinks) | `~/.gemini/config/mcp_config.json` / `mcpServers` | `~/.gemini/config/skills/` (symlinks) |
-| Grok Build | `~/.grok/AGENTS.md` (symlink) | `~/.grok/config.toml` / `mcp_servers` | read `SKILL.md` by path |
 
 Every pointer resolves to `/root/.agents/AGENTS.md`. If a CLI does not show that text in a session, repair its pointer; do not paste the text into a prompt as a permanent fix and do not create a copy.
 
@@ -31,14 +28,9 @@ Every pointer resolves to `/root/.agents/AGENTS.md`. If a CLI does not show that
 | CLI | Interactive | Headless (one prompt, then exit) | Resume an exact session |
 | --- | --- | --- | --- |
 | Claude Code | `claude --model <model> --effort <effort>` in the assigned checkout | `claude --print <prompt>` (section 10; a stage: `ap run`, section 9) | `claude --print --resume <session-id> <prompt>` (section 10) |
-| Codex | `codex --no-daemon -C <checkout> -m <model> -c model_reasoning_effort=<effort>` | `codex --no-daemon exec -C <checkout> --json <prompt>`; a stage of a unit is started by `ap run` with `runtime: codex` (`crates/ap/README.md`, "One stage") | `codex --no-daemon resume <session-id>` |
-| Muse | `muse --model <model> --reasoning-effort <effort>` | `MUSE_NO_AUTO_UPDATE=1 muse exec --json --model <model> --reasoning-effort <effort> --contributor-mode off --disable-reminders --session-id <new uuid> --workspace <checkout> --prompt-file <absolute TASK path>` (section 11) | `muse exec --session-id <the same id> --workspace <the same dir> <prompt>` (section 11; `muse resume <session-ref>` opens the terminal UI) |
-| Antigravity | `agy --model <model>` | `agy --print <prompt> --output-format stream-json` (section 12) | `agy --print <prompt> --conversation <id>` (section 12) |
-| Grok Build | `grok --cwd <checkout>` | `grok --cwd <checkout> -p <prompt> --output-format streaming-json` | `grok --cwd <checkout> --resume <session-id>` |
+| Antigravity | `agy --model <model>` | `agy --print <prompt> --output-format stream-json` (section 11) | `agy --print <prompt> --conversation <id>` (section 11) |
 
 - The Lead of a task runs in the CLI its STATE names (skill `lead`); every CLI of this table may run a worker or a reviewer when the task's assignment file names it.
-- Codex always runs with `--no-daemon` in a Herdr terminal. Do not replace this with an app-server workflow.
-- Muse: `MUSE_NO_AUTO_UPDATE=1` stops the updater from running during the command. `--disable-reminders` removes two built-in reminder agents and the extra model requests they make; use it for workers. `muse exec --provider echo` (without `--model`) runs a session with no model call, which is the cheap way to inspect what a session loads. Muse's session record does not store the effort of the main request.
 - Resume by exact session ID, not `--last`, when several sessions exist. A resumed session keeps older instructions and tool definitions: read the task's STATE again before any effect.
 - A blocking `ap status --wait <intent>` gets a `--timeout` below the CLI's limit for a foreground command (Claude Code: `BASH_MAX_TIMEOUT_MS`): the default of 14,400 s is above it.
 - If a flag is rejected or missing, read that CLI's installed `--help`. Do not run every CLI's help for every task.
@@ -52,28 +44,21 @@ Every pointer resolves to `/root/.agents/AGENTS.md`. If a CLI does not show that
 | CLI | Session record | Limits you must know |
 | --- | --- | --- |
 | Claude Code | `~/.claude/projects/<cwd with each / and . as ->/<session-id>.jsonl` (`$CLAUDE_CONFIG_DIR/projects/<cwd with each / and . as ->/<session-id>.jsonl` when that variable is set) | A subagent may not receive project instruction files. Excluding ToolSearch from `--tools` loads every MCP tool schema at start |
-| Codex | `~/.codex/sessions/` (`rollout-*.jsonl`) | Outside a Git repository Codex reads project instruction files in the cwd only, not in parent directories. The user-level pointer still loads. Do not create a fake repository to change this |
-| Muse | `~/.local/share/muse/sessions/<yyyy>/<mm>/<dd>/<session-id>/session.jsonl` | Without `~/.config/muse/AGENTS.md` Muse falls back to `~/.claude/CLAUDE.md` and shows its `@` line as literal text |
 | Antigravity | `~/.gemini/antigravity-cli/conversations/<conversation-id>.db` | A native rule include is written `@[label](path)`; a bare `@filename` is a reference, not an include |
-| Grok Build | `~/.grok/sessions/` (not yet inspected on this host) | Imports of other CLIs' MCP servers are off: `[compat.claude] mcps=false`, `[compat.cursor] mcps=false` |
 
 - A skill has three separate states: listed in the catalog (name and description only), body read, and applied. A listing does not show that the body was read.
 - A handoff therefore names the files to read first, and the receiver names them in its first output. A child agent does not inherit the parent's activated skills.
-- Codex plugins: `plugins.<plugin>.enabled` applies to local-marketplace entries only; `apps.<id>.enabled` and `skills.config` are separate controls.
 - A session started with restricted tools or flags shows a restricted inventory: do not report it as that CLI's default.
 - A configuration change does not replace what a running session already loaded. Check with a new session of your own; do not restart someone else's.
 
 ## 4. Context compaction
 
-The target window is a task decision and is written in the task's STATE. A configured value is not a measured ceiling: read back the effective value, and for Muse read the model's window from its catalog before computing a fraction. The native control per CLI:
+The target window is a task decision and is written in the task's STATE. A configured value is not a measured ceiling: read back the effective value. The native control per CLI:
 
 | CLI | Control |
 | --- | --- |
 | Claude Code | `CLAUDE_CODE_AUTO_COMPACT_WINDOW` and `CLAUDE_AUTOCOMPACT_PCT_OVERRIDE` in `~/.claude/settings.json` `env`; read back with `/context` in the terminal UI. For one run: section 10 |
-| Codex | `model_context_window` and `model_auto_compact_token_limit` in `~/.codex/config.toml` |
-| Muse headless | `--context-compaction-soft-threshold` and `--context-compaction-hard-threshold`, fractions of the model's window, soft below hard (section 11) |
-| Antigravity | Automatic: older turns become checkpoint summaries; no flag or setting for the point was found (section 12) |
-| Grok Build | Not qualified on this host; qualify before relying on a ceiling |
+| Antigravity | Automatic: older turns become checkpoint summaries; no flag or setting for the point was found (section 11) |
 
 ## 5. MCP servers
 
@@ -89,15 +74,15 @@ The target window is a task decision and is written in the task's STATE. A confi
 
 ## 6. Hooks
 
-Where a CLI has hooks, a user message is recorded by the hook of `ap request` (`specs/ap/request.md` R25 to R29). The hook reads only a Claude Code session record, so the entries are Claude Code's; in Codex (`~/.codex/hooks.json`), Muse (`~/.config/muse/settings.json` `hooks`), Antigravity (`~/.gemini/config/hooks.json`) and Grok (`~/.grok/hooks/`) the agent records the message itself with typed words. The two entries of the `hooks` setting are `"UserPromptSubmit": [{"hooks":[{"type":"command","command":"/usr/local/bin/ap request || exit 1","timeout":30}]}]` and `"Stop": [{"hooks":[{"type":"command","command":"/usr/local/bin/ap request || exit 1","timeout":30}]}]`, never with `async`, with no argument but `--store`, and in one settings file only: a second registration makes the second call of a prompt end `not recorded`. The `|| exit 1` is there because exit 2 of a prompt hook blocks the user's prompt, and a refusal of `ap request` before the input is known as a hook's (`usage`, an input over 1 MiB, no JSON) exits 2. The entries are a change of the host's configuration that the Lead makes after delivery, with the previous bytes kept and read back; this paragraph is no permission to make it.
+Where a CLI has hooks, a user message is recorded by the hook of `ap request` (`specs/ap/request.md` R25 to R29). The hook reads only a Claude Code session record, so the entries are Claude Code's; in Antigravity (`~/.gemini/config/hooks.json`) the agent records the message itself with typed words. The two entries of the `hooks` setting are `"UserPromptSubmit": [{"hooks":[{"type":"command","command":"/usr/local/bin/ap request || exit 1","timeout":30}]}]` and `"Stop": [{"hooks":[{"type":"command","command":"/usr/local/bin/ap request || exit 1","timeout":30}]}]`, never with `async`, with no argument but `--store`, and in one settings file only: a second registration makes the second call of a prompt end `not recorded`. The `|| exit 1` is there because exit 2 of a prompt hook blocks the user's prompt, and a refusal of `ap request` before the input is known as a hook's (`usage`, an input over 1 MiB, no JSON) exits 2. The entries are a change of the host's configuration that the Lead makes after delivery, with the previous bytes kept and read back; this paragraph is no permission to make it.
 
 What the agent does on each line of the hook:
 - `ap request: recorded <key> ...`: it records the message no second time and routes the request (`op` `route`), or supersedes it with the `words_from` the line gives whenever its kind, its reading or its topic differs from the hook's (the hook's topic is the name of the task's directory).
 - `ap request: not recorded by the hook ...`: only if the message is the user's (the hook also runs on turns the CLI starts on its own and on prompts a program sends), it records it with `ap request` and the `words_from` the line gives.
 - The `reason` of `Stop`: it routes or sets aside each key it names.
-- No line that says `recorded`: the agent still records a message sent while a turn runs (section 13), a prompt the record does not hold yet, and a message of a CLI without the entries. The CLI can deliver a message sent while a turn ran as a prompt when the turn ends, and the hook then records it: an agent that already recorded it from its `queue-operation` line sets the hook's request aside instead of leaving two.
+- No line that says `recorded`: the agent still records a message sent while a turn runs (section 12), a prompt the record does not hold yet, and a message of a CLI without the entries. The CLI can deliver a message sent while a turn ran as a prompt when the turn ends, and the hook then records it: an agent that already recorded it from its `queue-operation` line sets the hook's request aside instead of leaving two.
 
-Do not export a hook-disable variable and do not remove an MCP server to isolate a worker. To keep hooks and registered MCP servers out of ONE run, give that run its own flags (sections 10 to 12, `ap run` in section 9): they change no saved configuration and export nothing.
+Do not export a hook-disable variable and do not remove an MCP server to isolate a worker. To keep hooks and registered MCP servers out of ONE run, give that run its own flags (sections 10 and 11, `ap run` in section 9): they change no saved configuration and export nothing.
 
 ## 7. Skills
 
@@ -114,17 +99,15 @@ Installed shared path: `/root/.agents/skills/<skill>/SKILL.md`. Change a skill i
 | CLI | Location | Loaded when |
 | --- | --- | --- |
 | Claude Code | `~/.claude/projects/<cwd with slashes as dashes>/memory/` (`MEMORY.md` index plus one file per entry) | Every session started in that cwd |
-| Muse | `~/.local/share/muse/memory/personal/` and `~/.local/share/muse/memory/projects/<cwd name and hash>/` | Sessions in that cwd |
 | Antigravity | `~/.gemini/antigravity-cli/brain/` | Per conversation |
-| Codex, Grok Build | None found on this host | — |
 
 This memory is private to one CLI and one directory, so no other agent sees it and nothing reviews it. The rule for what may go there is in `/root/.agents/AGENTS.md` section 5. When an entry there contradicts the task's STATE or the shared instructions, STATE and the shared instructions win; delete the entry.
 
 ## 9. A stage or a unit of work on this host
 
-- A stage (one implementer, reviewer or fixer session of Claude Code, of the Codex CLI, of Muse Code with `runtime: "muse"`, or, for a reviewer, of the Antigravity CLI with `runtime: "agy"` in the request; `crates/ap/README.md`, "One stage", the parts headed A stage on Muse Code and A stage on the Antigravity CLI) is started with `ap run < request.json`: one headless run in its own systemd scope, with a time bound (`timeout_seconds`), its record `<out>.run.json` that another command reads, and, for Claude Code, the flags of section 10 set for you (no MCP server of the account, no hook, no auto-memory, no skill unless asked). A unit (implementer, gate, verifier, acceptance) is run with `ap unit run <key>` (`specs/ap/unit-run.md`). The contract of a stage: `agent-platform` `crates/ap/README.md`, section "One stage".
-- The raw commands of sections 10 to 12 are for what those two commands do not cover: a Muse Code run that is not a stage, an Antigravity CLI run that is not a reviewer stage, a probe of what a session loads, a reader of a test.
-- A Claude stage states its compaction window in the request's `compact_window` (`crates/ap/README.md`, "One stage"): an integer from 100000 to 1000000, carried as `CLAUDE_CODE_AUTO_COMPACT_WINDOW` in the `env` of the CLI's `--settings` value; without it the account's settings decide. A stage of Codex, Muse Code or the Antigravity CLI refuses the member: `invalid_input` at the field `compact_window` (`crates/ap/src/run.rs`, `unbuilt`). A request's `env` still refuses a name beginning `CLAUDE_` (`env_forbidden`).
+- A stage (one implementer, reviewer or fixer session of Claude Code, or of the Antigravity CLI with `runtime: "agy"` in the request; `crates/ap/README.md`, "One stage", the part headed A stage on the Antigravity CLI) is started with `ap run < request.json`: one headless run in its own systemd scope, with a time bound (`timeout_seconds`), its record `<out>.run.json` that another command reads, and, for Claude Code, the flags of section 10 set for you (no MCP server of the account, no hook, no auto-memory, no skill unless asked). A unit (implementer, gate, verifier, acceptance) is run with `ap unit run <key>` (`specs/ap/unit-run.md`). The contract of a stage: `agent-platform` `crates/ap/README.md`, section "One stage". On the Antigravity CLI, a stage admitted before it exists, from a page (`ap unit`'s case) or for a verifier's look, is a reviewer alone (`crates/ap/src/run.rs`, `admit_stage`).
+- The raw commands of sections 10 and 11 are for what those two commands do not cover: an Antigravity CLI run that is not a stage, a probe of what a session loads, a reader of a test.
+- A Claude stage states its compaction window in the request's `compact_window` (`crates/ap/README.md`, "One stage"): an integer from 100000 to 1000000, carried as `CLAUDE_CODE_AUTO_COMPACT_WINDOW` in the `env` of the CLI's `--settings` value; without it the account's settings decide. A stage of the Antigravity CLI refuses the member: `invalid_input` at the field `compact_window` (`crates/ap/src/run.rs`, `unbuilt`). A request's `env` still refuses a name beginning `CLAUDE_` (`env_forbidden`).
 
 ## 10. Claude Code without a terminal UI
 
@@ -156,35 +139,7 @@ Every row is for ONE run and changes no saved file. The account is `~/.claude`, 
 | The remaining quota | Each `rate_limit_event` line: `rate_limit_info.status` (`allowed`, `allowed_warning`, `rejected`) and per window of `rate_limit_info.unifiedWindows` (`five_hour`, `seven_day`) `utilization` (the fraction used) and `resetsAt` (epoch seconds). `overageStatus` is not the limit's status |
 | Another account or configuration directory | `CLAUDE_CONFIG_DIR=<dir> claude …`: settings, session records and plugins are read from and written under that directory |
 
-## 11. Muse Code without a terminal UI
-
-Every row is for ONE run and changes no saved file. The configuration directory is `~/.config/muse`.
-
-| Need | Command or setting |
-| --- | --- |
-| The run | `MUSE_NO_AUTO_UPDATE=1 muse exec --json --model <model> --reasoning-effort <effort> --contributor-mode off --disable-reminders --session-id <new uuid> --workspace <dir> --prompt-file <absolute path>` (or the prompt as the last argument instead of `--prompt-file`; not both). Pass `--contributor-mode off` because the configuration directory's `settings.json` holds `contributor_mode_enabled: true`, and that file is the user's and is not changed; the flag holds for this run only. `--json` prints the events as JSON lines on stdout; stderr gets `muse:` lines. Exit 0 when the turn completes, 1 when it fails or is cancelled, 2 for a usage error, 130 or 143 on a signal |
-| The serving model | A `task_lifecycle` line's provider facet names the model that served the call: an entry of `payload.event.details.facets` whose `detail.kind` is `provider`, with the model in `detail.model`. `ap run` stops a Muse Code stage whose serving model is not the requested one, and the stage's record names that model in `served_by` (`crates/ap/README.md`, "One stage") |
-| A time bound | None of wall time. `--max-model-steps <n>` caps model steps (the run then exits 1). Wrap the command in `timeout <seconds>` |
-| A model decides each approval, no person | The default: approval mode `on-request` with `--approval-judge on` (the profile Auto-review). A call the policy holds goes to the judge model, which decides it; the event of that call shows `"policy_decision":"allow:llm_judge"`. The judge's model is the CLI's choice: no flag names it, and the session record's `automated_review_completed` event names the model that judged |
-| No approval prompts | `--disable-approval` (the sandbox stays), or `--approval-mode never` (nothing stops for approval; the sandbox alone contains what runs). `--disable-sandbox` removes the sandbox and keeps approval. Unlike `--yolo`, these flags do not trust the workspace; use them only for a run that must also go without approval and sandbox. They are not what keeps MCP servers out: that is the row "Keep the registered MCP servers out". Each of `--yolo` and `--trust-workspace` writes nothing for its trust: it adds no workspace to `trust.json` and changes no file of a copied configuration directory |
-| No approval and no sandbox at all | `--yolo`. It also trusts the workspace, so the MCP servers of the home start (next rows) |
-| A call needs an approval | With `--approval-judge off` (or when the judge is unavailable) a held call waits for a person; a headless run has none, so the action stays unresolved |
-| What a run loads from the home | Instruction pointer `~/.config/muse/AGENTS.md`, skills (`~/.config/muse/skills`, `~/.agents/skills`, also `~/.claude/skills`), MCP servers `~/.config/muse/settings.json` `mcpServers`, hooks (`settings.json` `hooks`), a memory snapshot (`~/.local/share/muse/memory/`) |
-| Keep the registered MCP servers out | Run in a workspace Muse Code does not trust: a new directory, without `--yolo` and without `--trust-workspace`. It starts none, and the session record says `MCP startup withheld <n> servers: workspace is untrusted.` Each of `--trust-workspace` and `--yolo` trusts the workspace and the servers start. In a trusted workspace no switch of one run keeps them out (`-c mcpServers…` is refused) |
-| Keep the workspace's own rules, skills and hooks out | The same untrusted workspace: they are not loaded |
-| Keep other items out | `--disable-reminders` (reminder agents), `--no-foreign-personal-context` (foreign personal rules and skills), `--disable-shell`, `--disable-web-tools`, `--no-session-log`. The instruction pointer, user hooks, single user skills and the memory snapshot have no switch of one run (`muse skills disable` is saved). On this host `--disable-write` made the run end `model … does not exist or you lack access`: leave it out |
-| One setting for one run | `-c <key>=<JSON value>` (repeatable) |
-| The compaction point of one run | `--context-compaction-soft-threshold <fraction> --context-compaction-hard-threshold <fraction>`: fractions of the model's context window, soft in (0, 1), hard in (0, 1], soft below hard. At soft a compaction starts in the background, at hard a blocking one runs. Compute: hard = target tokens / the window; soft a little below. The window is `context_limit` of the model's row in `~/.local/share/muse/model-catalog/*.json` (no command lists it). A hard point under the size of the startup prompt refuses the start and prints `startup prompt estimate <n> reaches hard threshold <n>`. The defaults and a read-back of a running session were not found |
-| Session id in the events | `stream.id` of a line whose `stream.kind` is `session` (the id given with `--session-id`) |
-| Final answer | `payload.text` of the line whose `payload.kind` is `run_terminal`; `payload.terminal` is `completed` or `failed`, with the cause in `payload.reason` |
-| A tool call | Lines `payload.kind` `task_lifecycle`: `event.kind` `side_effect_intent` with `operation` (`tool:bash`) and `policy_decision`, then `started`, `output`, `completed`; then a line `tool_result` |
-| Usage | The line `payload.kind` `run_usage`: `models[]` with `input_tokens`, `output_tokens`, `cached_tokens`, `reasoning_tokens`, and `allowance` |
-| Resume | `MUSE_NO_AUTO_UPDATE=1 muse exec --json --model <model> --contributor-mode off --session-id <the same id> --workspace <the same dir> "<next prompt>"`: the same session continues. `muse resume` opens the terminal UI. Another workspace is refused unless `--allow-workspace-switch`. The same resume also continues a session whose earlier run was ended by a signal and printed no `run_terminal` and no `run_usage` |
-| At a usage limit | Not seen on this host. A failed turn exits 1 and ends with `run_terminal`, `terminal` `failed` and the text in `reason` |
-| The remaining quota | `muse usage --json` (no model turn): `allowance.window` and `allowance.weekly`, each `usedPercent` and `resetsAtMs`. A `--json` run's `run_usage.allowance` has the same members in snake_case |
-| Another account or configuration directory | `XDG_CONFIG_HOME=<dir> muse …` reads settings and login from `<dir>/muse`; with no login there `muse usage` answers `not logged in`. Sessions and memory go under `XDG_DATA_HOME` (`<dir>/muse/sessions`) |
-
-## 12. Antigravity CLI without a terminal UI
+## 11. Antigravity CLI without a terminal UI
 
 Every row is for ONE run and changes no saved file. The configuration directory is `~/.gemini`.
 
@@ -209,7 +164,7 @@ Every row is for ONE run and changes no saved file. The configuration directory 
 | The remaining quota | `agy --print /usage` (no model turn): one tab-separated line per limit: model group, limit, the remaining percent, the reset time |
 | Another account or configuration directory | No flag or variable is documented. `HOME=<dir>` moves the whole `~/.gemini` (row "Keep the registered MCP servers" above) |
 
-## 13. Claude Code's code mode
+## 12. Claude Code's code mode
 
 In code mode a turn is one JavaScript script run in a REPL, and a shell command is a template string. These are the forms Lead sessions got wrong:
 
