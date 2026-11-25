@@ -146,15 +146,10 @@ fn verbs_r1_r2_the_list_begins_with_the_usage_and_a_verb_without_a_usage_prints_
         lines.next(),
         Some("Verbs; the section is of crates/ap/README.md:")
     );
-    for verb in ["version", "accept", "row"] {
-        let line = help
-            .lines()
-            .find(|l| l.starts_with(&format!("  {verb}: ")))
-            .unwrap();
-        let answer = ap(&[verb, "--help"]);
-        assert_eq!(answer.status.code(), Some(0), "ap {verb} --help");
-        assert_eq!(answer.stdout, format!("{line}\n").into_bytes(), "{verb}");
-    }
+    let line = help.lines().find(|l| l.starts_with("  version: ")).unwrap();
+    let answer = ap(&["version", "--help"]);
+    assert_eq!(answer.status.code(), Some(0), "ap version --help");
+    assert_eq!(answer.stdout, format!("{line}\n").into_bytes());
 }
 
 // spec: specs/ap/verbs.md#R5

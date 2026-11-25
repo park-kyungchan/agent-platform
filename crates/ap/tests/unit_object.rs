@@ -862,7 +862,11 @@ fn r1_the_five_words_and_their_arguments() {
         );
     }
     let help = String::from_utf8(ap(&["unit", "--help"]).stdout).unwrap();
-    assert!(help.contains("ap unit [--compose-only] <page>"), "{help}");
+    // The page forms are gone (`specs/ap/verbs.md` R4); the request on standard input stays.
+    assert!(
+        help.starts_with("Usage: ap unit < request.json\n") && !help.contains("<page>"),
+        "{help}"
+    );
     assert!(
         help.contains("ap unit add|amend|ready|drop [--store <path>] < request.json"),
         "{help}"
@@ -873,7 +877,8 @@ fn r1_the_five_words_and_their_arguments() {
         .lines()
         .find(|l| l.trim_start().starts_with("unit: "))
         .unwrap();
-    assert!(line.contains("unit [<page>] < request.json") && line.contains("unit page <key>"));
+    assert!(line.contains("unit < request.json |") && line.contains("unit page <key>"));
+    assert!(!line.contains("<page>"), "{line}");
 }
 
 // spec: specs/ap/unit.md#R2
