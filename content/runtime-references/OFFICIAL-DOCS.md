@@ -32,10 +32,7 @@ Coding CLIs:
 | --- | --- |
 | Claude Code | https://code.claude.com/docs/llms.txt |
 | Anthropic API (wire contracts the Claude Code pages leave open) | https://docs.claude.com/llms.txt |
-| Codex | https://learn.chatgpt.com/docs/llms.txt |
-| Muse | https://dev.meta.ai/llms.txt |
 | Antigravity | https://antigravity.google/llms.txt |
-| Grok Build | https://docs.x.ai/llms.txt |
 
 Infrastructure:
 

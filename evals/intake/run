@@ -96,10 +96,6 @@ for _name in ("claude-sonnet", "claude-haiku"):
     R.READERS[_name]["argv"] = (lambda f: lambda *x: [t for t in f(*x) if t != "--disable-slash-commands"])(
         R.READERS[_name]["argv"])
 R.PROMPT = "{situation}"  # the case's words are the whole first message
-# The routing suite's Muse variants (a trusted workspace, a route pack in the prompt) are not readers of the first turn.
-for _name in ("ember-yolo", "ember-route", "ember-pack"):
-    del R.READERS[_name]
-R.READER_NAMES = tuple(n for n in R.READER_NAMES if n in R.READERS)
 
 # ---------------------------------------------------------------- cases
 
@@ -339,7 +335,7 @@ def cmd_answers(a):
                 states[key(c["id"], n)] = m["state"]
                 if m["state"] in ("sandbox_unavailable", "store_failed"):
                     lost.append(m["state"])
-                if m["mcp_processes"] or m.get("mcp_withheld") is False:
+                if m["mcp_processes"]:
                     broke.append(key(c["id"], n))
     threads = [threading.Thread(target=worker, daemon=True) for _ in range(JOBS)]
     for t in threads:

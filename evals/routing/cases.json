@@ -46,116 +46,6 @@
   "wrong": []
  },
  {
-  "id": "s04",
-  "situation": "Run the prompt file /tmp/p.md through Muse Code without a terminal UI, in the workspace /tmp/w, with its events as JSON lines and with a session id you choose.",
-  "must": [
-   {
-    "fact": [
-     "muse exec"
-    ]
-   },
-   {
-    "fact": [
-     "--prompt-file"
-    ]
-   },
-   {
-    "fact": [
-     "--json"
-    ]
-   },
-   {
-    "fact": [
-     "--session-id"
-    ]
-   },
-   {
-    "fact": [
-     "--workspace"
-    ]
-   }
-  ],
-  "wrong": []
- },
- {
-  "id": "s05",
-  "situation": "The home settings of Muse Code register MCP servers. One run without a terminal UI must start none of them. How?",
-  "must": [
-   {
-    "fact": [
-     "withheld"
-    ]
-   },
-   {
-    "fact": [
-     "--trust-workspace"
-    ]
-   },
-   {
-    "fact": [
-     "--yolo"
-    ]
-   }
-  ],
-  "wrong": []
- },
- {
-  "id": "s06",
-  "situation": "For a Muse Code run without a terminal UI: which setting lets a model decide a tool approval without a person, and which flag removes approval and sandbox altogether?",
-  "must": [
-   {
-    "fact": [
-     "--approval-judge"
-    ]
-   },
-   {
-    "fact": [
-     "--yolo"
-    ]
-   }
-  ],
-  "wrong": []
- },
- {
-  "id": "s07",
-  "situation": "A Muse Code run without a terminal UI must compact its context at about 600000 tokens. Which flags do you set, and how do you compute their values?",
-  "must": [
-   {
-    "fact": [
-     "--context-compaction-soft-threshold"
-    ]
-   },
-   {
-    "fact": [
-     "--context-compaction-hard-threshold"
-    ]
-   }
-  ],
-  "wrong": []
- },
- {
-  "id": "s08",
-  "situation": "Yesterday's Muse Code session ran without a terminal UI. Give it a second prompt in the same session, again without a terminal UI.",
-  "must": [
-   {
-    "fact": [
-     "muse exec"
-    ]
-   },
-   {
-    "fact": [
-     "--session-id"
-    ]
-   },
-   {
-    "fact": [
-     "--workspace"
-    ]
-   }
-  ],
-  "wrong": []
- },
- {
   "id": "s09",
   "situation": "Run one prompt through the Antigravity CLI without a terminal UI, with its events as JSON lines and without permission prompts.",
   "must": [
@@ -208,7 +98,7 @@
  },
  {
   "id": "s12",
-  "situation": "After a run without a terminal UI you must read what the session loaded and used. Where is the session record of Claude Code, of Muse Code and of the Antigravity CLI?",
+  "situation": "After a run without a terminal UI you must read what the session loaded and used. Where is the session record of Claude Code and of the Antigravity CLI?",
   "must": [
    {
     "fact": [
@@ -217,24 +107,7 @@
    },
    {
     "fact": [
-     ".local/share/muse/sessions"
-    ]
-   },
-   {
-    "fact": [
      ".gemini/antigravity-cli/conversations"
-    ]
-   }
-  ],
-  "wrong": []
- },
- {
-  "id": "s13",
-  "situation": "A Muse Code run without a terminal UI must run without the CLI's sandbox, but every tool call must still go through approval and the workspace must not become trusted. Which flag do you pass?",
-  "must": [
-   {
-    "fact": [
-     "--disable-sandbox"
     ]
    }
   ],
