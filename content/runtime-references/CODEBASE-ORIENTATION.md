@@ -55,7 +55,7 @@ Every platform repository has one workflow, `.github/workflows/rust.yml`, with t
 | Academy lessons | `/home/palantirkc/work/edu-lessons/STATE.md` |
 | Recovery archives | `/home/palantirkc/archive/INDEX.md`. An archive is for recovery; it carries no current rule |
 
-A task's current holds, decisions, KPI values and worker runs are in the Ontology store when its STATE says so (`ONTOLOGY-USE.md`).
+The state of the work (requests, intents, units, runs, findings, holds, KPIs) is in the Ontology store: `ap status --brief` in a task's directory, and `ONTOLOGY-USE.md`.
 
 ## 4. Services and state on the host
 

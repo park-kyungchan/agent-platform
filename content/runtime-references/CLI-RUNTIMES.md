@@ -16,13 +16,13 @@ Read this when you start, run without a terminal UI, resume or configure a CLI (
 
 ## 1. Files per CLI
 
-| CLI | Shared-instruction pointer | Custom MCP servers: file / section | Hindsight client name | Skills it lists |
-| --- | --- | --- | --- | --- |
-| Claude Code | `~/.claude/CLAUDE.md` (a file that imports the shared file with an `@` line) | `~/.claude.json` / `mcpServers` | `claude-code` | `~/.claude/skills/` (symlinks to the shared skills of section 7 that the user chose) |
-| Codex | `~/.codex/AGENTS.md` (symlink) | `~/.codex/config.toml` / `mcp_servers` | `codex` | `/root/.agents/skills/` directly |
-| Muse | `~/.config/muse/AGENTS.md` (symlink) | `~/.config/muse/settings.json` / `mcpServers` | `muse` | `/root/.agents/skills/` directly |
-| Antigravity | `~/.gemini/AGENTS.md` and `~/.gemini/GEMINI.md` (symlinks) | `~/.gemini/config/mcp_config.json` / `mcpServers` | `antigravity-cli` | `~/.gemini/config/skills/` (symlinks) |
-| Grok Build | `~/.grok/AGENTS.md` (symlink) | `~/.grok/config.toml` / `mcp_servers` | `grok-build` | read `SKILL.md` by path |
+| CLI | Shared-instruction pointer | Custom MCP servers: file / section | Skills it lists |
+| --- | --- | --- | --- |
+| Claude Code | `~/.claude/CLAUDE.md` (a file that imports the shared file with an `@` line) | `~/.claude.json` / `mcpServers` | `~/.claude/skills/` (symlinks to the shared skills of section 7 that the user chose) |
+| Codex | `~/.codex/AGENTS.md` (symlink) | `~/.codex/config.toml` / `mcp_servers` | `/root/.agents/skills/` directly |
+| Muse | `~/.config/muse/AGENTS.md` (symlink) | `~/.config/muse/settings.json` / `mcpServers` | `/root/.agents/skills/` directly |
+| Antigravity | `~/.gemini/AGENTS.md` and `~/.gemini/GEMINI.md` (symlinks) | `~/.gemini/config/mcp_config.json` / `mcpServers` | `~/.gemini/config/skills/` (symlinks) |
+| Grok Build | `~/.grok/AGENTS.md` (symlink) | `~/.grok/config.toml` / `mcp_servers` | read `SKILL.md` by path |
 
 Every pointer resolves to `/root/.agents/AGENTS.md`. If a CLI does not show that text in a session, repair its pointer; do not paste the text into a prompt as a permanent fix and do not create a copy.
 
@@ -77,11 +77,10 @@ The target window is a task decision and is written in the task's STATE. A confi
 
 ## 5. MCP servers
 
-- Custom servers shared by all CLIs: `hindsight`, `academy_operations`. Each is registered directly in every CLI's own file from section 1, with that CLI's client name where the server asks for one. The engine's server `ont` (`ont mcp`) is registered only in the CLIs where the task that owns the store registered it: read the CLI's file, and use the command `ont` where the server is absent (`ONTOLOGY-USE.md`).
+- The custom server shared by all CLIs: `academy_operations`, registered directly in every CLI's own file from section 1. The engine's server `ont` (`ont mcp`) is registered only in the CLIs where the task that owns the store registered it: read the CLI's file, and use the command `ont` where the server is absent (`ONTOLOGY-USE.md`).
 - Another CLI's personal configuration or plugin cache is never the registration source. Built-in, marketplace, account-synced and plugin servers stay with the CLI that installed them; do not copy them into the custom set and do not edit their caches.
 - Registered, enabled, handshake succeeded, tool visible and effect allowed are five different facts. Check the one your next action needs.
 - `academy_operations` works on one academy account with one lock: only the current lesson owner named in the Academy task STATE performs its operations. A visible write tool is not write permission. Do not reach the academy source by direct HTTP, browser or shell instead of the server.
-- The Hindsight integration is installed in `/root/.hindsight/coding-agents`; its settings file `/root/.hindsight/coding-agent.json` contains a credential: read fields inside a process, never print the file.
 - `academy_operations` keeps the launch command, release and credential files its own service defines. Do not put a not-yet-accepted Rust binary in its place.
 - When the user excludes a feature for one CLI, use that CLI's own control, keep the previous bytes and read the result back in a new session of your own. That is not uninstalling it for the account.
 - When reading a configuration file to reconcile a difference, read key names and the command and arguments only. Never print credential values.
@@ -90,11 +89,15 @@ The target window is a task decision and is written in the task's STATE. A confi
 
 ## 6. Hooks
 
-Hook wiring differs per CLI and changes with CLI and plugin versions, so read the actual configuration instead of assuming it: Claude Code `~/.claude/settings.json` `hooks` plus its installed plugins, Codex `~/.codex/hooks.json`, Muse `~/.config/muse/settings.json` `hooks`, Antigravity `~/.gemini/config/hooks.json`, Grok `~/.grok/hooks/`. A CLI with the `hindsight` MCP server but no Hindsight hook gets no automatic memory injection and no automatic session retention; the agent calls the tools itself. A hook name does not show that injection or retention happened.
+Where a CLI has hooks, a user message is recorded by the hook of `ap request` (`specs/ap/request.md` R25 to R29). The hook reads only a Claude Code session record, so the entries are Claude Code's; in Codex (`~/.codex/hooks.json`), Muse (`~/.config/muse/settings.json` `hooks`), Antigravity (`~/.gemini/config/hooks.json`) and Grok (`~/.grok/hooks/`) the agent records the message itself with typed words. The two entries of the `hooks` setting are `"UserPromptSubmit": [{"hooks":[{"type":"command","command":"/usr/local/bin/ap request || exit 1","timeout":30}]}]` and `"Stop": [{"hooks":[{"type":"command","command":"/usr/local/bin/ap request || exit 1","timeout":30}]}]`, never with `async`, with no argument but `--store`, and in one settings file only: a second registration makes the second call of a prompt end `not recorded`. The `|| exit 1` is there because exit 2 of a prompt hook blocks the user's prompt, and a refusal of `ap request` before the input is known as a hook's (`usage`, an input over 1 MiB, no JSON) exits 2. The entries are a change of the host's configuration that the Lead makes after delivery, with the previous bytes kept and read back; this paragraph is no permission to make it.
 
-Do not export a hook-disable variable and do not remove an MCP server to isolate a worker. Memory isolation uses the Hindsight path override described in `CONCURRENT-WORK.md`. To keep hooks and registered MCP servers out of ONE run, give that run its own flags (sections 10 to 12, `ap run` in section 9): they change no saved configuration and export nothing, so they are not what this paragraph forbids.
+What the agent does on each line of the hook:
+- `ap request: recorded <key> ...`: it records the message no second time and routes the request (`op` `route`), or supersedes it with the `words_from` the line gives whenever its kind, its reading or its topic differs from the hook's (the hook's topic is the name of the task's directory).
+- `ap request: not recorded by the hook ...`: only if the message is the user's (the hook also runs on turns the CLI starts on its own and on prompts a program sends), it records it with `ap request` and the `words_from` the line gives.
+- The `reason` of `Stop`: it routes or sets aside each key it names.
+- No line that says `recorded`: the agent still records a message sent while a turn runs (section 13), a prompt the record does not hold yet, and a message of a CLI without the entries. The CLI can deliver a message sent while a turn ran as a prompt when the turn ends, and the hook then records it: an agent that already recorded it from its `queue-operation` line sets the hook's request aside instead of leaving two.
 
-The request hook (`specs/ap/request.md` R25 to R29): `ap request` is itself the hook of Claude Code's `hooks` setting that records the user's prompt. Its two entries are `"UserPromptSubmit": [{"hooks":[{"type":"command","command":"/usr/local/bin/ap request || exit 1","timeout":30}]}]` and `"Stop": [{"hooks":[{"type":"command","command":"/usr/local/bin/ap request || exit 1","timeout":30}]}]`, never with `async`, with no argument but `--store`, and in one settings file only: a second registration makes the second call of a prompt end `not recorded`. The `|| exit 1` is there because exit 2 of a prompt hook blocks the user's prompt, and a refusal of `ap request` before the input is known as a hook's (`usage`, an input over 1 MiB, no JSON) exits 2. The entries are a change of the host's configuration that the Lead makes after delivery, with the previous bytes kept and read back; this paragraph is no permission to make it. What the agent does on each line: on `ap request: recorded <key> ...`, it records the message no second time and routes the request (`op` `route`) or supersedes it with the `words_from` the line gives, the supersede whenever its kind, its reading or the topic it lists by differs from the hook's (`route` keeps the hook's topic, the name of the task's directory); on `ap request: not recorded by the hook ...`, only if the message is the user's (the hook also runs on turns the CLI starts on its own and on prompts a program sends), it records it with `ap request` and `words_from` naming the record the line gives; on the `reason` of `Stop`, it routes or sets aside each key it names. The hook's line decides who records: without a line that says `recorded`, the agent still records a message sent while a turn runs (section 13), a prompt the record does not hold yet and a message of a CLI without the entries. The CLI can deliver a message sent while a turn ran as a prompt when the turn ends, and the hook then records it: an agent that already recorded it from its `queue-operation` line sets the hook's request aside instead of leaving two. A run an agent starts keeps hooks out by the flags of sections 9 and 10.
+Do not export a hook-disable variable and do not remove an MCP server to isolate a worker. To keep hooks and registered MCP servers out of ONE run, give that run its own flags (sections 10 to 12, `ap run` in section 9): they change no saved configuration and export nothing.
 
 ## 7. Skills
 
@@ -102,7 +105,6 @@ The request hook (`specs/ap/request.md` R25 to R29): `ap request` is itself the 
 | --- | --- |
 | `lead`, `herdr`, `report` | `agent-platform` `content/skills/` |
 | `academy-lesson-day`, `academy-dailyrecord-authoring`, `academy-prestudy-review` | `education-platform` `content/skills/` |
-| `hindsight-coding-agent` | Generated by the Hindsight integration; removed from every CLI while Hindsight is off, with its hooks |
 | Account-synced, marketplace and built-in skills | Their CLI or vendor; changed only through that CLI |
 
 Installed shared path: `/root/.agents/skills/<skill>/SKILL.md`. Change a skill in its source repository through review, then install it (`BUILD-AND-DELIVERY.md` section 6); never edit only the installed copy. Frontmatter fields other than `name` and `description` do not behave the same in every CLI.

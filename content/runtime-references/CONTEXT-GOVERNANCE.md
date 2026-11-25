@@ -1,12 +1,12 @@
 # Context governance: which context to load, from which one home
 
-Read this when you must decide which context to load for a task, above all a kind of task you have not met; which source answers a question; who writes a piece of information; or whether something may go to memory. Where each kind of information is written is the table of section 6 below. How to hand context to another agent: `CONCURRENT-WORK.md`.
+Read this when you must decide which context to load for a task, above all a kind of task you have not met; which source answers a question; who writes a piece of information; or what may go to a long-term memory. Where each kind of information is written is the table of section 6 below. How to hand context to another agent: `CONCURRENT-WORK.md`.
 
 ## 1. The order of loading
 
 Stop at the first step that answers; each step names the next one.
 
-1. The task's STATE: owner, holds, the next action (`AGENTS.md` section 8).
+1. `ap status --brief` in the task's directory: its intents, what is next, the units, the holds (`/root/.agents/AGENTS.md` section 3).
 2. The packet's `Read first:` line (full paths, a passage as `path:a-b`), when you were given one: read exactly that before anything it does not name.
 3. The one reference or skill whose first lines name your situation, in the directories of `/root/.agents/AGENTS.md` section 8.
 4. The area that owns the thing: `CODEBASE-ORIENTATION.md` sections 1 and 2; then that repository's `AGENTS.md` at `origin/main` (`git -C /home/palantirkc/platforms/<repo> show origin/main:AGENTS.md`, after `git -C /home/palantirkc/platforms/<repo> fetch -q origin`); then the start file the table names.
@@ -16,7 +16,7 @@ Stop at the first step that answers; each step names the next one.
 ## 2. How to read without waste
 
 - Read by line range: `sed -n '<a>,<b>p' <file>`. A file over about 300 lines, or with very long lines, is searched first (`grep -n`) and read where the search lands. A directory is listed, never read whole.
-- Ask a command for a fact instead of reading a file that copies it: `ap state <task directory> --text`, `ap backlog <task key> --text` (the board: items, objectives, the order; no holds), the view `active_holds` for holds (`ONTOLOGY-USE.md` section 2), `ont describe`, `ont action list`, a command's `--help`.
+- Ask a command for a fact instead of reading a file that copies it: `ap status --brief`, `ap status --term <word>`, the reads of `ONTOLOGY-USE.md` section 2, `ont describe`, `ont action list`, a command's `--help`.
 - Read a user's row or decision with its words, never from its key alone.
 - A map or an index names where to read; it is not the answer. Cite the file it points to, not the map.
 - A tool result too large to show means the read was too wide: narrow it with a line range, a `grep` or a command's own filter instead of paging through it.
@@ -26,9 +26,9 @@ Stop at the first step that answers; each step names the next one.
 | Copy | Why it misleads | Read instead |
 | --- | --- | --- |
 | The files of a main checkout, `/home/palantirkc/platforms/<repo>/<path>` | It can lag `origin/main` and hold someone's uncommitted edit | `git -C /home/palantirkc/platforms/<repo> show origin/main:<path>`, or a task worktree |
-| The store's objects of type `instruction_file`, `packet`, `report` and `task` | Index copies of files whose refresh stopped; their `fresh_until` has passed | The file itself, in Git or in the task directory |
+| The store's objects of the older generation (`ONTOLOGY-USE.md`) | Index copies of files whose refresh stopped | The file itself, in Git or in the task directory |
 | `text/` and `sources/` of `/home/palantirkc/external/reference-docs/` | The same text with other line numbers, and raw downloads | `docs/`, through the rows of `OFFICIAL-DOCS.md` section 4 |
-| A path an older file names that no longer exists | It was retired or archived (`/home/palantirkc/archive/INDEX.md`); an archive carries no current rule | The task's STATE |
+| A path an older file names that no longer exists | It was retired or archived (`/home/palantirkc/archive/INDEX.md`); an archive carries no current rule | `ap status --brief` in the task's directory |
 | Instructions in another CLI's home, or a skill copied instead of linked | A second copy drifts from its source | `/root/.agents/` |
 | A file that says it was generated | A snapshot of its source at one revision | The source it names |
 
@@ -55,57 +55,39 @@ The kinds of information, with a session's own record:
 | Kind | Who writes it | How to read it |
 | --- | --- | --- |
 | A session's conversation and a CLI's private memory | That CLI | Resume only the exact session you need. Never import another agent's transcript |
-| Short-term: the task's STATE, packets, the files STATE points to | The assigned owner, replacing old values | On entry, after a reset, at a handoff, and before an effect when it changed |
+| The state of the work: requests, intents, units, runs, findings (lessons among them), holds, principles, KPIs | The Lead, through `ap request`, `ap intent`, `ap unit` and `ont action apply` (`ONTOLOGY-USE.md`) | `ap status --brief`; on entry, after a reset and before an effect |
 | A rule or contract: source, schemas, tests, KPI definitions | The owner of the implementation, through review | Read the current revision. Do not rely on a remembered implementation |
-| Mid- and long-term: decisions with reasons, lessons, corrections, preferences, explained terms | The task owner, only with the task's authority, by the route of section 9 | Search and read as section 8 says; verify against current source and STATE |
-| An operational fact: deployed state, a KPI value, a domain record, an action and its result | The owner of the domain or the task; the Lead for the object types its STATE names in use in the Ontology store (`ONTOLOGY-USE.md`) | A fresh authorized read. Memory is only a pointer to it |
+| An operational fact: deployed state, a domain record, an action and its result | The owner of the domain | A fresh authorized read |
+| Narrative knowledge found by meaning | Nobody yet: section 8 | — |
 
 - A decision another agent needs must not stay only in one CLI's private memory.
-- Session transcripts are short-term. Automatic retention of whole sessions into Hindsight (`retainSessions` in the integration settings) stays off: retained transcripts carry dated status that later competes with corrections.
-- A KPI and its target are set by the Lead from the user's words and recorded in the task's strategy, or in the store's `kpi` object when the task's STATE names that object type in use, never in both; the user corrects them. A measured KPI value is an operational fact.
+- Session transcripts are short-term: a transcript carries dated status that later competes with corrections.
+- A KPI and its target are set by the Lead from the user's words and recorded as a `kpi` of the store, never in a second place; the user corrects them.
 
 ## 7. Which source answers a question
 
 | Question | Authority |
 | --- | --- |
-| What may I do now, and what is next? | The user's current instruction, `/root/.agents/AGENTS.md`, the task's STATE. Memory is history |
+| What may I do now, and what is next? | The user's current instruction, `/root/.agents/AGENTS.md`, `ap status --brief`. Memory is history |
 | What did the user decide, and why? | The dated source decision, newer corrections and the current task authority. A generated page is navigation |
 | What does the program implement? | Current source at a Git revision, compiler and runtime output, tests |
-| What does a KPI mean? | The definition in the owning repository or the task's strategy; the target in the task's strategy; the value as that definition computes it. When the task's STATE names the store's `kpi` object type in use, that object holds the task's definition, target and latest value (`ONTOLOGY-USE.md`). How a KPI, a metric or a guardrail is written as an intent's criterion: `/root/.agents/skills/lead/references/interview.md` section 3 |
-| What does a word in an instruction or in the user's message mean? | `ap status --term <word>` (`/root/.agents/AGENTS.md` section 3), then `GLOSSARY.md` |
+| What does a KPI mean? | The store's `kpi`: its definition, target and latest value (`ONTOLOGY-USE.md`); the value as that definition computes it. How a KPI, a metric or a guardrail is written as an intent's criterion: `/root/.agents/skills/lead/references/interview.md` section 3 |
+| What does a word in an instruction or in the user's message mean? | `ap status --term <word>` (`/root/.agents/AGENTS.md` section 3); a word the store has no entry for, the one file that needs it |
 | What does an operational object say now? | A fresh authorized domain read |
 | May a caller read, derive or act? | The domain's authenticated policy and the task grant. Neither memory nor a tag grants access |
 | Did an effect happen, and is a retry safe? | Reconciliation against the authoritative target. Neither prose nor a rollback settles it |
-| What was explained to the user? | Dated glossary evidence. An explanation does not show that the user mastered the term |
+| What was explained to the user? | The reading of the request that holds it (`ap request`). An explanation does not show that the user mastered the term |
 
 When memory and current source disagree, the source wins for current truth. Keep the dated history and write a scoped Correction; do not rewrite one store to match the other. Unknown or stale evidence stays labelled unknown or stale, even when a page reports `is_stale:false`.
 
-## 8. Reading memory
+## 8. Long-term memory
 
-- Long-term memory is off until it is rebuilt (`/root/.agents/AGENTS.md` section 6): call no memory tool and register no memory hook. When it returns, the route is the knowledge pages through the MCP server `hindsight`; search only when a decision needs it, never on every tool call, and read only the selected pages.
-- If the memory tool is unavailable or disabled for your task, say so and work from the task's files. Do not start a client or change global configuration to get it back.
+- What has a key, a state or an owner is an object of the store. What a query or a check can answer is stored nowhere else.
+- A later long-term memory holds only narrative knowledge found by meaning: how a kind of problem was solved, the tradecraft of a domain. Each record names the store objects it is about. A record is written only by a deliberate promotion from a closed finding or a closed task, never as a side effect. It holds no credential and nothing that goes stale.
+- Until the user deploys it, no memory tool is called (`/root/.agents/AGENTS.md` section 6).
+- The exception of 2026-11-06 for the Academy lesson archive is superseded by the user's word of 2026-11-24 (request `act-rq-6616f9477a559517d0349c4e22cb437d`): the teacher's dated statements and the source observations are objects of the store's Academy domain, and what that exception kept out (credentials, answer-key literals, parent contacts) stays out of them.
 
-## 9. Writing memory
+## 9. Lessons and Ontology
 
-- A skill or a visible tool is not a write grant. Writing needs the task's authority. A no-write task does not ingest, PATCH, refresh or delete.
-- Write nothing to Hindsight while it is off. The checked Git originals that were prepared for it are kept under the tag `memory-before-removal` of `agent-platform`; the rebuild starts from them.
-- Do not use MCP `ingest_document` or `capture_initiative`, direct retain/PATCH, generated pages or a copied STATE as the engineering write route. The publisher alone sends reviewed-main publication bytes and derived tags under its authorized maintenance window.
-- Corrections edit the same original through review; preserve Git history and pinned evidence. Retraction proves the listed reads before the owning PR removes the source; uncertain work keeps the route unavailable. No fallback to the mixed bank.
-- The separate private Academy archive keeps its owner and the exception below. This source change does not activate a route or release registration/content holds.
-
-## 10. Tags and derived pages
-
-- On retained older material keep the genuine `source:*`, `harness:*`, `project:*` and historical tags; never imitate a plugin's attribution.
-- A tag routes a topic. It is not privacy and not permission. A strict tagged scope can miss shared untagged observations.
-- A generated page is navigation. Never ingest one as new evidence, and do not assume a page exists: list the pages.
-
-## 11. What never goes to memory
-
-Write each fact once, at its owner. Do not retain in Hindsight: raw student, exam or lesson records; operational rows; action receipts or journals; KPI measurements or time series; full STATE copies; pane, model or quota assignments; CI logs; transcripts; copies of executable schemas; a second current-state table. Keep the detailed artifact at its owner and retain only a permitted locator or hash and a reusable lesson without student data. Never retain credentials. Never infer a user's ability or a broad permission.
-
-One exception, by the user's decision of 2026-11-06: the Academy lesson archive. The academy server removes old rows, so the designated lesson owner archives dated teacher statements and source observations in Hindsight under the `academy-practical-protocol` archive-writer contract. The locator is `education-platform` `docs/academy-lesson-archive.md`. The archive excludes credentials, answer-key literals and parent contact details. An archived observation is a dated snapshot, not live state: a fresh owner read replaces it only for the same fact and stage of the same occurrence while the server still shows the row, and an original source score does not reopen a later teacher-final completion.
-
-## 12. Lessons and Ontology
-
-- Lessons are promoted on independent occurrences of a verified mechanism, not on document count. A structural proposal goes to the Lead, who decides it as a `decision` in the store, and to the user; no memory write enacts architecture or policy.
-- `ontology-platform` owns source-qualified operational state, admission, named actions and recovery; Git owns engineering originals; Hindsight holds at most a retrieval copy of them. Boundary document: `ontology-platform` `docs/hindsight-boundary.md` at `origin/main`. There is no shared database, state replica or automatic promotion of prose into objects between them. Check what `ontology-platform` actually provides at its current revision before relying on it.
+- A lesson is a finding of kind `lesson` (`ONTOLOGY-USE.md` section 4), promoted on independent occurrences of a verified mechanism, not on document count. A structural proposal goes to the Lead and to the user; no memory write enacts architecture or policy.
+- `ontology-platform` owns source-qualified operational state, admission, named actions and recovery; Git owns engineering originals. There is no automatic promotion of prose into objects. Check what `ontology-platform` actually provides at its current revision before relying on it.

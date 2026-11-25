@@ -33,8 +33,7 @@ Fresh context or the same session:
 
 Memory for workers:
 - A stage of `ap run` loads no hook, and loads auto-memory only when its request sets `memory`.
-- A pane worker keeps its native Hindsight hooks and MCP server. When a task needs memory isolation (an evaluation, an independent review), run it in a directory covered by a `paths.<prefix>` override in the Hindsight integration settings, for example `/home/palantirkc/work/eval-isolated` with `{"disabled": true}`, and verify the override took effect. Adding an override changes host configuration and needs task authority.
-- If memory injected into a worker was irrelevant or misleading, record that as a finding (the action `open_finding`) and correct the page or the path override.
+- If memory injected into a worker was irrelevant or misleading, record that as a finding (the action `open_finding`) and correct the page.
 
 ## 3. When you receive work
 
