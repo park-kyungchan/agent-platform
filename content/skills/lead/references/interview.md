@@ -29,7 +29,7 @@ The interview holds no work: its message first says what you took the request to
 - A baseline is measured before any change, or written as unmeasured and measured first. A target has a reason (all, none, a limit the user named).
 - Each way a number could be raised by harming something else gets a guardrail criterion. A proxy says what it misses. A value only a worker's report supplies is not evidence.
 
-The card, in the form of skill `report`: the outcome, the criteria, what is not included, the defaults taken. The user's answer is recorded as a request routed to the intent; `confirm` names it in `by`.
+The card, in the form of skill `report`: the outcome, the criteria, what is not included, the defaults taken. The user's answer is recorded as a request routed to the intent; `confirm` names it in `by`. An answer to a stored question is written with `ap intent`, op `answer`, which keeps the confirmation; `amend` is for a change of the intent's substance and needs the user's confirmation again. A message about two intents is recorded once for each.
 
 ## 4. Assumed and delegated intents
 
@@ -63,7 +63,7 @@ It does not rest on the model: `add_unit` in the lane `objective` without an int
 | 지침, 인스트럭션 | The shared instructions; sometimes a skill or a page | Which file |
 | 런타임 레퍼런스, runtime-reference | `/root/.agents/runtime-references/` (plural) | — |
 | 스킬 | A skill under `/root/.agents/skills/`, or one a single CLI installed | A misspelled name means the nearest one |
-| 메모리 | STATE and its files ("단기"), long-term memory ("중장기"), or private memory ("CLI의 메모리") | Which of the three |
+| 메모리 | The store's objects ("단기" and "중장기" both), or a CLI's private memory | Which of the two |
 | 하인드사이트, HindSight | The long-term memory server and its MCP tools | — |
 | 온톨로지, Ontology | Palantir's sense: object types, links, actions in `ontology-platform` | Not a taxonomy |
 | REA, Ghidra Framework | The reverse-engineering tool at `/home/palantirkc/tools/rea`, Ghidra its backend | Static or dynamic; built? |
