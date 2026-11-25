@@ -228,11 +228,7 @@ pub fn judge(r: &Routing, live: &BTreeSet<String>, u: &Value) -> Result<(), Fail
         );
         let Some(at) = r.order.iter().position(|o| *o == p) else {
             let order: Vec<Value> = r.order.iter().map(pair_value).collect();
-            return Err(fail(
-                "tier_not_in_order",
-                field,
-                json!({"order": order}),
-            ));
+            return Err(fail("tier_not_in_order", field, json!({"order": order})));
         };
         if at < low {
             return Err(fail(

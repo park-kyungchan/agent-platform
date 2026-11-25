@@ -75,9 +75,11 @@ pub(super) fn pass(s: &mut impl System, argv: &[OsString]) -> Result<(Value, u8)
         let p = json!({"intent": intent, "since": since, "until": until, "by": "tier"});
         let answer = super::flow::flow(s, st, &p)?;
         for g in answer["groups"].as_array().into_iter().flatten() {
-            let (Some(runtime), Some(model), Some(kind)) =
-                (g["runtime"].as_str(), g["model"].as_str(), g["kind"].as_str())
-            else {
+            let (Some(runtime), Some(model), Some(kind)) = (
+                g["runtime"].as_str(),
+                g["model"].as_str(),
+                g["kind"].as_str(),
+            ) else {
                 continue;
             };
             let sum = sums

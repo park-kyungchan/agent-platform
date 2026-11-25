@@ -216,7 +216,10 @@ impl Fake {
             }
             "open_finding" | "see_finding_again" | "reopen_finding" | "close_finding" => {
                 // The pass claims `measure` as the agent `ap-measure` (specs/ap/roles.md R3).
-                assert_eq!((b["agent"].as_str(), b["role"].as_str()), (Some("ap-measure"), Some("measure")));
+                assert_eq!(
+                    (b["agent"].as_str(), b["role"].as_str()),
+                    (Some("ap-measure"), Some("measure"))
+                );
                 let key = p["finding"]["native_key"].as_str().unwrap().to_owned();
                 assert!(key.starts_with("routing-bar-"), "{key}");
                 if self.refuse.contains(&key) {
@@ -379,23 +382,37 @@ fn add_tier_below_map_names_the_rows_lowest_tier_by_kind_and_size() {
     );
     // Nothing applied, one search of findings and no function: the check costs one search.
     assert_eq!(f.names(), ["search finding"]);
-    assert_eq!(f.calls[0].1["where"]["all"], json!([{"eq": ["detector", "ap-routing"]}]));
+    assert_eq!(
+        f.calls[0].1["where"]["all"],
+        json!([{"eq": ["detector", "ap-routing"]}])
+    );
     // The verifier's tier, by the row `default` of a kind the map does not name.
     let e = op(&mut f, &["add"], unit("u-rust", "rust", HAIKU, HAIKU)).unwrap_err();
     assert_eq!(
         refusal(&e),
-        ("tier_below_map".into(), "verifier".into(), json!({"lowest": pair(SONNET)}))
+        (
+            "tier_below_map".into(),
+            "verifier".into(),
+            json!({"lowest": pair(SONNET)})
+        )
     );
     // Both fail: the implementer's is reported.
     let e = op(&mut f, &["add"], unit("u-both", "schema", HAIKU, HAIKU)).unwrap_err();
-    assert_eq!((e.field.as_str(), &e.detail), ("implementer", &json!({"lowest": pair(OPUS)})));
+    assert_eq!(
+        (e.field.as_str(), &e.detail),
+        ("implementer", &json!({"lowest": pair(OPUS)}))
+    );
     // The size: large from `large_lines` on.
     let mut large = unit("u-large", "rust", HAIKU, SONNET);
     large["estimate_lines"] = json!(400);
     let e = op(&mut f, &["add"], large.clone()).unwrap_err();
     assert_eq!(
         refusal(&e),
-        ("tier_below_map".into(), "implementer".into(), json!({"lowest": pair(SONNET)}))
+        (
+            "tier_below_map".into(),
+            "implementer".into(),
+            json!({"lowest": pair(SONNET)})
+        )
     );
     large["estimate_lines"] = json!(399);
     let a = op(&mut f, &["add"], large).unwrap();
@@ -403,7 +420,10 @@ fn add_tier_below_map_names_the_rows_lowest_tier_by_kind_and_size() {
     // At or above the row passes.
     let a = op(&mut f, &["add"], unit("u-ok", "schema", OPUS, OPUS)).unwrap();
     assert_eq!(a["outcome"], "applied");
-    assert!(!f.names().iter().any(|n| n == "log" || n == "render"), "no function is called");
+    assert!(
+        !f.names().iter().any(|n| n == "log" || n == "render"),
+        "no function is called"
+    );
 }
 
 // spec: specs/ap/routing.md#R1
@@ -416,9 +436,24 @@ fn add_tier_not_in_order_names_the_order() {
     let mut r = unit("u-codex", "rust", HAIKU, SONNET);
     r["implementer"] = json!({"runtime": "codex", "model": OPUS, "effort": "high"});
     let e = op(&mut f, &["add"], r).unwrap_err();
-    assert_eq!(refusal(&e), ("tier_not_in_order".into(), "implementer".into(), order.clone()));
-    let e = op(&mut f, &["add"], unit("u-other", "rust", HAIKU, "claude-other")).unwrap_err();
-    assert_eq!(refusal(&e), ("tier_not_in_order".into(), "verifier".into(), order));
+    assert_eq!(
+        refusal(&e),
+        (
+            "tier_not_in_order".into(),
+            "implementer".into(),
+            order.clone()
+        )
+    );
+    let e = op(
+        &mut f,
+        &["add"],
+        unit("u-other", "rust", HAIKU, "claude-other"),
+    )
+    .unwrap_err();
+    assert_eq!(
+        refusal(&e),
+        ("tier_not_in_order".into(), "verifier".into(), order)
+    );
     assert!(f.applies().is_empty());
 }
 
@@ -445,7 +480,10 @@ fn add_tier_over_bar_names_the_finding_and_the_lowest_tier_without_a_bar() {
     // A planned finding is a bar too; the lowest is the first pair from the row's on without one.
     f.finding(&bar_key("claude", HAIKU, "rust"), "planned");
     let e = op(&mut f, &["add"], unit("u4", "rust", HAIKU, SONNET)).unwrap_err();
-    assert_eq!(e.detail, json!({"finding": "routing-bar-claude-claude-haiku-5-5-rust", "lowest": pair(OPUS)}));
+    assert_eq!(
+        e.detail,
+        json!({"finding": "routing-bar-claude-claude-haiku-5-5-rust", "lowest": pair(OPUS)})
+    );
     f.finding(&bar_key("claude", OPUS, "rust"), "open");
     let e = op(&mut f, &["add"], unit("u5", "rust", OPUS, SONNET)).unwrap_err();
     assert_eq!(e.detail["lowest"], Value::Null);
@@ -455,7 +493,9 @@ fn add_tier_over_bar_names_the_finding_and_the_lowest_tier_without_a_bar() {
     f.finding(&bar_key("claude", OPUS, "rust"), "closed");
     op(&mut f, &["add"], unit("u7", "rust", OPUS, SONNET)).unwrap();
     f.finding(&bar_key("claude", OPUS, "rust"), "open");
-    f.objects.get_mut(&("finding".into(), bar_key("claude", OPUS, "rust"))).unwrap()["detector"] = json!("watch:x");
+    f.objects
+        .get_mut(&("finding".into(), bar_key("claude", OPUS, "rust")))
+        .unwrap()["detector"] = json!("watch:x");
     op(&mut f, &["add"], unit("u8", "rust", OPUS, SONNET)).unwrap();
     // A search that fails refuses the op, nothing applied.
     f.fail_search = true;
@@ -475,7 +515,14 @@ fn amend_tests_the_unit_as_the_amendment_leaves_it() {
     f.policy(map());
     let notes = json!({"request_id": "m1", "agent": "lead", "session": "s-lead", "unit": "u-old", "notes": "More."});
     let e = op(&mut f, &["amend"], notes).unwrap_err();
-    assert_eq!(refusal(&e), ("tier_below_map".into(), "implementer".into(), json!({"lowest": pair(OPUS)})));
+    assert_eq!(
+        refusal(&e),
+        (
+            "tier_below_map".into(),
+            "implementer".into(),
+            json!({"lowest": pair(OPUS)})
+        )
+    );
     let tiers = json!({"request_id": "m2", "agent": "lead", "session": "s-lead", "unit": "u-old",
         "implementer": tier(OPUS), "verifier": tier(OPUS)});
     let a = op(&mut f, &["amend"], tiers).unwrap();
@@ -497,19 +544,33 @@ fn without_the_routing_member_nothing_is_refused_or_searched() {
     // A file without the member.
     f.policy(Value::Null);
     op(&mut f, &["add"], unit("u2", "schema", HAIKU, HAIKU)).unwrap();
-    assert!(!f.names().iter().any(|n| n.starts_with("search")), "{:?}", f.names());
+    assert!(
+        !f.names().iter().any(|n| n.starts_with("search")),
+        "{:?}",
+        f.names()
+    );
     // With the member, a unit without a kind is not checked and searches nothing.
     f.policy(map());
     op(&mut f, &["add"], unit("u3", "", HAIKU, HAIKU)).unwrap();
-    assert!(!f.names().iter().any(|n| n.starts_with("search")), "{:?}", f.names());
+    assert!(
+        !f.names().iter().any(|n| n.starts_with("search")),
+        "{:?}",
+        f.names()
+    );
     // A policy file that cannot be read as one object is refused before the apply.
     f.raw_policy(b"{not json");
     let e = op(&mut f, &["add"], unit("u4", "schema", OPUS, OPUS)).unwrap_err();
-    assert_eq!((e.code.as_str(), e.field.as_str()), ("policy_invalid", "policy"));
+    assert_eq!(
+        (e.code.as_str(), e.field.as_str()),
+        ("policy_invalid", "policy")
+    );
     // A member of another form too.
     f.policy(json!({"order": []}));
     let e = op(&mut f, &["add"], unit("u5", "schema", OPUS, OPUS)).unwrap_err();
-    assert_eq!((e.code.as_str(), e.field.as_str()), ("policy_invalid", "policy"));
+    assert_eq!(
+        (e.code.as_str(), e.field.as_str()),
+        ("policy_invalid", "policy")
+    );
     assert!(f.obj("unit", "u3").is_object());
     assert!(!f.objects.contains_key(&("unit".into(), "u4".into())));
 }
@@ -518,17 +579,38 @@ fn without_the_routing_member_nothing_is_refused_or_searched() {
 // spec: specs/ap/routing.md#R8
 #[test]
 fn judge_and_the_wait_texts_of_the_dispatch_pass() {
-    let r = routing::routing(&json!({"routing": map()})).unwrap().unwrap();
+    let r = routing::routing(&json!({"routing": map()}))
+        .unwrap()
+        .unwrap();
     let live = [bar_key("claude", HAIKU, "rust")].into_iter().collect();
     let u = |kind: &str, i: &str, v: &str| json!({"kind": kind, "implementer": tier(i), "verifier": tier(v)});
-    let text = |u: Value| routing::judge(&r, &live, &u).err().map(|e| routing::wait_text(&e));
-    assert_eq!(text(u("rust", HAIKU, SONNET)), Some("tier over bar: routing-bar-claude-claude-haiku-5-5-rust".into()));
-    assert_eq!(text(u("schema", SONNET, OPUS)), Some("tier below map".into()));
-    assert_eq!(text(u("rust", "other", SONNET)), Some("tier not in order".into()));
+    let text = |u: Value| {
+        routing::judge(&r, &live, &u)
+            .err()
+            .map(|e| routing::wait_text(&e))
+    };
+    assert_eq!(
+        text(u("rust", HAIKU, SONNET)),
+        Some("tier over bar: routing-bar-claude-claude-haiku-5-5-rust".into())
+    );
+    assert_eq!(
+        text(u("schema", SONNET, OPUS)),
+        Some("tier below map".into())
+    );
+    assert_eq!(
+        text(u("rust", "other", SONNET)),
+        Some("tier not in order".into())
+    );
     assert_eq!(text(u("rust", SONNET, SONNET)), None);
     // Without a kind or a tier, nothing is tested.
-    assert_eq!(text(json!({"implementer": tier("other"), "verifier": tier("other")})), None);
-    assert_eq!(text(json!({"kind": "rust", "implementer": tier("other")})), None);
+    assert_eq!(
+        text(json!({"implementer": tier("other"), "verifier": tier("other")})),
+        None
+    );
+    assert_eq!(
+        text(json!({"kind": "rust", "implementer": tier("other")})),
+        None
+    );
     assert!(routing::routing(&json!({})).unwrap().is_none());
 }
 
@@ -643,32 +725,76 @@ fn routing_pass_opens_sees_reopens_and_closes_the_bars_of_the_window() {
     // The opened finding: detector, kind, severity, and an evidence with the rate, the two counts and the window.
     let opened = f.obj("finding", &haiku_schema).clone();
     assert_eq!(
-        (opened["detector"].as_str(), opened["kind"].as_str(), opened["severity"].as_str(), opened["state"].as_str()),
-        (Some("ap-routing"), Some("incident"), Some("act"), Some("open"))
+        (
+            opened["detector"].as_str(),
+            opened["kind"].as_str(),
+            opened["severity"].as_str(),
+            opened["state"].as_str()
+        ),
+        (
+            Some("ap-routing"),
+            Some("incident"),
+            Some("act"),
+            Some("open")
+        )
     );
     let evidence = opened["evidence"].as_str().unwrap();
-    for part in ["0.667", "2 stopped or repaired of 3 merged", "2026-11-16..2026-11-22"] {
+    for part in [
+        "0.667",
+        "2 stopped or repaired of 3 merged",
+        "2026-11-16..2026-11-22",
+    ] {
         assert!(evidence.contains(part), "{evidence}");
     }
-    let reason = f.obj("finding", &bar_key("claude", SONNET, "rust"))["reason"].as_str().unwrap().to_owned();
-    for part in ["0.250", "1 stopped or repaired of 4 merged", "2026-11-16..2026-11-22"] {
+    let reason = f.obj("finding", &bar_key("claude", SONNET, "rust"))["reason"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+    for part in [
+        "0.250",
+        "1 stopped or repaired of 4 merged",
+        "2026-11-16..2026-11-22",
+    ] {
         assert!(reason.contains(part), "{reason}");
     }
-    assert_eq!(f.obj("finding", &bar_key("claude", HAIKU, "config"))["state"], "dismissed");
-    assert!(!f.objects.contains_key(&("finding".into(), bar_key("claude", HAIKU, "import"))));
+    assert_eq!(
+        f.obj("finding", &bar_key("claude", HAIKU, "config"))["state"],
+        "dismissed"
+    );
+    assert!(
+        !f.objects
+            .contains_key(&("finding".into(), bar_key("claude", HAIKU, "import")))
+    );
     // Only the four actions, only to keys of the routing bars; the request ids are fixed by day, action and tier.
     let applies = f.applies();
     assert_eq!(applies.len(), 5);
     for (action, rid, p) in &applies {
-        assert!(["open_finding", "see_finding_again", "reopen_finding", "close_finding"].contains(&action.as_str()));
-        assert!(p["finding"]["native_key"].as_str().unwrap().starts_with("routing-bar-"));
+        assert!(
+            [
+                "open_finding",
+                "see_finding_again",
+                "reopen_finding",
+                "close_finding"
+            ]
+            .contains(&action.as_str())
+        );
+        assert!(
+            p["finding"]["native_key"]
+                .as_str()
+                .unwrap()
+                .starts_with("routing-bar-")
+        );
         assert!(rid.starts_with("routing-20261123-"), "{rid}");
     }
     // One search of findings, one of intents, and flow by tier once for each confirmed intent.
     let names = f.names();
     assert_eq!(names.iter().filter(|n| *n == "search finding").count(), 1);
     assert_eq!(names.iter().filter(|n| *n == "search intent").count(), 1);
-    let merges = f.calls.iter().filter(|(a, b)| a[0] == "log" && b["action_type"] == "merge_unit").count();
+    let merges = f
+        .calls
+        .iter()
+        .filter(|(a, b)| a[0] == "log" && b["action_type"] == "merge_unit")
+        .count();
     assert_eq!(merges, 2);
 
     // A second pass of the day repeats no action: what it already did is unchanged, the newly open are seen.
@@ -678,7 +804,9 @@ fn routing_pass_opens_sees_reopens_and_closes_the_bars_of_the_window() {
     assert_eq!(again["closed"], json!([]));
     assert_eq!(again["unchanged"], 1, "{again}");
     // The Lead dismisses a bar: the pass leaves it for good.
-    f.objects.get_mut(&("finding".into(), haiku_schema.clone())).unwrap()["state"] = json!("dismissed");
+    f.objects
+        .get_mut(&("finding".into(), haiku_schema.clone()))
+        .unwrap()["state"] = json!("dismissed");
     f.wall += 86_400;
     let (later, _) = pass(&mut f, &["--store", "/scratch/store.sqlite"]);
     assert!(!later.to_string().contains(&haiku_schema), "{later}");
@@ -692,7 +820,13 @@ fn routing_pass_without_the_member_reads_nothing_and_counts_a_refused_apply() {
     bar_store(&mut f);
     f.policy(Value::Null);
     let (line, status) = pass(&mut f, &[]);
-    assert_eq!((status, line), (0, json!({"at": "2026-11-23T00:20:00Z", "day": "2026-11-23", "skipped": "no routing"})));
+    assert_eq!(
+        (status, line),
+        (
+            0,
+            json!({"at": "2026-11-23T00:20:00Z", "day": "2026-11-23", "skipped": "no routing"})
+        )
+    );
     f.policy = None;
     let (line, _) = pass(&mut f, &[]);
     assert_eq!(line["skipped"], "no routing");
@@ -703,9 +837,16 @@ fn routing_pass_without_the_member_reads_nothing_and_counts_a_refused_apply() {
         (&["--day", "2026-02-30"][..], "invalid_input", "day"),
         (&["--store", "relative"][..], "invalid_input", "store"),
         (&["--when"][..], "usage", "args"),
-        (&["--day", "2026-11-20", "--day", "2026-11-20"][..], "usage", "args"),
+        (
+            &["--day", "2026-11-20", "--day", "2026-11-20"][..],
+            "usage",
+            "args",
+        ),
     ] {
-        let argv: Vec<OsString> = std::iter::once("routing").chain(args.iter().copied()).map(OsString::from).collect();
+        let argv: Vec<OsString> = std::iter::once("routing")
+            .chain(args.iter().copied())
+            .map(OsString::from)
+            .collect();
         let e = measure::run(&mut f, &argv).unwrap_err();
         assert_eq!((e.code, e.field.as_str()), (code, field), "{args:?}");
         assert_eq!(measure::exit_of(&e), 2);
@@ -738,7 +879,10 @@ fn routing_pass_without_the_member_reads_nothing_and_counts_a_refused_apply() {
 #[test]
 fn routing_pass_runs_third_in_the_nightly_service() {
     let service = include_str!("../../../deploy/ap-measure.service");
-    let steps: Vec<&str> = service.lines().filter(|l| l.starts_with("ExecStart=")).collect();
+    let steps: Vec<&str> = service
+        .lines()
+        .filter(|l| l.starts_with("ExecStart="))
+        .collect();
     assert_eq!(
         steps,
         [
@@ -748,5 +892,7 @@ fn routing_pass_runs_third_in_the_nightly_service() {
         ]
     );
     // The help names the pass.
-    assert!(measure::HELP.contains("Usage: ap measure routing [--day <YYYY-MM-DD>] [--store <path>]"));
+    assert!(
+        measure::HELP.contains("Usage: ap measure routing [--day <YYYY-MM-DD>] [--store <path>]")
+    );
 }

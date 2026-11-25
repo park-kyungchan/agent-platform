@@ -2343,8 +2343,10 @@ fn finding_searches(w: &W) -> usize {
 impl W {
     /// The ready units of the routing trial: one held by a bar, one under the map, one off the order, two free.
     fn routing_trial(&mut self, routing: Value) {
-        self.policy_with(json!({"work": {"prefix": PREFIX, "slice": SLICE, "slots": 16},
-            "models": {"allowed": ["opus", "haiku", "sonnet"], "never": []}, "routing": routing}));
+        self.policy_with(
+            json!({"work": {"prefix": PREFIX, "slice": SLICE, "slots": 16},
+            "models": {"allowed": ["opus", "haiku", "sonnet"], "never": []}, "routing": routing}),
+        );
         let tier = |m: &str| json!({"runtime": "claude", "model": m, "effort": "high"});
         self.ready("barred", &["b/**"], 1);
         self.set("barred", json!({"kind": "rust"}));
@@ -2354,7 +2356,10 @@ impl W {
             json!({"kind": "schema", "implementer": tier("haiku"), "verifier": tier("haiku")}),
         );
         self.ready("stranger", &["s/**"], 3);
-        self.set("stranger", json!({"kind": "rust", "implementer": tier("sonnet")}));
+        self.set(
+            "stranger",
+            json!({"kind": "rust", "implementer": tier("sonnet")}),
+        );
         self.ready("free", &["f/**"], 4);
         self.set("free", json!({"kind": "script"}));
         self.ready("plain", &["p/**"], 5);
@@ -2384,7 +2389,11 @@ fn r27_pass_holds_tier_over_bar_below_map_and_not_in_order() {
     // One search of findings a pass, and no function.
     assert_eq!(finding_searches(&w), 1);
     let calls = w.calls.borrow().clone();
-    assert!(calls.iter().all(|c| c.0 != "ont" || (c.1[0] != "fn" && c.1[0] != "log")));
+    assert!(
+        calls
+            .iter()
+            .all(|c| c.0 != "ont" || (c.1[0] != "fn" && c.1[0] != "log"))
+    );
     // The Lead closes the bar: the next pass starts the unit.
     w.others.insert(
         ("finding".into(), "routing-bar-claude-opus-rust".into()),
