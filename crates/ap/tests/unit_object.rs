@@ -877,7 +877,8 @@ fn r1_the_five_words_and_their_arguments() {
         .lines()
         .find(|l| l.trim_start().starts_with("unit: "))
         .unwrap();
-    assert!(line.contains("unit [<page>] < request.json") && line.contains("unit page <key>"));
+    assert!(line.contains("unit < request.json |") && line.contains("unit page <key>"));
+    assert!(!line.contains("<page>"), "{line}");
 }
 
 // spec: specs/ap/unit.md#R2
