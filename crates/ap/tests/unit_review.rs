@@ -3419,15 +3419,24 @@ fn r26_a_design_unreadable_refuses_the_look_before_anything_is_applied() {
             "{name}"
         );
         assert_eq!(e.intent.as_deref(), Some("widgets"));
-        let actions = f.calls.iter().filter(|c| c.0 == "ont" && c.1[0] == "action");
+        let actions = f
+            .calls
+            .iter()
+            .filter(|c| c.0 == "ont" && c.1[0] == "action");
         assert_eq!(actions.count(), 0, "{name}");
         assert_eq!(f.launches, 0);
-        let prompts = std::fs::read_dir(f.dir().join("prompts")).into_iter().flatten();
+        let prompts = std::fs::read_dir(f.dir().join("prompts"))
+            .into_iter()
+            .flatten();
         assert_eq!(prompts.count(), 0, "{name}");
     }
     // At most 60,000 bytes is read.
     std::fs::write(f.t.join("design/FULL.md"), "y".repeat(60_000)).unwrap();
-    f.modify("intent", "widgets", json!({"design": f.p("design/FULL.md")}));
+    f.modify(
+        "intent",
+        "widgets",
+        json!({"design": f.p("design/FULL.md")}),
+    );
     let (v, status) = f.ok(&f.req("intent", "widgets"));
     assert_eq!((status, &v["verdict"]), (0, &json!("accept")), "{v}");
 }
@@ -3460,7 +3469,10 @@ fn r25_marks_on_accept_name_every_block_read_and_the_design_record() {
             body["parameters"],
             json!({"unit": oid("unit", key), "review": oid("review", review), "digest": sha(block.as_bytes())})
         );
-        assert_eq!(f.get("unit", key)["plan_reviewed"], json!(sha(block.as_bytes())));
+        assert_eq!(
+            f.get("unit", key)["plan_reviewed"],
+            json!(sha(block.as_bytes()))
+        );
     }
     let [design] = &f.bodies("apply", "mark_design_reviewed")[..] else {
         panic!("one mark of the design record")
@@ -3476,10 +3488,18 @@ fn r25_marks_on_accept_name_every_block_read_and_the_design_record() {
     );
     // The marks come after the close.
     let actions = f.actions();
-    let closed = actions.iter().position(|a| a == "close_unit_review").unwrap();
+    let closed = actions
+        .iter()
+        .position(|a| a == "close_unit_review")
+        .unwrap();
     assert!(actions[closed + 1..].iter().all(|a| a.starts_with("mark_")));
     // A repair marks nothing and answers without the member.
-    let count = |f: &F| f.actions().iter().filter(|a| a.starts_with("mark_")).count();
+    let count = |f: &F| {
+        f.actions()
+            .iter()
+            .filter(|a| a.starts_with("mark_"))
+            .count()
+    };
     let before = count(&f);
     f.answer("verdict", Some("repair"));
     let (v, status) = f.ok(&f.req("intent", "widgets"));
@@ -3510,12 +3530,27 @@ fn r25_marks_on_accept_name_every_block_read_and_the_design_record() {
 // spec: specs/ap/unit-review.md#R27
 #[test]
 fn r27_the_plan_frame_judges_the_units_against_a_design_record() {
-    assert!(PLAN_REVIEWER.contains("When the plan holds a `## Design record`, judge the units against its decisions"));
-    assert!(PLAN_REVIEWER.contains("contradicts a decision of the record is a blocking finding of the kind `conflict`"));
-    assert!(PLAN_REVIEWER.contains("the record does not defer is one of the kind `unreached_criterion`"));
+    assert!(PLAN_REVIEWER.contains(
+        "When the plan holds a `## Design record`, judge the units against its decisions"
+    ));
+    assert!(PLAN_REVIEWER.contains(
+        "contradicts a decision of the record is a blocking finding of the kind `conflict`"
+    ));
+    assert!(
+        PLAN_REVIEWER
+            .contains("the record does not defer is one of the kind `unreached_criterion`")
+    );
     // The list of kinds is the one of R24.
-    for kind in ["unreached_criterion", "dependency", "conflict", "unguarded_effect"] {
-        assert!(PLAN_REVIEWER.contains(&format!("`blocking {kind}:`")), "{kind}");
+    for kind in [
+        "unreached_criterion",
+        "dependency",
+        "conflict",
+        "unguarded_effect",
+    ] {
+        assert!(
+            PLAN_REVIEWER.contains(&format!("`blocking {kind}:`")),
+            "{kind}"
+        );
     }
     assert_eq!(PLAN_REVIEWER.matches("`blocking ").count(), 5);
 }

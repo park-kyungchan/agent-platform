@@ -123,9 +123,9 @@ fn questions(q: &Value) -> Result<Value, Failure> {
 }
 /// The path of a design record (R25): absolute, 1 to 300 bytes, no component `..`. The file is not read.
 fn design(r: &Value) -> Result<&str, Failure> {
-    let path = r["design"].as_str().filter(|p| {
-        p.starts_with('/') && p.len() <= 300 && !p.split('/').any(|c| c == "..")
-    });
+    let path = r["design"]
+        .as_str()
+        .filter(|p| p.starts_with('/') && p.len() <= 300 && !p.split('/').any(|c| c == ".."));
     path.ok_or_else(|| bad("design"))
 }
 /// The substance of `draft` (`required`) or `amend` into the parameters `p`.

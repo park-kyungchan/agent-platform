@@ -1338,7 +1338,9 @@ fn ready(
 /// A draft unit of the lane `objective` whose intent names a design record: the record's bytes as read now have
 /// the digest the intent's last accepting plan review marked, else `design_not_reviewed` (R53).
 fn design_reviewed(s: &mut impl System, store: Option<&str>, u: &Value) -> Result<(), Failure> {
-    let intent = u["intent"]["native_key"].as_str().filter(|_| u["lane"] == "objective");
+    let intent = u["intent"]["native_key"]
+        .as_str()
+        .filter(|_| u["lane"] == "objective");
     let Some(intent) = intent else {
         return Ok(());
     };
@@ -1347,7 +1349,9 @@ fn design_reviewed(s: &mut impl System, store: Option<&str>, u: &Value) -> Resul
         return Ok(());
     };
     let reviewed = read.as_ref().and_then(|i| i["plan_design"].as_str());
-    let now = design_record(path).ok().map(|r| crate::host::digest(r.as_bytes()));
+    let now = design_record(path)
+        .ok()
+        .map(|r| crate::host::digest(r.as_bytes()));
     match (now, reviewed) {
         (Some(now), Some(reviewed)) if now == reviewed => Ok(()),
         _ => Err(fail(

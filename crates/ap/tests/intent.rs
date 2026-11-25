@@ -2171,7 +2171,12 @@ fn r25_a_design_named_by_its_absolute_path_keeps_the_intent_and_reads_no_file() 
     // The file does not exist: the op reads none. The status, the amendment and the confirmation stay.
     let after = f.o("widget-report");
     assert_eq!(after["design"], design);
-    for k in ["status", "amended_at", "confirmed_by", "confirmed_delegated"] {
+    for k in [
+        "status",
+        "amended_at",
+        "confirmed_by",
+        "confirmed_delegated",
+    ] {
         assert_eq!(after[k], before[k], "{k}");
     }
     // A path that is not absolute, has a component `..`, is longer than 300 bytes, is empty or is no string.
@@ -2212,7 +2217,10 @@ fn r25_a_design_named_by_its_absolute_path_keeps_the_intent_and_reads_no_file() 
     );
     let text = text_of(&shown);
     assert!(text.contains(&format!("design: {design}\n")), "{text}");
-    assert!(text.contains(&format!("plan design: {}\n", "a".repeat(64))), "{text}");
+    assert!(
+        text.contains(&format!("plan design: {}\n", "a".repeat(64))),
+        "{text}"
+    );
     // A retired intent is the store's to refuse, with the code of the other intent actions.
     run(
         &mut f,

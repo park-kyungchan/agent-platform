@@ -5107,7 +5107,10 @@ fn r52_add_sends_the_plan_digest_and_an_amendment_of_no_plan_field_keeps_it_plan
     {
         f.forget("unit", "u-plan", "plan_digest");
         f.calls.clear();
-        let r = with(writer(&format!("m3-{n}")), with(json!({"unit": "u-plan"}), member));
+        let r = with(
+            writer(&format!("m3-{n}")),
+            with(json!({"unit": "u-plan"}), member),
+        );
         yes(&mut f, &["amend"], r);
         let sent = f.applies()[0]["parameters"]["plan_digest"].clone();
         assert_eq!(sent, json!(plan_digest("u-plan", f.unit("u-plan"))));
@@ -5152,7 +5155,10 @@ fn r54_a_plan_block_changed_since_its_mark_is_refused_plan_not_reviewed() {
     .into_iter()
     .enumerate()
     {
-        let r = with(writer(&format!("m2-{n}")), with(json!({"unit": "u-mark"}), member));
+        let r = with(
+            writer(&format!("m2-{n}")),
+            with(json!({"unit": "u-mark"}), member),
+        );
         yes(&mut f, &["amend"], r);
         let u = f.unit("u-mark");
         assert_eq!(u["state"], "draft");
