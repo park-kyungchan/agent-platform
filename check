@@ -5,12 +5,18 @@
 # when the file system has less than 10,240 MiB free.
 #   ./check          everything
 #   ./check content  only the steps that need no Rust build (a change of content/ or documents)
+#   ./check lint     the content steps, then rustfmt and clippy (the CI job `lint`)
+#   ./check test     everything of ./check but the content steps, rustfmt and clippy (the CI job `test`)
 set -euo pipefail
 self=$(realpath "$0")
 cd "$(dirname "$self")"
 mode=${1:-all}
-[ "$mode" = all ] || [ "$mode" = content ] || { echo "usage: ./check [content]" >&2; exit 2; }
+case "$mode" in
+  all|content|lint|test) ;;
+  *) echo "usage: ./check [all|content|lint|test]" >&2; exit 2 ;;
+esac
 
+if [ "$mode" != test ]; then
 python3 -I -B ci/check-content.py
 bash scripts/test-install-content.sh
 bash scripts/test-pc-pull.sh
@@ -27,6 +33,7 @@ for test in $(cd ci && printf '%s\n' test_*.py | LC_ALL=C sort); do
   case " $after_build " in *" $test "*) continue ;; esac
   python3 -I -B -m unittest discover -s ci -p "$test"
 done
+fi
 if [ "$mode" = content ]; then echo "check: ok (content)"; exit 0; fi
 
 if [ "${CI:-}" != true ] && [ -z "${CHECK_LOCKED:-}" ]; then
@@ -52,9 +59,12 @@ ont_bin=$(bash ci/engine-pin.sh "$pin")
 # (crates/ap/build.rs), so every step of the check uses the one.
 export ONT_BIN="$ont_bin"
 
-bash scripts/test-install-ap.sh
-cargo fmt --all -- --check
-CARGO_BUILD_WARNINGS=deny cargo clippy --workspace --all-targets --locked
+if [ "$mode" != lint ]; then bash scripts/test-install-ap.sh; fi
+if [ "$mode" != test ]; then
+  cargo fmt --all -- --check
+  CARGO_BUILD_WARNINGS=deny cargo clippy --workspace --all-targets --locked
+fi
+if [ "$mode" = lint ]; then echo "check: ok (lint)"; exit 0; fi
 # The review tests need a private root that this check creates and removes.
 AP_S03_TEST_ROOT=$(mktemp -d "$PWD/.ap-rust-test.XXXXXXXX")
 export AP_S03_TEST_ROOT
@@ -112,4 +122,5 @@ if [ "${CI:-}" = true ] && { [ -e /home/palantirkc/work ] || [ -L /home/palantir
   echo "work_directory_exists@check: /home/palantirkc/work was made during the check" >&2
   exit 1
 fi
+if [ "$mode" = test ]; then echo "check: ok (test)"; exit 0; fi
 echo "check: ok"
