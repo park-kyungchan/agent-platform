@@ -12,7 +12,7 @@
 use ap::{
     host::{Answer, Failure, Host, Reply, System},
     unit::object::{Refusal, arguments, branch_ok, execute},
-    unit::render::{page_digest, page_part},
+    unit::render::{page_digest, page_part, plan_block, plan_digest},
 };
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
@@ -375,16 +375,20 @@ impl F {
                     p.get("intent").is_none_or(|i| *i == u("intent")),
                     "intent_differs",
                 );
-                // Version 16: a plan review counts only when it started after the unit was added.
+                // Version 16: a plan review counts only when it started after the unit was added; version 27:
+                // a unit with plan_digest needs plan_reviewed equal to it.
                 let added = u("added_at");
-                let plan = self.objects.iter().any(|((t, _), r)| {
-                    t == "review"
-                        && r["kind"] == "plan"
-                        && r["intent"] == u("intent")
-                        && r["status"] == "closed"
-                        && r["verdict"] == "accept"
-                        && r["started_at"].as_str() > added.as_str()
-                });
+                let plan = match u("plan_digest") {
+                    Value::Null => self.objects.iter().any(|((t, _), r)| {
+                        t == "review"
+                            && r["kind"] == "plan"
+                            && r["intent"] == u("intent")
+                            && r["status"] == "closed"
+                            && r["verdict"] == "accept"
+                            && r["started_at"].as_str() > added.as_str()
+                    }),
+                    digest => u("plan_reviewed") == digest,
+                };
                 need(!objective || plan, "plan_not_reviewed");
                 // Version 16: the digest given, when the unit stores one, is the stored one; an accepted page
                 // review whose head is the stored digest, whenever it started.
@@ -789,12 +793,18 @@ fn repo_unit(f: &mut F, r: &Repo, key: &str, checks: Value) {
 fn check(text: &str, kind: &str) -> Value {
     json!([{"check": text, "kind": kind}])
 }
+/// `ready` of a unit whose plan an accepting plan review marked, as `ap unit review` marks it (schema version 27).
 fn ready(f: &mut F, key: &str) -> Result<String, Box<Refusal>> {
-    call(
-        f,
-        &["ready"],
-        with(writer(&format!("r-{key}")), json!({"unit": key})),
-    )
+    if let Some(u) = f.objects.get_mut(&k("unit", key))
+        && u["plan_digest"].is_string()
+    {
+        u["plan_reviewed"] = u["plan_digest"].clone();
+    }
+    unmarked(f, key, &format!("r-{key}"))
+}
+/// `ready` with the request id `rid` as the store finds the unit: a plan review marks nothing here.
+fn unmarked(f: &mut F, key: &str, rid: &str) -> Result<String, Box<Refusal>> {
+    call(f, &["ready"], with(writer(rid), json!({"unit": key})))
 }
 
 // spec: specs/ap/unit.md#R1
@@ -1689,9 +1699,11 @@ fn r17_amend_takes_every_page_property_but_lane_intent_and_origin() {
     );
     let p = &f.applies()[0]["parameters"];
     let digest = page_digest("u-one", f.unit("u-one"));
+    // Schema version 27: the unit stores a plan digest, so the amendment sends it, unchanged (R52).
+    let plan = plan_digest("u-one", f.unit("u-one"));
     assert_eq!(
         p,
-        &json!({"unit": oid("unit", "u-one"), "notes": "Read the list.", "page_digest": digest})
+        &json!({"unit": oid("unit", "u-one"), "notes": "Read the list.", "page_digest": digest, "plan_digest": plan})
     );
     let v = yes(
         &mut f,
@@ -3889,7 +3901,8 @@ fn r44_a_stored_digest_that_is_not_the_page_s_refuses_ready_first() {
     f.calls.clear();
     let e = ready(&mut f, "u-one").unwrap_err();
     assert_eq!(e.code, "page_not_reviewed");
-    assert_eq!(&f.names()[..2], ["get unit", "render"]);
+    // The intent is read for its design record first (R53).
+    assert_eq!(&f.names()[..3], ["get unit", "get intent", "render"]);
     // The stored digest the page's: ready.
     f.modify("unit", "u-one", json!({"page_digest": digest}));
     let v: Value = serde_json::from_str(&ready(&mut f, "u-one").unwrap()).unwrap();
@@ -5008,8 +5021,9 @@ fn r51_ready_tier_over_bar_holds_a_draft_before_its_checks_run() {
             &None
         )
     );
-    // The unit read once, one search of findings, no check run and nothing applied.
-    assert_eq!(f.names(), ["get unit", "search"]);
+    // The unit read once, its intent for a design record (R53), one search of findings, no check run and nothing
+    // applied.
+    assert_eq!(f.names(), ["get unit", "get intent", "search"]);
     assert_eq!(f.unit("u-bar")["state"], "draft");
     // The Lead closes the bar: the unit is made ready, its checks run.
     f.put(
@@ -5046,5 +5060,204 @@ fn r51_ready_tier_over_bar_holds_a_draft_before_its_checks_run() {
             &json!({"lowest": ["claude", "big"]})
         )
     );
-    assert_eq!(f.names(), ["get unit", "search"]);
+    assert_eq!(f.names(), ["get unit", "get intent", "search"]);
+}
+
+// spec: specs/ap/unit.md#R52
+#[test]
+fn r52_add_sends_the_plan_digest_and_an_amendment_of_no_plan_field_keeps_it_plan_digest_kept() {
+    let mut f = F::new();
+    yes(&mut f, &["add"], added("u-plan"));
+    let stored = f.unit("u-plan").clone();
+    let digest = plan_digest("u-plan", &stored);
+    // The block: the heading line, the objective and the lines of the plan, without the tiers and the estimate.
+    assert_eq!(
+        plan_block("u-plan", &stored),
+        "### u-plan: plain, lane objective, no repository\n\nThe widget list holds every widget once.\nWrite set: src/list/**\n"
+    );
+    assert_eq!(
+        digest,
+        format!("{:x}", Sha256::digest(plan_block("u-plan", &stored)))
+    );
+    assert_eq!(f.applies()[0]["parameters"]["plan_digest"], json!(digest));
+    assert_eq!(stored["plan_digest"], json!(digest));
+    // The notes, the interface, the checks and the estimate are no field of the block: the digest is sent unchanged.
+    f.calls.clear();
+    let amend = json!({"unit": "u-plan", "notes": "Read the list.", "interface": "1. `list` prints.",
+        "estimate_lines": 90, "acceptance": [{"check": "test -f other.txt", "kind": "fails_on_base"}]});
+    yes(&mut f, &["amend"], with(writer("m1"), amend));
+    assert_eq!(f.applies()[0]["parameters"]["plan_digest"], json!(digest));
+    assert_eq!(f.unit("u-plan")["plan_digest"], json!(digest));
+    // A unit without a digest (added before schema version 27): an amendment of no field of the block sends none,
+    // and the unit keeps the rule without one.
+    f.forget("unit", "u-plan", "plan_digest");
+    f.calls.clear();
+    let notes = json!({"unit": "u-plan", "notes": "Read it twice."});
+    yes(&mut f, &["amend"], with(writer("m2"), notes));
+    assert!(f.applies()[0]["parameters"].get("plan_digest").is_none());
+    assert!(f.unit("u-plan").get("plan_digest").is_none());
+    // An amendment that gives a field of the block sends the digest of the unit as the apply leaves it.
+    for (n, member) in [
+        json!({"specs": ["specs/ap/unit.md#R52"]}),
+        json!({"class": "contract"}),
+        json!({"objective": "The widget list holds every widget once, sorted."}),
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        f.forget("unit", "u-plan", "plan_digest");
+        f.calls.clear();
+        let r = with(
+            writer(&format!("m3-{n}")),
+            with(json!({"unit": "u-plan"}), member),
+        );
+        yes(&mut f, &["amend"], r);
+        let sent = f.applies()[0]["parameters"]["plan_digest"].clone();
+        assert_eq!(sent, json!(plan_digest("u-plan", f.unit("u-plan"))));
+        assert_ne!(sent, json!(digest));
+    }
+}
+
+// spec: specs/ap/unit.md#R54
+#[test]
+fn r54_a_plan_block_changed_since_its_mark_is_refused_plan_not_reviewed() {
+    let mut f = F::new();
+    plain_unit(&mut f, "u-dep", check("test -f list.txt", "fails_on_base"));
+    plain_unit(&mut f, "u-mark", check("test -f list.txt", "fails_on_base"));
+    // A plan review that started after the unit was added does not count for a unit with a digest: the store's
+    // refusal is passed on.
+    f.put(
+        "review",
+        "plan-2",
+        json!({"kind": "plan", "intent": oid("intent", "widgets"), "status": "closed",
+            "verdict": "accept", "started_at": "2026-11-19T00:00:00Z", "head": "1".repeat(64)}),
+    );
+    let e = unmarked(&mut f, "u-mark", "r54-1").unwrap_err();
+    assert_eq!((e.code.as_str(), &e.after), ("plan_not_reviewed", &None));
+    // Marked with the digest of its block: ready.
+    let mark = |f: &mut F| {
+        let u = f.objects.get_mut(&k("unit", "u-mark")).unwrap();
+        u["plan_reviewed"] = u["plan_digest"].clone();
+    };
+    mark(&mut f);
+    let v: Value = serde_json::from_str(&unmarked(&mut f, "u-mark", "r54-2").unwrap()).unwrap();
+    assert_eq!(v["state"], "ready");
+    // An amendment of the notes keeps the mark: ready again.
+    let notes = json!({"unit": "u-mark", "notes": "Read the list."});
+    yes(&mut f, &["amend"], with(writer("m1"), notes));
+    let v: Value = serde_json::from_str(&unmarked(&mut f, "u-mark", "r54-3").unwrap()).unwrap();
+    assert_eq!(v["state"], "ready");
+    // The write set changed, then the dependencies: each change of the block is refused until a review marks it.
+    for (n, member) in [
+        json!({"write_set": ["src/list/**", "src/sort/**"]}),
+        json!({"depends_on": ["u-dep"]}),
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        let r = with(
+            writer(&format!("m2-{n}")),
+            with(json!({"unit": "u-mark"}), member),
+        );
+        yes(&mut f, &["amend"], r);
+        let u = f.unit("u-mark");
+        assert_eq!(u["state"], "draft");
+        assert_ne!(u["plan_digest"], u["plan_reviewed"]);
+        let e = unmarked(&mut f, "u-mark", "r54-4").unwrap_err();
+        assert_eq!((e.code.as_str(), &e.after), ("plan_not_reviewed", &None));
+        mark(&mut f);
+    }
+    // A unit without a digest keeps the rule of schema version 16: a plan review started after it was added.
+    f.forget("unit", "u-dep", "plan_digest");
+    let v: Value = serde_json::from_str(&unmarked(&mut f, "u-dep", "r54-5").unwrap()).unwrap();
+    assert_eq!(v["state"], "ready");
+}
+
+// spec: specs/ap/unit.md#R53
+#[test]
+fn r53_design_not_reviewed_refuses_ready_until_a_plan_review_read_the_record() {
+    let t = Tmp::new();
+    let design = t.at("DESIGN.md");
+    std::fs::write(&design, "# Design\n\nD1: one list.\n").unwrap();
+    let path = design.to_str().unwrap().to_owned();
+    let sha = |p: &Path| format!("{:x}", Sha256::digest(std::fs::read(p).unwrap()));
+    let mut f = F::new();
+    f.modify("intent", "widgets", json!({"design": path}));
+    for key in ["u-d1", "u-d2", "u-d3", "u-d4"] {
+        plain_unit(&mut f, key, check("test -f list.txt", "fails_on_base"));
+    }
+    // No plan review read the record: refused before the page check and the checks on the base, nothing applied.
+    f.calls.clear();
+    let e = ready(&mut f, "u-d1").unwrap_err();
+    assert_eq!(
+        (e.code.as_str(), e.field.as_str(), &e.detail, &e.after),
+        (
+            "design_not_reviewed",
+            "unit",
+            &json!({"design": path, "reviewed": null}),
+            &None
+        )
+    );
+    assert_eq!(f.names(), ["get unit", "get intent"]);
+    // The digest of the bytes the last accepting plan review read: ready.
+    let reviewed = sha(&design);
+    f.modify("intent", "widgets", json!({"plan_design": reviewed}));
+    let v: Value = serde_json::from_str(&ready(&mut f, "u-d1").unwrap()).unwrap();
+    assert_eq!(v["state"], "ready");
+    // The record changed since: refused with the digest reviewed.
+    std::fs::write(&design, "# Design\n\nD1: one list.\nD2: sorted.\n").unwrap();
+    let e = ready(&mut f, "u-d2").unwrap_err();
+    assert_eq!(
+        (e.code.as_str(), &e.detail),
+        (
+            "design_not_reviewed",
+            &json!({"design": path, "reviewed": reviewed})
+        )
+    );
+    // A record that cannot be read: absent, a link as its last component, too large, not UTF-8.
+    let link = t.at("LINK.md");
+    std::os::unix::fs::symlink(&design, &link).unwrap();
+    std::fs::write(t.at("LARGE.md"), "x".repeat(60_001)).unwrap();
+    std::fs::write(t.at("BYTES.md"), [0xff, 0xfe]).unwrap();
+    for name in ["ABSENT.md", "LINK.md", "LARGE.md", "BYTES.md"] {
+        let p = t.at(name).to_str().unwrap().to_owned();
+        let digest = match name {
+            "ABSENT.md" => reviewed.clone(),
+            _ => format!("{:x}", Sha256::digest(std::fs::read(t.at(name)).unwrap())),
+        };
+        f.modify(
+            "intent",
+            "widgets",
+            json!({"design": p, "plan_design": digest}),
+        );
+        let e = ready(&mut f, "u-d3").unwrap_err();
+        assert_eq!(
+            (e.code.as_str(), &e.detail),
+            (
+                "design_not_reviewed",
+                &json!({"design": p, "reviewed": digest})
+            ),
+            "{name}"
+        );
+    }
+    // The bytes of the record read now, of at most 60,000 bytes and through a link of a directory above: ready.
+    std::fs::write(t.at("FULL.md"), "y".repeat(60_000)).unwrap();
+    std::fs::create_dir(t.at("dir")).unwrap();
+    std::os::unix::fs::symlink(t.at("dir"), t.at("above")).unwrap();
+    std::fs::write(t.at("dir/DESIGN.md"), "D1.\n").unwrap();
+    for (key, p) in [("u-d3", t.at("FULL.md")), ("u-d4", t.at("above/DESIGN.md"))] {
+        let s = p.to_str().unwrap().to_owned();
+        f.modify(
+            "intent",
+            "widgets",
+            json!({"design": s, "plan_design": sha(&p)}),
+        );
+        let v: Value = serde_json::from_str(&ready(&mut f, key).unwrap()).unwrap();
+        assert_eq!(v["state"], "ready", "{key}");
+    }
+    // A unit that is not draft is answered as R20 says: the record is not read.
+    f.calls.clear();
+    let e = unmarked(&mut f, "u-d1", "r53-again").unwrap_err();
+    assert_eq!(e.code, "unit_not_draft");
+    assert!(!f.names().contains(&"get intent".to_owned()));
 }

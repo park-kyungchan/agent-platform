@@ -14,7 +14,7 @@
 )]
 use ap::host::{Answer, Failure, Host, Reply, System};
 use ap::unit::page_review::{Refusal, arguments, execute};
-use ap::unit::render::{Role, page, page_digest, page_part};
+use ap::unit::render::{Role, page, page_digest, page_part, plan_block};
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 use std::{
@@ -62,6 +62,9 @@ fn refused(code: &str, extra: Value) -> Value {
         v[k] = x.clone();
     }
     v
+}
+fn lost_answer() -> Answer {
+    lost()
 }
 fn lost() -> Answer {
     Err(Failure {
@@ -159,6 +162,8 @@ struct F {
     /// The answer of `/usr/bin/bwrap --version`, and how many times it was called.
     bwrap: bool,
     probes: usize,
+    /// The mark of this unit (or `design`) is lost on its way: the call gets no answer.
+    mark_fails: Option<&'static str>,
 }
 impl F {
     fn new() -> Self {
@@ -221,6 +226,7 @@ impl F {
             wraps: vec![],
             bwrap: true,
             probes: 0,
+            mark_fails: None,
         };
         f.write_policy(json!({}));
         f.put("task", "invented-task", json!({"status": "open"}));
@@ -680,6 +686,42 @@ impl F {
                 }
                 self.modify("unit", &key, json!({"state": "ready", "ready_at": now}));
                 json!([{"change": "update", "id": oid("unit", &key)}])
+            }
+            // Version 27: the marks of an accepted plan.
+            "mark_plan_reviewed" | "mark_design_reviewed" => {
+                let (kind, member, set) = match action.as_str() {
+                    "mark_plan_reviewed" => ("unit", "unit", "plan_reviewed"),
+                    _ => ("intent", "intent", "plan_design"),
+                };
+                let key = p[member]["native_key"].as_str().unwrap().to_owned();
+                let lost = match kind {
+                    "unit" => self.mark_fails == Some(key.as_str()),
+                    _ => self.mark_fails == Some("design"),
+                };
+                if lost {
+                    return lost_answer();
+                }
+                let r = self
+                    .objects
+                    .get(&k("review", p["review"]["native_key"].as_str().unwrap()))
+                    .cloned()
+                    .unwrap_or(Value::Null);
+                let mut failed = vec![];
+                if r["kind"] != "plan" || r["status"] != "closed" || r["verdict"] != "accept" {
+                    failed.push("review_not_accepting");
+                }
+                let own = match kind {
+                    "unit" => self.get("unit", &key)["intent"].clone(),
+                    _ => oid("intent", &key),
+                };
+                if r["intent"].is_null() || r["intent"] != own {
+                    failed.push("review_of_another_intent");
+                }
+                if !failed.is_empty() {
+                    return reply(false, &criteria(failed));
+                }
+                self.modify(kind, &key, json!({set: p["digest"]}));
+                json!([{"change": "update", "id": oid(kind, &key)}])
             }
             other => panic!("action {other}"),
         };
@@ -3299,4 +3341,216 @@ fn r4_the_next_accounts_of_reviews_or_the_request_stand_and_a_resume_has_none() 
     std::fs::write(f.t.join("bin/mode-a1"), "limit1").unwrap();
     let (v, _) = f.ok(&resume(&f, &first["review"]));
     assert_eq!((&v["verdict"], f.launches), (&json!("abandoned"), 2), "{v}");
+}
+
+/// The prompt of the review `v` answered.
+fn prompt_of(f: &F, v: &Value) -> String {
+    let review = f.get("review", v["review"].as_str().unwrap());
+    std::fs::read_to_string(review["prompt"].as_str().unwrap()).unwrap()
+}
+/// The plan part with the section of a design record at `path` holding `bytes` (R26).
+fn with_design(path: &str, bytes: &str) -> String {
+    let close = if bytes.ends_with('\n') { "" } else { "\n" };
+    let section = format!("\n## Design record\n\nPath: {path}\n-----\n{bytes}{close}-----\n");
+    PLAN_PART.replacen("\n## Units\n", &format!("{section}\n## Units\n"), 1)
+}
+
+// spec: specs/ap/unit-review.md#R26
+#[test]
+fn r26_the_design_record_in_plan_part_and_its_digest() {
+    let mut f = F::new();
+    plan_fixture(&mut f);
+    // A record without a final line feed, reached through a link of a directory above.
+    std::fs::create_dir(f.t.join("design")).unwrap();
+    symlink(f.t.join("design"), f.t.join("above")).unwrap();
+    let text = "# Design\n\nD1: every widget is listed once.";
+    std::fs::write(f.t.join("design/DESIGN.md"), text).unwrap();
+    let path = f.p("above/DESIGN.md");
+    f.modify("intent", "widgets", json!({"design": path}));
+    let (v, status) = f.ok(&f.req("intent", "widgets"));
+    assert_eq!((status, &v["verdict"]), (0, &json!("accept")), "{v}");
+    let prompt = prompt_of(&f, &v);
+    let (part, _) = prompt.split_once("\n## Repositories\n").unwrap();
+    assert_eq!(part, with_design(&path, text));
+    assert_eq!(v["digest"], json!(sha(part.as_bytes())));
+    // The record ends with a line feed: none is added. Its bytes are part of the digest.
+    let text = "# Design\n\nD1: every widget is listed once.\nD2: sorted by name.\n";
+    std::fs::write(f.t.join("design/DESIGN.md"), text).unwrap();
+    let (again, _) = f.ok(&f.req("intent", "widgets"));
+    let prompt = prompt_of(&f, &again);
+    let (part, _) = prompt.split_once("\n## Repositories\n").unwrap();
+    assert_eq!(part, with_design(&path, text));
+    assert_ne!(again["digest"], v["digest"]);
+    // The file is only read.
+    assert_eq!(
+        std::fs::read_to_string(f.t.join("design/DESIGN.md")).unwrap(),
+        text
+    );
+    // An intent without a design: the plan part of the base, byte for byte.
+    f.modify("intent", "widgets", json!({"design": null}));
+    let (bare, _) = f.ok(&f.req("intent", "widgets"));
+    assert!(prompt_of(&f, &bare).starts_with(&format!("{PLAN_PART}\n## Repositories\n")));
+}
+
+// spec: specs/ap/unit-review.md#R26
+#[test]
+fn r26_a_design_unreadable_refuses_the_look_before_anything_is_applied() {
+    let mut f = F::new();
+    plan_fixture(&mut f);
+    std::fs::create_dir(f.t.join("design")).unwrap();
+    std::fs::write(f.t.join("design/DESIGN.md"), "D1.\n").unwrap();
+    symlink(f.t.join("design/DESIGN.md"), f.t.join("design/LINK.md")).unwrap();
+    std::fs::write(f.t.join("design/LARGE.md"), "x".repeat(60_001)).unwrap();
+    std::fs::write(f.t.join("design/BYTES.md"), [b'D', 0xff, b'\n']).unwrap();
+    for (name, why) in [
+        ("ABSENT.md", "absent"),
+        ("", "not_a_file"),
+        ("LINK.md", "not_a_file"),
+        ("LARGE.md", "too_large"),
+        ("BYTES.md", "not_utf8"),
+    ] {
+        let path = f.p(&format!("design/{name}"));
+        f.modify("intent", "widgets", json!({"design": path}));
+        f.calls.clear();
+        let e = f.refusal(&f.req("intent", "widgets"));
+        assert_eq!(
+            (e.code.as_str(), e.field.as_str(), &e.detail, e.after),
+            ("design_unreadable", "intent", &json!(why), None),
+            "{name}"
+        );
+        assert_eq!(e.intent.as_deref(), Some("widgets"));
+        let actions = f
+            .calls
+            .iter()
+            .filter(|c| c.0 == "ont" && c.1[0] == "action");
+        assert_eq!(actions.count(), 0, "{name}");
+        assert_eq!(f.launches, 0);
+        let prompts = std::fs::read_dir(f.dir().join("prompts"))
+            .into_iter()
+            .flatten();
+        assert_eq!(prompts.count(), 0, "{name}");
+    }
+    // At most 60,000 bytes is read.
+    std::fs::write(f.t.join("design/FULL.md"), "y".repeat(60_000)).unwrap();
+    f.modify(
+        "intent",
+        "widgets",
+        json!({"design": f.p("design/FULL.md")}),
+    );
+    let (v, status) = f.ok(&f.req("intent", "widgets"));
+    assert_eq!((status, &v["verdict"]), (0, &json!("accept")), "{v}");
+}
+
+// spec: specs/ap/unit-review.md#R25
+#[test]
+fn r25_marks_on_accept_name_every_block_read_and_the_design_record() {
+    let mut f = F::new();
+    plan_fixture(&mut f);
+    let text = "D1: every widget is listed once.\n";
+    std::fs::write(f.t.join("DESIGN.md"), text).unwrap();
+    f.modify("intent", "widgets", json!({"design": f.p("DESIGN.md")}));
+    let r = f.req("intent", "widgets");
+    let rid = r["request_id"].as_str().unwrap().to_owned();
+    let (v, status) = f.ok(&r);
+    assert_eq!((status, &v["verdict"]), (0, &json!("accept")));
+    assert_eq!(v["marks"], json!({"applied": 6, "failed": []}));
+    let review = v["review"].as_str().unwrap();
+    // One mark per unit, in the order of the plan part, with the digest of the block the text held.
+    let prompt = prompt_of(&f, &v);
+    let marks = f.bodies("apply", "mark_plan_reviewed");
+    let order = ["a", "b", "g", "c", "d"];
+    assert_eq!(marks.len(), order.len());
+    for (n, (body, key)) in marks.iter().zip(order).enumerate() {
+        let block = plan_block(key, &f.get("unit", key));
+        assert!(prompt.contains(&format!("\n{block}")), "{key}");
+        assert_eq!(body["request_id"], json!(format!("{rid}-m{}", n + 1)));
+        assert_eq!(body["role"], "lead");
+        assert_eq!(
+            body["parameters"],
+            json!({"unit": oid("unit", key), "review": oid("review", review), "digest": sha(block.as_bytes())})
+        );
+        assert_eq!(
+            f.get("unit", key)["plan_reviewed"],
+            json!(sha(block.as_bytes()))
+        );
+    }
+    let [design] = &f.bodies("apply", "mark_design_reviewed")[..] else {
+        panic!("one mark of the design record")
+    };
+    assert_eq!(design["request_id"], json!(format!("{rid}-md")));
+    assert_eq!(
+        design["parameters"],
+        json!({"intent": oid("intent", "widgets"), "review": oid("review", review), "digest": sha(text.as_bytes())})
+    );
+    assert_eq!(
+        f.get("intent", "widgets")["plan_design"],
+        json!(sha(text.as_bytes()))
+    );
+    // The marks come after the close.
+    let actions = f.actions();
+    let closed = actions
+        .iter()
+        .position(|a| a == "close_unit_review")
+        .unwrap();
+    assert!(actions[closed + 1..].iter().all(|a| a.starts_with("mark_")));
+    // A repair marks nothing and answers without the member.
+    let count = |f: &F| {
+        f.actions()
+            .iter()
+            .filter(|a| a.starts_with("mark_"))
+            .count()
+    };
+    let before = count(&f);
+    f.answer("verdict", Some("repair"));
+    let (v, status) = f.ok(&f.req("intent", "widgets"));
+    assert_eq!((status, &v["verdict"]), (0, &json!("repair")));
+    assert!(v.get("marks").is_none());
+    assert_eq!(count(&f), before);
+    f.answer("verdict", None);
+    // A mark lost on its way is named; the verdict and the exit stay.
+    f.mark_fails = Some("b");
+    let (v, status) = f.ok(&f.req("intent", "widgets"));
+    assert_eq!((status, &v["verdict"]), (0, &json!("accept")));
+    assert_eq!(v["marks"], json!({"applied": 5, "failed": ["b"]}));
+    f.mark_fails = Some("design");
+    let (v, status) = f.ok(&f.req("intent", "widgets"));
+    assert_eq!((status, &v["verdict"]), (0, &json!("accept")));
+    assert_eq!(v["marks"], json!({"applied": 5, "failed": ["design"]}));
+    // An intent without a design: the units alone. A page review marks nothing.
+    f.mark_fails = None;
+    f.modify("intent", "widgets", json!({"design": null}));
+    let (v, _) = f.ok(&f.req("intent", "widgets"));
+    assert_eq!(v["marks"], json!({"applied": 5, "failed": []}));
+    let mut g = F::new();
+    let (v, _) = g.ok(&g.req("unit", "u1"));
+    assert_eq!(v["verdict"], "accept");
+    assert!(v.get("marks").is_none() && !g.actions().iter().any(|a| a.starts_with("mark_")));
+}
+
+// spec: specs/ap/unit-review.md#R27
+#[test]
+fn r27_the_plan_frame_judges_the_units_against_a_design_record() {
+    assert!(PLAN_REVIEWER.contains(
+        "When the plan holds a `## Design record`, judge the units against its decisions"
+    ));
+    assert!(PLAN_REVIEWER.contains(
+        "contradicts a decision of the record is a blocking finding of the kind `conflict`"
+    ));
+    assert!(
+        PLAN_REVIEWER
+            .contains("the record does not defer is one of the kind `unreached_criterion`")
+    );
+    // The list of kinds is the one of R24.
+    for kind in [
+        "unreached_criterion",
+        "dependency",
+        "conflict",
+        "unguarded_effect",
+    ] {
+        assert!(
+            PLAN_REVIEWER.contains(&format!("`blocking {kind}:`")),
+            "{kind}"
+        );
+    }
+    assert_eq!(PLAN_REVIEWER.matches("`blocking ").count(), 5);
 }

@@ -981,7 +981,7 @@ apply('triage_decision', 'v9-after-carry', dict(decision=third, triage='none', r
 unchanged = fingerprint()
 assert migrate(9, 10) == dict(carried=0, already=3)
 assert fingerprint() == unchanged and fields(third_request)['route_reason'] == 'carried from version 9'
-for before, after in [(9, 27), (10, 10), (10, 9)]:
+for before, after in [(9, 28), (10, 10), (10, 9)]:
     assert migrate(before, after, 2) == dict(status='unknown_pair')
 assert fingerprint() == unchanged
 assert migrate(9, 10) == dict(carried=0, already=3)
@@ -2747,7 +2747,7 @@ unchanged = fingerprint()
 assert migrate(21, 23) == dict(carried=0, already=0)
 assert migrate(20, 23) == dict(carried=0, already=0)
 assert migrate(22, 23) == dict(carried=0, already=0)
-assert migrate(23, 27, 2) == dict(status='unknown_pair')
+assert migrate(23, 28, 2) == dict(status='unknown_pair')
 assert fingerprint() == unchanged and [obj(i) for i in v21_objects] == v21_before
 print('v22_migration_rows_complete')
 phase = 'v22'
@@ -2881,7 +2881,7 @@ assert 'subject' in (listed_interfaces if isinstance(listed_interfaces, dict) el
 unchanged = fingerprint()
 assert migrate(23, 24) == dict(carried=0, already=0)
 assert migrate(22, 24) == dict(carried=0, already=0)
-assert migrate(24, 27, 2) == dict(status='unknown_pair')
+assert migrate(24, 28, 2) == dict(status='unknown_pair')
 assert fingerprint() == unchanged and [obj(i) for i in v23_objects] == v23_before
 print('v24_migration_rows_complete')
 # The walk. Each refusal row is before the action it guards; a refusal writes nothing.
@@ -3079,7 +3079,7 @@ assert described.returncode == 0 and json.loads(described.stdout)['schema']['wor
 unchanged = fingerprint()
 assert migrate(24, 25) == dict(carried=0, already=0)
 assert migrate(23, 25) == dict(carried=0, already=0)
-assert migrate(25, 27, 2) == dict(status='unknown_pair')
+assert migrate(25, 28, 2) == dict(status='unknown_pair')
 assert fingerprint() == unchanged and [obj(i) for i in v24_objects] == v24_before
 print('v25_migration_rows_complete')
 # The removed actions are unknown to the store.
@@ -3172,7 +3172,7 @@ claim('reopen_finding', 'v25-measure', dict(finding=measured, evidence='v25 back
 assert fields(measured)['state'] == 'open'
 print('v25_gate_rows_complete')
 print('v25 driver fields: ok')
-# Version 26, the repository's file, over the objects made under version 25 (pinned in Git above). The schema differs from
+# Version 26, pinned in Git by the commit of main that holds it, over the objects made under version 25 (pinned in Git above). The schema differs from
 # version 25 only by points 1 to 6 of ontology/README.md, "Version 26: what is used": 10 actions and 4 views removed, the
 # message of merge_unit's no_repository, define_kpi with its home intent or task, kpi.task optional, and the grants.
 v25_schema, v25_sizes = schema, sizes
@@ -3186,7 +3186,11 @@ v25_views = [(view, args, call(['render'], dict(view=view, args=args))) for view
 removed_views26 = [(view, args) for view, args in v25_all_views if view in REMOVED_VIEWS26]
 assert len(v25_views) == 16 and len(removed_views26) == 4 and all(call(['render'], dict(view=v, args=a))['status'] == 'ok' for v, a in removed_views26)
 phase = 'v26'
-schema = json.loads(pathlib.Path(repo, 'ontology/work.schema.json').read_text())
+V26_PIN = ('7d9642de7afc56276d7e2b65d49e12f378b0e348', '3d29e773cf69775d046643199abd63bd1dd30e8bc884916756d68dfd6d5bdbd2')
+v26_bytes = subprocess.check_output(['git', '-C', repo, 'show', V26_PIN[0] + ':ontology/work.schema.json'], timeout=10)
+assert hashlib.sha256(v26_bytes).hexdigest() == V26_PIN[1]
+v26_path = pathlib.Path(store).with_name('pinned-' + V26_PIN[0] + '.json'); v26_path.write_bytes(v26_bytes)
+schema = json.loads(v26_bytes)
 assert schema['version'] == 26
 head, old = json.loads(json.dumps(schema)), v25_schema
 changed = lambda sec: {k for k in set(head[sec]) | set(old[sec]) if head[sec].get(k) != old[sec].get(k)}
@@ -3219,7 +3223,7 @@ for g_new, g_old in zip(head['grants'], old['grants']):
 held26 = {g['role']: g for g in head['grants'] if 'role' in g}
 assert held26['lead']['actions'] == sorted(head['action_types']) and not any(REMOVED26 & set(g['actions']) for g in head['grants'])
 print('gate_row=v26-only-points-1-to-6 expected=admitted actions=' + str(len(schema['action_types'])) + ' views=' + str(len(schema['views'])))
-copy26 = cases_copy(pathlib.Path(repo, 'ontology/work.schema.json'), 'repository.json', 'repository-route.json')
+copy26 = cases_copy(v26_path, 'pinned-v26.json', 'pinned-v26-route.json')
 copy26_schema = json.loads(copy26.read_text())
 for fn_ in copy26_schema['functions'].values(): fn_['program'] = str(fake_fn)
 copy26.write_text(json.dumps(copy26_schema))
@@ -3244,7 +3248,7 @@ print('v26_describe_bytes=' + str(len(described.stdout.encode())), file=sys.stde
 unchanged = fingerprint()
 assert migrate(25, 26) == dict(carried=0, already=0)
 assert migrate(24, 26) == dict(carried=0, already=0)
-assert migrate(26, 27, 2) == dict(status='unknown_pair')
+assert migrate(26, 28, 2) == dict(status='unknown_pair')
 assert fingerprint() == unchanged and [obj(i) for i in v25_objects] == v25_before
 print('v26_migration_rows_complete')
 # The removed actions are unknown to the store.
@@ -3278,4 +3282,168 @@ apply('set_kpi_intent', 'same-name-as-a-kpi-of-the-intent', dict(kpi=other_of_ta
 apply('set_kpi_intent', 'kpi-without-a-task', dict(kpi=of_twin, intent=conf), 'criterion_not_evaluable')
 print('v26_gate_rows_complete')
 print('v26 schema use: ok')
+# Version 27, the repository's file, over the objects made under version 26 (pinned in Git above). The schema differs from
+# version 26 only by points 1 to 6 of ontology/README.md, "Version 27: the plan bound to what its review read": four
+# properties of unit and intent, prevented_by of finding, three actions, plan_digest of add_unit and amend_unit, the
+# criterion plan_not_reviewed of ready_unit, close_finding with prevented_by and lesson_needs_prevention, and lead's grant.
+v26_schema, v26_sizes = schema, sizes
+v26_objects = [o['id'] for t in TYPES25 for o in call(['search'], dict(object_type=t, limit=1000))['objects']]
+v26_before = [obj(i) for i in v26_objects]
+v26_views = [(view, args, call(['render'], dict(view=view, args=args))) for view, args in [(name, {a: ARGS22[a] for a in body.get('args', [])}) for name, body in v26_schema['views'].items()]]
+assert len(v26_views) == 16
+phase = 'v27'
+schema = json.loads(pathlib.Path(repo, 'ontology/work.schema.json').read_text())
+assert schema['version'] == 27
+head, old = json.loads(json.dumps(schema)), v26_schema
+changed = lambda sec: {k for k in set(head[sec]) | set(old[sec]) if head[sec].get(k) != old[sec].get(k)}
+NEW27 = {'name_design', 'mark_plan_reviewed', 'mark_design_reviewed'}
+assert set(head['action_types']) - set(old['action_types']) == NEW27 and set(old['action_types']) <= set(head['action_types'])
+assert changed('action_types') == NEW27 | {'add_unit', 'amend_unit', 'ready_unit', 'close_finding'}, changed('action_types')
+assert set(head) == set(old) and all(head[k] == old[k] for k in head if k not in ('version', 'action_types', 'object_types', 'grants'))
+# 1: the properties; every other object type and property reads as on version 26.
+assert changed('object_types') == {'unit', 'intent', 'finding'}
+PROPS27 = dict(unit=dict(plan_digest={'value_type': 'sha256_hex'}, plan_reviewed={'value_type': 'sha256_hex'}),
+               intent=dict(design='string', plan_design={'value_type': 'sha256_hex'}), finding=dict(prevented_by='string'))
+for name, props in PROPS27.items():
+    new_t, old_t = head['object_types'][name], old['object_types'][name]
+    assert {k: v for k, v in new_t.items() if k != 'properties'} == {k: v for k, v in old_t.items() if k != 'properties'}
+    assert {k: new_t['properties'][k] for k in old_t['properties']} == old_t['properties'] and set(new_t['properties']) - set(old_t['properties']) == set(props), name
+    assert all(new_t['properties'][k]['type'] == t_ and new_t['properties'][k]['required'] is False for k, t_ in props.items()), name
+assert head['object_types']['intent']['properties']['design']['max_bytes'] == 300 and head['object_types']['finding']['properties']['prevented_by']['max_bytes'] == 300
+# 2: add_unit and amend_unit take plan_digest and set it; absent keeps the stored value.
+for name in ('add_unit', 'amend_unit'):
+    a = json.loads(json.dumps(head['action_types'][name]))
+    p_ = a['parameters'].pop('plan_digest'); assert p_['type'] == {'value_type': 'sha256_hex'} and p_['required'] is False and a['rules'][0]['set'].pop('plan_digest') == '$plan_digest', name
+    assert a == old['action_types'][name], name
+# 5: ready_unit differs by plan_not_reviewed alone, which keeps its code and its place.
+a, b = (json.loads(json.dumps(s_['action_types']['ready_unit'])) for s_ in (head, old))
+i_ = [c['code'] for c in b['submission_criteria']].index('plan_not_reviewed')
+assert [c['code'] for c in a['submission_criteria']] == [c['code'] for c in b['submission_criteria']]
+a['submission_criteria'].pop(i_); b['submission_criteria'].pop(i_); assert a == b
+# 6: close_finding takes prevented_by and gains lesson_needs_prevention after its criteria; its description names the three forms.
+a, b = (json.loads(json.dumps(s_['action_types']['close_finding'])) for s_ in (head, old))
+p_ = a['parameters'].pop('prevented_by'); assert p_['type'] == {'value_type': 'nonempty_text'} and p_['required'] is False and p_['max_bytes'] == 300
+assert a['submission_criteria'].pop()['code'] == 'lesson_needs_prevention' and a['rules'][0]['set'].pop('prevented_by') == '$prevented_by'
+described_ = a.pop('description'); b.pop('description'); assert a == b and all(f in described_ for f in ('"unit:<key>"', '"eval:<suite>/<case>"', '"text:<path>#<section>"'))
+# 3, 4: the new actions, their parameters and their criteria in order.
+CODES27 = dict(name_design=['intent_closed', 'design_empty'], mark_plan_reviewed=['review_not_accepting', 'review_of_another_intent'],
+               mark_design_reviewed=['review_not_accepting', 'review_of_another_intent'])
+PARAMS27 = dict(name_design=['intent', 'design'], mark_plan_reviewed=['unit', 'review', 'digest'], mark_design_reviewed=['intent', 'review', 'digest'])
+for name in NEW27:
+    a = head['action_types'][name]
+    assert [c['code'] for c in a['submission_criteria']] == CODES27[name] and list(a['parameters']) == PARAMS27[name] and all(p_['required'] for p_ in a['parameters'].values()), name
+assert head['action_types']['name_design']['submission_criteria'][0] == next(c for c in old['action_types']['amend_intent']['submission_criteria'] if c['code'] == 'intent_closed')
+assert head['action_types']['name_design']['rules'] == [{'modify_object': 'intent', 'set': {'design': '$design'}}]
+assert head['action_types']['mark_plan_reviewed']['rules'] == [{'modify_object': 'unit', 'set': {'plan_reviewed': '$digest'}}]
+assert head['action_types']['mark_design_reviewed']['rules'] == [{'modify_object': 'intent', 'set': {'plan_design': '$digest'}}]
+# The grants: lead's gains the three actions, every other grant is that of version 26 (specs/ap/roles.md R2).
+assert len(head['grants']) == len(old['grants'])
+for g_new, g_old in zip(head['grants'], old['grants']):
+    assert g_new == dict(g_old, actions=sorted(set(g_old['actions']) | (NEW27 if g_old.get('role') == 'lead' else set()))), g_new.get('role')
+held27 = {g['role']: g for g in head['grants'] if 'role' in g}
+assert held27['lead']['actions'] == sorted(head['action_types']) and [r for r, g in held27.items() if NEW27 & set(g['actions'])] == ['lead']
+print('gate_row=v27-only-points-1-to-6 expected=admitted actions=' + str(len(schema['action_types'])) + ' views=' + str(len(schema['views'])))
+copy27 = cases_copy(pathlib.Path(repo, 'ontology/work.schema.json'), 'repository.json', 'repository-route.json')
+copy27_schema = json.loads(copy27.read_text())
+for fn_ in copy27_schema['functions'].values(): fn_['program'] = str(fake_fn)
+copy27.write_text(json.dumps(copy27_schema))
+call(['schema', 'install', str(copy27)])
+redirect.trace(work, copies)
+assert [obj(i) for i in v26_objects] == v26_before
+for view, args, before in v26_views:
+    answer = call(['render'], dict(view=view, args=args))
+    assert answer['rows'] == before['rows'] and answer['markdown'] == before['markdown'].replace('schema=work@26', 'schema=work@27'), view
+print('gate_row=v27-v26-objects-and-views-unchanged expected=admitted objects=' + str(len(v26_objects)) + ' views=' + str(len(v26_views)))
+sizes = []
+for name in ('ont_describe', 'ont_action_list'):
+    wire = subprocess.run([binary, '--store', store, 'mcp'], input=json.dumps(dict(jsonrpc='2.0', id=1, method='tools/call', params=dict(name=name, arguments={}))) + '\n', text=True, capture_output=True, timeout=60)
+    answer = json.loads(wire.stdout.splitlines()[0])['result']; assert wire.returncode == 0 and not answer['isError'], answer
+    sizes.append(len(answer['content'][0]['text'].encode())); assert sizes[-1] <= 262144, (name, sizes[-1])
+print('v27_mcp_bytes=' + ','.join(map(str, sizes)) + ' v26=' + ','.join(map(str, v26_sizes)), file=sys.stderr)
+described = subprocess.run([binary, '--store', store, 'describe'], input='{}', text=True, capture_output=True, timeout=60, env=env)
+assert described.returncode == 0 and json.loads(described.stdout)['schema']['work']['version'] == 27, described.stdout[:300]
+print('v27_describe_bytes=' + str(len(described.stdout.encode())), file=sys.stderr)
+unchanged = fingerprint()
+assert migrate(26, 27) == dict(carried=0, already=0)
+assert migrate(25, 27) == dict(carried=0, already=0)
+assert migrate(27, 28, 2) == dict(status='unknown_pair')
+assert fingerprint() == unchanged and [obj(i) for i in v26_objects] == v26_before
+print('v27_migration_rows_complete')
+# The walk. Each refusal row is before the action it guards; a refusal writes nothing.
+PLAN27 = digest('the v27 block of plan27'); OTHER27 = digest('another v27 block of plan27')
+# 2, 5: a unit with plan_digest and no mark is refused plan_not_reviewed, though an accepting plan review of its intent started after it was added.
+tick(); plan27 = unit('v27-plan')
+apply('add_unit', 'plan', dict(page, unit=plan27, lane='objective', intent=conf, plan_digest=PLAN27, **{'class': 'plain'}))
+assert fields(plan27)['plan_digest'] == PLAN27 and fields(plan27).get('plan_reviewed') is None
+review('v27-conf-plan', 'plan', digest('the v27 plan'), intent=conf)
+apply('ready_unit', 'unmarked', dict(unit=plan27, intent=conf), 'plan_not_reviewed')
+# 4: mark_plan_reviewed, each refusal before the action it guards.
+tick(); conf_plan = review('v27-conf-plan-accept', 'plan', digest('the v27 plan again'), intent=conf)
+running_plan = review('v27-conf-plan-running', 'plan', digest('the v27 plan running'), intent=conf, close=False)
+repair_plan = review('v27-conf-plan-repair', 'plan', digest('the v27 plan repaired'), intent=conf, verdict='repair')
+page_review = review('v27-page', 'page', digest('the v27 page'), unit=plan27)
+twin_plan = review('v27-twin-plan', 'plan', digest('the v27 twin plan'), intent=twin_intent)
+apply('mark_plan_reviewed', 'running', dict(unit=plan27, review=running_plan, digest=PLAN27), 'review_not_accepting')
+apply('mark_plan_reviewed', 'repair', dict(unit=plan27, review=repair_plan, digest=PLAN27), 'review_not_accepting')
+apply('mark_plan_reviewed', 'page', dict(unit=plan27, review=page_review, digest=PLAN27), ('review_not_accepting', 'review_of_another_intent'))
+apply('mark_plan_reviewed', 'twin', dict(unit=plan27, review=twin_plan, digest=PLAN27), 'review_of_another_intent')
+apply('mark_plan_reviewed', 'other-digest', dict(unit=plan27, review=conf_plan, digest=OTHER27))
+f = fields(plan27); assert f['plan_reviewed'] == OTHER27 and f['state'] == 'draft', f
+apply('ready_unit', 'other-digest', dict(unit=plan27, intent=conf), 'plan_not_reviewed')
+before_mark = fields(plan27)
+apply('mark_plan_reviewed', 'plan', dict(unit=plan27, review=conf_plan, digest=PLAN27))
+f = fields(plan27); assert f == dict(before_mark, plan_reviewed=PLAN27), (f, before_mark)
+apply('ready_unit', 'marked', dict(unit=plan27, intent=conf)); assert fields(plan27)['state'] == 'ready'
+# 2: amend_unit without plan_digest keeps it; with another one the unit returns to draft and is refused again.
+apply('amend_unit', 'notes', dict(unit=plan27, notes='The v27 notes.', page_digest=digest('v27 page 2')))
+f = fields(plan27); assert f['state'] == 'draft' and f['plan_digest'] == PLAN27 and f['plan_reviewed'] == PLAN27, f
+apply('ready_unit', 'notes', dict(unit=plan27, intent=conf)); assert fields(plan27)['state'] == 'ready'
+apply('amend_unit', 'plan', dict(unit=plan27, depends_on=[unit_a], page_digest=digest('v27 page 3'), plan_digest=OTHER27))
+f = fields(plan27); assert f['state'] == 'draft' and f['plan_digest'] == OTHER27 and f['plan_reviewed'] == PLAN27, f
+apply('ready_unit', 'amended', dict(unit=plan27, intent=conf), 'plan_not_reviewed')
+apply('mark_plan_reviewed', 'amended', dict(unit=plan27, review=conf_plan, digest=OTHER27))
+apply('ready_unit', 'remarked', dict(unit=plan27, intent=conf)); assert fields(plan27)['state'] == 'ready'
+# A mark applies to a unit in any state: a merged one keeps its state.
+apply('mark_plan_reviewed', 'merged', dict(unit=contract25, review=conf_plan, digest=PLAN27))
+f = fields(contract25); assert f['state'] == 'merged' and f['plan_reviewed'] == PLAN27 and f.get('plan_digest') is None, f
+# 5: a unit without plan_digest keeps the rule of version 26: a plan review of its intent started after it was added.
+tick(); bare27 = unit('v27-bare')
+apply('add_unit', 'bare', dict(page, unit=bare27, lane='objective', intent=conf, **{'class': 'plain'}))
+apply('ready_unit', 'bare-before', dict(unit=bare27, intent=conf), 'plan_not_reviewed')
+review('v27-conf-plan-bare', 'plan', digest('the v27 plan for bare'), intent=conf)
+apply('ready_unit', 'bare', dict(unit=bare27, intent=conf)); assert fields(bare27)['state'] == 'ready' and fields(bare27).get('plan_digest') is None
+# 3: name_design keeps a confirmed intent confirmed; mark_design_reviewed.
+DESIGN = '/home/palantirkc/work/fixture-v27/DESIGN.md'
+apply('name_design', 'retired', dict(intent=retired25, design=DESIGN), 'intent_closed')
+apply('name_design', 'empty', dict(intent=conf, design=''), 'design_empty')
+before_design = fields(conf); assert before_design['status'] == 'confirmed'
+apply('name_design', 'conf', dict(intent=conf, design=DESIGN))
+f = fields(conf); assert f == dict(before_design, design=DESIGN), (f, before_design)
+apply('name_design', 'conf-other-path', dict(intent=conf, design=DESIGN + '.v2')); assert fields(conf)['design'] == DESIGN + '.v2'
+DESIGN_SHA = digest('the v27 design record')
+apply('mark_design_reviewed', 'running', dict(intent=conf, review=running_plan, digest=DESIGN_SHA), 'review_not_accepting')
+apply('mark_design_reviewed', 'repair', dict(intent=conf, review=repair_plan, digest=DESIGN_SHA), 'review_not_accepting')
+apply('mark_design_reviewed', 'page', dict(intent=conf, review=page_review, digest=DESIGN_SHA), ('review_not_accepting', 'review_of_another_intent'))
+apply('mark_design_reviewed', 'twin', dict(intent=conf, review=twin_plan, digest=DESIGN_SHA), 'review_of_another_intent')
+before_design = fields(conf)
+apply('mark_design_reviewed', 'conf', dict(intent=conf, review=conf_plan, digest=DESIGN_SHA))
+f = fields(conf); assert f == dict(before_design, plan_design=DESIGN_SHA) and f['status'] == 'confirmed', (f, before_design)
+apply('name_design', 'conf-back', dict(intent=conf, design=DESIGN)); f = fields(conf); assert f['design'] == DESIGN and f['plan_design'] == DESIGN_SHA, f
+# 4: the three actions are lead's alone.
+apply('mark_plan_reviewed', 'dispatch', dict(unit=plan27, review=conf_plan, digest=PLAN27), 'not_granted', role='dispatch')
+apply('name_design', 'watch', dict(intent=conf, design=DESIGN), 'not_granted', role='watch')
+# 6: close_finding of a lesson needs prevented_by; another kind closes as before.
+lesson27 = oid('finding', 'v27-lesson')
+tick(); apply('open_finding', 'lesson', dict(finding=lesson27, kind='lesson', detector='fixture-lead', summary='The invented v27 lesson must not repeat.', severity='info'))
+apply('close_finding', 'lesson-bare', dict(finding=lesson27, reason='The refusal is delivered.'), 'lesson_needs_prevention')
+apply('close_finding', 'lesson-empty', dict(finding=lesson27, reason='The refusal is delivered.', prevented_by=''), 'invalid_parameter')
+apply('close_finding', 'lesson', dict(finding=lesson27, reason='The refusal is delivered.', prevented_by='unit:sdd-plan-bind'))
+f = fields(lesson27); assert f['state'] == 'closed' and f['prevented_by'] == 'unit:sdd-plan-bind' and f['ended_at'] == stamp(), f
+note27 = oid('finding', 'v27-note')
+apply('open_finding', 'note', dict(finding=note27, kind='note', detector='fixture-timer', summary='v27', severity='info'))
+apply('close_finding', 'note', dict(finding=note27, reason='v27 gone')); assert fields(note27).get('prevented_by') is None
+claim('open_finding', 'v27-measure', dict(FINDING25, finding=oid('finding', 'v27-measure')), 'measure')
+claim('close_finding', 'v27-measure', dict(finding=oid('finding', 'v27-measure'), reason='v27 gone'), 'measure')
+print('v27_gate_rows_complete')
+print('v27 plan bound: ok')
 PY

@@ -412,6 +412,7 @@ actions!(
     answer_questions,
     note_intent,
     name_lead,
+    name_design,
     confirm_intent,
     add_criterion,
     check_criterion,
