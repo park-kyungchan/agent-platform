@@ -132,6 +132,43 @@ class SkipsDeclared(Scratch):
         code, _, err = self.run_skips("declared")
         self.assertEqual(code, 1)
         self.assertIn("skips_site_form@scripts/one.sh:2", err)
+        # Every other way to write to the file is refused: an unquoted or braced target, `>`, `>|`, tee, a second
+        # write beside a site on its line, a Python open of it without its site's write, a Rust read of it.
+        writes = {
+            "scripts/one.sh": [
+                "echo bogus-id >> $CHECK_SKIPS",
+                "echo bogus-id >>${CHECK_SKIPS}",
+                'echo bogus-id >> "${CHECK_SKIPS}"',
+                'echo bogus-id > "$CHECK_SKIPS"',
+                "echo bogus-id >| $CHECK_SKIPS",
+                "echo bogus-id &>> $CHECK_SKIPS",
+                'echo bogus-id | tee -a "$CHECK_SKIPS"',
+                SHELL_SITE.rstrip("\n") + "; echo bogus-id >> $CHECK_SKIPS",
+            ],
+            "ci/two.py": [
+                'skips = open(os.environ["CHECK_SKIPS"], "a")',
+                'with open(os.environ.get("CHECK_SKIPS") or os.devnull, "a") as s:',
+                'path = os.environ.get("CHECK_SKIPS")',
+            ],
+            "crates/x/tests/three.rs": [
+                '    let path = std::env::var_os("CHECK_SKIPS");',
+                '    skipped(CHECK_SKIPS, id);',
+            ],
+        }
+        self.table(row(), row("two", "ci/two.py", runs_on="ci"), row("three", "crates/x/tests/three.rs", runs_on="ci"))
+        good = {"scripts/one.sh": SHELL_SITE,
+                "ci/two.py": 'with open(os.environ.get("CHECK_SKIPS") or os.devnull, "a") as s: s.write("two\\n")\n',
+                "crates/x/tests/three.rs": '    skipped(CHECK_SKIPS, "three");\n'}
+        for f, text in good.items():
+            self.write(f, text)
+        self.assertEqual(self.run_skips("declared")[0], 0)
+        for f, lines in writes.items():
+            for line in lines:
+                self.write(f, good[f] + line + "\n")
+                code, _, err = self.run_skips("declared")
+                self.assertEqual(code, 1, line)
+                self.assertIn(f"skips_site_form@{f}:2", err, line)
+            self.write(f, good[f])
         # And the whole again.
         self.write("scripts/one.sh", SHELL_SITE)
         self.assertEqual(self.run_skips("declared")[0], 0)

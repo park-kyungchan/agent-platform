@@ -9,9 +9,11 @@
                                                  whose runs_on is not "ci" at either commit
 
 A row is exactly {id, file, covers, runs_on, how}. A skip site is one line that holds the name CHECK_SKIPS and the id as a
-literal, in one of three forms: a shell line `echo <id> >> "$CHECK_SKIPS"`, a Python line that holds CHECK_SKIPS and
-`.write("<id>\\n"` (single quotes alike), a Rust test line `skipped(CHECK_SKIPS, "<id>")`. A line that holds CHECK_SKIPS and
-appends (`>> "$CHECK_SKIPS"`, `.write(`, `skipped(CHECK_SKIPS`) in none of these forms is refused. The script reads Git and
+literal, in one of three forms: a shell line `echo <id> >> "$CHECK_SKIPS"`, a Python line
+`with open(os.environ.get("CHECK_SKIPS") or os.devnull, "a"[, encoding="utf-8"]) as f: f.write("<id>\\n"` (single quotes
+alike), a Rust test line `skipped(CHECK_SKIPS, "<id>")`. A line that holds CHECK_SKIPS and, beside its sites, writes to the
+file in any other way (a redirection to it, quoted, unquoted or braced; tee; a Python open or environ; a Rust read) is
+refused. The script reads Git and
 files only: it starts no check.
 """
 import json
@@ -27,11 +29,15 @@ KEYS = {"id", "file", "covers", "runs_on", "how"}
 RUNS_ON = ("vps-root", "vps", "ci")
 ID = re.compile(r"[a-z0-9-]+")
 SITES = (
-    re.compile(r'\becho ([a-z0-9-]+) >> "\$CHECK_SKIPS"'),
-    re.compile(r"CHECK_SKIPS.*\.write\(([\"'])([a-z0-9-]+)\\n\1"),
-    re.compile(r'\bskipped\(CHECK_SKIPS, "([a-z0-9-]+)"\)'),
+    re.compile(r'\becho (?P<id>[a-z0-9-]+) >> "\$CHECK_SKIPS"'),
+    re.compile(r"\bwith open\(os\.environ\.get\((?P<q1>[\"'])CHECK_SKIPS(?P=q1)\) or os\.devnull, (?P<q2>[\"'])a(?P=q2)"
+               r"(?:, encoding=(?P<q3>[\"'])utf-8(?P=q3))?\) as (?P<f>\w+): (?P=f)\.write\((?P<q4>[\"'])(?P<id>[a-z0-9-]+)\\n(?P=q4)"),
+    re.compile(r'\bskipped\(CHECK_SKIPS, "(?P<id>[a-z0-9-]+)"\)'),
 )
-APPENDS = re.compile(r'>> ?"\$\{?CHECK_SKIPS|\.write\(|\bskipped\(CHECK_SKIPS\b')
+# What is left of a line holding CHECK_SKIPS once its sites are taken out must not write to the file: no redirection to
+# it (quoted, unquoted or braced; >, >>, >|, &>, &>>), no tee, no Python open or environ, no Rust read of it, no write.
+WRITES = re.compile(r"""(?:>>?|>\||&>>?)\s*["']?\$\{?CHECK_SKIPS\b|\btee\b|\bopen\(|\benviron\b|\bvar_os\(|\benv::var\("""
+                    r"""|\bskipped\(\s*CHECK_SKIPS\b|\.write\(""")
 
 
 class Refused(Exception):
@@ -102,9 +108,12 @@ def sites(text):
     for number, line in enumerate(text.splitlines(), 1):
         if "CHECK_SKIPS" not in line:
             continue
-        ids = [m.group(m.lastindex) for form in SITES for m in form.finditer(line)]
-        if not ids and APPENDS.search(line):
-            raise Refused(f"skips_site_form@{{}}:{number}: a line that appends to CHECK_SKIPS without a literal id of a site form")
+        ids, rest = [], line
+        for form in SITES:
+            ids.extend(m.group("id") for m in form.finditer(rest))
+            rest = form.sub(" ", rest)
+        if "CHECK_SKIPS" in rest and WRITES.search(rest):
+            raise Refused(f"skips_site_form@{{}}:{number}: a line that writes to CHECK_SKIPS beside the site forms with a literal id")
         found.extend((number, i) for i in ids)
     return found
 
