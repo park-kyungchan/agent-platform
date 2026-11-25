@@ -1428,6 +1428,7 @@ else:
 apply('check_criterion', 'gadget', dict(criterion=gadget_criterion, state='pass', evidence='fixture-check: 3 gadgets'))
 apply('close_intent', 'gadget-live-units', dict(intent=gadget, reason='fixture-check passed'), 'unit_not_ended')
 if skipped: print('rehearsal: skipped without the role of the actor: ' + '; '.join(skipped), file=sys.stderr)
+with open(os.environ.get("CHECK_SKIPS") or os.devnull, "a", encoding="utf-8") as skips: skips.write("rehearsal-actor-role\n" if skipped else "")
 print('v11_unit_rows_complete')
 # Runs.
 apply('start_run', 'unknown-unit', dict(role='implementer', runtime='fixture-cli', model='fixture-model', unit=unit('absent-v11-unit')), 'unknown_unit')

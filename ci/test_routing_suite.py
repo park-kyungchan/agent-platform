@@ -567,6 +567,7 @@ class Watch(unittest.TestCase):
             cg = line[3:]
             Path("/sys/fs/cgroup" + cg, "cgroup.procs").read_text()
         except (OSError, IndexError):
+            with open(os.environ.get("CHECK_SKIPS") or os.devnull, "a", encoding="utf-8") as skips: skips.write("routing-cgroup\n")
             self.skipTest("no readable cgroup v2 of this process")
         return cg
 

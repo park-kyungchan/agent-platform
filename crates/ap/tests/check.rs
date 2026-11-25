@@ -20,6 +20,22 @@ use std::{
     time::{Duration, Instant},
 };
 
+/// The variable that names the file of the skips of `./check` (`specs/ap/check.md` R22).
+const CHECK_SKIPS: &str = "CHECK_SKIPS";
+/// A test that cannot run here notes its row's id (`ci/skips.json`) as one line of the file `var`
+/// names, when that is set and not empty (`specs/ap/check.md` R22).
+fn skipped(var: &str, id: &str) {
+    let Some(path) = std::env::var_os(var).filter(|p| !p.is_empty()) else {
+        return;
+    };
+    let options = std::fs::OpenOptions::new()
+        .append(true)
+        .create(true)
+        .open(path);
+    let mut file = options.expect(var);
+    std::io::Write::write_all(&mut file, format!("{id}\n").as_bytes()).expect(var);
+}
+
 const TAILSCALE: &str = r#"#!/bin/sh
 # The fake PC, its state in the directory @PC@. ping: answers unless down exists. ssh: as ssh's
 # default SendEnv, LANG and LC_* of the caller go along; the probe reads loadavg, meminfo, the fake
@@ -651,6 +667,70 @@ fn r5_here_a_command_other_than_check_takes_the_build_lock() {
     );
 }
 
+// spec: specs/ap/check.md#R5
+/// A command `ap check` wraps under the build lock gets `CHECK_LOCKED=1`, so a copy of `./check`'s lock
+/// block inside it goes on at once instead of waiting on the lock its own wrapper holds; a command it
+/// does not wrap gets no inherited `CHECK_LOCKED`.
+#[test]
+fn r5_wrapped_command_is_locked_and_an_unwrapped_one_is_not() {
+    let w = World::new();
+    w.no_policy();
+    let d = w.dir();
+    write(&w.p("build.lock"), "", 0o644);
+    // The lock block of the repository's own `./check`, from its `if` to its `fi`.
+    let check = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../check");
+    let check = fs::read_to_string(check).unwrap();
+    let opening = "if [ \"${CI:-}\" != true ] && [ -z \"${CHECK_LOCKED:-}\" ]; then\n";
+    let start = check.find(opening).expect("the lock block of ./check");
+    let end = start
+        + check[start..]
+            .find("\nfi\n")
+            .expect("the end of the lock block")
+        + 4;
+    write(&w.p("inner"), "#!/bin/sh\necho inner ran\n", 0o755);
+    let copy = format!(
+        "set -euo pipefail\nself={}\n{}echo past the lock\n",
+        w.s("inner"),
+        &check[start..end]
+    );
+    write(&w.p("lock-block.sh"), &copy, 0o644);
+    let started = Instant::now();
+    let out = w
+        .command(&[&d, "--timeout", "60", "--", "bash", &w.s("lock-block.sh")])
+        .env_remove("CHECK_LOCKED")
+        .env_remove("CI")
+        .output()
+        .unwrap();
+    assert_eq!(
+        (out.status.code(), lines(&out.stdout)),
+        (Some(0), vec!["past the lock".to_owned()]),
+        "{out:?}"
+    );
+    assert!(started.elapsed() < Duration::from_secs(50));
+    // Not wrapped: an inherited CHECK_LOCKED is removed, without the lock file and for `./check`.
+    let show = "echo \"locked=${CHECK_LOCKED:-unset}\"";
+    let out = w
+        .command(&[&d, "--", "sh", "-c", show])
+        .env("CHECK_LOCKED", "1")
+        .output()
+        .unwrap();
+    assert_eq!(lines(&out.stdout), ["locked=1"], "{out:?}");
+    write(
+        &w.repo.join("check"),
+        &format!("#!/bin/sh\n{show}\n"),
+        0o755,
+    );
+    let out = w.command(&[&d]).env("CHECK_LOCKED", "1").output().unwrap();
+    assert_eq!(lines(&out.stdout), ["locked=unset"], "{out:?}");
+    fs::remove_file(w.p("build.lock")).unwrap();
+    let out = w
+        .command(&[&d, "--", "sh", "-c", show])
+        .env("CHECK_LOCKED", "1")
+        .output()
+        .unwrap();
+    assert_eq!(lines(&out.stdout), ["locked=unset"], "{out:?}");
+}
+
 // spec: specs/ap/check.md#R17
 #[test]
 fn r17_ap_check_host_is_pc_on_the_pc_only_and_the_cargo_settings_are_set_on_both() {
@@ -920,6 +1000,7 @@ fn own_net() -> String {
 fn r8_on_the_pc_the_command_is_uid_0_with_a_read_only_root_but_its_directories() {
     if !bwrap_works() {
         eprintln!("skipped: bwrap cannot make a user namespace on this host");
+        skipped(CHECK_SKIPS, "check-bwrap");
         return;
     }
     let parent = outside_tmp(&[env!("CARGO_TARGET_TMPDIR"), "/var/tmp"]);
@@ -1002,6 +1083,7 @@ echo "step net $(readlink /proc/self/ns/net)" >&2
 fn r18_the_step_fetches_in_a_sandbox_of_its_own_with_the_network() {
     if !bwrap_works() {
         eprintln!("skipped: bwrap cannot make a user namespace on this host");
+        skipped(CHECK_SKIPS, "check-bwrap");
         return;
     }
     let parent = outside_tmp(&[env!("CARGO_TARGET_TMPDIR"), "/var/tmp"]);

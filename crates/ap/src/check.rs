@@ -687,7 +687,8 @@ fn here(call: &Call, tree: &Tree, deadline: Instant) -> i32 {
     let lock = variable("HOST_CARGO_LOCK", DEFAULT_LOCK);
     let mut argv = call.command.clone();
     // `./check` takes the lock by itself, with any of its arguments; taking it here too would wait on itself.
-    if argv[0] != "./check" && Path::new(&lock).exists() {
+    let wrapped = argv[0] != "./check" && Path::new(&lock).exists();
+    if wrapped {
         argv.splice(0..0, ["flock".to_owned(), lock]);
     }
     let (program, rest) = argv.split_first().unwrap_or((&argv[0], &[]));
@@ -696,7 +697,14 @@ fn here(call: &Call, tree: &Tree, deadline: Instant) -> i32 {
     } else {
         PathBuf::from(program)
     };
-    let child = Command::new(path)
+    let mut command = Command::new(path);
+    // A wrapped command holds the lock: a `./check` inside it, or a copy of its lock block, does not take
+    // it again; a command that is not wrapped holds none, whatever this process inherited (R5).
+    match wrapped {
+        true => command.env("CHECK_LOCKED", "1"),
+        false => command.env_remove("CHECK_LOCKED"),
+    };
+    let child = command
         .arg0(program)
         .args(rest)
         .current_dir(&tree.dir)

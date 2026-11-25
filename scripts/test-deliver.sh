@@ -26,8 +26,8 @@
 # of this host. The Lead's delivery check runs the walk without it, here.
 set -euo pipefail
 [ "$#" -eq 2 ] || { echo "usage: scripts/test-deliver.sh <ont binary> <ap binary>" >&2; exit 2; }
-if [ "${CI:-}" = true ]; then echo "deliver-walk: skipped (CI)"; exit 0; fi
-if [ "${AP_CHECK_HOST:-}" = pc ]; then echo "deliver-walk: skipped (pc)"; exit 0; fi
+if [ "${CI:-}" = true ]; then echo "deliver-walk: skipped (CI)"; [ -z "${CHECK_SKIPS:-}" ] || echo deliver-walk-ci >> "$CHECK_SKIPS"; exit 0; fi
+if [ "${AP_CHECK_HOST:-}" = pc ]; then echo "deliver-walk: skipped (pc)"; [ -z "${CHECK_SKIPS:-}" ] || echo deliver-walk-pc >> "$CHECK_SKIPS"; exit 0; fi
 ONT=$(realpath -- "$1"); AP=$(realpath -- "$2")
 REPO=$(cd -- "$(dirname -- "$(realpath "$0")")/.." && pwd -P)
 MV=$(command -v mv)

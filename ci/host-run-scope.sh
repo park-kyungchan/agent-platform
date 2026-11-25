@@ -31,10 +31,12 @@
 set -uo pipefail
 ap=$(realpath -- "${1:-${CARGO_TARGET_DIR:-$(cd "$(dirname "$0")/.." && pwd -P)/target}/debug/ap}")
 if ! command -v systemctl > /dev/null || [ ! -d /run/systemd/system ]; then
-  echo "host-run-scope: skipped (no systemctl or systemd is not init)"; exit 0
+  echo "host-run-scope: skipped (no systemctl or systemd is not init)"
+  [ -z "${CHECK_SKIPS:-}" ] || echo host-run-scope >> "$CHECK_SKIPS"; exit 0
 fi
 if ! systemd-run --scope --quiet --collect --unit="ap-run-probe-$$" --slice=agents.slice true 2> /dev/null; then
-  echo "host-run-scope: skipped (this caller cannot start a transient unit in the system manager)"; exit 0
+  echo "host-run-scope: skipped (this caller cannot start a transient unit in the system manager)"
+  [ -z "${CHECK_SKIPS:-}" ] || echo host-run-scope >> "$CHECK_SKIPS"; exit 0
 fi
 t=$(mktemp -d "${TMPDIR:-/tmp}/ap-run-XXXXXX") || { echo "host-run-scope: cannot make a directory under ${TMPDIR:-/tmp}" >&2; exit 1; }
 chmod 0755 "$t"
@@ -232,6 +234,7 @@ done
 #    made here.
 if ! /usr/bin/bwrap --ro-bind / / true 2> /dev/null; then
   echo "host-run-scope: limits skipped (/usr/bin/bwrap --ro-bind / / true fails here)"
+  [ -z "${CHECK_SKIPS:-}" ] || echo host-run-scope-limits >> "$CHECK_SKIPS"
 else
   ends=$(( ($(date +%s) + 86400) * 1000 ))
   for a in acct acctB; do

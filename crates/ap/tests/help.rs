@@ -7,6 +7,22 @@
 )]
 use std::{collections::BTreeSet, process::Command};
 
+/// The variable that names the file of the skips of `./check` (`specs/ap/check.md` R22).
+const CHECK_SKIPS: &str = "CHECK_SKIPS";
+/// A test that cannot run here notes its row's id (`ci/skips.json`) as one line of the file `var`
+/// names, when that is set and not empty (`specs/ap/check.md` R22).
+fn skipped(var: &str, id: &str) {
+    let Some(path) = std::env::var_os(var).filter(|p| !p.is_empty()) else {
+        return;
+    };
+    let options = std::fs::OpenOptions::new()
+        .append(true)
+        .create(true)
+        .open(path);
+    let mut file = options.expect(var);
+    std::io::Write::write_all(&mut file, format!("{id}\n").as_bytes()).expect(var);
+}
+
 fn ap(args: &[&str]) -> std::process::Output {
     Command::new(env!("CARGO_BIN_EXE_ap"))
         .args(args)
@@ -157,6 +173,7 @@ fn verbs_r1_r2_the_list_begins_with_the_usage_and_a_verb_without_a_usage_prints_
 fn verbs_r5_an_answer_that_cannot_be_written_exits_4() {
     let Ok(full) = std::fs::OpenOptions::new().write(true).open("/dev/full") else {
         eprintln!("skipped: no /dev/full");
+        skipped(CHECK_SKIPS, "help-dev-full");
         return;
     };
     for args in [
