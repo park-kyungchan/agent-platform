@@ -1,7 +1,7 @@
 {
   "format": "ontology-schema/v1",
   "domain": "work",
-  "version": 25,
+  "version": 26,
   "namespace": {
     "instance": "vps://palantirkc",
     "account": "root"
@@ -724,7 +724,7 @@
           "type": {
             "ref": "task"
           },
-          "required": true,
+          "required": false,
           "description": "Reference to the task owning this object."
         },
         "name": {
@@ -1773,290 +1773,23 @@
         }
       ]
     },
-    "record_decision": {
-      "description": "Record a decision: task identifies its task, topic names the current decision, text states it, decided_by is user or lead, reason explains it and undo states its reversal. Actions take the full Id from search; view arguments take the native key.",
-      "parameters": {
-        "task": {
-          "type": {
-            "ref": "task"
-          },
-          "required": true,
-          "description": "Reference to the task owning the new object."
-        },
-        "topic": {
-          "type": "string",
-          "required": true,
-          "max_bytes": 120,
-          "description": "Short topic name; only one decision per task and topic is current. Reuse it when replacing that decision."
-        },
-        "text": {
-          "type": "string",
-          "required": true,
-          "max_bytes": 1000,
-          "description": "The decision being made; state the chosen behavior concretely."
-        },
-        "decided_by": {
-          "type": {
-            "value_type": "decision_actor"
-          },
-          "required": true,
-          "description": "Who made the decision: user or lead. This is attribution, not authentication."
-        },
-        "reason": {
-          "type": "string",
-          "required": false,
-          "max_bytes": 600,
-          "description": "Optional explanation of why this decision was made."
-        },
-        "undo": {
-          "type": "string",
-          "required": false,
-          "max_bytes": 300,
-          "description": "Optional instructions for reversing the decision."
-        },
-        "user_words": {
-          "type": "string",
-          "required": false,
-          "max_bytes": 1000
-        },
-        "user_form": {
-          "type": {"value_type": "user_form"},
-          "required": false
-        }
-      },
-      "submission_criteria": [
-        {
-          "code": "unknown_task",
-          "message": "Search task and pass its full Id; choose a task that exists and is not retracted.",
-          "all": [
-            {
-              "exists": "$task"
-            }
-          ]
-        },
-        {
-          "code": "decision_already_current",
-          "message": "Use supersede_decision with the current decision reference for this topic.",
-          "none": [
-            {
-              "linked": {
-                "from": "$task",
-                "link": "decisions",
-                "where": {
-                  "all": [
-                    {
-                      "eq": [
-                        "topic",
-                        "$topic"
-                      ]
-                    },
-                    {
-                      "eq": [
-                        "status",
-                        "current"
-                      ]
-                    }
-                  ]
-                }
-              }
-            }
-          ]
-        },
-        {
-          "code": "user_decision_evidence_required",
-          "message": "User attribution requires quoted user_words and user_form.",
-          "any": [{"ne": ["$decided_by", "user"]}, {"all": [{"present": "$user_words"}, {"ne": ["$user_words", ""]}, {"present": "$user_form"}]}]
-        },
-        {
-          "code": "user_question_is_not_a_decision",
-          "message": "Record the Lead decision and quote the user question in its reason.",
-          "none": [{"all": [{"eq": ["$decided_by", "user"]}, {"present": "$user_form"}, {"eq": ["$user_form", "question"]}]}]
-        }
-      ],
-      "rules": [
-        {
-          "create_object": "decision",
-          "set": {
-            "task": "$task",
-            "topic": "$topic",
-            "text": "$text",
-            "decided_by": "$decided_by",
-            "reason": "$reason",
-            "undo": "$undo",
-            "status": "current",
-            "decided_at": "$now",
-            "user_words": "$user_words",
-            "user_form": "$user_form"
-          }
-        }
-      ]
-    },
-    "supersede_decision": {
-      "description": "Replace decision with new text and decided_by (user or lead); optional reason explains the choice and undo its reversal. The old decision supplies task and topic automatically. Actions take the full Id from search; view arguments take the native key.",
-      "parameters": {
-        "decision": {
-          "type": {
-            "ref": "decision"
-          },
-          "required": true,
-          "description": "Reference to the current decision being replaced; its task and topic are reused automatically."
-        },
-        "text": {
-          "type": "string",
-          "required": true,
-          "max_bytes": 1000,
-          "description": "The decision being made; state the chosen behavior concretely."
-        },
-        "decided_by": {
-          "type": {
-            "value_type": "decision_actor"
-          },
-          "required": true,
-          "description": "Who made the decision: user or lead. This is attribution, not authentication."
-        },
-        "reason": {
-          "type": "string",
-          "required": false,
-          "max_bytes": 600,
-          "description": "Optional explanation of why this decision was made."
-        },
-        "undo": {
-          "type": "string",
-          "required": false,
-          "max_bytes": 300,
-          "description": "Optional instructions for reversing the decision."
-        },
-        "user_words": {
-          "type": "string",
-          "required": false,
-          "max_bytes": 1000
-        },
-        "user_form": {
-          "type": {"value_type": "user_form"},
-          "required": false
-        }
-      },
-      "submission_criteria": [
-        {
-          "code": "decision_not_current",
-          "message": "Read decision and choose one whose status is current.",
-          "all": [
-            {
-              "eq": [
-                "$decision.status",
-                "current"
-              ]
-            }
-          ]
-        },
-        {
-          "code": "user_decision_evidence_required",
-          "message": "User attribution requires quoted user_words and user_form.",
-          "any": [{"ne": ["$decided_by", "user"]}, {"all": [{"present": "$user_words"}, {"ne": ["$user_words", ""]}, {"present": "$user_form"}]}]
-        },
-        {
-          "code": "user_question_is_not_a_decision",
-          "message": "Record the Lead decision and quote the user question in its reason.",
-          "none": [{"all": [{"eq": ["$decided_by", "user"]}, {"present": "$user_form"}, {"eq": ["$user_form", "question"]}]}]
-        }
-      ],
-      "rules": [
-        {
-          "modify_object": "decision",
-          "set": {
-            "status": "superseded"
-          }
-        },
-        {
-          "create_object": "decision",
-          "set": {
-            "task": "$decision.task",
-            "topic": "$decision.topic",
-            "text": "$text",
-            "decided_by": "$decided_by",
-            "reason": "$reason",
-            "undo": "$undo",
-            "status": "current",
-            "supersedes": "$decision",
-            "decided_at": "$now",
-            "user_words": "$user_words",
-            "user_form": "$user_form"
-          }
-        }
-      ]
-    },
     "define_kpi": {
-      "description": "Define a KPI: task identifies its task, name is unique there, definition states what is counted and from which source, and target is the desired value. Actions take the full Id from search; view arguments take the native key.",
+      "description": "Define a KPI of an intent or, in the older form, of a task: exactly one of intent and task is its home, name is unique among the KPIs of that home, definition states what is counted and from which source, and target is the desired value. Actions take the full Id from search.",
       "parameters": {
-        "task": {
-          "type": {
-            "ref": "task"
-          },
-          "required": true,
-          "description": "Reference to the task owning the new object."
-        },
-        "name": {
-          "type": "string",
-          "required": true,
-          "max_bytes": 120,
-          "description": "KPI name, unique within its task."
-        },
-        "definition": {
-          "type": "string",
-          "required": true,
-          "max_bytes": 600,
-          "description": "What is counted and from which source; include enough detail to reproduce the measurement."
-        },
-        "target": {
-          "type": "string",
-          "required": false,
-          "max_bytes": 200,
-          "description": "Optional initial desired KPI value; omission creates a KPI with no target."
-        }
+        "intent": {"type": {"ref": "intent"}, "required": false, "description": "The intent whose KPI this is; give it or task, not both."},
+        "task": {"type": {"ref": "task"}, "required": false, "description": "The task owning the KPI, the older form; give it or intent, not both."},
+        "name": {"type": "string", "required": true, "max_bytes": 120, "description": "KPI name, unique among the KPIs of its intent or of its task."},
+        "definition": {"type": "string", "required": true, "max_bytes": 600, "description": "What is counted and from which source; include enough detail to reproduce the measurement."},
+        "target": {"type": "string", "required": false, "max_bytes": 200, "description": "Optional initial desired KPI value; omission creates a KPI with no target."}
       },
       "submission_criteria": [
-        {
-          "code": "unknown_task",
-          "message": "Search task and pass its full Id; choose a task that exists and is not retracted.",
-          "all": [
-            {
-              "exists": "$task"
-            }
-          ]
-        },
-        {
-          "code": "duplicate_kpi",
-          "message": "Use the existing KPI; change its target with set_kpi_target or record a value with record_measurement.",
-          "none": [
-            {
-              "linked": {
-                "from": "$task",
-                "link": "kpis",
-                "where": {
-                  "all": [
-                    {
-                      "eq": [
-                        "name",
-                        "$name"
-                      ]
-                    }
-                  ]
-                }
-              }
-            }
-          ]
-        }
+        {"code": "home_required", "message": "Give exactly one of intent and task: the KPI's home.", "any": [{"all": [{"present": "$intent"}, {"none": [{"present": "$task"}]}]}, {"all": [{"present": "$task"}, {"none": [{"present": "$intent"}]}]}]},
+        {"code": "unknown_intent", "message": "Name an existing intent (search intent).", "none": [{"all": [{"present": "$intent"}, {"none": [{"exists": "$intent"}]}]}]},
+        {"code": "unknown_task", "message": "Search task and pass its full Id; choose a task that exists and is not retracted.", "none": [{"all": [{"present": "$task"}, {"none": [{"exists": "$task"}]}]}]},
+        {"code": "duplicate_kpi", "message": "Use the existing KPI; change its target with set_kpi_target or record a value with record_measurement.", "none": [{"all": [{"present": "$intent"}, {"linked": {"from": "$intent", "link": "intent_kpis", "where": {"all": [{"eq": ["name", "$name"]}]}}}]}, {"all": [{"present": "$task"}, {"linked": {"from": "$task", "link": "kpis", "where": {"all": [{"eq": ["name", "$name"]}]}}}]}]}
       ],
       "rules": [
-        {
-          "create_object": "kpi",
-          "set": {
-            "task": "$task",
-            "name": "$name",
-            "definition": "$definition",
-            "target": "$target"
-          }
-        }
+        {"create_object": "kpi", "set": {"task": "$task", "intent": "$intent", "name": "$name", "definition": "$definition", "target": "$target"}}
       ]
     },
     "record_measurement": {
@@ -2378,187 +2111,6 @@
             "status": "revoked",
             "revoked_at": "$now",
             "revoke_reason": "$reason"
-          }
-        }
-      ]
-    },
-    "add_item": {
-      "description": "Add a queued item to a task's backlog.",
-      "parameters": {
-        "task": {"type": {"ref": "task"}, "required": true},
-        "key": {"type": {"value_type": "nonempty_text"}, "required": true, "max_bytes": 60},
-        "title": {"type": {"value_type": "nonempty_text"}, "required": true, "max_bytes": 200},
-        "statement": {"type": {"value_type": "nonempty_text"}, "required": true, "max_bytes": 400},
-        "objective": {"type": {"ref": "objective"}, "required": true},
-        "origin": {"type": {"ref": "decision"}, "required": true},
-        "first_use": {"type": {"value_type": "nonempty_text"}, "required": true, "max_bytes": 300}
-      },
-      "submission_criteria": [
-        {"code": "unknown_task", "message": "Choose an existing task.", "all": [{"exists": "$task"}]},
-        {"code": "origin_not_current", "message": "Name a current decision row of the task.", "all": [{"exists": "$origin"}, {"eq": ["$origin.status", "current"]}, {"eq": ["$origin.task", "$task"]}]},
-        {"code": "objective_not_live", "message": "Name a stated or confirmed objective of the task.", "all": [{"exists": "$objective"}, {"eq": ["$objective.task", "$task"]}, {"in": ["$objective.status", ["stated", "confirmed"]]}]},
-        {"code": "key_used", "message": "Choose a key no item of the task ever had.", "none": [{"linked": {"from": "$task", "link": "items", "where": {"all": [{"eq": ["key", "$key"]}]}}}]}
-      ],
-      "rules": [
-        {
-          "create_object": "item",
-          "set": {
-            "task": "$task",
-            "key": "$key",
-            "title": "$title",
-            "statement": "$statement",
-            "objective": "$objective",
-            "origin": "$origin",
-            "first_use": "$first_use",
-            "state": "queued",
-            "added_at": "$now"
-          }
-        }
-      ]
-    },
-    "amend_item": {
-      "description": "Change title, statement, first use or objective of an open item.",
-      "parameters": {
-        "item": {"type": {"ref": "item"}, "required": true},
-        "title": {"type": {"value_type": "nonempty_text"}, "required": false, "max_bytes": 200},
-        "statement": {"type": {"value_type": "nonempty_text"}, "required": false, "max_bytes": 400},
-        "first_use": {"type": {"value_type": "nonempty_text"}, "required": false, "max_bytes": 300},
-        "objective": {"type": {"ref": "objective"}, "required": false}
-      },
-      "submission_criteria": [
-        {"code": "item_closed", "message": "Choose a queued or in-work item.", "all": [{"exists": "$item"}, {"in": ["$item.state", ["queued", "in_work"]]}]},
-        {"code": "objective_not_live", "message": "Name a stated or confirmed objective of the item's task.", "any": [{"none": [{"present": "$objective"}]}, {"all": [{"exists": "$objective"}, {"eq": ["$objective.task", "$item.task"]}, {"in": ["$objective.status", ["stated", "confirmed"]]}]}]}
-      ],
-      "rules": [
-        {
-          "modify_object": "item",
-          "set": {
-            "title": "$title",
-            "statement": "$statement",
-            "first_use": "$first_use",
-            "objective": "$objective"
-          }
-        }
-      ]
-    },
-    "start_item": {
-      "description": "queued to in_work; repository and branch both or neither; the item must be named by its task's board.",
-      "parameters": {
-        "item": {"type": {"ref": "item"}, "required": true},
-        "repository": {"type": {"value_type": "nonempty_text"}, "required": false, "max_bytes": 200},
-        "branch": {"type": {"value_type": "nonempty_text"}, "required": false, "max_bytes": 100}
-      },
-      "submission_criteria": [
-        {"code": "item_not_queued", "message": "Choose a queued item.", "all": [{"exists": "$item"}, {"eq": ["$item.state", "queued"]}]},
-        {"code": "item_not_ordered", "message": "Name the item in its task's order first.", "all": [{"linked": {"from": "$item", "link": "ordering_boards", "where": {"all": [{"eq": ["task", "$item.task"]}]}}}]},
-        {"code": "repository_and_branch", "message": "Supply repository and branch both or neither; an item that held a repository takes one again.", "none": [{"all": [{"present": "$repository"}, {"none": [{"present": "$branch"}]}]}, {"all": [{"present": "$branch"}, {"none": [{"present": "$repository"}]}]}, {"all": [{"present": "$item.repository"}, {"none": [{"present": "$repository"}]}]}]}
-      ],
-      "rules": [
-        {
-          "modify_object": "item",
-          "set": {
-            "state": "in_work",
-            "repository": "$repository",
-            "branch": "$branch",
-            "started_at": "$now"
-          }
-        }
-      ]
-    },
-    "close_item": {
-      "description": "in_work to done: with a repository, a closed accepting review of the task and repository that closes no other item; without, evidence.",
-      "parameters": {
-        "item": {"type": {"ref": "item"}, "required": true},
-        "review": {"type": {"ref": "review"}, "required": false},
-        "evidence": {"type": {"value_type": "nonempty_text"}, "required": false, "max_bytes": 600}
-      },
-      "submission_criteria": [
-        {"code": "item_not_in_work", "message": "Choose an in-work item.", "all": [{"exists": "$item"}, {"eq": ["$item.state", "in_work"]}]},
-        {"code": "review_or_evidence", "message": "A unit closes with its accepting review; other work with evidence.", "any": [{"all": [{"present": "$item.repository"}, {"present": "$review"}, {"exists": "$review"}, {"eq": ["$review.status", "closed"]}, {"eq": ["$review.verdict", "accept"]}, {"eq": ["$review.task", "$item.task"]}, {"eq": ["$review.repository", "$item.repository"]}, {"none": [{"present": "$evidence"}]}]}, {"all": [{"none": [{"present": "$item.repository"}]}, {"present": "$evidence"}, {"none": [{"present": "$review"}]}]}]},
-        {"code": "review_closes_another_item", "message": "Name a review no other item names.", "none": [{"all": [{"present": "$review"}, {"linked": {"from": "$review", "link": "closed_items"}}]}]}
-      ],
-      "rules": [
-        {
-          "modify_object": "item",
-          "set": {
-            "state": "done",
-            "review": "$review",
-            "evidence": "$evidence",
-            "closed_at": "$now"
-          }
-        }
-      ]
-    },
-    "drop_item": {
-      "description": "Drop an item that is not done, with a reason.",
-      "parameters": {
-        "item": {"type": {"ref": "item"}, "required": true},
-        "reason": {"type": {"value_type": "nonempty_text"}, "required": true, "max_bytes": 600}
-      },
-      "submission_criteria": [
-        {"code": "item_done_or_dropped", "message": "Choose an item that is neither done nor dropped.", "all": [{"exists": "$item"}, {"in": ["$item.state", ["queued", "in_work"]]}]}
-      ],
-      "rules": [
-        {
-          "modify_object": "item",
-          "set": {
-            "state": "dropped",
-            "drop_reason": "$reason",
-            "dropped_at": "$now"
-          }
-        }
-      ]
-    },
-    "set_order": {
-      "description": "Replace a task's order in one action; the first call creates the board (key: the task's key, by convention of the caller).",
-      "parameters": {
-        "board": {"type": {"ref": "board"}, "required": true, "description": "Id of type board whose native_key is the task's key."},
-        "task": {"type": {"ref": "task"}, "required": true},
-        "order": {"type": {"array": {"ref": "item"}}, "required": true},
-        "reason": {"type": {"value_type": "nonempty_text"}, "required": true, "max_bytes": 600}
-      },
-      "submission_criteria": [
-        {"code": "unknown_task", "message": "Choose an existing task.", "all": [{"exists": "$task"}]},
-        {"code": "board_of_another_task", "message": "Name this task's board, or a new one when the task has none.", "any": [{"all": [{"exists": "$board"}, {"eq": ["$board.task", "$task"]}]}, {"all": [{"none": [{"exists": "$board"}]}, {"none": [{"linked": {"from": "$task", "link": "boards"}}]}]}]}
-      ],
-      "rules": [
-        {
-          "create_or_modify_object": "board",
-          "set": {
-            "task": "$task",
-            "order": "$order",
-            "reason": "$reason",
-            "set_at": "$now"
-          }
-        }
-      ]
-    },
-    "triage_decision": {
-      "description": "Triage a row of the user once: item, intent, not_adopted or none.",
-      "parameters": {
-        "decision": {"type": {"ref": "decision"}, "required": true},
-        "triage": {"type": {"value_type": "triage_kind"}, "required": true},
-        "item": {"type": {"ref": "item"}, "required": false},
-        "objective": {"type": {"ref": "objective"}, "required": false},
-        "reason": {"type": {"value_type": "nonempty_text"}, "required": false, "max_bytes": 600}
-      },
-      "submission_criteria": [
-        {"code": "not_a_user_row", "message": "Choose a current row decided by the user.", "all": [{"exists": "$decision"}, {"eq": ["$decision.status", "current"]}, {"eq": ["$decision.decided_by", "user"]}]},
-        {"code": "already_triaged", "message": "A row is triaged once.", "none": [{"present": "$decision.triage"}]},
-        {"code": "item_required", "message": "Triage item names an item of the row's task.", "any": [{"ne": ["$triage", "item"]}, {"all": [{"present": "$item"}, {"exists": "$item"}, {"eq": ["$item.task", "$decision.task"]}]}]},
-        {"code": "objective_required", "message": "Triage intent names an objective of the row's task.", "any": [{"ne": ["$triage", "intent"]}, {"all": [{"present": "$objective"}, {"exists": "$objective"}, {"eq": ["$objective.task", "$decision.task"]}]}]},
-        {"code": "reason_required", "message": "Triage not_adopted and none carry a reason.", "any": [{"in": ["$triage", ["item", "intent"]]}, {"present": "$reason"}]},
-        {"code": "reference_not_for_triage", "message": "Give item only with the word item and objective only with the word intent.", "all": [{"any": [{"none": [{"present": "$item"}]}, {"eq": ["$triage", "item"]}]}, {"any": [{"none": [{"present": "$objective"}]}, {"eq": ["$triage", "intent"]}]}]}
-      ],
-      "rules": [
-        {
-          "modify_object": "decision",
-          "set": {
-            "triage": "$triage",
-            "triage_item": "$item",
-            "triage_objective": "$objective",
-            "triage_reason": "$reason",
-            "triaged_at": "$now"
           }
         }
       ]
@@ -3157,7 +2709,7 @@
         {"code": "intent_parameter_required", "message": "A unit of the lane objective names its intent in the parameter intent.", "none": [{"all": [{"exists": "$unit"}, {"eq": ["$unit.lane", "objective"]}, {"none": [{"present": "$intent"}]}]}]},
         {"code": "held", "message": "An active hold names this unit or its intent: wait for its condition, then lift_hold.", "none": [{"linked": {"from": "$unit", "link": "subject_holds", "where": {"all": [{"eq": ["status", "active"]}]}}}, {"all": [{"present": "$intent"}, {"linked": {"from": "$intent", "link": "subject_holds", "where": {"all": [{"eq": ["status", "active"]}]}}}]}]},
         {"code": "not_approved", "message": "The Lead approves this head first (approve_unit, role lead): the class is contract or effect.", "none": [{"all": [{"exists": "$unit"}, {"in": ["$unit.class", ["contract", "effect"]]}, {"none": [{"all": [{"present": "$unit.approved_head"}, {"eq": ["$unit.approved_head", "$head"]}]}]}]}]},
-        {"code": "no_repository", "message": "A unit without a repository ends by close_unit.", "all": [{"exists": "$unit"}, {"present": "$unit.repository"}]}
+        {"code": "no_repository", "message": "merge_unit records a merge in a repository: choose a unit with one.", "all": [{"exists": "$unit"}, {"present": "$unit.repository"}]}
       ],
       "rules": [
         {"modify_object": "unit", "set": {"state": "merged", "merged_commit": "$merged_commit", "ended_at": "$now"}}
@@ -3176,27 +2728,6 @@
       ],
       "rules": [
         {"modify_object": "unit", "set": {"used_at": "$now", "use_evidence": "$evidence"}}
-      ]
-    },
-    "close_unit": {
-      "description": "An accepted unit without a repository is done. Its head is the SHA-256 of the evidence, recorded and reviewed like any head.",
-      "parameters": {
-        "unit": {"type": {"ref": "unit"}, "required": true, "description": "The unit: an Id of type unit whose native_key is the unit's key."},
-        "evidence": {"type": "string", "required": true, "max_bytes": 1500, "description": "What shows the unit is done; its SHA-256 is the unit's head."},
-        "intent": {"type": {"ref": "intent"}, "required": false, "description": "The unit's own intent; required in the lane objective, left out in the lane small."}
-      },
-      "submission_criteria": [
-        {"code": "unit_has_a_repository", "message": "A unit with a repository ends by merge_unit.", "none": [{"all": [{"exists": "$unit"}, {"present": "$unit.repository"}]}]},
-        {"code": "unit_not_accepted", "message": "Choose an accepted unit.", "all": [{"exists": "$unit"}, {"in": ["$unit.state", ["accepted"]]}]},
-        {"code": "evidence_empty", "message": "Give the evidence.", "all": [{"ne": ["$evidence", ""]}]},
-        {"code": "head_not_reviewed", "message": "A review of kind packet of this head, started after the unit's last amendment, must be closed accept (close_unit_review or carry_review).", "all": [{"exists": "$unit"}, {"present": "$unit.head"}, {"linked": {"from": "$unit", "link": "unit_reviews", "where": {"all": [{"eq": ["kind", "packet"]}, {"eq": ["status", "closed"]}, {"eq": ["verdict", "accept"]}, {"eq": ["head", "$unit.head"]}, {"gt": ["started_at", "$unit.amended_at"]}]}}}]},
-        {"code": "intent_differs", "message": "Give the unit's own intent, or none in the lane small.", "none": [{"all": [{"present": "$intent"}, {"none": [{"all": [{"exists": "$unit"}, {"present": "$unit.intent"}, {"eq": ["$unit.intent", "$intent"]}]}]}]}]},
-        {"code": "intent_parameter_required", "message": "A unit of the lane objective names its intent in the parameter intent.", "none": [{"all": [{"exists": "$unit"}, {"eq": ["$unit.lane", "objective"]}, {"none": [{"present": "$intent"}]}]}]},
-        {"code": "held", "message": "An active hold names this unit or its intent: wait for its condition, then lift_hold.", "none": [{"linked": {"from": "$unit", "link": "subject_holds", "where": {"all": [{"eq": ["status", "active"]}]}}}, {"all": [{"present": "$intent"}, {"linked": {"from": "$intent", "link": "subject_holds", "where": {"all": [{"eq": ["status", "active"]}]}}}]}]},
-        {"code": "not_approved", "message": "The Lead approves this head first (approve_unit, role lead): the class is contract or effect.", "none": [{"all": [{"exists": "$unit"}, {"in": ["$unit.class", ["contract", "effect"]]}, {"none": [{"all": [{"present": "$unit.approved_head"}, {"present": "$unit.head"}, {"eq": ["$unit.approved_head", "$unit.head"]}]}]}]}]}
-      ],
-      "rules": [
-        {"modify_object": "unit", "set": {"state": "done", "evidence": "$evidence", "ended_at": "$now"}}
       ]
     },
     "drop_unit": {
@@ -3867,10 +3398,8 @@
       "actions": [
         "accept_unit",
         "add_criterion",
-        "add_item",
         "add_unit",
         "amend_intent",
-        "amend_item",
         "amend_principle",
         "amend_unit",
         "answer_questions",
@@ -3882,10 +3411,8 @@
         "close_finding",
         "close_install",
         "close_intent",
-        "close_item",
         "close_review",
         "close_run",
-        "close_unit",
         "close_unit_review",
         "confirm_intent",
         "confirm_intent_delegated",
@@ -3894,7 +3421,6 @@
         "define_kpi",
         "dismiss_finding",
         "draft_intent",
-        "drop_item",
         "drop_unit",
         "end_delegation",
         "extend_session",
@@ -3910,7 +3436,6 @@
         "plan_finding_as_intent",
         "plan_finding_as_unit",
         "ready_unit",
-        "record_decision",
         "record_head",
         "record_measurement",
         "record_principle",
@@ -3929,19 +3454,15 @@
         "set_intent_principles",
         "set_kpi_intent",
         "set_kpi_target",
-        "set_order",
         "set_request_aside",
         "start_install",
-        "start_item",
         "start_review",
         "start_run",
         "start_unit",
         "start_unit_review",
         "state_allowance",
         "stop_unit",
-        "supersede_decision",
         "supersede_request",
-        "triage_decision",
         "undefer_unit",
         "waive_criterion"
       ],
@@ -4284,50 +3805,6 @@
     }
   ],
   "views": {
-    "kpi_board": {
-      "object_type": "kpi",
-      "args": [
-        "task"
-      ],
-      "filter": {
-        "all": [
-          {
-            "eq": [
-              "task",
-              "$task"
-            ]
-          }
-        ]
-      },
-      "order": [
-        {
-          "property": "name",
-          "direction": "asc"
-        }
-      ],
-      "columns": [
-        {
-          "header": "KPI",
-          "property": "name"
-        },
-        {
-          "header": "Current",
-          "property": "value"
-        },
-        {
-          "header": "Observed",
-          "property": "observed_at"
-        },
-        {
-          "header": "Target",
-          "property": "target"
-        },
-        {
-          "header": "Evidence",
-          "property": "evidence"
-        }
-      ]
-    },
     "active_holds": {
       "object_type": "hold",
       "args": [
@@ -4363,52 +3840,6 @@
         {
           "header": "Until",
           "property": "until"
-        }
-      ]
-    },
-    "current_decisions": {
-      "object_type": "decision",
-      "args": [
-        "task"
-      ],
-      "filter": {
-        "all": [
-          {
-            "eq": [
-              "task",
-              "$task"
-            ]
-          },
-          {
-            "eq": [
-              "status",
-              "current"
-            ]
-          }
-        ]
-      },
-      "order": [
-        {
-          "property": "topic",
-          "direction": "asc"
-        }
-      ],
-      "columns": [
-        {
-          "header": "Topic",
-          "property": "topic"
-        },
-        {
-          "header": "Decision",
-          "property": "text"
-        },
-        {
-          "header": "By",
-          "property": "decided_by"
-        },
-        {
-          "header": "Undo",
-          "property": "undo"
         }
       ]
     },
@@ -4607,44 +4038,6 @@
         {"header": "Parent", "property": "parent"},
         {"header": "Statement", "property": "statement"},
         {"header": "Requests", "property": "requests"}
-      ]
-    },
-    "lead_state": {
-      "args": ["directory"],
-      "blocks": [
-        {"heading": "Intent", "list": {"object_type": "intent", "filter": {"all": [{"eq": ["directory", "$directory"]}, {"in": ["status", ["draft", "assumed", "confirmed"]]}]}, "order": [{"property": "amended_at", "direction": "desc"}], "properties": ["$key", "lead_session", "lead_named_by", "notes"], "limit": 1}},
-        {"heading": "Holds", "list": {"object_type": "hold", "filter": {"all": [{"eq": ["status", "active"]}]}, "order": [{"property": "set_at", "direction": "asc"}], "properties": ["$key", "effect", "until"], "limit": 6}},
-        {"heading": "Lessons", "list": {"object_type": "finding", "filter": {"all": [{"eq": ["kind", "lesson"]}, {"in": ["state", ["open", "planned"]]}]}, "order": [{"property": "first_seen_at", "direction": "asc"}], "properties": ["$key", "summary"], "limit": 8}}
-      ]
-    },
-    "lead_handover": {
-      "args": ["directory", "intent", "task"],
-      "blocks": [
-        {"heading": "Mandate", "table": {"object_type": "intent", "filter": {"all": [{"eq": ["directory", "$directory"]}, {"in": ["status", ["draft", "assumed", "confirmed"]]}]}, "order": [{"property": "amended_at", "direction": "desc"}], "columns": [
-          {"header": "Key", "property": "$key"},
-          {"header": "Outcome", "property": "outcome"},
-          {"header": "First user", "property": "first_user"},
-          {"header": "Lead", "property": "lead_session"}
-        ], "limit": 1}},
-        {"heading": "Criteria", "table": {"object_type": "criterion", "filter": {"all": [{"eq": ["intent", "$intent"]}]}, "order": [{"property": "added_at", "direction": "asc"}], "columns": [
-          {"header": "Key", "property": "$key"},
-          {"header": "State", "property": "state"},
-          {"header": "Check", "property": "check"},
-          {"header": "Evidence", "property": "evidence"}
-        ], "limit": 40}},
-        {"heading": "Units", "table": {"object_type": "unit", "filter": {"all": [{"eq": ["intent", "$intent"]}, {"in": ["state", ["draft", "ready", "running", "accepted", "stopped"]]}]}, "order": [{"property": "added_at", "direction": "asc"}], "columns": [
-          {"header": "Key", "property": "$key"},
-          {"header": "State", "property": "state"},
-          {"header": "Class", "property": "class"},
-          {"header": "Waits on", "property": "waits_on"}
-        ], "limit": 100}},
-        {"heading": "Baseline", "table": {"object_type": "kpi", "filter": {"all": [{"eq": ["task", "$task"]}]}, "order": [{"property": "name", "direction": "asc"}], "columns": [
-          {"header": "KPI", "property": "name"},
-          {"header": "Current", "property": "value"},
-          {"header": "Observed", "property": "observed_at"},
-          {"header": "Evidence", "property": "evidence"}
-        ], "limit": 60}},
-        {"heading": "Lessons", "list": {"object_type": "finding", "filter": {"all": [{"eq": ["kind", "lesson"]}, {"in": ["state", ["open", "planned"]]}]}, "order": [{"property": "first_seen_at", "direction": "asc"}], "properties": ["$key", "summary"], "limit": 40}}
       ]
     },
     "bottlenecks": {

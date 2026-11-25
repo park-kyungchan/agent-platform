@@ -981,7 +981,7 @@ apply('triage_decision', 'v9-after-carry', dict(decision=third, triage='none', r
 unchanged = fingerprint()
 assert migrate(9, 10) == dict(carried=0, already=3)
 assert fingerprint() == unchanged and fields(third_request)['route_reason'] == 'carried from version 9'
-for before, after in [(9, 26), (10, 10), (10, 9)]:
+for before, after in [(9, 27), (10, 10), (10, 9)]:
     assert migrate(before, after, 2) == dict(status='unknown_pair')
 assert fingerprint() == unchanged
 assert migrate(9, 10) == dict(carried=0, already=3)
@@ -2746,7 +2746,7 @@ unchanged = fingerprint()
 assert migrate(21, 23) == dict(carried=0, already=0)
 assert migrate(20, 23) == dict(carried=0, already=0)
 assert migrate(22, 23) == dict(carried=0, already=0)
-assert migrate(23, 26, 2) == dict(status='unknown_pair')
+assert migrate(23, 27, 2) == dict(status='unknown_pair')
 assert fingerprint() == unchanged and [obj(i) for i in v21_objects] == v21_before
 print('v22_migration_rows_complete')
 phase = 'v22'
@@ -2880,7 +2880,7 @@ assert 'subject' in (listed_interfaces if isinstance(listed_interfaces, dict) el
 unchanged = fingerprint()
 assert migrate(23, 24) == dict(carried=0, already=0)
 assert migrate(22, 24) == dict(carried=0, already=0)
-assert migrate(24, 26, 2) == dict(status='unknown_pair')
+assert migrate(24, 27, 2) == dict(status='unknown_pair')
 assert fingerprint() == unchanged and [obj(i) for i in v23_objects] == v23_before
 print('v24_migration_rows_complete')
 # The walk. Each refusal row is before the action it guards; a refusal writes nothing.
@@ -2971,7 +2971,7 @@ reached = json.dumps(around('subject_holds'))
 assert hold_host['native_key'] in reached and hold_both['native_key'] in reached and hold_task['native_key'] not in reached and hold_unit['native_key'] not in reached, reached
 print('v24_gate_rows_complete')
 print('v24 subjects: ok')
-# Version 25, the repository's file, over the objects made under version 24 (pinned in Git above). The schema differs from
+# Version 25, pinned in Git by the commit of main that holds it, over the objects made under version 24 (pinned in Git above). The schema differs from
 # version 24 only by points 1 to 11 of ontology/README.md, "Version 25: the unit of the driver": 19 actions and 3 views
 # removed, two value types, eight properties of unit, five actions, the additions to five unit actions, flow's by and the grants.
 v24_schema, v24_sizes = schema, sizes
@@ -2989,7 +2989,11 @@ v24_views = [(view, args, call(['render'], dict(view=view, args=args))) for view
 removed_views = [(view, args) for view, args in v24_all_views if view in REMOVED_VIEWS25]
 assert len(v24_views) == 20 and len(removed_views) == 3 and all(call(['render'], dict(view=v, args=a))['status'] == 'ok' for v, a in removed_views)
 phase = 'v25'
-schema = json.loads(pathlib.Path(repo, 'ontology/work.schema.json').read_text())
+V25_PIN = ('3195e3a98be37cd856fb3cb42e497af9452af55c', '5da65525b31b666db7a2d1d36c486df4af5be43eae85090ad59b2f6df04f5cab')
+v25_bytes = subprocess.check_output(['git', '-C', repo, 'show', V25_PIN[0] + ':ontology/work.schema.json'], timeout=10)
+assert hashlib.sha256(v25_bytes).hexdigest() == V25_PIN[1]
+v25_path = pathlib.Path(store).with_name('pinned-' + V25_PIN[0] + '.json'); v25_path.write_bytes(v25_bytes)
+schema = json.loads(v25_bytes)
 assert schema['version'] == 25
 head, old = json.loads(json.dumps(schema)), v24_schema
 changed = lambda sec: {k for k in set(head[sec]) | set(old[sec]) if head[sec].get(k) != old[sec].get(k)}
@@ -3050,7 +3054,7 @@ held25 = {g['role']: g for g in head['grants'] if 'role' in g}
 assert held25['lead']['actions'] == sorted(head['action_types']) and not any(REMOVED25 & set(g['actions']) for g in head['grants'])
 assert [r for r, g in held25.items() if 'approve_unit_by_policy' in g['actions']] == ['lead', 'dispatch']
 print('gate_row=v25-only-points-1-to-11 expected=admitted actions=' + str(len(schema['action_types'])) + ' views=' + str(len(schema['views'])))
-copy25 = cases_copy(pathlib.Path(repo, 'ontology/work.schema.json'), 'repository.json', 'repository-route.json')
+copy25 = cases_copy(v25_path, 'pinned-v25.json', 'pinned-v25-route.json')
 copy25_schema = json.loads(copy25.read_text())
 for fn_ in copy25_schema['functions'].values(): fn_['program'] = str(fake_fn)
 copy25.write_text(json.dumps(copy25_schema))
@@ -3074,7 +3078,7 @@ assert described.returncode == 0 and json.loads(described.stdout)['schema']['wor
 unchanged = fingerprint()
 assert migrate(24, 25) == dict(carried=0, already=0)
 assert migrate(23, 25) == dict(carried=0, already=0)
-assert migrate(25, 26, 2) == dict(status='unknown_pair')
+assert migrate(25, 27, 2) == dict(status='unknown_pair')
 assert fingerprint() == unchanged and [obj(i) for i in v24_objects] == v24_before
 print('v25_migration_rows_complete')
 # The removed actions are unknown to the store.
@@ -3167,4 +3171,110 @@ claim('reopen_finding', 'v25-measure', dict(finding=measured, evidence='v25 back
 assert fields(measured)['state'] == 'open'
 print('v25_gate_rows_complete')
 print('v25 driver fields: ok')
+# Version 26, the repository's file, over the objects made under version 25 (pinned in Git above). The schema differs from
+# version 25 only by points 1 to 6 of ontology/README.md, "Version 26: what is used": 10 actions and 4 views removed, the
+# message of merge_unit's no_repository, define_kpi with its home intent or task, kpi.task optional, and the grants.
+v25_schema, v25_sizes = schema, sizes
+v25_objects = [o['id'] for t in TYPES25 for o in call(['search'], dict(object_type=t, limit=1000))['objects']]
+v25_before = [obj(i) for i in v25_objects]
+REMOVED26 = {'record_decision', 'supersede_decision', 'add_item', 'amend_item', 'start_item', 'close_item', 'drop_item', 'set_order',
+             'triage_decision', 'close_unit'}
+REMOVED_VIEWS26 = {'kpi_board', 'current_decisions', 'lead_state', 'lead_handover'}
+v25_all_views = [(name, {a: ARGS22[a] for a in body.get('args', [])}) for name, body in v25_schema['views'].items()]
+v25_views = [(view, args, call(['render'], dict(view=view, args=args))) for view, args in v25_all_views if view not in REMOVED_VIEWS26]
+removed_views26 = [(view, args) for view, args in v25_all_views if view in REMOVED_VIEWS26]
+assert len(v25_views) == 16 and len(removed_views26) == 4 and all(call(['render'], dict(view=v, args=a))['status'] == 'ok' for v, a in removed_views26)
+phase = 'v26'
+schema = json.loads(pathlib.Path(repo, 'ontology/work.schema.json').read_text())
+assert schema['version'] == 26
+head, old = json.loads(json.dumps(schema)), v25_schema
+changed = lambda sec: {k for k in set(head[sec]) | set(old[sec]) if head[sec].get(k) != old[sec].get(k)}
+# 1, 2: the removed actions and views; nothing is added.
+assert set(old['action_types']) - set(head['action_types']) == REMOVED26 and set(head['action_types']) <= set(old['action_types'])
+assert changed('action_types') == REMOVED26 | {'define_kpi', 'merge_unit'}, changed('action_types')
+assert changed('views') == REMOVED_VIEWS26 and set(head['views']) < set(old['views'])
+# 3: merge_unit differs only by the message of no_repository, which names no removed action.
+a, b = (json.loads(json.dumps(s_['action_types']['merge_unit'])) for s_ in (head, old))
+assert a['submission_criteria'][-1]['code'] == b['submission_criteria'][-1]['code'] == 'no_repository'
+message = a['submission_criteria'][-1].pop('message'); b['submission_criteria'][-1].pop('message')
+assert a == b and not any(name in message for name in REMOVED26), message
+# 4: the types stay; kpi differs only by task, now optional.
+assert set(head) == set(old) and all(head[k] == old[k] for k in head if k not in ('version', 'action_types', 'views', 'object_types', 'grants'))
+assert changed('object_types') == {'kpi'}
+new_kpi, old_kpi = (json.loads(json.dumps(s_['object_types']['kpi'])) for s_ in (head, old))
+assert old_kpi['properties']['task']['required'] is True and new_kpi['properties']['task'].pop('required') is False
+old_kpi['properties']['task'].pop('required'); assert new_kpi == old_kpi
+# 5: define_kpi takes intent or task, exactly one, and sets both.
+d = head['action_types']['define_kpi']
+assert list(d['parameters']) == ['intent', 'task', 'name', 'definition', 'target'] and [p_['required'] for p_ in d['parameters'].values()] == [False, False, True, True, False]
+assert d['parameters']['intent']['type'] == {'ref': 'intent'} and d['parameters']['task']['type'] == {'ref': 'task'}
+assert {k: d['parameters'][k] for k in ('definition', 'target')} == {k: old['action_types']['define_kpi']['parameters'][k] for k in ('definition', 'target')}
+assert [c['code'] for c in d['submission_criteria']] == ['home_required', 'unknown_intent', 'unknown_task', 'duplicate_kpi']
+assert d['rules'] == [{'create_object': 'kpi', 'set': {'task': '$task', 'intent': '$intent', 'name': '$name', 'definition': '$definition', 'target': '$target'}}]
+# 6: the grants are those of version 25 less the removed actions.
+assert len(head['grants']) == len(old['grants'])
+for g_new, g_old in zip(head['grants'], old['grants']):
+    assert g_new == dict(g_old, actions=[a_ for a_ in g_old['actions'] if a_ not in REMOVED26]), g_new.get('role')
+held26 = {g['role']: g for g in head['grants'] if 'role' in g}
+assert held26['lead']['actions'] == sorted(head['action_types']) and not any(REMOVED26 & set(g['actions']) for g in head['grants'])
+print('gate_row=v26-only-points-1-to-6 expected=admitted actions=' + str(len(schema['action_types'])) + ' views=' + str(len(schema['views'])))
+copy26 = cases_copy(pathlib.Path(repo, 'ontology/work.schema.json'), 'repository.json', 'repository-route.json')
+copy26_schema = json.loads(copy26.read_text())
+for fn_ in copy26_schema['functions'].values(): fn_['program'] = str(fake_fn)
+copy26.write_text(json.dumps(copy26_schema))
+call(['schema', 'install', str(copy26)])
+redirect.trace(work, copies)
+assert [obj(i) for i in v25_objects] == v25_before
+for view, args, before in v25_views:
+    answer = call(['render'], dict(view=view, args=args))
+    assert answer['rows'] == before['rows'] and answer['markdown'] == before['markdown'].replace('schema=work@25', 'schema=work@26'), view
+for view, args in removed_views26: assert call(['render'], dict(view=view, args=args), 2)['code'] == 'unavailable', view
+print('gate_row=v26-v25-objects-and-views-unchanged expected=admitted objects=' + str(len(v25_objects)) + ' views=' + str(len(v25_views)))
+sizes = []
+for name in ('ont_describe', 'ont_action_list'):
+    wire = subprocess.run([binary, '--store', store, 'mcp'], input=json.dumps(dict(jsonrpc='2.0', id=1, method='tools/call', params=dict(name=name, arguments={}))) + '\n', text=True, capture_output=True, timeout=60)
+    answer = json.loads(wire.stdout.splitlines()[0])['result']; assert wire.returncode == 0 and not answer['isError'], answer
+    sizes.append(len(answer['content'][0]['text'].encode())); assert sizes[-1] <= 262144, (name, sizes[-1])
+assert sizes[0] < v25_sizes[0] and sizes[1] < v25_sizes[1], (sizes, v25_sizes)
+print('v26_mcp_bytes=' + ','.join(map(str, sizes)) + ' v25=' + ','.join(map(str, v25_sizes)), file=sys.stderr)
+described = subprocess.run([binary, '--store', store, 'describe'], input='{}', text=True, capture_output=True, timeout=60, env=env)
+assert described.returncode == 0 and json.loads(described.stdout)['schema']['work']['version'] == 26, described.stdout[:300]
+print('v26_describe_bytes=' + str(len(described.stdout.encode())), file=sys.stderr)
+unchanged = fingerprint()
+assert migrate(25, 26) == dict(carried=0, already=0)
+assert migrate(24, 26) == dict(carried=0, already=0)
+assert migrate(26, 27, 2) == dict(status='unknown_pair')
+assert fingerprint() == unchanged and [obj(i) for i in v25_objects] == v25_before
+print('v26_migration_rows_complete')
+# The removed actions are unknown to the store.
+for name in sorted(REMOVED26): apply(name, 'removed', {}, 'unknown_action')
+# The walk of define_kpi. Each refusal row is before the action it guards; a refusal writes nothing.
+KPI26 = dict(name='v26_merged', definition='Merged units a day, counted from the store.')
+tick(); apply('define_kpi', 'no-home', KPI26, 'home_required')
+apply('define_kpi', 'two-homes', dict(KPI26, intent=conf, task=task), 'home_required')
+apply('define_kpi', 'unknown-intent', dict(KPI26, intent=oid('intent', 'absent-v26-intent')), 'unknown_intent')
+apply('define_kpi', 'unknown-task', dict(KPI26, task=oid('task', 'absent-v26-task')), 'unknown_task')
+of_intent = created(apply('define_kpi', 'of-intent', dict(KPI26, intent=conf, target='3')), 'kpi')
+f = fields(of_intent); assert f['intent'] == conf and f.get('task') is None and f['name'] == 'v26_merged' and f['target'] == '3', f
+apply('define_kpi', 'of-intent-again', dict(KPI26, intent=conf), 'duplicate_kpi')
+# The same name in another intent is another KPI.
+of_twin = created(apply('define_kpi', 'of-twin', dict(KPI26, intent=twin_intent)), 'kpi')
+assert fields(of_twin)['intent'] == twin_intent and of_twin != of_intent
+# The older form: a KPI of a task, unique among the task's KPIs; given an intent by set_kpi_intent, its name is taken there.
+of_task = created(apply('define_kpi', 'of-task', dict(name='v26_stops', definition='Stops a day.', task=task)), 'kpi')
+f = fields(of_task); assert f['task'] == task and f.get('intent') is None, f
+apply('define_kpi', 'of-task-again', dict(name='v26_stops', definition='Stops a day.', task=task), 'duplicate_kpi')
+apply('define_kpi', 'other-name-of-task', dict(name='v26_merged', definition='Merged units a day.', task=task))
+apply('set_kpi_intent', 'of-task', dict(kpi=of_task, intent=conf))
+apply('define_kpi', 'name-of-a-task-kpi-in-the-intent', dict(name='v26_stops', definition='Stops a day.', intent=conf), 'duplicate_kpi')
+# A KPI of an intent takes a measurement and a target as a KPI of a task does.
+tick(); apply('record_measurement', 'of-intent', dict(kpi=of_intent, value='2', observed_at=stamp(), evidence='ontology/rehearsal.sh'))
+apply('set_kpi_target', 'of-intent', dict(kpi=of_intent, target='4'))
+f = fields(of_intent); assert f['value'] == '2' and f['target'] == '4' and f['intent'] == conf, f
+# set_kpi_intent compares the task of the KPIs of the intent: a KPI without a task on either side leaves it not evaluable.
+other_of_task = call(['search'], dict(object_type='kpi', where={'all': [{'eq': ['name', 'v26_merged']}, {'eq': ['task', task]}]}))['objects'][0]['id']
+apply('set_kpi_intent', 'same-name-as-a-kpi-of-the-intent', dict(kpi=other_of_task, intent=conf), 'criterion_not_evaluable')
+apply('set_kpi_intent', 'kpi-without-a-task', dict(kpi=of_twin, intent=conf), 'criterion_not_evaluable')
+print('v26_gate_rows_complete')
+print('v26 schema use: ok')
 PY

@@ -2257,3 +2257,74 @@ to the intent) and `by_not_routed_here` (an answer routed to another intent), an
 `questions` change and no other field; `flow` with `by` answers under `lead`; `open_finding` under `dispatch` and the
 four finding actions under `measure` apply. The last line of standard output of the rehearsal is
 `v25 driver fields: ok`.
+
+## Version 26: what is used
+Version 25 remains pinned at
+`3195e3a98be37cd856fb3cb42e497af9452af55c:ontology/work.schema.json`,
+sha256 `5da65525b31b666db7a2d1d36c486df4af5be43eae85090ad59b2f6df04f5cab`.
+Version 26 removes the 10 action types and 4 views that neither the code of `ap`, nor an installed instruction file, nor
+a host script names, and gives a KPI an intent as its home. Every value type, object type, link type, action type, view,
+source, function and grant not named below reads as on version 25 in canonical JSON. The point of the version: the
+description an agent reads (`ont_describe`) carries no action and no view that nobody uses, so that it has room for the
+domains the host will add, and `ci/check-schema-use.py`, a step of `./check content`, refuses a schema that declares one
+again. A KPI of a new intent had no home: `define_kpi` required a task, and no program of the host writes a task any more.
+`ENGINE-PIN` is unchanged.
+
+1. Removed action types, each also taken out of every grant: `record_decision`, `supersede_decision`, `add_item`,
+   `amend_item`, `start_item`, `close_item`, `drop_item`, `set_order`, `triage_decision` and `close_unit`. As on version
+   25, the object types, properties, value types and link types they wrote (`decision`, `item`, `board` and theirs,
+   and the properties of `unit` that `close_unit` set) stay for the objects written before.
+2. Removed views: `kpi_board`, `current_decisions`, `lead_state` and `lead_handover`.
+3. `merge_unit`: the message of its criterion `no_repository`, which named `close_unit`, becomes "merge_unit records a
+   merge in a repository: choose a unit with one."; its code and its condition are unchanged. A unit without a
+   repository has no action that ends it.
+4. `kpi`: the property `task` is optional (`required: false`), as version 24 made `hold.task` optional.
+5. `define_kpi` takes the optional parameters `intent` and `task` (exactly one of the two), `name`, `definition` and
+   `target` as before. Its criteria, in this order: `home_required` (none or both of `intent` and `task` given),
+   `unknown_intent`, `unknown_task` (each only when given), `duplicate_kpi` (a KPI of the same name of the intent, read
+   through `intent_kpis`, or of the task, through `kpis`). One rule creates the KPI with `task`, `intent`, `name`,
+   `definition` and `target`. A KPI of a task given an intent by `set_kpi_intent` is a KPI of that intent: its name is
+   taken there.
+6. The grants. Every grant loses the removed actions.
+
+### What the store does not check
+- `set_kpi_intent` reads the `task` of the KPI it moves and of the intent's KPIs of the same name: it is refused
+  `criterion_not_evaluable` for a KPI without a task, and for a KPI of a task when the intent holds a KPI of the same
+  name without a task. Nothing is written; the KPI of an intent keeps the intent `define_kpi` gave it.
+- A KPI written before this version has a task, and on the host no task was written since the generation before.
+- `define_kpi` with `task` does not read the KPIs of an intent: a KPI of a task may share its name with a KPI of an
+  intent until `set_kpi_intent` moves it there.
+
+### The check of use
+`ci/check-schema-use.py` reads `ontology/work.schema.json` and looks, for every action type and every view, for its name
+as a whole word (an underscore is part of a word), and for an action also its generated type name (the name in
+CamelCase, as `ont schema gen` makes it for `crates/ap/build.rs`), in the files under `crates/ap/src`, `content`,
+`deploy` and `scripts` and in `ontology/migrate`. It prints `unused action <name>` or `unused view <name>` for each name
+it does not find and exits 1 when there is one. It takes no list of exceptions: an action a Lead applies by hand is
+named in `content/runtime-references/ONTOLOGY-USE.md`. The tests, the rehearsal, the evaluations and this file are not
+read: a name used only there is unused.
+
+### The migration and the rehearsal
+`ontology/migrate` knows version 26; its step is empty. `HIGHEST = 26`; `26 27` is a pair it does not know (exit 2);
+the pairs refused on the version 10 part of the rehearsal are (9, 27), (10, 10) and (10, 9), the walk of versions 22
+and 23 refuses 23 27, the walk of version 24 24 27 and the walk of version 25 25 27. The walk of version 25 runs on
+version 25 installed from Git by the commit and digest above (it ran on the repository's file before); every walk
+before it already ran on a version pinned in Git, so none of them applies a removed action on the repository's file.
+
+The rehearsal then installs the repository's file over the objects the walk of version 25 made: every object reads the
+same, the 16 views that stay read the same but for their version, the four removed views are `unavailable` and each
+removed action is `unknown_action`; the schema differs from version 25 only by points 1 to 6 (the changed names of
+each section are compared, `merge_unit` is that of version 25 but for the message, `kpi` that of version 25 but for
+`task`'s `required`, and each grant is that of version 25 less the removed actions); `ont describe` names version 26;
+`ont_describe` and `ont_action_list` stay within 262,144 bytes and both are smaller than version 25's measured in the
+same run (the line `v26_mcp_bytes=` was 227,324 and 122,101 when this section was written, against 242,806 and
+138,844 for version 25); `ontology/migrate` runs 25 26 and 24 26 (exit 0, the store unchanged) and 26 27 (exit 2).
+
+The walk of version 26, each refusal before the action it guards: `define_kpi` is refused `home_required` (neither
+`intent` nor `task`, and both), `unknown_intent` and `unknown_task`, and applies with `intent` (the KPI has the intent
+and no task); it is refused `duplicate_kpi` for the same name in the same intent, and applies for that name in another
+intent; with `task` it applies, is refused `duplicate_kpi` for the same name of the same task, and a KPI of that task
+given the intent by `set_kpi_intent` makes its name refused `duplicate_kpi` in that intent; `record_measurement` and
+`set_kpi_target` apply on a KPI of an intent; `set_kpi_intent` is refused `criterion_not_evaluable` for a KPI of a task
+whose name a KPI of the intent without a task holds, and for a KPI without a task. The last line of standard output of
+the rehearsal is `v26 schema use: ok`.
