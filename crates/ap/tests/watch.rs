@@ -2442,10 +2442,7 @@ fn r19_a_pass_only_reads_and_writes_only_its_directory() {
                 a.len() == 3 && a[0] == "ssh" && a[1].starts_with("apcheck@"),
                 "{a:?}"
             ),
-            "claude" | "agy" => assert!(
-                a == ["--version"] || a == ["--help"],
-                "{a:?}"
-            ),
+            "claude" | "agy" => assert!(a == ["--version"] || a == ["--help"], "{a:?}"),
             "stat" | "find" | "sh" | "df" | "ps" => {}
             other => panic!("{other}"),
         }

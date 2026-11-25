@@ -3957,7 +3957,6 @@ fn rf1_the_text_holds_each_path_byte_for_byte_whatever_the_other_path_holds() {
     assert_eq!(f.input(before + 2), want);
 }
 
-
 // ---- a resume across runtimes ---------------------------------------------------------------
 
 // spec: specs/ap/run.md#R39
@@ -4019,11 +4018,7 @@ fn retired_runtimes_refused_in_a_request_a_resumed_record_and_the_policy() {
         let before = f.launches.len();
         for request in [f.request("x"), f.agy("x")] {
             let r = f.resume(request, "again.md", "old.md");
-            assert_eq!(
-                code(f.run(&r)),
-                "resume_runtime_differs@runtime",
-                "{word}"
-            );
+            assert_eq!(code(f.run(&r)), "resume_runtime_differs@runtime", "{word}");
         }
         assert_eq!(f.launches.len(), before);
         assert!(!Path::new(&f.p("again.md.run.json")).exists());
@@ -5067,10 +5062,7 @@ fn g8_a_resume_across_runtimes_is_refused_in_both_directions() {
     let claude = f.run(&f.request("c.md")).unwrap().0;
     assert_eq!(claude["runtime"], "claude");
     let before = f.launches.len();
-    for (earlier, request) in [
-        ("a.md", f.request("x")),
-        ("c.md", f.agy("x")),
-    ] {
+    for (earlier, request) in [("a.md", f.request("x")), ("c.md", f.agy("x"))] {
         let r = f.resume(request, "again.md", earlier);
         assert_eq!(
             code(f.run(&r)),
