@@ -12,7 +12,6 @@ A change belongs to the area that owns the fact it changes.
 | Domain | The private-academy teaching domain: reads of the Academy server, the lesson workflow, the teacher's records, the Academy MCP server | `education-platform`; modules `education-dc-gang-a`, `education-problem-edit` | The Academy rows of section 4 |
 | Harness | How agents work here: the command `ap`, the shared instructions and skills, the work schema of the store, the evaluation suites, the delivery of its own install | `agent-platform` | `/usr/local/bin/ap`; `/root/.agents/`; state under `/var/lib/agent-platform/`; the timer `ap-deliver.timer` |
 | Host operations | Remote host and Hermes operations | `agent-vps-operations` | `/usr/local/bin/vps-ops` |
-| Memory service | Long-term memory (Hindsight), a container on this host; no first-party source | none | `/docker/hindsight/`; agent integration under `/root/.hindsight/` |
 
 The engine knows no domain. A domain or the harness uses the engine through a schema file it owns and the engine's library or command; it does not copy engine state.
 
@@ -63,8 +62,6 @@ The state of the work (requests, intents, units, runs, findings, holds, KPIs) is
 | --- | --- | --- |
 | Ontology store | `/var/lib/ontology-platform/ont/ontology.sqlite`, backups in `backup/` beside it; read and written only through `ont` | The task whose STATE names the object types in use |
 | Academy MCP server in use (`academy_operations`) | install base `/root/.local/share/academy-mcp-host-20261106/`; its `release.json` selects the running generation | `/home/palantirkc/work/edu-mcp-host-restore/STATE.md` |
-| Hindsight | container defined in `/docker/hindsight/`; API on `127.0.0.1:8888` | `/docker/hindsight/STATE.md` and `HINDSIGHT_OFFICIAL_PER_CALL.md` there |
-| Hindsight integration of the CLIs | `/root/.hindsight/coding-agents`; settings `/root/.hindsight/coding-agent.json` (contains a credential: never print it) | — |
 | Installed shared instructions | `/root/.agents/AGENTS.md`, `runtime-references/`, `skills/` | `agent-platform` `content/` |
 | Delivery of `ap` and the shared instructions | the timer `ap-deliver.timer`; its request `/etc/agent-platform/deliver.json`; its state under `/var/lib/agent-platform/deliver/` | `agent-platform` `deploy/README.md` |
 | Configuration of each CLI | `CLI-RUNTIMES.md` section 1 | that CLI |

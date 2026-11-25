@@ -31,8 +31,11 @@ def run_check(root, corpus=None, host=None):
 
 
 class Scratch:
-    def fixture(self):
-        scratch = Path(tempfile.mkdtemp(prefix="check-content-test."))
+    def fixture(self, neutral=False):
+        """A copy of what the check reads. neutral: a test that writes the scratch path into content/ puts it under
+        /tmp, whose path trips no rule of the check; the default temporary directory may name a version or a retired word."""
+        parent = "/tmp" if neutral and os.access("/tmp", os.W_OK) else None
+        scratch = Path(tempfile.mkdtemp(prefix="check-content-test.", dir=parent))
         self.addCleanup(shutil.rmtree, scratch, True)
         for name in READ_BY_THE_CHECK:
             source, target = REPO / name, scratch / name
@@ -111,12 +114,22 @@ class RetiredNames(Scratch, unittest.TestCase):
         self.assertEqual(code, 1, out)
         self.assertIn(f"retired_name@content/README.md:{text.count(chr(10)) + 1}: lessons-loop", out)
 
+    def test_the_legacy_memory_service_named_in_any_case_fails(self):
+        for word in ("Hindsight", "hindsight", "HINDSIGHT"):
+            with self.subTest(word=word):
+                root = self.fixture()
+                line = self.append(root, f"Long-term memory lives in {word}.")
+                code, out = run_check(root)
+                self.assertEqual(code, 1, out)
+                self.assertIn(f"retired_memory_named@content/{TARGET}:{line}: '{word}'", out)
+
     def test_no_retired_name_passes(self):
         root = self.fixture()
         self.append(root, "See the lead skill for the closure of a worker.")
         code, out = run_check(root)
         self.assertEqual(code, 0, out)
         self.assertNotIn("retired_name@", out)
+        self.assertNotIn("retired_memory_named@", out)
 
 
 class ModelNamesAndLimits(Scratch, unittest.TestCase):
@@ -316,7 +329,7 @@ class AgentsFile(Scratch, unittest.TestCase):
         self.assertEqual(out.count("agents_line_too_long@"), 1, out)
 
     def test_a_missing_absolute_path_fails_on_the_host(self):
-        root = self.fixture()
+        root = self.fixture(neutral=True)
         host = root / "host-agents.md"
         host.write_text("installed\n")
         missing, present, pattern = self.append_lines(
@@ -333,7 +346,7 @@ class AgentsFile(Scratch, unittest.TestCase):
         self.assertNotIn("agents paths: skipped", out)
 
     def test_without_the_host_the_paths_are_skipped_with_one_line(self):
-        root = self.fixture()
+        root = self.fixture(neutral=True)
         added = f"- Read `{root}/no-such-dir/file.md`."
         # Cut the copy's last lines (section 8's body) so the added line fits the byte limit
         # whatever headroom the real file leaves.

@@ -6,7 +6,7 @@ Fails the build when (1) SHA256SUMS and the files disagree, (2) always-loaded te
 names a model (the Lead's page form, which names the reviewers' models, alone excepted), (4) a file that content/ routes a reader to does not exist, (5) a path
 is elided or points into a main checkout's files, (6) on a host that has the corpus of
 design sources, a line range of OFFICIAL-DOCS.md section 4 falls outside its file, (7) a file names a retired name
-(RETIRED_NAMES), or (8) AGENTS.md
+(RETIRED_NAMES), (8) a file names the legacy memory service (RETIRED_MEMORY, without case), or (9) AGENTS.md
 breaks its form (specs/content/agents-file.md): over 6,500 bytes, its eight section headings not in
 order, a line over 400 characters or a table row, or, on the host, an absolute path that does not exist.
 Reads the repository, and the corpus and the host's paths when they are present. Run: python3 -I -B ci/check-content.py
@@ -31,6 +31,9 @@ CHANGING = {
 # Names removed from the repository (skills, files): a file under content/ that still names one is a route to nothing.
 # A later removal adds its names here; the rule stays the one fault `retired_name`.
 RETIRED_NAMES = ["lessons-loop", "hindsight-control", "memory/README.md", "publish-memory", "evaluate-memory", "explain-precisely", "herdr-hermes", "evals/instructions"]
+# The legacy memory service: long-term memory is off until the user deploys it anew (specs/content/agents-file.md R8),
+# so no file under content/ names the retired service, in any case of its letters.
+RETIRED_MEMORY = re.compile("hindsight", re.I)
 errors = []
 
 
@@ -80,12 +83,15 @@ for name, text in texts.items():
     for m in re.finditer(r"\]\((?!https?:|#)([^)\s]+)\)", prose):
         if not (ROOT / name).parent.joinpath(m.group(1).split("#")[0]).exists():
             fail("broken_relative_link", name, m.group(1))
-# Every file under content/ but the list of checksums, README.md included (it is not an owned file, but a reader loads it).
-for name in sorted(str(p.relative_to(ROOT)) for p in ROOT.rglob("*") if p.is_file() and p.name != "SHA256SUMS"):
+# Every file under content/, README.md included (it is not an owned file, but a reader loads it); the retired names are
+# looked for in every file but the list of checksums, the legacy memory service in every file.
+for name in sorted(str(p.relative_to(ROOT)) for p in ROOT.rglob("*") if p.is_file()):
     for number, line in enumerate((ROOT / name).read_text(encoding="utf-8", errors="replace").splitlines(), 1):
-        for retired in RETIRED_NAMES:
+        for retired in RETIRED_NAMES if name != "SHA256SUMS" else ():
             if retired in line:
                 fail("retired_name", f"{name}:{number}", retired)
+        for m in RETIRED_MEMORY.finditer(line):
+            fail("retired_memory_named", f"{name}:{number}", f"'{m.group(0)}': the legacy memory service is retired; long-term memory is off until the user deploys it anew")
 
 
 def has_section(target, number):
