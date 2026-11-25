@@ -143,8 +143,6 @@ if name == "claude":
     events = [{"type": "assistant", "message": {"content": [{"type": "tool_use", "id": "t1", "name": "Bash",
                                                               "input": {"command": "ont fn route < /dev/null"}}]}},
               {"type": "result", "result": answer, "total_cost_usd": 0.0123, "usage": {"input_tokens": 10, "output_tokens": 7}}]
-elif name == "muse":
-    events = [{"payload": {"kind": "run_terminal", "text": answer}}]
 else:
     events = [{"event": "result", "result": {"response": answer, "usage": {"input_tokens": 3, "output_tokens": 9}}}]
 for e in events:
@@ -261,7 +259,7 @@ class World:
         self.bin = t / "bin"
         self.bin.mkdir()
         for name, text in (("systemd-run", FAKE_SYSTEMD_RUN), ("systemctl", FAKE_SYSTEMCTL), ("claude", FAKE_CLI),
-                           ("muse", FAKE_CLI), ("agy", FAKE_CLI), ("ont", ONT_SHIM)):
+                           ("agy", FAKE_CLI), ("ont", ONT_SHIM)):
             (self.bin / name).write_text(text.replace("@PY@", PY).replace("@ONT@", ONT))
             (self.bin / name).chmod(0o755)
         self.root = t / "root"
@@ -393,7 +391,7 @@ class ScoreRecord(unittest.TestCase):
         self.words = self.w.cases_path and json.loads(self.w.cases_path.read_text())[0]["words"]
         self.w.plan({"cli": {self.words: {"answer": "fine"}}})
         (self.w.t / "host-ont.json").write_text(json.dumps({"tasks": ["task-suite"]}))
-        for reader in ("claude-haiku", "muse-ember"):
+        for reader in ("claude-haiku", "agy-hydrogen"):
             self.assertEqual(self.w.answers("--samples", "1", reader=reader)[0], 0)
         trap = self.w.t / "engine-trap"  # what ONT_BIN names for the score call: it must never run
         trap.write_text("#!/bin/sh\necho reached >> %s/trap.log\nexit 99\n" % self.w.t)
@@ -417,7 +415,7 @@ class ScoreRecord(unittest.TestCase):
         self.assertEqual(out["recorded"], {"measurements": 2, "already": 0, "older": 0, "skipped": 0, "failed": 0})
         x = out["readers"]["claude-haiku"]
         self.assertEqual((x["fn_samples"], x["usd"]), (1.0, 0.01))
-        self.assertEqual((out["readers"]["muse-ember"]["fn_samples"], out["readers"]["muse-ember"]["usd"]), (None, None))
+        self.assertEqual((out["readers"]["agy-hydrogen"]["fn_samples"], out["readers"]["agy-hydrogen"]["usd"]), (None, None))
         written = json.loads((w.out / "score.json").read_text())
         self.assertNotIn("recorded", written)
         digest = hashlib.sha256((w.out / "score.json").read_bytes()).hexdigest()
@@ -428,13 +426,13 @@ class ScoreRecord(unittest.TestCase):
         self.assertEqual(sorted(a["action_type"] for a in actions), ["define_kpi"] * 2 + ["record_measurement"] * 2)
         self.assertEqual({a["role"] for a in actions}, {"lead"})  # the score's record is the Lead's (roles.md R3)
         self.assertEqual({a["parameters"]["name"] for a in actions if a["action_type"] == "define_kpi"},
-                         {"suite intake claude-haiku", "suite intake muse-ember"})
+                         {"suite intake claude-haiku", "suite intake agy-hydrogen"})
         for a in actions:
             if a["action_type"] == "define_kpi":
                 self.assertIn("recorded by evals/intake/run score --record. No case text.", a["parameters"]["definition"])
         measured = {a["request_id"]: a["parameters"] for a in actions if a["action_type"] == "record_measurement"}
         for reader, value in (("claude-haiku", "mean 1.0000 majority 1/1 n 1 unanswered 0 fn 1.0000 usd 0.01"),
-                              ("muse-ember", "mean 1.0000 majority 1/1 n 1 unanswered 0 fn n/a usd n/a")):
+                              ("agy-hydrogen", "mean 1.0000 majority 1/1 n 1 unanswered 0 fn n/a usd n/a")):
             rid = "suite-" + hashlib.sha256(("%s:%s" % (reader, digest)).encode()).hexdigest()[:32]
             p = measured[rid]
             self.assertEqual((p["value"], p["evidence"]), (value, "evals/intake/run score sha256:" + digest))
@@ -518,7 +516,7 @@ class Session(unittest.TestCase):
 
     def test_the_session_gets_the_words_as_its_only_message_and_the_readers_of_the_routing_suite(self):
         routing = load(ROUTING, "routing_for_test")
-        for reader, cli in (("claude-haiku", "claude"), ("claude-sonnet", "claude"), ("muse-ember", "muse"), ("agy-hydrogen", "agy")):
+        for reader, cli in (("claude-haiku", "claude"), ("claude-sonnet", "claude"), ("agy-hydrogen", "agy")):
             code, out, r = self.w.answers("--samples", "1", "--case", "one", reader=reader)
             self.assertEqual((code, r.stderr), (0, ""), (reader, out))
             run = [c for c in self.w.lines("cli.jsonl") if c["cli"] == cli][-1]
@@ -589,11 +587,11 @@ class Session(unittest.TestCase):
 
 
     def test_parity_is_the_share_of_sonnets_majority_the_reader_also_holds_and_the_gate_judges_each_reader(self):
-        for reader in ("claude-sonnet", "muse-ember"):
+        for reader in ("claude-sonnet", "agy-hydrogen"):
             self.assertEqual(self.w.answers("--samples", "3", "--case", "one", reader=reader)[0], 0)
         code, score, _ = self.w.call("score", "--out", self.w.out)
-        self.assertEqual((code, score["parity"]), (0, {"muse-ember": 1.0}))
-        self.assertEqual(score["readers"]["muse-ember"]["majority"], ["one"])
+        self.assertEqual((code, score["parity"]), (0, {"agy-hydrogen": 1.0}))
+        self.assertEqual(score["readers"]["agy-hydrogen"]["majority"], ["one"])
         path = self.w.out / "score.json"
         code, out, _ = self.w.call("gate", "--baseline", path, "--candidate", path)
         self.assertEqual((code, out["status"]), (0, "pass"))
@@ -629,7 +627,7 @@ class Refusals(unittest.TestCase):
         self.assertEqual(self.status("answers", "--reader", "claude-haiku", "--root", self.w.root, "--out", self.w.out),
                          {"status": "cli_missing"})
         (self.w.bin / "ont").unlink()
-        self.assertEqual(self.status("answers", "--reader", "muse-ember", "--root", self.w.root, "--out", self.w.out),
+        self.assertEqual(self.status("answers", "--reader", "agy-hydrogen", "--root", self.w.root, "--out", self.w.out),
                          {"status": "ont_not_found"})
 
     def test_a_case_file_is_checked_before_anything_runs(self):

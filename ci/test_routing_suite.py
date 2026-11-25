@@ -130,10 +130,6 @@ if name == "claude":
     if "usd" in beh:
         result["total_cost_usd"] = beh["usd"]
     events.append(result)
-elif name == "muse":
-    events = [{"payload": {"kind": "run_usage", "models": [{"input_tokens": 40, "output_tokens": 4},
-                                                           {"input_tokens": 2, "output_tokens": 1}]}},
-              {"payload": {"kind": "run_terminal", "text": answer}}]
 else:
     events = [{"event": "init", "session_id": "agy-session-1"},
               {"event": "result", "result": {"response": answer,
@@ -195,22 +191,8 @@ if argv[:2] == ["action", "apply"] and "--client" in argv:
     st["requests"][rid] = edits
     st.setdefault("applied", []).append({"kind": kind, "rid": rid, "parameters": par})
     out({"status": "ok", "result": {"outcome": "applied", "edits": edits}})
-if argv == ["fn", "route"]:
-    if st.get("route") == "fail":
-        sys.exit(3)
-    out({"answer": {"answers": st.get("route", [])}})
 sys.exit(98)
 '''
-
-PACK = [{"kind": "section", "repository": "owner/repo-a", "path": "docs/guide.md", "first_line": 4, "last_line": 19,
-         "heading": "PACK-HEADING-ONE", "commit": "COMMIT", "matched": ["x"], "score": 1.5},
-        {"kind": "component", "repository": "owner/repo-a", "path": "map.json", "first_line": None, "last_line": None,
-         "heading": "PACK-COMPONENT", "commit": "c", "matched": ["x"], "score": 1.0},
-        {"kind": "section", "repository": None, "path": "/root/.agents/AGENTS.md", "first_line": 1, "last_line": 3,
-         "heading": "PACK-INSTR", "commit": None, "matched": ["x"], "score": 0.5}]
-MUSE_ARGV = ["muse", "exec", "--json", "--model", "muse-ember-1.0", "--contributor-mode", "off", "--disable-reminders",
-             "--disable-web-tools", "--disable-request-user-input", "--session-id", "SID", "--disable-approval",
-             "--workspace", "WORK", "PROMPT"]
 
 GOOD = "Load `FACT-ALPHA   one` and FACT-GAMMA with FACT-DELTA."
 CASES = [
@@ -253,7 +235,7 @@ class World:
         self.bin = t / "bin"
         self.bin.mkdir()
         for name, text in (("systemd-run", FAKE_SYSTEMD_RUN), ("systemctl", FAKE_SYSTEMCTL), ("claude", FAKE_CLI),
-                           ("muse", FAKE_CLI), ("agy", FAKE_CLI), ("ont", FAKE_ONT)):
+                           ("agy", FAKE_CLI), ("ont", FAKE_ONT)):
             (self.bin / name).write_text(text.replace("@PY@", PY))
             (self.bin / name).chmod(0o755)
         (t / "count").mkdir()
@@ -261,11 +243,6 @@ class World:
         self.root = t / "root"
         self.root.mkdir()
         (self.root / "AGENTS.md").write_text("INSTR-LINE-ONE\nINSTR-LINE-TWO\nINSTR-LINE-THREE\nINSTR-LINE-FOUR\n")
-        git = shutil.which("git")
-        if git:
-            (self.bin / "git").symlink_to(git)
-        self.clones = t / "clones"
-        self.clones.mkdir()
         self.tmpdir = t / "tmp"  # the runner's TMPDIR: its work directories are made, and swept, here only
         self.tmpdir.mkdir()
         self.home = t / "home"
@@ -278,20 +255,6 @@ class World:
         self.out = t / "out"
         self.plan({})
         self.ont_state({})
-
-    def make_clone(self, name, files):
-        """A clone under the tests' clones directory with the files committed; the commit's hash."""
-        d = self.clones / name
-        d.mkdir(parents=True)
-        g = lambda *a: subprocess.run(["git", "-C", str(d), "-c", "user.name=t", "-c", "user.email=t@t", *a],
-                                      check=True, capture_output=True, text=True).stdout.strip()
-        g("init", "-q")
-        for path, text in files.items():
-            (d / path).parent.mkdir(parents=True, exist_ok=True)
-            (d / path).write_text(text)
-        g("add", "-A")
-        g("commit", "-q", "-m", "x")
-        return g("rev-parse", "HEAD")
 
     def close(self):
         for f in (self.t / "pids").iterdir() if (self.t / "pids").exists() else []:
@@ -315,7 +278,7 @@ class World:
 
     def env(self, **extra):
         env = {"PATH": str(self.bin), "HOME": str(self.home), "CLAUDE_CONFIG_DIR": str(self.acct),
-               "TMPDIR": str(self.tmpdir), "ROUTING_CLONES_BASE": str(self.clones)}
+               "TMPDIR": str(self.tmpdir)}
         env.update(extra)
         return {k: v for k, v in env.items() if v is not None}
 
@@ -372,8 +335,8 @@ class FactRule(unittest.TestCase):
         root = RUN.parent.parent
         new = json.loads((root / "routing" / "cases.json").read_text())
         ids = [c["id"] for c in new]
-        self.assertEqual(len(ids), 16)
-        self.assertEqual(len(set(ids)), 16)
+        self.assertEqual(len(ids), 10)
+        self.assertEqual(len(set(ids)), 10)
         for c in new:
             self.assertTrue(c["must"], c["id"])
             for fact in c["must"]:
@@ -454,25 +417,16 @@ class Unit(unittest.TestCase):
         self.assertEqual(sorted(props(call, "ReadWritePaths")),
                          sorted(["-/tmp", "-%s/.claude" % w.home, "-%s/.claude.json" % w.home]))
 
-    def test_muse_and_agy_write_only_their_own_state(self):
+    def test_agy_writes_only_its_own_state(self):
         w = self.w
-        self.assertEqual(w.answers("--case", "c1", "--samples", "1", reader="muse-ember")[0], 0)
         self.assertEqual(w.answers("--case", "c1", "--samples", "1", reader="agy-hydrogen")[0], 0)
-        muse, agy = w.unit_calls()
+        agy, = w.unit_calls()
         h = str(w.home)
-        self.assertEqual(sorted(props(muse, "ReadWritePaths")), sorted(
-            ["-/tmp", "-%s/.config/muse" % h, "-%s/.local/share/muse" % h, "-%s/.local/state/muse" % h, "-%s/.cache" % h]))
         self.assertEqual(props(agy, "ReadWritePaths"), ["-/tmp", "-%s/.gemini/antigravity-cli" % h])
-        mcli, acli = [r["argv"] for r in w.cli_runs()]
-        self.assertNotIn("--disable-shell", mcli)
-        self.assertNotIn("--yolo", mcli)
-        self.assertNotIn("--trust-workspace", mcli)
-        self.assertIn("--disable-approval", mcli)
+        acli, = [r["argv"] for r in w.cli_runs()]
         self.assertIn("--dangerously-skip-permissions", acli)
-        self.assertNotEqual(w.cli_runs()[1]["env"]["HOME"], h, "agy runs with a new HOME")
-        mu = json.loads(w.sample("c1", 1, "muse-ember").with_suffix(".json").read_text())
+        self.assertNotEqual(w.cli_runs()[0]["env"]["HOME"], h, "agy runs with a new HOME")
         ag = json.loads(w.sample("c1", 1, "agy-hydrogen").with_suffix(".json").read_text())
-        self.assertEqual((mu["input_tokens"], mu["output_tokens"]), (42, 5))
         self.assertEqual((ag["input_tokens"], ag["output_tokens"], ag["session"]), (33, 9, "agy-session-1"))
 
     def test_no_systemd_run_no_session(self):
@@ -509,210 +463,14 @@ class Unit(unittest.TestCase):
         self.assertEqual([x["case"] for x in w.cli_runs()], ["c1"])
 
 
-class Ember(unittest.TestCase):
-    """The three Muse readers: one answer, usage and session branch; the command lines; the route pack; the MCP rule."""
-    MUSE = ("muse-ember", "ember-yolo", "ember-route", "ember-pack")
-
-    def setUp(self):
-        self.w = World(self)
-        self.w.plan({"cli": {"c1": [{"answer": GOOD}], "c2": [{"answer": GOOD}]}})
-        self.w.ont_state({"route": PACK})
-
-    def settings(self, servers):
-        d = self.w.home / ".config" / "muse"
-        d.mkdir(parents=True, exist_ok=True)
-        (d / "settings.json").write_text(json.dumps({"mcpServers": servers}))
-
-    def test_muse_argv_is_byte_identical(self):
-        m = load_module()
-        self.assertEqual(m.muse_argv("PROMPT", "ROOT", "WORK", "SID"), MUSE_ARGV)
-        self.assertEqual(m.yolo_argv("PROMPT", "ROOT", "WORK", "SID"), MUSE_ARGV[:-1] + ["--yolo", "PROMPT"])
-        self.assertEqual(m.READERS["muse-ember"]["argv"], m.muse_argv)
-        self.assertEqual(m.READERS["ember-route"]["argv"], m.muse_argv)
-        self.assertEqual(m.READERS["ember-pack"]["argv"], m.muse_argv)
-        self.assertEqual((m.READERS["ember-route"]["pack"], m.READERS["ember-pack"]["pack"]), (8, 4))
-
-    def test_every_muse_reader_answers_counts_tokens_and_writes_the_same_state(self):
-        w = self.w
-        for reader in self.MUSE:
-            code, out, r = w.answers("--case", "c1", "--samples", "1", reader=reader)
-            self.assertEqual((code, out["samples"], out["mcp_rule_broken"]), (0, {"c1__s1": "ok"}, []), r.stdout + r.stderr)
-            meta = json.loads(w.sample("c1", 1, reader).with_suffix(".json").read_text())
-            self.assertEqual((meta["state"], meta["input_tokens"], meta["output_tokens"]), ("ok", 42, 5))
-            self.assertEqual(w.sample("c1", 1, reader).with_suffix(".md").read_text(), GOOD)
-        calls, h = w.unit_calls(), str(w.home)
-        self.assertEqual(len(calls), 4)
-        for call in calls:
-            self.assertEqual(sorted(props(call, "ReadWritePaths")), sorted(
-                ["-/tmp", "-%s/.config/muse" % h, "-%s/.local/share/muse" % h, "-%s/.local/state/muse" % h, "-%s/.cache" % h]))
-        plain, yolo, route, pack = [r["argv"] for r in w.cli_runs()]
-        self.assertNotIn("--yolo", plain)
-        self.assertNotIn("--yolo", route)
-        self.assertNotIn("--yolo", pack)
-        self.assertEqual(pack[:-1][:pack.index("--session-id")], plain[:plain.index("--session-id")])
-        self.assertEqual(yolo.index("--yolo"), len(yolo) - 2)
-        self.assertEqual(yolo[-1], plain[-1], "the prompt of ember-yolo is the plain one")
-        self.assertEqual(len(yolo), len(plain) + 1)
-        self.assertEqual(yolo[yolo.index("--session-id") + 2:yolo.index("--workspace")],
-                         plain[plain.index("--session-id") + 2:plain.index("--workspace")])
-        self.assertEqual(yolo.index("--workspace") + 2, len(yolo) - 2, "--yolo comes after the workspace, before the prompt")
-        self.assertEqual(yolo[:yolo.index("--session-id")], plain[:plain.index("--session-id")])
-        self.assertEqual(route[:-1][:route.index("--session-id")], plain[:plain.index("--session-id")])
-
-    def pack_state(self):
-        """A clone that holds the guide of PACK, and the pack with that commit; (commit, pack)."""
-        guide = "".join("GUIDE-LINE-%d\n" % i for i in range(1, 25))
-        commit = self.w.make_clone("repo-a", {"docs/guide.md": guide})
-        pack = [dict(x, commit=commit) if x["commit"] else x for x in PACK]
-        self.w.ont_state({"route": pack})
-        return commit, pack
-
-    def test_route_pack_is_asked_on_the_host_and_goes_into_the_prompt_with_excerpts_of_both_pack_readers_only(self):
-        w = self.w
-        self.pack_state()
-        for reader in ("ember-route", "ember-pack", "muse-ember"):
-            self.assertEqual(w.answers("--case", "c1", "--samples", "1", reader=reader)[0], 0)
-        route_ask, pack_ask = w.lines("ont.jsonl")
-        for asked, limit in ((route_ask, 8), (pack_ask, 4)):
-            self.assertEqual(asked["argv"], ["fn", "route"])
-            self.assertEqual(asked["body"], {"parameters": {"words": "CASEID c1 SITUATION-SECRET-ONE", "limit": limit}})
-        route, pack, plain = [r["argv"][-1] for r in w.cli_runs()]
-        for prompt in (route, pack):
-            for text in ("1. owner/repo-a: docs/guide.md lines 4-19 (PACK-HEADING-ONE)", "2. owner/repo-a: map.json (PACK-COMPONENT)",
-                         "3. /root/.agents/AGENTS.md lines 1-3 (PACK-INSTR)", "Open at most 1 further file", "SITUATION-SECRET-ONE",
-                         "Do not do the assignment.", "   | GUIDE-LINE-4\n", "   | GUIDE-LINE-19\n",
-                         "   | INSTR-LINE-ONE\n   | INSTR-LINE-TWO\n   | INSTR-LINE-THREE\n"):
-                self.assertIn(text, prompt)
-            for text in ("GUIDE-LINE-3\n", "GUIDE-LINE-20", "INSTR-LINE-FOUR"):
-                self.assertNotIn(text, prompt)
-            self.assertTrue(prompt.startswith(plain), "the pack follows the prompt of the other readers")
-        self.assertNotIn("PACK-", plain)
-        self.assertNotIn("Open at most", plain)
-        meta = json.loads(w.sample("c1", 1, "ember-pack").with_suffix(".json").read_text())
-        self.assertEqual((meta["pack"], meta["excerpts"]), (3, 2))
-        unit = [c for c in w.unit_calls() if "routing-ember-route-c1-s1" in " ".join(c)][0]
-        self.assertFalse([o for o in unit[:unit.index("--")] if "PACK-" in o or "GUIDE-" in o])
-
-    def test_an_excerpt_is_at_most_3000_characters_and_a_missing_one_is_the_pointer_alone(self):
-        w = self.w
-        commit = w.make_clone("repo-a", {"docs/guide.md": "".join("%04d %s\n" % (i, "x" * 90) for i in range(1, 400))})
-        m = load_module()
-        x = {"repository": "owner/repo-a", "path": "docs/guide.md", "first_line": 1, "last_line": 399, "commit": commit}
-        os.environ["ROUTING_CLONES_BASE"] = str(w.clones)
-        self.addCleanup(lambda: os.environ.pop("ROUTING_CLONES_BASE", None))
-        text = m.pack_excerpt(x, str(w.root))
-        self.assertEqual(len(text), 3000)
-        self.assertTrue(text.startswith("0001 x"))
-        for bad in (dict(x, commit="0" * 40), dict(x, commit="--output=x"), dict(x, commit=None), dict(x, repository="owner/none"),
-                    dict(x, first_line=None), dict(x, first_line=5, last_line=4), dict(x, first_line=0), dict(x, first_line=True),
-                    dict(x, path="docs/absent.md"), dict(x, first_line=900, last_line=901), dict(x, path="-x"),
-                    dict(x, repository="owner/..")):
-            self.assertIsNone(m.pack_excerpt(bad, str(w.root)), bad)
-        i = {"repository": None, "path": "/root/.agents/AGENTS.md", "first_line": 2, "last_line": 3}
-        self.assertEqual(m.pack_excerpt(i, str(w.root)), "INSTR-LINE-TWO\nINSTR-LINE-THREE")
-        for bad in (dict(i, path="/etc/passwd"), dict(i, path="/root/.agents/../x"), dict(i, path="/root/.agents/none.md"),
-                    dict(i, path="AGENTS.md")):
-            self.assertIsNone(m.pack_excerpt(bad, str(w.root)), bad)
-        (w.root / "link.md").symlink_to(w.root / "AGENTS.md")
-        self.assertIsNone(m.pack_excerpt(dict(i, path="/root/.agents/link.md"), str(w.root)))
-
-    def test_an_unreadable_excerpt_never_fails_the_sample_and_the_academy_is_names_only(self):
-        w = self.w
-        edu = [{"kind": "section", "repository": "owner/education-platform", "path": "context/a.md", "first_line": 1,
-                "last_line": 2, "heading": "EDU-SECRET-HEADING", "commit": "abcdef1", "matched": [], "score": 1.0},
-               {"kind": "section", "repository": None, "path": "/root/.agents/edu-x/b.md", "first_line": 1, "last_line": 2,
-                "heading": "EDU-SECRET-TWO", "commit": None, "matched": [], "score": 1.0},
-               {"kind": "section", "repository": "owner/repo-a", "path": "docs/none.md", "first_line": 1, "last_line": 2,
-                "heading": "LOST-ONE", "commit": "abcdef1", "matched": [], "score": 1.0}]
-        (w.root / "edu-x").mkdir()
-        (w.root / "edu-x" / "b.md").write_text("EDU-BODY\nEDU-BODY\n")
-        w.make_clone("education-platform", {"context/a.md": "EDU-BODY\nEDU-BODY\n"})
-        w.ont_state({"route": edu})
-        for reader in ("ember-route", "ember-pack"):
-            code, out, r = w.answers("--case", "c1", "--samples", "1", reader=reader)
-            self.assertEqual((code, out["samples"]), (0, {"c1__s1": "ok"}), r.stdout)
-        for run in w.cli_runs():
-            prompt = run["argv"][-1]
-            self.assertIn("1. owner/education-platform: context/a.md\n", prompt)
-            self.assertIn("2. /root/.agents/edu-x/b.md\n", prompt)
-            self.assertIn("3. owner/repo-a: docs/none.md lines 1-2 (LOST-ONE)\n", prompt)
-            self.assertNotIn("EDU-SECRET", prompt)
-            self.assertNotIn("EDU-BODY", prompt)
-            self.assertNotIn("   | ", prompt)
-
-    def test_a_pack_that_cannot_be_had_leaves_no_session_after_three_tries(self):
-        w = self.w
-        for route in ("fail", []):
-            w.ont_state({"route": route})
-            code, out, r = w.answers("--case", "c1", "--samples", "1", reader="ember-pack")
-            self.assertEqual((code, out["samples"]), (0, {"c1__s1": "route_failed"}), r.stdout)
-            self.assertEqual(len(w.lines("ont.jsonl")), 3, "three tries, an empty list included")
-            self.assertFalse(w.sample("c1", 1, "ember-pack").with_suffix(".md").exists())
-            self.assertFalse(json.loads(w.sample("c1", 1, "ember-pack").with_suffix(".json").read_text())["answered"])
-            (w.t / "ont.jsonl").unlink()
-        self.assertEqual(w.cli_runs(), [])
-        (w.bin / "ont").unlink()
-        for reader in ("ember-route", "ember-pack"):
-            self.assertEqual(w.answers("--case", "c1", reader=reader)[:2], (2, {"status": "route_unavailable"}))
-        self.assertEqual(w.answers("--case", "c1", reader="muse-ember")[0], 0, "no other reader needs ont")
-
-    def test_the_retry_backs_off_two_then_four_seconds_and_stops_at_the_first_answer(self):
-        m = load_module()
-        sleeps, calls = [], []
-        real = m.time.sleep
-        self.addCleanup(lambda: setattr(m.time, "sleep", real))
-        m.time.sleep = sleeps.append
-        for plan, want, slept, n in (([None, [], [{"path": "p"}]], [{"path": "p"}], [2, 4], 3), ([[{"path": "a"}]], [{"path": "a"}], [], 1),
-                                     ([None, None, None], None, [2, 4], 3), ([[], [{"path": "q"}]], [{"path": "q"}], [2], 2)):
-            sleeps.clear()
-            calls.clear()
-            queue = list(plan)
-            m.route_once = lambda situation, limit: (calls.append(limit), queue.pop(0))[1]
-            self.assertEqual(m.route_pack("s", 4), want)
-            self.assertEqual((sleeps, len(calls)), (slept, n))
-            self.assertEqual(set(calls), {4})
-        self.assertEqual(m.PACK_TIMEOUT * m.PACK_TRIES + sum(m.PACK_BACKOFF), 186)
-
-    def test_yolo_is_exempt_from_the_mcp_watch_and_refused_when_a_server_is_registered(self):
-        w = self.w
-        w.plan({"cli": {"c1": [{"mode": "mcp", "answer": GOOD}]}})
-        code, out, r = w.answers("--case", "c1", "--samples", "1", reader="ember-yolo")
-        self.assertEqual((code, out["mcp_rule_broken"], out["samples"]), (0, [], {"c1__s1": "ok"}), r.stdout)
-        meta = json.loads(w.sample("c1", 1, "ember-yolo").with_suffix(".json").read_text())
-        self.assertTrue(meta["mcp_processes"], "the watch still records what it saw")
-        for reader in ("muse-ember", "ember-route"):
-            code, out, r = w.answers("--case", "c1", "--samples", "1", reader=reader)
-            self.assertEqual((code, out["mcp_rule_broken"]), (2, ["c1__s1"]), reader)
-        self.settings({"x": {"command": "x"}})
-        n = len(w.cli_runs())
-        self.assertEqual(w.answers("--case", "c2", reader="ember-yolo")[:2], (2, {"status": "mcp_not_allowed"}))
-        self.assertEqual(len(w.cli_runs()), n)
-        self.assertFalse((w.out / "ember-yolo" / "c2__s1.json").exists())
-        self.settings({})
-        self.assertEqual(w.answers("--case", "c1", "--samples", "1", reader="ember-yolo", out=w.t / "out2")[0], 0)
-
-    def test_withheld_text_is_the_rule_of_the_plain_and_the_route_reader_when_a_server_is_registered(self):
-        w = self.w
-        self.settings({"x": {"command": "x"}})
-        for reader in ("muse-ember", "ember-route"):
-            code, out, _ = w.answers("--case", "c1", "--samples", "1", reader=reader)
-            self.assertEqual((code, out["mcp_rule_broken"]), (2, ["c1__s1"]), "no session record shows the withheld text")
-            meta = json.loads(w.sample("c1", 1, reader).with_suffix(".json").read_text())
-            self.assertEqual((meta["mcp_registered"], meta["mcp_withheld"]), (1, False))
-            record = w.home / ".local" / "share" / "muse" / "sessions" / "a" / "b" / "c" / meta["session"]
-            record.mkdir(parents=True, exist_ok=True)
-            (record / "session.jsonl").write_text("MCP startup withheld\n")
-            shutil.rmtree(w.out / reader)
-            code, out, _ = w.answers("--case", "c1", "--samples", "1", reader=reader)
-            self.assertEqual(code, 2, "a new session has a new id and no record")
-
+class Intake(unittest.TestCase):
     def test_intake_has_none_of_the_new_readers(self):
         loader = importlib.machinery.SourceFileLoader("intake_run", str(RUN.parent.parent / "intake" / "run"))
         spec = importlib.util.spec_from_loader("intake_run", loader)
         mod = importlib.util.module_from_spec(spec)
         loader.exec_module(mod)
-        self.assertEqual(set(mod.R.READERS), {"claude-sonnet", "claude-haiku", "muse-ember", "agy-hydrogen"})
-        self.assertEqual(mod.R.READER_NAMES, ("claude-sonnet", "claude-haiku", "muse-ember", "agy-hydrogen"))
+        self.assertEqual(set(mod.R.READERS), {"claude-sonnet", "claude-haiku", "agy-hydrogen"})
+        self.assertEqual(mod.R.READER_NAMES, ("claude-sonnet", "claude-haiku", "agy-hydrogen"))
 
 
 class Samples(unittest.TestCase):
@@ -1021,15 +779,15 @@ class Refusals(unittest.TestCase):
         w = self.w
         w.out.mkdir()
         self.refused(w.call("score", "--out", w.out), "no_reader")
-        (w.out / "muse-ember").mkdir()
+        (w.out / "agy-hydrogen").mkdir()
         self.refused(w.call("score", "--out", w.out), "run_record_missing")
-        (w.out / "muse-ember").rmdir()
+        (w.out / "agy-hydrogen").rmdir()
         w.answers("--cases", w.host, "--samples", "1")
         self.refused(w.call("score", "--out", w.out), "case_sets_differ")
         self.refused(w.call("score", "--out", w.out, "--cases", w.host, "--cases", w.other_host), "case_sets_differ")
         self.assertEqual(w.call("score", "--out", w.out, "--cases", w.host)[0], 0)
-        w.answers("--cases", w.host, "--samples", "1", reader="muse-ember")
-        rec = w.out / "muse-ember" / "run.json"
+        w.answers("--cases", w.host, "--samples", "1", reader="agy-hydrogen")
+        rec = w.out / "agy-hydrogen" / "run.json"
         rec.write_text(json.dumps(dict(json.loads(rec.read_text()), suite="0" * 64)))
         self.refused(w.call("score", "--out", w.out, "--cases", w.host), "run_differs")
 
@@ -1134,12 +892,12 @@ class SampleRecord(unittest.TestCase):
                   [tool_use("t4", "cd / && ap fn route < /dev/null"), tool_use("t5", "ap status --brief x | head")],
                   [{"type": "tool_use", "name": "Bash", "input": {"command": ROUTE_CMD}}]]  # no id: not counted
         w.plan({"cli": {"c1": [{"answer": GOOD, "tool_use": stream}], "c2": [{"answer": GOOD}]}})
-        for reader in ("claude-haiku", "claude-sonnet", "muse-ember", "agy-hydrogen"):
+        for reader in ("claude-haiku", "claude-sonnet", "agy-hydrogen"):
             self.assertEqual(w.answers("--samples", "1", reader=reader)[0], 0, reader)
         self.assertEqual(self.usage("c1")["fn_calls"], {"route": 2, "brief": 2})
         self.assertEqual(self.usage("c1", reader="claude-sonnet")["fn_calls"], {"route": 2, "brief": 2})
         self.assertEqual(self.usage("c2")["fn_calls"], {"route": 0, "brief": 0}, "a Claude reader that called none")
-        for reader in ("muse-ember", "agy-hydrogen"):
+        for reader in ("agy-hydrogen",):
             for cid in ("c1", "c2"):
                 self.assertIsNone(self.usage(cid, reader=reader)["fn_calls"], reader)
 
@@ -1151,7 +909,6 @@ class SampleRecord(unittest.TestCase):
             {"type": "user", "message": {"content": [{"type": "tool_result", "tool_use_id": "a", "content": "ont fn route"}]}},
             {"type": "assistant", "message": {"content": "ap status --brief"}}]) + "\nnot json\n"
         self.assertEqual(m.fn_calls_of("claude-haiku", stream), {"route": 1, "brief": 0})
-        self.assertIsNone(m.fn_calls_of("muse-ember", stream))
         self.assertIsNone(m.fn_calls_of("agy-hydrogen", stream))
 
     def test_started_at_and_ended_at_are_utc_seconds_of_the_unit_that_started(self):
@@ -1178,11 +935,11 @@ class SampleRecord(unittest.TestCase):
     def test_usd_is_the_total_cost_of_the_last_result_of_a_claude_stream(self):
         w = self.w
         w.plan({"cli": {"c1": [{"answer": GOOD, "usd": 0.0123}], "c2": [{"answer": GOOD}]}})
-        for reader in ("claude-haiku", "muse-ember", "agy-hydrogen"):
+        for reader in ("claude-haiku", "agy-hydrogen"):
             self.assertEqual(w.answers("--samples", "1", reader=reader)[0], 0, reader)
         self.assertEqual(self.usage("c1")["usd"], 0.0123)
         self.assertIsNone(self.usage("c2")["usd"], "absent in the stream")
-        for reader in ("muse-ember", "agy-hydrogen"):
+        for reader in ("agy-hydrogen",):
             self.assertIsNone(self.usage("c1", reader=reader)["usd"], reader)
 
     def test_usd_of_takes_the_last_result_and_nothing_that_is_not_a_number(self):
@@ -1192,7 +949,7 @@ class SampleRecord(unittest.TestCase):
         self.assertIsNone(m.usd_of("claude-haiku", line(total_cost_usd=1) + "\n" + line()))
         self.assertIsNone(m.usd_of("claude-haiku", line(total_cost_usd="1.0")))
         self.assertIsNone(m.usd_of("claude-haiku", line(total_cost_usd=True)))
-        self.assertIsNone(m.usd_of("muse-ember", line(total_cost_usd=1)))
+        self.assertIsNone(m.usd_of("agy-hydrogen", line(total_cost_usd=1)))
 
     def test_the_prompt_names_the_functions_in_a_sentence_after_its_first_paragraph(self):
         w = self.w
@@ -1222,7 +979,7 @@ class ScoreMembers(unittest.TestCase):
         extra[("c1", 3)] = {"fn_calls": None, "usd": None}  # no count, no cost: not in either figure
         extra[("c2", 3)] = {"fn_calls": {"route": 0, "brief": 2}, "usd": 0.1}
         fake_reader(w.out / "claude-sonnet", 3, table, extra=extra)
-        fake_reader(w.out / "muse-ember", 3, table)
+        fake_reader(w.out / "agy-hydrogen", 3, table)
         fake_reader(w.out / "claude-haiku", 3, {"c1": [GOOD, None, GOOD], "c2": [GOOD] * 3, "h1": [GOOD] * 3},
                     extra={("c1", 1): {"fn_calls": {"route": 0, "brief": 0}, "usd": 1.234}})
         # a sample that is not answered holds no figure of the score, whatever its record says
@@ -1231,9 +988,9 @@ class ScoreMembers(unittest.TestCase):
         case_files(w, w.out)
         code, s, r = w.call("score", "--out", w.out, "--cases", w.host)
         self.assertEqual(code, 0, r.stdout)
-        son, mus, hai = (s["readers"][k] for k in ("claude-sonnet", "muse-ember", "claude-haiku"))
+        son, agy, hai = (s["readers"][k] for k in ("claude-sonnet", "agy-hydrogen", "claude-haiku"))
         self.assertEqual((son["fn_samples"], son["usd"]), (0.5, 1.85))  # 8 counts, 4 with a call; 7 x 0.25 and 0.1
-        self.assertEqual((mus["fn_samples"], mus["usd"]), (None, None))
+        self.assertEqual((agy["fn_samples"], agy["usd"]), (None, None))
         self.assertEqual((hai["fn_samples"], hai["usd"]), (0.0, 1.23))
         self.assertEqual(json.loads((w.out / "score.json").read_text()), s)
         for k in ("n", "passes", "samples", "mean", "majority", "unanswered", "tokens_median"):
@@ -1281,7 +1038,7 @@ class ScoreRecord(unittest.TestCase):
                                                   "h1": ["FACT-HOST", "x", "x"]}, extra=sonnet)
         fake_reader(w.out / "claude-haiku", 3, {"c1": [GOOD] * 3, "c2": [GOOD] * 3, "h1": ["x"] * 3},
                     extra={k: {"ended_at": "2026-11-20T11:00:00Z"} for k in ends})
-        fake_reader(w.out / "muse-ember", 3, {"c1": [GOOD] * 3, "c2": [GOOD] * 3, "h1": ["x"] * 3})  # no ended_at
+        fake_reader(w.out / "agy-hydrogen", 3, {"c1": [GOOD] * 3, "c2": [GOOD] * 3, "h1": ["x"] * 3})  # no ended_at
         case_files(w, w.out)
 
     def score(self, *extra):
@@ -1396,7 +1153,7 @@ class ScoreRecord(unittest.TestCase):
         self.assertEqual(code, 0)
         self.assertNotIn("recorded", out)
         self.assertEqual(w.call("gate", "--baseline", w.out / "score.json", "--candidate", w.out / "score.json")[0], 0)
-        self.assertEqual(w.answers("--cases", w.host, "--samples", "3", "--case", "c1", "--case", "h1", reader="muse-ember")[0], 2)
+        self.assertEqual(w.answers("--cases", w.host, "--samples", "3", "--case", "c1", "--case", "h1", reader="agy-hydrogen")[0], 2)
         self.assertEqual(self.calls(), [], "no `ont` call without --record")
         code, out, _ = self.score("--record", "")
         self.assertEqual((code, out), (2, {"status": "usage"}))
@@ -1426,7 +1183,7 @@ def reader_score(n=3, cases=16, unanswered=0, majority=None, tokens=None):
             "majority": sorted(majority), "unanswered": unanswered, "tokens_median": tokens}
 
 
-SONNET_TOKENS, EMBER_TOKENS = 146616, 395134  # the medians of the first run (AB-05)
+SONNET_TOKENS, HIGH_TOKENS = 146616, 395134  # a reader's token median 2.695 times Sonnet's
 
 
 class Bars(unittest.TestCase):
@@ -1442,53 +1199,53 @@ class Bars(unittest.TestCase):
     def sonnet(self, **kw):
         return reader_score(tokens=SONNET_TOKENS, **kw)
 
-    def test_ab05_ember_route_misses_the_token_bar_only(self):
+    def test_a_reader_over_the_token_ratio_misses_that_bar_only(self):
         code, out, r = self.bars({"claude-sonnet": self.sonnet(),
-                                  "ember-route": reader_score(tokens=EMBER_TOKENS)})
-        self.assertEqual((code, out["status"], out["reader"], out["missed"]), (1, "fail", "ember-route", ["G3"]), r.stdout)
+                                  "agy-hydrogen": reader_score(tokens=HIGH_TOKENS)})
+        self.assertEqual((code, out["status"], out["reader"], out["missed"]), (1, "fail", "agy-hydrogen", ["G3"]), r.stdout)
         self.assertEqual(out["bars"]["G3"], {"bar": "tokens_median ratio <= 1.2", "value": 2.695, "ok": False})
         self.assertTrue(out["bars"]["G1"]["ok"] and out["bars"]["G2"]["ok"])
         self.assertEqual((out["bars"]["G1"]["value"], out["bars"]["G2"]["value"]), (1.0, 0.0))
 
     def test_all_bars_held_exit_0(self):
-        code, out, _ = self.bars({"claude-sonnet": self.sonnet(), "ember-route": reader_score(tokens=SONNET_TOKENS * 12 // 10)})
+        code, out, _ = self.bars({"claude-sonnet": self.sonnet(), "agy-hydrogen": reader_score(tokens=SONNET_TOKENS * 12 // 10)})
         self.assertEqual((code, out["status"], out["missed"]), (0, "pass", []))
 
     def test_each_bar_at_its_edge(self):
         son = self.sonnet(majority=self.ids[:10])
         for maj, held in ((10, True), (9, True), (8, False)):  # parity 1.0, 0.9, 0.8
             x = reader_score(majority=self.ids[:maj], tokens=SONNET_TOKENS)
-            code, out, _ = self.bars({"claude-sonnet": son, "ember-route": x})
+            code, out, _ = self.bars({"claude-sonnet": son, "agy-hydrogen": x})
             self.assertEqual((code, out["bars"]["G1"]["ok"]), (0 if held else 1, held), maj)
         for un, held in ((4, True), (5, False)):  # 2/24 of 48 samples is 4
             x = reader_score(unanswered=un, tokens=SONNET_TOKENS)
-            code, out, _ = self.bars({"claude-sonnet": self.sonnet(), "ember-route": x})
+            code, out, _ = self.bars({"claude-sonnet": self.sonnet(), "agy-hydrogen": x})
             self.assertEqual((code, out["bars"]["G2"]["ok"]), (0 if held else 1, held), un)
         for tok, held in ((175939, True), (175940, False)):  # 1.2 times 146616 is 175939.2
-            code, out, _ = self.bars({"claude-sonnet": self.sonnet(), "ember-route": reader_score(tokens=tok)})
+            code, out, _ = self.bars({"claude-sonnet": self.sonnet(), "agy-hydrogen": reader_score(tokens=tok)})
             self.assertEqual((code, out["bars"]["G3"]["ok"]), (0 if held else 1, held), tok)
 
     def test_too_few_samples_null_and_absent_are_missed_bars(self):
         good = reader_score(tokens=SONNET_TOKENS)
-        for readers in ({"claude-sonnet": self.sonnet(), "ember-route": reader_score(n=2, tokens=SONNET_TOKENS)},
-                        {"claude-sonnet": self.sonnet(), "ember-route": reader_score(tokens=None)},
-                        {"claude-sonnet": self.sonnet(), "ember-route": reader_score(majority=[], tokens=SONNET_TOKENS),
-                         "muse-ember": good},
+        for readers in ({"claude-sonnet": self.sonnet(), "agy-hydrogen": reader_score(n=2, tokens=SONNET_TOKENS)},
+                        {"claude-sonnet": self.sonnet(), "agy-hydrogen": reader_score(tokens=None)},
+                        {"claude-sonnet": self.sonnet(), "agy-hydrogen": reader_score(majority=[], tokens=SONNET_TOKENS),
+                         "claude-haiku": good},
                         {"claude-sonnet": self.sonnet()},
-                        {"claude-sonnet": reader_score(tokens=None), "ember-route": good},
-                        {"claude-sonnet": reader_score(n=2, tokens=SONNET_TOKENS), "ember-route": good}):
+                        {"claude-sonnet": reader_score(tokens=None), "agy-hydrogen": good},
+                        {"claude-sonnet": reader_score(n=2, tokens=SONNET_TOKENS), "agy-hydrogen": good}):
             code, out, r = self.bars(readers)
             self.assertEqual((code, out["status"]), (1, "fail"), r.stdout)
             self.assertTrue(out["missed"])
-        code, out, _ = self.bars({"claude-sonnet": self.sonnet(), "ember-route": reader_score(n=2, tokens=SONNET_TOKENS)})
+        code, out, _ = self.bars({"claude-sonnet": self.sonnet(), "agy-hydrogen": reader_score(n=2, tokens=SONNET_TOKENS)})
         self.assertEqual(out["missed"], ["G1", "G2", "G3"])
         code, out, _ = self.bars({"claude-sonnet": self.sonnet()})
         self.assertEqual((out["missed"], out["bars"]["G1"]["value"]), (["G1", "G2", "G3"], None))
 
     def test_unreadable_score_exit_2(self):
         good = reader_score(tokens=SONNET_TOKENS)
-        for readers in ({}, {"ember-route": good}, {"claude-sonnet": {"n": 3}, "ember-route": good},
-                        {"claude-sonnet": self.sonnet(), "ember-route": {"n": 3}}):
+        for readers in ({}, {"agy-hydrogen": good}, {"claude-sonnet": {"n": 3}, "agy-hydrogen": good},
+                        {"claude-sonnet": self.sonnet(), "agy-hydrogen": {"n": 3}}):
             code, out, _ = self.bars(readers)
             self.assertEqual((code, out), (2, {"status": "score_unreadable"}))
         for raw in ("not json", "[]", '{"readers": []}'):
@@ -1496,47 +1253,47 @@ class Bars(unittest.TestCase):
         self.assertEqual(self.w.call("bars", "--score", self.w.t / "none.json")[:2], (2, {"status": "score_unreadable"}))
 
     def test_only_the_judged_reader_is_judged_the_others_are_information(self):
-        readers = {"claude-sonnet": self.sonnet(), "ember-route": reader_score(tokens=SONNET_TOKENS),
-                   "muse-ember": reader_score(majority=[], unanswered=48, tokens=EMBER_TOKENS)}
+        readers = {"claude-sonnet": self.sonnet(), "agy-hydrogen": reader_score(tokens=SONNET_TOKENS),
+                   "claude-haiku": reader_score(majority=[], unanswered=48, tokens=HIGH_TOKENS)}
         code, out, _ = self.bars(readers)
         self.assertEqual((code, out["missed"]), (0, []))
-        self.assertEqual(out["information"], {"muse-ember": {"parity": 0.0, "unanswered_rate": 1.0, "tokens_ratio": 2.695}})
-        self.assertNotIn("muse-ember", json.dumps(out["bars"]) + json.dumps(out["missed"]))
-        code, out, _ = self.bars(readers, "--reader", "muse-ember")
-        self.assertEqual((code, out["reader"], out["missed"]), (1, "muse-ember", ["G1", "G2", "G3"]))
-        self.assertEqual(list(out["information"]), ["ember-route"])
+        self.assertEqual(out["information"], {"claude-haiku": {"parity": 0.0, "unanswered_rate": 1.0, "tokens_ratio": 2.695}})
+        self.assertNotIn("claude-haiku", json.dumps(out["bars"]) + json.dumps(out["missed"]))
+        code, out, _ = self.bars(readers, "--reader", "claude-haiku")
+        self.assertEqual((code, out["reader"], out["missed"]), (1, "claude-haiku", ["G1", "G2", "G3"]))
+        self.assertEqual(list(out["information"]), ["agy-hydrogen"])
         for bad in ("claude-sonnet", "claude-opus"):
             self.assertEqual(self.bars(readers, "--reader", bad)[:2], (2, {"status": "usage"}))
 
-    def test_ember_pack_is_judged_like_ember_route(self):
-        readers = {"claude-sonnet": self.sonnet(), "ember-route": reader_score(tokens=SONNET_TOKENS * 2),
-                   "ember-pack": reader_score(tokens=SONNET_TOKENS // 2)}
-        code, out, r = self.bars(readers, "--reader", "ember-pack")
-        self.assertEqual((code, out["status"], out["reader"], out["missed"]), (0, "pass", "ember-pack", []), r.stdout)
+    def test_the_reader_option_judges_another_reader_like_the_default_one(self):
+        readers = {"claude-sonnet": self.sonnet(), "agy-hydrogen": reader_score(tokens=SONNET_TOKENS * 2),
+                   "claude-haiku": reader_score(tokens=SONNET_TOKENS // 2)}
+        code, out, r = self.bars(readers, "--reader", "claude-haiku")
+        self.assertEqual((code, out["status"], out["reader"], out["missed"]), (0, "pass", "claude-haiku", []), r.stdout)
         self.assertEqual(out["bars"]["G3"]["value"], 0.5)
-        self.assertEqual(out["information"], {"ember-route": {"parity": 1.0, "unanswered_rate": 0.0, "tokens_ratio": 2.0}})
+        self.assertEqual(out["information"], {"agy-hydrogen": {"parity": 1.0, "unanswered_rate": 0.0, "tokens_ratio": 2.0}})
         code, out, _ = self.bars(readers)
-        self.assertEqual((code, out["reader"], out["missed"]), (1, "ember-route", ["G3"]))
+        self.assertEqual((code, out["reader"], out["missed"]), (1, "agy-hydrogen", ["G3"]))
 
     def test_a_case_subset_is_judged_as_a_rate_of_its_own_samples(self):
-        ids = ["s04", "s05", "s13"]
+        ids = ["s09", "s10", "s11"]
 
         def sub(unanswered=0):
             x = reader_score(cases=3, unanswered=unanswered, tokens=SONNET_TOKENS)
             x["passes"], x["majority"] = {c: 3 for c in ids}, ids
             return x
-        code, out, r = self.bars({"claude-sonnet": sub(), "ember-pack": sub()}, "--reader", "ember-pack")
+        code, out, r = self.bars({"claude-sonnet": sub(), "agy-hydrogen": sub()})
         self.assertEqual((code, out["bars"]["G2"]), (0, {"bar": "unanswered rate <= 2/24", "value": 0.0, "ok": True}), r.stdout)
-        code, out, r = self.bars({"claude-sonnet": sub(), "ember-pack": sub(1)}, "--reader", "ember-pack")
+        code, out, r = self.bars({"claude-sonnet": sub(), "agy-hydrogen": sub(1)})
         self.assertEqual((code, out["bars"]["G2"]["value"], out["missed"]), (1, 0.1111, ["G2"]), "1 of 9 samples, not of 48")
 
     def test_judged_and_sonnet_case_sets_that_differ_are_refused(self):
         son, other = self.sonnet(), reader_score(cases=3, tokens=SONNET_TOKENS)
-        for readers in ({"claude-sonnet": son, "ember-route": other},
-                        {"claude-sonnet": other, "ember-route": reader_score(tokens=SONNET_TOKENS)},
-                        {"claude-sonnet": son, "ember-route": dict(son, passes={"k00": 3, **{"z%d" % i: 3 for i in range(15)}})}):
+        for readers in ({"claude-sonnet": son, "agy-hydrogen": other},
+                        {"claude-sonnet": other, "agy-hydrogen": reader_score(tokens=SONNET_TOKENS)},
+                        {"claude-sonnet": son, "agy-hydrogen": dict(son, passes={"k00": 3, **{"z%d" % i: 3 for i in range(15)}})}):
             self.assertEqual(self.bars(readers)[:2], (2, {"status": "case_sets_differ"}))
-        code, out, _ = self.bars({"claude-sonnet": son, "ember-route": reader_score(tokens=SONNET_TOKENS), "muse-ember": other})
+        code, out, _ = self.bars({"claude-sonnet": son, "agy-hydrogen": reader_score(tokens=SONNET_TOKENS), "claude-haiku": other})
         self.assertEqual(code, 0, "an information reader is compared with nothing")
 
     def test_score_parity_is_the_one_bars_reads(self):
@@ -1558,14 +1315,14 @@ class Gate(unittest.TestCase):
         return self.w.call("gate", "--baseline", b, "--candidate", c)
 
     def test_one_case_lost_entirely_fails(self):
-        code, out, _ = self.gate({"muse-ember": table(dict(self.rest, k01=3))}, {"muse-ember": table(dict(self.rest, k01=0))})
-        x = out["readers"]["muse-ember"]
+        code, out, _ = self.gate({"claude-sonnet": table(dict(self.rest, k01=3))}, {"claude-sonnet": table(dict(self.rest, k01=0))})
+        x = out["readers"]["claude-sonnet"]
         self.assertEqual((code, out["status"]), (1, "fail"))
         self.assertEqual((x["drop"], x["noise"], x["ok"], x["lost"]), (1.0, 0.408, False, ["k01"]))
 
     def test_one_case_from_two_to_one_is_noise(self):
-        code, out, _ = self.gate({"muse-ember": table(dict(self.rest, k01=2))}, {"muse-ember": table(dict(self.rest, k01=1))})
-        x = out["readers"]["muse-ember"]
+        code, out, _ = self.gate({"claude-sonnet": table(dict(self.rest, k01=2))}, {"claude-sonnet": table(dict(self.rest, k01=1))})
+        x = out["readers"]["claude-sonnet"]
         self.assertEqual((code, out["status"]), (0, "pass"))
         self.assertEqual((x["drop"], x["noise"], x["ok"], x["lost"]), (0.333, 0.408, True, ["k01"]))
 
@@ -1576,10 +1333,10 @@ class Gate(unittest.TestCase):
 
     def test_reader_missing_fails_reader_only_in_candidate_not_judged(self):
         t = table(dict(self.rest, k01=3))
-        code, out, _ = self.gate({"muse-ember": t, "claude-haiku": t}, {"claude-haiku": t, "agy-hydrogen": table(dict(self.rest, k01=0))})
+        code, out, _ = self.gate({"claude-sonnet": t, "claude-haiku": t}, {"claude-haiku": t, "agy-hydrogen": table(dict(self.rest, k01=0))})
         self.assertEqual((code, out["status"]), (1, "fail"))
-        self.assertEqual(set(out["readers"]), {"muse-ember", "claude-haiku"})
-        self.assertFalse(out["readers"]["muse-ember"]["ok"])
+        self.assertEqual(set(out["readers"]), {"claude-sonnet", "claude-haiku"})
+        self.assertFalse(out["readers"]["claude-sonnet"]["ok"])
         self.assertTrue(out["readers"]["claude-haiku"]["ok"])
 
     def test_refusals(self):
