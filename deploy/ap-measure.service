@@ -1,13 +1,15 @@
 [Unit]
-Description=ap measure: the sessions pass and then the KPI pass (one run a night)
+Description=ap measure: the sessions pass, the KPI pass and then the routing pass (one run a night)
 Documentation=https://github.com/park-kyungchan/agent-platform/blob/main/deploy/README.md
 
 [Service]
 Type=oneshot
-# A failed sessions pass (the `-` prefix) does not keep the KPI pass of that night from running.
+# A failed sessions or KPI pass (the `-` prefix) does not keep the passes after it that night from running.
 ExecStart=-/usr/local/bin/ap measure sessions
-ExecStart=/usr/local/bin/ap measure kpis
-# The sessions pass reads three days of session records and the KPI pass asks three functions of the store.
+ExecStart=-/usr/local/bin/ap measure kpis
+ExecStart=/usr/local/bin/ap measure routing
+# The sessions pass reads three days of session records, the KPI pass asks three functions of the store and the
+# routing pass asks flow by tier of each confirmed intent.
 TimeoutStartSec=3600
 Slice=agents.slice
 Nice=10

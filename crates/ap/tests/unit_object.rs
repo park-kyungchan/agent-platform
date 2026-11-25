@@ -556,12 +556,16 @@ impl F {
         ok(json!({"objects": [{"id": id, "head": head,
             "observations": [{"revision": "r#0", "fields": {}}, {"revision": head, "fields": fields}]}]}))
     }
-    /// `search` of the objects of `clause`, filtered by `eq` as the engine does, one page.
+    /// `search` of the objects of `clause` or `finding`, filtered by `eq` as the engine does, one page.
     fn search(&self, body: &Value) -> Answer {
-        assert_eq!(body["object_type"], "clause", "only clauses are searched");
+        let kind = body["object_type"].as_str().unwrap();
+        assert!(
+            kind == "clause" || kind == "finding",
+            "only clauses and findings are searched"
+        );
         let all = body["where"]["all"].as_array().unwrap();
         let found = self.objects.iter().filter(|((t, _), o)| {
-            t == "clause"
+            t == kind
                 && all
                     .iter()
                     .all(|c| o[c["eq"][0].as_str().unwrap()] == c["eq"][1])
@@ -571,7 +575,7 @@ impl F {
                 let fields: Value = (o.as_object().unwrap().iter())
                     .map(|(n, v)| (n.clone(), json!({"kind": "value", "value": v})))
                     .collect();
-                json!({"id": oid("clause", key), "head": {"fields": fields}})
+                json!({"id": oid(kind, key), "head": {"fields": fields}})
             })
             .collect();
         ok(json!({"basis": {"qualified": self.clauses_qualified},
@@ -4953,4 +4957,89 @@ fn r50_use_recorded_by_used_on_a_merged_unit() {
     f.env.push(("ONT_ROLE".into(), "lead".into()));
     let e = used(&mut f, "u8", "u-one", json!(shown)).unwrap_err();
     assert_eq!(e.code, "role_in_environment");
+}
+
+/// A policy file with the routing map of `specs/ap/routing.md` R1: the tiers `m`, then `big`; `big` implements and
+/// verifies a large unit, `m` a small one.
+fn routing_policy(t: &Tmp) -> PathBuf {
+    let path = t.at("policy.json");
+    let small = json!({"implementer": ["claude", "m"], "verifier": ["claude", "m"]});
+    let large = json!({"implementer": ["claude", "big"], "verifier": ["claude", "big"]});
+    let policy = json!({"models": {"allowed": ["m", "big"], "never": []}, "accounts": {"claude": ["/scratch/a"]},
+        "routing": {"order": [["claude", "m"], ["claude", "big"]], "large_lines": 400,
+            "map": {"default": {"small": small, "large": large}},
+            "bar": {"rate": 0.5, "window_days": 7, "min_merged": 3}}});
+    std::fs::write(&path, policy.to_string()).unwrap();
+    path
+}
+
+// spec: specs/ap/unit.md#R51
+// spec: specs/ap/routing.md#R7
+#[test]
+fn r51_ready_tier_over_bar_holds_a_draft_before_its_checks_run() {
+    let mut f = F::new();
+    // Added before the map existed, and the bar opened after it was added.
+    let req = with(
+        added("u-bar"),
+        json!({"kind": "schema", "acceptance": check("exit 1", "fails_on_base")}),
+    );
+    yes(&mut f, &["add"], req);
+    let t = Tmp::new();
+    f.policy = Some(routing_policy(&t));
+    let key = "routing-bar-claude-m-schema";
+    f.put(
+        "finding",
+        key,
+        json!({"detector": "ap-routing", "state": "open", "kind": "incident"}),
+    );
+    f.calls.clear();
+    let e = ready(&mut f, "u-bar").unwrap_err();
+    assert_eq!(
+        (e.code.as_str(), e.field.as_str(), &e.detail, &e.after),
+        (
+            "tier_over_bar",
+            "implementer",
+            &json!({"finding": key, "lowest": ["claude", "big"]}),
+            &None
+        )
+    );
+    // The unit read once, one search of findings, no check run and nothing applied.
+    assert_eq!(f.names(), ["get unit", "search"]);
+    assert_eq!(f.unit("u-bar")["state"], "draft");
+    // The Lead closes the bar: the unit is made ready, its checks run.
+    f.put(
+        "finding",
+        key,
+        json!({"detector": "ap-routing", "state": "closed", "kind": "incident"}),
+    );
+    let v: Value = serde_json::from_str(&ready(&mut f, "u-bar").unwrap()).unwrap();
+    assert_eq!(v["state"], "ready");
+    // A ready unit is not tested again.
+    f.calls.clear();
+    f.put(
+        "finding",
+        key,
+        json!({"detector": "ap-routing", "state": "open", "kind": "incident"}),
+    );
+    let _ = ready(&mut f, "u-bar");
+    assert!(!f.names().iter().any(|n| n == "search"), "{:?}", f.names());
+    // A large unit under the map's row: `tier_below_map`, before the checks.
+    f.policy = None;
+    let req = with(
+        added("u-large"),
+        json!({"kind": "rust", "estimate_lines": 400, "acceptance": check("exit 1", "fails_on_base")}),
+    );
+    yes(&mut f, &["add"], req);
+    f.policy = Some(routing_policy(&t));
+    f.calls.clear();
+    let e = ready(&mut f, "u-large").unwrap_err();
+    assert_eq!(
+        (e.code.as_str(), e.field.as_str(), &e.detail),
+        (
+            "tier_below_map",
+            "implementer",
+            &json!({"lowest": ["claude", "big"]})
+        )
+    );
+    assert_eq!(f.names(), ["get unit", "search"]);
 }

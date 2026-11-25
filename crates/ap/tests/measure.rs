@@ -2706,17 +2706,25 @@ fn r15_the_text_of_each_kind_of_kpi_and_its_bounds() {
 
 // spec: specs/ap/measure.md#R16
 #[test]
-fn r16_the_timer_runs_the_sessions_pass_and_then_the_kpi_pass_each_night() {
+fn r16_the_timer_runs_the_sessions_pass_the_kpi_pass_and_the_routing_pass_each_night() {
     let service = include_str!("../../../deploy/ap-measure.service");
     let timer = include_str!("../../../deploy/ap-measure.timer");
     let route = include_str!("../../../deploy/ap-route.service");
     let lines: Vec<&str> = service.lines().collect();
-    let at = |l: &str| lines.iter().position(|x| *x == l);
-    let (sessions, kpis) = (
-        at("ExecStart=-/usr/local/bin/ap measure sessions"),
-        at("ExecStart=/usr/local/bin/ap measure kpis"),
+    // Three steps in this order; a failed sessions or KPI pass does not keep the routing pass from running.
+    let steps: Vec<&str> = lines
+        .iter()
+        .copied()
+        .filter(|l| l.starts_with("ExecStart="))
+        .collect();
+    assert_eq!(
+        steps,
+        [
+            "ExecStart=-/usr/local/bin/ap measure sessions",
+            "ExecStart=-/usr/local/bin/ap measure kpis",
+            "ExecStart=/usr/local/bin/ap measure routing",
+        ]
     );
-    assert!(sessions.is_some() && kpis.is_some() && sessions < kpis);
     for l in [
         "Type=oneshot",
         "TimeoutStartSec=3600",
