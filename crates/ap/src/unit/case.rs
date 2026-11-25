@@ -105,7 +105,10 @@ fn executable(acceptance: &str) -> Result<(), Failure> {
 }
 /// The `ap run` request of the implementer stage, the same when it is admitted and when it starts.
 fn stage_request(r: &Value, prompt: &str) -> Value {
-    let (mut req, out) = (r["implementer"].clone(), r["out"].as_str().unwrap_or_default());
+    let (mut req, out) = (
+        r["implementer"].clone(),
+        r["out"].as_str().unwrap_or_default(),
+    );
     (req["cwd"], req["prompt"]) = (r["worktree"].clone(), json!(prompt));
     req["out"] = json!(format!("{out}.implementer.md"));
     req["role"] = json!("implementer");

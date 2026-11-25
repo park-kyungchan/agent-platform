@@ -409,7 +409,10 @@ fn r4_the_removed_verbs_and_the_page_forms_of_unit_reach_no_verb() {
     for verb in ["accept", "backlog", "row", "state"] {
         assert!(!help.contains(&format!("  {verb}: ")), "{verb}: {help}");
     }
-    assert!(!help.contains("<page>") && !help.contains("compose-only"), "{help}");
+    assert!(
+        !help.contains("<page>") && !help.contains("compose-only"),
+        "{help}"
+    );
 }
 
 // ---- The case call (README "One case") -------------------------------------------------------
