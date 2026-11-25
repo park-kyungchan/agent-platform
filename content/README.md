@@ -8,7 +8,7 @@ Generic Academy routing belongs to education-platform; private teaching/reportin
 ownership is planned for education-dc-gang-a after verified source/consumer transfer.
 Both Academy skills are excluded here; their retained education-platform copies
 do not release the disabled-tool hold or authorize direct fallback. Native Herdr hooks, per-CLI pointer files,
-third-party skills and Hindsight integrations are not copied or owned. Skills
+third-party skills are not copied or owned. Skills
 assign no permanent role to a CLI and add no instruction loader.
 
 Content describes native integrations and existing host paths; copying it does

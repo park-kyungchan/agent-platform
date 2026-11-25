@@ -1,6 +1,6 @@
 # Official documentation: when to look it up and where
 
-Read this when a CLI, Herdr, Docker, Tailscale, Hostinger, Hindsight or another tool behaves differently from what you expect and local evidence does not settle it. Read only section 4 when you design, plan or review the life cycle, an Ontology store, Rust, Spec-Driven Development or context governance and need what the design sources say.
+Read this when a CLI, Herdr, Docker, Tailscale, Hostinger or another tool behaves differently from what you expect and local evidence does not settle it. Read only section 4 when you design, plan or review the life cycle, an Ontology store, Rust, Spec-Driven Development or context governance and need what the design sources say.
 
 ## 1. Lookup order
 
@@ -42,7 +42,6 @@ Infrastructure:
 | Owner | Index |
 | --- | --- |
 | Herdr | https://herdr.dev/llms.txt and https://herdr.dev/agent-guide.md |
-| Hindsight | https://hindsight.vectorize.io/llms.txt ; API reference https://hindsight.vectorize.io/api-reference |
 | Docker | https://docs.docker.com/llms.txt |
 | Tailscale | https://tailscale.com/docs/llms.txt |
 | Hostinger | https://www.hostinger.com/llms.txt ; API https://www.hostinger.com/api/llms.txt ; VPS API schema https://developers.hostinger.com/openapi/openapi.json |
@@ -53,7 +52,7 @@ Infrastructure:
 | Rust and Cargo | https://doc.rust-lang.org/cargo/ ; https://doc.rust-lang.org/rustc/ |
 | Node.js and Bun | https://nodejs.org/api/ ; https://bun.sh/docs |
 
-Known dead routes, so nobody retries them: `https://developers.hostinger.com/llms.txt` returns 404; `https://tailscale.com/kb/llms.txt` redirects to an HTML page; the Hindsight `/sdks/mcp` page returns 404. Do not guess an `llms-full.txt` address.
+Known dead routes, so nobody retries them: `https://developers.hostinger.com/llms.txt` returns 404; `https://tailscale.com/kb/llms.txt` redirects to an HTML page. Do not guess an `llms-full.txt` address.
 
 When you verify a correction to this file, change it in the `agent-platform` source through review.
 
