@@ -1180,6 +1180,8 @@ fn write(
     // `amend`, `drop`, `defer`, `undefer` and `used` of a unit the store does not have: the actions would
     // answer another refusal.
     let mut revision = None;
+    // The unit as the op leaves it, for the routing map's tests (`specs/ap/routing.md` R3).
+    let mut routed = p.clone();
     if op != "add" {
         let Some((read, stored)) = at(store::head_of::<objects::Unit>(s, store, key), "unit")?
         else {
@@ -1204,12 +1206,17 @@ fn write(
             }
             p["page_digest"] = json!(render::page_digest(key, &page));
             page_size(&call, op, &p)?;
+            routed = page;
         }
     }
     for (list, d) in &depends {
         if at(store::get_of::<objects::Unit>(s, store, d), list)?.is_none() {
             return Err(fail("unknown_dependency", list, json!(d)));
         }
+    }
+    // After the other checks and before the apply: the tiers against the routing map (`specs/ap/routing.md` R3).
+    if op == "add" || op == "amend" {
+        super::routing::check_unit(s, store, &routed)?;
     }
     let applied = match op {
         "add" => (add_action(&p)).and_then(|a| store::apply_action(s, store, &call, &a)),
@@ -1277,6 +1284,8 @@ fn ready(
         {
             return Err(fail("page_not_reviewed", "unit", json!({"digest": digest})));
         }
+        // The routing map's tests, before the acceptance checks run on the base (`specs/ap/routing.md` R7).
+        super::routing::check_unit(s, store, &u)?;
         (base, checks) = on_base(s, store, &u)?;
     }
     // The intent is copied from the unit's head, which the store may have written unreadable: the form ends
