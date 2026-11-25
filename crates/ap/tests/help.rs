@@ -105,7 +105,7 @@ fn r34_the_help_of_status_names_the_indicators_form() {
 // spec: specs/ap/status.md#R43
 #[test]
 fn r43_the_help_of_status_names_the_brief_and_requests_forms() {
-    let form = "ap status --brief <intent> [--store <path>]";
+    let form = "ap status --brief [<intent>] [--directory <absolute path>] [--store <path>]";
     let help = String::from_utf8(ap(&["--help"]).stdout).unwrap();
     assert!(help.contains(form));
     let status = String::from_utf8(ap(&["status", "--help"]).stdout).unwrap();

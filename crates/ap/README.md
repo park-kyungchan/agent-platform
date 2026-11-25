@@ -10,7 +10,7 @@ The contract of each kept verb is its specification under `specs/ap/`; its secti
 | `deliver` | `ap deliver [check] < request.json` | `specs/ap/deliver.md` |
 | `request` | `ap request [--store <path>] [--text] < request.json` | `specs/ap/request.md` |
 | `intent` | `ap intent [--store <path>] [--text] < request.json` | `specs/ap/intent.md` |
-| `status` | `ap status [<key> [--requests] \| --term <word>]`, `--brief`, `--wait`, `--indicators` | `specs/ap/status.md` |
+| `status` | `ap status [<key> [--requests] \| --term <word>]`, `--brief [<intent>] [--directory <path>]`, `--wait`, `--indicators` | `specs/ap/status.md` |
 | `quota` | `ap quota` | `specs/ap/quota.md` |
 | `work` | `ap work [--store <path>]` | `specs/ap/work.md` |
 | `policy` | `ap policy check [<file>]` | `specs/ap/policy.md` R12 to R16 |
@@ -312,7 +312,7 @@ The answer is one JSON line on stdout, exit 0: `topic`, `decision` (the row's id
 
 ## The status
 
-`ap status [<key> [--requests] | --term <word>] [--text] [--store <path>]`, `ap status --brief <intent> [--store <path>]`, `ap status --wait <intent> [--timeout <seconds>] [--store <path>]` and `ap status --indicators [<intent>] [--text] [--store <path>]` and `ap status --page [--store <path>]` (the status page the service `ap-status-page.service` writes: the lines of `ap status --text`, each open intent's brief, flow and week's cost by role, the flow, cost and month's API spend of all, and the capacity of the hosts, machines and accounts; plain lines, a section that cannot be read as one line with its code): `specs/ap/status.md`.
+`ap status [<key> [--requests] | --term <word>] [--text] [--store <path>]`, `ap status --brief [<intent>] [--directory <absolute path>] [--store <path>]` (one block of at most 40 lines for the intent, or for each open intent of the directory, the working directory without `--directory`), `ap status --wait <intent> [--timeout <seconds>] [--store <path>]` and `ap status --indicators [<intent>] [--text] [--store <path>]` and `ap status --page [--store <path>]` (the status page the service `ap-status-page.service` writes: the lines of `ap status --text`, each open intent's brief, flow and week's cost by role, the flow, cost and month's API spend of all, and the capacity of the hosts, machines and accounts; plain lines, a section that cannot be read as one line with its code): `specs/ap/status.md`.
 
 ## The task's state
 
