@@ -1985,14 +1985,47 @@ fn r13_a_remote_that_fails_for_25_hours_raises_backup_copy_stale() {
     f.at(26 * 60);
     let v = f.pass();
     assert_eq!(v["closed"], json!([kc]));
-    // `none` (no remote) counts as not copied too.
-    let mut g = F::new();
-    g.record();
-    g.backup.as_mut().unwrap()["remote"] = json!("none");
-    g.pass();
-    g.at(24 * 60 + 1);
+}
+
+// spec: specs/ap/watch.md#R13
+#[test]
+fn r13_no_remote_raises_no_copy_stale() {
+    let mut f = F::new();
+    f.record();
+    let kc = k("records", "backup copy stale");
+    f.backup.as_mut().unwrap()["remote"] = json!("none");
+    let v = f.pass();
+    assert_eq!(v["opened"], json!([]));
+    assert_eq!(f.state()["records"]["copied_at"], utc(BASE - 600));
+
+    // Across 25 hours with `remote: "none"`, `copied_at` advances and no signal opens.
+    f.at(25 * 60);
+    f.backup_age = 60;
+    let v = f.pass();
+    assert_eq!(v["opened"], json!([]));
+    assert_eq!(
+        f.state()["records"]["copied_at"],
+        utc(BASE + 25 * 60 * 60 - 60)
+    );
+
+    // A reading with `remote: "none"` closes an already open `backup copy stale` finding.
+    let mut g = F::quiet();
+    g.backup.as_mut().unwrap()["remote"] = json!("failed");
+    g.at(24 * 60);
     let v = g.pass();
     assert_eq!(v["opened"], json!([kc]));
+    assert_eq!(g.finding(&kc)["state"], "open");
+
+    g.backup.as_mut().unwrap()["remote"] = json!("none");
+    g.backup_age = 60;
+    g.at(25 * 60);
+    let v = g.pass();
+    assert_eq!(v["closed"], json!([kc]));
+    assert_eq!(g.finding(&kc)["state"], "closed");
+    assert_eq!(
+        g.state()["records"]["copied_at"],
+        utc(BASE + 25 * 60 * 60 - 60)
+    );
 }
 
 // ---- login.
