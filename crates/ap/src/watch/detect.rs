@@ -591,7 +591,10 @@ pub(crate) fn records(s: &mut impl System, now: u64, prior: Option<&Value>) -> R
         (false, Some(t)) => t,
         (false, None) => now,
     };
-    let copied = matches!(last["remote"].as_str(), Some("copied" | "unchanged"));
+    let copied = matches!(
+        last["remote"].as_str(),
+        Some("copied" | "unchanged" | "none")
+    );
     let copied_at = match (copied, kept("copied_at")) {
         (true, _) => at,
         (false, Some(t)) => t,
