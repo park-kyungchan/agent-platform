@@ -119,7 +119,7 @@ pub fn evidence_text(function: &str, parameters: &Value) -> Result<String, &'sta
 }
 
 /// The options of the pass: the day and the store, each at most once (R14).
-fn options(argv: &[OsString]) -> Result<(Option<String>, Option<String>), Failure> {
+pub(super) fn options(argv: &[OsString]) -> Result<(Option<String>, Option<String>), Failure> {
     let usage = || error("usage", "args");
     let mut words = vec![];
     for a in argv {

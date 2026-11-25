@@ -331,6 +331,26 @@ impl W {
             return broken("ont");
         }
         match args[0].as_str() {
+            "search" if input["object_type"] == "finding" => {
+                // The findings of the routing map's bars (R27), filtered by `eq` as the engine does.
+                let all = input["where"]["all"].as_array().unwrap();
+                let objects: Vec<Value> = self
+                    .others
+                    .iter()
+                    .filter(|((t, _), f)| {
+                        t == "finding"
+                            && all
+                                .iter()
+                                .all(|c| f[c["eq"][0].as_str().unwrap()] == c["eq"][1])
+                    })
+                    .map(|((_, k), f)| json!({"id": json!({"object_type": "finding", "native_key": k}), "head": {"fields": wrap(f)}}))
+                    .collect();
+                reply(
+                    true,
+                    &json!({"status": "ok", "result": {"basis": {"qualified": true},
+                    "objects": objects, "continuation": null}}),
+                )
+            }
             "search" => {
                 assert_eq!(input["object_type"], "unit");
                 let states = &input["where"]["all"][0]["in"];
@@ -2303,4 +2323,119 @@ fn r26_not_delivered_comes_after_the_validate_and_is_read_only_for_such_a_candid
         1,
         "{reads:?}"
     );
+}
+
+/// The routing map of the trials: `haiku` before `opus`; a unit of kind `schema` needs `opus`.
+fn routing_map() -> Value {
+    let lowest = |m: &str| json!({"implementer": ["claude", m], "verifier": ["claude", m]});
+    json!({"order": [["claude", "haiku"], ["claude", "opus"]], "large_lines": 400,
+        "map": {"default": {"small": lowest("haiku"), "large": lowest("haiku")},
+            "schema": {"small": lowest("opus"), "large": lowest("opus")}},
+        "bar": {"rate": 0.5, "window_days": 7, "min_merged": 3}})
+}
+fn finding_searches(w: &W) -> usize {
+    let calls = w.calls.borrow();
+    calls
+        .iter()
+        .filter(|c| c.0 == "ont" && c.1[0] == "search" && c.2["object_type"] == "finding")
+        .count()
+}
+impl W {
+    /// The ready units of the routing trial: one held by a bar, one under the map, one off the order, two free.
+    fn routing_trial(&mut self, routing: Value) {
+        self.policy_with(json!({"work": {"prefix": PREFIX, "slice": SLICE, "slots": 16},
+            "models": {"allowed": ["opus", "haiku", "sonnet"], "never": []}, "routing": routing}));
+        let tier = |m: &str| json!({"runtime": "claude", "model": m, "effort": "high"});
+        self.ready("barred", &["b/**"], 1);
+        self.set("barred", json!({"kind": "rust"}));
+        self.ready("under", &["u/**"], 2);
+        self.set(
+            "under",
+            json!({"kind": "schema", "implementer": tier("haiku"), "verifier": tier("haiku")}),
+        );
+        self.ready("stranger", &["s/**"], 3);
+        self.set("stranger", json!({"kind": "rust", "implementer": tier("sonnet")}));
+        self.ready("free", &["f/**"], 4);
+        self.set("free", json!({"kind": "script"}));
+        self.ready("plain", &["p/**"], 5);
+        self.others.insert(
+            ("finding".into(), "routing-bar-claude-opus-rust".into()),
+            json!({"detector": "ap-routing", "state": "open", "kind": "incident"}),
+        );
+    }
+}
+
+// spec: specs/ap/work.md#R27
+// spec: specs/ap/routing.md#R8
+// spec: specs/ap/routing.md#R14
+#[test]
+fn r27_pass_holds_tier_over_bar_below_map_and_not_in_order() {
+    let mut w = W::new();
+    w.routing_trial(routing_map());
+    let v = w.ok();
+    assert_eq!(keys(&v["started"]), ["free", "plain"], "{v}");
+    let expected = [
+        ("barred", "tier over bar: routing-bar-claude-opus-rust"),
+        ("under", "tier below map"),
+        ("stranger", "tier not in order"),
+    ];
+    assert_eq!(waiting(&v), pairs(&expected));
+    assert_eq!(w.notes(), pairs(&expected));
+    // One search of findings a pass, and no function.
+    assert_eq!(finding_searches(&w), 1);
+    let calls = w.calls.borrow().clone();
+    assert!(calls.iter().all(|c| c.0 != "ont" || (c.1[0] != "fn" && c.1[0] != "log")));
+    // The Lead closes the bar: the next pass starts the unit.
+    w.others.insert(
+        ("finding".into(), "routing-bar-claude-opus-rust".into()),
+        json!({"detector": "ap-routing", "state": "closed", "kind": "incident"}),
+    );
+    w.reset();
+    let v = w.ok();
+    assert_eq!(keys(&v["started"]), ["barred"], "{v}");
+}
+
+// spec: specs/ap/work.md#R27
+// spec: specs/ap/routing.md#R8
+#[test]
+fn r27_without_routing_nothing_is_held_and_a_bad_member_refuses_the_pass() {
+    let mut w = W::new();
+    w.routing_trial(Value::Null);
+    let v = w.ok();
+    assert_eq!(
+        keys(&v["started"]),
+        ["barred", "under", "stranger", "free", "plain"],
+        "{v}"
+    );
+    assert_eq!(finding_searches(&w), 0);
+    let mut w = W::new();
+    w.routing_trial(json!({"order": [["claude", "haiku"]]}));
+    let (code, status) = w.refused();
+    assert_eq!((code.as_str(), status), ("policy_invalid@policy", 2));
+    assert!(w.calls.borrow().iter().all(|c| c.0 != "ont"));
+}
+
+// spec: specs/ap/work.md#R27
+#[test]
+fn r27_a_merge_candidate_is_not_tested_and_a_test_comes_after_not_delivered() {
+    // A merge candidate (R22) whose implementer has a bar starts all the same.
+    let mut w = W::new();
+    w.routing_trial(routing_map());
+    w.objects.clear();
+    w.put(
+        "m-barred",
+        json!({"state": "accepted", "class": "plain", "repository": "o/r", "kind": "rust",
+        "head": "c".repeat(40), "write_set": ["m/**"],
+        "implementer": {"runtime": "claude", "model": "opus", "effort": "high"},
+        "verifier": {"runtime": "claude", "model": "opus", "effort": "high"}}),
+    );
+    let v = w.ok();
+    assert_eq!(keys(&v["started"]), ["m-barred"], "{v}");
+    assert_eq!(finding_searches(&w), 0);
+    // A failed validate of `start_unit` names the wait before the map's.
+    let mut w = W::new();
+    w.routing_trial(routing_map());
+    w.refuse.insert("barred".into(), vec!["held".into()]);
+    let v = w.ok();
+    assert_eq!(waiting(&v)[0], ("barred".to_owned(), "held".to_owned()));
 }

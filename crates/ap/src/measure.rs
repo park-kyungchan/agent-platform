@@ -3,11 +3,13 @@
 //! list-price spend, refusals, reads and writes by UTC day (`measure/sessions.rs`, the counts of a day in
 //! `measure/count.rs`), the functions `cost`, `flow` and `share`, which answer from those runs and the merged units
 //! (`measure/cost.rs`, `measure/flow.rs`, `measure/share.rs`), and the pass `kpis`, which records each KPI of a
-//! confirmed intent once a day from them (`measure/kpis.rs`).
+//! confirmed intent once a day from them (`measure/kpis.rs`), and the pass `routing`, which opens and closes the
+//! findings that bar a tier of the routing map from a kind of work (`measure/routing.rs`, `specs/ap/routing.md`).
 mod cost;
 mod count;
 mod flow;
 mod kpis;
+mod routing;
 mod sessions;
 mod share;
 
@@ -25,12 +27,12 @@ pub use kpis::{TABLE, evidence_text, value_text};
 pub use sessions::academy;
 
 /// The usage of every pass (R1).
-pub const HELP: &str = "Usage: ap measure sessions [--since <YYYY-MM-DD>] [--accounts <dir>]... [--work-root <dir>] [--platforms-root <dir>] [--stage-dir <dir>]... [--prices <file>] [--store <path>]\nOne pass: reads the Claude Code session records of each account (projects/**/*.jsonl and homes/*/projects/**/*.jsonl), the stage records and the door's record, and makes every session of route engineering a run of the store (record_session, extend_session) with its list-price spend, refusals, reads and writes by UTC day (measure_run); one JSON line. Default --since: two days before today (UTC).\nUsage: ap measure kpis [--day <YYYY-MM-DD>] [--store <path>]\nOne pass: records once a day one measurement of each KPI of a confirmed intent whose name is in the table of specs/ap/measure.md, over the seven days before --day (default: today, UTC), from the functions cost, flow and share (record_measurement); one JSON line. A KPI measured that day is left as it is. ap with no argument and ONT_FN_NAME=cost, flow or share answers that function of the store.\n";
+pub const HELP: &str = "Usage: ap measure sessions [--since <YYYY-MM-DD>] [--accounts <dir>]... [--work-root <dir>] [--platforms-root <dir>] [--stage-dir <dir>]... [--prices <file>] [--store <path>]\nOne pass: reads the Claude Code session records of each account (projects/**/*.jsonl and homes/*/projects/**/*.jsonl), the stage records and the door's record, and makes every session of route engineering a run of the store (record_session, extend_session) with its list-price spend, refusals, reads and writes by UTC day (measure_run); one JSON line. Default --since: two days before today (UTC).\nUsage: ap measure kpis [--day <YYYY-MM-DD>] [--store <path>]\nOne pass: records once a day one measurement of each KPI of a confirmed intent whose name is in the table of specs/ap/measure.md, over the seven days before --day (default: today, UTC), from the functions cost, flow and share (record_measurement); one JSON line. A KPI measured that day is left as it is.\nUsage: ap measure routing [--day <YYYY-MM-DD>] [--store <path>]\nOne pass, with the policy's member routing: over the bar's window before --day (default: today, UTC), each tier's stop-and-repair rate on each kind of work from the function flow by tier over the confirmed intents, and the findings of the detector ap-routing that bar a tier above the rate (open_finding, see_finding_again, reopen_finding, close_finding); one JSON line. ap with no argument and ONT_FN_NAME=cost, flow or share answers that function of the store.\n";
 
 /// The exit status of a refusal or a failure: 2 for what the caller asked wrongly, 3 for the store (R2, R9).
 pub fn exit_of(f: &Failure) -> u8 {
     match f.code {
-        "usage" | "invalid_input" | "unknown_intent" | "input_too_large" => 2,
+        "usage" | "invalid_input" | "unknown_intent" | "input_too_large" | "policy_invalid" => 2,
         _ => 3,
     }
 }
@@ -41,6 +43,7 @@ pub fn run(s: &mut impl System, argv: &[OsString]) -> Result<(Value, u8), Failur
     match argv.split_first() {
         Some((pass, rest)) if pass == "sessions" => sessions::pass(s, rest),
         Some((pass, rest)) if pass == "kpis" => kpis::pass(s, rest),
+        Some((pass, rest)) if pass == "routing" => routing::pass(s, rest),
         _ => Err(error("usage", "args")),
     }
 }

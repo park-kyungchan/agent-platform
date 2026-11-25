@@ -83,8 +83,21 @@ fn host() -> Value {
                 "merge-review": {"cap_usd": 45, "models": ["claude-opus-5-5", "claude-fable-5-2"], "max_tokens": 8000, "max_requests": 100},
                 "mining": {"cap_usd": 18, "models": ["claude-sonnet-5-5", "claude-fable-5-2"], "max_tokens": 8000, "max_requests": 400},
                 "evals": {"cap_usd": 39, "models": ["claude-haiku-5-5", "claude-sonnet-5-5", "claude-opus-5-5", "claude-fable-5-2"], "max_tokens": 8000, "max_requests": 300}}},
-        "store_url": "http://100.95.133.99:7432"
+        "store_url": "http://100.95.133.99:7432",
+        "routing": routing()
     })
+}
+
+/// A routing map of the form of `specs/ap/routing.md` R1, invented.
+fn routing() -> Value {
+    json!({"order": [["claude", "claude-haiku-5-5"], ["claude", "claude-sonnet-5-5"], ["claude", "claude-opus-5-5"]],
+        "large_lines": 400,
+        "map": {
+            "default": {"small": {"implementer": ["claude", "claude-haiku-5-5"], "verifier": ["claude", "claude-sonnet-5-5"]},
+                "large": {"implementer": ["claude", "claude-sonnet-5-5"], "verifier": ["claude", "claude-sonnet-5-5"]}},
+            "schema": {"small": {"implementer": ["claude", "claude-opus-5-5"], "verifier": ["claude", "claude-opus-5-5"]},
+                "large": {"implementer": ["claude", "claude-opus-5-5"], "verifier": ["claude", "claude-opus-5-5"]}}},
+        "bar": {"rate": 0.4, "window_days": 28, "min_merged": 3}})
 }
 
 /// The refusal of the host's shape with `member` set to `value`: (reader, code, field, detail).
@@ -126,7 +139,7 @@ fn r12_the_host_shape_passes_every_reader_after_one_read() {
     assert_eq!(
         answer,
         json!({"status": "ok", "path": PATH, "sha256": digest,
-            "readers": ["models", "quota", "units", "reviews", "repositories", "work", "check", "writer", "api", "client"]})
+            "readers": ["models", "quota", "units", "reviews", "repositories", "work", "check", "writer", "api", "client", "routing"]})
     );
     assert_eq!(fake.reads.get(), 1);
     assert!(fake.calls.is_empty());
@@ -693,4 +706,73 @@ fn r20_approval_member_of_units_is_read_by_its_form() {
             "{approval}"
         );
     }
+}
+
+// spec: specs/ap/policy.md#R12
+// spec: specs/ap/policy.md#R13
+// spec: specs/ap/policy.md#R21
+// spec: specs/ap/routing.md#R1
+// spec: specs/ap/routing.md#R2
+#[test]
+fn routing_member_is_validated_by_the_reader_routing_after_client() {
+    // A file without the member passes, and the reader is listed all the same.
+    let mut p = host();
+    p.as_object_mut().unwrap().remove("routing");
+    let ans = check(&Fake::json(&p), None).unwrap();
+    assert_eq!(ans["readers"].as_array().unwrap().last().unwrap(), "routing");
+    let set = |path: &[&str], v: Value| {
+        let mut r = routing();
+        let (last, up) = path.split_last().unwrap();
+        let parent = format!("/{}", up.join("/"));
+        let at = match up.is_empty() {
+            true => &mut r,
+            false => r.pointer_mut(&parent).unwrap(),
+        };
+        match (v, at) {
+            (Value::Null, at) => {
+                at.as_object_mut().unwrap().remove(*last);
+            }
+            (v, Value::Array(list)) => list[last.parse::<usize>().unwrap()] = v,
+            (v, at) => at[*last] = v,
+        }
+        r
+    };
+    let sonnet = json!(["claude", "claude-sonnet-5-5"]);
+    for (r, detail) in [
+        (json!([]), "routing is not an object"),
+        (set(&["extra"], json!(1)), "routing.extra is not a member"),
+        (set(&["bar"], Value::Null), "routing.bar is missing"),
+        (set(&["order"], json!([["claude", "claude-opus-5-5"]])), "routing.order is not a list of 2 to 20 pairs"),
+        (set(&["order"], json!((0..21).map(|i| json!(["claude", format!("m{i}")])).collect::<Vec<_>>())), "routing.order is not a list of 2 to 20 pairs"),
+        (set(&["order", "1"], json!(["claude", "claude-haiku-5-5"])), "routing.order.1 is named twice"),
+        (set(&["order", "0"], json!(["claude"])), "routing.order.0 is not a pair [runtime, model]"),
+        (set(&["order", "0"], json!(["claude", ""])), "routing.order.0 is not a pair of two texts of 1 to 80 bytes"),
+        (set(&["large_lines"], json!(99)), "routing.large_lines is not an integer from 100 to 5000"),
+        (set(&["large_lines"], json!(5001)), "routing.large_lines is not an integer from 100 to 5000"),
+        (set(&["map", "default"], Value::Null), "routing.map.default is missing"),
+        (set(&["map", "poetry"], json!({})), "routing.map.poetry is not a unit kind of the schema or default"),
+        (set(&["map", "schema", "large"], Value::Null), "routing.map.schema.large is missing"),
+        (set(&["map", "schema", "small", "verifier"], json!(["codex", "gpt"])), "routing.map.schema.small.verifier is not a pair of routing.order"),
+        (set(&["bar", "rate"], json!(0)), "routing.bar.rate is not a number above 0 and at most 1"),
+        (set(&["bar", "rate"], json!(1.01)), "routing.bar.rate is not a number above 0 and at most 1"),
+        (set(&["bar", "window_days"], json!(93)), "routing.bar.window_days is not an integer from 1 to 92"),
+        (set(&["bar", "min_merged"], json!(0)), "routing.bar.min_merged is not an integer from 1 to 100"),
+    ] {
+        assert_eq!(refused("routing", r), policy_invalid("routing", detail), "{detail}");
+    }
+    // The bounds themselves pass: a rate of 1, 92 days, 100 merged, 5000 lines, a map of every kind.
+    let mut r = set(&["bar"], json!({"rate": 1, "window_days": 92, "min_merged": 100}));
+    r["large_lines"] = json!(5000);
+    for kind in ["rust", "schema", "instructions", "removal", "script", "typescript", "config", "import"] {
+        r["map"][kind] = json!({"small": {"implementer": sonnet, "verifier": sonnet}, "large": {"implementer": sonnet, "verifier": sonnet}});
+    }
+    let mut p = host();
+    p["routing"] = r;
+    assert_eq!(check(&Fake::json(&p), None).unwrap()["status"], "ok");
+    // `routing` runs after `client`: a fault in both is refused by `client`.
+    let mut p = host();
+    p["routing"] = json!(1);
+    p["store_url"] = json!("http://127.0.0.1:1");
+    let Refusal { reader, .. } = check(&Fake::json(&p), None).unwrap_err();
+    assert_eq!(reader, Some("client"));
 }

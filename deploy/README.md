@@ -509,6 +509,16 @@ systemctl is-active ap-status-page.service            # until it answers inactiv
 
 `/var/lib/agent-platform/status-page/` (`status.txt` and `serve.before.json`) stays; remove it by hand when no longer needed.
 
+## The nightly measures
+
+`ap-measure.timer` fires at 00:20 UTC and `ap-measure.service` runs three steps (`specs/ap/measure.md` R16): `ap measure sessions`, `ap measure kpis` and `ap measure routing` (`specs/ap/routing.md` R9 to R13). The first two have the `-` prefix, so that a failed measurement does not keep the routing pass from running. The routing pass applies nothing without the policy's member `routing`; with it, it opens, sees again, reopens or closes the findings `routing-bar-<runtime>-<model>-<kind>` of the detector `ap-routing`, which hold a tier off a kind of work at `ap unit add`, `amend`, `ready` and in the dispatch pass.
+
+```sh
+journalctl -u ap-measure.service -o cat | tail -n 3   # the last line of each pass
+```
+
+Undo of the routing step: remove the member `routing` from the policy file (nothing is then refused, held or applied for a tier); a bar is lifted by the Lead's `close_finding` or, for good, `dismiss_finding`.
+
 ## The tailnet Ontology server (ont-serve)
 
 `ont-serve.service` runs `/usr/local/bin/ont serve --bind 100.95.133.99:7432` as a long-lived `Type=simple` service (`Restart=on-failure`, `RestartSec=5`, `Nice=10`, `Environment=TZ=UTC`, all eleven R52 confinement lines, and no `Environment=ONT_ROLE=` or `ONT_AGENT=`: `ont serve` authenticates remote peers over Tailscale and never inherits server `ONT_ROLE`).

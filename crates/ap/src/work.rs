@@ -9,7 +9,7 @@ use crate::run::KEEP;
 use crate::status;
 use crate::store::{self, Actor};
 use crate::unit::drive::{self, key_form};
-use crate::unit::{object, page_write, render};
+use crate::unit::{object, page_write, render, routing};
 use serde_json::{Value, json};
 use std::{
     collections::BTreeSet,
@@ -228,6 +228,8 @@ pub fn execute(s: &mut impl System, store: Option<&str>) -> Result<Value, Box<Re
     // A writer of a wrong form refuses the pass before the lock, whatever `pages` (R24).
     let writer = page_write::writer(&policy).map_err(before)?;
     scratch(&policy, store).map_err(before)?;
+    // A routing map of a wrong form refuses the pass before the lock (R27).
+    let routing = routing::routing(&policy).map_err(before)?;
     let (directory, _) = drive::units(&policy).map_err(before)?;
     let cpu = quota::config(s).map_err(before)?;
     if !s.units() {
@@ -253,6 +255,8 @@ pub fn execute(s: &mut impl System, store: Option<&str>) -> Result<Value, Box<Re
         load: None,
         pages,
         delivery: None,
+        routing,
+        bars: None,
     };
     pass.run(s).map_err(|f| {
         Box::new(Refusal {
@@ -439,6 +443,9 @@ struct Pass {
     pages: Option<PathBuf>,
     /// The delivery's files, read once by the first candidate with `depends_delivered` (R26).
     delivery: Option<status::DeliveryFiles>,
+    /// The policy's routing map, and the live bars read once by the first candidate it tests (R27).
+    routing: Option<routing::Routing>,
+    bars: Option<BTreeSet<String>>,
 }
 /// A candidate's end in this pass.
 enum End {
@@ -752,6 +759,10 @@ impl Pass {
             if let Some(why) = self.undelivered(s, f)? {
                 return Ok(Some(why));
             }
+            // R27: right after the delivered dependencies, the routing map's tests.
+            if let Some(why) = self.routed(s, f)? {
+                return Ok(Some(why));
+            }
         } else {
             p["head"] = f["head"].clone();
             p["merged_commit"] = json!("0".repeat(40));
@@ -796,6 +807,25 @@ impl Pass {
             return Ok(Some("cpu outside".into()));
         }
         Ok(None)
+    }
+
+    /// The routing map's tests of a `ready` candidate (R27), as its `waits_on`: nothing without the member
+    /// `routing` or for a unit without a kind and both tiers; the live bars come from one search a pass.
+    fn routed(&mut self, s: &mut impl System, f: &Value) -> Result<Option<String>, Failure> {
+        let Some(r) = self.routing.clone() else {
+            return Ok(None);
+        };
+        if !routing::checked(f) {
+            return Ok(None);
+        }
+        if self.bars.is_none() {
+            let r = self.store.clone();
+            self.bars = Some(routing::live_bars(s, r.as_deref())?);
+        }
+        let live = self.bars.clone().unwrap_or_default();
+        Ok(routing::judge(&r, &live, f)
+            .err()
+            .map(|e| routing::wait_text(&e)))
     }
 
     /// The first unit of `depends_delivered` that is not delivered, as its `waits_on` (R26). The

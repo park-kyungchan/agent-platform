@@ -65,6 +65,7 @@ pub mod object;
 pub mod page_review;
 pub mod page_write;
 pub mod render;
+pub mod routing;
 pub mod scan;
 use compose::Composed;
 
