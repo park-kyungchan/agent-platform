@@ -2003,7 +2003,10 @@ fn r13_no_remote_raises_no_copy_stale() {
     f.backup_age = 60;
     let v = f.pass();
     assert_eq!(v["opened"], json!([]));
-    assert_eq!(f.state()["records"]["copied_at"], utc(BASE + 25 * 60 * 60 - 60));
+    assert_eq!(
+        f.state()["records"]["copied_at"],
+        utc(BASE + 25 * 60 * 60 - 60)
+    );
 
     // A reading with `remote: "none"` closes an already open `backup copy stale` finding.
     let mut g = F::quiet();
@@ -2019,7 +2022,10 @@ fn r13_no_remote_raises_no_copy_stale() {
     let v = g.pass();
     assert_eq!(v["closed"], json!([kc]));
     assert_eq!(g.finding(&kc)["state"], "closed");
-    assert_eq!(g.state()["records"]["copied_at"], utc(BASE + 25 * 60 * 60 - 60));
+    assert_eq!(
+        g.state()["records"]["copied_at"],
+        utc(BASE + 25 * 60 * 60 - 60)
+    );
 }
 
 // ---- login.
