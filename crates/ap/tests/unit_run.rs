@@ -139,6 +139,10 @@ struct F {
     capacity: Option<Value>,
     capacity_calls: usize,
     clock: Duration,
+    /// Every pause the run asked for.
+    pauses: Vec<Duration>,
+    /// The next `pr view` calls fail, each with the next message.
+    gh_flaky: Vec<&'static str>,
     launches: usize,
     /// At this launch the store dies: every later call of `ont` fails and no stage launches.
     die_at_launch: Option<usize>,
@@ -253,6 +257,8 @@ impl F {
             capacity: None,
             capacity_calls: 0,
             clock: Duration::ZERO,
+            pauses: vec![],
+            gh_flaky: vec![],
             launches: 0,
             die_at_launch: None,
             die_after: None,
@@ -1202,6 +1208,9 @@ impl F {
             }
             ("pr", "view") => {
                 assert_eq!(a[2], "7");
+                if !self.gh_flaky.is_empty() {
+                    return said(self.gh_flaky.remove(0));
+                }
                 if self.t.join("bin/gh-down").exists() {
                     return said(self.gh_says);
                 }
@@ -1522,6 +1531,7 @@ impl System for F {
     /// the store's strict comparison of times) passes for real, as the fake store's clock is real.
     fn pause(&mut self, duration: Duration) {
         self.clock += duration;
+        self.pauses.push(duration);
         let real = if duration == Duration::from_secs(1) {
             duration
         } else {
@@ -6661,4 +6671,51 @@ fn r48_policy_sample_opens_a_finding_on_every_sampleth_merge_the_policy_approved
         assert_eq!((a["state"].as_str(), status), (Some("merged"), 0), "{a}");
         assert!(!f.actions().contains(&"open_finding".to_owned()));
     }
+}
+
+// spec: specs/ap/unit-run.md#R9
+#[test]
+fn gh_retry_a_transient_reply_then_success_goes_on() {
+    let mut f = F::new();
+    f.gh_flaky = vec![
+        "Post: dial tcp 1.2.3.4:443: i/o timeout",
+        "HTTP 502: Bad Gateway",
+    ];
+    f.steps(&["implement"]);
+    let (a, _) = f.ok();
+    assert_ne!(a["stop_cause"], "github_unreadable", "{a}");
+    assert!(f.gh_flaky.is_empty());
+    let ten = Duration::from_secs(10);
+    let thirty = Duration::from_secs(30);
+    let waits: Vec<_> = f
+        .pauses
+        .iter()
+        .filter(|d| **d == ten || **d == thirty)
+        .collect();
+    assert_eq!(waits, [&ten, &thirty]);
+}
+
+// spec: specs/ap/unit-run.md#R9
+#[test]
+fn gh_retry_three_transient_replies_stop_github_unreadable() {
+    let mut f = F::new();
+    f.gh_flaky = vec![
+        "HTTP 503",
+        "HTTP 401: Bad credentials",
+        "dial tcp: i/o timeout",
+    ];
+    f.steps(&["implement"]);
+    let a = f.stopped("github_unreadable");
+    assert!(a["stop_detail"].as_str().unwrap().contains("i/o timeout"));
+    assert!(f.gh_flaky.is_empty());
+}
+
+// spec: specs/ap/unit-run.md#R9
+#[test]
+fn gh_retry_a_404_stops_at_once() {
+    let mut f = F::new();
+    f.gh_flaky = vec!["HTTP 404: Not Found", "HTTP 503"];
+    f.steps(&["implement"]);
+    f.stopped("github_unreadable");
+    assert_eq!(f.gh_flaky, ["HTTP 503"]);
 }
