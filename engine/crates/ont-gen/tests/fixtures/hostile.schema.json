@@ -1,0 +1,103 @@
+{
+  "format": "ontology-schema/v1",
+  "domain": "type",
+  "version": 3,
+  "namespace": {
+    "instance": "a\"b\\c\nd\u202ee",
+    "account": "root"
+  },
+  "value_types": {
+    "mood": {
+      "base": "string",
+      "enum": [
+        "self",
+        "calm"
+      ]
+    },
+    "loose": {
+      "base": "string",
+      "enum": [
+        "a_b",
+        "a__b"
+      ]
+    }
+  },
+  "object_types": {
+    "self": {
+      "description": "Ends \" here \\ and \u202e turns\n} pub fn injected() { panic!() } //",
+      "owner": "ontology",
+      "primary_key": {
+        "from": "$action_id"
+      },
+      "properties": {
+        "self": {
+          "type": "string",
+          "required": true,
+          "description": "Ends \" here \\ and \u202e turns\n} pub fn injected() { panic!() } //"
+        },
+        "type": {
+          "type": "string",
+          "required": false
+        }
+      }
+    }
+  },
+  "action_types": {
+    "self": {
+      "description": "Ends \" here \\ and \u202e turns\n} pub fn injected() { panic!() } //",
+      "parameters": {
+        "self": {
+          "type": "string",
+          "required": true,
+          "description": "Ends \" here \\ and \u202e turns\n} pub fn injected() { panic!() } //"
+        },
+        "type": {
+          "type": "string",
+          "required": false
+        },
+        "gen": {
+          "type": {
+            "value_type": "mood"
+          },
+          "required": true
+        },
+        "try": {
+          "type": {
+            "array": {
+              "struct": {
+                "crate": "string",
+                "loop": {
+                  "value_type": "loose"
+                }
+              }
+            }
+          },
+          "required": false
+        }
+      },
+      "rules": [
+        {
+          "create_object": "self",
+          "set": {
+            "self": "$self"
+          }
+        }
+      ]
+    }
+  },
+  "functions": {
+    "super": {
+      "description": "Ends \" here \\ and \u202e turns\n} pub fn injected() { panic!() } //",
+      "parameters": {
+        "async": {
+          "type": "string",
+          "required": true
+        }
+      },
+      "program": "/bin/cat",
+      "answer_bytes": 64,
+      "timeout_ms": 1000
+    }
+  },
+  "grants": []
+}

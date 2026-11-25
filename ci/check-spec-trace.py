@@ -9,7 +9,8 @@ word 'spec:', a space and such an id, in a tracked file that is not Markdown. Fa
 line each, sorted: requirement_untested, citation_missing, requirement_duplicate. The last
 line counts requirements, citations and errors; exit 1 on a fault, 0 without one, 2 when
 the files cannot be listed or the argument is bad. Reads only the tracked files; writes
-nothing.
+nothing. Every path under engine/ is skipped: the Ontology engine's citations name the
+engine's own specifications.
 """
 import os
 import re
@@ -20,6 +21,8 @@ from pathlib import Path
 
 REQ_RE = re.compile(r"^- R([0-9]+):")
 CITE_RE = re.compile(r"spec: (specs/[^\s#]+\.md)#R([0-9]+)")
+# The Ontology engine's tree, with specifications and citations of its own.
+SKIPPED = "engine/"
 
 
 def unreadable(reason):
@@ -36,7 +39,8 @@ def tracked_files(root):
         ).stdout
     except (OSError, subprocess.CalledProcessError):
         return None
-    return sorted(p.decode("utf-8", "surrogateescape") for p in out.split(b"\0") if p)
+    files = (p.decode("utf-8", "surrogateescape") for p in out.split(b"\0") if p)
+    return sorted(f for f in files if not f.startswith(SKIPPED))
 
 
 def read_lines(root, rel):

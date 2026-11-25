@@ -1,0 +1,234 @@
+//! `ont`: schema check/install, describe, get, backup, index and search over
+//! a format 3 store.
+//!
+//! Layout: [`cli`] parses arguments and builds every answer line, exit code
+//! and the error text (the only place that does); [`schema`], [`describe`],
+//! [`get`] and [`backup`] are one public operation each, from a typed request
+//! and a [`Context`] to `Result<Answer, Failure>` (as are [`index`] and
+//! [`search`]; [`sources`] holds the file readers of `index`); [`principal`] holds the one
+//! grant view that both admission and `describe` use.
+//!
+//! Opening rule: only `schema install` may create or initialise a store
+//! file (it creates it with mode 0600 before SQLite opens it). Every other
+//! operation opens an existing format 3 file through
+//! `Store::open_schema_existing` (read-only) or, for `index`,
+//! `Store::open_schema_existing_writable`; neither can create or initialise.
+//!
+//! `authorization_revision` is the policy generation of the `Authority`
+//! built for the request ([`principal::Principal::revision`], or
+//! [`principal::fresh_revision`] where no principal is bound), read through
+//! `Authority::generation`.
+//!
+//! Behaviours worth knowing: a backup taken before an install that then
+//! refuses remains; `--now` also sets the install time and the backup name
+//! stamp; `schema check` does not predict `schema_version_conflict`. No
+//! function grant exists yet, so `describe` lists the functions of every
+//! listed domain.
+pub mod action;
+pub mod aggregate;
+pub mod around;
+pub mod backup;
+pub mod cli;
+pub mod describe;
+pub mod function;
+pub mod get;
+pub mod gitread;
+pub mod index;
+mod input;
+pub mod log;
+pub mod mcp;
+pub mod principal;
+pub mod refusal;
+pub mod render;
+pub mod schema;
+pub mod search;
+pub mod serve;
+pub(crate) mod sources;
+mod usage;
+
+pub use cli::{Outcome, run};
+pub use refusal::{Failure, Internal, Refusal};
+
+use ont_core::schema::SchemaPin;
+use serde_json::{Value, json};
+use sha2::{Digest, Sha256};
+use std::collections::BTreeMap;
+use std::path::PathBuf;
+
+pub const TRUST_LIMIT: &str = "OS-account principal only; on this host every agent shares this UID, so the CLI does not authenticate a human.";
+pub const MAX_REQUEST: usize = 65_536;
+/// The store `ont` uses without `--store`.
+pub const DEFAULT_STORE: &str = "/var/lib/ontology-platform/ont/ontology.sqlite";
+/// The variable a function's program finds set to `1`: `ont` then only reads.
+pub const READ_ONLY_ENV: &str = "ONT_FN_READ_ONLY";
+
+/// The refusal of a writing command or tool while [`READ_ONLY_ENV`] is `1`.
+pub fn read_only_refusal() -> Refusal {
+    Refusal::new("read_only_call").with(
+        "rule",
+        json!("inside a function's program (ONT_FN_READ_ONLY=1) ont only reads"),
+    )
+}
+
+/// `read_only_call` when the context is read only: the first step of every
+/// operation that writes to a store or installs.
+pub(crate) fn refuse_read_only(ctx: &Context) -> Result<(), Failure> {
+    if ctx.read_only {
+        return Err(read_only_refusal().into());
+    }
+    Ok(())
+}
+
+/// Real = effective = 0, else `principal_not_trusted`.
+pub fn check_uid(real: u32, effective: u32) -> Result<(), &'static str> {
+    if real != 0 || effective != real {
+        return Err("principal_not_trusted");
+    }
+    Ok(())
+}
+
+/// What an operation needs besides its request: the store path, `now` and
+/// the attribution the caller claims. `client` is the command's `--client`
+/// value (default `cli`); `agent` comes from the request field or
+/// `ONT_AGENT`; `session` is given per request; `role` comes from the
+/// request field `role` of an action or `ONT_ROLE`. These four members are
+/// the caller's claim (DESIGN section 7); the actor's `claimed` names them.
+/// The actor's `principal` and `host` are not members of `Context`: the
+/// engine reads them from the kernel itself (`principal::engine_identity`),
+/// and nothing a caller supplies sets either.
+#[derive(Debug, Clone)]
+#[non_exhaustive]
+pub struct Context {
+    pub store: PathBuf,
+    pub now: u64,
+    pub client: String,
+    pub agent: Option<String>,
+    pub session: Option<String>,
+    /// The actor's self-reported role: the member `role` of the logged
+    /// actor, read by criteria; never part of a derived action id.
+    pub role: Option<String>,
+    /// Snapshot paging for action evaluation (test-only tuning via
+    /// [`Context::with_snapshot_bounds`]); `Context::new` is the supported
+    /// constructor.
+    pub snapshot_page_size: usize,
+    pub snapshot_max_heads: usize,
+    /// Set by `run` when `ONT_FN_READ_ONLY` is `1` (the caller is a
+    /// function's program): every operation that writes refuses
+    /// `read_only_call`. `Context::new` leaves it false.
+    pub read_only: bool,
+    /// Authenticated peer identity propagated exclusively by `crate::serve`.
+    /// Local calls and external library callers leave this `None` and read
+    /// `principal::engine_identity()` from the kernel.
+    pub(crate) peer_identity: Option<crate::principal::EngineIdentity>,
+}
+thread_local! {
+    static TEST_SNAPSHOT_BOUNDS: std::cell::Cell<Option<(usize, usize)>> = const { std::cell::Cell::new(None) };
+}
+/// Test seam for exercising the command and MCP dispatchers with small bounds.
+/// The calling thread's previous bounds are restored even during unwinding.
+#[doc(hidden)]
+pub fn __with_snapshot_bounds<T>(page: usize, max: usize, f: impl FnOnce() -> T) -> T {
+    let _restore = std::mem::DropGuard::new(
+        TEST_SNAPSHOT_BOUNDS.with(|b| b.replace(Some((page.max(1), max.max(1))))),
+        |previous| TEST_SNAPSHOT_BOUNDS.with(|b| b.set(previous)),
+    );
+    f()
+}
+impl Context {
+    pub fn new(store: PathBuf, now: u64) -> Self {
+        let (page, max) = TEST_SNAPSHOT_BOUNDS
+            .with(|b| b.get())
+            .unwrap_or((500, 100_000));
+        Self {
+            store,
+            now,
+            client: "cli".to_string(),
+            agent: None,
+            session: None,
+            role: None,
+            snapshot_page_size: page,
+            snapshot_max_heads: max,
+            read_only: false,
+            peer_identity: None,
+        }
+    }
+    /// The identity of this call: the peer identity authenticated by
+    /// `crate::serve` when set, else the kernel identity of this process.
+    pub(crate) fn identity(&self) -> Result<crate::principal::EngineIdentity, Failure> {
+        if let Some(identity) = &self.peer_identity {
+            return Ok(identity.clone());
+        }
+        crate::principal::engine_identity()
+    }
+    /// Test-only constructor: a small snapshot page size (and hard head
+    /// bound) without a global.
+    pub fn with_snapshot_bounds(
+        store: PathBuf,
+        now: u64,
+        page_size: usize,
+        max_heads: usize,
+    ) -> Self {
+        let mut ctx = Self::new(store, now);
+        ctx.snapshot_page_size = page_size.max(1);
+        ctx.snapshot_max_heads = max_heads.max(1);
+        ctx
+    }
+}
+
+/// An operation's answer; `run` wraps `Enveloped` into the common envelope.
+#[derive(Debug)]
+pub enum Answer {
+    Enveloped {
+        pins: BTreeMap<String, SchemaPin>,
+        revision: u64,
+        result: Value,
+    },
+    /// A complete answer object (`schema check`).
+    Plain(Value),
+    /// An enveloped answer of an operation that ran but whose work failed in
+    /// part (`index` with a failed source): same envelope, exit 2.
+    Failed {
+        pins: BTreeMap<String, SchemaPin>,
+        revision: u64,
+        result: Value,
+    },
+}
+
+pub(crate) fn sha256_hex(bytes: &[u8]) -> String {
+    let mut h = Sha256::new();
+    h.update(bytes);
+    format!("{:x}", h.finalize())
+}
+pub(crate) fn pin_json(p: &SchemaPin) -> Value {
+    json!({"domain":p.domain,"version":p.version,"sha256":p.sha256})
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn bounds() -> (usize, usize) {
+        let ctx = Context::new(PathBuf::new(), 0);
+        (ctx.snapshot_page_size, ctx.snapshot_max_heads)
+    }
+
+    #[test]
+    fn previous_bounds_return_after_a_value_and_after_a_panic() {
+        assert_eq!(bounds(), (500, 100_000));
+        __with_snapshot_bounds(2, 3, || {
+            assert_eq!(bounds(), (2, 3));
+            let caught = std::panic::catch_unwind(|| {
+                __with_snapshot_bounds(5, 7, || {
+                    assert_eq!(bounds(), (5, 7));
+                    panic!("seam");
+                })
+            });
+            assert!(caught.is_err());
+            assert_eq!(bounds(), (2, 3));
+            assert_eq!(__with_snapshot_bounds(5, 7, bounds), (5, 7));
+            assert_eq!(bounds(), (2, 3));
+        });
+        assert_eq!(__with_snapshot_bounds(0, 0, bounds), (1, 1));
+        assert_eq!(bounds(), (500, 100_000));
+    }
+}

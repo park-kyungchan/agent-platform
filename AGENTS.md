@@ -4,6 +4,8 @@ What the repository is and who uses it: `README.md`. Start reading from `map.jso
 
 This repository holds the command `ap`, the shared instructions every coding CLI on this host loads, the specifications of the `ap` contracts, and the checks that hold them. Its users are the Lead, the workers and verifiers of a unit in this repository, and agents of every CLI that call `ap`.
 
+`engine/` is the Ontology engine, a workspace of its own whose rules are in `engine/AGENTS.md` and `engine/REVIEW.md`; the root `./check` and `ci/check-map.py` neither read nor build it, and nothing builds from it yet (the engine in use is the one `ontology/ENGINE-PIN` names).
+
 ## The check
 
 `./check` at the repository root, until it prints `check: ok`. The CI job `rust` runs the same file and is the required check of `main`. `./check content` runs only the steps without a Rust build, until it prints `check: ok (content)`; it is enough for a change of `content/` or of documents. The whole `./check` is for the rest. The script takes the build lock by itself (do not wrap it in `flock`) and builds into `target/` inside your worktree. `ap check <worktree>` runs it on the local PC when the host's policy names the PC and the PC is free, else here; `ap check <worktree> -- <command>` does the same for one cargo command (`specs/ap/check.md`). Do not push before it passes.

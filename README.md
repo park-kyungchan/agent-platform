@@ -12,6 +12,9 @@ unknown verb.
 the content check, the test of the install script,
 format, lints as errors, all tests, and the rehearsal of `ontology/work.schema.json`
 against the engine revision in `ontology/ENGINE-PIN`.
+`engine/` holds the source of the Ontology engine with its history, a
+workspace of its own with its own check ([engine/README.md](engine/README.md));
+nothing builds from it yet.
 How an agent works here: [AGENTS.md](AGENTS.md). What blocks a pull request: [REVIEW.md](REVIEW.md).
 
 Source changes require independent review and Lead integration. Real-host
