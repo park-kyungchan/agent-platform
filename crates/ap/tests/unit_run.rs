@@ -1824,6 +1824,12 @@ fn r3_the_units_member_and_where_a_run_keeps_its_files() {
         fixer.contains(&format!("\n{FIXER}\n## The round\n\n")),
         "{fixer}"
     );
+    // The fixer asks the door's two functions in the words of the implementer's frame.
+    let door = include_str!("../src/unit/frames/implementer.md")
+        .lines()
+        .find(|l| l.starts_with("- Three commands leave your view"))
+        .unwrap();
+    assert!(FIXER.lines().any(|l| l == door) && door.contains("| ap fn clause"));
     let (_, second) = f.launch(4);
     assert!(
         second.contains(&format!("\n{SECOND_LOOK}\n## The round\n\n")),
