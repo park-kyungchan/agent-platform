@@ -840,7 +840,7 @@ fn r4_the_time_and_the_schema_are_the_first_answers_of_the_store() {
     let v = run(&mut f, &Call::Overview);
     // The fake's clock moves with every answer: the first one is the verb's `at`.
     assert_eq!(v["at"], "2026-11-17T12:00:00Z");
-    assert_eq!(v["schema"], 25);
+    assert_eq!(v["schema"], 26);
     let first_schema = v["schema"].clone();
     let members: Vec<&str> = v.as_object().unwrap().keys().map(String::as_str).collect();
     assert_eq!(
@@ -1504,7 +1504,7 @@ fn r17_the_overview_text_is_one_golden_text() {
     assert!(text.is_ascii());
 }
 const GOLDEN: &str = "\
-status 2026-11-17T12:00:00Z schema work@25
+status 2026-11-17T12:00:00Z schema work@26
 NEEDS THE LEAD
 finding f-urgent: Summary of f-urgent.
 unit u-stop: ci_failed
@@ -1632,7 +1632,7 @@ fn r17_the_text_stays_within_80_lines_and_says_what_it_cut() {
     assert!(text.ends_with("DELIVERY\nunreadable\n"), "{text}");
     assert_eq!(
         text.lines().next(),
-        Some("status 2026-11-17T12:00:00Z schema work@25")
+        Some("status 2026-11-17T12:00:00Z schema work@26")
     );
 }
 
@@ -1753,10 +1753,11 @@ fn r19_a_word_matches_names_exact_first_and_at_most_twelve() {
         ),
         (Some("action"), Some("accept_unit"))
     );
+    // Schema 26 removed `close_unit`: the criterion of `accept_unit` and of `merge_unit` is left.
     let v = run(&mut f, &term("head_not_reviewed"));
     let m = v["matches"].as_array().unwrap();
     assert!(
-        m.len() >= 3
+        m.len() == 2
             && m.iter()
                 .all(|x| x["kind"] == "criterion" && x["name"] == "head_not_reviewed")
     );

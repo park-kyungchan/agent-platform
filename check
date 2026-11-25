@@ -18,6 +18,8 @@ bash scripts/test-backup-store.sh
 python3 -I -B -m unittest discover -s github -p 'test_*.py'
 python3 -I -B ci/check-map.py crates/ ci/ content/ deploy/ evals/ github/ ontology/ scripts/ specs/ .github/ check rust-toolchain.toml Cargo.toml Cargo.lock
 python3 -I -B ci/check-spec-trace.py
+# The work schema declares no action type and no view that the code, the content and the host's scripts do not name.
+python3 -I -B ci/check-schema-use.py
 # Every ci/test_*.py in sorted order, but those that build their stores with the engine: each of these has a step
 # of its own after the build.
 after_build="test_lesson_replay.py test_intake_suite.py test_cases_engine.py"
