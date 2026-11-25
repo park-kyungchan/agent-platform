@@ -1,5 +1,5 @@
 //! The detector `runtimes` of `ap watch` (`specs/ap/watch.md` R20, R26): checks `--version` and
-//! `--help` flags of `claude`, `muse` and `agy` (never `codex`) without starting a session.
+//! `--help` flags of `claude` and `agy` without starting a session.
 use super::{RUNTIMES, Read, Reading, RuntimeSpec, Signal};
 use crate::host::{System, digest};
 use serde_json::{Map, Value, json};
@@ -69,8 +69,7 @@ fn check_runtime(
     if unchanged {
         return kept.cloned();
     }
-    let mut help_texts = String::new();
-    let Some(main_help) = run_cli(s, name, &["--help"]) else {
+    let Some(help_texts) = run_cli(s, name, &["--help"]) else {
         out.push(Signal::new(
             format!("cli {name} help"),
             "act",
@@ -79,20 +78,6 @@ fn check_runtime(
         ));
         return kept.cloned();
     };
-    help_texts.push_str(&main_help);
-    for sub in spec.subcommands {
-        let Some(sub_help) = run_cli(s, name, &[sub, "--help"]) else {
-            out.push(Signal::new(
-                format!("cli {name} help"),
-                "act",
-                &format!("runtime CLI {name} {sub} failed --help"),
-                format!("{name} {sub} --help failed or timed out"),
-            ));
-            return kept.cloned();
-        };
-        help_texts.push('\n');
-        help_texts.push_str(&sub_help);
-    }
     let mut all_found = true;
     for flag in spec.flags {
         if !flag_in_help(&help_texts, flag) {
@@ -112,7 +97,7 @@ fn check_runtime(
     }
 }
 
-/// `runtimes` (R20, R26): `--version` and `--help` flags of `claude`, `muse` and `agy`.
+/// `runtimes` (R20, R26): `--version` and `--help` flags of `claude` and `agy`.
 pub(crate) fn detect(s: &mut impl System, prior: Option<&Value>) -> Reading {
     let mut r = Read::default();
     let mut next = Map::new();

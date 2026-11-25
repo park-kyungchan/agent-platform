@@ -832,7 +832,7 @@ pub(crate) fn github(policy: &Value) -> Result<Github, Failure> {
 fn tier(u: &Value, which: &str, role: &str, policy: &Value) -> Result<Value, Failure> {
     let t = &u[which];
     let (runtime, model) = (text(t, "runtime").unwrap_or_default(), text(t, "model"));
-    // Claude and `agy` only (R2): Codex and Muse stay out.
+    // Claude and `agy` only (R2): any other word stays out.
     if !matches!(runtime, "claude" | "agy") {
         return Err(fail("tier_not_supported", which, json!(runtime)));
     }

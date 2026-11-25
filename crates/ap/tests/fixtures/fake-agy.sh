@@ -9,7 +9,8 @@
 # `script-<base>.sh` in the cwd is the answer; otherwise the lines of `lines-<base>` when it
 # exists, else the real lines below), `hang-<base>` keeps the process alive after its lines,
 # `exit-<base>` is its exit code, `watch` names a file copied to `seen.json` when the process
-# starts. `calls.log` gets one line per call (the prompt shown as `<prompt>`), `env.<n>` the
+# starts; the mode `blockrecord` puts a directory where the record goes until a second after the
+# line `init`. `calls.log` gets one line per call (the prompt shown as `<prompt>`), `env.<n>` the
 # environment, `stdin.<n>` what the standard input is, `prompt.<n>` the prompt argument, `cwd.<n>`
 # the working directory, `home.<n>` the names under `$HOME` (path, type, link target) and
 # `homemode.<n>` its mode, both as the call finds them. As the real CLI does at a fresh run, the fake creates in its `$HOME`
@@ -64,6 +65,9 @@ resumed=(
 emit() { local l; for l in "$@"; do printf '%s\n' "${l//@CID@/$cid}"; done; }
 mode=$(cat "$here/mode-$base" 2>/dev/null)
 case "$mode" in
+  blockrecord)
+    p=$(readlink "/proc/$$/fd/1"); r=${p%.stream.jsonl}.run.json; rm -f "$r"; mkdir "$r"
+    emit "${fresh[0]}"; sleep 1; rmdir "$r"; emit "${fresh[@]:1}" ;;
   script)
     emit "${fresh[0]}" "${fresh[1]}" "${fresh[3]}" "${fresh[4]}"
     python3 -I -c 'import json,sys; d=json.loads(sys.argv[1].replace("@CID@",sys.argv[3])); d["result"]["response"]=sys.argv[2]; print(json.dumps(d,separators=(",",":")))' "${fresh[7]}" "$(bash "$here/script-$base.sh")" "$cid" ;;

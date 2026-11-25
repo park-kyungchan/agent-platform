@@ -2992,31 +2992,6 @@ fn r13_a_look_on_claude_runs_under_limits_with_its_own_scratch_directory() {
     );
 }
 
-// spec: specs/ap/unit-review.md#R13
-#[test]
-fn r13_a_look_on_another_runtime_is_launched_without_limits() {
-    let mut f = F::new();
-    std::fs::create_dir(f.t.join("muse")).unwrap();
-    f.write_policy(json!({"runtime": "muse", "account": f.p("muse"),
-        "permission_mode": "bypassPermissions"}));
-    let path = f.t.join("policy.json");
-    let mut policy: Value = serde_json::from_slice(&std::fs::read(&path).unwrap()).unwrap();
-    policy["accounts"]["muse"] = json!([f.p("muse")]);
-    std::fs::write(&path, policy.to_string()).unwrap();
-    // The fake has no `muse`: the launch fails, after the words it was given are kept.
-    let (v, _) = f.ok(&f.req("unit", "u1"));
-    assert_eq!(v["verdict"], "abandoned", "{v}");
-    assert_eq!(f.wraps, [Vec::<String>::new()]);
-    assert_eq!(f.probes, 0);
-    let rec = record(
-        f.dir()
-            .join(format!("{}.md", v["review"].as_str().unwrap()))
-            .to_str()
-            .unwrap(),
-    );
-    assert!(rec.get("limits").is_none(), "{rec}");
-}
-
 // spec: specs/ap/unit-review.md#R18
 // spec: specs/ap/unit-review.md#R22
 #[test]

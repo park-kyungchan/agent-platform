@@ -1420,23 +1420,13 @@ fn r53_a_writer_stage() {
     let t = f.t.clone();
     let p = |rel: &str| t.join(rel).to_string_lossy().into_owned();
     std::fs::write(t.join("prompt.md"), "invented").unwrap();
-    std::fs::create_dir_all(t.join("muse")).unwrap();
     let base = json!({"role": "writer", "account": p("w1"), "model": "opus", "effort": "high",
         "permission_mode": "bypassPermissions", "cwd": p("origin"), "prompt": p("prompt.md"),
         "out": p("w.json"), "limits": {"scratch": p("ws")}});
-    for runtime in ["codex", "muse", "agy"] {
-        let mut r = base.clone();
-        r["runtime"] = json!(runtime);
-        if runtime == "muse" {
-            r["account"] = json!(p("muse"));
-        }
-        let e = ap::run::execute(&mut f, &r).unwrap_err();
-        assert_eq!(
-            (e.code, e.field.as_str()),
-            ("invalid_input", "role"),
-            "{runtime}"
-        );
-    }
+    let mut r = base.clone();
+    r["runtime"] = json!("agy");
+    let e = ap::run::execute(&mut f, &r).unwrap_err();
+    assert_eq!((e.code, e.field.as_str()), ("invalid_input", "role"), "agy");
     let mut r = base.clone();
     r.as_object_mut().unwrap().remove("limits");
     let e = ap::run::execute(&mut f, &r).unwrap_err();

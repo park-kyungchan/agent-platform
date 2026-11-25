@@ -219,7 +219,7 @@ impl System for U {
     ) -> std::io::Result<Child> {
         self.launches += 1;
         let at = argv.iter().position(|a| a == "--").unwrap();
-        assert!(["claude", "codex", "muse", "agy"].contains(&argv[at + 1].as_str()));
+        assert!(["claude", "agy"].contains(&argv[at + 1].as_str()));
         let unit = argv[..at]
             .iter()
             .find_map(|a| a.strip_prefix("--unit="))

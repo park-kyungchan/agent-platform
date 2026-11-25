@@ -54,7 +54,7 @@ A refusal of the store passes on the store's code, such as `said_in_the_future`,
 
 ## Not included
 
-- No reader of a Muse Code, Antigravity or Codex session record and no hook for them: their messages are recorded as typed words, not verified.
+- No reader of an Antigravity session record and no hook for it: its messages are recorded as typed words, not verified.
 - No session record outside `<home>/.claude/projects/` gives verified words, and no symbolic link under it is resolved.
 - No record by the hook of a message sent while a turn runs (a `queue-operation` line), of a prompt the record does not hold as a human's line when the hook runs, or of a slash command: these stay the agent's `ap request`. The hook does not wait for the record, does not try again and keeps no state between two calls; it bounds no age of the message's line.
 - No write of a CLI's settings file: the hook's registration is a change of the host's configuration made by hand.
