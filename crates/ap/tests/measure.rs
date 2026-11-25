@@ -903,6 +903,53 @@ fn r5_a_session_run_takes_the_intent_of_its_directory_or_its_lead() {
     );
 }
 
+// spec: specs/ap/measure.md#R5
+#[test]
+fn r5_a_runs_model_is_not_synthetic_while_it_has_another() {
+    let bed = Bed::new();
+    let mut f = Fake::new(&bed.dir);
+    let e = bed.dir.path("platforms/agent-platform");
+    // A code-mode line as the session records it: a message id and a usage of zero tokens, the model `<synthetic>`.
+    let code = |sid: &str, ts: &str, mid: &str| {
+        json!({"type": "assistant", "sessionId": sid, "timestamp": ts, "cwd": e,
+            "message": {"id": mid, "model": "<synthetic>", "role": "assistant",
+                "content": [{"type": "tool_use", "id": format!("u-{mid}"), "name": "Read", "input": {"file_path": "/x"}}],
+                "usage": {"input_tokens": 0, "output_tokens": 0, "cache_read_input_tokens": 0, "cache_creation_input_tokens": 0}}})
+    };
+    bed.file(
+        "accounts/claude-a/projects/p/s-code.jsonl",
+        &[
+            msg("s-code", "2026-11-18T10:00:00Z", &e, "c0"),
+            code("s-code", "2026-11-18T10:00:01Z", "c1"),
+            code("s-code", "2026-11-18T10:00:02Z", "c2"),
+            code("s-code", "2026-11-18T10:00:03Z", "c3"),
+        ],
+        "2026-11-18T10:00:04Z",
+    );
+    bed.file(
+        "accounts/claude-a/projects/p/s-only.jsonl",
+        &[code("s-only", "2026-11-18T11:00:00Z", "o1")],
+        "2026-11-18T11:00:01Z",
+    );
+    let line = bed.pass(&mut f, "2026-11-18");
+    assert_eq!(line["runs"]["recorded"], 2);
+    let run = f.run_of("session", "s-code");
+    assert_eq!(
+        days(&run),
+        [("2026-11-18".to_owned(), 4)],
+        "the code-mode lines are messages"
+    );
+    assert_eq!(
+        run["model"], OPUS,
+        "the model of most messages but <synthetic>"
+    );
+    assert_eq!(
+        f.run_of("session", "s-only")["model"],
+        "<synthetic>",
+        "a run with no other model"
+    );
+}
+
 // spec: specs/ap/measure.md#R6
 #[test]
 fn r6_a_second_pass_applies_nothing_new_and_a_run_it_reads_nothing_of_is_unchanged() {
@@ -1574,6 +1621,66 @@ fn r10_cost_by_intent_unit_and_day_and_of_one_intent() {
             one["unmeasured"].as_u64()
         ),
         (Some("gadget"), Some(1), Some(0))
+    );
+}
+
+// spec: specs/ap/measure.md#R10
+#[test]
+fn r10_cost_of_an_intent_counts_the_run_of_its_lead_session() {
+    let bed = Bed::new();
+    let mut f = cost_store(&bed);
+    // One Lead session leads two intents; its run was recorded under `gadget` only.
+    let mut lead = f.objects[&("run".to_owned(), "r-lead".to_owned())].clone();
+    lead["session"] = json!("s-lead");
+    f.put("run", "r-lead", lead);
+    let mut stage = f.objects[&("run".to_owned(), "r-impl".to_owned())].clone();
+    stage["session"] = json!("s-lead");
+    f.put("run", "r-impl", stage);
+    f.put(
+        "intent",
+        "other",
+        json!({"status": "confirmed", "lead_session": "s-lead"}),
+    );
+    let mut gadget = f.objects[&("intent".to_owned(), "gadget".to_owned())].clone();
+    gadget["lead_session"] = json!("s-lead");
+    f.put("intent", "gadget", gadget);
+    let keys = |v: &Value| -> Vec<(Value, Value, Value)> {
+        v["groups"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|g| (g["key"].clone(), g["usd"].clone(), g["runs"].clone()))
+            .collect()
+    };
+    let window = |intent: &str, by: &str| json!({"since": "2026-11-16", "until": "2026-11-22", "intent": intent, "by": by});
+    let other = cost(&mut f, window("other", "role"));
+    assert_eq!(
+        keys(&other),
+        [(json!("lead"), json!(5.0), json!(1))],
+        "the Lead's run counts; a run with a unit of that session does not"
+    );
+    assert_eq!(other["lead_share"], 100.0);
+    assert_eq!(
+        keys(&cost(&mut f, window("other", "intent"))),
+        [(json!("other"), json!(5.0), json!(1))],
+        "grouped under the given intent"
+    );
+    assert_eq!(
+        keys(&cost(&mut f, window("gadget", "role"))),
+        [
+            (json!("implementer"), json!(3.0), json!(1)),
+            (json!("lead"), json!(5.0), json!(1))
+        ],
+        "a run of its intent and of its lead session counts once"
+    );
+    let all = json!({"since": "2026-11-16", "until": "2026-11-22", "by": "intent"});
+    assert_eq!(
+        keys(&cost(&mut f, all)),
+        [
+            (json!("gadget"), json!(8.0), json!(2)),
+            (Value::Null, json!(2.0), json!(2))
+        ],
+        "without intent the grouping is as before"
     );
 }
 

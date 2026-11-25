@@ -26,6 +26,8 @@ const DOOR_LOG: &str = "/var/lib/agent-platform/door.jsonl";
 const TEMP_ROOTS: [&str; 2] = ["/tmp", "/var/tmp"];
 /// The word `crates/ap/src/run.rs` gives a Claude stage's `runtime` (`Runtime::word`), also the pass's.
 const RUNTIME: &str = "claude";
+/// The model of the lines a code-mode script produces: no model of its own (R5).
+const SYNTHETIC: &str = "<synthetic>";
 const DAY: u64 = 86_400;
 
 /// Whether a walk skips a directory of this name (R3): a name that begins with `edu-`, and, for a project directory
@@ -1037,11 +1039,18 @@ pub(super) fn pass(s: &mut impl System, argv: &[OsString]) -> Result<(Value, u8)
                 let Some(run) = mine.as_ref().filter(|r| !r.messages.is_empty()) else {
                     continue;
                 };
-                let model = run
-                    .models
-                    .iter()
-                    .max_by(|a, b| a.1.cmp(b.1).then_with(|| b.0.cmp(a.0)))
-                    .map_or_else(|| "unknown".to_owned(), |(m, _)| m.clone());
+                // The model of most messages but `<synthetic>`, the lines a code-mode script produces (R5); then the
+                // smallest name; `<synthetic>` only for a run with no other model.
+                let most = |real: bool| {
+                    run.models
+                        .iter()
+                        .filter(|(m, _)| !real || m.as_str() != SYNTHETIC)
+                        .max_by(|a, b| a.1.cmp(b.1).then_with(|| b.0.cmp(a.0)))
+                        .map(|(m, _)| m.clone())
+                };
+                let model = most(true)
+                    .or_else(|| most(false))
+                    .unwrap_or_else(|| "unknown".to_owned());
                 let first = run
                     .messages
                     .iter()
