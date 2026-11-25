@@ -30,6 +30,8 @@ const SCHEMA: &str = "ontology/work.schema.json";
 const MAIN: &str = "+refs/heads/main:refs/remotes/origin/main";
 const CLIENT: [&str; 4] = ["action", "apply", "--client", "ap-deliver"];
 const FREE_MIB: u64 = 10_240;
+const KEPT_BYTES: usize = 65_536;
+const KEPT_FILES: usize = 20;
 const PC_PROBE_MS: u64 = 15_000;
 const PC_PUSH_MS: u64 = 60_000;
 const PC_PROBE_SCRIPT: &str = r#"p=$1; if [ ! -e "$p" ] && [ ! -L "$p" ]; then printf 'ABSENT\n'; exit 0; fi; if [ ! -f "$p" ] || [ -L "$p" ]; then printf 'NOT_REGULAR\n'; exit 0; fi; h=$(sha256sum -- "$p" 2>/dev/null | awk '{print $1}') || exit 1; v=$("$p" --version </dev/null 2>/dev/null | head -n 1) || v=; printf 'SHA256 %s\nVERSION %s\n' "$h" "$v""#;
@@ -156,6 +158,9 @@ struct Call<'a> {
     etc: Option<String>,
     /// With `pc`: the PC checks account target (R60).
     pc: Option<Pc>,
+    /// What the first installer that failed in the current attempt wrote, its last `KEPT_BYTES`
+    /// bytes, standard output then standard error (R65).
+    failed: Option<Vec<u8>>,
 }
 /// What one installer did: its exit (128 plus the signal for a signal), its code, and for the
 /// content installer the tarball it printed.
@@ -970,6 +975,14 @@ fn installer(s: &mut impl System, c: &mut Call, name: &str, words: &[&str]) -> R
         ("content", Some(1)) => after(&err, "kept copy "),
         _ => None,
     };
+    // A failed installer's output is kept for the attempt's file (R65); `etc-check` exits 1 to say
+    // "differs", which is no failure.
+    if c.failed.is_none() && exit != Some(0) && !(name == "etc-check" && exit == Some(1)) {
+        let mut text = out.into_bytes();
+        text.extend_from_slice(err.as_bytes());
+        let from = text.len().saturating_sub(KEPT_BYTES);
+        c.failed = Some(text.split_off(from));
+    }
     if let Some(rows) = c.rec["installers"].as_array_mut() {
         rows.push(json!({"name": name, "exit": exit, "code": code}));
     }
@@ -1260,6 +1273,7 @@ fn start(
     }
     if local {
         (c.rec["install"], c.rec["attempt"]) = (edit["id"].clone(), json!(attempt));
+        c.failed = None;
     }
     Ok(edit["id"].clone())
 }
@@ -2715,12 +2729,68 @@ fn record() -> Value {
     json!({"at": stamp(SystemTime::now()), "by": null, "repository": null, "target": TARGET, "tip": null,
         "from": null, "end": "refused", "outcome": null, "code": null, "detail": null, "install": null,
         "attempt": null, "installers": [], "to": null, "rollback_binary": null, "rollback_content": null,
-        "index": null, "closed": null, "units": null})
+        "index": null, "closed": null, "units": null, "output": null})
 }
 fn invalid(field: &str) -> (Value, u8) {
     let mut rec = record();
     (rec["code"], rec["detail"]) = (json!("invalid_input"), json!({ "field": field }));
     (rec, 2)
+}
+/// The kept output of a failed attempt (R65): `<state>/output/<the attempt's key>.log`, the files beyond
+/// the 20 newest of the directory removed first. The path, or null when nothing was kept.
+fn keep_output(c: &Call) -> Value {
+    use std::os::unix::fs::{DirBuilderExt, OpenOptionsExt, PermissionsExt};
+    let key = c.rec["install"]["native_key"].as_str().unwrap_or_default();
+    let safe = !key.is_empty()
+        && key.len() <= 200
+        && !key.starts_with('.')
+        && key
+            .bytes()
+            .all(|b| b.is_ascii_alphanumeric() || matches!(b, b'.' | b'-' | b'_'));
+    let text = match &c.failed {
+        Some(t) if safe && !t.is_empty() => t,
+        _ => return Value::Null,
+    };
+    let dir = format!("{}/output", c.state);
+    let path = format!("{dir}/{key}.log");
+    let kept = (|| {
+        match std::fs::DirBuilder::new().mode(0o700).create(&dir) {
+            Ok(()) => (),
+            Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => (),
+            Err(e) => return Err(e),
+        }
+        std::fs::set_permissions(&dir, std::fs::Permissions::from_mode(0o700))?;
+        let mut files: Vec<(SystemTime, String)> = std::fs::read_dir(&dir)?
+            .filter_map(Result::ok)
+            .filter(|e| e.metadata().is_ok_and(|m| m.is_file()))
+            .map(|e| {
+                let at = e.metadata().and_then(|m| m.modified());
+                (
+                    at.unwrap_or(SystemTime::UNIX_EPOCH),
+                    e.file_name().to_string_lossy().into_owned(),
+                )
+            })
+            .collect();
+        files.sort();
+        files.reverse();
+        for (_, name) in files.iter().skip(KEPT_FILES) {
+            std::fs::remove_file(format!("{dir}/{name}"))?;
+        }
+        let mut f = OpenOptions::new()
+            .write(true)
+            .create(true)
+            .truncate(true)
+            .mode(0o600)
+            .open(&path)?;
+        f.set_permissions(std::fs::Permissions::from_mode(0o600))?;
+        f.write_all(text)?;
+        f.sync_all()
+    })();
+    if kept.is_ok() {
+        json!(path)
+    } else {
+        Value::Null
+    }
 }
 /// One call: the record and the exit code. The record is in `<state>/last.json` for every end but
 /// `invalid_input`.
@@ -2760,6 +2830,7 @@ pub fn execute(s: &mut impl System, r: &Value) -> (Value, u8) {
         engine: None,
         etc: None,
         pc: None,
+        failed: None,
         env,
     };
     if let Some(e) = r.get("engine") {
@@ -2842,6 +2913,9 @@ pub fn execute(s: &mut impl System, r: &Value) -> (Value, u8) {
     }
     if ended && r.get("rollback").is_none() && c.pc.is_some() {
         c.rec["pc"] = pc_push(s, &mut c);
+    }
+    if made && !ended {
+        c.rec["output"] = keep_output(&c);
     }
     if made {
         let _ = write(
