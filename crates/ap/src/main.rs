@@ -6,7 +6,7 @@ use serde::Serialize;
 const HELP: &str = "Usage: ap <verb> [< request.json]\n";
 /// Every verb the dispatch below knows: the verb, its request form, the heading of the section of
 /// `crates/ap/README.md` that documents it. `ap --help` prints one line of this table per verb.
-const VERBS: [(&str, &str, &str); 25] = [
+const VERBS: [(&str, &str, &str); 21] = [
     ("version", "version | --version", "The older verbs"),
     ("run", "run < request.json", "One stage"),
     ("gate", "gate < request.json", "The gate"),
@@ -17,22 +17,10 @@ const VERBS: [(&str, &str, &str); 25] = [
     ),
     (
         "unit",
-        "unit [<page>] < request.json | unit add|amend|ready|drop [--store <path>] < request.json | unit defer|undefer|used [--store <path>] < request.json | unit page <key> [--for implementer|verifier|reviewer] [--digest] [--store <path>] | unit review [--store <path>] < request.json | unit run <key> [--store <path>] | unit write <key> [--store <path>] | unit approve|reject [--store <path>] < request.json",
+        "unit < request.json | unit add|amend|ready|drop [--store <path>] < request.json | unit defer|undefer|used [--store <path>] < request.json | unit page <key> [--for implementer|verifier|reviewer] [--digest] [--store <path>] | unit review [--store <path>] < request.json | unit run <key> [--store <path>] | unit write <key> [--store <path>] | unit approve|reject [--store <path>] < request.json",
         "One unit",
     ),
-    ("accept", "accept <page>", "The page's block"),
     ("deliver", "deliver [check] < request.json", "Delivery"),
-    (
-        "backlog",
-        "backlog <task key> [--text] [--store <path>]",
-        "The board",
-    ),
-    (
-        "state",
-        "state <task directory> [--text]",
-        "The task's state",
-    ),
-    ("row", "row [--store <path>] < row.json", "One row"),
     (
         "request",
         "request [--store <path>] [--text] < request.json",
@@ -94,10 +82,8 @@ fn verb_line(verb: &str, form: &str, heading: &str) -> String {
 }
 const RUN_HELP: &str = "Usage: ap run < request.json\nOne headless Claude Code stage in a transient scope of agents.slice; one record <out>.run.json.\n";
 const GATE_HELP: &str = "Usage: ap gate < request.json\nWaits on a pull request's head for its required checks, and for an automatic review when the request names its reviewer; one JSON answer.\n";
-const UNIT_HELP: &str = "Usage: ap unit < request.json | ap unit [--compose-only] <page>\n       ap unit add|amend|ready|drop [--store <path>] < request.json\n       ap unit defer|undefer|used [--store <path>] < request.json\n       ap unit page <key> [--for implementer|verifier|reviewer] [--digest] [--store <path>]\n       ap unit review [--store <path>] < request.json\n       ap unit run <key> [--store <path>]\n       ap unit write <key> [--store <path>]\n       ap unit approve|reject [--store <path>] < request.json\nOne unit of work once from its page to the merge; one record <out>.unit.json. With a page, the request and prompts are composed from it and units.json; --compose-only prints them only.\nadd, amend, ready and drop write the unit's page as an object of the store (ready after its acceptance checks ran on the base); defer and undefer record the user's deferral of a unit and its end, used the first real use of a merged unit's result; page prints the rendered page, or with --digest its SHA-256; review has the page of a unit or the plan of an intent reviewed by a fresh session and records the review; run drives one unit of the store to stopped, accepted or merged, its repairs and updates inside, and removes the worktree of an ended unit; approve and reject record the Lead's word on an accepted unit; write has a fresh session write the page of a draft unit inside its write set, applies it as amend does and has it reviewed (README \"The unit object\", \"The page writer\").\n";
+const UNIT_HELP: &str = "Usage: ap unit < request.json\n       ap unit add|amend|ready|drop [--store <path>] < request.json\n       ap unit defer|undefer|used [--store <path>] < request.json\n       ap unit page <key> [--for implementer|verifier|reviewer] [--digest] [--store <path>]\n       ap unit review [--store <path>] < request.json\n       ap unit run <key> [--store <path>]\n       ap unit write <key> [--store <path>]\n       ap unit approve|reject [--store <path>] < request.json\nWith a request on standard input that has the member case, one case call: a past unit run again in a copy of its base and judged by its accepted tests; one record <out>.unit.json (README \"One case\").\nadd, amend, ready and drop write the unit's page as an object of the store (ready after its acceptance checks ran on the base); defer and undefer record the user's deferral of a unit and its end, used the first real use of a merged unit's result; page prints the rendered page, or with --digest its SHA-256; review has the page of a unit or the plan of an intent reviewed by a fresh session and records the review; run drives one unit of the store to stopped, accepted or merged, its repairs and updates inside, and removes the worktree of an ended unit; approve and reject record the Lead's word on an accepted unit; write has a fresh session write the page of a draft unit inside its write set, applies it as amend does and has it reviewed (README \"The unit object\", \"The page writer\").\n";
 const DELIVER_HELP: &str = "Usage: ap deliver [check] < request.json\nInstalls the accepted tip of main (ap and content) and records the attempt in the store; one JSON record. With check it only checks the request and prints {\"status\":\"ok\"} or the refusal record; it writes nothing.\n";
-const BACKLOG_HELP: &str = "Usage: ap backlog <task key> [--text] [--store <path>]\nPrints the board of a task: its order, each item's refusal, the unplaced items and the untriaged rows; reads only.\n";
-const STATE_HELP: &str = "Usage: ap state <task directory> [--text]\nPrints the unit calls, stages, limits and streams of a task directory from its records and Git; reads only.\n";
 const REQUEST_HELP: &str = "Usage: ap request [--store <path>] [--text] < request.json\nRecords a message of the user as a request of the store with its words, routes it, or lists the current requests of a topic; one JSON answer.\n";
 const INTENT_HELP: &str = "Usage: ap intent [--store <path>] [--text] < request.json\nDrafts, amends, leads, confirms and closes the intent of an objective with its success criteria, or shows it; one JSON answer.\n";
 const STATUS_HELP: &str = "Usage: ap status [<key> [--requests] | --term <word>] [--text] [--store <path>]\n       ap status --brief [<intent>] [--directory <absolute path>] [--store <path>]\n       ap status --wait <intent> [--timeout <seconds>] [--store <path>]\n       ap status --indicators [<intent>] [--text] [--store <path>]\n       ap status --page [--store <path>]\nPrints what is asked, planned, running, waiting and broken from the store alone, one intent or unit in full (an intent with its count of requests and the newest five, or all of them with --requests), or what a word of the life cycle means; reads only. With --brief it prints, for the intent named, or for each open intent whose directory is --directory or, without it, the working directory, one block of at most 40 short lines: its status and Lead, the next action, criteria, units (stopped, waiting for the Lead, owing a use, running, ready), its open findings, holds and the last delivery. With --wait it returns, in one JSON answer, when a unit of the intent needs the Lead (unit_accepted, unit_stopped, unit_idle), a finding of severity act or urgent opens, every unit has ended, or the timeout (30 to 86400 seconds, default 14400) passes. With --indicators it prints, for each merged unit, its minutes from the first start to the merge, review rounds, repairs, first verdict, stop causes and tokens by role, and their medians; reads only. With --page it prints the status page the service ap-status-page writes: the lines of ap status --text, then for each open intent its brief, its flow and the week's cost by role, then the flow, the week's cost by role and the month's API spend of all, then the hosts, machines and accounts with their capacity, each section that cannot be read as one line with its code; reads only.\n";
@@ -151,12 +137,12 @@ fn main() -> ExitCode {
             fail("io_error", "stdout", 4)
         };
     }
-    // The verbs without a help of their own (`version`, `accept`, `row`) answer with their line of the table.
+    // The verb without a help of its own (`version`) answers with its line of the table.
     if args.len() == 2
         && args[1] == "--help"
         && let Some((verb, form, heading)) = VERBS
             .iter()
-            .find(|(verb, ..)| matches!(*verb, "version" | "accept" | "row") && args[0] == *verb)
+            .find(|(verb, ..)| *verb == "version" && args[0] == *verb)
     {
         return match io::stdout()
             .lock()
@@ -204,12 +190,6 @@ fn main() -> ExitCode {
             };
         }
         return ap::unit::cli(&args[1..]);
-    }
-    if args.first().is_some_and(|arg| arg == "accept") {
-        return ap::page::cli(&args[1..]);
-    }
-    if args.first().is_some_and(|arg| arg == "row") {
-        return ap::row::cli(&args[1..]);
     }
     if args.first().is_some_and(|arg| arg == "request") {
         if args.len() == 2 && args[1] == "--help" {
@@ -312,24 +292,6 @@ fn main() -> ExitCode {
             };
         }
         return ap::deliver::cli(&args[1..]);
-    }
-    if args.first().is_some_and(|arg| arg == "backlog") {
-        if args.len() == 2 && args[1] == "--help" {
-            return match io::stdout().lock().write_all(BACKLOG_HELP.as_bytes()) {
-                Ok(()) => ExitCode::SUCCESS,
-                Err(_) => fail("io_error", "stdout", 4),
-            };
-        }
-        return ap::backlog::cli(&args[1..]);
-    }
-    if args.first().is_some_and(|arg| arg == "state") {
-        if args.len() == 2 && args[1] == "--help" {
-            return match io::stdout().lock().write_all(STATE_HELP.as_bytes()) {
-                Ok(()) => ExitCode::SUCCESS,
-                Err(_) => fail("io_error", "stdout", 4),
-            };
-        }
-        return ap::state::cli(&args[1..]);
     }
     if args.first().is_some_and(|arg| arg == "route") {
         if args.len() == 2 && args[1] == "--help" {

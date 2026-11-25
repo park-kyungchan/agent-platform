@@ -47,7 +47,7 @@ struct Words {
     said_at: String,
 }
 /// The words of a session record at the second `at`: the strings of the user's lines of that second
-/// (`ap row`'s rule, without the harness's lines), byte-equal ones counted once; exactly one is the words.
+/// (`specs/ap/request.md` R7, without the harness's lines), byte-equal ones counted once; exactly one is the words.
 fn from_record(bytes: &[u8], at: &str) -> Result<String, Failure> {
     let mut found: Vec<String> = vec![];
     for line in bytes.split(|b| *b == b'\n') {

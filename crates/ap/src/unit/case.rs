@@ -1,13 +1,16 @@
 //! The case call of `ap unit` (README "One case"): a past unit again, in a copy of its base, judged
-//! by its accepted tests. The record, the claim, the stage and the bounded evaluator are the unit
-//! call's code.
-use super::{
-    End, RUN_FILES, Stop, Unit, accept, claimed, create, executable, now, path, regular, seconds,
-    stage, stage_request, stage_run, stop, unchanged,
-};
-use crate::host::{Failure, LIMIT, System, args, digest, error, fail, require};
+//! by its accepted tests. The stage is `ap run`'s code; the record, its claim and the bounded
+//! evaluator are this module's.
+use super::regular;
+use crate::host::{Failure, LIMIT, System, args, digest, error, fail, require, text};
+use crate::run::{stamp, write};
 use serde_json::{Value, json};
-use std::path::{Component, Path};
+use std::{
+    io::Write,
+    os::unix::fs::PermissionsExt,
+    path::{Component, Path},
+    time::SystemTime,
+};
 
 const MEMBERS: &str = "case clone worktree page out acceptance implementer at acceptance_seconds";
 const CASE: &str = "id repository pull_request base head tests commands page_sha256";
@@ -35,6 +38,210 @@ echo "$commit""#;
 const DIFF: &str = r#"set -euo pipefail -o noclobber
 export GIT_NO_REPLACE_OBJECTS=1
 cd "$1"; git add -A; git diff --cached --binary "$2" > "$3""#;
+
+const STAGE: &str = "account model effort prompt permission_mode timeout_seconds next_accounts env resume runtime compact_window";
+/// The files `ap run` writes beside a stage's answer.
+const RUN_FILES: [&str; 4] = ["", ".run.json", ".stream.jsonl", ".err"];
+/// The acceptance executable runs in the worktree under `timeout`, with the arguments after the
+/// fourth; its exit is printed last.
+const ACCEPT: &str = "cd \"$1\" || exit 0; a=$2 o=$3 t=$4; shift 4; timeout -k 10 \"$t\" \"$a\" \"$@\" > \"$o\" 2>&1 < /dev/null; echo \"$?\"";
+
+/// The first step that did not pass.
+struct Stop {
+    cause: String,
+    detail: Value,
+}
+fn stop(cause: &str, detail: Value) -> Stop {
+    let cause = cause.to_owned();
+    Stop { cause, detail }
+}
+impl From<Failure> for Stop {
+    fn from(f: Failure) -> Self {
+        stop(f.code, f.detail)
+    }
+}
+type Step = Result<Value, Stop>;
+type End = Result<&'static str, Stop>;
+/// Ends the step with `cause` (and `detail`) unless `condition` holds.
+macro_rules! ensure {
+    ($condition:expr => $cause:expr, $detail:expr) => {
+        if !$condition {
+            return Err(stop($cause, $detail));
+        }
+    };
+}
+
+fn absolute(p: &str) -> bool {
+    let path = Path::new(p);
+    path.is_absolute() && !p.contains('\0') && !path.components().any(|c| c == Component::ParentDir)
+}
+fn path<'a>(r: &'a Value, key: &str, field: &str) -> Result<&'a str, Failure> {
+    let p = r[key].as_str().filter(|p| absolute(p));
+    p.ok_or_else(|| error("invalid_input", field))
+}
+fn stage(r: &Value, key: &str) -> Result<(), Failure> {
+    let o = r[key]
+        .as_object()
+        .ok_or_else(|| error("invalid_input", key))?;
+    let field = |k: &str| format!("{key}.{k}");
+    if let Some(k) = o.keys().find(|k| !STAGE.split(' ').any(|m| m == *k)) {
+        return Err(error("invalid_input", &field(k)));
+    }
+    Ok(())
+}
+/// `acceptance_seconds`: 1 to 86400, default 2700.
+fn seconds(r: &Value) -> Result<u64, Failure> {
+    let Some(v) = r.get("acceptance_seconds") else {
+        return Ok(2700);
+    };
+    let n = v.as_u64().filter(|n| (1..=86_400).contains(n));
+    n.ok_or_else(|| error("invalid_input", "acceptance_seconds"))
+}
+fn executable(acceptance: &str) -> Result<(), Failure> {
+    let executable = std::fs::metadata(acceptance)
+        .is_ok_and(|m| m.is_file() && m.permissions().mode() & 0o111 != 0);
+    require!(executable => "acceptance_unreadable", "acceptance");
+    regular(acceptance, "acceptance_unreadable", "acceptance").map(|_| ())
+}
+/// The `ap run` request of the implementer stage, the same when it is admitted and when it starts.
+fn stage_request(r: &Value, prompt: &str) -> Value {
+    let (mut req, out) = (r["implementer"].clone(), r["out"].as_str().unwrap_or_default());
+    (req["cwd"], req["prompt"]) = (r["worktree"].clone(), json!(prompt));
+    req["out"] = json!(format!("{out}.implementer.md"));
+    req["role"] = json!("implementer");
+    // An author stage commits under its own name, as in `ap unit run` (`specs/ap/run-object.md` R5).
+    req["git_author"] = json!(true);
+    // Only a stage on Claude Code has a default mode: a stage on another runtime states its own or is refused.
+    let claude = matches!(req["runtime"].as_str(), None | Some("claude"));
+    if req.get("permission_mode").is_none() && claude {
+        req["permission_mode"] = json!("auto");
+    }
+    req
+}
+
+/// The record and its writes: replaced through a temporary name after every step.
+struct Unit {
+    path: String,
+    rec: Value,
+    clean: bool,
+    started: String,
+}
+fn now() -> String {
+    stamp(SystemTime::now())
+}
+impl Unit {
+    fn save(&mut self) {
+        let mut bytes = serde_json::to_vec_pretty(&self.rec).unwrap_or_default();
+        bytes.push(b'\n');
+        let saved = write(&self.path, &bytes).is_ok()
+            || std::fs::File::create(&self.path).is_ok_and(|mut f| f.write_all(&bytes).is_ok());
+        self.clean &= saved;
+    }
+    /// The step begun: named in `step`, on disk before it has an effect.
+    fn begin(&mut self, name: &str) {
+        self.rec["step"] = json!(name);
+        self.started = now();
+        self.save();
+    }
+    /// The step done: appended to `steps` with its result and times.
+    fn end(&mut self, result: &str, detail: Value) {
+        let name = std::mem::take(&mut self.rec["step"]);
+        let step = json!({"name": name, "result": result, "start": self.started, "end": now(), "detail": detail});
+        match self.rec["steps"].as_array_mut() {
+            Some(steps) => steps.push(step),
+            None => self.rec["steps"] = json!([step]),
+        }
+        self.save();
+    }
+    fn step(&mut self, name: &str, f: impl FnOnce(&mut Self) -> Step) -> Result<(), Stop> {
+        self.begin(name);
+        let detail = f(self)?;
+        self.end("passed", detail);
+        Ok(())
+    }
+}
+fn unchanged(rec: &Value, path: &str) -> Result<(), Stop> {
+    let now = regular(path, "digest_differs", "file").map(|b| digest(&b));
+    ensure!(now.ok().as_deref() == rec["sha256"].as_str() => "digest_differs", json!({"path": path}));
+    Ok(())
+}
+/// One `ap run` stage; its record's path goes into the record before its state is judged.
+fn stage_run(s: &mut impl System, u: &mut Unit, which: &str, r: Value) -> Step {
+    // The record's path is on disk before the stage starts: a killed call names it.
+    u.rec["stages"][which] = json!(format!("{}.run.json", text(&r, "out")?));
+    u.save();
+    let refused = |f: Failure| stop("stage_refused", json!({"code": f.code, "field": f.field}));
+    let (rec, status) = crate::run::execute(s, &r).map_err(refused)?;
+    let state = rec["state"].as_str().unwrap_or("failed");
+    ensure!(state == "ok" => state, Value::Null);
+    // `ok` with an exit that is not 0: the stage's final record could not be written.
+    ensure!(status == 0 => "stage_record_unwritten", Value::Null);
+    Ok(json!({"session": rec["session"]}))
+}
+/// `acceptance` in `wt` with `extra` arguments under the bound; its exit, when one was read.
+fn accept(
+    s: &mut impl System,
+    wt: &str,
+    a: &str,
+    log: &str,
+    n: u64,
+    extra: &[&str],
+) -> Option<i64> {
+    let mut a = args(&["-c", ACCEPT, "sh", wt, a, log, &n.to_string()]);
+    a.extend(args(extra));
+    let reply = s.call("sh", &a, &Value::Null, (n + 30) * 1000).ok();
+    reply.and_then(|r| String::from_utf8_lossy(&r.stdout).trim().parse().ok())
+}
+fn create(path: &str, bytes: &[u8]) -> Result<(), Stop> {
+    let mut options = std::fs::OpenOptions::new();
+    let created = options.write(true).create_new(true).open(path);
+    let written = created.and_then(|mut f| f.write_all(bytes));
+    written.map_err(|_| stop("io_error", json!({"path": path})))
+}
+/// The claim, the steps and the end of a case call.
+fn claimed(
+    r: &Value,
+    rec: Value,
+    steps: impl FnOnce(&mut Unit) -> End,
+) -> Result<(Value, u8), Failure> {
+    let path = format!("{}.unit.json", text(r, "out")?);
+    // The claim: created exclusively before any effect.
+    let mut options = std::fs::OpenOptions::new();
+    options
+        .write(true)
+        .create_new(true)
+        .open(&path)
+        .map_err(|e| match e.kind() {
+            std::io::ErrorKind::AlreadyExists => error("out_exists", "out"),
+            _ => error("out_unwritable", "out"),
+        })?;
+    let (clean, started) = (true, String::new());
+    let mut u = Unit {
+        path,
+        rec,
+        clean,
+        started,
+    };
+    u.save();
+    let state = match steps(&mut u) {
+        Ok(state) => state,
+        Err(Stop { cause, detail }) => {
+            u.rec["stopped_at"] = u.rec["step"].clone();
+            u.end("stopped", detail.clone());
+            (u.rec["cause"], u.rec["detail"]) = (json!(cause), detail);
+            "stopped"
+        }
+    };
+    (u.rec["state"], u.rec["end"]) = (json!(state), json!(now()));
+    u.save();
+    let status = match state {
+        _ if !u.clean => 5,
+        "stopped" => 3,
+        "failed" => 4,
+        _ => 0,
+    };
+    Ok((u.rec, status))
+}
 
 fn hex(v: &Value, n: usize) -> bool {
     let ok = |s: &str| s.len() == n && s.bytes().all(|b| b.is_ascii_hexdigit());
@@ -137,7 +344,7 @@ fn request(s: &mut impl System, r: &Value) -> Result<(Value, String), Failure> {
     require!(c["page_sha256"] == digest(&bytes).as_str() => "case_page_differs", "page");
     if let Some(lead) = r["implementer"]["prompt"].as_str() {
         let field = |f: Failure| fail(f.code, &format!("implementer.{}", f.field), f.detail);
-        crate::run::admit_stage(s, &stage_request(r, "implementer", lead)).map_err(field)?;
+        crate::run::admit_stage(s, &stage_request(r, lead)).map_err(field)?;
         let size = std::fs::metadata(lead).map_or(LIMIT, |m| m.len());
         require!(size + (facts(r, &c).len() as u64) < LIMIT => "prompt_unreadable", "implementer.prompt");
     }
@@ -208,7 +415,7 @@ fn steps(s: &mut impl System, r: &Value, c: &Value, u: &mut Unit) -> End {
         let prompt = format!("{out}.implementer.prompt.md");
         create(&prompt, &bytes)?;
         u.rec["files"]["report"] = json!(format!("{out}.implementer.md"));
-        let req = stage_request(r, "implementer", &prompt);
+        let req = stage_request(r, &prompt);
         match stage_run(s, u, "implementer", req) {
             Ok(detail) => u.end("passed", detail),
             Err(Stop { cause, .. }) if cause == "timeout" => {

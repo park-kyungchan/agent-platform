@@ -3865,13 +3865,6 @@ pub fn cli(argv: &[OsString]) -> ExitCode {
         None => execute(s, r).map_err(Refused::from),
     })
 }
-/// One JSON request on stdin, the answer on stdout, a refusal on stderr with exit 2.
-pub(crate) fn cli_with(
-    argv: &[OsString],
-    execute: impl FnOnce(&mut crate::host::Host, &Value) -> Result<(Value, u8), Failure>,
-) -> ExitCode {
-    answered(argv, |s, r| execute(s, r).map_err(Refused::from))
-}
 /// One JSON request on stdin, the answer on stdout, a refusal on stderr with its exit.
 fn answered(
     argv: &[OsString],
