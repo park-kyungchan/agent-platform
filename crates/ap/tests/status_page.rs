@@ -383,7 +383,7 @@ fn the_status_page_unit_files_and_readme_section() {
     let timer_lines: Vec<&str> = timer.lines().filter(|l| !l.starts_with('#')).collect();
     for want in [
         "[Timer]",
-        "OnCalendar=*:0/15",
+        "OnCalendar=*:33",
         "AccuracySec=10s",
         "Persistent=false",
         "WantedBy=timers.target",
