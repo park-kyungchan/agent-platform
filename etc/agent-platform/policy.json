@@ -86,7 +86,8 @@
    "stage_tokens": {
     "park-kyungchan/agent-platform": "/etc/agent-platform/credentials/stage-token-agent-platform",
     "park-kyungchan/ontology-platform": "/etc/agent-platform/credentials/stage-token-ontology-platform",
-    "park-kyungchan/agent-vps-operations": "/etc/agent-platform/credentials/stage-token-agent-vps-operations"
+    "park-kyungchan/agent-vps-operations": "/etc/agent-platform/credentials/stage-token-agent-vps-operations",
+    "park-kyungchan/education-platform": "/etc/agent-platform/credentials/stage-token-education-platform"
    }
   },
   "approval": {
