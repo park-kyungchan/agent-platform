@@ -11,5 +11,6 @@
   {"id": "routing-cgroup", "file": "ci/test_routing_suite.py", "covers": ["evals/routing/**", "ci/test_routing_suite.py"], "runs_on": "ci", "how": "python3 -I -B -m unittest discover -s ci -p test_routing_suite.py"},
   {"id": "check-bwrap", "file": "crates/ap/tests/check.rs", "covers": ["crates/ap/src/check.rs", "crates/ap/src/check/pc.sh", "crates/ap/tests/check.rs"], "runs_on": "vps", "how": "cargo test --locked -p ap --test check -- r8_on_the_pc_the_command_is_uid_0 r18_the_step_fetches_in_a_sandbox"},
   {"id": "run-systemd", "file": "crates/ap/tests/run.rs", "covers": ["crates/ap/src/run.rs", "crates/ap/src/policy.rs"], "runs_on": "ci", "how": "cargo test --locked -p ap --test run policy_the_built_binary_reads_the_file_the_variable_names"},
-  {"id": "help-dev-full", "file": "crates/ap/tests/help.rs", "covers": ["crates/ap/src/main.rs"], "runs_on": "ci", "how": "cargo test --locked -p ap --test help verbs_r5_an_answer_that_cannot_be_written_exits_4"}
+  {"id": "help-dev-full", "file": "crates/ap/tests/help.rs", "covers": ["crates/ap/src/main.rs"], "runs_on": "ci", "how": "cargo test --locked -p ap --test help verbs_r5_an_answer_that_cannot_be_written_exits_4"},
+  {"id": "door-pc", "file": "crates/ap/tests/door.rs", "covers": ["crates/ap/src/door.rs", "crates/ap/tests/door.rs"], "runs_on": "ci", "how": "cargo test --locked -p ap --test door"}
 ]}
