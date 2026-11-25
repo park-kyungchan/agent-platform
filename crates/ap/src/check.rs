@@ -1262,7 +1262,6 @@ mod tests {
     use super::*;
 
     // spec: specs/ap/check.md#R11
-    // spec: specs/ap/check.md#R13
     #[test]
     fn the_status_line_is_taken_out_wherever_the_stream_splits_it() {
         let nonce = "0f0e0d0c-0b0a-4908-8706-050403020100";

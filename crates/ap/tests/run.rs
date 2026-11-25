@@ -3309,6 +3309,28 @@ fn cut1_no_continuation_without_a_next_account() {
     assert_eq!(v["attempts"][0]["continued"], false);
     assert_eq!(v["limit"]["status"], "rejected");
     assert_eq!(v["attempts"][0]["limit"], v["limit"]);
+    // With a next account the later launch is the one that reads the text, and only when the
+    // launch before it worked: a cut after a tool gives it, a cut before any tool gives none, so
+    // the test fails both when the text is no longer given and when it is given too often.
+    let before = f.count_now();
+    let (v, status) = f.run(&f.with_next("implementer", "w.md", &["a2"])).unwrap();
+    assert_eq!((status, v["state"].as_str()), (0, Some("ok")), "{v}");
+    assert_eq!(v["attempts"].as_array().unwrap().len(), 2, "{v}");
+    assert_eq!(f.input(before + 1), b"review this\n");
+    assert_eq!(
+        f.input(before + 2),
+        [CONTINUATION.as_bytes(), b"review this\n"].concat()
+    );
+    assert_eq!(v["attempts"][1]["continued"], true);
+    f.mode("a1", "limit1");
+    let before = f.count_now();
+    let (v, status) = f
+        .run(&f.with_next("implementer", "nw.md", &["a2"]))
+        .unwrap();
+    assert_eq!((status, v["state"].as_str()), (0, Some("ok")), "{v}");
+    assert_eq!(v["attempts"][0]["worked"], false, "{v}");
+    assert_eq!(f.input(before + 2), b"review this\n");
+    assert_eq!(v["attempts"][1]["continued"], false);
 }
 
 // spec: specs/ap/run.md#R21
@@ -6582,6 +6604,168 @@ fn engine_run_object_r15_the_run_reads_back_with_host_and_uses() {
     assert_eq!(fields["uses"]["value"]["native_key"], "a1", "{got}");
 }
 
+/// R16: what `ap run` applies and records stays as it is. A real `ap run` of a stage that names an
+/// intent, then a real `ap measure sessions` pass that measures that run on the same store: the run's
+/// role, status, times and token counts are the same before and after, and only the members of the
+/// pass (`days`, `refusals`, `measured_at`) differ.
+// spec: specs/ap/run-object.md#R16
+#[test]
+#[ignore = "runs the real engine: ./check runs it with --ignored and ONT_BIN"]
+fn engine_run_object_r16_run_leaves_what_ap_run_wrote_after_a_measure_pass() {
+    use std::io::Write;
+    let engine = PathBuf::from(std::env::var("ONT_BIN").expect("ONT_BIN names the engine"));
+    let mut f = Fake::new();
+    let store = f.p("engine-store.sqlite");
+    let ont = |args: &[&str], input: &Value| -> Value {
+        let mut child = Command::new(&engine)
+            .arg("--store")
+            .arg(&store)
+            .args(args)
+            .env_remove("ONT_ROLE")
+            .stdin(std::process::Stdio::piped())
+            .stdout(std::process::Stdio::piped())
+            .stderr(std::process::Stdio::piped())
+            .spawn()
+            .unwrap();
+        child
+            .stdin
+            .take()
+            .unwrap()
+            .write_all(input.to_string().as_bytes())
+            .unwrap();
+        let out = child.wait_with_output().unwrap();
+        let v: Value = serde_json::from_slice(&out.stdout).unwrap_or_else(|_| {
+            panic!(
+                "ont {args:?}: {}{}",
+                String::from_utf8_lossy(&out.stdout),
+                String::from_utf8_lossy(&out.stderr)
+            )
+        });
+        assert_eq!(out.status.code(), Some(0), "ont {args:?}: {v}");
+        v
+    };
+    let schema_text = include_str!("../../../ontology/work.schema.json");
+    let schema = f.p("work.schema.json");
+    std::fs::write(&schema, schema_text).unwrap();
+    let installed = ont(&["schema", "install", &schema], &Value::Null);
+    assert_eq!(installed["status"], "ok", "{installed}");
+    roles_file::put(
+        Path::new(&store).parent().unwrap(),
+        &serde_json::from_str(schema_text).unwrap(),
+    );
+    let apply = |action: &str, rid: &str, parameters: Value| -> Value {
+        let body = json!({"action_type": action, "request_id": rid, "role": "lead", "parameters": parameters});
+        let v = ont(&["action", "apply", "--client", "ap"], &body);
+        assert_eq!(v["result"]["outcome"], "applied", "{v}");
+        v
+    };
+    let request = apply(
+        "record_request",
+        "r16-request",
+        json!({"words": "Build the invented widget board.", "words_verified": true,
+            "record": "fixture/session.jsonl", "reading": "The user orders a widget board.",
+            "kind": "order", "topic": "r16-widget-board", "said_at": "2026-01-01T00:00:00Z",
+            "session": "fixture-session", "runtime": "fixture-cli"}),
+    );
+    let origin = request["result"]["edits"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|e| e["id"]["object_type"] == "request" && e["change"] == "initial")
+        .unwrap()["id"]
+        .clone();
+    apply(
+        "draft_intent",
+        "r16-intent",
+        json!({"intent": object_id("intent", "r16-widget-board"),
+            "outcome": "The invented widget board lists every widget.",
+            "first_user": "The fixture reader, in its first run.", "origin": origin,
+            "questions": [{"question": "Which colour?", "default": "green", "answer": ""}],
+            "directory": "fixture/widget-board"}),
+    );
+    f.ont = Some(FakeOnt {
+        engine: Some(engine.clone()),
+        ..FakeOnt::default()
+    });
+    let mut r = f.request("r16.md");
+    r["intent"] = json!("r16-widget-board");
+    r["store"] = json!(store);
+    let (v, status) = f.run(&r).unwrap();
+    assert_eq!(status, 0, "{v}");
+    assert_eq!(v["run_object"]["start"], "applied", "{v}");
+    assert_eq!(v["run_object"]["close"], "applied", "{v}");
+    let key = v["run_object"]["key"].as_str().unwrap().to_owned();
+    // The members of the run as the store holds them, by name.
+    let read = || -> std::collections::BTreeMap<String, Value> {
+        let got = ont(&["get"], &json!({"id": object_id("run", &key)}));
+        let seen = got["result"]["objects"][0]["observations"]
+            .as_array()
+            .unwrap();
+        seen.last().unwrap()["fields"]
+            .as_object()
+            .unwrap()
+            .iter()
+            .map(|(k, v)| (k.clone(), v["value"].clone()))
+            .collect()
+    };
+    let before = read();
+    for k in ["role", "status", "started_at", "ended_at"] {
+        assert!(before[k].is_string(), "{k}: {before:?}");
+    }
+    assert!(!before.contains_key("measured_at"), "{before:?}");
+    // A pass over this store whose stage directory is this test's: it reads the run's record, finds
+    // the run by that path and measures it. No account and no work directory holds a session.
+    let bin = f.p("measure-bin");
+    std::fs::create_dir_all(&bin).unwrap();
+    std::os::unix::fs::symlink(&engine, format!("{bin}/ont")).unwrap();
+    for d in [
+        "measure-acc/projects",
+        "measure-work",
+        "measure-platforms",
+        "measure-home",
+    ] {
+        std::fs::create_dir_all(f.p(d)).unwrap();
+    }
+    let out = Command::new(env!("CARGO_BIN_EXE_ap"))
+        .args(["measure", "sessions", "--since", "2020-01-01", "--accounts"])
+        .arg(f.p("measure-acc"))
+        .arg("--work-root")
+        .arg(f.p("measure-work"))
+        .arg("--platforms-root")
+        .arg(f.p("measure-platforms"))
+        .arg("--stage-dir")
+        .arg(&f.t)
+        .arg("--store")
+        .arg(&store)
+        .env_clear()
+        .env("PATH", &bin)
+        .env("HOME", f.p("measure-home"))
+        .env("AP_DOOR_LOG", f.p("measure-door.jsonl"))
+        .output()
+        .unwrap();
+    let line: Value = serde_json::from_slice(&out.stdout)
+        .unwrap_or_else(|_| panic!("{}", String::from_utf8_lossy(&out.stderr)));
+    assert_eq!(out.status.code(), Some(0), "{line}");
+    assert_eq!(line["runs"]["measured"].as_u64(), Some(1), "{line}");
+    let after = read();
+    assert!(
+        after.contains_key("measured_at"),
+        "the pass did not measure the run: {after:?}"
+    );
+    for k in ["role", "status", "started_at", "ended_at"] {
+        assert_eq!(after[k], before[k], "{k}");
+    }
+    for k in before.keys().chain(after.keys()) {
+        if !["days", "refusals", "measured_at"].contains(&k.as_str()) {
+            assert_eq!(after.get(k), before.get(k), "{k} changed");
+        }
+    }
+    assert!(
+        before.contains_key("input_tokens") && before.contains_key("output_tokens"),
+        "the run holds token counts: {before:?}"
+    );
+}
+
 // spec: specs/ap/run-object.md#R12
 #[test]
 fn run_object_r12_a_second_call_on_the_same_out_is_refused_before_the_store() {
@@ -9309,7 +9493,6 @@ fn limits_r16_the_state_of_gh_only_where_show_names_it_and_it_exists() {
 }
 
 // spec: specs/ap/run-limits.md#R16
-// spec: specs/ap/run-limits.md#R10
 #[test]
 fn limits_r16_no_bind_holds_a_path_of_the_audits_must_not_see_list() {
     let mut f = Fake::new();
@@ -10304,6 +10487,53 @@ fn a_policy_without_api_key_accounts_launches_as_the_base() {
             assert_eq!(env_before, &now.2, "environment of {n}");
             assert_eq!(settings_before, &now.3, "settings of {n}");
         }
+    }
+    // The form rule (R17): the reader `ap run` calls refuses every other form of the member,
+    // `policy_invalid` of the field `policy`, its detail beginning with the member or the entry.
+    let six: serde_json::Map<String, Value> = (1..=6)
+        .map(|n| (format!("/k{n}"), json!(STAGE_FILE)))
+        .collect();
+    let launched = f.launches.len();
+    let a2 = f.p("a2");
+    let cases: Vec<(Value, String)> = vec![
+        (json!("on"), "api_key_accounts".into()),
+        (json!({}), "api_key_accounts".into()),
+        (Value::Object(six), "api_key_accounts".into()),
+        (
+            json!({"relative/dir": STAGE_FILE}),
+            "api_key_accounts.relative/dir".into(),
+        ),
+        (
+            json!({ format!("{a2}/"): STAGE_FILE }),
+            format!("api_key_accounts.{a2}/"),
+        ),
+        (
+            json!({ a2.clone(): "anthropic-stage-key" }),
+            format!("api_key_accounts.{a2}"),
+        ),
+        (
+            json!({ a2.clone(): "/etc/agent-platform/credentials/a/b" }),
+            format!("api_key_accounts.{a2}"),
+        ),
+    ];
+    for (n, (member, first)) in cases.iter().enumerate() {
+        let mut v = f.open_policy();
+        v["api_key_accounts"] = member.clone();
+        f.policy_is(&v);
+        let out = format!("form{n}.md");
+        let refused = f.run(&f.request(&out)).unwrap_err();
+        assert_eq!(
+            (refused.code, refused.field.as_str()),
+            ("policy_invalid", "policy"),
+            "{member}"
+        );
+        let detail = refused.detail.as_str().unwrap().to_owned();
+        assert!(
+            detail.starts_with(&format!("{first} ")),
+            "{member}: {detail}"
+        );
+        assert_eq!(f.launches.len(), launched, "{member}");
+        assert!(!f.t.join(&out).exists(), "{member}");
     }
 }
 

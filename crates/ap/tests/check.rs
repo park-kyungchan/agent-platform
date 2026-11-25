@@ -1136,7 +1136,6 @@ fn r18_the_step_fetches_in_a_sandbox_of_its_own_with_the_network() {
 }
 
 // spec: specs/ap/check.md#R6
-// spec: specs/ap/check.md#R8
 #[test]
 fn r8_what_a_command_leaves_in_git_never_runs_outside_its_sandbox() {
     // The stand-in bwrap lets the command write the repository at .git: as if the read-only bind

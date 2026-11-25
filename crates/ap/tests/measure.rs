@@ -2869,7 +2869,6 @@ fn r16_the_timer_runs_the_sessions_pass_the_kpi_pass_and_the_routing_pass_each_n
     }
 }
 
-// spec: specs/ap/run-object.md#R16
 #[test]
 fn run_object_r16_a_stage_run_is_measured_and_a_session_run_recorded_by_the_new_actions() {
     let schema: Value =
