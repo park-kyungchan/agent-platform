@@ -94,6 +94,34 @@
     "park-kyungchan/ontology-platform": "/etc/agent-platform/credentials/stage-token-ontology-platform",
     "park-kyungchan/agent-vps-operations": "/etc/agent-platform/credentials/stage-token-agent-vps-operations"
    }
+  },
+  "approval": {
+   "contract": "verifier",
+   "guarded": [
+    "ontology/**",
+    "deploy/**",
+    "host/**",
+    "etc/**",
+    "github/**",
+    "git/**",
+    ".github/**",
+    "ci/**",
+    "scripts/**",
+    "check",
+    "Cargo.toml",
+    "Cargo.lock",
+    "AGENTS.md",
+    "REVIEW.md",
+    "content/AGENTS.md",
+    "crates/ap/src/deliver.rs",
+    "crates/ap/src/run.rs",
+    "crates/ap/src/run/**",
+    "crates/ap/src/door.rs",
+    "crates/ap/src/store.rs",
+    "crates/ap/src/unit/drive.rs",
+    "deployments/**"
+   ],
+   "sample": 5
   }
  },
  "quota": {
@@ -104,7 +132,7 @@
   "ceiling": 170
  },
  "work": {
-  "slots": 4,
+  "slots": 6,
   "slice": "agents.slice",
   "prefix": "ap-unit"
  },
@@ -165,6 +193,166 @@
     "max_tokens": 8000,
     "max_requests": 300
    }
+  }
+ },
+ "routing": {
+  "order": [
+   [
+    "claude",
+    "haiku"
+   ],
+   [
+    "claude",
+    "sonnet"
+   ],
+   [
+    "claude",
+    "opus"
+   ],
+   [
+    "claude",
+    "fable"
+   ]
+  ],
+  "large_lines": 500,
+  "map": {
+   "default": {
+    "small": {
+     "implementer": [
+      "claude",
+      "sonnet"
+     ],
+     "verifier": [
+      "claude",
+      "opus"
+     ]
+    },
+    "large": {
+     "implementer": [
+      "claude",
+      "opus"
+     ],
+     "verifier": [
+      "claude",
+      "opus"
+     ]
+    }
+   },
+   "schema": {
+    "small": {
+     "implementer": [
+      "claude",
+      "opus"
+     ],
+     "verifier": [
+      "claude",
+      "opus"
+     ]
+    },
+    "large": {
+     "implementer": [
+      "claude",
+      "opus"
+     ],
+     "verifier": [
+      "claude",
+      "opus"
+     ]
+    }
+   },
+   "instructions": {
+    "small": {
+     "implementer": [
+      "claude",
+      "opus"
+     ],
+     "verifier": [
+      "claude",
+      "opus"
+     ]
+    },
+    "large": {
+     "implementer": [
+      "claude",
+      "opus"
+     ],
+     "verifier": [
+      "claude",
+      "opus"
+     ]
+    }
+   },
+   "removal": {
+    "small": {
+     "implementer": [
+      "claude",
+      "sonnet"
+     ],
+     "verifier": [
+      "claude",
+      "opus"
+     ]
+    },
+    "large": {
+     "implementer": [
+      "claude",
+      "sonnet"
+     ],
+     "verifier": [
+      "claude",
+      "opus"
+     ]
+    }
+   },
+   "config": {
+    "small": {
+     "implementer": [
+      "claude",
+      "sonnet"
+     ],
+     "verifier": [
+      "claude",
+      "opus"
+     ]
+    },
+    "large": {
+     "implementer": [
+      "claude",
+      "sonnet"
+     ],
+     "verifier": [
+      "claude",
+      "opus"
+     ]
+    }
+   },
+   "import": {
+    "small": {
+     "implementer": [
+      "claude",
+      "sonnet"
+     ],
+     "verifier": [
+      "claude",
+      "opus"
+     ]
+    },
+    "large": {
+     "implementer": [
+      "claude",
+      "sonnet"
+     ],
+     "verifier": [
+      "claude",
+      "opus"
+     ]
+    }
+   }
+  },
+  "bar": {
+   "rate": 0.34,
+   "window_days": 14,
+   "min_merged": 5
   }
  }
 }

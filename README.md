@@ -73,6 +73,9 @@ only that one file:
 | `check [<commit>]` | Prints `same` (exit 0) or `differs <target>` (exit 1) against `<commit>`, by default the tip of `origin/main`; it writes nothing but its own clone |
 | `rollback <kept file>` | Puts one kept `policy.json.before-<stamp>` back, after `ap policy check`, keeping the current bytes first |
 
+The policy's v3 members: `units.approval` says which unit of class contract merges on its verifier's accept (its head meets no path of `guarded`, and `sample` sets how many accepted merges are drawn for a later look); `work.slots` is how many units the dispatch pass runs at once (6); and `routing` holds the tier `order`, the `large_lines` bound, the `map` of implementer and verifier tiers by kind and size, and the `bar` a tier must meet.
+A unit whose tier names a runtime outside `routing.order` is refused `tier_not_in_order` until a later policy unit adds it.
+
 The script works in its own clone, `/var/lib/agent-platform/clones/agent-vps-operations`
 (never in a main checkout), holds the lock `/var/lib/agent-platform/etc/lock`, and
 refuses with a code on stderr and exit 2 before any write (`busy`, `not_forward`,
