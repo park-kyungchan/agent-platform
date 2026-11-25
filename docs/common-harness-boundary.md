@@ -3,8 +3,8 @@
 **Scope approved by the user — 2026-11-04.** Initially prepared against
 `aaefe063dbbc83f23a4f00c397c80ce60bca2003`; rechecked against agent-platform main
 `42055b7b70d52e6aeb02a84136367fdc09748f45`. This is autonomy goal 8's permanent mechanism
-boundary for a small Rust, CLI-agnostic harness on Herdr, used by Claude Code,
-Codex, Muse and Antigravity CLI (`agy`). It assigns no role, priority, model or
+boundary for a small Rust, CLI-agnostic harness on Herdr, used by Claude Code
+and Antigravity CLI (`agy`). It assigns no role, priority, model or
 work category to any CLI. Scope approval does not authorize implementation,
 deployment or host configuration changes. PR #98 merged on 2026-11-05 at `2dd51af`; the current task STATE records acceptance and deployment. This milestone grants no new host effects.
 
@@ -95,9 +95,8 @@ store. [G1][H1][Z1]
 Memory retrieval, transcript retention, extraction/consolidation, page refresh
 and an already-loaded model context are separate events. A hook registration
 does not prove execution. Short-lived hooks reread config on invocation; the
-persistent MCP process generally reads it at startup. Muse's dated configuration
-has MCP with no configured Hindsight lifecycle injection hook; do not claim all
-four runtimes inject or retain identically. Tagged models can miss shared
+persistent MCP process generally reads it at startup. Do not claim the runtimes
+inject or retain identically. Tagged models can miss shared
 untagged observations, so platform scope requires actual readback, not just a
 tag name. No retention or refresh operation is performed here. [G3][H1][H2]
 

@@ -1,7 +1,7 @@
 # Agent platform
 
-A small Rust workspace of the command `ap`. Native Muse, Claude Code, Codex,
-Antigravity CLI (`agy`) and Hermes own their sessions, tools and lifecycle.
+A small Rust workspace of the command `ap`. Native Claude Code, Antigravity CLI
+(`agy`) and Hermes own their sessions, tools and lifecycle.
 
 `crates/ap` implements the verbs `version`, `run`, `gate`, `review`, `unit` and
 `deliver`; [crates/ap/README.md](crates/ap/README.md) documents each. The

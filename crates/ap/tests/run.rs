@@ -49,8 +49,6 @@ fn skipped(var: &str, id: &str) {
 mod roles_file;
 static NEXT: AtomicU32 = AtomicU32::new(0);
 const FAKE: &str = include_str!("fixtures/fake-claude.sh");
-const FAKE_CODEX: &str = include_str!("fixtures/fake-codex.sh");
-const FAKE_MUSE: &str = include_str!("fixtures/fake-muse.sh");
 const FAKE_AGY: &str = include_str!("fixtures/fake-agy.sh");
 const BWRAP: &str = "/usr/bin/bwrap";
 
@@ -325,17 +323,12 @@ impl Fake {
         for d in ["bin", "a1", "a2", "cwd"] {
             std::fs::create_dir_all(t.join(d)).unwrap();
         }
-        for (name, text) in [
-            ("claude", FAKE),
-            ("codex", FAKE_CODEX),
-            ("muse", FAKE_MUSE),
-            ("agy", FAKE_AGY),
-        ] {
+        for (name, text) in [("claude", FAKE), ("agy", FAKE_AGY)] {
             let fake = t.join("bin").join(name);
             std::fs::write(&fake, text).unwrap();
             std::fs::set_permissions(&fake, std::fs::Permissions::from_mode(0o755)).unwrap();
         }
-        // The four fakes are written and closed: no fork of this binary still holds one open for
+        // The two fakes are written and closed: no fork of this binary still holds one open for
         // writing when a launch executes it.
         forks::settled();
         std::fs::write(t.join("prompt.md"), "review this\n").unwrap();
@@ -645,7 +638,7 @@ impl System for Fake {
             true => unit_at + 1 + argv[unit_at + 1..].iter().position(|a| a == "--").unwrap(),
             false => unit_at,
         };
-        assert!(["claude", "codex", "muse", "agy"].contains(&argv[at + 1].as_str()));
+        assert!(["claude", "agy"].contains(&argv[at + 1].as_str()));
         let unit = argv[..unit_at]
             .iter()
             .find_map(|a| a.strip_prefix("--unit="))
@@ -1289,17 +1282,9 @@ fn a2_unknown_role_and_out_named_in_prompt() {
 // ---- the other invariants ------------------------------------------------------------------
 
 // spec: specs/ap/run.md#R9
-// spec: specs/ap/run.md#R34
 #[test]
-fn refusals_codex_systemd_members() {
+fn refusals_systemd_members() {
     let mut f = Fake::new();
-    let mut r = f.request("r.md");
-    r["runtime"] = json!("codex");
-    assert_eq!(
-        code(f.run(&r)),
-        "invalid_input@role",
-        "reviewers run on Claude Code"
-    );
     let mut r = f.request("r.md");
     r["roles_file"] = json!("/root/.config/lead/roles.tsv");
     assert_eq!(code(f.run(&r)), "invalid_input@roles_file");
@@ -1393,13 +1378,7 @@ fn ok_means_the_expected_result_and_denials_are_recorded() {
 // spec: specs/ap/run.md#R18
 #[test]
 fn p3_a_preamble_before_the_verdict_is_no_result() {
-    for (runtime, role) in [
-        ("claude", "reviewer"),
-        ("claude", "implementer"),
-        ("claude", "fixer"),
-        ("codex", "implementer"),
-        ("codex", "fixer"),
-    ] {
+    for role in ["reviewer", "implementer", "fixer"] {
         for newline in ["\n", "\r\n"] {
             let mut f = Fake::new();
             let answer = format!(
@@ -1408,11 +1387,7 @@ fn p3_a_preamble_before_the_verdict_is_no_result() {
             );
             std::fs::write(f.t.join("bin/answer"), &answer).unwrap();
             f.mode("a1", "answer");
-            let mut r = if runtime == "codex" {
-                f.codex("p.md")
-            } else {
-                f.request("p.md")
-            };
+            let mut r = f.request("p.md");
             r["role"] = json!(role);
             r["expect"] = json!({"first_line": "Verdict: *"});
             let (v, status) = f.run(&r).unwrap();
@@ -1588,25 +1563,6 @@ fn asked_again_and_still_missing_the_first_line_is_no_result() {
         (Some("no_result"), Some("file"))
     );
     assert_eq!(f.launches.len(), 1);
-    // A Codex stage is handled as before.
-    let mut f = Fake::new();
-    std::fs::write(
-        f.t.join("bin/answer"),
-        "No verdict here.\nVerdict: accept\n",
-    )
-    .unwrap();
-    f.mode("a1", "answer");
-    let mut r = f.codex("c.md");
-    r["expect"] = json!({"first_line": "Verdict: *"});
-    let (v, status) = f.run(&r).unwrap();
-    assert_eq!(
-        (status, v["state"].as_str(), v["unmet"].as_str()),
-        (3, Some("no_result"), Some("first_line"))
-    );
-    assert_eq!(
-        (f.launches.len(), v["attempts"].as_array().unwrap().len()),
-        (1, 1)
-    );
 }
 
 /// What the session reads when its answer met `expect.first_line` and missed `expect.second_line`.
@@ -1655,7 +1611,7 @@ fn second_line_is_admitted_only_beside_first_line() {
 
 /// A Claude answer whose first line meets and whose second line misses is `no_result` with `unmet`
 /// `second_line` and is asked again once, in its own session, with the sentence of the second line;
-/// an answer that misses the first line keeps the sentence of R20. A Codex stage is not asked.
+/// an answer that misses the first line keeps the sentence of R20.
 // spec: specs/ap/run.md#R16
 // spec: specs/ap/run.md#R17
 // spec: specs/ap/run.md#R20
@@ -1721,18 +1677,6 @@ fn a_missed_second_line_is_asked_again_with_its_own_sentence() {
     r["expect"] = json!({"first_line": "Verdict: *", "second_line": "*"});
     let (v, status) = f.run(&r).unwrap();
     assert_eq!((status, v["state"].as_str()), (0, Some("ok")));
-    // A Codex stage is not asked again.
-    let mut f = Fake::new();
-    std::fs::write(f.t.join("bin/answer"), "Verdict: accept\nDigest: none\n").unwrap();
-    f.mode("a1", "answer");
-    let mut r = f.codex("c.md");
-    r["expect"] = expect;
-    let (v, status) = f.run(&r).unwrap();
-    assert_eq!(
-        (status, v["state"].as_str(), v["unmet"].as_str()),
-        (3, Some("no_result"), Some("second_line"))
-    );
-    assert_eq!(f.launches.len(), 1);
 }
 
 /// The result a stage is judged by meets both lines: a later result that meets only the first
@@ -2592,44 +2536,9 @@ fn gate_a_later_result_does_not_unmake_one_that_met_expect() {
     );
 }
 
-// ---- runtime codex: a stage on the Codex CLI (tests/fixtures/fake-codex.sh) ------------------
+// ---- the words of a launch ---------------------------------------------------------------------
 
-/// The flags that leave out the home's configuration, hooks, rules, apps, plugins, memories and
-/// further agents, for a fresh and a resumed stage alike.
-const CODEX_FLAGS: [&str; 21] = [
-    "--json",
-    "--ignore-user-config",
-    "--ignore-rules",
-    "--disable",
-    "hooks",
-    "--disable",
-    "apps",
-    "--disable",
-    "plugins",
-    "--disable",
-    "plugin_discovery_prefetch",
-    "--disable",
-    "skill_mcp_dependency_install",
-    "--disable",
-    "memories",
-    "--disable",
-    "multi_agent",
-    "-c",
-    "features.multi_agent_v2.max_concurrent_threads_per_session=1",
-    "--skip-git-repo-check",
-    "--dangerously-bypass-approvals-and-sandbox",
-];
-/// One turn's usage in the fake, as the record maps it (input without the cached and the
-/// cache-write part).
-fn one_turn() -> Value {
-    json!({"input": 18839 - 12288 - 100, "output": 5, "cache_read": 12288, "cache_creation": 100})
-}
 impl Fake {
-    fn codex(&self, out: &str) -> Value {
-        json!({"role":"implementer","runtime":"codex","account":self.p("a1"),"model":"gpt-6.1-terra",
-               "effort":"high","permission_mode":"bypassPermissions","cwd":self.p("cwd"),
-               "prompt":self.p("prompt.md"),"out":self.p(out)})
-    }
     /// The program and arguments of the last launch after `systemd-run … --`.
     fn last_cli(&self) -> Vec<String> {
         let launch = self.launches.last().unwrap();
@@ -2641,94 +2550,12 @@ impl Fake {
         env.unwrap().lines().map(str::to_owned).collect()
     }
 }
-fn codex_cli(head: &[&str], tail: &[&str]) -> Vec<String> {
-    let mut a: Vec<String> = head.iter().map(|s| s.to_string()).collect();
-    a.extend(CODEX_FLAGS.iter().map(|s| s.to_string()));
-    a.extend(tail.iter().map(|s| s.to_string()));
-    a
-}
-
-// spec: specs/ap/run.md#R35
-#[test]
-fn x1_codex_stage_is_started_headless_without_the_user_configuration() {
-    let mut f = Fake::new();
-    // Nothing of the caller's environment chooses another home or another login.
-    f.env
-        .push(("CODEX_HOME".into(), "/elsewhere/.codex".into()));
-    f.env.push(("CODEX_SQLITE_HOME".into(), "/var/x".into()));
-    f.env.push(("OPENAI_API_KEY".into(), "not-a-key".into()));
-    let mut r = f.codex("c.md");
-    r["env"] = json!({"CARGO_TARGET_DIR": "/x/target"});
-    let (v, status) = f.run(&r).unwrap();
-    assert_eq!((status, v["state"].as_str()), (0, Some("ok")), "{v}");
-    let launch = f.launches.last().unwrap();
-    let at = launch.iter().position(|a| a == "--").unwrap();
-    assert_eq!(
-        launch[..at],
-        [
-            "systemd-run",
-            "--scope",
-            "--quiet",
-            "--collect",
-            v["unit"]
-                .as_str()
-                .map(|u| format!("--unit={u}"))
-                .unwrap()
-                .as_str(),
-            "--slice=agents.slice",
-            "-p",
-            "RuntimeMaxSec=5410s",
-            "-p",
-            "TimeoutStopSec=10s",
-        ]
-    );
-    let cwd = f.p("cwd");
-    let want = codex_cli(
-        &["codex", "--no-daemon", "exec"],
-        &[
-            "-m",
-            "gpt-6.1-terra",
-            "-c",
-            "model_reasoning_effort=\"high\"",
-            "-C",
-            &cwd,
-            "-",
-        ],
-    );
-    assert_eq!(f.last_cli(), want);
-    // The prompt on stdin, byte for byte; the home is the request's account, by CODEX_HOME only.
-    assert_eq!(
-        std::fs::read(f.t.join("bin/prompt.1")).unwrap(),
-        b"review this\n"
-    );
-    assert!(f.calls()[0].starts_with(&format!("{}|--no-daemon exec --json ", f.p("a1"))));
-    let env = f.env_of_last();
-    let names: Vec<&str> = env.iter().filter_map(|l| l.split('=').next()).collect();
-    assert!(
-        env.contains(&format!("CODEX_HOME={}", f.p("a1"))),
-        "{env:?}"
-    );
-    assert!(env.contains(&"CARGO_TARGET_DIR=/x/target".to_owned()));
-    for n in &names {
-        assert!(
-            !n.starts_with("CLAUDE_") && !n.starts_with("HERDR_") && !n.starts_with("OPENAI_"),
-            "{n}"
-        );
-        assert!(!n.starts_with("CODEX_") || *n == "CODEX_HOME", "{n}");
-    }
-    assert!(!names.contains(&"FOO"));
-    assert_eq!(v["runtime"], "codex");
-    // `ap` writes no file of the home.
-    assert_eq!(std::fs::read_dir(f.t.join("a1")).unwrap().count(), 0);
-}
 
 // spec: specs/ap/run.md#R11
 // spec: specs/ap/run.md#R12
 #[test]
 fn x1_claude_stage_arguments_are_unchanged() {
     let mut f = Fake::new();
-    // A Codex stage before it leaves nothing behind in the next Claude stage.
-    assert_eq!(f.run(&f.codex("c.md")).unwrap().0["state"], "ok");
     for (out, runtime) in [("a.md", None), ("b.md", Some("claude"))] {
         let mut r = f.request(out);
         if let Some(rt) = runtime {
@@ -2775,360 +2602,6 @@ fn x1_claude_stage_arguments_are_unchanged() {
     }
 }
 
-// spec: specs/ap/run.md#R34
-#[test]
-fn x2_refusals_of_the_codex_runtime_write_nothing() {
-    let mut f = Fake::new();
-    let cases: Vec<(&str, Option<Value>, &str)> = vec![
-        ("role", Some(json!("reviewer")), "invalid_input@role"),
-        (
-            "next_accounts",
-            Some(json!([f.p("a2")])),
-            "invalid_input@next_accounts",
-        ),
-        ("permission_mode", None, "invalid_input@permission_mode"),
-        (
-            "permission_mode",
-            Some(json!("auto")),
-            "invalid_input@permission_mode",
-        ),
-        (
-            "permission_mode",
-            Some(json!("acceptEdits")),
-            "invalid_input@permission_mode",
-        ),
-        (
-            "mcp_config",
-            Some(json!(["/etc/ap-test/mcp.json"])),
-            "invalid_input@mcp_config",
-        ),
-        ("skills", Some(json!(true)), "invalid_input@skills"),
-        ("skills", Some(json!(false)), "invalid_input@skills"),
-        ("memory", Some(json!(false)), "invalid_input@memory"),
-        (
-            "integration",
-            Some(json!(false)),
-            "invalid_input@integration",
-        ),
-        (
-            "env",
-            Some(json!({"CODEX_HOME": "/elsewhere/.codex"})),
-            "env_forbidden@env",
-        ),
-        (
-            "env",
-            Some(json!({"CODEX_SQLITE_HOME": "/x"})),
-            "env_forbidden@env",
-        ),
-        (
-            "env",
-            Some(json!({"OPENAI_API_KEY": "x"})),
-            "env_forbidden@env",
-        ),
-        (
-            "env",
-            Some(json!({"CLAUDE_CONFIG_DIR": "/x"})),
-            "env_forbidden@env",
-        ),
-        ("env", Some(json!({"HOME": "/"})), "env_forbidden@env"),
-        (
-            "account",
-            Some(json!(f.p("missing"))),
-            "account_missing@account",
-        ),
-        ("runtime", Some(json!("grok")), "invalid_input@runtime"),
-    ];
-    for (member, value, want) in cases {
-        let mut r = f.codex("r.md");
-        match value {
-            Some(v) => r[member] = v,
-            None => {
-                r.as_object_mut().unwrap().remove(member);
-            }
-        }
-        assert_eq!(code(f.run(&r)), want, "{member}");
-    }
-    // An empty list of next accounts or of MCP files is no member that asks for anything.
-    let mut r = f.codex("ok.md");
-    (r["next_accounts"], r["mcp_config"]) = (json!([]), json!([]));
-    assert_eq!(f.run(&r).unwrap().0["state"], "ok");
-    // Nothing of the refused requests exists: no file, no call, one launch (the last request).
-    let mut names: Vec<String> = std::fs::read_dir(&f.t)
-        .unwrap()
-        .map(|e| e.unwrap().file_name().into_string().unwrap())
-        .collect();
-    names.sort();
-    assert_eq!(
-        names,
-        [
-            "a1",
-            "a2",
-            "bin",
-            "cwd",
-            "ok.md",
-            "ok.md.run.json",
-            "ok.md.stream.jsonl",
-            "prompt.md"
-        ]
-    );
-    assert_eq!((f.calls().len(), f.launches.len()), (1, 1));
-}
-
-// spec: specs/ap/run.md#R37
-#[test]
-fn x3_stream_becomes_the_record() {
-    let mut f = Fake::new();
-    let mut r = f.codex("s.md");
-    r["expect"] = json!({"first_line": "stage ok"});
-    let (v, status) = f.run(&r).unwrap();
-    assert_eq!((status, v["state"].as_str()), (0, Some("ok")), "{v}");
-    assert_eq!(v, f.record("s.md"));
-    // The answer is the last agent message of the completed turn, byte for byte.
-    assert_eq!(
-        std::fs::read(f.p("s.md")).unwrap(),
-        b"stage ok\nsecond line"
-    );
-    assert_eq!(v["answer"]["sha256"], f.sha("s.md"));
-    assert_eq!(v["session"], "00000000-0000-7000-8000-000000000001");
-    assert_eq!(v["tokens"], one_turn());
-    // reasoning, the command, two messages; one turn end; no denial on this runtime.
-    assert_eq!(
-        (v["turns"].as_u64(), v["results"].as_u64()),
-        (Some(4), Some(1))
-    );
-    assert_eq!(v["permission_denials"], json!([]));
-    assert_eq!(
-        (v["expect_met"].as_bool(), v["unmet"].as_str()),
-        (Some(true), None)
-    );
-    assert_eq!(
-        (v["model"].as_str(), v["effort"].as_str()),
-        (Some("gpt-6.1-terra"), Some("high"))
-    );
-    // A CLI that reports no cache-write part gives cache_creation 0.
-    f.mode("a1", "nowrite");
-    let (v, _) = f.run(&f.codex("n.md")).unwrap();
-    assert_eq!(
-        v["tokens"],
-        json!({"input": 18839 - 12288, "output": 5, "cache_read": 12288, "cache_creation": 0})
-    );
-}
-
-// spec: specs/ap/run.md#R36
-#[test]
-fn x3_session_enters_the_record_at_the_thread_start() {
-    let mut f = Fake::new();
-    std::fs::write(f.t.join("bin/watch"), f.p("w.md.run.json")).unwrap();
-    f.mode("a1", "watch");
-    let (v, status) = f.run(&f.codex("w.md")).unwrap();
-    let seen: Value =
-        serde_json::from_slice(&std::fs::read(f.t.join("bin/seen.json")).unwrap()).unwrap();
-    let thread = "00000000-0000-7000-8000-000000000001";
-    assert_eq!(
-        (seen["state"].as_str(), seen["session"].as_str()),
-        (Some("running"), Some(thread))
-    );
-    // A turn that failed (the CLI without a login) keeps the session in the record.
-    assert_eq!(
-        (status, v["state"].as_str(), v["session"].as_str()),
-        (3, Some("failed"), Some(thread))
-    );
-    // A CLI that names no thread leaves the session null.
-    f.clear("a1");
-    let fake = f.t.join("bin/codex");
-    let text = FAKE_CODEX.replace(
-        "started() { e '{\"type\":\"thread.started\",\"thread_id\":\"'\"$tid\"'\"}';",
-        "started() {",
-    );
-    std::fs::write(&fake, text).unwrap();
-    forks::settled();
-    let (v, _) = f.run(&f.codex("n.md")).unwrap();
-    assert_eq!(
-        (v["state"].as_str(), v["session"].as_str()),
-        (Some("ok"), None)
-    );
-}
-
-// spec: specs/ap/run.md#R36
-#[test]
-fn x3_a_message_of_an_unfinished_turn_is_no_answer() {
-    let mut f = Fake::new();
-    for (mode, out) in [
-        ("unfinished", "u.md"),
-        ("msgfailed", "m.md"),
-        ("hang", "h.md"),
-    ] {
-        f.mode("a1", mode);
-        let mut r = f.codex(out);
-        r["timeout_seconds"] = json!(2);
-        let (v, status) = f.run(&r).unwrap();
-        let want = if mode == "hang" { "timeout" } else { "failed" };
-        assert_eq!((status, v["state"].as_str()), (3, Some(want)), "{mode} {v}");
-        assert!(
-            !Path::new(&f.p(out)).exists(),
-            "{mode}: the message was written"
-        );
-        // A failed turn is a result that met nothing; without a turn end there is none.
-        let met = if mode == "msgfailed" {
-            json!(false)
-        } else {
-            Value::Null
-        };
-        assert_eq!(
-            (
-                v["answer"].clone(),
-                v["expect_met"].clone(),
-                v["results"].clone()
-            ),
-            (Value::Null, met, json!(u64::from(mode == "msgfailed"))),
-            "{mode}"
-        );
-    }
-}
-
-// spec: specs/ap/run.md#R36
-#[test]
-fn x4_failed_turn_is_failed() {
-    let mut f = Fake::new();
-    f.mode("a1", "failed");
-    let (v, status) = f.run(&f.codex("f.md")).unwrap();
-    assert_eq!((status, v["state"].as_str()), (3, Some("failed")), "{v}");
-    assert_eq!(
-        (v["results"].as_u64(), v["answer"].clone()),
-        (Some(1), Value::Null)
-    );
-    assert!(!Path::new(&f.p("f.md")).exists());
-    // The record keeps no error text; the stream holds it.
-    let record = std::fs::read_to_string(f.p("f.md.run.json")).unwrap();
-    assert!(!record.contains("not supported"), "{record}");
-    let stream = std::fs::read_to_string(f.p("f.md.stream.jsonl")).unwrap();
-    assert!(stream.contains("not supported"));
-}
-
-// spec: specs/ap/run.md#R36
-#[test]
-fn x4_usage_limit_text_is_cut() {
-    let mut f = Fake::new();
-    for (mode, out) in [("limit", "l.md"), ("limit2", "l2.md")] {
-        f.mode("a1", mode);
-        let (v, status) = f.run(&f.codex(out)).unwrap();
-        assert_eq!(
-            (status, v["state"].as_str()),
-            (75, Some("cut")),
-            "{mode} {v}"
-        );
-        assert!(!Path::new(&f.p(out)).exists());
-        assert!(
-            !std::fs::read_to_string(f.p(&format!("{out}.run.json")))
-                .unwrap()
-                .contains("usage limit")
-        );
-    }
-}
-
-// spec: specs/ap/run.md#R36
-#[test]
-fn x4_error_event_alone_decides_nothing() {
-    let mut f = Fake::new();
-    f.mode("a1", "errors");
-    let mut r = f.codex("e.md");
-    r["expect"] = json!({"first_line": "stage ok"});
-    let (v, status) = f.run(&r).unwrap();
-    assert_eq!((status, v["state"].as_str()), (0, Some("ok")), "{v}");
-    assert_eq!(std::fs::read(f.p("e.md")).unwrap(), b"stage ok");
-    assert_eq!(v["results"], 1);
-}
-
-// spec: specs/ap/run.md#R36
-#[test]
-fn x4_no_turn_end_is_timeout_or_failed() {
-    let mut f = Fake::new();
-    f.mode("a1", "hang");
-    let mut r = f.codex("t.md");
-    r["timeout_seconds"] = json!(2);
-    let (v, status) = f.run(&r).unwrap();
-    assert_eq!(
-        (status, v["state"].as_str(), v["unmet"].as_str()),
-        (3, Some("timeout"), None),
-        "{v}"
-    );
-    f.mode("a1", "noend");
-    let (v, status) = f.run(&f.codex("n.md")).unwrap();
-    assert_eq!(
-        (status, v["state"].as_str(), v["unmet"].as_str()),
-        (3, Some("failed"), Some("result_event")),
-        "{v}"
-    );
-    assert_eq!(
-        (v["results"].as_u64(), v["turns"].clone()),
-        (Some(0), Value::Null)
-    );
-}
-
-// spec: specs/ap/run.md#R36
-#[test]
-fn x4_empty_answer_is_no_result() {
-    let mut f = Fake::new();
-    f.mode("a1", "empty");
-    let (v, status) = f.run(&f.codex("y.md")).unwrap();
-    assert_eq!(
-        (status, v["state"].as_str(), v["unmet"].as_str()),
-        (3, Some("no_result"), Some("answer")),
-        "{v}"
-    );
-    assert!(!Path::new(&f.p("y.md")).exists());
-    assert_eq!(v["tokens"], one_turn());
-}
-
-// spec: specs/ap/run.md#R10
-// spec: specs/ap/run.md#R35
-// spec: specs/ap/run.md#R37
-#[test]
-fn x5_resume_continues_the_recorded_session() {
-    let mut f = Fake::new();
-    let (first, _) = f.run(&f.codex("r1.md")).unwrap();
-    let session = first["session"].as_str().unwrap().to_owned();
-    let mut r = f.resume(f.codex("x"), "r2.md", "r1.md");
-    r["role"] = json!("fixer");
-    let (v, status) = f.run(&r).unwrap();
-    assert_eq!((status, v["state"].as_str()), (0, Some("ok")), "{v}");
-    let cwd = f.p("cwd");
-    let want = codex_cli(
-        &["codex", "--no-daemon", "exec", "resume"],
-        &[
-            "-m",
-            "gpt-6.1-terra",
-            "-c",
-            "model_reasoning_effort=\"high\"",
-            &session,
-            "-",
-        ],
-    );
-    assert_eq!(f.last_cli(), want);
-    assert!(f.calls()[1].starts_with(&format!("{}|", f.p("a1"))));
-    assert_eq!(
-        (v["session"].as_str(), v["cwd"].as_str()),
-        (Some(session.as_str()), Some(cwd.as_str()))
-    );
-    assert_eq!(v["resumes"], f.p("r1.md.run.json"));
-    // The CLI reports the thread's usage so far; the record holds this run's own part.
-    assert_eq!(v["tokens"], one_turn());
-    let mut r = f.resume(f.codex("x"), "r3.md", "r2.md");
-    r["role"] = json!("fixer");
-    let (v, _) = f.run(&r).unwrap();
-    assert_eq!(
-        (v["session"].as_str(), v["tokens"].clone()),
-        (Some(session.as_str()), one_turn())
-    );
-    // A session the CLI would read as a flag is no session.
-    let mut rec = f.record("r1.md");
-    rec["session"] = json!("--last");
-    std::fs::write(f.p("bad.md.run.json"), rec.to_string()).unwrap();
-    let mut r = f.resume(f.codex("x"), "r4.md", "bad.md");
-    r["role"] = json!("fixer");
-    assert_eq!(code(f.run(&r)), "resume_record_missing@resume");
-}
-
 // spec: specs/ap/run.md#R10
 #[test]
 fn x5_resume_of_the_other_runtime_is_refused() {
@@ -3136,10 +2609,10 @@ fn x5_resume_of_the_other_runtime_is_refused() {
     let mut claude = f.request("c.md");
     claude["role"] = json!("implementer");
     f.run(&claude).unwrap();
-    f.run(&f.codex("x.md")).unwrap();
-    let mut r = f.resume(f.codex("x"), "c2.md", "c.md");
-    r["role"] = json!("fixer");
-    assert_eq!(code(f.run(&r)), "resume_runtime_differs@runtime");
+    // The record of a stage on a retired runtime, written by hand.
+    let mut rec = f.record("c.md");
+    rec["runtime"] = json!("codex");
+    std::fs::write(f.p("x.md.run.json"), rec.to_string()).unwrap();
     let mut r = f.resume(claude.clone(), "x2.md", "x.md");
     r["role"] = json!("fixer");
     assert_eq!(code(f.run(&r)), "resume_runtime_differs@runtime");
@@ -3150,55 +2623,17 @@ fn x5_resume_of_the_other_runtime_is_refused() {
     );
 }
 
-// spec: specs/ap/run.md#R36
+// spec: specs/ap/run.md#R49
 #[test]
 fn x3_a_failed_write_of_the_session_at_the_thread_start_is_a_failed_write() {
     let mut f = Fake::new();
-    f.mode("a1", "blockrecord");
-    let (v, status) = f.run(&f.codex("b.md")).unwrap();
-    // The record could not be written when the thread started: exit 5, as for any write of the
-    // record after the launch; the final record is on stdout and, once writable, in the file.
+    f.mode("g1", "blockrecord");
+    let (v, status) = f.run(&f.agy("b.md")).unwrap();
+    // The record could not be written when the conversation started: exit 5, as for any write of
+    // the record after the launch; the final record is on stdout and, once writable, in the file.
     assert_eq!(status, 5, "{v}");
-    assert_eq!(v["session"], "00000000-0000-7000-8000-000000000001");
+    assert!(v["session"].as_str().is_some_and(|s| s.len() == 36), "{v}");
     assert_eq!(f.record("b.md"), v);
-}
-
-// spec: specs/ap/run.md#R37
-#[test]
-fn x5_tokens_of_a_resume_whose_chain_cannot_be_followed_are_null() {
-    let mut f = Fake::new();
-    f.run(&f.codex("c0.md")).unwrap();
-    let base = f.record("c0.md");
-    // `name` resumes `earlier` (a record path), with the tokens of one turn.
-    let link = |f: &Fake, name: &str, earlier: &str| {
-        let mut rec = base.clone();
-        rec["resumes"] = json!(f.p(earlier));
-        std::fs::write(f.p(&format!("{name}.run.json")), rec.to_string()).unwrap();
-    };
-    let null = json!({"input": null, "output": null, "cache_read": null, "cache_creation": null});
-    let resume = |f: &mut Fake, out: &str, earlier: &str| {
-        let mut r = f.resume(f.codex("x"), out, earlier);
-        r["role"] = json!("fixer");
-        let (v, status) = f.run(&r).unwrap();
-        assert_eq!((status, v["state"].as_str()), (0, Some("ok")), "{out} {v}");
-        v["tokens"].clone()
-    };
-    // Past the bound: 256 records before the one resumed, 257 in the chain.
-    let mut earlier = "c0.md.run.json".to_owned();
-    for i in 1..=256 {
-        link(&f, &format!("long{i}.md"), &earlier);
-        earlier = format!("long{i}.md.run.json");
-    }
-    assert_eq!(resume(&mut f, "r1.md", "long256.md"), null);
-    // A record of the chain that cannot be read.
-    link(&f, "gap.md", "missing.md.run.json");
-    assert_eq!(resume(&mut f, "r2.md", "gap.md"), null);
-    // A chain that returns to a record already seen.
-    link(&f, "loop1.md", "loop2.md.run.json");
-    link(&f, "loop2.md", "loop1.md.run.json");
-    assert_eq!(resume(&mut f, "r3.md", "loop2.md"), null);
-    // A chain followed to its end keeps its tokens known.
-    assert_ne!(resume(&mut f, "r4.md", "c0.md"), null);
 }
 
 // ---- V1: a typed answer (`answer_schema`) --------------------------------------------------
@@ -3291,10 +2726,6 @@ fn v1_p1_an_answer_schema_that_is_not_a_json_object_file_is_refused_before_any_e
     r["expect"] = json!({"first_line": "Verdict: *"});
     assert_eq!(code(f.run(&r)), "invalid_input@answer_schema");
     r["expect"] = json!({"first_line": "Verdict: *", "file": f.p("e.md")});
-    assert_eq!(code(f.run(&r)), "invalid_input@answer_schema");
-    // The member with the Codex runtime.
-    let mut r = f.codex("s.md");
-    r["answer_schema"] = json!(f.p("schema.json"));
     assert_eq!(code(f.run(&r)), "invalid_input@answer_schema");
     // `expect.file` alone is no obstacle.
     let mut r = f.typed("file.md");
@@ -4080,20 +3511,6 @@ fn compact_window_a_resume_and_a_next_account_get_their_own_request_value() {
     }
 }
 
-// spec: specs/ap/run.md#R5
-#[test]
-fn compact_window_a_codex_stage_refuses_it_before_any_effect() {
-    let mut f = Fake::new();
-    let mut r = f.codex("c.md");
-    r["compact_window"] = json!(400_000);
-    assert_eq!(code(f.run(&r)), "invalid_input@compact_window");
-    assert!(!f.t.join("c.md.run.json").exists());
-    assert_eq!(f.launches.len(), 0);
-    // A Codex stage without the member runs as before.
-    let (v, _) = f.run(&f.codex("ok.md")).unwrap();
-    assert_eq!(v["state"], "ok", "{v}");
-}
-
 // spec: specs/ap/run.md#R25
 #[test]
 fn compact_window_the_record_names_it_or_null_for_every_runtime() {
@@ -4106,9 +3523,6 @@ fn compact_window_the_record_names_it_or_null_for_every_runtime() {
     let (v, _) = f.run(&f.request("none.md")).unwrap();
     assert!(v["compact_window"].is_null());
     assert!(f.record("none.md")["compact_window"].is_null());
-    let (v, _) = f.run(&f.codex("cx.md")).unwrap();
-    assert_eq!(v["state"], "ok", "{v}");
-    assert!(f.record("cx.md")["compact_window"].is_null());
 }
 
 #[test]
@@ -4145,22 +3559,6 @@ fn compact_window_a_call_whose_files_cannot_be_opened_keeps_three_members() {
     );
     assert_eq!(f.record("h.md"), v);
     assert_eq!(f.count_now(), 0, "no CLI call");
-}
-
-// spec: specs/ap/run.md#R28
-// spec: specs/ap/run.md#R34
-#[test]
-fn cut1_a_codex_stage_has_a_null_limit_and_one_entry() {
-    let mut f = Fake::new();
-    let (v, status) = f.run(&f.codex("cx.md")).unwrap();
-    assert_eq!((status, v["state"].as_str()), (0, Some("ok")), "{v}");
-    assert!(v["limit"].is_null());
-    let attempts = v["attempts"].as_array().unwrap();
-    assert_eq!(attempts.len(), 1);
-    assert_eq!(attempts[0]["continued"], false);
-    assert!(attempts[0]["limit"].is_null());
-    assert_eq!(attempts[0]["session"], v["session"]);
-    assert_eq!(attempts[0]["worked"], true);
 }
 
 // ---- RF1: a resumed stage cut by a usage limit goes on as a new session on the next account -----
@@ -4559,892 +3957,83 @@ fn rf1_the_text_holds_each_path_byte_for_byte_whatever_the_other_path_holds() {
     assert_eq!(f.input(before + 2), want);
 }
 
-// ---- runtime muse: a stage on the Muse Code CLI (tests/fixtures/fake-muse.sh) -----------------
 
-const MUSE_MODEL: &str = "muse-wonder-1.0";
-/// A line of `muse exec --json` in the shape of the kept real ones: an envelope whose `payload`
-/// names the kind.
-fn m_line(payload: Value) -> Value {
-    json!({"schema_version":1,"stream":{"kind":"session","id":"5c4c0346-a668-4d09-8868-8df92c97bc38"},
-           "record_type":"event","durability":"durable","payload":payload})
-}
-/// A `task_lifecycle` line of the task kind `kind` (`tool.read_file`, `model.meta.response`).
-fn m_task(kind: &str) -> Value {
-    m_line(
-        json!({"command_id":"c1","kind":"task_lifecycle","task_id":"t1",
-        "event":{"kind":"proposed","task_id":"t1","task_kind":kind}}),
-    )
-}
-/// The status line that names the serving model in a `producer` facet (line 6 of the observed file).
-fn m_served(model: &Value) -> Value {
-    m_line(
-        json!({"command_id":"c1","kind":"task_lifecycle","task_id":"t1",
-        "event":{"kind":"status","task_id":"t1","message":"completed meta model stream attempt 1/10",
-        "details":{"phase":"stream_succeeded","facets":[
-            {"attempt":1,"error_kind":"stream_succeeded","kind":"external_attempt","operation":"model.response"},
-            {"kind":"producer","detail":{"kind":"provider","model":model,"provider":"meta","request_id":"r1"}}]}}}),
-    )
-}
-fn m_usage(calls: Value, models: Value, allowance: Value) -> Value {
-    let mut p = json!({"command_id":"c1","kind":"run_usage","calls":calls,"models":models,
-        "cancelled_calls":0,"children_included":false});
-    if !allowance.is_null() {
-        p["allowance"] = allowance;
-    }
-    m_line(p)
-}
-fn m_done(text: Value) -> Value {
-    m_line(
-        json!({"command_id":"c1","kind":"run_terminal","terminal":"completed","text":text,"reason":null}),
-    )
-}
-fn m_failed(reason: Value) -> Value {
-    m_line(
-        json!({"command_id":"c1","kind":"run_terminal","terminal":"failed","text":"","reason":reason}),
-    )
-}
-/// The usual lines of a completed run: a tool, the usage, the end.
-fn m_run(text: &str) -> Vec<Value> {
-    let models =
-        json!([{"model":MUSE_MODEL,"input_tokens":100,"cached_tokens":40,"output_tokens":7}]);
-    vec![
-        m_task("tool.read_file"),
-        m_usage(json!(3), models, Value::Null),
-        m_done(json!(text)),
-    ]
-}
-const MUSE_FLAGS: [&str; 6] = [
-    "--disable-reminders",
-    "--session-id",
-    "",
-    "--workspace",
-    "",
-    "--prompt-file",
-];
-impl Fake {
-    fn muse(&self, out: &str) -> Value {
-        for d in ["m1/muse", "m2/muse"] {
-            std::fs::create_dir_all(self.t.join(d)).unwrap();
-        }
-        json!({"role":"implementer","runtime":"muse","account":self.p("m1/muse"),"model":MUSE_MODEL,
-               "effort":"high","permission_mode":"bypassPermissions","cwd":self.p("cwd"),
-               "prompt":self.p("prompt.md"),"out":self.p(out)})
-    }
-    /// The lines the fake prints for the account `m1` (one object per line).
-    fn lines(&self, lines: &[Value]) {
-        let text: String = lines.iter().map(|l| format!("{l}\n")).collect();
-        std::fs::write(self.t.join("bin/lines-m1"), text).unwrap();
-    }
-    fn lines_then(&self, lines: &[Value], hang: bool, exit: i32) {
-        self.lines(lines);
-        if hang {
-            std::fs::write(self.t.join("bin/hang-m1"), "").unwrap();
-        }
-        std::fs::write(self.t.join("bin/exit-m1"), exit.to_string()).unwrap();
-    }
-    /// The arguments after `muse` that a Muse stage is started with.
-    fn muse_cli(&self, session: &str, prompt: &str) -> Vec<String> {
-        let (cwd, mut a) = (
-            self.p("cwd"),
-            vec!["muse", "exec", "--json", "--model", MUSE_MODEL],
-        );
-        a.extend(["--reasoning-effort", "high", "--contributor-mode", "off"]);
-        a.extend(MUSE_FLAGS);
-        let mut a: Vec<String> = a.iter().map(|s| s.to_string()).collect();
-        for (i, v) in [(a.len() - 4, session), (a.len() - 2, &*cwd)] {
-            a[i] = v.to_owned();
-        }
-        a.extend([prompt.to_owned(), "--yolo".to_owned()]);
-        a
-    }
-    /// A Muse stage that ended `ok` to resume from, with its out `first`.
-    fn muse_first(&mut self, first: &str) -> Value {
-        self.lines(&m_run("stage ok"));
-        self.run(&self.muse(first)).unwrap().0
-    }
-}
-
-// spec: specs/ap/run.md#R38
-// spec: specs/ap/run.md#R39
-#[test]
-fn m1_refusals_name_their_field_and_come_before_any_effect() {
-    let mut f = Fake::new();
-    f.lines(&m_run("stage ok"));
-    let set = |k: &str, v: Value| {
-        let k = k.to_owned();
-        move |r: &mut Value| r[k.as_str()] = v.clone()
-    };
-    type Edit = Box<dyn Fn(&mut Value)>;
-    let mut cases: Vec<(&str, Edit, &str)> = vec![
-        (
-            "runtime",
-            Box::new(set("runtime", json!("grok"))),
-            "invalid_input@runtime",
-        ),
-        (
-            "runtime",
-            Box::new(set("runtime", json!(["muse"]))),
-            "invalid_input@runtime",
-        ),
-        (
-            "next_accounts",
-            Box::new(set("next_accounts", json!([f.p("m2/muse")]))),
-            "invalid_input@next_accounts",
-        ),
-        (
-            "mcp_config",
-            Box::new(set("mcp_config", json!([f.p("prompt.md")]))),
-            "invalid_input@mcp_config",
-        ),
-        (
-            "skills",
-            Box::new(set("skills", json!(true))),
-            "invalid_input@skills",
-        ),
-        (
-            "skills",
-            Box::new(set("skills", json!(false))),
-            "invalid_input@skills",
-        ),
-        (
-            "memory",
-            Box::new(set("memory", json!(true))),
-            "invalid_input@memory",
-        ),
-        (
-            "integration",
-            Box::new(set("integration", json!(false))),
-            "invalid_input@integration",
-        ),
-        (
-            "answer_schema",
-            Box::new(set("answer_schema", json!(f.p("prompt.md")))),
-            "invalid_input@answer_schema",
-        ),
-        (
-            "compact_window",
-            Box::new(set("compact_window", json!(400_000))),
-            "invalid_input@compact_window",
-        ),
-        (
-            "mode",
-            Box::new(set("permission_mode", json!("auto"))),
-            "invalid_input@permission_mode",
-        ),
-        (
-            "mode",
-            Box::new(set("permission_mode", json!("acceptEdits"))),
-            "invalid_input@permission_mode",
-        ),
-        (
-            "mode",
-            Box::new(|r| {
-                r.as_object_mut().unwrap().remove("permission_mode");
-            }),
-            "invalid_input@permission_mode",
-        ),
-        (
-            "account",
-            Box::new(set("account", json!(f.p("a1")))),
-            "invalid_input@account",
-        ),
-        (
-            "account",
-            Box::new(set("account", json!(f.p("m1")))),
-            "invalid_input@account",
-        ),
-        (
-            "account",
-            Box::new(set("account", json!(f.p("m1/muse/..")))),
-            "invalid_input@account",
-        ),
-        (
-            "account",
-            Box::new(set("account", json!(f.p("m3/muse")))),
-            "account_missing@account",
-        ),
-    ];
-    for name in [
-        "CLAUDE_X",
-        "HERDR_X",
-        "ANTHROPIC_X",
-        "HOME",
-        "MUSE_X",
-        "MUSE_NO_AUTO_UPDATE",
-        "XDG_CONFIG_HOME",
-    ] {
-        let env = json!({ name: "1" });
-        cases.push(("env", Box::new(set("env", env)), "env_forbidden@env"));
-    }
-    for role in ["implementer", "fixer", "reviewer"] {
-        for (what, edit, want) in &cases {
-            let mut r = f.muse("x.md");
-            r["role"] = json!(role);
-            edit(&mut r);
-            assert_eq!(code(f.run(&r)), *want, "{role} {what}");
-        }
-    }
-    assert!(f.launches.is_empty() && f.calls().is_empty());
-    assert!(!Path::new(&f.p("x.md.run.json")).exists());
-    // What a Muse stage does admit: empty lists, the names of another CLI, all three roles.
-    for (i, role) in ["implementer", "fixer", "reviewer"].into_iter().enumerate() {
-        let mut r = f.muse(&format!("ok{i}.md"));
-        r["role"] = json!(role);
-        r["next_accounts"] = json!([]);
-        r["mcp_config"] = json!([]);
-        r["env"] = json!({"CODEX_HOME": "/x", "OPENAI_API_KEY": "k", "CARGO_TARGET_DIR": "/t"});
-        let (v, status) = f.run(&r).unwrap();
-        assert_eq!(
-            (status, v["state"].as_str(), v["runtime"].as_str()),
-            (0, Some("ok"), Some("muse")),
-            "{role} {v}"
-        );
-        assert_eq!(
-            std::fs::read(f.p(&format!("ok{i}.md"))).unwrap(),
-            b"stage ok"
-        );
-        assert_eq!(v["role"], role);
-    }
-}
-
-// spec: specs/ap/run.md#R40
-#[test]
-fn m2_a_fresh_stage_is_started_with_exactly_these_arguments_and_this_environment() {
-    let mut f = Fake::new();
-    f.env.push(("XDG_CONFIG_HOME".into(), "/elsewhere".into()));
-    f.env.push(("MUSE_API_KEY".into(), "not-a-key".into()));
-    f.lines(&m_run("stage ok"));
-    let mut r = f.muse("c.md");
-    r["env"] = json!({"CARGO_TARGET_DIR": "/x/target"});
-    let (v, status) = f.run(&r).unwrap();
-    assert_eq!((status, v["state"].as_str()), (0, Some("ok")), "{v}");
-    let launch = f.launches.last().unwrap();
-    let at = launch.iter().position(|a| a == "--").unwrap();
-    assert_eq!(launch[4], format!("--unit={}", v["unit"].as_str().unwrap()));
-    assert_eq!(
-        launch[at - 3..at],
-        ["RuntimeMaxSec=5410s", "-p", "TimeoutStopSec=10s"][..]
-            .iter()
-            .map(|s| s.to_string())
-            .collect::<Vec<_>>()[..]
-    );
-    let session = v["session"].as_str().unwrap();
-    assert_eq!(session.len(), 36);
-    assert_eq!(f.last_cli(), f.muse_cli(session, &f.p("prompt.md")));
-    // The prompt reaches the CLI as the path; its standard input is the null device.
-    assert_eq!(
-        std::fs::read(f.t.join("bin/prompt.1")).unwrap(),
-        b"review this\n"
-    );
-    assert_eq!(
-        std::fs::read_to_string(f.t.join("bin/stdin.1"))
-            .unwrap()
-            .trim(),
-        "/dev/null"
-    );
-    // The configuration directory is the account's parent, by XDG_CONFIG_HOME alone.
-    let env = f.env_of_last();
-    assert!(
-        env.contains(&format!("XDG_CONFIG_HOME={}", f.p("m1"))),
-        "{env:?}"
-    );
-    assert!(env.contains(&"MUSE_NO_AUTO_UPDATE=1".to_owned()));
-    assert!(env.contains(&"CARGO_TARGET_DIR=/x/target".to_owned()));
-    assert_eq!(
-        env.iter()
-            .filter(|l| l.starts_with("XDG_CONFIG_HOME="))
-            .count(),
-        1
-    );
-    for l in &env {
-        let n = l.split('=').next().unwrap();
-        assert!(
-            !n.starts_with("CLAUDE_") && !n.starts_with("HERDR_") && !n.starts_with("CODEX_"),
-            "{n}"
-        );
-        assert!(!n.starts_with("MUSE_") || n == "MUSE_NO_AUTO_UPDATE", "{n}");
-        assert!(n != "FOO", "{n}");
-    }
-    assert_eq!(v["runtime"], "muse");
-    // `ap run` writes no file under the account directory, nor beside it.
-    assert_eq!(std::fs::read_dir(f.t.join("m1/muse")).unwrap().count(), 0);
-    assert_eq!(std::fs::read_dir(f.t.join("m1")).unwrap().count(), 1);
-}
-
-// spec: specs/ap/run.md#R40
-#[test]
-fn m2_a_resumed_stage_is_the_same_launch_with_the_recorded_session() {
-    let mut f = Fake::new();
-    let first = f.muse_first("r1.md");
-    let session = first["session"].as_str().unwrap().to_owned();
-    std::fs::write(f.p("next.md"), "continue\n").unwrap();
-    f.lines(&m_run("second answer"));
-    let mut r = f.resume(f.muse("x"), "r2.md", "r1.md");
-    r["prompt"] = json!(f.p("next.md"));
-    let (v, status) = f.run(&r).unwrap();
-    assert_eq!((status, v["state"].as_str()), (0, Some("ok")), "{v}");
-    assert_eq!(f.last_cli(), f.muse_cli(&session, &f.p("next.md")));
-    assert_eq!(v["session"], session.as_str());
-    assert_eq!(v["resumes"], f.p("r1.md.run.json").as_str());
-    assert_eq!(
-        std::fs::read(f.t.join("bin/prompt.2")).unwrap(),
-        b"continue\n"
-    );
-    assert_eq!(
-        std::fs::read_to_string(f.t.join("bin/stdin.2"))
-            .unwrap()
-            .trim(),
-        "/dev/null"
-    );
-    let env = f.env_of_last();
-    assert!(env.contains(&format!("XDG_CONFIG_HOME={}", f.p("m1"))));
-    assert!(env.contains(&"MUSE_NO_AUTO_UPDATE=1".to_owned()));
-    assert!(
-        !env.iter().any(|l| l.starts_with("CLAUDE_CONFIG_DIR=")),
-        "{env:?}"
-    );
-    // The record's own rules hold: the same account, and the same working directory.
-    let mut r = f.resume(f.muse("x"), "r3.md", "r1.md");
-    r["account"] = json!(f.p("m2/muse"));
-    assert_eq!(code(f.run(&r)), "resume_account_differs@account");
-    assert_eq!(f.launches.len(), 2);
-}
-
-// spec: specs/ap/run.md#R40
-#[test]
-fn m2_the_session_is_in_the_record_before_the_launch() {
-    let mut f = Fake::new();
-    std::fs::write(f.t.join("bin/watch"), f.p("w.md.run.json")).unwrap();
-    f.lines(&m_run("stage ok"));
-    let (v, _) = f.run(&f.muse("w.md")).unwrap();
-    let seen: Value =
-        serde_json::from_slice(&std::fs::read(f.t.join("bin/seen.json")).unwrap()).unwrap();
-    assert_eq!(
-        (seen["state"].as_str(), seen["runtime"].as_str()),
-        (Some("running"), Some("muse"))
-    );
-    let session = seen["session"].as_str().unwrap();
-    assert_eq!(session.len(), 36);
-    assert_eq!(v["session"], session);
-    assert!(
-        f.calls()[0].contains(&format!(" --session-id {session} ")),
-        "{:?}",
-        f.calls()
-    );
-}
-
-// spec: specs/ap/run.md#R43
-#[test]
-fn m3_each_role_ends_ok_with_its_answer_in_out() {
-    let mut f = Fake::new();
-    for role in ["implementer", "fixer", "reviewer"] {
-        let answer = format!("{role} answer\nline «ü» two");
-        f.lines(&m_run(&answer));
-        let mut r = f.muse(&format!("{role}.md"));
-        r["role"] = json!(role);
-        let (v, status) = f.run(&r).unwrap();
-        assert_eq!((status, v["state"].as_str()), (0, Some("ok")), "{role} {v}");
-        assert_eq!(
-            std::fs::read(f.p(&format!("{role}.md"))).unwrap(),
-            answer.as_bytes()
-        );
-        assert_eq!(v, f.record(&format!("{role}.md")));
-        assert_eq!(v["answer"]["sha256"], f.sha(&format!("{role}.md")));
-        assert_eq!(
-            (v["results"].as_u64(), v["expect_met"].as_bool()),
-            (Some(1), Some(true))
-        );
-        assert_eq!(v["permission_denials"], json!([]));
-    }
-}
-
-// spec: specs/ap/run.md#R43
-#[test]
-fn m3_an_empty_answer_is_no_result_and_expect_judges_the_first_line() {
-    let mut f = Fake::new();
-    for text in [json!(""), json!(null), json!(5)] {
-        f.lines(&[m_task("tool.x"), m_done(text)]);
-        let (v, status) = f
-            .run(&f.muse(&format!("e{}.md", f.launches.len())))
-            .unwrap();
-        assert_eq!(
-            (status, v["state"].as_str(), v["unmet"].as_str()),
-            (3, Some("no_result"), Some("answer")),
-            "{v}"
-        );
-        assert!(v["answer"].is_null());
-    }
-    assert_eq!(
-        std::fs::read_dir(f.p(""))
-            .unwrap()
-            .filter(|e| e
-                .as_ref()
-                .unwrap()
-                .file_name()
-                .to_str()
-                .unwrap()
-                .ends_with(".md"))
-            .count(),
-        1
-    );
-    f.lines(&m_run("Verdict: accept\nbody"));
-    let mut r = f.muse("v1.md");
-    r["expect"] = json!({"first_line": "Verdict: *"});
-    let (v, status) = f.run(&r).unwrap();
-    assert_eq!(
-        (status, v["state"].as_str(), v["expect_met"].as_bool()),
-        (0, Some("ok"), Some(true))
-    );
-    f.lines(&m_run("Looks fine\nbody"));
-    let mut r = f.muse("v2.md");
-    r["expect"] = json!({"first_line": "Verdict: *"});
-    let (v, status) = f.run(&r).unwrap();
-    assert_eq!(
-        (status, v["state"].as_str(), v["unmet"].as_str()),
-        (3, Some("no_result"), Some("first_line")),
-        "{v}"
-    );
-    assert_eq!(std::fs::read(f.p("v2.md")).unwrap(), b"Looks fine\nbody");
-}
-
-// spec: specs/ap/run.md#R43
-#[test]
-fn m4_a_failed_run_is_failed_and_writes_no_answer() {
-    let mut f = Fake::new();
-    let reason =
-        "model `muse-nonexistent-9.9` does not exist or you lack access [request_id=99f7e09a]";
-    f.lines_then(&[m_failed(json!(reason))], false, 1);
-    let (v, status) = f.run(&f.muse("f.md")).unwrap();
-    assert_eq!(
-        (status, v["state"].as_str(), v["unmet"].as_str()),
-        (3, Some("failed"), None),
-        "{v}"
-    );
-    assert_eq!(
-        (v["results"].as_u64(), v["tokens"]["input"].clone()),
-        (Some(1), Value::Null)
-    );
-    assert!(!Path::new(&f.p("f.md")).exists());
-    // A reason that is no string counts as empty: failed, not cut.
-    f.lines_then(&[m_failed(json!(7))], false, 1);
-    let (v, status) = f.run(&f.muse("g.md")).unwrap();
-    assert_eq!((status, v["state"].as_str()), (3, Some("failed")), "{v}");
-    assert!(!Path::new(&f.p("g.md")).exists());
-}
-
-// spec: specs/ap/run.md#R41
-// spec: specs/ap/run.md#R43
-#[test]
-fn m4_a_failed_run_with_the_usage_limit_text_is_cut_and_never_moves() {
-    let mut f = Fake::new();
-    f.lines_then(
-        &[
-            m_task("tool.x"),
-            m_failed(json!("You've hit your usage limit. Try again at 6:30 PM.")),
-        ],
-        false,
-        1,
-    );
-    let (v, status) = f.run(&f.muse("c.md")).unwrap();
-    assert_eq!((status, v["state"].as_str()), (75, Some("cut")), "{v}");
-    assert!(!Path::new(&f.p("c.md")).exists());
-    // One account: no continuation and no move.
-    assert_eq!(
-        (f.launches.len(), v["attempts"].as_array().unwrap().len()),
-        (1, 1)
-    );
-    f.lines_then(&[m_failed(json!("usage limit reached"))], false, 1);
-    let (_, status) = f.run(&f.muse("c2.md")).unwrap();
-    assert_eq!((status, f.launches.len()), (75, 2));
-}
-
-// spec: specs/ap/run.md#R43
-#[test]
-fn m5_no_terminal_is_failed_after_the_exit_and_timeout_after_the_bound() {
-    let mut f = Fake::new();
-    f.lines_then(&[m_task("tool.x")], false, 0);
-    let (v, status) = f.run(&f.muse("n.md")).unwrap();
-    assert_eq!(
-        (status, v["state"].as_str(), v["unmet"].as_str()),
-        (3, Some("failed"), Some("result_event")),
-        "{v}"
-    );
-    assert_eq!(
-        (v["results"].as_u64(), v["turns"].clone()),
-        (Some(0), Value::Null)
-    );
-    f.lines_then(&[m_task("tool.x")], true, 0);
-    let mut r = f.muse("t.md");
-    r["timeout_seconds"] = json!(2);
-    let (v, status) = f.run(&r).unwrap();
-    assert_eq!(
-        (status, v["state"].as_str(), v["unmet"].as_str()),
-        (3, Some("timeout"), None),
-        "{v}"
-    );
-}
-
-// spec: specs/ap/run.md#R43
-#[test]
-fn m6_two_terminals_a_reviewer_ends_at_the_first_and_the_others_take_the_last_that_meets_expect() {
-    let mut f = Fake::new();
-    f.lines(&[
-        m_task("tool.x"),
-        m_done(json!("Verdict: accept\nfirst")),
-        m_done(json!("Verdict: repair\nsecond")),
-    ]);
-    let mut r = f.muse("rv.md");
-    r["role"] = json!("reviewer");
-    r["expect"] = json!({"first_line": "Verdict: *"});
-    let (v, _) = f.run(&r).unwrap();
-    assert_eq!(
-        (v["state"].as_str(), v["results"].as_u64()),
-        (Some("ok"), Some(1)),
-        "{v}"
-    );
-    assert_eq!(
-        std::fs::read(f.p("rv.md")).unwrap(),
-        b"Verdict: accept\nfirst"
-    );
-    // An implementer: the last result is the answer, unless an earlier one is the last to meet expect.
-    let mut r = f.muse("im1.md");
-    let (v, _) = f.run(&r).unwrap();
-    assert_eq!(
-        (v["state"].as_str(), v["results"].as_u64()),
-        (Some("ok"), Some(2)),
-        "{v}"
-    );
-    assert_eq!(
-        std::fs::read(f.p("im1.md")).unwrap(),
-        b"Verdict: repair\nsecond"
-    );
-    f.lines(&[
-        m_task("tool.x"),
-        m_done(json!("Verdict: accept\nfirst")),
-        m_done(json!("no verdict")),
-    ]);
-    r = f.muse("im2.md");
-    r["expect"] = json!({"first_line": "Verdict: *"});
-    let (v, status) = f.run(&r).unwrap();
-    assert_eq!(
-        (status, v["state"].as_str(), v["results"].as_u64()),
-        (0, Some("ok"), Some(2)),
-        "{v}"
-    );
-    assert_eq!(
-        std::fs::read(f.p("im2.md")).unwrap(),
-        b"Verdict: accept\nfirst"
-    );
-}
-
-// spec: specs/ap/run.md#R43
-#[test]
-fn m6_a_cli_that_outlives_its_terminal_is_timeout_with_the_answer_kept() {
-    let mut f = Fake::new();
-    let mut lines = m_run("Verdict: accept\nkept");
-    lines.push(m_task("tool.later"));
-    f.lines_then(&lines, true, 0);
-    let mut r = f.muse("h.md");
-    r["timeout_seconds"] = json!(2);
-    r["expect"] = json!({"first_line": "Verdict: *"});
-    let (v, status) = f.run(&r).unwrap();
-    assert_eq!(
-        (status, v["state"].as_str(), v["expect_met"].as_bool()),
-        (3, Some("timeout"), Some(true)),
-        "{v}"
-    );
-    assert_eq!(
-        std::fs::read(f.p("h.md")).unwrap(),
-        b"Verdict: accept\nkept"
-    );
-    // A reviewer ends at its first terminal and does not wait for the CLI.
-    let mut r = f.muse("hr.md");
-    r["role"] = json!("reviewer");
-    let (v, status) = f.run(&r).unwrap();
-    assert_eq!((status, v["state"].as_str()), (0, Some("ok")), "{v}");
-}
-
-// spec: specs/ap/run.md#R44
-#[test]
-fn m7_tokens_and_turns_come_from_the_last_usage_line() {
-    let mut f = Fake::new();
-    let models = json!([
-        {"model":"a","input_tokens":100,"cached_tokens":40,"output_tokens":7,"reasoning_tokens":2},
-        {"model":"b","input_tokens":10,"cached_tokens":30,"output_tokens":3,"reasoning_tokens":1}]);
-    let other = json!([{"model":"a","input_tokens":1,"cached_tokens":0,"output_tokens":1}]);
-    f.lines(&[
-        m_task("tool.x"),
-        m_usage(json!(1), other, Value::Null),
-        m_usage(json!(9), models, Value::Null),
-        m_done(json!("ok")),
-    ]);
-    let (v, _) = f.run(&f.muse("t.md")).unwrap();
-    // cached above input counts input 0; the sum of `input_tokens` less `cached_tokens` is 60.
-    assert_eq!(
-        v["tokens"],
-        json!({"input":60,"output":10,"cache_read":70,"cache_creation":0}),
-        "{v}"
-    );
-    assert_eq!(v["turns"], 9);
-    // Members that are no numbers count 0; a `calls` that is no number is null.
-    let odd = json!([{"input_tokens":"x","cached_tokens":5,"output_tokens":null},
-        {"input_tokens":50,"cached_tokens":"y","output_tokens":4.5}, "not an object"]);
-    f.lines(&[
-        m_usage(json!("many"), odd, Value::Null),
-        m_done(json!("ok")),
-    ]);
-    let (v, _) = f.run(&f.muse("u.md")).unwrap();
-    assert_eq!(
-        v["tokens"],
-        json!({"input":50,"output":0,"cache_read":5,"cache_creation":0}),
-        "{v}"
-    );
-    assert_eq!(v["turns"], Value::Null);
-    // No usage line: all five are null, a failed run included.
-    for lines in [
-        vec![m_task("tool.x"), m_done(json!("ok"))],
-        vec![m_failed(json!("boom"))],
-    ] {
-        f.lines(&lines);
-        let (v, _) = f
-            .run(&f.muse(&format!("n{}.md", f.launches.len())))
-            .unwrap();
-        assert_eq!(
-            v["tokens"],
-            json!({"input":null,"output":null,"cache_read":null,"cache_creation":null}),
-            "{v}"
-        );
-        assert_eq!(
-            (v["turns"].clone(), v["limit"].clone()),
-            (Value::Null, Value::Null)
-        );
-    }
-}
-
-// spec: specs/ap/run.md#R44
-#[test]
-fn m7_a_resume_holds_its_own_runs_numbers_as_the_cli_gives_them() {
-    let mut f = Fake::new();
-    f.muse_first("p1.md");
-    let models =
-        json!([{"model":MUSE_MODEL,"input_tokens":1000,"cached_tokens":600,"output_tokens":20}]);
-    f.lines(&[
-        m_task("tool.x"),
-        m_usage(json!(4), models, Value::Null),
-        m_done(json!("again")),
-    ]);
-    let (v, _) = f.run(&f.resume(f.muse("x"), "p2.md", "p1.md")).unwrap();
-    assert_eq!(
-        v["tokens"],
-        json!({"input":400,"output":20,"cache_read":600,"cache_creation":0}),
-        "{v}"
-    );
-    assert_eq!(v["turns"], 4);
-}
-
-// spec: specs/ap/run.md#R45
-#[test]
-fn m8_limit_is_made_from_the_allowance() {
-    let mut f = Fake::new();
-    let models = json!([]);
-    let mut limit = |allowance: Value| {
-        f.lines(&[
-            m_usage(json!(1), models.clone(), allowance),
-            m_done(json!("ok")),
-        ]);
-        let (v, _) = f
-            .run(&f.muse(&format!("l{}.md", f.launches.len())))
-            .unwrap();
-        v["limit"].clone()
-    };
-    let both = json!({"weekly":{"resets_at_ms":1795392000999u64,"used_percent":2},
-        "window":{"resets_at_ms":1794805703000u64,"used_percent":7.5},"tier":null});
-    assert_eq!(
-        limit(both),
-        json!({"status":null,"resets_at":null,"kind":null,"windows":{
-        "weekly":{"status":null,"resets_at":1795392000u64,"utilization":0.02},
-        "window":{"status":null,"resets_at":1794805703u64,"utilization":0.075}}})
-    );
-    let one = json!({"window":{"resets_at_ms":5000,"used_percent":100}});
-    assert_eq!(
-        limit(one),
-        json!({"status":null,"resets_at":null,"kind":null,"windows":{
-        "window":{"status":null,"resets_at":5,"utilization":1.0}}})
-    );
-    // A member of another shape: a window that is no object is left out; a part that is no
-    // number, a negative or a fractional time is null.
-    let odd = json!({"weekly":"x","window":{"resets_at_ms":-5000,"used_percent":"7"}});
-    assert_eq!(
-        limit(odd),
-        json!({"status":null,"resets_at":null,"kind":null,"windows":{
-        "window":{"status":null,"resets_at":null,"utilization":null}}})
-    );
-    let fraction = json!({"weekly":{"resets_at_ms":1500.5,"used_percent":0},"window":{}});
-    assert_eq!(
-        limit(fraction),
-        json!({"status":null,"resets_at":null,"kind":null,"windows":{
-        "weekly":{"status":null,"resets_at":null,"utilization":0.0},
-        "window":{"status":null,"resets_at":null,"utilization":null}}})
-    );
-    assert_eq!(
-        limit(json!({"other":{}})),
-        json!({"status":null,"resets_at":null,"kind":null,"windows":{}})
-    );
-    // No allowance, or one that is no object: null.
-    assert_eq!(limit(Value::Null), Value::Null);
-    assert_eq!(limit(json!(5)), Value::Null);
-}
-
-// spec: specs/ap/run.md#R42
-#[test]
-fn m9_work_is_seen_from_a_tool_task_only() {
-    let mut f = Fake::new();
-    let mut worked = |kind: Value| {
-        f.lines(&[
-            m_line(json!({"kind":"task_lifecycle","event":{"task_kind":kind}})),
-            m_done(json!("ok")),
-        ]);
-        let (v, _) = f
-            .run(&f.muse(&format!("w{}.md", f.launches.len())))
-            .unwrap();
-        v["attempts"][0]["worked"].clone()
-    };
-    assert_eq!(worked(json!("tool.read_file")), true);
-    assert_eq!(worked(json!("tool.")), true);
-    for other in [
-        json!("model.meta.response"),
-        json!("toolbox"),
-        json!("a.tool.x"),
-        json!(3),
-        json!(null),
-    ] {
-        assert_eq!(worked(other.clone()), false, "{other}");
-    }
-    // Nor does another kind of line with such a member.
-    f.lines(&[
-        m_line(json!({"kind":"run_usage","event":{"task_kind":"tool.x"}})),
-        m_done(json!("ok")),
-    ]);
-    let (v, _) = f.run(&f.muse("w9.md")).unwrap();
-    assert_eq!(v["attempts"][0]["worked"], false);
-}
-
-// spec: specs/ap/run.md#R46
-#[test]
-fn m10_a_line_that_names_another_serving_model_stops_the_stage() {
-    let mut f = Fake::new();
-    let served = format!("{MUSE_MODEL}-contributor");
-    // The request's model: nothing changes.
-    f.lines(&[
-        m_served(&json!(MUSE_MODEL)),
-        m_served(&json!(null)),
-        m_done(json!("fine")),
-    ]);
-    let (v, status) = f.run(&f.muse("a.md")).unwrap();
-    assert_eq!(
-        (status, v["state"].as_str(), v["unmet"].as_str()),
-        (0, Some("ok"), None),
-        "{v}"
-    );
-    // Another model: failed, `unmet: model`, no answer, wherever the line stands.
-    let lines = [
-        vec![m_served(&json!(served)), m_done(json!("answer"))],
-        vec![m_done(json!("answer")), m_served(&json!(served))],
-        vec![
-            m_served(&json!(MUSE_MODEL)),
-            m_done(json!("answer")),
-            m_served(&json!(served)),
-            m_done(json!("second")),
-        ],
-    ];
-    for (i, lines) in lines.iter().enumerate() {
-        f.lines(lines);
-        let out = format!("b{i}.md");
-        let (v, status) = f.run(&f.muse(&out)).unwrap();
-        assert_eq!(
-            (status, v["state"].as_str(), v["unmet"].as_str()),
-            (3, Some("failed"), Some("model")),
-            "{i} {v}"
-        );
-        assert!(!Path::new(&f.p(&out)).exists(), "{i}");
-        assert!(v["answer"].is_null());
-        assert!(
-            serde_json::to_string(&v).unwrap().contains(&served),
-            "{i}: the record names the model"
-        );
-        assert_eq!(v, f.record(&out));
-    }
-    // It stops the stage at once: a CLI that stays alive is not waited for to the bound.
-    f.lines_then(&[m_served(&json!(served))], true, 0);
-    let mut r = f.muse("c.md");
-    r["timeout_seconds"] = json!(600);
-    let began = Instant::now();
-    let (v, _) = f.run(&r).unwrap();
-    assert_eq!(
-        (v["state"].as_str(), v["unmet"].as_str()),
-        (Some("failed"), Some("model")),
-        "{v}"
-    );
-    assert!(began.elapsed().as_secs() < 20);
-}
+// ---- a resume across runtimes ---------------------------------------------------------------
 
 // spec: specs/ap/run.md#R39
 #[test]
 fn m11_a_resume_across_runtimes_is_refused_in_both_directions() {
     let mut f = Fake::new();
-    let muse = f.muse_first("m.md");
-    assert_eq!(muse["runtime"], "muse");
     let claude = f.run(&f.request("c.md")).unwrap().0;
     assert_eq!(claude["runtime"], "claude");
-    let codex = f.run(&f.codex("x.md")).unwrap().0;
-    assert_eq!(codex["runtime"], "codex");
-    let before = f.launches.len();
-    for (earlier, request) in [
-        ("m.md", f.request("x")),
-        ("m.md", f.codex("x")),
-        ("c.md", f.muse("x")),
-        ("x.md", f.muse("x")),
-    ] {
-        let r = f.resume(request, "again.md", earlier);
-        assert_eq!(
-            code(f.run(&r)),
-            "resume_runtime_differs@runtime",
-            "{earlier}"
-        );
-    }
-    // A Claude record without the member counts as `claude`.
+    // The record of a stage on a retired runtime, written by hand.
     let mut rec = f.record("c.md");
-    rec.as_object_mut().unwrap().remove("runtime");
-    std::fs::write(f.p("old.md.run.json"), rec.to_string()).unwrap();
-    let r = f.resume(f.muse("x"), "again.md", "old.md");
+    rec["runtime"] = json!("muse");
+    std::fs::write(f.p("m.md.run.json"), rec.to_string()).unwrap();
+    let before = f.launches.len();
+    let r = f.resume(f.request("x"), "again.md", "m.md");
     assert_eq!(code(f.run(&r)), "resume_runtime_differs@runtime");
-    let r = f.resume(f.muse("x"), "again.md", "m.md");
-    assert_eq!(f.run(&r).unwrap().0["state"], "ok");
-    assert_eq!(f.launches.len(), before + 1);
+    assert_eq!(f.launches.len(), before);
 }
 
-// spec: specs/ap/run.md#R38
+// spec: specs/ap/run.md#R2
+// spec: specs/ap/run.md#R39
+// spec: specs/ap/policy.md#R3
 #[test]
-fn m12_a_model_or_effort_that_looks_like_a_flag_is_refused_for_muse_only() {
-    let mut f = Fake::new();
-    f.lines(&m_run("stage ok"));
-    for member in ["model", "effort"] {
-        for value in ["--trust-workspace", "--yolo", "-h", "-"] {
-            let mut r = f.muse("x.md");
-            r[member] = json!(value);
+fn retired_runtimes_refused_in_a_request_a_resumed_record_and_the_policy() {
+    for word in ["codex", "muse"] {
+        let mut f = Fake::new();
+        // In a request: the answer of any unknown word, before any effect.
+        let mut r = f.request("r.md");
+        r["role"] = json!("implementer");
+        r["runtime"] = json!(word);
+        r["permission_mode"] = json!("bypassPermissions");
+        assert_eq!(code(f.run(&r)), "invalid_input@runtime", "{word}");
+        f.untouched("r.md");
+        assert!(f.launches.is_empty());
+        // As a key of the policy's accounts: alone, with a role or with a model.
+        for key in [
+            word.to_owned(),
+            format!("{word}/implementer"),
+            format!("{word}/sonnet"),
+        ] {
+            let mut p = f.open_policy();
+            p["accounts"][key.as_str()] = json!([f.p("a1")]);
+            f.policy_is(&p);
+            let refused = f.run(&f.request("p.md")).unwrap_err();
+            assert_eq!(
+                (refused.code, refused.field.as_str()),
+                ("policy_invalid", "policy"),
+                "{key}"
+            );
+            let reason = refused.detail.as_str().unwrap().to_owned();
+            assert!(reason.starts_with(&format!("accounts.{key} ")), "{reason}");
+            f.untouched("p.md");
+        }
+        f.policy = None;
+        // In a resumed record: a runtime other than the request's, for either runtime that stays.
+        let first = f.run(&f.request("c.md")).unwrap().0;
+        let mut rec = first.clone();
+        rec["runtime"] = json!(word);
+        std::fs::write(f.p("old.md.run.json"), rec.to_string()).unwrap();
+        let before = f.launches.len();
+        for request in [f.request("x"), f.agy("x")] {
+            let r = f.resume(request, "again.md", "old.md");
             assert_eq!(
                 code(f.run(&r)),
-                format!("invalid_input@{member}"),
-                "{member} {value}"
+                "resume_runtime_differs@runtime",
+                "{word}"
             );
         }
+        assert_eq!(f.launches.len(), before);
+        assert!(!Path::new(&f.p("again.md.run.json")).exists());
     }
-    assert!(f.launches.is_empty() && !Path::new(&f.p("x.md.run.json")).exists());
-    // A value with a dash inside is still a name.
-    let mut r = f.muse("y.md");
-    r["model"] = json!("muse-ember-1.0");
-    assert_eq!(f.run(&r).unwrap().0["state"], "ok");
-    // The other runtimes keep their rules.
+}
+
+// spec: specs/ap/run.md#R2
+#[test]
+fn m12_a_claude_effort_that_looks_like_a_flag_keeps_its_rules() {
+    let mut f = Fake::new();
     let mut r = f.request("c.md");
     r["effort"] = json!("-x");
     assert_eq!(f.run(&r).unwrap().0["state"], "ok");
@@ -6435,6 +5024,40 @@ fn g7_a_resumes_tokens_are_the_results_sums_less_every_earlier_record_of_the_cha
     assert_eq!(std::fs::read(f.p("c4.md")).unwrap(), b"four");
 }
 
+// spec: specs/ap/run.md#R52
+#[test]
+fn g7_a_chain_past_its_bound_or_back_to_a_record_seen_has_null_tokens() {
+    let mut f = Fake::new();
+    f.agy_first("c0.md");
+    let base = f.record("c0.md");
+    // `name` resumes `earlier` (a record path), with the tokens of one result.
+    let link = |f: &Fake, name: &str, earlier: &str| {
+        let mut rec = base.clone();
+        rec["resumes"] = json!(f.p(earlier));
+        std::fs::write(f.p(&format!("{name}.run.json")), rec.to_string()).unwrap();
+    };
+    let null = json!({"input": null, "output": null, "cache_read": null, "cache_creation": null});
+    let resume = |f: &mut Fake, out: &str, earlier: &str| {
+        let r = f.resume(f.agy("x"), out, earlier);
+        let (v, status) = f.run(&r).unwrap();
+        assert_eq!((status, v["state"].as_str()), (0, Some("ok")), "{out} {v}");
+        v["tokens"].clone()
+    };
+    // Past the bound: 256 records before the one resumed, 257 in the chain.
+    let mut earlier = "c0.md.run.json".to_owned();
+    for i in 1..=256 {
+        link(&f, &format!("long{i}.md"), &earlier);
+        earlier = format!("long{i}.md.run.json");
+    }
+    assert_eq!(resume(&mut f, "r1.md", "long256.md"), null);
+    // A chain that returns to a record already seen.
+    link(&f, "loop1.md", "loop2.md.run.json");
+    link(&f, "loop2.md", "loop1.md.run.json");
+    assert_eq!(resume(&mut f, "r2.md", "loop2.md"), null);
+    // A chain followed to its end keeps its tokens known.
+    assert_ne!(resume(&mut f, "r3.md", "c0.md"), null);
+}
+
 // spec: specs/ap/run.md#R47
 #[test]
 fn g8_a_resume_across_runtimes_is_refused_in_both_directions() {
@@ -6446,8 +5069,6 @@ fn g8_a_resume_across_runtimes_is_refused_in_both_directions() {
     let before = f.launches.len();
     for (earlier, request) in [
         ("a.md", f.request("x")),
-        ("a.md", f.codex("x")),
-        ("a.md", f.muse("x")),
         ("c.md", f.agy("x")),
     ] {
         let r = f.resume(request, "again.md", earlier);
@@ -6823,9 +5444,12 @@ fn policy_invalid_refuses_every_stage_and_names_the_member() {
     ok["scheduler"] = json!({"anything": true});
     ok["accounts"]["claude/reviewer"] = json!([f.p("a1")]);
     ok["accounts"]["claude/sonnet"] = json!([f.p("a1")]);
-    ok["accounts"]["muse"] = json!([f.p("a1")]);
     f.policy_is(&ok);
     assert_eq!(f.run(&f.request("ok.md")).unwrap().0["state"], "ok");
+    // A key of a retired runtime is no runtime.
+    ok["accounts"]["muse"] = json!([f.p("a1")]);
+    f.policy_is(&ok);
+    assert_eq!(code(f.run(&f.request("muse.md"))), "policy_invalid@policy");
 }
 
 // spec: specs/ap/policy.md#R4
@@ -6896,7 +5520,7 @@ fn policy_the_role_key_comes_before_the_model_key_and_the_model_key_before_the_r
     assert_eq!(code(f.run(&r)), "account_not_allowed@account");
     // Another runtime's key does not stand in for the stage's runtime.
     let mut p = f.open_policy();
-    p["accounts"] = json!({"codex": [f.p("a1")]});
+    p["accounts"] = json!({"agy": [f.p("a1")]});
     f.policy_is(&p);
     assert_eq!(
         code(f.run(&f.request("cx.md"))),
@@ -7385,10 +6009,6 @@ fn run_object_r4_the_agent_is_a_form_the_engine_accepts() {
                 .all(|c| c.is_ascii_alphanumeric() || b"._:-".contains(&c))
         );
     }
-    // Another runtime: its own name before the colon.
-    let r = f.codex("c.md");
-    assert_eq!(f.run(&r).unwrap().1, 0);
-    assert_eq!(f.stage_env()["ONT_AGENT"], "codex:gpt-6.1-terra");
 }
 
 // spec: specs/ap/run-object.md#R5
@@ -7420,15 +6040,6 @@ fn run_object_r5_git_author_names_the_stage_as_author_and_committer() {
     assert_eq!(env["GIT_AUTHOR_EMAIL"], "verifier.sonnet@agents.invalid");
     assert_eq!(env["GIT_COMMITTER_NAME"], "verifier sonnet");
     assert_eq!(env["GIT_COMMITTER_EMAIL"], "verifier.sonnet@agents.invalid");
-    let mut r = f.codex("d.md");
-    r["git_author"] = json!(true);
-    assert_eq!(f.run(&r).unwrap().1, 0);
-    let env = f.stage_env();
-    assert_eq!(env["GIT_COMMITTER_NAME"], env["GIT_AUTHOR_NAME"]);
-    assert_eq!(
-        env["GIT_COMMITTER_EMAIL"],
-        "implementer.gpt-6.1-terra@agents.invalid"
-    );
     // Without the member nothing of Git's environment is set.
     assert_eq!(f.run(&f.request("c.md")).unwrap().1, 0);
     assert!(f.stage_env().keys().all(|k| !k.starts_with("GIT_")));
@@ -7528,7 +6139,7 @@ fn run_object_r7_the_start_comes_after_admission_and_before_the_first_launch() {
     );
     assert!(start["parameters"].get("unit").is_none());
     assert_eq!(start["parameters"]["intent"], object_id("intent", "i-1"));
-    // A resume names its session before the launch; a Codex stage's id is its own, given at the close.
+    // A resume names its session before the launch.
     let mut r = f.for_unit("e.md");
     r["unit"] = json!("u-1");
     let earlier = f.run(&f.request("p.md")).unwrap().0;
@@ -7537,15 +6148,6 @@ fn run_object_r7_the_start_comes_after_admission_and_before_the_first_launch() {
     assert_eq!(
         f.store().bodies("start_run")[0]["parameters"]["session"],
         earlier["session"]
-    );
-    let mut r = f.codex("c.md");
-    r["unit"] = json!("u-1");
-    f.store_with(&["unit:u-1"]);
-    assert_eq!(f.run(&r).unwrap().1, 0);
-    assert!(
-        f.store().bodies("start_run")[0]["parameters"]
-            .get("session")
-            .is_none()
     );
     // A path that is no `file_path` of the schema is left out, not sent.
     let mut r = f.for_unit("with space.md");
@@ -8348,21 +6950,6 @@ fn limits_r1_only_a_claude_reviewer_with_one_scratch_apart_from_its_paths() {
     let scratch = |r: &mut Value, p: Value| r["limits"] = json!({ "scratch": p });
     type Change<'a> = Box<dyn Fn(&mut Value) + 'a>;
     let cases: Vec<(&str, Change)> = vec![
-        (
-            "codex implementer",
-            Box::new(|r| {
-                r["role"] = json!("implementer");
-                r["runtime"] = json!("codex");
-                r["permission_mode"] = json!("bypassPermissions");
-            }),
-        ),
-        (
-            "muse",
-            Box::new(|r| {
-                r["runtime"] = json!("muse");
-                r["permission_mode"] = json!("bypassPermissions");
-            }),
-        ),
         ("no object", Box::new(|r| r["limits"] = json!("/tmp/x"))),
         ("empty", Box::new(|r| r["limits"] = json!({}))),
         (
@@ -9147,36 +7734,6 @@ fn run_r2_r8_the_bound_the_pattern_and_the_out_file_are_refused_before_any_effec
             "{suffix}"
         );
     }
-}
-
-// spec: specs/ap/run.md#R41
-#[test]
-fn run_r41_a_muse_stage_writes_no_file_under_its_account() {
-    let mut f = Fake::new();
-    let r = f.muse("w.md");
-    let account = f.t.join("m1");
-    let listing = |dir: &Path| {
-        let mut all = vec![];
-        let mut todo = vec![dir.to_path_buf()];
-        while let Some(d) = todo.pop() {
-            for e in std::fs::read_dir(&d).unwrap() {
-                let p = e.unwrap().path();
-                let m = std::fs::symlink_metadata(&p).unwrap();
-                all.push((p.clone(), m.len(), m.modified().unwrap()));
-                if m.is_dir() {
-                    todo.push(p);
-                }
-            }
-        }
-        all.sort();
-        all
-    };
-    std::fs::write(account.join("muse/settings.json"), "{}").unwrap();
-    let before = listing(&account);
-    f.lines(&m_run("stage ok"));
-    let (v, status) = f.run(&r).unwrap();
-    assert_eq!((status, &v["state"]), (0, &json!("ok")), "{v}");
-    assert_eq!(listing(&account), before);
 }
 
 // spec: specs/ap/run-limits.md#R10
@@ -11686,16 +10243,6 @@ fn key_account_and_account_in_next_accounts_each_get_their_own_auth() {
         f.variable(6, "ANTHROPIC_API_KEY").as_deref(),
         Some(STAGE_KEY)
     );
-    // A stage on another runtime holds neither member, in the record or in an attempt.
-    f.policy = None;
-    std::fs::write(f.t.join("bin/answer"), "Verdict: accept\n").unwrap();
-    f.mode("a1", "answer");
-    let (v, _) = f.run(&f.codex("c.md")).unwrap();
-    assert!(
-        v.get("auth").is_none() && v.get("auth_fault").is_none(),
-        "{v}"
-    );
-    assert!(v["attempts"][0].get("auth").is_none(), "{v}");
 }
 
 // spec: specs/ap/run.md#R54
@@ -12112,7 +10659,6 @@ fn pc_r57_each_refusal_of_the_member_host_comes_before_any_effect() {
         with(&f, "host", json!("local")),
         with(&f, "host", json!(true)),
         with(&f, "host", json!(null)),
-        with(&f, "runtime", json!("codex")),
         with(&f, "role", json!("implementer")),
         with(&f, "mcp_config", json!([f.p("small.md")])),
         with(&f, "expect", json!({"file": f.p("o.txt")})),
@@ -13127,7 +11673,7 @@ fn g_r49_an_agy_stage_gets_the_toolchain_of_the_passwd_home_unless_the_request_n
 
 // spec: specs/ap/run-limits.md#R1
 #[test]
-fn limits_r1_agy_admits_limits_for_three_roles_and_codex_and_muse_refuse_them() {
+fn limits_r1_agy_admits_limits_for_three_roles() {
     let mut f = Fake::new();
     f.agy_lines(&g_run("stage ok"));
     for (i, role) in ["reviewer", "implementer", "fixer"].into_iter().enumerate() {
@@ -13138,17 +11684,10 @@ fn limits_r1_agy_admits_limits_for_three_roles_and_codex_and_muse_refuse_them() 
         assert_eq!(v["state"], "ok", "{role}: {v}");
         assert_eq!(v["limits"]["scratch"], json!(f.p(&format!("s{i}"))));
     }
-    // A writer is refused by its role first; Codex and Muse by `limits`.
+    // A writer is refused by its role first.
     let mut r = f.agy_limited("w.md");
     r["role"] = json!("writer");
     assert_eq!(code(f.run(&r)), "invalid_input@role");
-    for runtime in ["codex", "muse"] {
-        let mut r = f.limited("y.md");
-        r["role"] = json!("implementer");
-        r["runtime"] = json!(runtime);
-        r["permission_mode"] = json!("bypassPermissions");
-        assert_eq!(code(f.run(&r)), "invalid_input@limits", "{runtime}");
-    }
     // The paths of the request keep R1's rules on `agy`: a scratch inside the account is refused.
     let mut r = f.agy_limited("z.md");
     r["limits"]["scratch"] = json!(format!("{}/s", r["account"].as_str().unwrap()));

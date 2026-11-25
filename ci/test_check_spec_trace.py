@@ -94,6 +94,42 @@ class CheckSpecTraceTest(unittest.TestCase):
             ],
         )
 
+    def test_a_retired_requirement_is_never_untested_and_never_cited(self):
+        files = self.base()
+        files["specs/ap/a.md"] += "- R3: Retired with the runtimes codex and muse.\n"
+        root = self.make(files)
+        r = run(str(root))
+        self.assertEqual(r.returncode, 0, r.stdout)
+        self.assertEqual(r.stdout, "spec-trace: 3 requirements, 2 citations, 0 errors\n")
+        # A citation of a retired requirement is a fault with its line.
+        files["tests/b.rs"] = f"// x\n// {cite('specs/ap/a.md', 3)}\n"
+        root = self.make(files)
+        r = run(str(root))
+        self.assertEqual(r.returncode, 1)
+        self.assertEqual(
+            r.stdout,
+            "citation_retired@tests/b.rs:2 specs/ap/a.md#R3\n"
+            "spec-trace: 3 requirements, 3 citations, 1 errors\n",
+        )
+        # Only the one sentence retires: a longer text, or another sentence, is a requirement.
+        for text in [
+            "Retired with the runtimes codex and muse. Its tests left.",
+            "Retired.",
+            "retired with the runtimes codex and muse.",
+            "The runtime codex. Retired with it.",
+        ]:
+            files = self.base()
+            files["specs/ap/a.md"] += f"- R3: {text}\n"
+            root = self.make(files)
+            r = run(str(root))
+            self.assertEqual(r.returncode, 1, text)
+            self.assertEqual(
+                r.stdout,
+                "requirement_untested@specs/ap/a.md#R3\n"
+                "spec-trace: 3 requirements, 2 citations, 1 errors\n",
+                text,
+            )
+
     def test_an_id_twice_in_one_file_is_a_duplicate(self):
         files = self.base()
         files["specs/ap/a.md"] += "- R2: two again.\n"

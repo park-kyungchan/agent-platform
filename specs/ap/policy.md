@@ -1,6 +1,6 @@
 # The host's policy of models and accounts for `ap run`
 
-Purpose: one file of the host states which models a stage may run on and which Claude, Codex, Muse or agy accounts a stage of a runtime, role or model may use, and `ap run` enforces it at admission for every stage, so a request written by hand is checked like any other.
+Purpose: one file of the host states which models a stage may run on and which Claude or agy accounts a stage of a runtime, role or model may use, and `ap run` enforces it at admission for every stage, so a request written by hand is checked like any other.
 
 ## Requirements
 
@@ -31,7 +31,7 @@ Purpose: one file of the host states which models a stage may run on and which C
 The file is one JSON object. `models` and `accounts` are required; every other top-level member is not read by `ap run`, but the optional `api_key_accounts`. The member `quota` (the runtime CPU quota of a slice) is read only by `ap quota` and by the dispatch pass `ap work`, which starts no unit over its limit: `specs/ap/quota.md`, `specs/ap/work.md`.
 
 - `models`: an object with exactly `allowed` (1 to 64 model names, each as `ap run` takes a model: at most 40 characters of letters, digits and `._-[]`) and `never` (0 to 16 patterns; a pattern is a model name in which `*` stands for any run of characters, at most two `*`).
-- `accounts`: an object from a key to an array of 1 to 5 absolute paths. A key is a runtime name (`claude`, `codex`, `muse`, `agy`), or a runtime, `/` and a role of `ap run` (`implementer`, `fixer`, `reviewer` or `writer`, so `accounts` takes the key `<runtime>/writer`), or a runtime, `/` and a model name. The runtime of a stage is the request's `runtime` (default `claude`).
+- `accounts`: an object from a key to an array of 1 to 5 absolute paths. A key is a runtime name (`claude` or `agy`), or a runtime, `/` and a role of `ap run` (`implementer`, `fixer`, `reviewer` or `writer`, so `accounts` takes the key `<runtime>/writer`), or a runtime, `/` and a model name. The runtime of a stage is the request's `runtime` (default `claude`).
 
 The member `work` (the dispatch pass's slots, slice and prefix, and `work.pages` and `work.page_prefix`, the writers in flight and the prefix of their units) is read only by `ap work`: `specs/ap/work.md`.
 

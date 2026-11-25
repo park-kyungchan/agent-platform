@@ -1,4 +1,4 @@
-//! One stage of a unit: one headless Claude Code (or Codex, Muse Code or Antigravity CLI) session in a transient systemd
+//! One stage of a unit: one headless Claude Code (or Antigravity CLI) session in a transient systemd
 //! scope under `agents.slice`, ended at its time bound, its exit or (a reviewer or a writer only)
 //! its first `result` event, after which the whole scope is stopped. One record `<out>.run.json` per run; no
 //! other ledger, no store write.
@@ -129,16 +129,12 @@ const ALIVE: [&str; 5] = [
 enum Runtime {
     #[default]
     Claude,
-    Codex,
-    Muse,
     Agy,
 }
 impl Runtime {
     fn of(word: Option<&Value>) -> Option<Self> {
         match word.map(Value::as_str) {
             None | Some(Some("claude")) => Some(Self::Claude),
-            Some(Some("codex")) => Some(Self::Codex),
-            Some(Some("muse")) => Some(Self::Muse),
             Some(Some("agy")) => Some(Self::Agy),
             Some(_) => None,
         }
@@ -147,8 +143,6 @@ impl Runtime {
     fn word(self) -> &'static str {
         match self {
             Self::Claude => "claude",
-            Self::Codex => "codex",
-            Self::Muse => "muse",
             Self::Agy => "agy",
         }
     }
@@ -156,8 +150,7 @@ impl Runtime {
     fn unbuilt(self) -> &'static [&'static str] {
         match self {
             Self::Claude => &[],
-            Self::Codex => &["skills", "memory", "integration", "compact_window"],
-            Self::Muse | Self::Agy => &[
+            Self::Agy => &[
                 "skills",
                 "memory",
                 "integration",
@@ -166,61 +159,57 @@ impl Runtime {
             ],
         }
     }
-    /// The roles this runtime builds: Codex has no reviewer, an `agy` stage no writer (its `HOME` is
+    /// The roles this runtime builds: an `agy` stage no writer (its `HOME` is
     /// its own home, so `ap run` hands it the toolchain's paths by variables, R47); a page's writer
     /// runs on Claude alone (R53).
     fn role_ok(self, role: &str) -> bool {
         match self {
             Self::Claude => true,
-            Self::Muse => role != "writer",
-            Self::Codex => role != "reviewer" && role != "writer",
             Self::Agy => matches!(role, "reviewer" | "implementer" | "fixer"),
         }
     }
     fn typed_answer(self) -> bool {
         match self {
             Self::Claude => true,
-            Self::Codex | Self::Muse | Self::Agy => false,
+            Self::Agy => false,
         }
     }
     /// No approval and no sandbox of the CLI's own, one account and no MCP file.
     fn bare(self) -> bool {
         match self {
             Self::Claude => false,
-            Self::Codex | Self::Muse | Self::Agy => true,
+            Self::Agy => true,
         }
     }
     /// The names `env` may not hold, so that the account named in the record is the one that answers.
     fn reserved(self, name: &str) -> bool {
         match self {
             Self::Claude => false,
-            Self::Codex => name.starts_with("CODEX_") || name.starts_with("OPENAI_"),
-            Self::Muse => name.starts_with("MUSE_") || name == "XDG_CONFIG_HOME",
             Self::Agy => name.starts_with("AGY_") || name.starts_with("GEMINI_"),
         }
     }
     /// A value that reaches the CLI as an argument of its own must not read as a flag there.
     fn argument_ok(self, value: &str) -> bool {
         match self {
-            Self::Claude | Self::Codex => true,
-            Self::Muse | Self::Agy => !value.starts_with('-'),
+            Self::Claude => true,
+            Self::Agy => !value.starts_with('-'),
         }
     }
     /// An `agy` slug carries the level of its stage, which the CLI is not given apart from it.
     fn effort_ok(self, model: &str, effort: &str) -> bool {
         match self {
-            Self::Claude | Self::Codex | Self::Muse => true,
+            Self::Claude => true,
             Self::Agy => LEVELS.contains(&effort) && model.rsplit('-').next() == Some(effort),
         }
     }
     /// The prompt reaches an `agy` stage as one argument of the program.
     fn prompt_argument(self) -> bool {
         match self {
-            Self::Claude | Self::Codex | Self::Muse => false,
+            Self::Claude => false,
             Self::Agy => true,
         }
     }
-    /// A Muse account is a directory named `muse`; an `agy` account is the template of the stage's
+    /// An `agy` account is the template of the stage's
     /// homes: it holds the login token and no `.gemini/config`, where the CLI reads what is
     /// registered for it.
     fn account_named(self, account: &str) -> bool {
@@ -229,8 +218,7 @@ impl Runtime {
             "antigravity-cli/antigravity-oauth-token",
         );
         match self {
-            Self::Claude | Self::Codex => true,
-            Self::Muse => Path::new(account).file_name().is_some_and(|n| n == "muse"),
+            Self::Claude => true,
             Self::Agy => {
                 let config = std::fs::symlink_metadata(home.join("config"));
                 home.join(token).metadata().is_ok_and(|m| m.is_file())
@@ -273,7 +261,7 @@ struct Request {
     skills: bool,
     memory: bool,
     runtime: Runtime,
-    /// A Codex stage on a resume: the thread's tokens before this run.
+    /// An `agy` stage on a resume: the conversation's tokens before this run.
     spent: Option<[u64; 4]>,
     /// The compaction window the stated `CLAUDE_CODE_AUTO_COMPACT_WINDOW` gets (a Claude stage).
     compact_window: Option<u64>,
@@ -1276,7 +1264,7 @@ fn request_at(
     }
     let runtime = Runtime::of(r.get("runtime")).ok_or_else(|| error("invalid_input", "runtime"))?;
     let role = text(r, "role")?;
-    // Not built for every runtime: some roles (Codex has no reviewer, `agy` only one) and these members.
+    // Not built for every runtime: some roles (`agy` has no writer) and these members.
     require!(runtime.role_ok(role) => "invalid_input", "role");
     require!(agy_authors || runtime != Runtime::Agy || role == "reviewer" => "invalid_input", "role");
     if let Some(k) = (runtime.unbuilt().iter()).find(|k| r.get(**k).is_some()) {
@@ -1506,7 +1494,7 @@ fn request_at(
                 text(&rec, "session").map_err(missing)?,
                 text(&rec, "account").map_err(missing)?,
             );
-            // The Codex CLI takes the session as an argument of its own: never one it reads as a flag.
+            // A CLI takes the session as an argument of its own: never one it reads as a flag.
             require!(!session.starts_with('-') => "resume_record_missing", "resume");
             require!(accounts.iter().any(|a| a == account) => "resume_account_differs", "account");
             require!(rec["cwd"] == cwd.as_str() => "resume_cwd_differs", "cwd");
@@ -1648,10 +1636,8 @@ fn request_at(
         schema,
         mcp,
         spent: match (runtime, &earlier) {
-            (Runtime::Codex | Runtime::Agy, Some((_, (_, _, file)))) => spent(file),
-            (Runtime::Codex | Runtime::Agy, None) | (Runtime::Claude | Runtime::Muse, _) => {
-                Some([0; 4])
-            }
+            (Runtime::Agy, Some((_, (_, _, file)))) => spent(file),
+            (Runtime::Agy, None) | (Runtime::Claude, _) => Some([0; 4]),
         },
         resume: earlier.map(|(_, r)| r),
         moved,
@@ -1951,7 +1937,7 @@ fn make_home(account: &str, home: &Path) -> std::io::Result<()> {
     Ok(())
 }
 const TOKENS: [&str; 4] = ["input", "output", "cache_read", "cache_creation"];
-/// The tokens of a Codex or `agy` thread up to the end of the run of `file`: that record's and those of
+/// The tokens of an `agy` conversation up to the end of the run of `file`: that record's and those of
 /// every record it resumes (the CLI reports the thread's usage, a record its own part). None when
 /// the chain cannot be followed to its end: a record that cannot be read, a record met twice, or
 /// more than 256 records.
@@ -2085,19 +2071,12 @@ struct Seen {
     rejected: bool,
     /// The rate-limit event `limit` is made from: the last rejected one, else the last one.
     limit: Option<Value>,
-    /// The CLI the lines come from, with a Codex or `agy` stream's thread tokens before this run (None:
-    /// they are unknown, so this run's are too) and a Muse stream's requested model.
+    /// The CLI the lines come from, with an `agy` stream's conversation tokens before this run (None:
+    /// they are unknown, so this run's are too).
     runtime: Runtime,
     spent: Option<[u64; 4]>,
-    model: String,
-    /// A Codex stream's thread (an `agy` stream's conversation), the last agent message of the turn running, and the items
-    /// completed since the last turn end.
+    /// An `agy` stream's conversation.
     thread: Option<String>,
-    message: Option<String>,
-    items: u64,
-    /// A Muse stream: the last `run_usage` and the first other model that served the stage.
-    usage: Option<Value>,
-    served: Option<String>,
     /// An `agy` stream: the current `agent_response` step index and its accumulated `text_delta`.
     agy_step: Option<u64>,
     agy_text: String,
@@ -2115,8 +2094,6 @@ impl Seen {
         };
         match self.runtime {
             Runtime::Claude => self.claude_line(e),
-            Runtime::Codex => self.codex_line(&e, self.spent),
-            Runtime::Muse => self.muse_line(&e["payload"]),
             Runtime::Agy => self.agy_line(&e),
         }
     }
@@ -2133,35 +2110,6 @@ impl Seen {
                     self.limit = Some(e);
                 }
                 self.rejected |= rejected;
-            }
-            _ => (),
-        }
-    }
-    /// A Muse Code line, read into the shape of a `result`: each `run_terminal` is one, its `text`
-    /// the answer when it completed, its `reason` the error's message otherwise. A tool task is
-    /// work; a facet that names another serving model than the request's is noted; the last
-    /// `run_usage` gives the tokens and the limit.
-    fn muse_line(&mut self, p: &Value) {
-        let text = |k: &str| p[k].as_str().unwrap_or("");
-        match p["kind"].as_str() {
-            Some("task_lifecycle") => {
-                let event = &p["event"];
-                let tool = event["task_kind"]
-                    .as_str()
-                    .is_some_and(|k| k.starts_with("tool."));
-                self.worked |= tool;
-                let facets = event["details"]["facets"].as_array().into_iter().flatten();
-                let mut other = facets.filter_map(|f| f["detail"]["model"].as_str());
-                let other = other.find(|m| *m != self.model);
-                self.served = self.served.take().or(other.map(str::to_owned));
-            }
-            Some("run_usage") => self.usage = Some(p.clone()),
-            Some("run_terminal") => {
-                let done = p["terminal"] == "completed";
-                self.results
-                    .push(json!({"type": "result", "is_error": !done,
-                    "result": if done { text("text") } else { text("reason") },
-                    "permission_denials": []}));
             }
             _ => (),
         }
@@ -2226,49 +2174,6 @@ impl Seen {
             _ => (),
         }
     }
-    /// A Codex event, read into the shape of a `result`: a turn end is one, with the last agent
-    /// message of its turn as the answer when it completed, the error's message when it failed.
-    /// An `error` event alone is none: the CLI prints one for each reconnection attempt.
-    fn codex_line(&mut self, e: &Value, spent: Option<[u64; 4]>) {
-        let (item, kind) = (&e["item"], e["item"]["type"].as_str());
-        match e["type"].as_str().unwrap_or("") {
-            "thread.started" => self.thread = e["thread_id"].as_str().map(str::to_owned),
-            "turn.started" => self.message = None,
-            t @ ("item.started" | "item.completed") => {
-                self.worked |= !matches!(kind, Some("agent_message" | "reasoning" | "error"));
-                if t == "item.completed" {
-                    self.items += 1;
-                    if kind == Some("agent_message") {
-                        self.message = Some(item["text"].as_str().unwrap_or("").to_owned());
-                    }
-                }
-            }
-            t @ ("turn.completed" | "turn.failed") => {
-                let message = self.message.take();
-                let mut r = json!({"type": "result", "session_id": self.thread,
-                    "num_turns": std::mem::take(&mut self.items), "is_error": t == "turn.failed",
-                    "result": e["error"]["message"], "permission_denials": []});
-                if t == "turn.completed" {
-                    // As evals/readout.py maps a Codex session; the thread's usage less what the
-                    // runs before this one spent.
-                    let u = |k: &str| e["usage"][k].as_u64();
-                    let (read, write) = (u("cached_input_tokens"), u("cache_write_input_tokens"));
-                    let (read, write) = (read.unwrap_or(0), write.unwrap_or(0));
-                    let input = u("input_tokens").map(|i| i.saturating_sub(read + write));
-                    let own = |v: Option<u64>, i: usize| {
-                        spent.and_then(|s| v.map(|v| v.saturating_sub(s[i])))
-                    };
-                    r["result"] = json!(message.unwrap_or_default());
-                    r["usage"] = json!({"input_tokens": own(input, 0),
-                        "output_tokens": own(u("output_tokens"), 1),
-                        "cache_read_input_tokens": own(Some(read), 2),
-                        "cache_creation_input_tokens": own(Some(write), 3)});
-                }
-                self.results.push(r);
-            }
-            _ => (),
-        }
-    }
 }
 /// `status` and `resets_at` of a rate-limit event or of one of its windows, by the shape stated in
 /// README "One stage": a member of another shape is null.
@@ -2299,45 +2204,6 @@ fn limit_of(e: Option<&Value>) -> Value {
         })
         .collect();
     limit
-}
-/// A Muse stage's `turns` and `tokens` from its last `run_usage` line: the sums over its `models`,
-/// where `input` is each entry's `input_tokens` less its `cached_tokens` (never below 0) and a
-/// member that is no number counts 0; null without such a line.
-fn muse_tally(usage: Option<&Value>) -> (Value, Value) {
-    let Some(u) = usage else {
-        let none =
-            json!({"input": null, "output": null, "cache_read": null, "cache_creation": null});
-        return (Value::Null, none);
-    };
-    let (mut input, mut read, mut output) = (0u64, 0u64, 0u64);
-    for m in u["models"].as_array().into_iter().flatten() {
-        let n = |k: &str| m[k].as_u64().unwrap_or(0);
-        input += n("input_tokens").saturating_sub(n("cached_tokens"));
-        (read, output) = (read + n("cached_tokens"), output + n("output_tokens"));
-    }
-    let tokens = json!({"input": input, "output": output, "cache_read": read, "cache_creation": 0});
-    (json!(u["calls"].as_u64()), tokens)
-}
-/// A Muse stage's `limit`: the object of the Claude shape from the `allowance` of its last
-/// `run_usage` line, with one entry per window (`weekly`, `window`) that is an object.
-fn muse_limit(usage: Option<&Value>) -> Value {
-    let Some(a) = usage.map(|u| &u["allowance"]).filter(|a| a.is_object()) else {
-        return Value::Null;
-    };
-    let windows: serde_json::Map<String, Value> = ["weekly", "window"]
-        .into_iter()
-        .filter(|k| a[*k].is_object())
-        .map(|k| {
-            let w = &a[k];
-            let at = w["resets_at_ms"].as_u64().map(|ms| ms / 1000);
-            let used = w["used_percent"].as_f64().map(|p| p / 100.0);
-            (
-                k.to_owned(),
-                json!({"status": null, "resets_at": at, "utilization": used}),
-            )
-        })
-        .collect();
-    json!({"status": null, "resets_at": null, "kind": null, "windows": windows})
 }
 /// Reads what the CLI appended to its output since the last call, through the handle opened
 /// before the launch (`read_at` leaves the CLI's file offset alone); whole lines only.
@@ -2575,65 +2441,6 @@ fn claude_args(q: &Request, argv: &mut Vec<String>, resume: Option<&str>, sessio
         session,
     ]));
 }
-/// The Codex CLI after `systemd-run … --`, headless and without the home's configuration, hooks,
-/// rules, apps, plugins, memories or further agents (README "One stage" names each flag).
-fn codex_args(q: &Request, resume: Option<&str>) -> Vec<String> {
-    let mut a = args(&["--", "codex", "--no-daemon", "exec"]);
-    a.extend(resume.map(|_| "resume".to_owned()));
-    a.extend(args(&["--json", "--ignore-user-config", "--ignore-rules"]));
-    for feature in [
-        "hooks",
-        "apps",
-        "plugins",
-        "plugin_discovery_prefetch",
-        "skill_mcp_dependency_install",
-        "memories",
-        "multi_agent",
-    ] {
-        a.extend(args(&["--disable", feature]));
-    }
-    let effort = format!("model_reasoning_effort=\"{}\"", q.effort);
-    a.extend(args(&[
-        "-c",
-        "features.multi_agent_v2.max_concurrent_threads_per_session=1",
-        "--skip-git-repo-check",
-        "--dangerously-bypass-approvals-and-sandbox",
-        "-m",
-        &q.model,
-        "-c",
-        &effort,
-    ]));
-    a.extend(match resume {
-        Some(session) => args(&[session]),
-        None => args(&["-C", &q.cwd]),
-    });
-    a.push("-".into());
-    a
-}
-/// The Muse Code CLI after `systemd-run … --`: one prompt from a file, headless, no approval and
-/// no sandbox (`--yolo`), the contributor mode off (README "A stage on Muse Code").
-fn muse_args(q: &Request, session: &str) -> Vec<String> {
-    args(&[
-        "--",
-        "muse",
-        "exec",
-        "--json",
-        "--model",
-        &q.model,
-        "--reasoning-effort",
-        &q.effort,
-        "--contributor-mode",
-        "off",
-        "--disable-reminders",
-        "--session-id",
-        session,
-        "--workspace",
-        &q.cwd,
-        "--prompt-file",
-        &q.prompt,
-        "--yolo",
-    ])
-}
 /// The Antigravity CLI after `systemd-run … --`: the prompt as one argument, headless, no approval
 /// (README "A stage on the Antigravity CLI"); the stage's bound is the CLI's own.
 fn agy_args(q: &Request, resume: Option<&str>) -> Vec<String> {
@@ -2655,7 +2462,7 @@ fn agy_args(q: &Request, resume: Option<&str>) -> Vec<String> {
     }
     a
 }
-/// The session the Codex CLI named at the thread's start (or the `agy` conversation at its `init`) enters the record at once. False when
+/// The `agy` conversation named at its `init` enters the record at once. False when
 /// that write of the record failed, which counts as every failed write of it after the launch.
 fn named(out: &str, record: &mut Value, seen: &Seen) -> bool {
     if let (true, Some(thread)) = (record["session"].is_null(), &seen.thread) {
@@ -2687,11 +2494,10 @@ fn mirror(record: &mut Value, worked: bool) {
 /// line of a move) that text, an empty line and the file's bytes, through a pipe that a thread
 /// fills (no file); an ask reads its sentence alone.
 fn input(q: &Request, lead: Option<&str>, ask: bool) -> std::io::Result<File> {
-    // A Muse stage reads its prompt from the file the argument names, an `agy` stage has its text
-    // as an argument, and neither reads stdin.
+    // An `agy` stage has its text as an argument and does not read stdin.
     let file = match q.runtime {
-        Runtime::Muse | Runtime::Agy => return File::open("/dev/null"),
-        Runtime::Claude | Runtime::Codex => File::open(&q.prompt)?,
+        Runtime::Agy => return File::open("/dev/null"),
+        Runtime::Claude => File::open(&q.prompt)?,
     };
     let Some(lead) = lead else {
         return Ok(file);
@@ -2861,10 +2667,10 @@ fn attempt(
         return not_launched(record, "launch");
     };
     let unit = format!("ap-run-{unit}.scope");
-    // The Codex CLI names a fresh session itself, at the thread's start, and `agy` at its `init`.
+    // The `agy` CLI names a fresh session itself, at its `init`.
     let names_itself = match q.runtime {
-        Runtime::Codex | Runtime::Agy => resume.is_none(),
-        Runtime::Claude | Runtime::Muse => false,
+        Runtime::Agy => resume.is_none(),
+        Runtime::Claude => false,
     };
     if !names_itself {
         record["session"] = json!(session);
@@ -3047,17 +2853,6 @@ fn attempt(
                 env.push(("ANTHROPIC_API_KEY".into(), key));
             }
         }
-        Runtime::Codex => {
-            argv.extend(codex_args(q, resume));
-            env.push(("CODEX_HOME".into(), account.into()));
-        }
-        Runtime::Muse => {
-            argv.extend(muse_args(q, &session));
-            // The CLI finds its configuration directory as `$XDG_CONFIG_HOME/muse`.
-            let home = Path::new(account).parent().and_then(Path::to_str);
-            env.push(("XDG_CONFIG_HOME".into(), home.unwrap_or_default().into()));
-            env.push(("MUSE_NO_AUTO_UPDATE".into(), "1".into()));
-        }
         Runtime::Agy => {
             argv.extend(agy_args(q, resume));
             // The stage's home is the CLI's `HOME`, in place of the caller's.
@@ -3142,7 +2937,6 @@ fn attempt(
         first_only: first_result(&q.role),
         runtime: q.runtime,
         spent: q.spent,
-        model: q.model.clone(),
         ..Seen::default()
     };
     let (mut offset, mut partial, mut kept) = (0, vec![], true);
@@ -3150,8 +2944,7 @@ fn attempt(
         let exited = !matches!(child.try_wait(), Ok(None));
         follow(reader, &mut offset, &mut partial, &mut seen);
         kept &= named(&q.out, &mut record, &seen);
-        // Another serving model stops the stage at once, as the bound does: nothing it says counts.
-        if seen.done() || seen.served.is_some() {
+        if seen.done() {
             break End::Result;
         }
         if exited {
@@ -3202,11 +2995,6 @@ fn attempt(
     record["results"] = json!(seen.results.len());
     let mut write_failed = false;
     let state = match chosen(q, &seen) {
-        _ if seen.served.is_some() => {
-            record["unmet"] = json!("model");
-            record["served_by"] = json!(seen.served);
-            "failed"
-        }
         None if timed_out => "timeout",
         None => {
             record["unmet"] = json!("result_event");
@@ -3220,18 +3008,13 @@ fn attempt(
         }
     };
     record["state"] = json!(state);
-    match q.runtime {
-        Runtime::Muse => (record["turns"], record["tokens"]) = muse_tally(seen.usage.as_ref()),
-        Runtime::Claude | Runtime::Codex | Runtime::Agy => (),
-    }
     if !stopped {
         // Something of the stage may still live: never `ok`.
         record["state"] = json!("failed");
         record["unmet"] = json!("stop");
     }
     record["limit"] = match q.runtime {
-        Runtime::Claude | Runtime::Codex => limit_of(seen.limit.as_ref()),
-        Runtime::Muse => muse_limit(seen.usage.as_ref()),
+        Runtime::Claude => limit_of(seen.limit.as_ref()),
         Runtime::Agy => Value::Null,
     };
     mirror(&mut record, seen.worked);
@@ -3269,8 +3052,8 @@ impl Object {
     fn begin(&mut self, s: &mut impl System, q: &Request, account: &str, host: &str) {
         self.session = match (&q.resume, q.runtime) {
             (Some((session, _, _)), _) => Some(session.clone()),
-            (None, Runtime::Claude | Runtime::Muse) => new_session_id(s).ok(),
-            (None, Runtime::Codex | Runtime::Agy) => None,
+            (None, Runtime::Claude) => new_session_id(s).ok(),
+            (None, Runtime::Agy) => None,
         };
         let fits = |p: String| {
             (p.len() <= 400 && p.bytes().all(|c| (b'!'..=b'~').contains(&c))).then_some(p)

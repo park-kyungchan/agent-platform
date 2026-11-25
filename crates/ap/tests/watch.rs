@@ -156,7 +156,7 @@ struct F {
     apply_check: Answer,
     /// `<cli> --version` answers by runtime name.
     cli_version: BTreeMap<String, Answer>,
-    /// `<cli> [<subcommand>] --help` answers by `(name, subcommand)`.
+    /// `<cli> --help` answers by `(name, "")`.
     cli_help: BTreeMap<(String, String), Answer>,
     /// `git -C VPS_OPS_REPO rev-parse` answer.
     git_commit: Answer,
@@ -252,29 +252,13 @@ impl F {
         for spec in &RUNTIMES {
             f.cli_version
                 .insert(spec.name.into(), ok(&format!("{} 1.0.0\n", spec.name)));
-            if spec.subcommands.is_empty() {
-                let help = spec
-                    .flags
-                    .iter()
-                    .map(|fl| format!("  {fl}  flag\n"))
-                    .collect::<String>();
-                f.cli_help
-                    .insert((spec.name.into(), String::new()), ok(&help));
-            } else {
-                f.cli_help.insert(
-                    (spec.name.into(), String::new()),
-                    ok("Commands:\n  exec  run a stage\n"),
-                );
-                let help = spec
-                    .flags
-                    .iter()
-                    .map(|fl| format!("  {fl}  flag\n"))
-                    .collect::<String>();
-                for sub in spec.subcommands {
-                    f.cli_help
-                        .insert((spec.name.into(), (*sub).into()), ok(&help));
-                }
-            }
+            let help = spec
+                .flags
+                .iter()
+                .map(|fl| format!("  {fl}  flag\n"))
+                .collect::<String>();
+            f.cli_help
+                .insert((spec.name.into(), String::new()), ok(&help));
         }
         f.files.insert(
             GITHUB_REPOSITORIES.into(),
@@ -861,7 +845,7 @@ impl System for F {
                     other => panic!("unexpected git {other} {args:?}"),
                 }
             }
-            "claude" | "muse" | "agy" => {
+            "claude" | "agy" => {
                 if args == ["--version"] {
                     self.cli_version
                         .get(program)
@@ -869,10 +853,6 @@ impl System for F {
                 } else if args == ["--help"] {
                     self.cli_help
                         .get(&(program.into(), String::new()))
-                        .map_or_else(|| broken(program), dup)
-                } else if args.len() == 2 && args[1] == "--help" {
-                    self.cli_help
-                        .get(&(program.into(), args[0].clone()))
                         .map_or_else(|| broken(program), dup)
                 } else {
                     panic!("unexpected cli {program} {args:?}")
@@ -2462,8 +2442,8 @@ fn r19_a_pass_only_reads_and_writes_only_its_directory() {
                 a.len() == 3 && a[0] == "ssh" && a[1].starts_with("apcheck@"),
                 "{a:?}"
             ),
-            "claude" | "muse" | "agy" => assert!(
-                a == ["--version"] || a == ["--help"] || a == ["exec", "--help"],
+            "claude" | "agy" => assert!(
+                a == ["--version"] || a == ["--help"],
                 "{a:?}"
             ),
             "stat" | "find" | "sh" | "df" | "ps" => {}
@@ -3105,13 +3085,13 @@ fn r26_runtimes_version_change_help_matching_and_kept_version() {
     assert_eq!(v["closed"], json!([kf]));
     assert_eq!(f.state()["runtimes"]["agy"]["version"], "agy 2.0.0");
     // `--help` failure -> `cli <name> help`, kept version unchanged.
-    f.cli_version.insert("muse".into(), ok("muse 2.0.0\n"));
+    f.cli_version.insert("agy".into(), ok("agy 3.0.0\n"));
     f.cli_help
-        .insert(("muse".into(), "exec".into()), failed("err"));
+        .insert(("agy".into(), String::new()), failed("err"));
     f.at(20);
     let v = f.pass();
-    assert_eq!(v["opened"], json!([k("runtimes", "cli muse help")]));
-    assert_eq!(f.state()["runtimes"]["muse"]["version"], "muse 1.0.0");
+    assert_eq!(v["opened"], json!([k("runtimes", "cli agy help")]));
+    assert_eq!(f.state()["runtimes"]["agy"]["version"], "agy 2.0.0");
     // Missing CLI (`--version` fails) -> `cli <name> absent`, kept version unchanged.
     f.cli_version.insert("claude".into(), broken("claude"));
     f.at(25);
@@ -3143,7 +3123,6 @@ impl RunFake {
         for d in [
             "bin",
             "acc_claude",
-            "acc_muse/muse",
             "acc_agy/.gemini/antigravity-cli",
             "cwd",
         ] {
@@ -3156,18 +3135,12 @@ impl RunFake {
         .unwrap();
         for (name, text) in [
             ("claude", include_str!("fixtures/watch/fake-claude.sh")),
-            ("muse", include_str!("fixtures/watch/fake-muse.sh")),
             ("agy", include_str!("fixtures/watch/fake-agy.sh")),
         ] {
             let fake = t.join("bin").join(name);
             std::fs::write(&fake, text).unwrap();
             std::fs::set_permissions(&fake, std::fs::Permissions::from_mode(0o755)).unwrap();
         }
-        std::fs::write(
-            t.join("bin/lines-acc_muse"),
-            "{\"payload\":{\"kind\":\"run_terminal\",\"terminal\":\"completed\",\"text\":\"Verdict: accept\",\"reason\":null}}\n",
-        )
-        .unwrap();
         std::fs::write(t.join("prompt.md"), "review this\n").unwrap();
         std::fs::write(t.join("mcp.json"), "{}\n").unwrap();
         std::fs::write(t.join("schema.json"), "{\"type\":\"object\"}\n").unwrap();
@@ -3315,19 +3288,6 @@ fn r26_runtimes_flag_lists_match_ap_run_stages() {
         "resume": {"record": rf.p("claude-reviewer.run.json")},
         "out": rf.p("claude-extra"),
     }));
-    for role in ["implementer", "fixer", "reviewer"] {
-        requests.push(json!({
-            "role": role,
-            "runtime": "muse",
-            "account": rf.p("acc_muse/muse"),
-            "model": "muse-wonder-1.0",
-            "effort": "high",
-            "permission_mode": "bypassPermissions",
-            "cwd": rf.p("cwd"),
-            "prompt": rf.p("prompt.md"),
-            "out": rf.p(&format!("muse-{role}")),
-        }));
-    }
     requests.push(json!({
         "role": "reviewer",
         "runtime": "agy",
@@ -3368,14 +3328,6 @@ fn r26_runtimes_flag_lists_match_ap_run_stages() {
             .iter()
             .find(|s| s.name == cli)
             .unwrap_or_else(|| panic!("unexpected cli {cli}"));
-        if cli == "muse" {
-            let first_non_flag = rest
-                .iter()
-                .find(|w| !w.starts_with('-'))
-                .map(String::as_str);
-            assert_eq!(first_non_flag, Some("exec"), "{rest:?}");
-            assert_eq!(spec.subcommands, ["exec"]);
-        }
         let flags = seen_flags.entry(cli.clone()).or_default();
         for w in rest {
             if w.starts_with('-') {

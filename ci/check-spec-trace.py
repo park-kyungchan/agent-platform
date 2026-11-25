@@ -5,8 +5,10 @@ Usage: check-spec-trace.py [<repository root>]   (default: the current directory
 
 A requirement is a line of a tracked specs/ap/**/*.md file that begins with a dash, a space,
 R and digits and a colon; its id is the file's path, '#' and R<digits>. A citation is the
-word 'spec:', a space and such an id, in a tracked file that is not Markdown. Faults, one
-line each, sorted: requirement_untested, citation_missing, requirement_duplicate. The last
+word 'spec:', a space and such an id, in a tracked file that is not Markdown. A retired
+requirement is one whose whole text is one sentence that begins 'Retired with' (its number is
+kept, never reused): no test cites it, and it is never untested. Faults, one line each, sorted:
+requirement_untested, citation_missing, citation_retired, requirement_duplicate. The last
 line counts requirements, citations and errors; exit 1 on a fault, 0 without one, 2 when
 the files cannot be listed or the argument is bad. Reads only the tracked files; writes
 nothing. Every path under engine/ is skipped: the Ontology engine's citations name the
@@ -20,6 +22,8 @@ import sys
 from pathlib import Path
 
 REQ_RE = re.compile(r"^- R([0-9]+):")
+# A retired requirement: its number and one sentence, "Retired with <what retired it>."
+RETIRED_RE = re.compile(r"^- R[0-9]+: Retired with [^.]+\.$")
 CITE_RE = re.compile(r"spec: (specs/[^\s#]+\.md)#R([0-9]+)")
 # The Ontology engine's tree, with specifications and citations of its own.
 SKIPPED = "engine/"
@@ -75,6 +79,7 @@ def main(argv):
 
     # Every id a tracked specs/**/*.md file holds; the traced ones are those of specs/ap/.
     ids = set()
+    retired = set()
     traced = []
     faults = []
     for rel in tracked:
@@ -97,6 +102,8 @@ def main(argv):
             ids.add(rid)
             if rel.startswith("specs/ap/"):
                 traced.append(rid)
+                if RETIRED_RE.match(line):
+                    retired.add(rid)
 
     cited = set()
     citations = 0
@@ -113,9 +120,11 @@ def main(argv):
                 cited.add(rid)
                 if rid not in ids:
                     faults.append(f"citation_missing@{rel}:{no} {rid}")
+                elif rid in retired:
+                    faults.append(f"citation_retired@{rel}:{no} {rid}")
 
     for rid in traced:
-        if rid not in cited:
+        if rid not in cited and rid not in retired:
             faults.append(f"requirement_untested@{rid}")
 
     for f in sorted(set(faults)):

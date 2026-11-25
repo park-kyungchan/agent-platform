@@ -36,17 +36,15 @@ pub const DETECTORS: [&str; 10] = [
     "delivery", "login", "services", "host", "records", "accounts", "checks", "runtimes", "drift",
     "credit",
 ];
-/// Fixed CLI subcommands and flags `ap run` invokes per runtime (R26).
+/// Fixed CLI flags `ap run` invokes per runtime (R26).
 pub struct RuntimeSpec {
     pub name: &'static str,
-    pub subcommands: &'static [&'static str],
     pub flags: &'static [&'static str],
 }
-/// The runtime CLIs `runtimes` checks (never `codex`).
-pub const RUNTIMES: [RuntimeSpec; 3] = [
+/// The runtime CLIs `runtimes` checks: the two `ap run` starts.
+pub const RUNTIMES: [RuntimeSpec; 2] = [
     RuntimeSpec {
         name: "claude",
-        subcommands: &[],
         flags: &[
             "--print",
             "--output-format",
@@ -67,23 +65,7 @@ pub const RUNTIMES: [RuntimeSpec; 3] = [
         ],
     },
     RuntimeSpec {
-        name: "muse",
-        subcommands: &["exec"],
-        flags: &[
-            "--json",
-            "--model",
-            "--reasoning-effort",
-            "--contributor-mode",
-            "--disable-reminders",
-            "--session-id",
-            "--workspace",
-            "--prompt-file",
-            "--yolo",
-        ],
-    },
-    RuntimeSpec {
         name: "agy",
-        subcommands: &[],
         flags: &[
             "--print",
             "--output-format",
