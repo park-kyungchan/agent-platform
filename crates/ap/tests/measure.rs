@@ -1940,19 +1940,20 @@ fn r11_flow_refuses_its_parameters_by_member_and_reads_nothing_of_the_host() {
     assert!(out.stdout.is_empty());
 }
 
+/// One unit of `tier_store`: its key, kind, implementer run (runtime, model, messages), packet verdicts, stop causes and fixers.
+type TierUnit = (
+    &'static str,
+    Option<&'static str>,
+    Option<(&'static str, &'static str, u64)>,
+    &'static [&'static str],
+    &'static [&'static str],
+    u32,
+);
 /// A store of merged units that different implementers ran, for `flow` by tier: each row is the unit, its kind, the
 /// implementer's run (runtime, model, messages) or none, the verdicts of its packet reviews, its stops and its fixers.
-#[allow(clippy::type_complexity)]
 fn tier_store(f: &mut Fake) {
     f.put("intent", "gadget", json!({"status": "confirmed"}));
-    let rows: [(
-        &str,
-        Option<&str>,
-        Option<(&str, &str, u64)>,
-        &[&str],
-        &[&str],
-        u32,
-    ); 7] = [
+    let rows: [TierUnit; 7] = [
         (
             "t1",
             Some("rust"),
