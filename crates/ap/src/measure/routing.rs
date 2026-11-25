@@ -3,7 +3,6 @@
 //! tier over every confirmed intent, and the findings of the detector `ap-routing` that bar a tier (`open_finding`,
 //! `see_finding_again`, `reopen_finding`, `close_finding`). It applies nothing else.
 use super::cost::DAY;
-use super::kpis::options;
 use super::sessions::day_start;
 use crate::host::{Failure, System, digest, error, id};
 use crate::store::{self, Actor};
@@ -17,6 +16,29 @@ use std::{collections::BTreeMap, ffi::OsString, time::UNIX_EPOCH};
 struct Sum {
     merged: u64,
     stopped_or_repaired: u64,
+}
+
+/// The options of the pass: the day and the store, each at most once, as `ap measure kpis` takes them (R9).
+fn options(argv: &[OsString]) -> Result<(Option<String>, Option<String>), Failure> {
+    let usage = || error("usage", "args");
+    let mut words = vec![];
+    for a in argv {
+        words.push(a.to_str().ok_or_else(usage)?.to_owned());
+    }
+    let (mut day, mut store) = (None, None);
+    let mut it = words.into_iter();
+    while let Some(w) = it.next() {
+        let slot = match w.as_str() {
+            "--day" => &mut day,
+            "--store" => &mut store,
+            _ => return Err(usage()),
+        };
+        let value = it.next().ok_or_else(usage)?;
+        if slot.replace(value).is_some() {
+            return Err(usage());
+        }
+    }
+    Ok((day, store))
 }
 
 /// The pass (R9 to R12): the answer line and its exit status.
