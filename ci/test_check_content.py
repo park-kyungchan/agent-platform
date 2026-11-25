@@ -333,7 +333,15 @@ class AgentsFile(Scratch, unittest.TestCase):
 
     def test_without_the_host_the_paths_are_skipped_with_one_line(self):
         root = self.fixture()
-        self.append_lines(root, f"- Read `{root}/no-such-dir/file.md`.")
+        added = f"- Read `{root}/no-such-dir/file.md`."
+        # Cut the copy's last lines (section 8's body) so the added line fits the byte limit
+        # whatever headroom the real file leaves.
+        lines = (root / "content/AGENTS.md").read_text(encoding="utf-8").splitlines(keepends=True)
+        while len("".join(lines).encode()) + len(added.encode()) + 1 > 6500:
+            self.assertFalse(lines[-1].startswith("## "), "no body line of section 8 is left to cut")
+            lines.pop()
+        self.write(root, "".join(lines))
+        self.append_lines(root, added)
         code, out = run_check(root)
         self.assertEqual(code, 0, out)
         self.assertNotIn("agents_path_missing@", out)
