@@ -466,7 +466,6 @@ fn listing(dir: &Path) -> Vec<String> {
 }
 
 // spec: specs/ap/api.md#R10
-// spec: specs/ap/api.md#R7
 #[test]
 fn over_budget_is_refused_before_any_call() {
     // The output part alone passes the day's cap: 30 USD spent today and 100 x 8,000 tokens at 40 / 2.
@@ -748,7 +747,6 @@ fn the_whole_flow_reserves_submits_polls_and_settles() {
     assert_eq!(mode(&f.at("run/api.lock")), 0o600);
 }
 
-// spec: specs/ap/api.md#R4
 // spec: specs/ap/api.md#R11
 #[test]
 fn the_key_is_only_in_the_header_file_while_its_call_runs() {

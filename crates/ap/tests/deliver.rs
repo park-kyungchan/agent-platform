@@ -1719,6 +1719,29 @@ fn d5_refusals_apply_nothing() {
         refused(&w, &v, exit, code);
         assert!(w.applies("close_install").is_empty(), "{code}: {v}");
     }
+    // Step 1 (R20): the host lock is held by another process, so the call is `busy` before any
+    // step: no installer, no store read of the pair, no attempt applied.
+    let mut w = W::new();
+    let mut holder = Command::new("flock")
+        .args(["-n", &w.lock, "-c", "echo held; exec sleep 60"])
+        .stdout(std::process::Stdio::piped())
+        .spawn()
+        .unwrap();
+    let mut held = String::new();
+    std::io::BufRead::read_line(
+        &mut std::io::BufReader::new(holder.stdout.take().unwrap()),
+        &mut held,
+    )
+    .unwrap();
+    assert_eq!(held, "held\n", "the holder took the lock");
+    let (v, exit) = w.run();
+    holder.kill().unwrap();
+    holder.wait().unwrap();
+    assert_eq!((end(&v), exit), (("refused", "busy"), 2), "{v}");
+    assert!(w.launched().is_empty(), "an installer ran: {v}");
+    assert!(w.applies("start_install").is_empty(), "{v}");
+    assert!(w.applies("close_install").is_empty(), "{v}");
+    assert_eq!(v["installers"], json!([]));
     // At the tip already: `current`, exit 0, no index, no start, no installer.
     let mut w = W::new();
     (w.file, w.tree, w.bytes) = (Some(c(2)), Some(c(2)), binary(&c(2)));
@@ -5595,6 +5618,45 @@ fn u2_a_file_whose_history_the_clone_cannot_answer_is_failed() {
     assert_eq!(unit_rows(&v), [urow("a.service", "failed", Value::Null)]);
     assert_eq!(std::fs::read_to_string(w.host("a.service")).unwrap(), "A\n");
     assert_eq!(w.systemctl(), Vec::<String>::new());
+}
+
+/// What `specs/ap/clause.md` R11 says of `ap deliver`: it installs the clause service and its timer
+/// and enables the timer. The merged files of `deploy/` are the unit files of the tip, the host has
+/// neither, and the call writes both byte for byte, reloads the manager, and enables the timer.
+// spec: specs/ap/clause.md#R11
+#[test]
+fn r11_clause_timer_is_installed_and_enabled_by_deliver() {
+    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let service = std::fs::read_to_string(root.join("deploy/ap-clause.service")).unwrap();
+    let timer = std::fs::read_to_string(root.join("deploy/ap-clause.timer")).unwrap();
+    let mut w = W::new();
+    w.unit(1..=2, "ap-clause.service", &service);
+    w.unit(1..=2, "ap-clause.timer", &timer);
+    let (v, exit) = w.run();
+    assert_eq!((end(&v), exit), (("installed", ""), 0), "{v}");
+    assert_eq!(
+        unit_rows(&v),
+        [
+            urow("ap-clause.service", "written", Value::Null),
+            urow("ap-clause.timer", "written", json!(true)),
+        ]
+    );
+    assert_eq!(
+        std::fs::read_to_string(w.host("ap-clause.service")).unwrap(),
+        service
+    );
+    assert_eq!(
+        std::fs::read_to_string(w.host("ap-clause.timer")).unwrap(),
+        timer
+    );
+    assert_eq!(
+        w.systemctl(),
+        [
+            "daemon-reload",
+            "enable --now ap-clause.timer",
+            "is-enabled ap-clause.timer"
+        ]
+    );
 }
 
 // spec: specs/ap/deliver.md#R50
