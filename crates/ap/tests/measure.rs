@@ -1940,6 +1940,216 @@ fn r11_flow_refuses_its_parameters_by_member_and_reads_nothing_of_the_host() {
     assert!(out.stdout.is_empty());
 }
 
+/// A store of merged units that different implementers ran, for `flow` by tier: each row is the unit, its kind, the
+/// implementer's run (runtime, model, messages) or none, the verdicts of its packet reviews, its stops and its fixers.
+#[allow(clippy::type_complexity)]
+fn tier_store(f: &mut Fake) {
+    f.put("intent", "gadget", json!({"status": "confirmed"}));
+    let rows: [(
+        &str,
+        Option<&str>,
+        Option<(&str, &str, u64)>,
+        &[&str],
+        &[&str],
+        u32,
+    ); 7] = [
+        (
+            "t1",
+            Some("rust"),
+            Some(("claude", OPUS, 30)),
+            &["accept"],
+            &[],
+            0,
+        ),
+        (
+            "t2",
+            Some("rust"),
+            Some(("claude", OPUS, 30)),
+            &["repair", "accept"],
+            &[],
+            1,
+        ),
+        (
+            "t3",
+            Some("rust"),
+            Some(("claude", OPUS, 30)),
+            &["accept"],
+            &["ci_failed"],
+            0,
+        ),
+        (
+            "t4",
+            Some("script"),
+            Some(("agy", "agy-model", 4)),
+            &["accept"],
+            &[],
+            0,
+        ),
+        ("t5", None, Some(("claude", OPUS, 9)), &["accept"], &[], 2),
+        ("t6", Some("rust"), None, &["repair", "accept"], &[], 0),
+        (
+            "t7",
+            Some("rust"),
+            Some(("claude", OPUS, 1)),
+            &[],
+            &["a", "b"],
+            1,
+        ),
+    ];
+    for (u, kind, ran, verdicts, stops, fixers) in rows {
+        let mut unit =
+            json!({"state": "merged", "intent": oid("intent", "gadget"), "class": "plain"});
+        if let Some(k) = kind {
+            unit["kind"] = json!(k);
+        }
+        f.put("unit", u, unit);
+        f.log.push(json!({"action_type": "start_unit", "submitted_at": "2026-11-17T08:00:00Z", "parameters": {"unit": oid("unit", u)}}));
+        f.log.push(json!({"action_type": "merge_unit", "submitted_at": "2026-11-17T09:00:00Z", "parameters": {"unit": oid("unit", u)}}));
+        for c in stops {
+            f.log.push(json!({"action_type": "stop_unit", "submitted_at": "2026-11-17T08:30:00Z", "parameters": {"unit": oid("unit", u), "cause": c}}));
+        }
+        for (i, v) in verdicts.iter().enumerate() {
+            f.put("review", &format!("{u}-k{i}"), json!({"unit": oid("unit", u), "kind": "packet", "status": "closed", "verdict": v, "closed_at": format!("2026-11-17T08:{:02}:00Z", 10 + i)}));
+        }
+        let run = |role: &str, runtime: &str, model: &str, messages: u64| json!({"role": role, "runtime": runtime, "model": model, "status": "closed", "started_at": "2026-11-17T08:00:00Z", "unit": oid("unit", u), "days": [{"day": "2026-11-17", "messages": messages}]});
+        if let Some((runtime, model, messages)) = ran {
+            f.put(
+                "run",
+                &format!("{u}-impl"),
+                run("implementer", runtime, model, messages),
+            );
+        }
+        for i in 0..fixers {
+            f.put(
+                "run",
+                &format!("{u}-fix{i}"),
+                run("fixer", "claude", OPUS, 3),
+            );
+        }
+    }
+}
+fn by_tier(window: Value) -> Value {
+    let mut p = window;
+    p["by"] = json!("tier");
+    p
+}
+
+// spec: specs/ap/measure.md#R17
+#[test]
+fn r17_tier_flow_groups_the_merged_units_by_implementer_and_kind() {
+    let bed = Bed::new();
+    let mut f = Fake::new(&bed.dir);
+    tier_store(&mut f);
+    let base = flow(&mut f, window("gadget"));
+    assert!(
+        base.get("groups").is_none(),
+        "without by the answer has no groups: {base}"
+    );
+    let a = flow(&mut f, by_tier(window("gadget")));
+    // Nothing but the member `groups` is added.
+    let mut without = a.clone();
+    let groups = without.as_object_mut().unwrap().remove("groups").unwrap();
+    assert_eq!(without, base);
+    let group = |runtime: Value, model: Value, kind: Value, m: [Value; 6]| {
+        let [merged, first_accept, stopped, repairs, either, rate] = m;
+        json!({"runtime": runtime, "model": model, "kind": kind, "merged": merged,
+            "first_accept": first_accept, "units_stopped": stopped, "repairs": repairs,
+            "stopped_or_repaired": either, "stop_repair_rate": rate})
+    };
+    // By runtime, model, kind, a null last in its member: the claude unit with no kind (t5) after the claude units of
+    // kind rust, and the unit with no implementer run (t6) after every group that has one.
+    assert_eq!(
+        groups,
+        json!([
+            group(
+                json!("agy"),
+                json!("agy-model"),
+                json!("script"),
+                [
+                    json!(1),
+                    json!(1.0),
+                    json!(0),
+                    json!(0),
+                    json!(0),
+                    json!(0.0)
+                ]
+            ),
+            group(
+                json!("claude"),
+                json!(OPUS),
+                json!("rust"),
+                [
+                    json!(4),
+                    json!(0.5),
+                    json!(2),
+                    json!(2),
+                    json!(3),
+                    json!(0.75)
+                ]
+            ),
+            group(
+                json!("claude"),
+                json!(OPUS),
+                Value::Null,
+                [
+                    json!(1),
+                    json!(1.0),
+                    json!(0),
+                    json!(2),
+                    json!(1),
+                    json!(1.0)
+                ]
+            ),
+            group(
+                Value::Null,
+                Value::Null,
+                json!("rust"),
+                [
+                    json!(1),
+                    json!(0.0),
+                    json!(0),
+                    json!(0),
+                    json!(0),
+                    json!(0.0)
+                ]
+            ),
+        ])
+    );
+    // Nothing is applied.
+    assert!(f.applies().is_empty());
+}
+
+// spec: specs/ap/measure.md#R17
+#[test]
+fn r17_tier_flow_has_no_group_without_a_merged_unit_and_refuses_another_by() {
+    let bed = Bed::new();
+    let mut f = Fake::new(&bed.dir);
+    tier_store(&mut f);
+    let none = flow(
+        &mut f,
+        by_tier(json!({"intent": "gadget", "since": "2026-12-01", "until": "2026-12-02"})),
+    );
+    assert_eq!(none["merged"], 0);
+    assert_eq!(none["groups"], json!([]));
+    for by in [
+        json!("role"),
+        json!("day"),
+        json!("Tier"),
+        json!(7),
+        json!(["tier"]),
+    ] {
+        let mut p = window("gadget");
+        p["by"] = by.clone();
+        let e = measure::answer(&mut f, "flow", "/scratch/store.sqlite", &p).unwrap_err();
+        assert_eq!((e.code, e.field.as_str()), ("invalid_input", "by"), "{by}");
+    }
+    // `share` has no such member.
+    let mut p = json!({"since": "2026-11-16", "until": "2026-11-22"});
+    p["by"] = json!("tier");
+    let e = measure::answer(&mut f, "share", "/scratch/store.sqlite", &p).unwrap_err();
+    assert_eq!((e.code, e.field.as_str()), ("invalid_input", "by"));
+}
+
 // spec: specs/ap/measure.md#R12
 #[test]
 fn r12_share_by_role_and_by_group_with_the_null_shares() {

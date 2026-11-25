@@ -3340,6 +3340,103 @@ fn r35_one_row_for_each_merged_unit_of_the_intent_or_of_the_store() {
     assert_eq!(none.names(), ["search"]);
 }
 
+// spec: specs/ap/status.md#R54
+#[test]
+fn r54_tier_a_row_names_the_implementer_that_ran_and_the_unit_kind() {
+    let mut f = indicator_store();
+    let ran = |f: &mut F| indicators_of(f, Some("vps"))["units"].clone();
+    let days = |n: u64| json!([{"day": "2026-11-17", "messages": n}]);
+    let of = |unit: &str, more: Value| {
+        let mut o = json!({"unit": oid("unit", unit)});
+        for (m, v) in more.as_object().unwrap() {
+            o[m] = v.clone();
+        }
+        o
+    };
+    // u-a: two implementer runs without days count 0 messages each; they tie on the start, and the smaller key wins.
+    // A unit of the store holds its kind as the page recorded it; one that has none is null.
+    f.objects.get_mut(&("unit".into(), "u-a".into())).unwrap()["kind"] = json!("rust");
+    let rows = ran(&mut f);
+    assert_eq!(
+        rows[0]["ran"],
+        json!({"runtime": "claude", "model": "invented-model"})
+    );
+    assert_eq!(rows[0]["kind"], "rust");
+    // The planned tier of the page keeps its meaning beside it.
+    assert_eq!(rows[0]["implementer"]["model"], "m1");
+    // No implementer run: both null; no kind: null. A fixer's run is not an implementer's.
+    assert_eq!(
+        (rows[1]["ran"].clone(), rows[1]["kind"].clone()),
+        (Value::Null, Value::Null)
+    );
+    run_object(
+        &mut f,
+        "r-fix",
+        "closed",
+        "2026-11-17T09:00:00Z",
+        of("u-b", json!({"role": "fixer", "days": days(99)})),
+    );
+    assert_eq!(ran(&mut f)[1]["ran"], Value::Null);
+    // The run with the most messages, the model it was served by in the place of the one asked for.
+    run_object(
+        &mut f,
+        "r-b1",
+        "closed",
+        "2026-11-17T09:00:00Z",
+        of("u-b", json!({"model": "m-a", "days": days(5)})),
+    );
+    run_object(
+        &mut f,
+        "r-b2",
+        "closed",
+        "2026-11-17T09:00:00Z",
+        of(
+            "u-b",
+            json!({"runtime": "agy", "model": "m-b", "served_by": "m-served", "days": days(7)}),
+        ),
+    );
+    assert_eq!(
+        ran(&mut f)[1]["ran"],
+        json!({"runtime": "agy", "model": "m-served"})
+    );
+    // Messages tie: the later start wins, and with one start the smaller key.
+    run_object(
+        &mut f,
+        "r-e1",
+        "closed",
+        "2026-11-17T09:00:00Z",
+        of("u-e", json!({"model": "e1", "days": days(3)})),
+    );
+    run_object(
+        &mut f,
+        "r-e2",
+        "closed",
+        "2026-11-17T10:00:00Z",
+        of("u-e", json!({"model": "e2", "days": days(3)})),
+    );
+    assert_eq!(ran(&mut f)[2]["ran"]["model"], "e2");
+    run_object(
+        &mut f,
+        "r-e0",
+        "closed",
+        "2026-11-17T10:00:00Z",
+        of("u-e", json!({"model": "e0", "days": days(3)})),
+    );
+    assert_eq!(ran(&mut f)[2]["ran"]["model"], "e0");
+    // The plain lines of the rows do not change.
+    let text = text_of(
+        &Call::Indicators(Some("vps".into())),
+        &indicators_of(&mut f, Some("vps")),
+    );
+    assert!(
+        text.lines()
+            .next()
+            .unwrap()
+            .starts_with("u-a vps contract claude/m1/high "),
+        "{text}"
+    );
+}
+
 // spec: specs/ap/status.md#R36
 #[test]
 fn r36_the_minutes_run_from_the_first_start_to_the_merge_rounded_down() {
