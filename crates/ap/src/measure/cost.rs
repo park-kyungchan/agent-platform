@@ -102,11 +102,17 @@ struct Group {
 /// `cost` over the store `st` (the engine's default when none) with the parameters `p`.
 pub(super) fn cost(s: &mut impl System, st: Option<&str>, p: &Value) -> Result<Value, Failure> {
     let w = parameters(p)?;
-    if let Some(i) = &w.intent
-        && store::get(s, st, "intent", i)?.is_none()
-    {
-        return Err(error("unknown_intent", "intent"));
-    }
+    let lead_session = match &w.intent {
+        Some(i) => {
+            let fields =
+                store::get(s, st, "intent", i)?.ok_or_else(|| error("unknown_intent", "intent"))?;
+            fields["lead_session"]
+                .as_str()
+                .filter(|l| !l.is_empty())
+                .map(str::to_owned)
+        }
+        None => None,
+    };
     let (runs, _) = store::search_every(s, st, "run", store::PAGE)?;
     let needs_units = w.intent.is_some() || w.by == "intent";
     let units: BTreeMap<String, Value> = match needs_units {
@@ -122,9 +128,23 @@ pub(super) fn cost(s: &mut impl System, st: Option<&str>, p: &Value) -> Result<V
             key_of(&units.get(&unit)?["intent"])
         })
     };
+    // With `intent`, a run of the Lead without a unit counts also when its session is the intent's `lead_session`
+    // (R10), so a Lead of two intents counts toward each; it is then grouped under the given intent.
+    let led = |f: &Value| -> bool {
+        lead_session.is_some()
+            && LEAD.contains(&f["role"].as_str().unwrap_or_default())
+            && f["unit"].is_null()
+            && f["session"].as_str() == lead_session.as_deref()
+    };
+    let intent_in = |f: &Value| -> Option<String> {
+        match led(f) {
+            true => w.intent.clone(),
+            false => intent_of(f),
+        }
+    };
     let mine: Vec<&(String, Value)> = runs
         .iter()
-        .filter(|(_, f)| w.intent.is_none() || intent_of(f) == w.intent)
+        .filter(|(_, f)| w.intent.is_none() || intent_of(f) == w.intent || led(f))
         .collect();
     let in_window = |d: &str| w.since.as_str() <= d && d <= w.until.as_str();
     let mut groups: BTreeMap<Option<String>, Group> = BTreeMap::new();
@@ -138,7 +158,7 @@ pub(super) fn cost(s: &mut impl System, st: Option<&str>, p: &Value) -> Result<V
             let micros = d["usd_micros"].as_i64().unwrap_or(0);
             let key = match w.by.as_str() {
                 "role" => Some(role.to_owned()),
-                "intent" => intent_of(f),
+                "intent" => intent_in(f),
                 "unit" => key_of(&f["unit"]),
                 _ => Some(day.to_owned()),
             };
