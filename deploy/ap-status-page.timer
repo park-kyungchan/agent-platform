@@ -1,9 +1,9 @@
 [Unit]
-Description=ap status page every fifteen minutes
+Description=ap status page every hour
 Documentation=https://github.com/park-kyungchan/agent-platform/blob/main/deploy/README.md
 
 [Timer]
-OnCalendar=*:0/15
+OnCalendar=*:33
 AccuracySec=10s
 Persistent=false
 
