@@ -2328,3 +2328,81 @@ given the intent by `set_kpi_intent` makes its name refused `duplicate_kpi` in t
 `set_kpi_target` apply on a KPI of an intent; `set_kpi_intent` is refused `criterion_not_evaluable` for a KPI of a task
 whose name a KPI of the intent without a task holds, and for a KPI without a task. The last line of standard output of
 the rehearsal is `v26 schema use: ok`.
+
+## Version 27: the plan bound to what its review read
+Version 26 remains pinned at
+`7d9642de7afc56276d7e2b65d49e12f378b0e348:ontology/work.schema.json`,
+sha256 `3d29e773cf69775d046643199abd63bd1dd30e8bc884916756d68dfd6d5bdbd2`.
+Version 27 binds a plan review to the blocks of the plan and the design record it read, and closes a lesson with what
+prevents it. Every value type, object type, link type, action type, view, source, function and grant not named below
+reads as on version 26 in canonical JSON. The point of the version: until now a plan review counted for a unit when it
+started after the unit was added, so a write set or a dependency changed after that review was built unreviewed, and
+the design record a plan follows was named nowhere in the store. `ENGINE-PIN` is unchanged.
+
+1. The optional properties: of `unit`, `plan_digest` and `plan_reviewed` (`sha256_hex`): the digest of the unit's block
+   of the plan as `add_unit` or `amend_unit` left it, and the one an accepting plan review read; of `intent`, `design`
+   (string, 300 bytes: the absolute path of the design record) and `plan_design` (`sha256_hex`: the digest of the
+   record's bytes an accepting plan review read); of `finding`, `prevented_by` (string, 300 bytes). No link type is
+   added.
+2. `add_unit` and `amend_unit` take the optional parameter `plan_digest` and set it; absent, `amend_unit` keeps the
+   stored value.
+3. `name_design` (`intent`, `design`): criteria `intent_closed` (as `amend_intent`) and `design_empty`; the rule sets
+   `design` and leaves `status`, `amended_at`, `confirmed_by`, `confirmed_delegated` and `plan_design`. There is no
+   removal: another path replaces the design, and a path with the same bytes keeps its mark.
+4. `mark_plan_reviewed` (`unit`, `review`, `digest`) sets the unit's `plan_reviewed`; `mark_design_reviewed` (`intent`,
+   `review`, `digest`) sets the intent's `plan_design`. Each takes its object in any state and changes nothing else.
+   Criteria: `review_not_accepting` (the review exists, is of kind `plan`, is `closed` and has the verdict `accept`)
+   and `review_of_another_intent` (the review's `intent` is the unit's `intent`, or the intent).
+5. `ready_unit`, criterion `plan_not_reviewed`, keeps its code and its place: for a unit of the lane `objective` with an
+   intent, a unit with `plan_digest` passes only when `plan_reviewed` is present and equal to it; a unit without
+   `plan_digest` keeps the rule of version 26 (a plan review of the intent, started after the unit was added, closed
+   `accept`). Its message serves both.
+6. `close_finding` takes the optional parameter `prevented_by` (`nonempty_text`, 300 bytes: `""` is
+   `invalid_parameter`) and sets it; its last criterion `lesson_needs_prevention` refuses a finding of kind `lesson`
+   without it. Its description gives the three forms: `"unit:<key>"` (a refusal or a check that unit delivered),
+   `"eval:<suite>/<case>"` (a case of a suite under `evals/`) and `"text:<path>#<section>"` (a sentence of an
+   instruction file, for a lesson nothing can check).
+7. The grants. `lead` gains the three new actions; no other grant changes (`specs/ap/roles.md` R2).
+
+### What the store does not check
+- That a `digest` of a mark is the digest of anything: `ap unit review` computes it from the text the reviewer read
+  (`specs/ap/unit-review.md` R25); a mark applied by hand stores what its caller says.
+- That `design` names a file, or an absolute path: `ap intent` checks the form (`specs/ap/intent.md` R25), and the store
+  keeps any string of 1 to 300 bytes.
+- That `plan_digest` is the digest of the unit's block: `ap` is the one writer of a unit's page; an `amend_unit` applied
+  by hand without it keeps the stored digest, so its next mark is lost only when `ap` amends the plan again.
+- The form of `prevented_by`: the three forms are the description's, not a pattern.
+- A unit stored before this version has no `plan_digest` and keeps the rule of version 26 until an amendment of a field
+  of its block gives it one: nothing is migrated.
+
+### The migration and the rehearsal
+`ontology/migrate` knows version 27; its step is empty. `HIGHEST = 27`; `27 28` is a pair it does not know (exit 2);
+the pairs refused on the version 10 part of the rehearsal are (9, 28), (10, 10) and (10, 9), the walk of versions 22
+and 23 refuses 23 28, the walk of version 24 24 28, the walk of version 25 25 28 and the walk of version 26 26 28. The
+walk of version 26 runs on version 26 installed from Git by the commit and digest above (it ran on the repository's
+file before).
+
+The rehearsal then installs the repository's file over the objects the walk of version 26 made: every object reads the
+same and the 16 views read the same but for their version; the schema differs from version 26 only by points 1 to 7
+(the changed names of each section are compared, `add_unit` and `amend_unit` are those of version 26 but for
+`plan_digest`, `ready_unit` that of version 26 but for `plan_not_reviewed`, `close_finding` that of version 26 but for
+its description, `prevented_by` and `lesson_needs_prevention`, and each grant is that of version 26, `lead`'s with the
+three actions); `ont describe` names version 27; `ont_describe` and `ont_action_list` stay within 262,144 bytes (the
+line `v27_mcp_bytes=` was 233,311 and 127,296 when this section was written, against 227,324 and 122,101 for version
+26); `ontology/migrate` runs 26 27 and 25 27 (exit 0, the store unchanged) and 27 28 (exit 2).
+
+The walk of version 27, each refusal before the action it guards: a unit added with `plan_digest` is refused
+`plan_not_reviewed` although an accepting plan review of its intent started after it was added; `mark_plan_reviewed` is
+refused `review_not_accepting` for a running plan review and one closed `repair`, `review_not_accepting` and
+`review_of_another_intent` for a review of kind `page`, and `review_of_another_intent` for an accepted plan review of
+another intent; a mark of another digest applies and `ready_unit` is still refused; the mark of the unit's digest
+changes `plan_reviewed` alone and `ready_unit` applies; `amend_unit` without `plan_digest` keeps the digest and the
+mark, and the unit is made ready again; `amend_unit` with another `plan_digest` returns it to draft and `ready_unit` is
+refused until the next mark; a merged unit takes a mark and keeps its state; a unit without `plan_digest` is refused
+before and made ready after a plan review that started after it was added; `name_design` is refused `intent_closed` (a
+retired intent) and `design_empty`, and applies on a confirmed intent, which keeps every other field; another path
+replaces it; `mark_design_reviewed` is refused as `mark_plan_reviewed` is and applies, the intent still confirmed; a
+design named again keeps `plan_design`; `mark_plan_reviewed` under `dispatch` and `name_design` under `watch` are
+`not_granted`; `close_finding` of a lesson is refused `lesson_needs_prevention` without `prevented_by`,
+`invalid_parameter` with `""`, and applies with `unit:<key>`; a note closes without it, also under `measure`. The last
+line of standard output of the rehearsal is `v27 plan bound: ok`.

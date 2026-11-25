@@ -800,15 +800,11 @@ fn ready(f: &mut F, key: &str) -> Result<String, Box<Refusal>> {
     {
         u["plan_reviewed"] = u["plan_digest"].clone();
     }
-    unmarked(f, key)
+    unmarked(f, key, &format!("r-{key}"))
 }
-/// `ready` as the store finds the unit: a plan review marks nothing here.
-fn unmarked(f: &mut F, key: &str) -> Result<String, Box<Refusal>> {
-    call(
-        f,
-        &["ready"],
-        with(writer(&format!("r-{key}")), json!({"unit": key})),
-    )
+/// `ready` with the request id `rid` as the store finds the unit: a plan review marks nothing here.
+fn unmarked(f: &mut F, key: &str, rid: &str) -> Result<String, Box<Refusal>> {
+    call(f, &["ready"], with(writer(rid), json!({"unit": key})))
 }
 
 // spec: specs/ap/unit.md#R1
@@ -5064,7 +5060,7 @@ fn r51_ready_tier_over_bar_holds_a_draft_before_its_checks_run() {
             &json!({"lowest": ["claude", "big"]})
         )
     );
-    assert_eq!(f.names(), ["get unit", "search"]);
+    assert_eq!(f.names(), ["get unit", "get intent", "search"]);
 }
 
 // spec: specs/ap/unit.md#R52
@@ -5133,7 +5129,7 @@ fn r54_a_plan_block_changed_since_its_mark_is_refused_plan_not_reviewed() {
         json!({"kind": "plan", "intent": oid("intent", "widgets"), "status": "closed",
             "verdict": "accept", "started_at": "2026-11-19T00:00:00Z", "head": "1".repeat(64)}),
     );
-    let e = unmarked(&mut f, "u-mark").unwrap_err();
+    let e = unmarked(&mut f, "u-mark", "r54-1").unwrap_err();
     assert_eq!((e.code.as_str(), &e.after), ("plan_not_reviewed", &None));
     // Marked with the digest of its block: ready.
     let mark = |f: &mut F| {
@@ -5141,12 +5137,12 @@ fn r54_a_plan_block_changed_since_its_mark_is_refused_plan_not_reviewed() {
         u["plan_reviewed"] = u["plan_digest"].clone();
     };
     mark(&mut f);
-    let v: Value = serde_json::from_str(&unmarked(&mut f, "u-mark").unwrap()).unwrap();
+    let v: Value = serde_json::from_str(&unmarked(&mut f, "u-mark", "r54-2").unwrap()).unwrap();
     assert_eq!(v["state"], "ready");
     // An amendment of the notes keeps the mark: ready again.
     let notes = json!({"unit": "u-mark", "notes": "Read the list."});
     yes(&mut f, &["amend"], with(writer("m1"), notes));
-    let v: Value = serde_json::from_str(&unmarked(&mut f, "u-mark").unwrap()).unwrap();
+    let v: Value = serde_json::from_str(&unmarked(&mut f, "u-mark", "r54-3").unwrap()).unwrap();
     assert_eq!(v["state"], "ready");
     // The write set changed, then the dependencies: each change of the block is refused until a review marks it.
     for (n, member) in [
@@ -5161,13 +5157,13 @@ fn r54_a_plan_block_changed_since_its_mark_is_refused_plan_not_reviewed() {
         let u = f.unit("u-mark");
         assert_eq!(u["state"], "draft");
         assert_ne!(u["plan_digest"], u["plan_reviewed"]);
-        let e = unmarked(&mut f, "u-mark").unwrap_err();
+        let e = unmarked(&mut f, "u-mark", "r54-4").unwrap_err();
         assert_eq!((e.code.as_str(), &e.after), ("plan_not_reviewed", &None));
         mark(&mut f);
     }
     // A unit without a digest keeps the rule of schema version 16: a plan review started after it was added.
     f.forget("unit", "u-dep", "plan_digest");
-    let v: Value = serde_json::from_str(&unmarked(&mut f, "u-dep").unwrap()).unwrap();
+    let v: Value = serde_json::from_str(&unmarked(&mut f, "u-dep", "r54-5").unwrap()).unwrap();
     assert_eq!(v["state"], "ready");
 }
 
@@ -5255,7 +5251,7 @@ fn r53_design_not_reviewed_refuses_ready_until_a_plan_review_read_the_record() {
     }
     // A unit that is not draft is answered as R20 says: the record is not read.
     f.calls.clear();
-    let e = ready(&mut f, "u-d1").unwrap_err();
+    let e = unmarked(&mut f, "u-d1", "r53-again").unwrap_err();
     assert_eq!(e.code, "unit_not_draft");
     assert!(!f.names().contains(&"get intent".to_owned()));
 }

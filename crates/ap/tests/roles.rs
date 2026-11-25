@@ -41,7 +41,7 @@ fn sorted(mut v: Vec<String>) -> Vec<String> {
 #[test]
 fn grants_hold_the_roles_of_the_table() {
     let s = schema();
-    assert_eq!(s["version"], 26);
+    assert_eq!(s["version"], 27);
     let grants = s["grants"].as_array().unwrap();
     assert_eq!(grants.len(), 13);
     // The grant without a role: the reads and the derivations of the one grant of version 21, the function route.
@@ -102,7 +102,13 @@ fn grants_hold_the_roles_of_the_table() {
     );
     assert_eq!(strings(&held["lead"]["actions"]), types);
     assert_eq!(strings(&held["lead"]["functions"]), functions);
-    for gate in ["approve_unit", "record_principle"] {
+    for gate in [
+        "approve_unit",
+        "record_principle",
+        "name_design",
+        "mark_plan_reviewed",
+        "mark_design_reviewed",
+    ] {
         let owners: Vec<&str> = held
             .iter()
             .filter(|(_, g)| strings(&g["actions"]).iter().any(|a| a == gate))

@@ -2142,3 +2142,92 @@ fn r24_answer_questions_passes_on_the_store_refusals_and_ont_role_refuses_it() {
     assert_eq!(e.code, "role_in_environment");
     assert!(f.calls.is_empty());
 }
+
+// spec: specs/ap/intent.md#R25
+#[test]
+fn r25_a_design_named_by_its_absolute_path_keeps_the_intent_and_reads_no_file() {
+    let mut f = led();
+    let design = "/invented/nowhere/DESIGN.md";
+    let before = f.o("widget-report").clone();
+    let q = with(
+        writer("design", "g1"),
+        json!({"intent": "widget-report", "design": design}),
+    );
+    let v = run(&mut f, &q);
+    assert_eq!(
+        v,
+        json!({"intent": "widget-report", "outcome": "applied", "status": before["status"]})
+    );
+    let b = f.applies()[0].clone();
+    assert_eq!(
+        (&b["action_type"], &b["request_id"], &b["role"]),
+        (&json!("name_design"), &json!("g1-design"), &json!("lead"))
+    );
+    assert_eq!(
+        b["parameters"],
+        json!({"intent": oid("intent", "widget-report"), "design": design})
+    );
+    assert!(b.get("expected").is_none());
+    // The file does not exist: the op reads none. The status, the amendment and the confirmation stay.
+    let after = f.o("widget-report");
+    assert_eq!(after["design"], design);
+    for k in ["status", "amended_at", "confirmed_by", "confirmed_delegated"] {
+        assert_eq!(after[k], before[k], "{k}");
+    }
+    // A path that is not absolute, has a component `..`, is longer than 300 bytes, is empty or is no string.
+    let long = format!("/{}", "x".repeat(300));
+    for bad in [
+        json!("invented/DESIGN.md"),
+        json!("/invented/../DESIGN.md"),
+        json!("/invented/.."),
+        json!(long),
+        json!(""),
+        json!(7),
+        Value::Null,
+    ] {
+        f.calls.clear();
+        let mut q = with(writer("design", "g2"), json!({"intent": "widget-report"}));
+        if !bad.is_null() {
+            q["design"] = bad.clone();
+        }
+        let e = refusal(&mut f, &q);
+        assert_eq!(
+            (e.code.as_str(), e.field.as_str(), e.after.as_deref()),
+            ("invalid_input", "design", None),
+            "{bad}"
+        );
+        assert!(f.calls.is_empty(), "{bad}");
+    }
+    let q = with(
+        writer("design", "g3"),
+        json!({"intent": "widget-report", "design": design, "notes": "x"}),
+    );
+    assert_eq!(refusal(&mut f, &q).field, "notes");
+    // `show` prints the design and the digest a plan review marked.
+    f.modify("widget-report", json!({"plan_design": "a".repeat(64)}));
+    let shown = run(&mut f, &json!({"op": "show", "intent": "widget-report"}));
+    assert_eq!(
+        (&shown["design"], &shown["plan_design"]),
+        (&json!(design), &json!("a".repeat(64)))
+    );
+    let text = text_of(&shown);
+    assert!(text.contains(&format!("design: {design}\n")), "{text}");
+    assert!(text.contains(&format!("plan design: {}\n", "a".repeat(64))), "{text}");
+    // A retired intent is the store's to refuse, with the code of the other intent actions.
+    run(
+        &mut f,
+        &with(
+            writer("retire", "x1"),
+            json!({"intent": "widget-report", "reason": "r"}),
+        ),
+    );
+    let q = with(
+        writer("design", "g4"),
+        json!({"intent": "widget-report", "design": design}),
+    );
+    let e = refusal(&mut f, &q);
+    assert_eq!(
+        (e.code.as_str(), e.after.as_deref()),
+        ("intent_closed", None)
+    );
+}

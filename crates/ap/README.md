@@ -163,6 +163,8 @@ Refusals (local checks precede writes and status posts):
 
 `ap unit run` carries an accept across an update (`specs/ap/unit-run.md` R37): when `main` moved under an accepted head and the run's own update merged it without a conflict, the other side changed no path of the unit's write set and the unit's patch is unchanged, the new head is checked (the write set, the acceptance checks, the required check) and the accept is carried to it with the store's `carry_review`, with no verifier session; the call writes `<directory>/<key>/<n>.update.md` (the heads, the bases, the other side's paths, the checks' ends) and its answer names `carried: {review, from, file}`. An author commit, a path of the write set, a conflict or a `repair` verdict still goes to a verifier round. A carried review is a verdict but not a round: neither the unit's `rounds` nor `ap status --indicators` counts it.
 
+A plan review is bound to what it read (schema version 27). `add` and `amend` keep each unit's `plan_digest`, the digest of its block of the plan (its heading, objective, dependencies, write set and specifications; not its tiers or estimate: `specs/ap/unit.md` R52); an accepted plan review marks every unit it read and the intent's design record (`specs/ap/unit-review.md` R25, R26); `ready` passes on the store's `plan_not_reviewed` for a unit whose block changed since its mark (R54). The order of an objective: the pages are written first (`ap unit write` amends their plan fields), the Lead names the intent's design record (`ap intent`, op `design`), and then the one plan review runs; a page amended after it in a field of its block needs the plan review again. The two refusals of `ap`: `design_unreadable` (field `intent`) when the plan review cannot read the named record, and `design_not_reviewed` (field `unit`) when `ready` reads a record whose digest is not the one the last accepting plan review marked (`specs/ap/unit.md` R53).
+
 ## The page writer
 
 `ap unit write <key> [--store <path>]`: `specs/ap/unit-write.md`.
@@ -198,7 +200,7 @@ What a case record means, for the read-out (`evals/readout.py`) and any other re
 
 ## One intent
 
-`ap intent [--store <path>] [--text] < request.json`: `specs/ap/intent.md`.
+`ap intent [--store <path>] [--text] < request.json`: `specs/ap/intent.md`. The op `design` names an intent's design record by its absolute path (`name_design`) and reads no file; a plan review reads it (R25).
 
 ## The status
 
