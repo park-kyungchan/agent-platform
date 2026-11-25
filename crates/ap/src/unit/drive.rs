@@ -131,6 +131,22 @@ fn merge_call(s: &mut impl System, words: &str) -> Result<(), String> {
 pub(crate) fn racing(message: &[u8]) -> bool {
     message.windows(15).any(|w| w == b"cannot lock ref")
 }
+/// Whether the redacted reply of a failed `gh` call names a transient failure of the service (R9).
+fn transient(reply: &str) -> bool {
+    const SAYS: [&str; 9] = [
+        "i/o timeout",
+        "connection reset",
+        "tls handshake timeout",
+        "http 502",
+        "http 503",
+        "http 504",
+        "http 500",
+        "bad credentials",
+        "could not resolve host",
+    ];
+    let reply = reply.to_lowercase();
+    SAYS.iter().any(|t| reply.contains(t))
+}
 /// A stop that keeps the redacted reply of the failed `gh` call that caused it.
 fn said<T>(cause: &str, detail: impl ToString, reply: String) -> Step<T> {
     Err(Halt::Said(cause.to_owned(), detail.to_string(), reply))
@@ -1223,7 +1239,21 @@ impl Run {
         }
     }
     fn gh(&self, s: &mut impl System, words: &str) -> Step<Value> {
-        let reply = s.call("gh", &args(&w(words)), &Value::Null, 60_000);
+        // A transient failure of the hosting service is tried again, twice at most, after 10 and
+        // then 30 seconds (R9); a retry adds nothing to the store.
+        let mut reply = s.call("gh", &args(&w(words)), &Value::Null, 60_000);
+        for pause in [10, 30] {
+            let transient = match &reply {
+                Ok(r) if r.success => false,
+                Ok(r) => transient(&crate::unit::redact(&r.bytes)),
+                Err(_) => true,
+            };
+            if !transient {
+                break;
+            }
+            s.pause(Duration::from_secs(pause));
+            reply = s.call("gh", &args(&w(words)), &Value::Null, 60_000);
+        }
         // A call that ran and failed keeps its reply, redacted, in the detail (R22, R25).
         if let Some(r) = reply.as_ref().ok().filter(|r| !r.success) {
             let reply = crate::unit::redact(&r.bytes);
