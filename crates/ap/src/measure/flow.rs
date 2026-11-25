@@ -9,7 +9,7 @@ use serde_json::{Value, json};
 use std::collections::{BTreeMap, BTreeSet};
 
 /// The parameters of `flow` and `share` (R9, R11, R12): the window and the intent, which `flow` requires and `share`
-/// may leave out; no other member.
+/// may leave out; no other member (`flow`'s `by` is read apart, R17).
 pub(super) fn parameters(
     p: &Value,
     intent_required: bool,
@@ -49,12 +49,55 @@ fn ratio(n: usize, of: usize, steps: f64) -> Value {
     }
 }
 
+/// The group of a unit in `flow` by `tier` (R17): its runtime, model and kind, each ordered with null last.
+type Tier<'a> = [(bool, &'a str); 3];
+
+/// `flow`'s groups by tier (R17) over the rows of the indicators: one group for each runtime, model and kind of
+/// the rows' `ran` and `kind`, a null one last in its member, as `cost`'s null key is (R10).
+fn tiers(rows: &[&Value]) -> Value {
+    fn part(v: &Value) -> (bool, &str) {
+        (v.as_str().is_none(), v.as_str().unwrap_or_default())
+    }
+    let mut groups: BTreeMap<Tier, Vec<&Value>> = BTreeMap::new();
+    for r in rows {
+        let key = [
+            part(&r["ran"]["runtime"]),
+            part(&r["ran"]["model"]),
+            part(&r["kind"]),
+        ];
+        groups.entry(key).or_default().push(r);
+    }
+    groups
+        .into_values()
+        .map(|g| {
+            let n = g.len();
+            // A row whose `stops` is null (a cut log) counts as no stop (R17).
+            let stopped = |r: &Value| r["stops"].as_array().is_some_and(|c| !c.is_empty());
+            let repairs = |r: &Value| r["repairs"].as_u64().unwrap_or(0);
+            let count = |f: &dyn Fn(&Value) -> bool| g.iter().filter(|r| f(r)).count();
+            let either = count(&|r| stopped(r) || repairs(r) > 0);
+            json!({"runtime": g[0]["ran"]["runtime"], "model": g[0]["ran"]["model"], "kind": g[0]["kind"],
+                "merged": n, "first_accept": ratio(count(&|r| r["first_verdict"] == "accept"), n, 1000.0),
+                "units_stopped": count(&stopped),
+                "repairs": g.iter().map(|r| repairs(r)).sum::<u64>(),
+                "stopped_or_repaired": either, "stop_repair_rate": ratio(either, n, 1000.0)})
+        })
+        .collect()
+}
+
 /// One page look of a unit: when it closed, its key and its verdict.
 type Look = (String, String, String);
 
 /// `flow` over the store `st` (the engine's default when none) with the parameters `p`.
 pub(super) fn flow(s: &mut impl System, st: Option<&str>, p: &Value) -> Result<Value, Failure> {
-    let (since, until, intent) = parameters(p, true)?;
+    let mut rest = p.clone();
+    let by = rest.as_object_mut().and_then(|o| o.remove("by"));
+    let (since, until, intent) = parameters(&rest, true)?;
+    let tier = match by {
+        None | Some(Value::Null) => false,
+        Some(Value::String(b)) if b == "tier" => true,
+        Some(_) => return Err(error("invalid_input", "by")),
+    };
     let intent = intent.unwrap_or_default();
     if store::get(s, st, "intent", &intent)?.is_none() {
         return Err(error("unknown_intent", "intent"));
@@ -123,8 +166,7 @@ pub(super) fn flow(s: &mut impl System, st: Option<&str>, p: &Value) -> Result<V
             after += l.len() - n - 1;
         }
     }
-    Ok(
-        json!({"intent": intent, "since": since, "until": until, "merged": merged,
+    let mut answer = json!({"intent": intent, "since": since, "until": until, "merged": merged,
         "merged_a_day": (merged as f64 / days as f64 * 100.0).round() / 100.0,
         "median_minutes": median(numbers),
         "packet_first_accept": ratio(accepted, verdicts.len(), 1000.0),
@@ -132,6 +174,9 @@ pub(super) fn flow(s: &mut impl System, st: Option<&str>, p: &Value) -> Result<V
         "page_looks": ratio(total, merged, 100.0),
         "looks_after_accept": ratio(after, merged, 100.0),
         "first_accept": ratio(first, merged, 1000.0),
-        "log_cut": rows.iter().any(|r| r["log_cut"] == true)}),
-    )
+        "log_cut": rows.iter().any(|r| r["log_cut"] == true)});
+    if tier {
+        answer["groups"] = tiers(&rows);
+    }
+    Ok(answer)
 }
