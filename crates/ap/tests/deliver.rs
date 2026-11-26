@@ -5938,7 +5938,11 @@ impl W {
         assert!(["check", "install"].contains(&argv[2].as_str()), "{argv:?}");
         let own = argv[1] == self.p("state/r/host/scripts/install-etc.sh");
         let head = if own { &self.rhead } else { &self.xhead };
-        assert_eq!(head.as_deref(), Some(argv[3].as_str()), "a program ran off E");
+        assert_eq!(
+            head.as_deref(),
+            Some(argv[3].as_str()),
+            "a program ran off E"
+        );
         let (exit, err) = self.xruns.remove(0);
         let [stdin, stdout, stderr] = files;
         Command::new("sh")
@@ -7584,7 +7588,10 @@ fn etc_same_repository() {
     let program = w
         .calls
         .iter()
-        .find(|(_, a, _)| a.first().is_some_and(|x| x.ends_with("host/scripts/install-etc.sh")))
+        .find(|(_, a, _)| {
+            a.first()
+                .is_some_and(|x| x.ends_with("host/scripts/install-etc.sh"))
+        })
         .unwrap();
     assert!(program.2["env"].get("CARGO_TARGET_DIR").is_none());
     assert_eq!(w.own_tip(), Some(format!("{tip}\n")));
@@ -7601,7 +7608,10 @@ fn etc_same_repository() {
     // A call whose record has `etc` null (a refusal) keeps F.
     w.fetch_fails = true;
     let (v, _) = w.run();
-    assert_eq!((v["code"].clone(), v["etc"].clone()), (json!("fetch_failed"), Value::Null));
+    assert_eq!(
+        (v["code"].clone(), v["etc"].clone()),
+        (json!("fetch_failed"), Value::Null)
+    );
     assert_eq!(w.own_tip(), Some(format!("{tip}\n")));
     w.fetch_fails = false;
 

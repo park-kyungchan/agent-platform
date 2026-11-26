@@ -275,10 +275,9 @@ fn check(r: &Value) -> Result<(), String> {
     };
     fn named_by(v: &Value, part: impl Fn(&str) -> bool) -> Option<(&str, &str)> {
         let name = v.as_str().filter(|v| !v.is_empty() && v.len() <= 200);
-        name.and_then(|v| v.split_once('/'))
-            .filter(|(o, n)| {
-                part(o) && part(n) && ![".", "..", "target", "last.json", ETC_TIP].contains(n)
-            })
+        name.and_then(|v| v.split_once('/')).filter(|(o, n)| {
+            part(o) && part(n) && ![".", "..", "target", "last.json", ETC_TIP].contains(n)
+        })
     }
     let url_of = |v: &Value| {
         let u = v.as_str().filter(|v| !v.is_empty() && v.len() <= 4096);
@@ -1978,7 +1977,10 @@ fn same_repository(s: &mut impl System, c: &mut Call) -> Value {
         .ok()
         .map(|t| t.trim().to_owned())
         .filter(|t| hex40(t));
-    let tip = c.rec["tip"].as_str().filter(|t| hex40(t)).map(str::to_owned);
+    let tip = c.rec["tip"]
+        .as_str()
+        .filter(|t| hex40(t))
+        .map(str::to_owned);
     let mut out = json!({"repository": c.r["etc"]["repository"], "from": from, "tip": tip,
         "result": "fetch_failed", "code": null, "detail": null});
     let Some(tip) = tip else {

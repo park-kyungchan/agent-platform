@@ -427,7 +427,11 @@ impl F {
     fn clone_git(&self, args: &[String]) -> Answer {
         let clone = args[1].as_str();
         let joined = format!("{clone} {}", args[2..].join(" "));
-        if self.git_fails.iter().any(|e| joined.starts_with(e.as_str())) {
+        if self
+            .git_fails
+            .iter()
+            .any(|e| joined.starts_with(e.as_str()))
+        {
             return failed("fatal: bad object\n");
         }
         let a: Vec<&str> = args[2..].iter().map(String::as_str).collect();
@@ -459,7 +463,10 @@ impl F {
                 dup(&self.git_show)
             }
             (DELIVER_CLONE, ["cat-file", "-t", spec]) => {
-                assert!(spec.starts_with(&format!("{}:{HOST_TREE}", installed())), "{spec}");
+                assert!(
+                    spec.starts_with(&format!("{}:{HOST_TREE}", installed())),
+                    "{spec}"
+                );
                 self.git_cat_file
                     .get(*spec)
                     .map_or_else(|| ok("blob\n"), dup)
@@ -3653,8 +3660,10 @@ fn r29_each_cause_of_unreadable() {
     type Setup = fn(&mut F);
     let causes: [(&str, Setup); 3] = [
         ("ls-tree", |f| {
-            f.git_fails
-                .insert(format!("{DELIVER_CLONE} ls-tree -r -z {} host/etc/", installed()));
+            f.git_fails.insert(format!(
+                "{DELIVER_CLONE} ls-tree -r -z {} host/etc/",
+                installed()
+            ));
         }),
         ("show", |f| {
             f.git_fails
