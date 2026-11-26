@@ -2,7 +2,7 @@
 
 Purpose: The tailnet HTTP/1.1 server of the `ont` command (`ont serve`), exposing reads, actions, functions, and MCP over HTTP with Tailscale LocalAPI peer authentication.
 
-`ont serve` is the single tailnet listener exception to "No daemon" in `AGENTS.md`.
+`ont serve` is the single tailnet listener exception to "No daemon" in the repository's `AGENTS.md` ("The engine").
 
 ## CLI and startup
 

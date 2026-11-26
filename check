@@ -7,13 +7,15 @@
 #   ./check content  only the steps that need no Rust build (a change of content/ or documents)
 #   ./check lint     the content steps, then rustfmt and clippy (the CI job `lint`)
 #   ./check test     everything of ./check but the content steps, rustfmt and clippy (the CI job `test`)
+#   ./check engine   only the engine's steps: rustfmt, clippy and the tests of the workspace engine/, its trace of
+#                    specs/ont/ and the test of its installer (the CI job `test` when engine/ changed)
 set -euo pipefail
 self=$(realpath "$0")
 cd "$(dirname "$self")"
 mode=${1:-all}
 case "$mode" in
-  all|content|lint|test) ;;
-  *) echo "usage: ./check [all|content|lint|test]" >&2; exit 2 ;;
+  all|content|lint|test|engine) ;;
+  *) echo "usage: ./check [all|content|lint|test|engine]" >&2; exit 2 ;;
 esac
 # The declared skips (ci/skips.json, specs/ap/check.md R22): a step that cannot run here appends its row's id as one
 # line to the file CHECK_SKIPS names, and the line `check: skipped <id> ...` before the last line names them. The file
@@ -38,13 +40,13 @@ say_skips() {
   if [ -n "$ids" ]; then echo "check: skipped $ids"; fi
 }
 
-if [ "$mode" != test ]; then
+if [ "$mode" != test ] && [ "$mode" != engine ]; then
 python3 -I -B ci/check-content.py
 bash scripts/test-install-content.sh
 bash scripts/test-pc-pull.sh
 bash scripts/test-backup-store.sh
 python3 -I -B -m unittest discover -s github -p 'test_*.py'
-python3 -I -B ci/check-map.py crates/ ci/ content/ deploy/ evals/ github/ ontology/ scripts/ specs/ .github/ check rust-toolchain.toml Cargo.toml Cargo.lock
+python3 -I -B ci/check-map.py crates/ ci/ content/ deploy/ engine/ evals/ github/ ontology/ scripts/ specs/ .github/ check rust-toolchain.toml Cargo.toml Cargo.lock
 python3 -I -B ci/check-spec-trace.py
 # The work schema declares no action type and no view that the code, the content and the host's scripts do not name.
 python3 -I -B ci/check-schema-use.py
@@ -75,24 +77,37 @@ if [ "${CI:-}" != true ] && [ -z "${CHECK_LOCKED:-}" ]; then
   fi
 fi
 
-# The engine for the rehearsal and every step after it, chosen by ci/engine-pin.sh before the Rust build so that
-# a missing engine refuses first. The rule of two trees (specs/ap/check.md R26): a tree that holds
-# ontology/ENGINE-PIN takes the engine of the pin (deploy/README.md, "The engine of a pin"); one without it that
-# holds engine/ takes the engine named by the Git tree id of engine/ (deploy/README.md, "An engine change"),
-# and runs engine/check exactly when that engine had to be built here.
-if [ -e ontology/ENGINE-PIN ] || [ -L ontology/ENGINE-PIN ]; then
-  pin=$(tr -d '[:space:]' < ontology/ENGINE-PIN)
-  [[ "$pin" =~ ^[0-9a-f]{40}$ ]] || { echo "engine_pin_invalid@ontology/ENGINE-PIN" >&2; exit 2; }
-  ont_bin=$(bash ci/engine-pin.sh "$pin")
-elif [ -d engine ]; then
-  ont_bin=$(bash ci/engine-pin.sh --tree)
-  engine_root=${CARGO_TARGET_DIR:-$PWD/target}/engine-tree
-  if [ "$ont_bin" = "$engine_root/build/debug/ont" ]; then
-    CARGO_TARGET_DIR="$engine_root/build" engine/check
-  fi
-else
-  echo "engine_missing@check: the tree holds neither ontology/ENGINE-PIN nor engine/" >&2
-  exit 2
+# The engine's own steps, run in engine/, its own workspace, into the directory ci/engine.sh builds the engine in:
+# the format, the lints and the tests of the workspace, the trace between specs/ont/ and the tests that cite it, and
+# the test of its installer.
+engine_steps() {
+  (
+    unset ONT_AGENT ONT_ROLE
+    export CARGO_BUILD_WARNINGS=deny CARGO_TARGET_DIR="${CARGO_TARGET_DIR:-$PWD/target}/engine-tree/build"
+    cd engine
+    python3 -I -B scripts/check-spec-trace.py
+    python3 -I -B -m unittest discover -s scripts -p 'test_check_spec_trace.py'
+    cargo fmt --all -- --check
+    cargo clippy --workspace --all-targets --locked
+    cargo test --workspace --locked
+    sh scripts/test-install-ont.sh
+  )
+}
+if [ "$mode" = engine ]; then
+  [ -d engine ] || { echo "engine_missing@check: no engine/" >&2; exit 2; }
+  engine_steps
+  say_skips
+  echo "check: ok (engine)"
+  exit 0
+fi
+
+# The engine for the rehearsal and every step after it, chosen by ci/engine.sh before the Rust build so that a
+# missing engine refuses first: the engine named by the Git tree id of engine/ (specs/ap/check.md R26,
+# deploy/README.md, "An engine change"). The engine's own steps run exactly when that engine had to be built here.
+[ -d engine ] || { echo "engine_missing@check: no engine/" >&2; exit 2; }
+ont_bin=$(bash ci/engine.sh)
+if [ "$ont_bin" = "${CARGO_TARGET_DIR:-$PWD/target}/engine-tree/build/debug/ont" ]; then
+  engine_steps
 fi
 # The build of `ap` (clippy, test, the engine tests) generates its module of the schema with this engine
 # (crates/ap/build.rs), so every step of the check uses the one.
@@ -115,8 +130,8 @@ cargo test --workspace --locked
 bash ci/host-run-scope.sh "${CARGO_TARGET_DIR:-$PWD/target}/debug/ap"
 
 # The schema against a real engine: ontology/work.schema.json is installed into a
-# disposable store of the engine chosen above (the pin's, or the tree's of engine/), and every action
-# answer `ap` parses is asserted. The engine is the one chosen before the build (ci/engine-pin.sh).
+# disposable store of the engine chosen above (the one of engine/), and every action
+# answer `ap` parses is asserted. The engine is the one chosen before the build (ci/engine.sh).
 # The engine admits only uid 0, so in CI the rehearsal runs through sudo. The index sources of the schema name
 # the host's work directory; the rehearsal reads fixture files of the repository (ontology/fixtures/work) that it
 # copies under its own temporary root, and makes nothing under /home/palantirkc/work.

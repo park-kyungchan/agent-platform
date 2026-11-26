@@ -1,10 +1,10 @@
 #!/bin/sh
 # Test scripts/install-ont.sh in a temporary directory with a small
 # stand-in binary (a shell script that prints the expected version line).
-# No root, no host path is touched. The script serves the rule of a tree
-# without ontology/ENGINE-PIN (specs/ap/deliver.md R67): the fixture is a
-# repository whose engine/ holds the script, and the engine's id is the tree
-# id of engine/ at the commit installed.
+# No root, no host path is touched. The engine of a commit is engine/ of that
+# commit (specs/ap/deliver.md R67): the fixture is a repository whose engine/
+# holds the script, and the engine's id is the tree id of engine/ at the
+# commit installed.
 set -eu
 
 SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)

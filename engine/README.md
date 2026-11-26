@@ -1,4 +1,4 @@
-# ontology-platform
+# The Ontology engine (`engine/`)
 
 The Ontology engine of this host: one generic engine, no domain knowledge. A domain describes its world in a schema file kept in the domain's own repository (object types with typed properties, link types, action types with submission criteria, views); the engine stores observations of those objects, answers reads over them and applies actions.
 
@@ -24,10 +24,10 @@ A change of an answer's shape or of the schema language is a change of a contrac
 
 ## Check, install
 
-- `./check` is the one check: format, lints as errors, all tests, the test of the install script. The CI job `rust` runs the same file and is the required check of `main`.
-- `scripts/install-ont.sh install <commit>` builds and installs the command from a clean checkout of a commit on `main`, building in a new 0700 directory under `/var/lib/ontology-platform/build` (never under `/tmp`), and refuses when a component of that path is a link or writable by an account other than root; `check` compares the installed files with the record that install wrote (sha256 and commit); `rollback` restores the previous one. It installs no schema and runs no index.
+- The repository's `./check` is the one check; `./check engine` runs the engine's steps: format, lints as errors, all tests of this workspace, the trace of `specs/ont/`, the test of the install script. `./check` runs them when it had to build the engine, and the CI job `test` when `engine/` changed.
+- `scripts/install-ont.sh install <commit>` builds and installs the command from `engine/` of a commit of the repository around it, building in a new 0700 directory under `/var/lib/ontology-platform/build` (never under `/tmp`), and refuses when a component of that path is a link or writable by an account other than root; `check` compares the installed files with the record that install wrote (sha256 and commit); `rollback` restores the previous one. It installs no schema and runs no index.
 
 ## What else is in the tree
 
 - `conformance/fixtures/`: synthetic fixtures that tests of `ont-core` and `ont-store` read.
-- `AGENTS.md`: how an agent works in this repository. `REVIEW.md`: what blocks a pull request.
+- The repository's `AGENTS.md` ("The engine"): how an agent works on the engine. Its `REVIEW.md`: what blocks a pull request.
