@@ -1,8 +1,8 @@
-//! The detector `drift` of `ap watch` (`specs/ap/watch.md` R20, R27 to R29, R33): compares host files
-//! named in `deployments/host-artifacts.json` at `origin/main` of `agent-vps-operations` against their
-//! recorded SHA-256 digests (R27), the unit files of `deploy/` at the commit the installed `ap` names
-//! (R28), the files of `etc/` at the tip delivery's last fetch of the operations repository read
-//! (R29), and when the policy names `hosts.pc.ssh` (`apcheck@...`) and the PC is reachable, the
+//! The detector `drift` of `ap watch` (`specs/ap/watch.md` R20, R27 to R29, R33, R34 to R36): at
+//! the commit K the installed `ap` names, read from delivery's clone of this repository, it compares
+//! host files named in `host/deployments/host-artifacts.json` against their recorded SHA-256 digests
+//! (R27), the unit files of `deploy/` (R28) and the files of `host/etc/` (R29) against the host's
+//! copies, and when the policy names `hosts.pc.ssh` (`apcheck@...`) and the PC is reachable, the
 //! checks account's `ont` binary against `/usr/local/bin/ont` (R33). It only reads: no clone or
 //! checkout is fetched, checked out or written.
 use super::detect::output;
@@ -11,18 +11,19 @@ use crate::host::{System, digest};
 use serde_json::Value;
 use std::io::ErrorKind;
 
-pub const VPS_OPS_REPO: &str = "/home/palantirkc/platforms/agent-vps-operations";
-pub const INVENTORY_PATH: &str = "deployments/host-artifacts.json";
+/// The tree of the host's configuration in this repository; every path of the inventory and of `etc/`
+/// is read under it (R34).
+pub const HOST_TREE: &str = "host/";
+pub const INVENTORY_PATH: &str = "host/deployments/host-artifacts.json";
 /// The installed `ap`, whose `--version` names the commit delivery installed (R28).
 pub const INSTALLED_AP: &str = "/usr/local/bin/ap";
 /// The installed `ont`, whose digest and `--version` the PC checks binary is compared against (R33).
 pub const INSTALLED_ONT: &str = "/usr/local/bin/ont";
 /// Default remote binary path on the PC checks account when `deploy/deliver.json` names none (R33).
 pub const DEFAULT_PC_ONT: &str = "/home/apcheck/.cargo/bin/ont";
-/// Delivery's clone of agent-platform and of the operations repository: `<state>/<name>` of
-/// `deploy/deliver.json`, its `repository` and its `etc.repository` (R28, R29).
+/// Delivery's clone of agent-platform: `<state>/<name>` of `deploy/deliver.json`, its `repository`
+/// (R27 to R29).
 pub const DELIVER_CLONE: &str = "/var/lib/agent-platform/deliver/agent-platform";
-pub const ETC_CLONE: &str = "/var/lib/agent-platform/deliver/agent-vps-operations";
 /// The host's directory of the unit files delivery installs (`specs/ap/deliver.md` R48).
 pub const UNIT_DIR: &str = "/etc/systemd/system";
 const MS: u64 = 10_000;
@@ -43,10 +44,10 @@ fn valid_source(source: &str) -> bool {
 }
 
 fn is_blob(s: &mut impl System, commit: &str, dest: &str) -> Result<bool, String> {
-    let spec = format!("{commit}:{dest}");
+    let spec = format!("{commit}:{HOST_TREE}{dest}");
     let args = [
         "-C".to_owned(),
-        VPS_OPS_REPO.to_owned(),
+        DELIVER_CLONE.to_owned(),
         "cat-file".to_owned(),
         "-t".to_owned(),
         spec,
@@ -57,26 +58,22 @@ fn is_blob(s: &mut impl System, commit: &str, dest: &str) -> Result<bool, String
     Ok(reply.success && String::from_utf8_lossy(&reply.stdout).trim() == "blob")
 }
 
-/// `drift` (R20, R27 to R29, R33): compares host files against the inventory at `origin/main`,
-/// unit files, configuration files, and the PC checks account's `ont` binary.
+/// `drift` (R20, R27 to R29, R33): compares host files against the inventory, unit files and
+/// configuration files at the installed commit K, and the PC checks account's `ont` binary.
 pub(crate) fn detect(s: &mut impl System, policy: &Result<Option<Value>, String>) -> Reading {
-    let commit = output(
-        s,
-        "git",
-        &[
-            "-C",
-            VPS_OPS_REPO,
-            "rev-parse",
-            "--verify",
-            "origin/main^{commit}",
-        ],
-    )?;
-    let commit = commit.trim().to_owned();
-    if commit.len() != 40 || !commit.bytes().all(|b| b.is_ascii_hexdigit()) {
-        return Err("git rev-parse origin/main did not return a commit".into());
-    }
+    let k = installed_commit(s)?;
+    let mut r = Read::default();
+    inventory(s, &mut r, &k)?;
+    units(s, &mut r, &k)?;
+    configuration(s, &mut r, &k)?;
+    pc_ont(s, &mut r, policy, &k)?;
+    Ok(r)
+}
+/// R27: the rows of `host/deployments/host-artifacts.json` at K, each host file against its digest;
+/// a row's `destination` is relative to `host/`.
+fn inventory(s: &mut impl System, r: &mut Read, commit: &str) -> Result<(), String> {
     let spec = format!("{commit}:{INVENTORY_PATH}");
-    let raw = output(s, "git", &["-C", VPS_OPS_REPO, "show", &spec])?;
+    let raw = output(s, "git", &["-C", DELIVER_CLONE, "show", &spec])?;
     let rows: Value =
         serde_json::from_str(&raw).map_err(|_| format!("{INVENTORY_PATH}: not JSON"))?;
     let rows = rows
@@ -98,7 +95,6 @@ pub(crate) fn detect(s: &mut impl System, policy: &Result<Option<Value>, String>
         };
         parsed.push((source, destination, sha256));
     }
-    let mut r = Read::default();
     for (source, destination, expected) in parsed {
         if !valid_destination(destination) || !valid_source(source) {
             r.signals.push(Signal::new(
@@ -109,7 +105,7 @@ pub(crate) fn detect(s: &mut impl System, policy: &Result<Option<Value>, String>
             ));
             continue;
         }
-        if !is_blob(s, &commit, destination)? {
+        if !is_blob(s, commit, destination)? {
             r.signals.push(Signal::new(
                 format!("inventory {destination}"),
                 "act",
@@ -144,10 +140,7 @@ pub(crate) fn detect(s: &mut impl System, policy: &Result<Option<Value>, String>
             }
         }
     }
-    let k = units(s, &mut r)?;
-    configuration(s, &mut r)?;
-    pc_ont(s, &mut r, policy, &k)?;
-    Ok(r)
+    Ok(())
 }
 /// The standard output of one `git -C <clone>` call that ran and succeeded, as bytes; else the cause.
 fn git_bytes(s: &mut impl System, clone: &str, words: &[&str]) -> Result<Vec<u8>, String> {
@@ -204,9 +197,8 @@ fn compare(
         Err(_) => Err(format!("host file {host} cannot be read")),
     }
 }
-/// R28: the unit files of the commit K the installed `ap` names, read from delivery's clone, against
-/// their copies under `/etc/systemd/system`. Returns K.
-fn units(s: &mut impl System, r: &mut Read) -> Result<String, String> {
+/// K, the commit the installed `ap` names in the first line of its `--version` (R28).
+fn installed_commit(s: &mut impl System) -> Result<String, String> {
     let version = output(s, INSTALLED_AP, &["--version"])?;
     let words: Vec<&str> = version
         .lines()
@@ -214,19 +206,23 @@ fn units(s: &mut impl System, r: &mut Read) -> Result<String, String> {
         .unwrap_or_default()
         .split_whitespace()
         .collect();
-    let k = match words.as_slice() {
-        ["ap", _, k] if hex40(k) => (*k).to_owned(),
-        _ => return Err(format!("{INSTALLED_AP} --version names no commit")),
-    };
-    let listed = git_bytes(s, DELIVER_CLONE, &["ls-tree", &k, "deploy/"])?;
+    match words.as_slice() {
+        ["ap", _, k] if hex40(k) => Ok((*k).to_owned()),
+        _ => Err(format!("{INSTALLED_AP} --version names no commit")),
+    }
+}
+/// R28: the unit files of K, read from delivery's clone, against their copies under
+/// `/etc/systemd/system`.
+fn units(s: &mut impl System, r: &mut Read, k: &str) -> Result<(), String> {
+    let listed = git_bytes(s, DELIVER_CLONE, &["ls-tree", k, "deploy/"])?;
     let listed = String::from_utf8(listed).map_err(|_| "git ls-tree: not UTF-8".to_owned())?;
     for name in crate::deliver::unit_entries(&listed) {
         let spec = format!("{k}:deploy/{name}");
         let want = git_bytes(s, DELIVER_CLONE, &["show", &spec])?;
         let host = format!("{UNIT_DIR}/{name}");
-        compare(s, r, &format!("deploy/{name}"), &host, &want, &k)?;
+        compare(s, r, &format!("deploy/{name}"), &host, &want, k)?;
     }
-    Ok(k)
+    Ok(())
 }
 /// A path of `etc/` the watch compares: ASCII letters, digits, `/`, `.`, `_`, `@` and `-`, with no
 /// empty, `.` or `..` component.
@@ -235,52 +231,32 @@ fn plain_path(p: &str) -> bool {
         .all(|b| b.is_ascii_alphanumeric() || b"/._@-".contains(&b))
         && !p.split('/').any(|c| c.is_empty() || c == "." || c == "..")
 }
-/// R29: the files of `etc/` at the tip E of delivery's last fetch of the operations repository,
-/// against the host's files of the same path under `/`. No clone, or no fetched tip: nothing.
-fn configuration(s: &mut impl System, r: &mut Read) -> Result<(), String> {
-    match s.read(&format!("{ETC_CLONE}/.git/HEAD")) {
-        Ok(_) => {}
-        Err(e) if e.kind() == ErrorKind::NotFound => return Ok(()),
-        Err(_) => return Err(format!("{ETC_CLONE}/.git/HEAD cannot be read")),
-    }
-    let refs = git_bytes(
-        s,
-        ETC_CLONE,
-        &[
-            "for-each-ref",
-            "--format=%(objectname)",
-            "refs/remotes/origin/main",
-        ],
-    )?;
-    let refs = String::from_utf8_lossy(&refs);
-    let lines: Vec<&str> = refs.lines().collect();
-    let tip = match lines.as_slice() {
-        [] => return Ok(()),
-        [one] if hex40(one) => (*one).to_owned(),
-        _ => return Err("git for-each-ref did not answer one commit".into()),
-    };
-    let listed = git_bytes(s, ETC_CLONE, &["ls-tree", "-r", "-z", &tip, "etc/"])?;
+/// R29: the files of `host/etc/` at K, read from delivery's clone, against the host's files of the
+/// path without `host/` under `/` (`host/etc/x` is `/etc/x`); the signature names that path.
+fn configuration(s: &mut impl System, r: &mut Read, k: &str) -> Result<(), String> {
+    let tree = format!("{HOST_TREE}etc/");
+    let listed = git_bytes(s, DELIVER_CLONE, &["ls-tree", "-r", "-z", k, &tree])?;
     for entry in listed.split(|b| *b == 0).filter(|e| !e.is_empty()) {
         let entry = String::from_utf8_lossy(entry);
-        let (meta, path) = entry.split_once('\t').unwrap_or(("", &entry));
+        let (meta, full) = entry.split_once('\t').unwrap_or(("", &entry));
+        let path = full.strip_prefix(HOST_TREE).unwrap_or(full);
         let meta: Vec<&str> = meta.split(' ').collect();
         let file = meta.len() == 3
             && meta[1] == "blob"
             && (meta[0] == "100644" || meta[0] == "100755")
+            && full.starts_with(&tree)
             && plain_path(path);
         if !file {
             r.signals.push(Signal::new(
                 format!("inventory {path}"),
                 "act",
-                &format!(
-                    "entry {path} of the operations repository is not a file the watch compares"
-                ),
-                format!("commit {tip}, entry {path} is not a plain file"),
+                &format!("entry {full} of host/etc/ is not a file the watch compares"),
+                format!("commit {k}, entry {full} is not a plain file"),
             ));
             continue;
         }
-        let want = git_bytes(s, ETC_CLONE, &["show", &format!("{tip}:{path}")])?;
-        compare(s, r, path, &format!("/{path}"), &want, &tip)?;
+        let want = git_bytes(s, DELIVER_CLONE, &["show", &format!("{k}:{full}")])?;
+        compare(s, r, path, &format!("/{path}"), &want, k)?;
     }
     Ok(())
 }

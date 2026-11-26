@@ -4,7 +4,8 @@
 //! except that a request with `checkouts` may fast-forward those checkouts and an install writes the
 //! unit files of `deploy/` under `AP_UNIT_DIR` (`specs/ap/deliver.md` R48 to R51). With the member `etc`
 //! it also runs the installer of the operations repository's clone at its accepted tip (R53 to R57),
-//! which alone writes the host's configuration files.
+//! which alone writes the host's configuration files; an `etc` that names the delivered repository
+//! itself runs `host/scripts/install-etc.sh` of its clone at the tip T (R71 to R74).
 use crate::host::{Host, LIMIT, System, args, complete_id, digest, id, ont, refused};
 use crate::review::{accepting, field, objects};
 use crate::run::{stamp, write};
@@ -25,6 +26,8 @@ const MEMBERS: &str = "repository url state build_lock build_wait_seconds by rea
 const TARGET: &str = "/usr/local/bin/ap";
 const ENGINE: &str = "/usr/local/bin/ont";
 const MARKER: &str = "migrate.pending";
+/// The last `etc.tip` a same-repository call recorded, under `<state>` (R72).
+const ETC_TIP: &str = "etc.tip";
 const SCHEMA: &str = "ontology/work.schema.json";
 const MAIN: &str = "+refs/heads/main:refs/remotes/origin/main";
 const CLIENT: [&str; 4] = ["action", "apply", "--client", "ap-deliver"];
@@ -154,8 +157,11 @@ struct Call<'a> {
     /// with its own defaults on every call (R37).
     ont_dir: String,
     ont_state: String,
-    /// With `etc`: the clone of the operations repository, `<state>/<etc name>` (R53).
+    /// With `etc`: the clone of the operations repository, `<state>/<etc name>` (R53); the
+    /// repository's own clone when `etc` names the delivered repository (R71).
     etc: Option<String>,
+    /// `etc` names the delivered repository itself (R71).
+    etc_same: bool,
     /// With `pc`: the PC checks account target (R60).
     pc: Option<Pc>,
     /// What the first installer that failed in the current attempt wrote, its last `KEPT_BYTES`
@@ -270,7 +276,9 @@ fn check(r: &Value) -> Result<(), String> {
     fn named_by(v: &Value, part: impl Fn(&str) -> bool) -> Option<(&str, &str)> {
         let name = v.as_str().filter(|v| !v.is_empty() && v.len() <= 200);
         name.and_then(|v| v.split_once('/'))
-            .filter(|(o, n)| part(o) && part(n) && ![".", "..", "target", "last.json"].contains(n))
+            .filter(|(o, n)| {
+                part(o) && part(n) && ![".", "..", "target", "last.json", ETC_TIP].contains(n)
+            })
     }
     let url_of = |v: &Value| {
         let u = v.as_str().filter(|v| !v.is_empty() && v.len() <= 4096);
@@ -282,11 +290,13 @@ fn check(r: &Value) -> Result<(), String> {
     let own = named_by(&r["repository"], part).map_or("", |(_, n)| n);
     // The member `engine` is read no more (R14): any object is accepted and ignored.
     let engine = r.get("engine").is_none_or(Value::is_object);
-    // The operations repository's clone lies beside the repository's and the marker (R53).
+    // The operations repository's clone lies beside the repository's and the marker (R53); an `etc`
+    // whose `owner/name` is the request's own is the delivered repository itself (R71).
     let etc = r.get("etc").is_none_or(|e| {
         let members = e.as_object().is_some_and(|o| o.len() == 2);
         let name = named_by(&e["repository"], part).map(|(_, n)| n);
-        let free = |n: &str| n != own && n != MARKER;
+        let same = e["repository"].as_str().is_some() && e["repository"] == r["repository"];
+        let free = |n: &str| same || (n != own && n != MARKER);
         members && url_of(&e["url"]) && name.is_some_and(free)
     });
     // Three forms: a Lead's install, a Lead's rollback (no `past`), the timer's (none of the four).
@@ -864,7 +874,11 @@ fn installer(s: &mut impl System, c: &mut Call, name: &str, words: &[&str]) -> R
         }
         "etc" => {
             let clone = c.etc.clone().unwrap_or_default();
-            let script = format!("{clone}/scripts/install-etc.sh");
+            let script = if c.etc_same {
+                format!("{clone}/host/scripts/install-etc.sh")
+            } else {
+                format!("{clone}/scripts/install-etc.sh")
+            };
             (args(&["bash", &script]), clone, c.env.clone())
         }
         _ => {
@@ -1872,6 +1886,9 @@ fn forward(s: &mut impl System, path: &str) -> Value {
 /// already checked out, `install` and `check` again. The record's member `etc`; it changes nothing
 /// else of the record, the pair or the store.
 fn configuration(s: &mut impl System, c: &mut Call) -> Value {
+    if c.etc_same {
+        return same_repository(s, c);
+    }
     let e = &c.r["etc"];
     let repository = e["repository"].as_str().unwrap_or_default().to_owned();
     let url = e["url"].as_str().unwrap_or_default().to_owned();
@@ -1947,8 +1964,50 @@ fn configuration(s: &mut impl System, c: &mut Call) -> Value {
     if !checkout(s, &clone, &tip) {
         return out;
     }
-    let first = installer(s, c, "etc-check", &["check", &tip]);
-    let new = from.as_deref() != Some(tip.as_str());
+    let (result, code) = programs(s, c, from.as_deref(), &tip);
+    (out["result"], out["code"]) = (json!(result), code);
+    out
+}
+/// The configuration step of an `etc` that names the delivered repository (R71 to R74): E is the tip T
+/// of this call, F the last `etc.tip` a same-repository call recorded (`<state>/etc.tip`), no clone
+/// but the repository's own, no fetch and no judgement of its own (T's chain was judged); the clone is
+/// checked out at T when its `HEAD` is not T, then `host/scripts/install-etc.sh` runs as R56 says.
+fn same_repository(s: &mut impl System, c: &mut Call) -> Value {
+    let file = format!("{}/{ETC_TIP}", c.state);
+    let from = std::fs::read_to_string(&file)
+        .ok()
+        .map(|t| t.trim().to_owned())
+        .filter(|t| hex40(t));
+    let tip = c.rec["tip"].as_str().filter(|t| hex40(t)).map(str::to_owned);
+    let mut out = json!({"repository": c.r["etc"]["repository"], "from": from, "tip": tip,
+        "result": "fetch_failed", "code": null, "detail": null});
+    let Some(tip) = tip else {
+        return out;
+    };
+    // F follows every call that records a tip, so that a call whose record has `etc` null keeps it.
+    let _ = write(&file, format!("{tip}\n").as_bytes());
+    let clone = c.clone.clone();
+    let head = git_at(s, &clone, &["rev-parse", "--verify", "HEAD^{commit}"]);
+    let at_tip = head.is_some_and(|h| h.trim() == tip);
+    // No program of the clone runs before its tree is at T (R47).
+    if !at_tip && !checkout(s, &clone, &tip) {
+        return out;
+    }
+    let (result, code) = programs(s, c, from.as_deref(), &tip);
+    (out["result"], out["code"]) = (json!(result), code);
+    out
+}
+/// The programs of the configuration step (R56): `check <E>`; when it exits 0 and E is F nothing more,
+/// else on exit 0 or 1 `install <E>` and `check <E>` again. The result the last `check` decides (R57)
+/// and the first code of the rows.
+fn programs(
+    s: &mut impl System,
+    c: &mut Call,
+    from: Option<&str>,
+    tip: &str,
+) -> (&'static str, Value) {
+    let first = installer(s, c, "etc-check", &["check", tip]);
+    let new = from != Some(tip);
     let mut ran = vec![];
     let mut installed = false;
     let goes_on = match first.exit {
@@ -1958,10 +2017,10 @@ fn configuration(s: &mut impl System, c: &mut Call) -> Value {
     };
     ran.push(first);
     if goes_on {
-        let install = installer(s, c, "etc", &["install", &tip]);
+        let install = installer(s, c, "etc", &["install", tip]);
         installed = install.exit == Some(0);
         ran.push(install);
-        ran.push(installer(s, c, "etc-check", &["check", &tip]));
+        ran.push(installer(s, c, "etc-check", &["check", tip]));
     }
     // The last `check` decides, never the exit of `install`.
     let result = match ran.last().and_then(|r| r.exit) {
@@ -1970,8 +2029,7 @@ fn configuration(s: &mut impl System, c: &mut Call) -> Value {
         Some(1) => "differs",
         _ => "failed",
     };
-    (out["result"], out["code"]) = (json!(result), first_code(&ran));
-    out
+    (result, first_code(&ran))
 }
 
 fn scratch_file(dir: &Path) -> Option<File> {
@@ -2793,6 +2851,7 @@ pub fn execute(s: &mut impl System, r: &Value) -> (Value, u8) {
         ont_dir: var(&env, "ONT_INSTALL_BIN_DIR", "/usr/local/bin"),
         ont_state: var(&env, "ONT_INSTALL_STATE_DIR", "/var/lib/ontology-platform"),
         etc: None,
+        etc_same: false,
         pc: None,
         failed: None,
         env,
@@ -2800,6 +2859,7 @@ pub fn execute(s: &mut impl System, r: &Value) -> (Value, u8) {
     if let Some(e) = r.get("etc") {
         let name = e["repository"].as_str().and_then(|v| v.split_once('/'));
         c.etc = Some(format!("{}/{}", c.state, name.map_or("", |(_, n)| n)));
+        c.etc_same = e["repository"] == r["repository"];
         c.rec["etc"] = Value::Null;
     }
     if r.get("checkouts").is_some() {

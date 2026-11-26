@@ -207,6 +207,12 @@ struct W {
     xcheckout_fails: bool,
     xsearch_fails: bool,
     xruns: Vec<(i32, String)>,
+    /// `etc` names the delivered repository itself (R71); the `HEAD` of the repository's clone, which a
+    /// checkout of it moves (None: `rev-parse` fails).
+    own_etc: bool,
+    rhead: Option<String>,
+    /// A checkout of the repository's clone fails, and nothing else does.
+    rcheckout_fails: bool,
     /// PC push (`specs/ap/deliver.md` R60 to R63): optional `pc` member of request, how
     /// `tailscale ssh` behaves, local `ont` fault injection, and virtual clock for timeouts.
     pc: Option<Value>,
@@ -334,6 +340,9 @@ impl W {
             xcheckout_fails: false,
             xsearch_fails: false,
             xruns: vec![],
+            own_etc: false,
+            rhead: None,
+            rcheckout_fails: false,
             pc: None,
             pc_ssh: PcSsh::Local,
             ont_unreadable: false,
@@ -461,6 +470,9 @@ impl W {
         }
         if self.etc {
             r["etc"] = json!({"repository": "o/ops", "url": XURL});
+        }
+        if self.own_etc {
+            r["etc"] = json!({"repository": "o/r", "url": "https://example.invalid/other/r.git"});
         }
         if let Some(pc) = &self.pc {
             r["pc"] = pc.clone();
@@ -616,9 +628,17 @@ impl W {
                 let origin = self.origin_once.take().unwrap_or_else(|| self.tip());
                 Self::text(!self.fetch_fails, &format!("{origin}\n"))
             }
-            ["checkout", "--quiet", "--force", "--detach", _] => {
-                Self::text(!self.checkout_fails, "")
+            ["checkout", "--quiet", "--force", "--detach", k] => {
+                let fails = self.checkout_fails || self.rcheckout_fails;
+                if !fails {
+                    self.rhead = Some((*k).to_owned());
+                }
+                Self::text(!fails, "")
             }
+            ["rev-parse", "--verify", "HEAD^{commit}"] => match &self.rhead {
+                Some(h) => Self::text(true, &format!("{h}\n")),
+                None => Self::text(false, ""),
+            },
             ["ls-tree", k, "deploy/"] => {
                 let lines: String = self
                     .deploy
@@ -5105,7 +5125,7 @@ fn r8_the_command_checks_makes_nothing_and_leaves_the_other_forms_alone() {
 // spec: specs/ap/deliver.md#R13
 #[test]
 fn deliver_r13_the_clone_may_not_take_a_name_of_the_state_directory() {
-    for name in [".", "..", "target", "last.json"] {
+    for name in [".", "..", "target", "last.json", "etc.tip"] {
         let mut w = W::new();
         let mut r = w.request();
         r["repository"] = json!(format!("o/{name}"));
@@ -5916,11 +5936,9 @@ impl W {
         assert_eq!(argv[0], "bash");
         assert_eq!(argv.len(), 4, "{argv:?}");
         assert!(["check", "install"].contains(&argv[2].as_str()), "{argv:?}");
-        assert_eq!(
-            self.xhead.as_deref(),
-            Some(argv[3].as_str()),
-            "a program ran off E"
-        );
+        let own = argv[1] == self.p("state/r/host/scripts/install-etc.sh");
+        let head = if own { &self.rhead } else { &self.xhead };
+        assert_eq!(head.as_deref(), Some(argv[3].as_str()), "a program ran off E");
         let (exit, err) = self.xruns.remove(0);
         let [stdin, stdout, stderr] = files;
         Command::new("sh")
@@ -5996,8 +6014,10 @@ fn x_etc_is_checked() {
         json!({"repository": "o/ops", "url": "-uhttps://x"}),
         json!({"repository": "o/ops", "url": ""}),
         json!({"repository": "o/ops", "url": 1}),
-        json!({"repository": "o/r", "url": XURL}),
+        // The repository's own name under another owner (R53, R71).
+        json!({"repository": "x/r", "url": XURL}),
         json!({"repository": "o/migrate.pending", "url": XURL}),
+        json!({"repository": "o/etc.tip", "url": XURL}),
         json!({"repository": "o/.", "url": XURL}),
         json!({"repository": "o/..", "url": XURL}),
         json!({"repository": "o/target", "url": XURL}),
@@ -7475,4 +7495,154 @@ fn r69_engine_tree_the_pc_push_depends_only_on_the_local_installed_attempt() {
     assert_eq!(start["parameters"]["commit"], etree());
     assert_eq!(start["parameters"]["head"], h(2));
     assert!(!w.engine_clone_touched());
+}
+
+impl W {
+    /// A request whose `etc` names the delivered repository itself (R71): the pair goes from c(0) to
+    /// c(2); each run of `host/scripts/install-etc.sh` exits 0.
+    fn own() -> Self {
+        let mut w = W::new();
+        w.own_etc = true;
+        w.xruns = vec![(0, String::new()); 3];
+        w
+    }
+    /// The runs of `host/scripts/install-etc.sh`, as `etc-check <E>` or `etc <E>`, and the calls of
+    /// `git` on the repository's clone that read its `HEAD` or check it out, from the call `from` on.
+    fn own_calls(&self, from: usize) -> Vec<String> {
+        let clone = self.p("state/r");
+        self.calls[from..]
+            .iter()
+            .filter_map(|(p, a, body)| {
+                if p == "bash" && a[0] == format!("{clone}/host/scripts/install-etc.sh") {
+                    assert_eq!(body["cwd"], json!(clone));
+                    let name = if a[1] == "check" { "etc-check" } else { "etc" };
+                    return Some(format!("{name} {}", a[2..].join(" ")));
+                }
+                (p == "git" && a.len() > 2 && a[1] == clone && a[2] != "fetch")
+                    .then(|| a[2..].join(" "))
+            })
+            .filter(|w| w.starts_with("etc") || w.starts_with("checkout") || w.contains("HEAD"))
+            .collect()
+    }
+    fn own_tip(&self) -> Option<String> {
+        std::fs::read_to_string(self.p("state/etc.tip")).ok()
+    }
+}
+fn own_record(from: Option<&str>, tip: Option<&str>, result: &str) -> Value {
+    json!({"repository": "o/r", "from": from, "tip": tip, "result": result, "code": null, "detail": null})
+}
+
+// spec: specs/ap/deliver.md#R53
+// spec: specs/ap/deliver.md#R71
+// spec: specs/ap/deliver.md#R72
+// spec: specs/ap/deliver.md#R73
+// spec: specs/ap/deliver.md#R74
+#[test]
+fn etc_same_repository() {
+    // The request: the request's own `owner/name` is accepted whatever its URL, in each form; the same
+    // name under another owner stays refused.
+    let w = W::own();
+    for r in [w.request(), w.timer(), w.rollback()] {
+        assert_eq!(check_request(&r), (json!({"status": "ok"}), 0), "{r}");
+    }
+    let mut r = w.request();
+    r["etc"] = json!({"repository": "x/r", "url": XURL});
+    let (v, exit) = check_request(&r);
+    assert_eq!((v["detail"].clone(), exit), (json!({"field": "etc"}), 2));
+
+    // A first call: the pair moves to T = c(2), then the configuration step at T with F null (no call
+    // recorded one): `check`, `install` and `check` of `host/scripts/install-etc.sh` of the clone.
+    let mut w = W::own();
+    let tip = c(2);
+    let (v, exit) = w.run();
+    assert_eq!((end(&v), exit), (("installed", ""), 0), "{v}");
+    assert_eq!(v["etc"], own_record(None, Some(&tip), "installed"));
+    let names: Vec<String> = rows(&v).into_iter().map(|r| r.0).collect();
+    assert_eq!(names, ["ap", "content", "etc-check", "etc", "etc-check"]);
+    assert_eq!(
+        w.own_calls(w.at("close_install").unwrap()),
+        [
+            "rev-parse --verify HEAD^{commit}".to_owned(),
+            format!("etc-check {tip}"),
+            format!("etc {tip}"),
+            format!("etc-check {tip}"),
+        ]
+    );
+    // No second clone and no second fetch: nothing reaches another directory of `<state>`, the URL of
+    // `etc` is never read, and the one fetch is the pair's.
+    assert!(w.calls.iter().all(|(_, a, _)| {
+        !a.iter()
+            .any(|x| x.contains("/state/ops") || x.contains("other/r.git"))
+    }));
+    let fetches = w
+        .calls
+        .iter()
+        .filter(|(p, a, _)| p == "git" && a.get(2).is_some_and(|x| x == "fetch"))
+        .count();
+    assert_eq!(fetches, 1);
+    // The program's environment is the command's, unchanged; its record is F's file.
+    let program = w
+        .calls
+        .iter()
+        .find(|(_, a, _)| a.first().is_some_and(|x| x.ends_with("host/scripts/install-etc.sh")))
+        .unwrap();
+    assert!(program.2["env"].get("CARGO_TARGET_DIR").is_none());
+    assert_eq!(w.own_tip(), Some(format!("{tip}\n")));
+    assert_eq!(w.last(), Some(v));
+
+    // The next call ends `current`: F is the recorded tip, E the same T, one `check` that answers the
+    // host at T, `same`.
+    w.xruns = vec![(0, String::new())];
+    let (v, exit) = w.run();
+    assert_eq!((end(&v), exit), (("current", ""), 0), "{v}");
+    assert_eq!(v["etc"], own_record(Some(&tip), Some(&tip), "same"));
+    assert_eq!(rows(&v).len(), 1, "{v}");
+
+    // A call whose record has `etc` null (a refusal) keeps F.
+    w.fetch_fails = true;
+    let (v, _) = w.run();
+    assert_eq!((v["code"].clone(), v["etc"].clone()), (json!("fetch_failed"), Value::Null));
+    assert_eq!(w.own_tip(), Some(format!("{tip}\n")));
+    w.fetch_fails = false;
+
+    // The clone's `HEAD` is not T: it is checked out at T (a kind of R47) before the first program; a
+    // host that differs at the same T is installed again and checked.
+    w.rhead = Some(c(1));
+    w.xruns = vec![(1, String::new()), (0, String::new()), (0, String::new())];
+    let start = w.calls.len();
+    let (v, _) = w.run();
+    assert_eq!(v["etc"], own_record(Some(&tip), Some(&tip), "installed"));
+    assert_eq!(
+        w.own_calls(start),
+        [
+            "rev-parse --verify HEAD^{commit}".to_owned(),
+            format!("checkout --quiet --force --detach {tip}"),
+            format!("etc-check {tip}"),
+            format!("etc {tip}"),
+            format!("etc-check {tip}"),
+        ]
+    );
+    // A checkout that fails runs no program: `fetch_failed` with the tip.
+    w.rhead = Some(c(1));
+    w.rcheckout_fails = true;
+    w.xruns = vec![];
+    let (v, _) = w.run();
+    assert_eq!(end(&v), ("current", ""), "{v}");
+    assert_eq!(v["etc"], own_record(Some(&tip), Some(&tip), "fetch_failed"));
+    assert!(etc_rows(&v).is_empty());
+    w.rcheckout_fails = false;
+
+    // F's file lost (or never written): a check that answers the host at T still installs, so that
+    // the installer's own record follows T.
+    std::fs::remove_file(w.p("state/etc.tip")).unwrap();
+    w.xruns = vec![(0, String::new()); 3];
+    let (v, _) = w.run();
+    assert_eq!(v["etc"], own_record(None, Some(&tip), "installed"));
+    // A rollback runs no step and leaves F.
+    let mut w = W::own();
+    w.run();
+    installed_by_a(&mut w);
+    let (v, _) = w.run_with(&w.rollback());
+    assert_eq!(v["etc"], Value::Null, "{v}");
+    assert_eq!(w.own_tip(), Some(format!("{tip}\n")));
 }
