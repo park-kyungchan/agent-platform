@@ -22,7 +22,7 @@ if [ "${CI:-}" != true ] && [ -z "${CHECK_LOCKED:-}" ]; then
 fi
 unset ONT_AGENT ONT_ROLE
 export CARGO_BUILD_WARNINGS=deny
-python3 -I -B scripts/check-map.py crates/ scripts/ conformance/ specs/ .github/ check rust-toolchain.toml
+python3 -I -B scripts/check-map.py crates/ scripts/ conformance/ specs/ check rust-toolchain.toml
 python3 -I -B -m unittest discover -s scripts -p 'test_check_map.py'
 python3 -I -B scripts/check-spec-trace.py
 python3 -I -B -m unittest discover -s scripts -p 'test_check_spec_trace.py'

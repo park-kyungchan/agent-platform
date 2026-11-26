@@ -66,7 +66,7 @@ A run that exited 3 because of `attempt_running` (an attempt is `running` that a
 
 ## The engine and the schema
 
-With `engine` in the request (`crates/ap/README.md`, "The engine and the schema"), a merged move of `ontology/ENGINE-PIN` is followed by a run that fetches the engine's repository into `/var/lib/agent-platform/deliver/ontology-platform` (a clone with the remote `origin`), checks that every merge from the installed engine to the pin was accepted, records the attempt as an `install` object of the target `/usr/local/bin/ont`, runs that clone's `scripts/install-ont.sh install <pin>` and ends; the next run installs `ap` and `content/`. A merged higher version of `ontology/work.schema.json` is followed by a run that takes `ont backup`, installs the schema from the clone of this repository and, when the tip holds an executable `ontology/migrate`, runs it with the store's path and the two versions, guarded by the marker `/var/lib/agent-platform/deliver/migrate.pending`. The engine's build is a cold one: such a run lasts up to the service's hour.
+With `engine` in the request (`crates/ap/README.md`, "The engine and the schema"), under the rule of a tree that holds `ontology/ENGINE-PIN`, a merged move of the pin is followed by a run that fetches the engine's repository into `/var/lib/agent-platform/deliver/ontology-platform` (a clone with the remote `origin`), checks that every merge from the installed engine to the pin was accepted, records the attempt as an `install` object of the target `/usr/local/bin/ont`, runs that clone's `scripts/install-ont.sh install <pin>` and ends; the next run installs `ap` and `content/`. A merged higher version of `ontology/work.schema.json` is followed by a run that takes `ont backup`, installs the schema from the clone of this repository and, when the tip holds an executable `ontology/migrate`, runs it with the store's path and the two versions, guarded by the marker `/var/lib/agent-platform/deliver/migrate.pending`. The engine's build is a cold one: such a run lasts up to the service's hour.
 
 ```sh
 python3 -I -c 'import json; r = json.load(open("/var/lib/agent-platform/deliver/last.json")); print(r["target"], r["end"], r["code"], r.get("schema"))'
@@ -76,7 +76,7 @@ ont --version                                                      # the engine'
 
 `schema_install_failed` and `migrate_failed` end a run with exit 4 and keep the service failed. A marker that cannot clear: stop the timer, run the corrected `ontology/migrate` by hand with the store's path and the marker's two versions, read the result, remove the marker, start the timer.
 
-Undo: remove the member `engine` from `/etc/agent-platform/deliver.json`; delivery then stops on a difference of the engine or the schema as before (`engine_differs`, `schema_differs`) and reads no marker. An installed engine goes back with the engine's own rollback, with the timer stopped: `bash /var/lib/agent-platform/deliver/ontology-platform/scripts/install-ont.sh rollback`. A schema is repaired by a higher version, installed forward; delivery never restores the store from a backup.
+Undo: remove the member `engine` from `/etc/agent-platform/deliver.json`; delivery then stops on a difference of the engine or the schema as before (`engine_differs`, `schema_differs`) and reads no marker. An installed engine goes back with the engine's own rollback, with the timer stopped: `bash /var/lib/agent-platform/deliver/ontology-platform/scripts/install-ont.sh rollback` (an engine of the tree rule: "An engine change"). A schema is repaired by a higher version, installed forward; delivery never restores the store from a backup.
 
 ## Roles
 
@@ -101,7 +101,27 @@ The `ap` installed before this merge sends no role and puts no roles file, and t
 
 The undo: the schema is not lowered (deliver.md R40). A role refused for want of the file (`role_not_admitted`, `roles_file_absent`) comes back when the file is put back: point 2 again.
 
+## An engine change
+
+The engine is built, checked and delivered from `engine/` of the same commit as everything else (`specs/ap/deliver.md` R66 to R70, `specs/ap/check.md` R25, R26). This is the rule of a tree without `ontology/ENGINE-PIN`; while a tree still holds that file, the section "The engine of a pin" below is its rule, unchanged. The engine's identity is the Git tree id of `engine/` at the commit, which its `--version` prints as `ont <version> <id>` (`engine/crates/ont/build.rs`: `ONT_TREE_ID`, else Git at the top level when `engine/` is unmodified, else `unknown`). A merge that does not touch `engine/` keeps the id, so nothing is rebuilt.
+
+Made: change `engine/` in the pull request that needs it, with the schema and `ap` when they follow; there is no pin to move. `engine/` is a protected tree (`specs/ap/unit-run.md` R36): a unit that changes it is of class `contract` or `effect`, since delivery installs its build as root.
+
+Checked: `./check` reads the id (`git ls-tree HEAD -- engine`) and takes the engine in this order (`ci/engine-pin.sh --tree`): a file `<dir>/ont-<id>`; the `ont` on PATH, else `<dir>/ont`, when its `--version` names the id (so the host's delivered engine and the PC account's pushed engine serve every worktree without a build); else one build of `engine/` into `${CARGO_TARGET_DIR:-$PWD/target}/engine-tree/build`, after which `./check` also runs `engine/check`. A modified `engine/` is always built, prints `unknown`, and the build of `ap` stops `engine_differs` until the change is committed: commit, then run `./check` again. In CI each job restores the engine cached by the id (or builds it once) and puts it on PATH; the job `test` runs `engine/check` when the change touches `engine/`. `ap check` runs a call on the PC only when the PC's `ont` names the worktree's id and `engine/` is unmodified (else `pc_engine_differs`).
+
+Delivered: with `engine` in the request, the first call after the merge finds the installed engine's id is not T's id of `engine/`, installs the engine from this repository's clone at T (`engine/scripts/install-ont.sh install <T>`: `git archive <T> engine`, built with `ONT_TREE_ID`, its `--version` read back; no second clone, no fetch, no ancestor test: the review that accepted T accepted its engine) and ends; the next call installs `ap` and `content/` of the same T. Two records:
+
+```sh
+python3 -I -c 'import json; r = json.load(open("/var/lib/agent-platform/deliver/last.json")); print(r["target"], r["end"], r["to"], r["install"])'   # /usr/local/bin/ont installed <id> ..., then /usr/local/bin/ap installed <T> ...
+git -C /var/lib/agent-platform/deliver/agent-platform rev-parse <T>:engine                                                                   # <id>
+ont --version                                                                                                                                 # ont <version> <id>
+```
+
+The engine attempt names this repository and the id as its `commit`. Rollback of the engine, with the timer stopped: `bash /var/lib/agent-platform/deliver/agent-platform/engine/scripts/install-ont.sh rollback` (it restores the binary installed before, whichever rule installed it). Without `engine` in the request delivery stops `engine_differs`; a tree with neither the pin nor `engine/` is refused `engine_missing`. The PC: delivery's push (R69) sends the host's engine once a local attempt installed it at the id; the user's own account runs `scripts/pc-pull.sh`, which builds `engine/` of the pulled commit (R70) and skips the build when its `ont` already names the id.
+
 ## The engine of a pin
+
+This section is the rule of an older tree: one that holds `ontology/ENGINE-PIN`. A tree without it follows "An engine change" above.
 
 A stage of `ap run` holds no credential for `park-kyungchan/ontology-platform` (`specs/ap/unit-run.md` R38) and sees `/usr` read-only (`specs/ap/run-limits.md` R16), so `./check` in a stage cannot build the engine of a pin.
 

@@ -3541,7 +3541,7 @@ fn r39_a_plain_unit_whose_pattern_can_only_match_protected_paths_is_refused() {
 }
 
 /// The section of R40 as it prints.
-const SECTION: &str = "\n## Protected paths\n\nThis unit is of class plain: its run stops protected_path_changed when it changes one of these paths, compared without case, whatever its write set names. A page that needs one is class contract, lane objective.\n- exactly: check, review.md\n- the last component, in any directory: clippy.toml, .clippy.toml, rustfmt.toml, .rustfmt.toml, rust-toolchain, rust-toolchain.toml, build.rs, cargo.toml, cargo.lock\n- the last two components, in any directory: .cargo/config.toml, .cargo/config\n- the first component, the path itself or anything under it: ci, .github, specs, scripts, .cargo, deploy, etc, content, github, ontology\n";
+const SECTION: &str = "\n## Protected paths\n\nThis unit is of class plain: its run stops protected_path_changed when it changes one of these paths, compared without case, whatever its write set names. A page that needs one is class contract, lane objective.\n- exactly: check, review.md\n- the last component, in any directory: clippy.toml, .clippy.toml, rustfmt.toml, .rustfmt.toml, rust-toolchain, rust-toolchain.toml, build.rs, cargo.toml, cargo.lock\n- the last two components, in any directory: .cargo/config.toml, .cargo/config\n- the first component, the path itself or anything under it: ci, .github, specs, scripts, .cargo, deploy, etc, content, github, ontology, engine\n";
 
 // spec: specs/ap/unit.md#R40
 #[test]

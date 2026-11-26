@@ -198,12 +198,45 @@ fn version_of(path: &Path) -> Option<String> {
     Some(text.trim_end_matches('\n').to_owned())
 }
 
-/// The engine of `pin`: the path `ONT_BIN` names when it is set and not empty, and then no other; else
-/// `ont-<pin>` of `PATH`, `/usr/local/bin/ont-<pin>`, `ont` of `PATH`. Only an executable file whose `--version`
-/// prints `ont 0.1.0 <pin>` is taken.
-fn engine_of(pin: &str) -> PathBuf {
+/// Which rule of two trees names the engine (`specs/ap/deliver.md` R66): the pin of
+/// `ontology/ENGINE-PIN`, whose engine prints exactly `ont 0.1.0 <pin>`; or the Git tree id of `engine/`
+/// at `HEAD`, whose engine prints `ont <version> <id>`.
+enum Rule {
+    Pin(String),
+    Tree(String),
+}
+
+impl Rule {
+    fn id(&self) -> &str {
+        match self {
+            Rule::Pin(id) | Rule::Tree(id) => id,
+        }
+    }
+    /// Whether a printed version line names this rule's engine.
+    fn names(&self, printed: &str) -> bool {
+        match self {
+            Rule::Pin(pin) => printed == format!("{VERSION_PREFIX}{pin}"),
+            Rule::Tree(id) => {
+                let words: Vec<&str> = printed.split(' ').collect();
+                words.len() == 3 && words[0] == "ont" && !words[1].is_empty() && words[2] == id
+            }
+        }
+    }
+    /// What the refusal `engine_differs` says the engine should name.
+    fn wanted(&self) -> String {
+        match self {
+            Rule::Pin(pin) => format!("the pin is {pin}"),
+            Rule::Tree(id) => format!("the tree id of engine/ at HEAD is {id}"),
+        }
+    }
+}
+
+/// The engine of `rule`: the path `ONT_BIN` names when it is set and not empty, and then no other; else
+/// `ont-<id>` of `PATH`, `/usr/local/bin/ont-<id>`, `ont` of `PATH` (and, under the tree rule,
+/// `/usr/local/bin/ont`). Only an executable file whose `--version` names the rule's engine is taken.
+fn engine_of(rule: &Rule) -> PathBuf {
     let named = env::var_os("ONT_BIN").filter(|path| !path.is_empty());
-    let pinned = format!("ont-{pin}");
+    let pinned = format!("ont-{}", rule.id());
     let (looked, listed): (String, Vec<PathBuf>) = match named {
         Some(path) => (
             format!("ONT_BIN {}", PathBuf::from(&path).display()),
@@ -213,10 +246,12 @@ fn engine_of(pin: &str) -> PathBuf {
             let mut all = on_path(&pinned);
             all.push(Path::new(INSTALLED).join(&pinned));
             all.extend(on_path("ont"));
-            (
-                format!("{pinned} and ont on PATH, {INSTALLED}/{pinned}"),
-                all,
-            )
+            let mut looked = format!("{pinned} and ont on PATH, {INSTALLED}/{pinned}");
+            if let Rule::Tree(_) = rule {
+                all.push(Path::new(INSTALLED).join("ont"));
+                looked.push_str(&format!(", {INSTALLED}/ont"));
+            }
+            (looked, all)
         }
     };
     let mut candidates: Vec<PathBuf> = vec![];
@@ -228,11 +263,10 @@ fn engine_of(pin: &str) -> PathBuf {
     if candidates.is_empty() {
         refuse("engine_missing", &format!("no engine at {looked}"));
     }
-    let want = format!("{VERSION_PREFIX}{pin}");
     let mut seen = vec![];
     for path in &candidates {
         let printed = version_of(path);
-        if printed.as_deref() == Some(want.as_str()) {
+        if printed.as_deref().is_some_and(|text| rule.names(text)) {
             return path.clone();
         }
         let revision = printed.map(|text| match text.strip_prefix(VERSION_PREFIX) {
@@ -244,8 +278,38 @@ fn engine_of(pin: &str) -> PathBuf {
     }
     refuse(
         "engine_differs",
-        &format!("{}; the pin is {pin}", seen.join("; ")),
+        &format!("{}; {}", seen.join("; "), rule.wanted()),
     )
+}
+
+/// The Git tree id of `engine/` at `HEAD` of the repository whose top level is `root`, read at that top
+/// level (`git ls-tree HEAD -- engine`, the id `git rev-parse HEAD:engine` prints); the engine `./check` or delivery provides must name it.
+fn tree_id(root: &Path) -> String {
+    let top = run_git(root, &["rev-parse", "--show-toplevel"])
+        .and_then(|text| fs::canonicalize(text.trim()).ok());
+    if top.is_none() || top != fs::canonicalize(root).ok() {
+        refuse(
+            "engine_differs",
+            "the tree id of engine/ cannot be read: the workspace is not the top level of a Git repository",
+        );
+    }
+    // `git ls-tree HEAD -- engine` names the entry with its type: only a tree counts.
+    let entry = run_git(root, &["ls-tree", "HEAD", "--", "engine"]).unwrap_or_default();
+    let id = entry
+        .strip_prefix("040000 tree ")
+        .and_then(|rest| rest.trim_end().strip_suffix("\tengine"))
+        .map(str::to_owned);
+    match id {
+        Some(id)
+            if id.len() == 40 && id.bytes().all(|c| matches!(c, b'0'..=b'9' | b'a'..=b'f')) =>
+        {
+            id
+        }
+        _ => refuse(
+            "engine_differs",
+            "the tree id of engine/ at HEAD cannot be read (git rev-parse HEAD:engine)",
+        ),
+    }
 }
 
 /// The first `"code":"<text>"` of the refusal line of the engine.
@@ -314,10 +378,22 @@ fn main() {
         root.join("ontology/ENGINE-PIN"),
     );
     println!("cargo:rerun-if-changed={}", schema.display());
-    println!("cargo:rerun-if-changed={}", pin_file.display());
     println!("cargo:rerun-if-env-changed=ONT_BIN");
     println!("cargo:rerun-if-env-changed=PATH");
-    let pin = pin_of(&pin_file);
-    let engine = engine_of(&pin);
+    // The rule of two trees (`specs/ap/deliver.md` R66): a tree that holds `ontology/ENGINE-PIN` keeps
+    // the pin's rule; one without it that holds `engine/` names its engine by the tree id of `engine/`.
+    let rule = if fs::symlink_metadata(&pin_file).is_ok() {
+        println!("cargo:rerun-if-changed={}", pin_file.display());
+        Rule::Pin(pin_of(&pin_file))
+    } else if fs::symlink_metadata(root.join("engine")).is_ok_and(|m| m.is_dir()) {
+        // `HEAD` and its ref are watched by `emit_rerun`: the tree id moves only with them.
+        Rule::Tree(tree_id(&root))
+    } else {
+        refuse(
+            "engine_missing",
+            "the tree holds neither ontology/ENGINE-PIN nor engine/",
+        )
+    };
+    let engine = engine_of(&rule);
     generate(&engine, &schema);
 }

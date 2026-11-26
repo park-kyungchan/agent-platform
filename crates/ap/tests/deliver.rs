@@ -222,6 +222,10 @@ struct W {
     extra_env: Vec<(String, String)>,
     clock_offset: std::time::Duration,
     advance_on_pause: std::time::Duration,
+    /// The rule of two trees (`specs/ap/deliver.md` R66): the tip holds no `ontology/ENGINE-PIN` and
+    /// its `engine/` is this tree id; or the tip holds neither.
+    engine_tree: Option<String>,
+    neither: bool,
 }
 
 #[derive(Clone)]
@@ -344,6 +348,8 @@ impl W {
             extra_env: vec![],
             clock_offset: std::time::Duration::ZERO,
             advance_on_pause: std::time::Duration::ZERO,
+            engine_tree: None,
+            neither: false,
         };
         w.lock = w.p("deliver.lock");
         for n in 1..=k {
@@ -665,6 +671,14 @@ impl W {
                 });
                 Self::text(!self.roles_git_fails, &entry)
             }
+            ["ls-tree", tip, "--", "ontology/ENGINE-PIN", "engine"] => {
+                assert_eq!(*tip, self.tip());
+                let entry = self
+                    .engine_tree
+                    .as_ref()
+                    .map_or(String::new(), |id| format!("040000 tree {id}\tengine\n"));
+                Self::text(true, &entry)
+            }
             ["ls-tree", tip, "--", "ontology/migrate"] => {
                 assert_eq!(*tip, self.tip());
                 let entry = self.migrate_mode.map_or(String::new(), |m| {
@@ -676,7 +690,10 @@ impl W {
                 let (commit, path) = spec.split_once(':').unwrap();
                 match path {
                     "content/SHA256SUMS" => Self::text(true, &self.sums(commit)),
-                    "ontology/ENGINE-PIN" => Self::text(true, &format!("{}\n", self.pin)),
+                    "ontology/ENGINE-PIN" => Self::text(
+                        self.engine_tree.is_none() && !self.neither,
+                        &format!("{}\n", self.pin),
+                    ),
                     "deploy/roles.json" => {
                         Self::text(self.roles_blob.is_some(), self.roles_blob.unwrap_or(""))
                     }
@@ -7343,4 +7360,266 @@ fn r64_deliver_json_and_pc_pull_script_present() {
     let pull = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../scripts/pc-pull.sh");
     let meta = std::fs::metadata(&pull).unwrap();
     assert!(meta.is_file() && meta.permissions().mode() & 0o111 != 0);
+}
+
+// ---- The rule of two trees: a tip without ontology/ENGINE-PIN (`specs/ap/deliver.md` R66 to R69) ----
+
+/// The Git tree id of `engine/` at the tip, under the tree rule.
+fn etree() -> String {
+    format!("{:040}", 777)
+}
+impl W {
+    /// A request with `engine` whose tip holds `engine/` with the id `etree()` and no pin; the engine
+    /// at ec(0), an installed pin of an older tree.
+    fn engine_tree() -> Self {
+        let mut w = W::engine();
+        w.engine_tree = Some(etree());
+        w.ont_install = (Some(etree()), 0);
+        w
+    }
+    /// Whether any program touched the engine's clone of the pin rule.
+    fn engine_clone_touched(&self) -> bool {
+        let eclone = self.p("state/engine");
+        self.calls.iter().any(|(_, a, b)| {
+            a.iter().any(|x| x.starts_with(&eclone)) || b["cwd"].as_str() == Some(eclone.as_str())
+        })
+    }
+    fn git_words(&self, word: &str) -> usize {
+        self.calls
+            .iter()
+            .filter(|(p, a, _)| p == "git" && a.iter().any(|x| x == word))
+            .count()
+    }
+}
+
+// spec: specs/ap/deliver.md#R66
+// spec: specs/ap/deliver.md#R67
+#[test]
+fn r67_engine_tree_the_engine_of_t_is_built_from_its_engine_and_the_call_ends() {
+    let mut w = W::engine_tree();
+    let (v, exit) = w.run();
+    assert_eq!((end(&v), exit), (("installed", ""), 0), "{v}");
+    let (id, from) = (etree(), ec(0));
+    let want = json!({"target": ENGINE, "tip": c(2), "from": from, "to": id, "outcome": "installed",
+        "install": oid("install", &format!("act-ont.{id}.1")), "attempt": 1, "rollback_binary": ekept(&w),
+        "rollback_content": null, "index": {"before": "ok", "after": "ok"}, "schema": null});
+    for (k, value) in want.as_object().unwrap() {
+        assert_eq!(&v[k], value, "{k}");
+    }
+    assert_eq!(rows(&v), [row("ont", 0, None)]);
+    // The attempt names this repository and the tree id; its review is that of T's chain.
+    let start = &w.applies("start_install")[0];
+    assert_eq!(start["request_id"], format!("ont.{id}.1"));
+    assert_eq!(
+        start["parameters"],
+        json!({"target": etarget(), "kind": "forward", "repository": "o/r", "commit": id,
+            "attempt": 1, "from": from, "from_sha256": sha(&engine_binary(&from)), "by": "session-1",
+            "reason": "after a merge", "head": h(2), "review": w.accepting(2),
+            "reviews": [w.accepting(1), w.accepting(2)], "host": oid("host", "local")})
+    );
+    // The installer: engine/scripts/install-ont.sh of this repository's clone, checked out at T
+    // before, `install <T>`, with the command's environment.
+    let clone = w.p("state/r");
+    let launch = w.calls.iter().find(|(p, _, _)| p == "bash").unwrap();
+    assert_eq!(
+        launch.1,
+        args(&[
+            &format!("{clone}/engine/scripts/install-ont.sh"),
+            "install",
+            &c(2)
+        ])
+    );
+    let env: serde_json::Map<String, Value> = w
+        .environment()
+        .into_iter()
+        .map(|(k, v)| (k, json!(v)))
+        .collect();
+    assert_eq!(launch.2, json!({"cwd": clone, "env": env}));
+    let checkout = w.calls.iter().position(|(p, a, _)| {
+        p == "git" && a.iter().any(|x| x == "checkout") && a.last() == Some(&c(2))
+    });
+    assert!(checkout.unwrap() < w.at("start_install").unwrap());
+    // No engine clone, no fetch of another repository, no ancestor test of a pin.
+    assert!(!w.engine_clone_touched(), "{:?}", w.calls);
+    assert_eq!(w.git_words("merge-base"), 0);
+    assert_eq!(w.git_words("fetch"), 1);
+    // The next call finds the engine at the tree id and installs the pair from the same commit.
+    w.settle();
+    let (v, exit) = w.run();
+    assert_eq!(
+        (end(&v), exit, v["target"].clone()),
+        (("installed", ""), 0, json!(TARGET)),
+        "{v}"
+    );
+    assert_eq!(rows(&v), [row("ap", 0, None), row("content", 0, None)]);
+    assert!(!w.engine_clone_touched());
+    // A failed build leaves the engine where it was: failed_restored, the rollback not needed.
+    let mut w = W::engine_tree();
+    w.ont_install = (None, 2);
+    let (v, exit) = w.run();
+    assert_eq!(
+        (v["outcome"].clone(), exit),
+        (json!("failed_restored"), 3),
+        "{v}"
+    );
+    assert_eq!(rows(&v), [row("ont", 2, Some("engine_refused"))]);
+}
+
+// spec: specs/ap/deliver.md#R66
+#[test]
+fn r66_engine_tree_the_id_is_compared_and_a_tree_with_neither_is_refused() {
+    // Without `engine`: the installed engine against the tree id, as against a pin.
+    let mut w = W::new();
+    w.engine_tree = Some(etree());
+    let (v, exit) = w.run();
+    refused(&w, &v, exit, "engine_differs");
+    assert_eq!(
+        v["detail"],
+        json!({"tip": etree(), "installed": "e".repeat(40)})
+    );
+    let mut w = W::new();
+    w.engine_tree = Some(etree());
+    w.ont = etree();
+    let (v, exit) = w.run();
+    assert_eq!((end(&v), exit), (("installed", ""), 0), "{v}");
+    // With `engine` and the engine at the tree id: the pair, with no engine attempt.
+    let mut w = W::engine_tree();
+    w.ont = etree();
+    let (v, exit) = w.run();
+    assert_eq!(
+        (end(&v), exit, v["target"].clone()),
+        (("installed", ""), 0, json!(TARGET)),
+        "{v}"
+    );
+    assert!(!w.engine_clone_touched());
+    // Neither ontology/ENGINE-PIN nor engine/: engine_missing before any attempt, with or without
+    // `engine`.
+    for with_engine in [false, true] {
+        let mut w = if with_engine { W::engine() } else { W::new() };
+        w.neither = true;
+        let (v, exit) = w.run();
+        refused(&w, &v, exit, "engine_missing");
+        assert_eq!(
+            v["detail"],
+            json!({"tip": c(2), "why": "neither ontology/ENGINE-PIN nor engine/"})
+        );
+        assert!(w.applies("start_install").is_empty());
+        assert!(!w.engine_clone_touched());
+    }
+    // A tree with the pin is read as on the base: one `git show`, no `ls-tree` of the two entries.
+    let mut w = W::new();
+    w.ont = w.pin.clone();
+    let (v, _) = w.run();
+    assert_eq!(end(&v), ("installed", ""), "{v}");
+    assert!(
+        !w.calls
+            .iter()
+            .any(|(_, a, _)| a.iter().any(|x| x == "engine"))
+    );
+}
+
+// spec: specs/ap/deliver.md#R38
+// spec: specs/ap/deliver.md#R68
+#[test]
+fn r68_engine_tree_a_dead_engine_attempt_reaches_no_checkout_and_no_rev_list() {
+    let dead = |w: &mut W| {
+        let id = oid("install", "act-dead-ont");
+        w.installs.push(json!({"id": id, "target": etarget(), "kind": "forward", "repository": "o/r",
+            "commit": etree(), "attempt": 1, "from": ec(0), "from_sha256": sha(&engine_binary(&ec(0))),
+            "by": "dead", "status": "running", "started_at": STARTED, "running_in": etarget()}));
+        id
+    };
+    // Before the dead attempt is closed, no program checks out or walks a chain.
+    let quiet_until_close = |w: &W| {
+        let close = w.at("close_install").unwrap();
+        w.calls[..close]
+            .iter()
+            .all(|(p, a, _)| p != "git" || !a.iter().any(|x| x == "checkout" || x == "rev-list"))
+    };
+    // At its commit: installed, and the call goes on to the pair.
+    let mut w = W::engine_tree();
+    w.ont = etree();
+    let id = dead(&mut w);
+    let (v, exit) = w.run();
+    assert_eq!((end(&v), exit), (("installed", ""), 0), "{v}");
+    assert_eq!(v["closed"], json!({"install": id, "outcome": "installed"}));
+    assert!(quiet_until_close(&w));
+    // At its from: not_started; the call goes on and installs the engine of the tree.
+    let mut w = W::engine_tree();
+    let id = dead(&mut w);
+    let (v, _) = w.run();
+    assert_eq!(
+        v["closed"],
+        json!({"install": id, "outcome": "not_started"})
+    );
+    assert!(quiet_until_close(&w));
+    assert_eq!(
+        (v["target"].clone(), v["to"].clone()),
+        (json!(ENGINE), json!(etree()))
+    );
+    // At neither: this repository's installer rolls back once, from the clone as it stands.
+    for (back, want) in [(Some(ec(0)), "failed_restored"), (None, "failed")] {
+        let mut w = W::engine_tree();
+        let id = dead(&mut w);
+        w.ont = "f".repeat(40);
+        w.ont_rollback = (back, 0);
+        let script = w.p("state/r/engine/scripts/install-ont.sh");
+        std::fs::create_dir_all(w.p("state/r/engine/scripts")).unwrap();
+        std::fs::write(&script, "#!/bin/sh\n").unwrap();
+        let (v, _) = w.run();
+        let row = w.installs.iter().find(|i| i["id"] == id).unwrap();
+        assert_eq!(row["outcome"], want, "{v}");
+        let launch = w.calls.iter().find(|(p, _, _)| p == "bash").unwrap();
+        assert_eq!(launch.1, args(&[&script, "rollback"]));
+        assert_eq!(launch.2["cwd"], json!(w.p("state/r")));
+        assert!(quiet_until_close(&w));
+        assert!(!w.engine_clone_touched());
+    }
+    // Without this repository's installer in the clone: attempt_running.
+    let mut w = W::engine_tree();
+    let id = dead(&mut w);
+    w.ont = "f".repeat(40);
+    let (v, exit) = w.run();
+    refused(&w, &v, exit, "attempt_running");
+    assert_eq!(v["detail"], json!({ "install": id }));
+}
+
+// spec: specs/ap/deliver.md#R63
+// spec: specs/ap/deliver.md#R69
+#[test]
+fn r69_engine_tree_the_pc_push_depends_only_on_the_local_installed_attempt() {
+    let setup = || {
+        let mut w = W::engine_tree();
+        w.ont = etree();
+        (w.file, w.tree, w.bytes) = (Some(c(2)), Some(c(2)), binary(&c(2)));
+        w.pc = Some(pc_target(&w));
+        std::fs::write(w.p("ont-bin/ont"), fake_ont_script(&etree())).unwrap();
+        w
+    };
+    // No local installed attempt at the tree id: not_accepted, and no rev-list of an engine clone.
+    let mut w = setup();
+    let (v, exit) = w.run();
+    assert_eq!((end(&v), exit), (("current", ""), 0), "{v}");
+    assert_eq!(v["pc"]["result"], "not_accepted", "{v}");
+    assert!(w.applies("start_install").is_empty());
+    assert!(!w.engine_clone_touched());
+    assert_eq!(w.git_words("rev-list"), 0);
+    // The local attempt at the tree id carries the review: the PC attempt names this repository.
+    let mut w = setup();
+    let review = w.accepting(2);
+    w.installs.push(json!({"id": oid("install", "act-local-tree"), "target": etarget(),
+        "host": oid("host", "local"), "kind": "forward", "repository": "o/r", "commit": etree(),
+        "attempt": 1, "from": ec(0), "from_sha256": sha(&engine_binary(&ec(0))), "by": "timer:1",
+        "head": h(2), "review": review, "reviews": [review], "status": "closed", "outcome": "installed",
+        "to": etree(), "started_at": "2026-11-14T08:00:00Z", "closed_at": "2026-11-14T08:01:00Z"}));
+    let (v, exit) = w.run();
+    assert_eq!((end(&v), exit), (("current", ""), 0), "{v}");
+    assert_eq!(v["pc"]["result"], "installed", "{v}");
+    assert_eq!(v["pc"]["to"], etree());
+    let start = &w.applies("start_install")[0];
+    assert_eq!(start["request_id"], format!("pc.pc.{}.1", etree()));
+    assert_eq!(start["parameters"]["repository"], "o/r");
+    assert_eq!(start["parameters"]["commit"], etree());
+    assert_eq!(start["parameters"]["head"], h(2));
+    assert!(!w.engine_clone_touched());
 }

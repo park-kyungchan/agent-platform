@@ -158,6 +158,10 @@ struct Call<'a> {
     etc: Option<String>,
     /// With `pc`: the PC checks account target (R60).
     pc: Option<Pc>,
+    /// The rule of two trees of T once step 5 read it (R66): true under the tree rule, where the engine
+    /// is built from `engine/` of this repository's clone; also set for a dead call's engine attempt of
+    /// this repository (R68).
+    tree_rule: Option<bool>,
     /// What the first installer that failed in the current attempt wrote, its last `KEPT_BYTES`
     /// bytes, standard output then standard error (R65).
     failed: Option<Vec<u8>>,
@@ -861,6 +865,11 @@ fn installer(s: &mut impl System, c: &mut Call, name: &str, words: &[&str]) -> R
     let kind = name.split('-').next().unwrap_or_default();
     let eclone = c.engine.as_ref().map_or("", |e| e.0.as_str()).to_owned();
     let (mut argv, cwd, mut env) = match kind {
+        // Under the tree rule the engine's installer is this repository's, from its clone at T (R67).
+        "ont" if c.tree_rule == Some(true) => {
+            let script = format!("{}/engine/scripts/install-ont.sh", c.clone);
+            (args(&["bash", &script]), c.clone.clone(), c.env.clone())
+        }
         "ont" => {
             let script = format!("{eclone}/scripts/install-ont.sh");
             (args(&["bash", &script]), eclone, c.env.clone())
@@ -1059,9 +1068,22 @@ fn deliver(s: &mut impl System, c: &mut Call) -> Step<()> {
         None => return Err(differs(s, c, &target)),
     };
     c.rec["from"] = json!(from);
-    // 5. The engine and the schema the tip names.
-    let pin =
-        git(s, c, &["show", &format!("{tip}:ontology/ENGINE-PIN")]).map(|p| p.trim().to_owned());
+    // 5. The engine and the schema the tip names: the pin, or under the tree rule the tree id of
+    // `engine/` (R66); a tree with neither is refused before any attempt.
+    let pin = match rule_at(s, c, &tip) {
+        Rule::Pin(pin) => {
+            c.tree_rule = Some(false);
+            pin
+        }
+        Rule::Tree(id) => {
+            c.tree_rule = Some(true);
+            Some(id)
+        }
+        Rule::Neither => {
+            let why = "neither ontology/ENGINE-PIN nor engine/";
+            return Err(No("engine_missing", json!({"tip": tip, "why": why})));
+        }
+    };
     let engine = match c.engine {
         Some(_) => engine_at(s, c),
         None => run(s, "ont", args(&["--version"]), 10_000)
@@ -1111,7 +1133,10 @@ fn deliver(s: &mut impl System, c: &mut Call) -> Step<()> {
         marker(s, c, &tip)?;
     }
     if engine_moves {
-        return engine_install(s, c, &pin, &engine.unwrap_or_default());
+        // Under the tree rule the review that accepts T accepts its engine (R67).
+        let own =
+            (c.tree_rule == Some(true)).then(|| (head.clone(), review.clone(), reviews.clone()));
+        return engine_install(s, c, &pin, &engine.unwrap_or_default(), own);
     }
     if c.engine.is_some() {
         roles_step(s, c, &tip)?;
@@ -1121,6 +1146,46 @@ fn deliver(s: &mut impl System, c: &mut Call) -> Step<()> {
     }
     // 8. The attempt, applied before any installer.
     deliver_pair(s, c, &target, &tip, &from, (head, review, reviews))
+}
+/// The rule of two trees for a commit of the clone (R66): the pin of `ontology/ENGINE-PIN` when the
+/// commit holds it (None when it cannot be read: today's `engine_differs`), else the Git tree id of
+/// `engine/`, else neither. Read from the clone's objects only: `git show` first, so that a tree with the
+/// pin is read as on the base, then `git ls-tree` of the two entries.
+enum Rule {
+    Pin(Option<String>),
+    Tree(String),
+    Neither,
+}
+fn rule_at(s: &mut impl System, c: &Call, commit: &str) -> Rule {
+    let pin = git(s, c, &["show", &format!("{commit}:ontology/ENGINE-PIN")]);
+    if let Some(pin) = pin {
+        return Rule::Pin(Some(pin.trim().to_owned()));
+    }
+    let words = ["ls-tree", commit, "--", "ontology/ENGINE-PIN", "engine"];
+    let Some(list) = git(s, c, &words) else {
+        return Rule::Pin(None);
+    };
+    let mut tree = None;
+    for line in list.lines() {
+        if line.ends_with("\tontology/ENGINE-PIN") {
+            return Rule::Pin(None);
+        }
+        let id = line.strip_prefix("040000 tree ");
+        let id = id.and_then(|rest| rest.strip_suffix("\tengine"));
+        if let Some(id) = id.filter(|id| hex40(id)) {
+            tree = Some(id.to_owned());
+        }
+    }
+    tree.map_or(Rule::Neither, Rule::Tree)
+}
+/// Whether T follows the tree rule (R66), read once per call.
+fn tree_rule(s: &mut impl System, c: &mut Call, tip: &str) -> bool {
+    if let Some(known) = c.tree_rule {
+        return known;
+    }
+    let tree = matches!(rule_at(s, c, tip), Rule::Tree(_));
+    c.tree_rule = Some(tree);
+    tree
 }
 /// The clone's tree at T, after step 7 and before the marker, the schema and step 8 (R47, R28).
 fn judged(s: &mut impl System, c: &Call, tip: &str) -> Step<()> {
@@ -1491,12 +1556,26 @@ fn engine_dead(s: &mut impl System, c: &mut Call) -> Step<bool> {
     } else if now.as_deref() == Some(&from) {
         (p["outcome"], p["code"]) = (json!("not_started"), json!("dead_call"));
     } else {
-        let eclone = c.engine.as_ref().map_or("", |e| e.0.as_str());
-        if s.read(&format!("{eclone}/scripts/install-ont.sh")).is_err() {
+        // An attempt of this repository is one of the tree rule: its rollback is this repository's
+        // installer, from the clone as it stands, with no checkout and no rev-list (R68).
+        let ours = c.r["repository"]
+            .as_str()
+            .is_some_and(|r| f("repository") == r);
+        c.tree_rule = ours.then_some(true);
+        let script = match ours {
+            true => format!("{}/engine/scripts/install-ont.sh", c.clone),
+            false => {
+                let eclone = c.engine.as_ref().map_or("", |e| e.0.as_str());
+                format!("{eclone}/scripts/install-ont.sh")
+            }
+        };
+        if s.read(&script).is_err() {
             return Err(running());
         }
         c.rec["target"] = json!(ENGINE);
         let ran = vec![installer(s, c, "ont-rollback", &["rollback"])];
+        // The flag chose this attempt's installer only; T's rule is read in step 5.
+        c.tree_rule = None;
         let now = engine_at(s, c);
         let (outcome, to) = match now.as_deref() {
             Some(v) if v == from => ("failed_restored", from.as_str()),
@@ -1529,11 +1608,48 @@ fn engine_dead(s: &mut impl System, c: &mut Call) -> Step<bool> {
     Ok(false)
 }
 /// The engine at the pin (README "The engine and the schema"): its clone with the remote `origin`,
-/// its chain accepted, the attempt, `install-ont.sh install <pin>`, the read, the close. The call
-/// ends here.
-fn engine_install(s: &mut impl System, c: &mut Call, pin: &str, from: &str) -> Step<()> {
-    let target = id("installed_artifact", ENGINE);
+/// its chain accepted, the attempt, `install-ont.sh install <pin>`, the read, the close. Under the tree
+/// rule (`own`, the review of T's chain, R67) the engine is this repository's: no engine clone, no
+/// fetch, no ancestor test; `engine/scripts/install-ont.sh install <T>` from the clone at T, and the
+/// attempt names this repository and the tree id. The call ends here.
+fn engine_install(
+    s: &mut impl System,
+    c: &mut Call,
+    pin: &str,
+    from: &str,
+    own: Option<(String, Value, Vec<Value>)>,
+) -> Step<()> {
     (c.rec["target"], c.rec["from"]) = (json!(ENGINE), json!(from));
+    let request: &Value = c.r;
+    let (head, review, reviews, repository, words) = match own {
+        Some((head, review, reviews)) => {
+            let repository = request["repository"].as_str().unwrap_or_default();
+            let tip = c.rec["tip"].as_str().unwrap_or_default().to_owned();
+            (
+                head,
+                review,
+                reviews,
+                repository,
+                ["install".to_owned(), tip],
+            )
+        }
+        None => {
+            let (head, review, reviews, repository) = engine_clone_at(s, c, pin, from)?;
+            let words = ["install".to_owned(), pin.to_owned()];
+            (head, review, reviews, repository, words)
+        }
+    };
+    engine_attempt(s, c, pin, from, (head, review, reviews), repository, &words)
+}
+/// R43's engine clone: made or reused with the remote `origin`, fetched, the pin under its `origin/main`
+/// and its chain accepted, then checked out at the pin. The head, the review, the reviews and the
+/// engine's repository.
+fn engine_clone_at<'r>(
+    s: &mut impl System,
+    c: &Call<'r>,
+    pin: &str,
+    from: &str,
+) -> Step<(String, Value, Vec<Value>, &'r str)> {
     let e = &c.r["engine"];
     let (repository, url) = (e["repository"].as_str(), e["url"].as_str());
     let (repository, url) = (repository.unwrap_or_default(), url.unwrap_or_default());
@@ -1567,6 +1683,20 @@ fn engine_install(s: &mut impl System, c: &mut Call, pin: &str, from: &str) -> S
     if !checkout(s, &eclone, pin) {
         return Err(fetch_failed());
     }
+    Ok((head, review, reviews, repository))
+}
+/// The engine's attempt (R43): the index run, `start_install`, the installer with `words`, the read,
+/// the rollback when at neither, the close, the index run.
+fn engine_attempt(
+    s: &mut impl System,
+    c: &mut Call,
+    pin: &str,
+    from: &str,
+    (head, review, reviews): (String, Value, Vec<Value>),
+    repository: &str,
+    words: &[String; 2],
+) -> Step<()> {
+    let target = id("installed_artifact", ENGINE);
     c.rec["index"] = json!({"before": index(s, c), "after": null});
     let filter = [("target", target.clone()), ("commit", json!(pin))];
     let attempt = search(s, c, "install", &filter)?
@@ -1584,7 +1714,7 @@ fn engine_install(s: &mut impl System, c: &mut Call, pin: &str, from: &str) -> S
         "head": head, "review": review, "reviews": reviews});
     let request = format!("ont.{pin}.{attempt}");
     start(s, c, id("host", "local"), request.clone(), p, attempt)?;
-    let mut ran = vec![installer(s, c, "ont", &["install", pin])];
+    let mut ran = vec![installer(s, c, "ont", &[&words[0], &words[1]])];
     let (outcome, to) = match engine_at(s, c) {
         Some(v) if v == pin => ("installed", pin),
         Some(v) if v == from => ("failed_restored", from),
@@ -2169,12 +2299,14 @@ fn pc_dead(s: &mut impl System, c: &mut Call) -> Step<()> {
 
 /// Resolves the closed accepting packet review for `ontology-platform` commit `pin` (R63): first
 /// from the newest closed `installed` attempt of `/usr/local/bin/ont` on host `local` at `pin`,
-/// else via `accepted()` on the engine clone (where `head` is `pin^2`).
+/// else via `accepted()` on the engine clone (where `head` is `pin^2`). Under the tree rule (`tree`,
+/// R69) only the local attempt counts: no rev-list of an engine clone.
 fn pc_accepted(
     s: &mut impl System,
     c: &Call,
     same_commit: &[Value],
     pin: &str,
+    tree: bool,
 ) -> Result<Option<(String, Value, Vec<Value>)>, No> {
     let mut local_installed: Vec<&Value> = same_commit
         .iter()
@@ -2199,6 +2331,9 @@ fn pc_accepted(
     let Some((eclone, _, _)) = &c.engine else {
         return Ok(None);
     };
+    if tree {
+        return Ok(None);
+    }
     let repository = c.r["engine"]["repository"]
         .as_str()
         .unwrap_or(DEFAULT_ENGINE_REPO);
@@ -2321,7 +2456,9 @@ fn pc_push(s: &mut impl System, c: &mut Call) -> Value {
             );
         }
     };
-    let (head, review, reviews) = match pc_accepted(s, c, &same_commit, &pin) {
+    let tip = c.rec["tip"].as_str().unwrap_or_default().to_owned();
+    let tree = hex40(&tip) && tree_rule(s, c, &tip);
+    let (head, review, reviews) = match pc_accepted(s, c, &same_commit, &pin, tree) {
         Ok(Some(v)) => v,
         Ok(None) => {
             return make(
@@ -2345,10 +2482,15 @@ fn pc_push(s: &mut impl System, c: &mut Call) -> Value {
         }
     };
     let attempt = same_commit.iter().filter(|a| is_host(a, &pc.host)).count() + 1;
-    let repository =
-        c.r.get("engine")
-            .and_then(|e| e["repository"].as_str())
-            .unwrap_or(DEFAULT_ENGINE_REPO);
+    // Under the tree rule the PC attempt names this repository, as the local one does (R69).
+    let repository = match tree {
+        true => c.r["repository"].as_str().unwrap_or_default(),
+        false => {
+            c.r.get("engine")
+                .and_then(|e| e["repository"].as_str())
+                .unwrap_or(DEFAULT_ENGINE_REPO)
+        }
+    };
     let from_param = remote_commit.clone().unwrap_or_else(|| "0".repeat(40));
     let request = format!("pc.{}.{pin}.{attempt}", pc.host);
     let p = json!({
@@ -2830,6 +2972,7 @@ pub fn execute(s: &mut impl System, r: &Value) -> (Value, u8) {
         engine: None,
         etc: None,
         pc: None,
+        tree_rule: None,
         failed: None,
         env,
     };

@@ -1919,6 +1919,100 @@ fn r19_a_pinned_engine_the_pc_does_not_have_runs_here_as_pc_engine_differs() {
     on_pc("no pin and no ont");
 }
 
+// spec: specs/ap/check.md#R19
+// spec: specs/ap/check.md#R25
+#[test]
+fn r25_engine_tree_a_worktree_without_the_pin_names_the_tree_id_of_engine() {
+    let w = World::new();
+    let d = w.dir();
+    let tree = w.tree();
+    let tree = tree.to_str().unwrap().to_owned();
+    write(&w.repo.join("engine/Cargo.toml"), "[workspace]\n", 0o644);
+    sh(
+        &w.repo,
+        "git add -A && git -c user.name=t -c user.email=t@e commit -q -m engine",
+    );
+    let id = sh(&w.repo, "git rev-parse HEAD:engine").trim().to_owned();
+    assert_eq!(id.len(), 40, "{id:?}");
+    let other = "fedcba9876543210fedcba9876543210fedcba98";
+    let ont = FAKE_ONT.replace("@PC@", &w.s("pc"));
+    write(&w.p("pc/bin/ont"), &ont, 0o755);
+    let version = |rev: &str| write(&w.p("pc/ont-version"), &format!("ont 0.2.0 {rev}\n"), 0o644);
+    let where_ = ["--", "sh", "-c", "echo \"in $PWD\""];
+    let args = [&[d.as_str()][..], &where_].concat();
+    let placed = |what: &str, want: &str| {
+        let _ = fs::remove_file(w.p("pc/remote"));
+        let out = w.ap(&args);
+        assert_eq!(out.status.code(), Some(0), "{what}: {out:?}");
+        let r = w.records().pop().unwrap();
+        if want == "pc" {
+            assert_eq!(
+                lines(&out.stderr),
+                ["check: on pc (4 CPUs, load 0.10, 8192 MB available)"],
+                "{what}"
+            );
+            assert_eq!(lines(&out.stdout), [format!("in {tree}")], "{what}");
+            assert_eq!(
+                (r["host"].as_str(), &r["reason"]),
+                (Some("pc"), &Value::Null),
+                "{what}"
+            );
+        } else {
+            assert_eq!(
+                lines(&out.stderr),
+                ["check: on this host (pc_engine_differs)"],
+                "{what}"
+            );
+            assert_eq!(lines(&out.stdout), [format!("in {d}")], "{what}");
+            assert!(!w.p("pc/remote").exists(), "{what}");
+            assert_eq!(
+                (r["host"].as_str(), r["reason"].as_str()),
+                (Some("local"), Some("pc_engine_differs")),
+                "{what}"
+            );
+        }
+    };
+    // Another id on the PC: here. The tree id of engine/ at HEAD, whatever the version word: the PC.
+    version(other);
+    placed("another engine", "here");
+    version(&id);
+    placed("the engine of the tree", "pc");
+    // A modified engine/ names no tree: here, until the change is committed.
+    write(
+        &w.repo.join("engine/Cargo.toml"),
+        "[workspace]\n# edited\n",
+        0o644,
+    );
+    placed("a modified engine", "here");
+    write(&w.repo.join("engine/new.rs"), "\n", 0o644);
+    write(&w.repo.join("engine/Cargo.toml"), "[workspace]\n", 0o644);
+    placed("an untracked file in engine", "here");
+    fs::remove_file(w.repo.join("engine/new.rs")).unwrap();
+    placed("the engine again", "pc");
+    // A change elsewhere does not touch the engine's id.
+    write(&w.repo.join("a.txt"), "changed\n", 0o644);
+    placed("a change outside engine", "pc");
+    // A tree that holds ontology/ENGINE-PIN keeps the pin's rule, beside engine/.
+    let pin = "0123456789abcdef0123456789abcdef01234567";
+    write(
+        &w.repo.join("ontology/ENGINE-PIN"),
+        &format!("{pin}\n"),
+        0o644,
+    );
+    placed("the pin's rule beside engine", "here");
+    write(&w.p("pc/ont-version"), &format!("ont 0.1.0 {pin}\n"), 0o644);
+    placed("the pin's engine", "pc");
+    // Neither the pin nor engine/: placed as R4 says, whatever the PC's engine.
+    fs::remove_file(w.repo.join("ontology/ENGINE-PIN")).unwrap();
+    fs::remove_dir_all(w.repo.join("engine")).unwrap();
+    sh(
+        &w.repo,
+        "git add -A && git -c user.name=t -c user.email=t@e commit -q -m none",
+    );
+    version(other);
+    placed("neither", "pc");
+}
+
 /// `command` run under the umask `mask`, with its environment.
 fn with_umask(command: &Command, mask: &str) -> Command {
     let mut c = Command::new("sh");

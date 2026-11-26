@@ -564,6 +564,27 @@ pub fn engine_pin(dir: &str) -> Option<String> {
         String::from_utf8_lossy(&bytes).split_whitespace().collect()
     })
 }
+/// The engine a worktree names (R19, R25), read on this host without running anything of the worktree.
+/// A worktree that holds `ontology/ENGINE-PIN` (any entry) keeps R19's pin (`engine_pin`). One without it
+/// whose working tree holds the directory `engine/` names the Git tree id of `engine/` at `HEAD`
+/// (`git rev-parse HEAD:engine`); a modified `engine/` (`git status --porcelain -- engine` prints anything)
+/// or an id that cannot be read is an empty pin, which no engine names. Neither: no engine, as R19 says.
+pub(crate) fn worktree_engine(ctx: &Ctx, dir: &str) -> Option<String> {
+    let root = Path::new(dir);
+    if fs::symlink_metadata(root.join("ontology/ENGINE-PIN")).is_ok() {
+        return engine_pin(dir);
+    }
+    if !fs::symlink_metadata(root.join("engine")).is_ok_and(|m| m.is_dir()) {
+        return None;
+    }
+    let clean =
+        git(ctx, dir, &["status", "--porcelain", "--", "engine"]).is_some_and(|o| o.is_empty());
+    let id = clean
+        .then(|| git(ctx, dir, &["rev-parse", "HEAD:engine"]).and_then(line))
+        .flatten()
+        .filter(|id| hex40(id));
+    Some(id.unwrap_or_default())
+}
 /// What the probe answered (R4, R19): its readings, the revision the account's `ont` names, and the
 /// HEAD of the worktree's repository on the PC.
 #[derive(Debug, PartialEq)]
@@ -1153,7 +1174,7 @@ pub(crate) fn for_door(
     };
     let deadline = arrival + Duration::from_secs(call.timeout);
     let key = digest(tree.dir.as_bytes())[..16].to_owned();
-    match place(ctx, &pc, &key, engine_pin(&tree.dir).as_deref()) {
+    match place(ctx, &pc, &key, worktree_engine(ctx, &tree.dir).as_deref()) {
         Place::Here(reason, _) => Ended::Here(reason),
         Place::Pc { probe, head } => {
             ctx.say(&on_pc_line(&probe));
@@ -1230,7 +1251,7 @@ pub fn cli(argv: &[OsString]) -> ExitCode {
     let local = |reason: &'static str| ("local", Some(reason), local(reason));
     let (probe, low, (host, reason, exit)) = match &pc {
         None => (None, None, local("no_pc_in_policy")),
-        Some(pc) => match place(&ctx, pc, &key, engine_pin(&tree.dir).as_deref()) {
+        Some(pc) => match place(&ctx, pc, &key, worktree_engine(&ctx, &tree.dir).as_deref()) {
             Place::Here(reason, probe) => (probe, None, local(reason)),
             Place::Pc { probe, head } => {
                 say(&on_pc_line(&probe));
