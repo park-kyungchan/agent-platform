@@ -1,6 +1,6 @@
 [Unit]
 Description=ont serve: tailnet HTTP/1.1 and MCP server for the Ontology store
-Documentation=https://github.com/park-kyungchan/agent-platform/blob/main/deploy/README.md
+Documentation=https://github.com/park-kyungchan/lifecycle-platform/blob/main/deploy/README.md
 Wants=tailscaled.service network-online.target
 After=tailscaled.service network-online.target
 

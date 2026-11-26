@@ -8,10 +8,8 @@ Every platform has one long name and one short name, and no third form. The long
 
 | Thing | Long name | Short name |
 | --- | --- | --- |
-| The agent platform | `agent-platform` | `ap` |
-| The Ontology platform | `ontology-platform` | `ont` |
-| The education platform | `education-platform` | `edu` |
-| Remote host and Hermes operations | `agent-vps-operations` | `vps-ops` |
+| The life cycle platform: the command `ap`, the engine (`engine/`), the host's configuration (`host/`) | `lifecycle-platform` | `ap`; the engine's crates and command `ont` |
+| The Academy platform | `academy-platform` | `edu` |
 | Work on the whole host | none | `ws` |
 | Long-term memory work | none | `mem` |
 
@@ -40,5 +38,6 @@ Every platform has one long name and one short name, and no third form. The long
 
 - A closed task directory, an archived repository and a third-party tool keep their names.
 - An older name is renamed only in the order and on the conditions of `/home/palantirkc/work/workspace-strategy-reassessment-20261109/naming-20261111/NAMING-STANDARD.md`. Do not rename one because it breaks a pattern.
-- Known exceptions that stay until that order reaches them: the checkout of `education-problem-edit` at `/home/palantirkc/work/problem-edit`; the MCP server name `academy_operations`; task directories with a date or a long scope word.
+- Known exceptions that stay until that order reaches them: the checkout `/home/palantirkc/work/problem-edit` of an archived Academy module; the MCP server name `academy_operations`; task directories with a date or a long scope word.
+- The installed paths kept their names when the repositories were regrouped: `/etc/agent-platform`, `/var/lib/agent-platform` and `/var/lib/ontology-platform` are host paths, not repository names.
 - Do not copy an exception: a new thing follows section 2.

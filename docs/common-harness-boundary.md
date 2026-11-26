@@ -1,7 +1,7 @@
 # Common harness mechanism boundary
 
 **Scope approved by the user — 2026-11-04.** Initially prepared against
-`aaefe063dbbc83f23a4f00c397c80ce60bca2003`; rechecked against agent-platform main
+`aaefe063dbbc83f23a4f00c397c80ce60bca2003`; rechecked against lifecycle-platform main
 `42055b7b70d52e6aeb02a84136367fdc09748f45`. This is autonomy goal 8's permanent mechanism
 boundary for a small Rust, CLI-agnostic harness on Herdr, used by Claude Code
 and Antigravity CLI (`agy`). It assigns no role, priority, model or

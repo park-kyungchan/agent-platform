@@ -32,7 +32,7 @@ Job J4 of the API credit, run by hand once a week: each specification file of th
 Weekly, from a checkout at the installed commit:
 
 ```
-evals/batch/lint/build --repo park-kyungchan/agent-platform=<clone> --repo park-kyungchan/ontology-platform=<clone> --model claude-fable-5-2 --out <dir>
+evals/batch/lint/build --repo park-kyungchan/lifecycle-platform=<clone> --model claude-fable-5-2 --out <dir>
 ap api batch evals --requests <dir>/requests.jsonl --out <batch dir>
 evals/batch/lint/read --files <dir>/files.json --results <batch dir>/results.jsonl
 ```

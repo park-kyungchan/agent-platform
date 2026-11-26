@@ -42,7 +42,7 @@ A weak model routes as well as a strong one only where a route asks for no judgm
 - At most three steps lead from `AGENTS.md` to a line: a reference in a directory its section 8 names, a table of the reference, a `path:a-b`.
 - Paths are written in full, never shortened or elided; a table is keyed by the situation, in the words an assignment uses.
 - A stale copy is taken off the path, not warned about.
-- A change of a route is accepted on the routing suite (`agent-platform` `evals/README.md`, section "The routing suite"); its cases in the repository, `evals/routing/cases.json`, cover how each CLI runs without a terminal UI, not the routes of this file or of `OFFICIAL-DOCS.md` section 4, so such a change also names the reads it was tried on.
+- A change of a route is accepted on the routing suite (`lifecycle-platform` `evals/README.md`, section "The routing suite"); its cases in the repository, `evals/routing/cases.json`, cover how each CLI runs without a terminal UI, not the routes of this file or of `OFFICIAL-DOCS.md` section 4, so such a change also names the reads it was tried on.
 
 ## 5. A task kind no row covers
 
@@ -90,4 +90,4 @@ When memory and current source disagree, the source wins for current truth. Keep
 ## 9. Lessons and Ontology
 
 - A lesson is a finding of kind `lesson` (`ONTOLOGY-USE.md` section 4), promoted on independent occurrences of a verified mechanism, not on document count. A structural proposal goes to the Lead and to the user; no memory write enacts architecture or policy.
-- `ontology-platform` owns source-qualified operational state, admission, named actions and recovery; Git owns engineering originals. There is no automatic promotion of prose into objects. Check what `ontology-platform` actually provides at its current revision before relying on it.
+- The engine (`lifecycle-platform` `engine/`) owns source-qualified operational state, admission, named actions and recovery; Git owns engineering originals. There is no automatic promotion of prose into objects. Check what the engine actually provides at its current revision before relying on it.

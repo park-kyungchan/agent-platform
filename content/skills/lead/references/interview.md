@@ -64,7 +64,7 @@ It does not rest on the model: `add_unit` in the lane `objective` without an int
 | 런타임 레퍼런스, runtime-reference | `/root/.agents/runtime-references/` (plural) | — |
 | 스킬 | A skill under `/root/.agents/skills/`, or one a single CLI installed | A misspelled name means the nearest one |
 | 메모리 | The store's objects ("단기" and "중장기" both), or a CLI's private memory | Which of the two |
-| 온톨로지, Ontology | Palantir's sense: object types, links, actions in `ontology-platform` | Not a taxonomy |
+| 온톨로지, Ontology | Palantir's sense: object types, links, actions in the engine (`lifecycle-platform` `engine/`) | Not a taxonomy |
 | REA, Ghidra Framework | The reverse-engineering tool at `/home/palantirkc/tools/rea`, Ghidra its backend | Static or dynamic; built? |
 | Rust 전환, 마이그레이션 | Moving an implementation to Rust | Which repository and consumer |
 | 컷오버, cutover | Moving a service's live consumers to the new implementation | Which consumers; rollback |

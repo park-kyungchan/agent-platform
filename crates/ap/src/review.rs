@@ -65,7 +65,8 @@ pub(crate) fn accepting(
     let (found, _) = objects(s, r, "review", all)?;
     let accepts = |o: &Value| {
         field(o, "verdict") == "accept"
-            && field(o, "repository") == repository
+            && (field(o, "repository").as_str())
+                .is_some_and(|r| crate::unit::object::same_repository(r, repository))
             && complete_id(&o["id"])
     };
     Ok(found.into_iter().filter(accepts).collect())
@@ -320,7 +321,8 @@ fn lead_app(s: &impl System, repository: &str) -> Result<Option<(u64, String)>, 
         return Ok(None);
     };
     let g = &v["units"]["github"];
-    let named = g["stage_tokens"].get(repository).is_some();
+    let tokens = g["stage_tokens"].as_object();
+    let named = tokens.is_some_and(|m| crate::unit::object::member_of(m, repository).is_some());
     match g.get("lead_app").filter(|_| named) {
         None => Ok(None),
         Some(app) => crate::unit::drive::lead_app(app).map(Some),

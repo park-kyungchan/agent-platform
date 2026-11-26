@@ -12,7 +12,7 @@
 | `apcheck@ap-checks` | the value of `hosts.pc.ssh` in `etc/agent-platform/policy.json` |
 | `/home/apcheck/work/ap-checks` | the value of `hosts.pc.work`; the PC's side of `ap check` makes it at the first call |
 
-Who uses it: `ap check` on the VPS, which reaches the PC by `tailscale ping` and `tailscale ssh <ssh>` alone (agent-platform `specs/ap/check.md` R4 and R16).
+Who uses it: `ap check` on the VPS, which reaches the PC by `tailscale ping` and `tailscale ssh <ssh>` alone (lifecycle-platform `specs/ap/check.md` R4 and R16).
 
 Who acts. Every step on the PC and in the tailnet's admin console is the user's, and so is every change of the VPS's node identity. The one exception is the copy of L5 below, which writes one file in the account's home. The Lead's steps all run on the VPS, and they are this list and nothing else:
 
@@ -20,7 +20,7 @@ Who acts. Every step on the PC and in the tailnet's admin console is the user's,
 - **L2**: the reads `tailscale status`, `tailscale ping ap-checks`, `ss -H -ltn` and `tailscale serve status`. The Lead gives their output to the user, in a message and not in a file.
 - **L3**: the commands of the table in "The tailnet's rule" that start at the VPS (E1, E2, E3, E4, E7).
 - **L4**: the real run of "The real run".
-- **L5**: each time agent-platform's engine pin (`ontology/ENGINE-PIN`) moves, until a program delivers the checks' toolchain into the account: the copy of the VPS's newly installed `/usr/local/bin/ont` to `/home/apcheck/.cargo/bin/ont`, its readback and its undo. The copy goes to a new file, the old one is kept beside it as `ont.before`, and then a rename puts the new file in place:
+- **L5**: each time lifecycle-platform's engine pin (`ontology/ENGINE-PIN`) moves, until a program delivers the checks' toolchain into the account: the copy of the VPS's newly installed `/usr/local/bin/ont` to `/home/apcheck/.cargo/bin/ont`, its readback and its undo. The copy goes to a new file, the old one is kept beside it as `ont.before`, and then a rename puts the new file in place:
 
   ```sh
   tailscale ssh apcheck@ap-checks 'cat > ~/.cargo/bin/ont.new && chmod 755 ~/.cargo/bin/ont.new && ln -f ~/.cargo/bin/ont ~/.cargo/bin/ont.before && mv ~/.cargo/bin/ont.new ~/.cargo/bin/ont' < /usr/local/bin/ont
@@ -51,12 +51,12 @@ As the user prepared it on 2026-11-21. One line per property, with its read comm
 | no cargo home of the checks before the first call | `wsl -d ap-checks --exec test -e /home/apcheck/work/ap-checks/cargo-home` | `$LASTEXITCODE` `1`. Where it exists, the user removes it once (`wsl -d ap-checks --exec rm -rf /home/apcheck/work/ap-checks/cargo-home`), because only the step that fetches the dependencies may fill it |
 | the resolver file exists (that step is shown it) | `wsl -d ap-checks --exec readlink -f /etc/resolv.conf` and `wsl -d ap-checks --exec stat -L -c %F /etc/resolv.conf` | a path, and `regular file` |
 | `bwrap` runs a command in a new user namespace | `wsl -d ap-checks --exec bwrap --unshare-user --uid 0 --gid 0 --ro-bind / / id -u` | `0` |
-| the programs the PC's side calls, and `python3`, which agent-platform's `./check` calls | `wsl -d ap-checks --exec bash -c 'command -v bash git tar flock timeout nice setsid find python3 bwrap'` | ten paths, one per name |
-| the engine, read through `~/.profile` | `wsl -d ap-checks --exec sh -c '. ~/.profile; command -v ont; ont --version'` | `/home/apcheck/.cargo/bin/ont`, then `ont 0.1.0 <pin>`. The pin is agent-platform's `ontology/ENGINE-PIN` at main (`c600967d1d9725a318843fb693d1b71acd3b284f` on 2026-11-21, which the VPS's `/usr/local/bin/ont` equals). Step 1 of "The order" places this file, which is not there yet |
+| the programs the PC's side calls, and `python3`, which lifecycle-platform's `./check` calls | `wsl -d ap-checks --exec bash -c 'command -v bash git tar flock timeout nice setsid find python3 bwrap'` | ten paths, one per name |
+| the engine, read through `~/.profile` | `wsl -d ap-checks --exec sh -c '. ~/.profile; command -v ont; ont --version'` | `/home/apcheck/.cargo/bin/ont`, then `ont 0.1.0 <pin>`. The pin is lifecycle-platform's `ontology/ENGINE-PIN` at main (`c600967d1d9725a318843fb693d1b71acd3b284f` on 2026-11-21, which the VPS's `/usr/local/bin/ont` equals). Step 1 of "The order" places this file, which is not there yet |
 | glibc for the VPS's dynamically linked `ont` | `wsl -d ap-checks --exec ldd --version` | first line ends with `2.39` or a later version. Where `ont` does not start, the user stops and tells the Lead |
 | no Windows program starts | the user copies a Windows program (for example `whoami.exe`) into `\\wsl.localhost\ap-checks\home\apcheck\`, runs `wsl -d ap-checks --exec /home/apcheck/whoami.exe`, then removes the copy | an error and a non-zero `$LASTEXITCODE`; nothing of Windows prints |
 
-agent-platform's `./check` uses the installed `ont` only when its version names the pin. The account cannot build an `ont` itself, because the engine's repository is private. No credential is ever put into the account to make that possible.
+lifecycle-platform's `./check` uses the installed `ont` only when its version names the pin. The account cannot build an `ont` itself, because the engine's repository is private. No credential is ever put into the account to make that possible.
 
 ## What the two distributions share
 
@@ -67,7 +67,7 @@ agent-platform's `./check` uses the installed `ont` only when its version names 
 | One kernel | Root in `ap-checks` is root on the kernel that the user's distribution runs on | `apcheck` is not root and has no sudo, and no step gives it root | `uname -r` gives the same answer in both; `id apcheck` and `sudo -n true` as in "The distribution" |
 | The mount `/mnt/wsl` | Both distributions see it | Nothing of the user's is placed there, and nothing reaches the account through it | `ls -la /mnt/wsl` shows the same listing in both, with no file of the user's |
 | One network | The interfaces, the loopback and its ports are the same in both | The second `tailscaled` runs in userspace-networking mode with a UDP port of its own ("The node"); see the first line of "Not closed by this" | `ip -br addr` gives the same lines in both |
-| One virtual machine's memory | A check's memory comes out of the same machine as the user's own work. No `memory` line is added to `.wslconfig`: the user decided at 2026-11-21 02:49Z not to cap the machine's memory | In `ap-checks`, the probe of `ap check` reads the Linux `MemAvailable` alone. Its Windows reading needs `powershell.exe` under `/mnt/c`, which is absent there by design, so each record line has `pc_windows_available_mb` null, and `min_available_mb` (2,048 MB while it is absent from the policy) is compared with the Linux reading only (agent-platform `specs/ap/check.md` R4, R15, R16) | PowerShell: `Select-String -Path $env:USERPROFILE\.wslconfig -Pattern '^\s*memory'` prints nothing (or the file does not exist) |
+| One virtual machine's memory | A check's memory comes out of the same machine as the user's own work. No `memory` line is added to `.wslconfig`: the user decided at 2026-11-21 02:49Z not to cap the machine's memory | In `ap-checks`, the probe of `ap check` reads the Linux `MemAvailable` alone. Its Windows reading needs `powershell.exe` under `/mnt/c`, which is absent there by design, so each record line has `pc_windows_available_mb` null, and `min_available_mb` (2,048 MB while it is absent from the policy) is compared with the Linux reading only (lifecycle-platform `specs/ap/check.md` R4, R15, R16) | PowerShell: `Select-String -Path $env:USERPROFILE\.wslconfig -Pattern '^\s*memory'` prints nothing (or the file does not exist) |
 
 ## The node
 
@@ -227,7 +227,7 @@ Each step names who acts, its readback and its undo.
 
    Undo: `Unregister-ScheduledTask -TaskName ap-checks-keepalive -Confirm:$false`.
 
-   When the instance stops anyway (a `wsl --shutdown`, a closed session): every `ap check` already tests the PC at each call (ping and probe, `specs/ap/check.md` R4 of agent-platform) and runs on the VPS with `pc_unreachable` meanwhile. The Lead, when it hands out work or reads such a line while `tailscale status` shows the user's PC online, asks the user at once to run `Start-ScheduledTask -TaskName ap-checks-keepalive`, then reads `tailscale ping ap-checks`.
+   When the instance stops anyway (a `wsl --shutdown`, a closed session): every `ap check` already tests the PC at each call (ping and probe, `specs/ap/check.md` R4 of lifecycle-platform) and runs on the VPS with `pc_unreachable` meanwhile. The Lead, when it hands out work or reads such a line while `tailscale status` shows the user's PC online, asks the user at once to run `Start-ScheduledTask -TaskName ap-checks-keepalive`, then reads `tailscale ping ap-checks`.
 
    Why it works: a running process keeps the instance from the idle shutdown.
 4. **The install** (the Lead, L1). The Lead approves this unit, and so merges it, only after the user has done steps 1 to 3; the user works from the pull request's branch. No other policy merge is installed between this merge and this step, because `install` writes the whole file and would put the new account live before its time. Then at once:
@@ -244,7 +244,7 @@ Each step names who acts, its readback and its undo.
 
 ## The real run
 
-These are the Lead's commands on the VPS and what each shows. Each call writes its record to a scratch file of its own through `AP_CHECKS_LOG`, so that the line read is the call's own. `<worktree>` is a worktree of agent-platform at main.
+These are the Lead's commands on the VPS and what each shows. Each call writes its record to a scratch file of its own through `AP_CHECKS_LOG`, so that the line read is the call's own. `<worktree>` is a worktree of lifecycle-platform at main.
 
 ```sh
 set -o pipefail
@@ -261,7 +261,7 @@ AP_CHECKS_LOG=$run/4.jsonl ap check <worktree> -- ont --version; echo "exit $?";
 Expected:
 
 1. **The repository's check.** `ap check <worktree>` exits 0, its first line on standard error begins `check: on pc (`, and the record line prints `pc None 0 None`: `host` `pc`, `reason` null, `exit` 0 and `pc_windows_available_mb` null.
-2. **The Windows file and program.** The read of `/mnt/c/Windows/win.ini` and the start of `cmd.exe` each exit non-zero, with `host` `pc` in the line. Both would fail on the VPS too, and the command's view shows no path under `/mnt` on any distribution (agent-platform `specs/ap/check.md` R8). So `host` shows the place, and the distribution's own state shows elsewhere: in `pc_windows_available_mb` null (the probe runs outside the sandbox, R4) and in "The distribution".
+2. **The Windows file and program.** The read of `/mnt/c/Windows/win.ini` and the start of `cmd.exe` each exit non-zero, with `host` `pc` in the line. Both would fail on the VPS too, and the command's view shows no path under `/mnt` on any distribution (lifecycle-platform `specs/ap/check.md` R8). So `host` shows the place, and the distribution's own state shows elsewhere: in `pc_windows_available_mb` null (the probe runs outside the sandbox, R4) and in "The distribution".
 3. **E3.** The command of E3 is refused: non-zero, 124 included.
 4. **The engine.** `ap check <worktree> -- ont --version` prints `ont 0.1.0 <pin>` with `host` `pc`, because the command sees the account's Cargo `bin` (R8). This is also the readback of L5.
 

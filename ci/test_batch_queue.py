@@ -19,8 +19,7 @@ PY = sys.executable
 HOME = os.environ.get("HOME", "/")
 GIT_ID = ["-c", "user.name=Test", "-c", "user.email=test@example.invalid", "-c", "commit.gpgsign=false",
           "-c", "init.defaultBranch=main"]
-AP_REPO = "park-kyungchan/agent-platform"
-ONT_REPO = "park-kyungchan/ontology-platform"
+AP_REPO = "park-kyungchan/lifecycle-platform"
 
 # The fake programs of the clone. Each appends one line to FAKE_LOG: which program, its arguments, its own path and
 # its marker, so that a test sees what ran and from which copy.
@@ -82,7 +81,7 @@ class Queue(unittest.TestCase):
     def setUp(self):
         self.tmp = Path(tempfile.mkdtemp(prefix="ap-queue-test-"))
         self.addCleanup(shutil.rmtree, self.tmp, True)
-        self.clone = self.tmp / "deliver" / "agent-platform"
+        self.clone = self.tmp / "deliver" / "lifecycle-platform"
         self.clone.mkdir(parents=True)
         git(self.clone, "init", "-q")
         write(self.clone / "evals" / "batch" / "lib.py", "# lib\n")
@@ -97,7 +96,7 @@ class Queue(unittest.TestCase):
         self.state = self.tmp / "state"
         self.log = self.tmp / "log.jsonl"
         self.policy = self.tmp / "policy.json"
-        self.clones = {AP_REPO: "/invented/platforms/agent-platform", ONT_REPO: "/invented/platforms/ontology-platform"}
+        self.clones = {AP_REPO: "/invented/platforms/lifecycle-platform"}
         self.set_policy({"repositories": {name: {"clone": c} for name, c in self.clones.items()}})
         self.version = f"ap 0.1.0 {self.k}"
 
@@ -150,7 +149,7 @@ class Queue(unittest.TestCase):
                                                           "over_cap": 0}})
         build, = self.of("build")
         self.assertEqual(build["argv"], [
-            "--repo", f"{AP_REPO}={self.clones[AP_REPO]}", "--repo", f"{ONT_REPO}={self.clones[ONT_REPO]}",
+            "--repo", f"{AP_REPO}={self.clones[AP_REPO]}",
             "--model", "claude-sonnet-5-5", "--out", pass_dir + "/build", "--results", first, "--results", second])
         ap, = self.of("ap")
         self.assertEqual(ap["argv"], ["api", "batch", "drift", "--requests", pass_dir + "/build/requests.jsonl",
@@ -247,10 +246,10 @@ class Queue(unittest.TestCase):
                      ["--pass", "nightly", "--model", "claude-sonnet-5-5", "--x"]]:
             with self.subTest(argv=argv):
                 self.assertEqual(self.run_queue(*argv), ({"status": "usage"}, 2))
-        for policy, code in [({}, "repository_not_mapped"), ({"repositories": {AP_REPO: {"clone": "/x"}}},
+        for policy, code in [({}, "repository_not_mapped"), ({"repositories": {"invented/other": {"clone": "/x"}}},
                                                              "repository_not_mapped"),
                              ("{not json", "policy_invalid"), ({"repositories": []}, "policy_invalid"),
-                             ({"repositories": {AP_REPO: {"clone": "x"}, ONT_REPO: {"clone": "/y"}}},
+                             ({"repositories": {AP_REPO: {"clone": "x"}}},
                               "policy_invalid")]:
             with self.subTest(policy=policy):
                 self.set_policy(policy)
@@ -268,7 +267,7 @@ class Queue(unittest.TestCase):
         self.assertEqual(self.calls(), [])
 
     def test_unit_files(self):
-        documentation = "Documentation=https://github.com/park-kyungchan/agent-platform/blob/main/deploy/README.md"
+        documentation = "Documentation=https://github.com/park-kyungchan/lifecycle-platform/blob/main/deploy/README.md"
         confinement = ["NoNewPrivileges=yes", "ProtectKernelModules=yes", "ProtectKernelLogs=yes",
                        "ProtectKernelTunables=yes", "ProtectControlGroups=yes", "ProtectHostname=yes",
                        "LockPersonality=yes", "RestrictRealtime=yes", "RestrictSUIDSGID=yes",
@@ -290,7 +289,7 @@ class Queue(unittest.TestCase):
                     self.assertEqual(unit.count(line), 1, line)
                 lines = sections["[Service]"]
                 for line in ["Type=oneshot",
-                             "ExecStart=/usr/bin/python3 -I -B /var/lib/agent-platform/deliver/agent-platform/"
+                             "ExecStart=/usr/bin/python3 -I -B /var/lib/agent-platform/deliver/lifecycle-platform/"
                              f"evals/batch/queue --pass {name} --model {model}",
                              "TimeoutStartSec=26h", "StateDirectory=agent-platform/api", "StateDirectoryMode=0700",
                              "Slice=agents.slice", "Nice=10", "Environment=HOME=/root", "Environment=TZ=UTC",

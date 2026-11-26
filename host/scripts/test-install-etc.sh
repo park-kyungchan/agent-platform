@@ -137,7 +137,9 @@ add_review() { # <key> <kind> <head> <status> <verdict> <repository> <pull_reque
   printf '{"key":"%s","kind":"%s","head":"%s","status":"%s","verdict":"%s","repository":"%s","pull_request":%s}\n' \
     "$@" >>"$FAKE_ONT_DB"
 }
-repo=park-kyungchan/agent-platform
+repo=park-kyungchan/lifecycle-platform
+# The old name of the same repository (specs/ap/unit.md R55): a review stored under it counts as one of this repository.
+old_repo=park-kyungchan/agent-platform
 merge_pr() { # <n> <extra file or ->: a feature branch with policy version n, merged without a fast-forward
   local n=$1 branch=feature-$1
   git -C "$work" checkout -q -b "$branch" main
@@ -179,13 +181,14 @@ refresh() {
 }
 refresh
 other_head=$(printf 'f%.0s' {1..40})
-add_review r1 packet "${H[1]}" closed accept "$repo" 1
+add_review r1 packet "${H[1]}" closed accept "$old_repo" 1 # the old name of this repository
 add_review r2 packet "${H[2]}" closed accept "$repo" 2
 add_review r3 design "${H[3]}" closed accept "$repo" 3 # another kind
 add_review r4 packet "$other_head" closed accept "$repo" 4 # another head
 add_review r5 packet "${H[5]}" closed reject "$repo" 5
 add_review r6 packet "${H[6]}" running accept "$repo" 6
 add_review r7 packet "${H[7]}" closed accept other/repository 7
+add_review r7b packet "${H[7]}" closed accept park-kyungchan/education-platform 7 # another renamed repository
 add_review r8 packet "${H[8]}" closed accept "$repo" 99 # another pull request
 add_review r9 packet "${H[9]}" closed accept "$repo" 9
 add_review r10 packet "${H[10]}" closed accept "$repo" 10
@@ -557,7 +560,7 @@ carried_chain() { # <n> <length>: reviews c<n>_1 .. c<n>_<length>, the first of 
 for n in 14 15 16 17 18 19 20 21 22 23 24 25 26; do merge_pr "$n" -; done
 refresh
 add_row c14 packet "${H[14]}" closed accept "$repo" - o14 # one step
-add_row o14 packet "$other_head" closed accept "$repo" 14 -
+add_row o14 packet "$other_head" closed accept "$old_repo" 14 - # the origin under the old name
 add_row c15 packet "${H[15]}" closed accept "$repo" - m15 # two steps
 add_row m15 packet "$other_head" closed accept "$repo" - o15
 add_row o15 packet "$other_head" closed accept "$repo" 15 -

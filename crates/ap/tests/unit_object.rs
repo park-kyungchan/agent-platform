@@ -11,7 +11,9 @@
 )]
 use ap::{
     host::{Answer, Failure, Host, Reply, System},
-    unit::object::{Refusal, arguments, branch_ok, execute},
+    unit::object::{
+        Refusal, arguments, branch_ok, clone_of, current_name, execute, member_of, same_repository,
+    },
     unit::render::{page_digest, page_part, plan_block, plan_digest},
 };
 use serde_json::{Value, json};
@@ -5260,4 +5262,81 @@ fn r53_design_not_reviewed_refuses_ready_until_a_plan_review_read_the_record() {
     let e = unmarked(&mut f, "u-d1", "r53-again").unwrap_err();
     assert_eq!(e.code, "unit_not_draft");
     assert!(!f.names().contains(&"get intent".to_owned()));
+}
+
+// spec: specs/ap/unit.md#R55
+#[test]
+fn r55_an_old_name_reads_as_its_new_one() {
+    const OLD: &str = "park-kyungchan/agent-platform";
+    const NEW: &str = "park-kyungchan/lifecycle-platform";
+    assert_eq!(current_name(OLD), NEW);
+    assert_eq!(
+        current_name("park-kyungchan/education-platform"),
+        "park-kyungchan/academy-platform"
+    );
+    assert_eq!(current_name(NEW), NEW);
+    assert_eq!(current_name("invented/widgets"), "invented/widgets");
+    assert!(same_repository(OLD, NEW) && same_repository(NEW, OLD) && same_repository(OLD, OLD));
+    assert!(!same_repository(OLD, "park-kyungchan/academy-platform"));
+    assert!(!same_repository("invented/widgets", "invented/gadgets"));
+    // The policy's new key answers the old name, its old key the new name, and an exact key wins.
+    let dir = Tmp::new();
+    let path = dir.at("policy.json");
+    let mut f = F::new();
+    f.policy = Some(path.clone());
+    let cases = [
+        (
+            json!({NEW: {"clone": "/invented/new"}}),
+            OLD,
+            Some("/invented/new"),
+        ),
+        (
+            json!({NEW: {"clone": "/invented/new"}}),
+            NEW,
+            Some("/invented/new"),
+        ),
+        (
+            json!({OLD: {"clone": "/invented/old"}}),
+            NEW,
+            Some("/invented/old"),
+        ),
+        (
+            json!({OLD: {"clone": "/invented/old"}, NEW: {"clone": "/invented/new"}}),
+            OLD,
+            Some("/invented/old"),
+        ),
+        (
+            json!({NEW: {"clone": "/invented/new"}}),
+            "park-kyungchan/education-platform",
+            None,
+        ),
+    ];
+    for (repositories, asked, want) in cases {
+        std::fs::write(&path, json!({"repositories": repositories}).to_string()).unwrap();
+        let got = clone_of(&f, asked);
+        match want {
+            Some(w) => assert_eq!(got.ok().as_deref(), Some(w), "{asked} {repositories}"),
+            None => assert_eq!(got.unwrap_err().code, "repository_not_mapped", "{asked}"),
+        }
+    }
+    // A detail names the member as the policy spells it.
+    std::fs::write(
+        &path,
+        json!({"repositories": {NEW: {"clone": "relative"}}}).to_string(),
+    )
+    .unwrap();
+    let e = clone_of(&f, OLD).unwrap_err();
+    assert_eq!(e.code, "policy_invalid");
+    assert_eq!(
+        e.detail,
+        json!(format!("repositories.{NEW}.clone is not an absolute path"))
+    );
+    // The stage tokens: the member of either name.
+    let tokens = json!({NEW: "/invented/token"});
+    let tokens = tokens.as_object().unwrap();
+    assert_eq!(
+        member_of(tokens, OLD),
+        Some((NEW, &json!("/invented/token")))
+    );
+    assert_eq!(member_of(tokens, "invented/widgets"), None);
 }

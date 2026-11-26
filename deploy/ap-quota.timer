@@ -1,6 +1,6 @@
 [Unit]
 Description=ap quota about every 30 seconds
-Documentation=https://github.com/park-kyungchan/agent-platform/blob/main/deploy/README.md
+Documentation=https://github.com/park-kyungchan/lifecycle-platform/blob/main/deploy/README.md
 
 [Timer]
 OnBootSec=1min

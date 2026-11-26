@@ -793,14 +793,12 @@ struct Chain<'a> {
     past: Vec<&'a str>,
     code: &'static str,
 }
-/// Step 6: the head of the tip, its accepting review, and the accepting reviews oldest first.
-fn accepted(
-    s: &mut impl System,
-    c: &Call,
-    w: &Chain,
-    from: &str,
-    tip: &str,
-) -> Step<(String, Value, Vec<Value>)> {
+/// The head of a tip, its accepting review, the accepting reviews oldest first, and the repository the
+/// tip's review names, which the attempt names (R25, R27).
+type Accepted = (String, Value, Vec<Value>, String);
+/// Step 6: the head of the tip, its accepting review, and the accepting reviews oldest first. A review
+/// stored under an old name of the regroup accepts a commit of the new one (`specs/ap/unit.md` R55).
+fn accepted(s: &mut impl System, c: &Call, w: &Chain, from: &str, tip: &str) -> Step<Accepted> {
     let (past, repository) = (&w.past, w.repository);
     let range = format!("{from}..{tip}");
     let lines = git_at(
@@ -820,7 +818,7 @@ fn accepted(
     if let Some(p) = past.iter().find(|p| !chain.iter().any(|l| l[0] == **p)) {
         return Err(No("past_not_on_chain", json!({ "commit": p })));
     }
-    let (mut reviews, mut last) = (vec![], (String::new(), Value::Null));
+    let (mut reviews, mut last) = (vec![], (String::new(), Value::Null, String::new()));
     for l in &chain {
         let commit = l[0];
         if commit != tip && past.contains(&commit) {
@@ -852,9 +850,10 @@ fn accepted(
             }
         }
         reviews.push(review["id"].clone());
-        last = (l[2].to_owned(), review["id"].clone());
+        let named = field(review, "repository").as_str().unwrap_or(repository);
+        last = (l[2].to_owned(), review["id"].clone(), named.to_owned());
     }
-    Ok((last.0, last.1, reviews))
+    Ok((last.0, last.1, reviews, last.2))
 }
 /// One installer from the clone, with the command's environment (and so its lock) and the build
 /// directory; its stdout and stderr go to unlinked files of `<state>`.
@@ -1102,7 +1101,7 @@ fn deliver(s: &mut impl System, c: &mut Call) -> Step<()> {
         past: strs(&c.r["past"]),
         code: "not_accepted",
     };
-    let (head, review, reviews) = accepted(s, c, &own, &from, &tip)?;
+    let accepted = accepted(s, c, &own, &from, &tip)?;
     let pin = pin.unwrap_or_default();
     if c.r.get("by").is_none() {
         limits(s, c, &target, Some(&tip))?;
@@ -1117,15 +1116,14 @@ fn deliver(s: &mut impl System, c: &mut Call) -> Step<()> {
     marker(s, c, &tip)?;
     if engine_moves {
         // The review that accepts T accepts its engine (R67).
-        let own = (head, review, reviews);
-        return engine_install(s, c, &pin, &engine.unwrap_or_default(), own);
+        return engine_install(s, c, &pin, &engine.unwrap_or_default(), accepted);
     }
     roles_step(s, c, &tip)?;
     if let (true, Some(to_v), Some(from_v)) = (higher, to_v, from_v) {
         schema_step(s, c, &tip, from_v, to_v)?;
     }
     // 8. The attempt, applied before any installer.
-    deliver_pair(s, c, &target, &tip, &from, (head, review, reviews))
+    deliver_pair(s, c, &target, &tip, &from, accepted)
 }
 /// The engine of a commit of the clone (R66): the Git tree id of its `engine/`, read from the clone's
 /// objects only (`git ls-tree <commit> -- engine`). Any other entry of the commit is not read: a file of an
@@ -1197,7 +1195,7 @@ fn deliver_pair(
     target: &Value,
     tip: &str,
     from: &str,
-    (head, review, reviews): (String, Value, Vec<Value>),
+    (head, review, reviews, named): Accepted,
 ) -> Step<()> {
     let (tip, from) = (tip.to_owned(), from.to_owned());
     c.rec["index"] = json!({"before": index(s, c), "after": null});
@@ -1212,7 +1210,8 @@ fn deliver_pair(
     let Ok(from_sha256) = from_sha256 else {
         return Err(differs(s, c, target));
     };
-    let mut p = json!({"target": target, "kind": "forward", "repository": c.r["repository"], "commit": tip,
+    // The attempt names the repository of its review, as the store's `start_install` compares it (R27).
+    let mut p = json!({"target": target, "kind": "forward", "repository": named, "commit": tip,
         "attempt": attempt, "from": from, "from_sha256": from_sha256, "by": c.by, "reason": c.r["reason"],
         "head": head, "review": review, "reviews": reviews});
     let past = strs(&c.r["past"]);
@@ -1561,21 +1560,19 @@ fn engine_dead(s: &mut impl System, c: &mut Call) -> Step<bool> {
     Ok(false)
 }
 /// The engine at the tree id of `engine/` at T (R67): no engine clone, no fetch, no ancestor test;
-/// `engine/scripts/install-ont.sh install <T>` from the clone at T, and the attempt names this repository,
-/// the tree id and the review of T's chain (`own`). The call ends here.
+/// `engine/scripts/install-ont.sh install <T>` from the clone at T, and the attempt names the repository
+/// of the review of T's chain (`own`), the tree id and that review. The call ends here.
 fn engine_install(
     s: &mut impl System,
     c: &mut Call,
     pin: &str,
     from: &str,
-    own: (String, Value, Vec<Value>),
+    own: Accepted,
 ) -> Step<()> {
     (c.rec["target"], c.rec["from"]) = (json!(ENGINE), json!(from));
-    let request: &Value = c.r;
-    let repository = request["repository"].as_str().unwrap_or_default();
     let tip = c.rec["tip"].as_str().unwrap_or_default().to_owned();
     let words = ["install".to_owned(), tip];
-    engine_attempt(s, c, pin, from, own, repository, &words)
+    engine_attempt(s, c, pin, from, own, &words)
 }
 /// The engine's attempt (R67): the index run, `start_install`, the installer with `words`, the read,
 /// the rollback when at neither, the close, the index run.
@@ -1584,8 +1581,7 @@ fn engine_attempt(
     c: &mut Call,
     pin: &str,
     from: &str,
-    (head, review, reviews): (String, Value, Vec<Value>),
-    repository: &str,
+    (head, review, reviews, repository): Accepted,
     words: &[String; 2],
 ) -> Step<()> {
     let target = id("installed_artifact", ENGINE);
@@ -2237,7 +2233,7 @@ fn pc_dead(s: &mut impl System, c: &mut Call) -> Step<()> {
 /// Resolves the closed accepting packet review for the engine's id `pin` (R63, R69): the newest closed
 /// `installed` attempt of `/usr/local/bin/ont` on host `local` at `pin` gives its `head`, `review` and
 /// `reviews`; without one, none (no rev-list of any clone).
-fn pc_accepted(same_commit: &[Value]) -> Option<(String, Value, Vec<Value>)> {
+fn pc_accepted(same_commit: &[Value]) -> Option<Accepted> {
     let mut local_installed: Vec<&Value> = same_commit
         .iter()
         .filter(|a| {
@@ -2255,7 +2251,7 @@ fn pc_accepted(same_commit: &[Value]) -> Option<(String, Value, Vec<Value>)> {
                 .filter(|v| !v.is_empty())
                 .cloned()
                 .unwrap_or_else(|| vec![review.clone()]);
-            (head, review.clone(), reviews)
+            (head, review.clone(), reviews, prop(a, "repository"))
         })
     })
 }
@@ -2359,7 +2355,7 @@ fn pc_push(s: &mut impl System, c: &mut Call) -> Value {
             );
         }
     };
-    let Some((head, review, reviews)) = pc_accepted(&same_commit) else {
+    let Some((head, review, reviews, named)) = pc_accepted(&same_commit) else {
         return make(
             json!(remote_commit),
             json!(remote_commit),
@@ -2370,8 +2366,10 @@ fn pc_push(s: &mut impl System, c: &mut Call) -> Value {
         );
     };
     let attempt = same_commit.iter().filter(|a| is_host(a, &pc.host)).count() + 1;
-    // The PC attempt names this repository, as the local one does (R69).
-    let repository = c.r["repository"].as_str().unwrap_or_default();
+    // The PC attempt names the repository of the local attempt whose review it carries, else the
+    // request's (R69).
+    let own = c.r["repository"].as_str().unwrap_or_default();
+    let repository = if named.is_empty() { own } else { &named };
     let from_param = remote_commit.clone().unwrap_or_else(|| "0".repeat(40));
     let request = format!("pc.{}.{pin}.{attempt}", pc.host);
     let p = json!({

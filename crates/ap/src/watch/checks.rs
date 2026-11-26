@@ -5,9 +5,9 @@ use crate::host::{Reply, System};
 use serde_json::Value;
 use std::collections::{BTreeMap, BTreeSet};
 
-pub const GITHUB_APPLY: &str = "/home/palantirkc/platforms/agent-platform/github/apply";
+pub const GITHUB_APPLY: &str = "/home/palantirkc/platforms/lifecycle-platform/github/apply";
 pub const GITHUB_REPOSITORIES: &str =
-    "/home/palantirkc/platforms/agent-platform/github/repositories.json";
+    "/home/palantirkc/platforms/lifecycle-platform/github/repositories.json";
 const GH_MS: u64 = 30_000;
 
 fn call_words(s: &mut impl System, program: &str, words: &[&str]) -> Result<Reply, String> {

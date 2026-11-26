@@ -1413,7 +1413,7 @@ computed it, so that `ready_unit` compares a page review's `head` with what the 
 parameter.
 
 1. The object type `clause`, owned by the new source `clauses`, without a `title`, keyed by `<owner>/<name>:<path>#R<n>`
-   (`park-kyungchan/agent-platform:specs/ap/unit.md#R11`). Its properties, each from the record's member of its name and
+   (`park-kyungchan/lifecycle-platform:specs/ap/unit.md#R11`). Its properties, each from the record's member of its name and
    each required: `repository`, `path`, `rule` (`R<n>`) and `commit` (strings), `line` and `tests_total` (integers),
    `digest` (`sha256_hex`), `text` (string, at most 4,000 bytes) and `tests` (array of strings, each `<path>:<line>`).
    The source `clauses` is of kind `records`: every line of `/var/lib/agent-platform/clause/*.clauses.jsonl`, its time
@@ -2408,3 +2408,45 @@ design named again keeps `plan_design`; `mark_plan_reviewed` under `dispatch` an
 `not_granted`; `close_finding` of a lesson is refused `lesson_needs_prevention` without `prevented_by`,
 `invalid_parameter` with `""`, and applies with `unit:<key>`; a note closes without it, also under `measure`. The last
 line of standard output of the rehearsal is `v27 plan bound: ok`.
+
+## Version 28: the renamed checkout
+Version 27 remains pinned at
+`04ee17d1045f9f3d60871d0bd5e211ddbf9718a4:ontology/work.schema.json`,
+sha256 `52d4fcae56e4f30084c0b407bb1ca03a9b1181c2b475ee536a2360802d9024da`.
+Version 28 follows the regroup of the repositories: `park-kyungchan/agent-platform` is `park-kyungchan/lifecycle-platform`,
+and its checkout on the host moves from `/home/palantirkc/platforms/agent-platform` to
+`/home/palantirkc/platforms/lifecycle-platform` (`deploy/README.md`, "The regroup cutover"). Every value type, object type,
+link type, action type, view, function and grant reads as on version 27 in canonical JSON, but for the points below.
+`ENGINE-PIN` is unchanged. The host paths `/etc/agent-platform`, `/var/lib/agent-platform` and the store's own directory
+keep their names: every other source of the schema is unchanged.
+
+1. The source `instructions`: its three paths under the checkout (`content/AGENTS.md`, `content/runtime-references/*.md`,
+   `content/skills/*/SKILL.md`) begin with `/home/palantirkc/platforms/lifecycle-platform/content/`; its three paths under
+   `/root/.agents/` stay.
+2. `instruction_file`: the `replace_prefix` of the property `source_copy` maps `/root/.agents/` to
+   `/home/palantirkc/platforms/lifecycle-platform/content/`, and the descriptions of the type and of `source_copy` name
+   `lifecycle-platform/content`.
+
+### What the store does not check
+- That the checkout exists: until the cutover moves it, an index run of `instructions` lists no file under the new
+  paths, and an installed file's `source_copy` names a key the store does not hold yet. The source is read again by the
+  next index run after the move.
+- The repository a stored record names: a unit, a review or an install attempt stored under `park-kyungchan/agent-platform`
+  keeps that value. `ap` reads an old name as its new one where it maps a repository to a clone, a stage token or a review
+  (`specs/ap/unit.md` R55); nothing is migrated, and `ap deliver`'s attempt names the repository its accepting review
+  names, so `start_install`'s `review_not_accepting`, unchanged, compares two equal values.
+
+### The migration and the rehearsal
+`ontology/migrate` knows version 28; its step is empty. `HIGHEST = 28`; `28 29` is a pair it does not know (exit 2); the
+pairs refused on the version 10 part of the rehearsal are (9, 29), (10, 10) and (10, 9), the walk of versions 22 and 23
+refuses 23 29, the walk of version 24 24 29, the walk of version 25 25 29, the walk of version 26 26 29 and the walk of
+version 27 27 29. The walk of version 27 runs on version 27 installed from Git by the commit and digest above (it ran on
+the repository's file before).
+
+The rehearsal then installs the repository's file over the objects the walk of version 27 made: every object reads the
+same and the 16 views read the same but for their version; the schema differs from version 27 only by points 1 and 2
+(read back with `lifecycle-platform/content` as `agent-platform/content`, version 28 is version 27 but for its version, and
+the seven strings that name the checkout are exactly those of version 27); `ont describe` names version 28; `ont_describe`
+and `ont_action_list` stay within 262,144 bytes (the line `v28_mcp_bytes=`); `ontology/migrate` runs 27 28 and 26 28
+(exit 0, the store unchanged) and 28 29 (exit 2). The last line of standard output of the rehearsal is
+`v28 renamed checkout: ok`.

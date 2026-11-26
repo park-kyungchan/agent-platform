@@ -16,8 +16,8 @@ The reads and the action commands (`describe`, `get`, `search`, `around`, `aggre
 ## Who uses it
 
 - Agents of every CLI on this host, through the installed command `ont` and its MCP server.
-- `agent-platform`: its schema `ontology/work.schema.json` and the command `ap`, which calls the installed `ont`.
-- Domain crates in other repositories, which pin this repository by Git revision and link `ont`, `ont-core` and `ont-store` as libraries. The first is `edu-academy-ontology` of `education-platform`, on a branch that is not merged yet.
+- `lifecycle-platform`: its schema `ontology/work.schema.json` and the command `ap`, which calls the installed `ont`.
+- Domain crates in other repositories, which pin this repository by Git revision and link `ont`, `ont-core` and `ont-store` as libraries. The first is `edu-academy-ontology` of `academy-platform`, on a branch that is not merged yet.
 - A consumer may generate the Rust types of its schema with `ont-gen` in its build script, or by running the pinned engine's `ont schema gen FILE` there (`specs/ont/gen.md`), pinned at the revision it pins the engine at.
 
 A change of an answer's shape or of the schema language is a change of a contract those users rely on.

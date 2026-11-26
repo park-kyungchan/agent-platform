@@ -214,7 +214,7 @@ class PathsAndDesignRoutes(Scratch, unittest.TestCase):
 
     def test_a_path_into_a_main_checkout_fails_and_a_pattern_passes(self):
         root = self.fixture()
-        line = self.append(root, "Read `/home/palantirkc/platforms/agent-platform/crates/ap/src/run.rs`.")
+        line = self.append(root, "Read `/home/palantirkc/platforms/lifecycle-platform/crates/ap/src/run.rs`.")
         self.append(root, "Read `git -C /home/palantirkc/platforms/<repo> show origin/main:<path>`.")
         code, out = run_check(root)
         self.assertEqual(code, 1, out)

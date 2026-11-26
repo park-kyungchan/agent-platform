@@ -1,11 +1,11 @@
 [Unit]
 Description=ap route index: the sections and components the function route answers from (one run)
-Documentation=https://github.com/park-kyungchan/agent-platform/blob/main/deploy/README.md
+Documentation=https://github.com/park-kyungchan/lifecycle-platform/blob/main/deploy/README.md
 
 [Service]
 Type=oneshot
-ExecStart=/usr/local/bin/ap route index --prune --repository park-kyungchan/agent-platform --repository park-kyungchan/agent-vps-operations --instructions /root/.agents
-# A run fetches two clones, reads their Markdown at origin/main and indexes two sources: well under a minute.
+ExecStart=/usr/local/bin/ap route index --prune --repository park-kyungchan/lifecycle-platform --instructions /root/.agents
+# A run fetches one clone, reads its Markdown at origin/main and indexes two sources: well under a minute.
 TimeoutStartSec=600
 Slice=agents.slice
 Nice=10

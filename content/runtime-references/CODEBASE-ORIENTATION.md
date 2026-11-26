@@ -8,10 +8,12 @@ A change belongs to the area that owns the fact it changes.
 
 | Area | Owns | Repository | Installed on the host |
 | --- | --- | --- | --- |
-| Engine | Typed objects and their observations, actions with criteria, authorization, views (the Ontology) | `ontology-platform` | `/usr/local/bin/ont`; store and install state under `/var/lib/ontology-platform/` |
-| Domain | The private-academy teaching domain: reads of the Academy server, the lesson workflow, the teacher's records, the Academy MCP server | `education-platform`; modules `education-dc-gang-a`, `education-problem-edit` | The Academy rows of section 4 |
-| Harness | How agents work here: the command `ap`, the shared instructions and skills, the work schema of the store, the evaluation suites, the delivery of its own install | `agent-platform` | `/usr/local/bin/ap`; `/root/.agents/`; state under `/var/lib/agent-platform/`; the timer `ap-deliver.timer` |
-| Host operations | Remote host and Hermes operations | `agent-vps-operations` | `/usr/local/bin/vps-ops` |
+| Engine | Typed objects and their observations, actions with criteria, authorization, views (the Ontology) | `lifecycle-platform` `engine/` | `/usr/local/bin/ont`; store and install state under `/var/lib/ontology-platform/` |
+| Domain | The private-academy teaching domain: reads of the Academy server, the lesson workflow, the teacher's records, the Academy MCP server | `academy-platform` | The Academy rows of section 4 |
+| Harness | How agents work here: the command `ap`, the shared instructions and skills, the work schema of the store, the evaluation suites, the delivery of its own install | `lifecycle-platform` | `/usr/local/bin/ap`; `/root/.agents/`; state under `/var/lib/agent-platform/`; the timer `ap-deliver.timer` |
+| Host configuration | The policy file, the recorded copies of host files, the system Git configuration | `lifecycle-platform` `host/` | `/etc/agent-platform/policy.json`, installed by `ap deliver`; `/etc/gitconfig`, installed by the Lead |
+
+The host has two repositories: `lifecycle-platform`, which holds the engine, the harness and the host's configuration, and `academy-platform`, the Academy's domain. The repositories they absorbed are archived on GitHub and have no checkout here; an installed command built from one of them, such as `/usr/local/bin/vps-ops`, is read at its archived repository before it is changed. The installed paths `/etc/agent-platform`, `/var/lib/agent-platform` and `/var/lib/ontology-platform` kept their names.
 
 The engine knows no domain. A domain or the harness uses the engine through a schema file it owns and the engine's library or command; it does not copy engine state.
 
@@ -21,27 +23,24 @@ Main checkouts are under `/home/palantirkc/platforms/<repository>/` unless a pat
 
 | Repository | Crate or directory | What it is | Start reading at |
 | --- | --- | --- | --- |
-| `ontology-platform` | `crates/ont-core` | Types and rules of the engine without storage | `src/lib.rs` |
-| | `crates/ont-store` | The SQLite store: schema installation, edits, the action log, candidates for queries | `src/lib.rs` |
-| | `crates/ont` | The library and command `ont`: `get`, `search`, `around`, `aggregate`, `action`, `render`, `index`, `schema`, `backup`, `mcp` | `README.md`, then `src/lib.rs` and the file named after the command |
-| | `crates/ont-daemon` | An older service form of the engine; not installed on the host | its `Cargo.toml` |
-| `agent-platform` | `crates/ap` | The command `ap`: `unit` (the unit object, its run `ap unit run` and the case call of the engineering suite), `run` (one stage), `gate`, `review`, `deliver` (the install of an accepted merge of `main`), `version`; `ap --help` names the README section of each | `README.md` (by section; it is long), then the file named after the verb under `src/` |
+| `lifecycle-platform` | `crates/ap` | The command `ap`: `unit` (the unit object, its run `ap unit run` and the case call of the engineering suite), `run` (one stage), `gate`, `review`, `deliver` (the install of an accepted merge of `main`), `version`; `ap --help` names the README section of each | `README.md` (by section; it is long), then the file named after the verb under `src/` |
 | | `content/` | Source of `/root/.agents/`: `AGENTS.md`, `runtime-references/`, `skills/`, with `SHA256SUMS` | `content/README.md` |
 | | `ontology/` | `work.schema.json`: the store's object and action types for tasks (holds, decisions, KPIs and measurements, reviews, install attempts, worker runs); the file is the list | `ontology/README.md` |
 | | `evals/` | The suites and the cost read-out: `engineering/` (cases cut from merged units, judged by an executable), `lead/` (frozen situations of a Lead, scored by a model against a rubric), `lesson/` (the lesson replay: recorded daily-record reads against the read store), `readout.py` | `evals/README.md` |
 | | `deploy/` | The systemd units and the request file of the delivery timer | `deploy/README.md` |
-| `education-platform` | `crates/edu-academy-core` | Domain rules and the lesson workflow: intake, review, decision, approval, save, reconciliation and their records | `src/lib.rs`; `src/workflow/` |
+| | `engine/` | The Ontology engine, a Cargo workspace of its own: `crates/ont-core` (types and rules without storage), `crates/ont-store` (the SQLite store: schema installation, edits, the action log), `crates/ont` (the library and command `ont`: `get`, `search`, `around`, `aggregate`, `action`, `render`, `index`, `schema`, `backup`, `mcp`), `crates/ont-gen` (a typed module from a schema file), its specifications and installer | `engine/README.md` |
+| | `host/` | The host's configuration: the source of `/etc/agent-platform/policy.json` and its installer, the recorded copies of host files, the system Git configuration | `host/README.md` |
+| | `github/` | The rulesets and settings of the two repositories, compared and applied as files | `github/README.md` |
+| | `specs/`, `ci/`, `scripts/` | The specifications of the `ap` contracts; the checks `./check` runs; the install, backup and PC pull steps | `map.json` |
+| `academy-platform` | `crates/edu-academy-core` | Domain rules and the lesson workflow: intake, review, decision, approval, save, reconciliation and their records | `src/lib.rs`; `src/workflow/` |
 | | `crates/edu-academy-sources` | Reads and writes against the Academy server's pages and scripts; the qualification tool `academy-live-driver` | `src/lib.rs` |
 | | `crates/edu-academy-teacher` | The teacher's draft records and their checks | `src/lib.rs` |
 | | `crates/edu-academy-mcp` | The Academy MCP server in Rust and its launcher | `src/bin/` |
 | | `content/skills/` | Skills `academy-lesson-day`, `academy-dailyrecord-authoring`, `academy-prestudy-review` | each `SKILL.md` |
 | | `modules/academy-workbench/` | Source of the Academy MCP server the teacher uses today (Bun) | its `README.md` |
-| `education-dc-gang-a` | `crates/edu-dc-gang-a` | Module of one academy | `README.md` |
-| `agent-vps-operations` | `crates/vps-ops` | The command `vps-ops` | `README.md` |
-| `education-problem-edit` | checkout `/home/palantirkc/work/problem-edit` | Problem editing module | `README.md` |
 | Custody repositories | `/home/palantirkc/projects/` | `bible-commentary-station`, `daniel-prayer-operations`, `park-kyungchan.github.io`, archived `academy-workbench` | not part of the platforms; open one only when the task names it |
 
-Every platform repository has one workflow, `.github/workflows/rust.yml`, with the job `rust` (`BUILD-AND-DELIVERY.md` section 3).
+Each of the two repositories has one workflow, `.github/workflows/rust.yml`, with the job `rust` (`BUILD-AND-DELIVERY.md` section 3).
 
 ## 3. Tasks and plans
 
@@ -62,8 +61,8 @@ The state of the work (requests, intents, units, runs, findings, holds, KPIs) is
 | --- | --- | --- |
 | Ontology store | `/var/lib/ontology-platform/ont/ontology.sqlite`, backups in `backup/` beside it; read and written only through `ont` | The task whose STATE names the object types in use |
 | Academy MCP server in use (`academy_operations`) | install base `/root/.local/share/academy-mcp-host-20261106/`; its `release.json` selects the running generation | `/home/palantirkc/work/edu-mcp-host-restore/STATE.md` |
-| Installed shared instructions | `/root/.agents/AGENTS.md`, `runtime-references/`, `skills/` | `agent-platform` `content/` |
-| Delivery of `ap` and the shared instructions | the timer `ap-deliver.timer`; its request `/etc/agent-platform/deliver.json`; its state under `/var/lib/agent-platform/deliver/` | `agent-platform` `deploy/README.md` |
+| Installed shared instructions | `/root/.agents/AGENTS.md`, `runtime-references/`, `skills/` | `lifecycle-platform` `content/` |
+| Delivery of `ap` and the shared instructions | the timer `ap-deliver.timer`; its request `/etc/agent-platform/deliver.json`; its state under `/var/lib/agent-platform/deliver/` | `lifecycle-platform` `deploy/README.md` |
 | Configuration of each CLI | `CLI-RUNTIMES.md` section 1 | that CLI |
 | Cargo build lock of the host | `/var/lib/agent-platform/build.lock` | `BUILD-AND-DELIVERY.md` section 2 |
 

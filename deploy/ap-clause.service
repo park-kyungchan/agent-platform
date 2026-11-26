@@ -1,11 +1,11 @@
 [Unit]
 Description=ap clause index: the numbered sentences of the specifications the function clause answers from (one run)
-Documentation=https://github.com/park-kyungchan/agent-platform/blob/main/deploy/README.md
+Documentation=https://github.com/park-kyungchan/lifecycle-platform/blob/main/deploy/README.md
 
 [Service]
 Type=oneshot
-ExecStart=/usr/local/bin/ap clause index --prune --repository park-kyungchan/agent-platform --repository park-kyungchan/agent-vps-operations
-# A run fetches two clones, reads their files at origin/main and indexes one source: well under a minute.
+ExecStart=/usr/local/bin/ap clause index --prune --repository park-kyungchan/lifecycle-platform
+# A run fetches one clone, reads its files at origin/main and indexes one source: well under a minute.
 TimeoutStartSec=600
 Slice=agents.slice
 Nice=10

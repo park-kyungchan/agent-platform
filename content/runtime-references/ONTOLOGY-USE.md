@@ -10,7 +10,7 @@ Read this when you read the state of the work from the store, or write to it as 
 | The Lead, and a session that works for it | `ap request`, `ap intent`, `ap unit`, and `ont action apply` with the role `lead` for the actions of section 4 |
 | A stage | No write |
 
-Every agent here is the same OS user; a role is a claim the engine checks against the roles file beside the store (`agent-platform` `specs/ap/roles.md`). These limits are rules of work; an example grants no authority. The contract: `ont describe < /dev/null` (types, views and their arguments) and `ont action list < /dev/null` (parameters, byte limits, criteria); without `< /dev/null` they wait on standard input.
+Every agent here is the same OS user; a role is a claim the engine checks against the roles file beside the store (`lifecycle-platform` `specs/ap/roles.md`). These limits are rules of work; an example grants no authority. The contract: `ont describe < /dev/null` (types, views and their arguments) and `ont action list < /dev/null` (parameters, byte limits, criteria); without `< /dev/null` they wait on standard input.
 
 ## 2. Reads
 

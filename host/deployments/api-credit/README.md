@@ -4,7 +4,7 @@
 
 The host holds one key of the Claude API for batches, paid from a monthly credit, and a set of limits for it. The key is a file that the user writes by hand (step H3 below); the limits are the member `api` of the host's policy file, `etc/agent-platform/policy.json`.
 
-Who uses them: `ap api batch` of agent-platform (unit api-batch, its contract `specs/ap/api.md`). It reads `api` before any call and refuses a batch, before any call, when the settled spend plus the reserved spend plus the batch's worst case passes the job's cap, the day's cap or the stop. Later the timers of unit api-timer use the same member.
+Who uses them: `ap api batch` of lifecycle-platform (unit api-batch, its contract `specs/ap/api.md`). It reads `api` before any call and refuses a batch, before any call, when the settled spend plus the reserved spend plus the batch's worst case passes the job's cap, the day's cap or the stop. Later the timers of unit api-timer use the same member.
 
 A merge of this file or of the policy changes nothing on the host until delivery installs the policy (`ap deliver` runs `scripts/install-etc.sh`, README.md "Who uses it").
 
@@ -48,11 +48,11 @@ The pairs that can never send a full batch. At the batch output price, half the 
 
 ## The hand steps
 
-The user acts in H1 and H3, the Lead in H2. No agent opens the Console or handles the key. Every readback runs on the host, outside any stage: in a stage's view `/etc/agent-platform/credentials` is an empty directory of its own (agent-platform `specs/ap/run-limits.md` R10), whatever its mode on the host.
+The user acts in H1 and H3, the Lead in H2. No agent opens the Console or handles the key. Every readback runs on the host, outside any stage: in a stage's view `/etc/agent-platform/credentials` is an empty directory of its own (lifecycle-platform `specs/ap/run-limits.md` R10), whatever its mode on the host.
 
 - **H1.** In the Console, a workspace of its own for the host's batches, with a monthly spend limit of 190 USD, and auto-reload off. Readback: the user reads both in the Console and tells the Lead, who records the user's words. Undo: the user's, in the Console.
 - **H2** (the Lead, before H3). The directory: `install -d -m 0700 -o root -g root /etc/agent-platform/credentials`, which makes it, or sets an existing one to that owner and mode (no change where it already is so). Readback: `stat -c '%a %U:%G' /etc/agent-platform/credentials` prints `700 root:root`. Undo: `chmod <the mode read before H2> /etc/agent-platform/credentials`, or `rmdir` of a directory H2 made while it is empty.
-- **H3.** A key of that workspace, written by the user into `/etc/agent-platform/credentials/anthropic-api-key` (owner and group root, mode `0600`), in the form agent-platform `specs/ap/api.md` states. Readback (the Lead): `stat -c '%a %U:%G' /etc/agent-platform/credentials/anthropic-api-key` prints `600 root:root`, and H2's readback still prints `700 root:root`. Undo: the user disables the key in the Console, then the file is removed.
+- **H3.** A key of that workspace, written by the user into `/etc/agent-platform/credentials/anthropic-api-key` (owner and group root, mode `0600`), in the form lifecycle-platform `specs/ap/api.md` states. Readback (the Lead): `stat -c '%a %U:%G' /etc/agent-platform/credentials/anthropic-api-key` prints `600 root:root`, and H2's readback still prints `700 root:root`. Undo: the user disables the key in the Console, then the file is removed.
 
 The key is never in an argument, an environment variable, a record, a prompt, a chat message or a file of a repository, and no command of this README prints, copies or reads a byte of it.
 
@@ -71,4 +71,4 @@ The Lead runs, on the host:
 
 1. The two readbacks of the section above.
 2. The readbacks of H2 and H3.
-3. A stage of role `reviewer` and one of role `implementer`, each started by `ap run` with `limits` and asked to run `test -r /etc/agent-platform/credentials/anthropic-api-key; echo $?`. Each prints a non-zero status, because the credential directory is hidden from a stage's view (agent-platform `specs/ap/run-limits.md` R10, unit sec-mount).
+3. A stage of role `reviewer` and one of role `implementer`, each started by `ap run` with `limits` and asked to run `test -r /etc/agent-platform/credentials/anthropic-api-key; echo $?`. Each prints a non-zero status, because the credential directory is hidden from a stage's view (lifecycle-platform `specs/ap/run-limits.md` R10, unit sec-mount).

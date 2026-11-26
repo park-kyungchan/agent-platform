@@ -1,6 +1,6 @@
 [Unit]
 Description=ap resource: one pass that observes the hosts and accounts and indexes the samples and the checks
-Documentation=https://github.com/park-kyungchan/agent-platform/blob/main/specs/ap/resource.md
+Documentation=https://github.com/park-kyungchan/lifecycle-platform/blob/main/specs/ap/resource.md
 
 [Service]
 Type=oneshot

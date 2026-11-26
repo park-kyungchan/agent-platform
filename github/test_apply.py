@@ -627,11 +627,15 @@ class Files(unittest.TestCase):
                                                    "patterns_allowed": ["Swatinem/rust-cache@*"]}},
                   "vulnerability_alerts": True, "automated_security_fixes": True}
         self.assertEqual(entries, [
-            dict(public, repository="park-kyungchan/agent-platform"),
-            {"repository": "park-kyungchan/education-platform", "settings": settings,
+            dict(public, repository="park-kyungchan/lifecycle-platform"),
+            {"repository": "park-kyungchan/academy-platform", "settings": settings,
              "actions": {"enabled": True, "allowed_actions": "all", "sha_pinning_required": True}},
-            {"repository": "park-kyungchan/agent-vps-operations"},
         ])
+        # The archived repositories have no entry, and the two regrouped ones are named by their new names only.
+        text = (HERE / "repositories.json").read_text()
+        for old in ("agent-platform", "education-platform", "ontology-platform", "agent-vps-operations",
+                    "education-dc-gang-a", "education-problem-edit"):
+            self.assertNotIn("park-kyungchan/" + old + '"', text)
         self.assertEqual(json.loads((HERE / "repositories.json").read_text())["rulesets"], ["ruleset-main.json", "ruleset-tags.json"])
         self.assertEqual([(r["name"], r["target"]) for r in rulesets],
                          [("Protected main with exact native review", "branch"), ("Preserve immutable tags", "tag")])

@@ -535,6 +535,8 @@ pub(super) fn citations_judged(
         .map(|p| (*p).to_owned())
         .collect();
     let inside = |path: &str| outside(&set, &[path]).is_empty();
+    // The clauses are indexed under the repository's current name (R55).
+    let repository = current_name(repository);
     let property = properties::Clause::Repository.name();
     let filter = vec![json!({"eq": [property, repository]})];
     let found = at(
@@ -1421,7 +1423,42 @@ fn accepted_page(
 fn invalid(member: &str, why: &str) -> Failure {
     fail("policy_invalid", "policy", json!(format!("{member} {why}")))
 }
-/// The clone of `repository` named by the host's policy file (R22).
+/// The repositories the regroup renamed, each old name with its new one (R55).
+const RENAMED: [(&str, &str); 2] = [
+    (
+        "park-kyungchan/agent-platform",
+        "park-kyungchan/lifecycle-platform",
+    ),
+    (
+        "park-kyungchan/education-platform",
+        "park-kyungchan/academy-platform",
+    ),
+];
+/// The current name of `repository` (R55): an old name of the regroup reads as its new one, any other
+/// name as itself.
+pub fn current_name(repository: &str) -> &str {
+    let renamed = RENAMED.iter().find(|(old, _)| *old == repository);
+    renamed.map_or(repository, |(_, new)| new)
+}
+/// Whether two names name the same repository (R55): equal once each reads as its current name.
+pub fn same_repository(a: &str, b: &str) -> bool {
+    current_name(a) == current_name(b)
+}
+/// The member of `map` (the policy's `repositories` or `units.github.stage_tokens`) that names
+/// `repository` (R55): the member of exactly that name, else the first one that names the same
+/// repository; with the member's own name.
+pub fn member_of<'a>(
+    map: &'a Map<String, Value>,
+    repository: &str,
+) -> Option<(&'a str, &'a Value)> {
+    if let Some((k, v)) = map.get_key_value(repository) {
+        return Some((k.as_str(), v));
+    }
+    let mut same = map.iter().filter(|(k, _)| same_repository(k, repository));
+    same.next().map(|(k, v)| (k.as_str(), v))
+}
+/// The clone of `repository` named by the host's policy file (R22), an old name of the regroup read as
+/// its new one (R55).
 pub fn clone_of(s: &impl System, repository: &str) -> Result<String, Failure> {
     let unmapped = || error("repository_not_mapped", "repository");
     let file = s.policy_file().ok_or_else(unmapped)?;
@@ -1449,10 +1486,10 @@ pub fn clone_of(s: &impl System, repository: &str) -> Result<String, Failure> {
     let all = all
         .as_object()
         .ok_or_else(|| invalid("repositories", "is not an object"))?;
-    let member = format!("repositories.{repository}");
-    let Some(entry) = all.get(repository) else {
+    let Some((named, entry)) = member_of(all, repository) else {
         return Err(unmapped());
     };
+    let member = format!("repositories.{named}");
     let entry = entry
         .as_object()
         .ok_or_else(|| invalid(&member, "is not an object"))?;

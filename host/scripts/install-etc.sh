@@ -18,7 +18,7 @@ umask 077
 unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE GIT_COMMON_DIR GIT_OBJECT_DIRECTORY \
   GIT_ALTERNATE_OBJECT_DIRECTORIES GIT_NAMESPACE GIT_CEILING_DIRECTORIES
 
-REPOSITORY=park-kyungchan/agent-platform
+REPOSITORY=park-kyungchan/lifecycle-platform
 SOURCE_REL=host/etc/agent-platform/policy.json
 NAME=policy.json
 
@@ -125,12 +125,23 @@ source_ok() { # <commit>: the policy file is a regular blob there
 # `pull_request`) counts by the number of the review it was carried from: that review is read with `ont get`,
 # must be of kind packet, closed, accept and of this repository, and holds the number or is itself carried,
 # followed the same way, at most 20 reviews in all. A `pull_request` that is present is never looked past.
-# The store is read through `ont search` and `ont get`; no GitHub read.
+# The store is read through `ont search` and `ont get`; no GitHub read. A review keeps the repository it was
+# stored under: an old name of the regroup reads as its new one (specs/ap/unit.md R55), so a review of
+# park-kyungchan/agent-platform counts for park-kyungchan/lifecycle-platform and the other way round.
 REVIEW_PY=$(
   cat <<'PY'
 import json, subprocess, sys
 
 repo, head, pr = sys.argv[1], sys.argv[2], int(sys.argv[3])
+RENAMED = {
+    "park-kyungchan/agent-platform": "park-kyungchan/lifecycle-platform",
+    "park-kyungchan/education-platform": "park-kyungchan/academy-platform",
+}
+
+
+def same(r):
+    """True when r names this repository, by its name or an old name of it."""
+    return isinstance(r, str) and RENAMED.get(r, r) == RENAMED.get(repo, repo)
 
 
 def field(o, k):
@@ -187,7 +198,7 @@ def followed(ref):
             gvalue(f, "kind") == "packet"
             and gvalue(f, "status") == "closed"
             and gvalue(f, "verdict") == "accept"
-            and gvalue(f, "repository") == repo
+            and same(gvalue(f, "repository"))
         ):
             return False
         number = gvalue(f, "pull_request")
@@ -220,7 +231,7 @@ for _ in range(20):
             and field(o, "head") == head
             and field(o, "status") == "closed"
             and field(o, "verdict") == "accept"
-            and field(o, "repository") == repo
+            and same(field(o, "repository"))
             and complete(o.get("id"))
         ):
             if is_number(number) and number == pr:

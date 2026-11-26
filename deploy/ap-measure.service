@@ -1,6 +1,6 @@
 [Unit]
 Description=ap measure: the sessions pass, the KPI pass and then the routing pass (one run a night)
-Documentation=https://github.com/park-kyungchan/agent-platform/blob/main/deploy/README.md
+Documentation=https://github.com/park-kyungchan/lifecycle-platform/blob/main/deploy/README.md
 
 [Service]
 Type=oneshot

@@ -1,6 +1,6 @@
 [Unit]
 Description=ap status page every hour
-Documentation=https://github.com/park-kyungchan/agent-platform/blob/main/deploy/README.md
+Documentation=https://github.com/park-kyungchan/lifecycle-platform/blob/main/deploy/README.md
 
 [Timer]
 OnCalendar=*:33

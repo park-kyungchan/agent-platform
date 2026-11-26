@@ -21,7 +21,7 @@ Each stage is a separate fact with its own evidence. A later stage does not show
 
 One Cargo build or test runs on the host at a time, under the lock `/var/lib/agent-platform/build.lock`.
 
-- In `agent-platform`, `ontology-platform` and `education-platform` the one check is `./check` at the worktree's root; the CI job `rust` runs the same script. Run it bare from the worktree: it takes the lock itself, sets the build limits and stops under 10,240 MiB free (`disk_floor@check`). Wrapped in `flock` it waits on its own lock and never runs. It builds into the worktree's `target/` unless `CARGO_TARGET_DIR` is set. In `agent-platform`, `./check content` runs only the steps that need no Rust build.
+- In `lifecycle-platform` and `academy-platform` the one check is `./check` at the worktree's root; the CI job `rust` runs the same script. Run it bare from the worktree: it takes the lock itself, sets the build limits and stops under 10,240 MiB free (`disk_floor@check`). Wrapped in `flock` it waits on its own lock and never runs. It builds into the worktree's `target/` unless `CARGO_TARGET_DIR` is set. In `lifecycle-platform`, `./check content` runs only the steps that need no Rust build.
 - Every other Cargo command takes the lock like this:
 
 ```sh
@@ -47,13 +47,12 @@ flock /var/lib/agent-platform/build.lock env \
 
 ## 3. What CI runs
 
-Every platform repository has one workflow, `.github/workflows/rust.yml`, with one job, `rust`, on every pull request and on every push to `main`. `rust` is the required check of `main`.
+Each of the two repositories has one workflow, `.github/workflows/rust.yml`, with one job, `rust`, on every pull request and on every push to `main`. `rust` is the required check of `main`.
 
 | Repository | Steps of the job `rust` |
 | --- | --- |
-| `agent-platform`, `ontology-platform`, `education-platform` | `./check`, the same script an agent runs before a push: `cargo fmt`, `cargo clippy -D warnings`, `cargo test` and the repository's own steps (`agent-platform`: the content check, the memory record checks, the suite tests; `ontology-platform`: the test of its install script; `education-platform`: the offline teacher harness and the build of its binaries). In `education-platform` the job does not run on a draft pull request: it runs when the pull request is made ready |
-| `agent-vps-operations`, `education-dc-gang-a` | `cargo fmt --all -- --check`; `cargo clippy --workspace --all-targets --locked -- -D warnings`; `cargo test --workspace --locked` |
-| All | A change that touches only documentation skips the Rust steps inside the job (`agent-platform` runs `./check content`), and the job still reports |
+| `lifecycle-platform`, `academy-platform` | `./check`, the same script an agent runs before a push: `cargo fmt`, `cargo clippy -D warnings`, `cargo test` and the repository's own steps (`lifecycle-platform`: the content check, the memory record checks, the suite tests, the engine's steps when `engine/` changed, the steps of `host/`; `academy-platform`: the offline teacher harness and the build of its binaries). In `academy-platform` the job does not run on a draft pull request: it runs when the pull request is made ready |
+| All | A change that touches only documentation skips the Rust steps inside the job (`lifecycle-platform` runs `./check content`), and the job still reports |
 
 - CI minutes are limited per month. Push when a packet is complete, not after every commit.
 - A workflow file, a required check and a ruleset are shared files with one integrator (`CONCURRENT-WORK.md` section 1). Do not change one to get a change through.
@@ -71,7 +70,7 @@ Every platform repository has one workflow, `.github/workflows/rust.yml`, with o
 | After the merge | `git -C <main checkout> fetch origin`; move a main checkout only with `merge --ff-only`, and not at all while it holds someone's uncommitted edits |
 | Worktree and branch | Remove only your own merged worktree, without force, then its branch |
 
-The rulesets of the three platform repositories require the commit status `lead-review` on the head beside the check `rust`; `ap unit run` posts it at the merge, never a worker. A unit of class `plain` is merged once its verifier accepted the head, and one of class `contract` or `effect` waits for the Lead's `ap unit approve` of the head the Lead read, or `ap unit reject` (`agent-platform` `specs/ap/unit-run.md` R33, R34). Where the policy's `units.approval.contract` is `verifier`, `ap unit run` approves a `contract` unit itself when the head it checked changes no path of `units.approval.guarded` (R46, R47). Every `units.approval.sample`-th unit so approved and merged opens a finding `policy-sample-<unit>`, and the Lead reads that merged diff (R48).
+The rulesets of the two repositories require the commit status `lead-review` on the head beside the check `rust`; `ap unit run` posts it at the merge, never a worker. A unit of class `plain` is merged once its verifier accepted the head, and one of class `contract` or `effect` waits for the Lead's `ap unit approve` of the head the Lead read, or `ap unit reject` (`lifecycle-platform` `specs/ap/unit-run.md` R33, R34). Where the policy's `units.approval.contract` is `verifier`, `ap unit run` approves a `contract` unit itself when the head it checked changes no path of `units.approval.guarded` (R46, R47). Every `units.approval.sample`-th unit so approved and merged opens a finding `policy-sample-<unit>`, and the Lead reads that merged diff (R48).
 
 Commit, push, merge and installation are four effects; each needs the task's authority.
 
@@ -82,7 +81,7 @@ Install from a clean checkout of the merged commit, never from a branch.
 | What | Install | Read back |
 | --- | --- | --- |
 | The engine `ont` | `bash <checkout>/scripts/install-ont.sh install <commit>`; also `check` and `rollback` | `ont --version` names the commit; `install-ont.sh check`; one real read; then `ont index` |
-| The command `ap` and the shared instructions, references and skills of `agent-platform` | `ap deliver` (`crates/ap/README.md`, "Delivery") installs both from one accepted commit of `main`: by a Lead's call with `by` and `reason`, and by the timer `ap-deliver.timer` where `systemctl is-enabled ap-deliver.timer` answers `enabled`. A Lead undoes the newest install by a rollback call (`rollback: true`). `scripts/install-ap.sh` and `scripts/install-content.sh` are called by hand only for the repairs that README names, with the timer stopped first (`deploy/README.md`). Only the Lead installs them | `/var/lib/agent-platform/deliver/last.json`: the last call, its `end`, `code` and `at`; the newest attempt: the first row of `printf '{"view":"installs","args":{}}' | ont render`; `systemctl is-failed ap-deliver.service` answers `failed` after a run that failed. `ap --version` names the commit and, in `/root/.agents`, `sha256sum -c` of that commit's `content/SHA256SUMS` passes; then a new session of your own shows the changed text |
+| The command `ap` and the shared instructions, references and skills of `lifecycle-platform` | `ap deliver` (`crates/ap/README.md`, "Delivery") installs both from one accepted commit of `main`: by a Lead's call with `by` and `reason`, and by the timer `ap-deliver.timer` where `systemctl is-enabled ap-deliver.timer` answers `enabled`. A Lead undoes the newest install by a rollback call (`rollback: true`). `scripts/install-ap.sh` and `scripts/install-content.sh` are called by hand only for the repairs that README names, with the timer stopped first (`deploy/README.md`). Only the Lead installs them | `/var/lib/agent-platform/deliver/last.json`: the last call, its `end`, `code` and `at`; the newest attempt: the first row of `printf '{"view":"installs","args":{}}' | ont render`; `systemctl is-failed ap-deliver.service` answers `failed` after a run that failed. `ap --version` names the commit and, in `/root/.agents`, `sha256sum -c` of that commit's `content/SHA256SUMS` passes; then a new session of your own shows the changed text |
 | Academy skills, the Academy MCP server, memory records | Their own owners and holds; none of the forms above installs them | The owner's record (`CODEBASE-ORIENTATION.md` section 4) |
 
 - Keep the previous binary or bytes and know the rollback command before you install.
@@ -91,9 +90,9 @@ Install from a clean checkout of the merged commit, never from a branch.
 
 ## 6. Changing a shared instruction, a reference or a skill
 
-1. Find the source: `CLI-RUNTIMES.md` section 7 names the repository of each skill; `AGENTS.md` and `runtime-references/` are in `agent-platform` `content/`. Never edit only the installed copy.
-2. One home per fact (skill `lead` section 4), and no changing value in always-loaded text (`agent-platform` `specs/content/agents-file.md`).
-3. In `agent-platform`, a file added to or removed from `content/` is also added to or removed from `content/SHA256SUMS`, in the same order; every changed file gets its new checksum.
+1. Find the source: `CLI-RUNTIMES.md` section 7 names the repository of each skill; `AGENTS.md` and `runtime-references/` are in `lifecycle-platform` `content/`. Never edit only the installed copy.
+2. One home per fact (skill `lead` section 4), and no changing value in always-loaded text (`lifecycle-platform` `specs/content/agents-file.md`).
+3. In `lifecycle-platform`, a file added to or removed from `content/` is also added to or removed from `content/SHA256SUMS`, in the same order; every changed file gets its new checksum.
 4. Run `python3 -I -B ci/check-content.py`. It refuses a checksum mismatch, a route to a missing file or section, a verb of `ap` or a section of its README that does not exist, a retired name, a model name, and a file over its limit.
 5. Deliver through sections 3 to 5. The review is by a fresh session whose tier is not below the writer's.
-6. A change of `AGENTS.md`, of a reference or of a skill that shapes how a Lead decides or speaks is judged by the Lead suite (`agent-platform` `evals/README.md`, "The Lead suite"): the answers of its cases under the instructions of `main` and under those of the change's head, scored blind. The pull request carries the public sheet; the Lead reads every case the sheet lists as lost before the merge.
+6. A change of `AGENTS.md`, of a reference or of a skill that shapes how a Lead decides or speaks is judged by the Lead suite (`lifecycle-platform` `evals/README.md`, "The Lead suite"): the answers of its cases under the instructions of `main` and under those of the change's head, scored blind. The pull request carries the public sheet; the Lead reads every case the sheet lists as lost before the merge.

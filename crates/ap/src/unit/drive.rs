@@ -970,7 +970,7 @@ fn prepare(s: &mut impl System, store: Option<&str>, key: &str) -> Result<(Run, 
     if c.github.lead_app.is_none() {
         return Err(error("github_not_mapped", "lead_app"));
     }
-    let token_file = c.github.stage_tokens.get(&c.repo);
+    let token_file = object::member_of(&c.github.stage_tokens, &c.repo).map(|(_, v)| v);
     let token_file = token_file.and_then(Value::as_str).map(str::to_owned);
     let (home, lock) = locked(&c.directory, key)?;
     let drawn = new_session_id(s)?.replace('-', "");

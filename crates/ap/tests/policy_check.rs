@@ -70,7 +70,7 @@ fn host() -> Value {
         "units": {"directory": "/var/lib/units", "timeouts": {"implementer": 3600}},
         "reviews": {"runtime": "claude", "model": "opus", "account": "/root/.claude", "task": "t"},
         "repositories": {
-            "park-kyungchan/agent-platform": {"clone": "/srv/agent-platform"},
+            "park-kyungchan/lifecycle-platform": {"clone": "/srv/lifecycle-platform"},
             "park-kyungchan/other": {"clone": "/srv/other"}
         },
         "work": {"slots": 3, "slice": "agents.slice", "prefix": "ap-unit", "pages": 2, "page_prefix": "ap-page"},
@@ -849,4 +849,44 @@ fn routing_member_is_validated_by_the_reader_routing_after_client() {
     p["store_url"] = json!("http://127.0.0.1:1");
     let Refusal { reader, .. } = check(&Fake::json(&p), None).unwrap_err();
     assert_eq!(reader, Some("client"));
+}
+
+// spec: specs/ap/policy.md#R12
+// spec: specs/ap/unit.md#R55
+#[test]
+fn r12_the_repository_policy_names_the_regrouped_repositories() {
+    let bytes = include_bytes!("../../../host/etc/agent-platform/policy.json");
+    let fake = Fake::with(bytes);
+    let answer = check(&fake, None).unwrap();
+    assert_eq!(answer["status"], "ok", "{answer}");
+    let p: Value = serde_json::from_slice(bytes).unwrap();
+    // The two regrouped repositories by their new names, their clones and their stage tokens; no absorbed one.
+    assert_eq!(
+        p["repositories"],
+        json!({
+            "park-kyungchan/lifecycle-platform": {"clone": "/home/palantirkc/platforms/lifecycle-platform"},
+            "park-kyungchan/academy-platform": {"clone": "/home/palantirkc/platforms/academy-platform"}
+        })
+    );
+    assert_eq!(
+        p["units"]["github"]["stage_tokens"],
+        json!({
+            "park-kyungchan/lifecycle-platform": "/etc/agent-platform/credentials/stage-token-lifecycle-platform",
+            "park-kyungchan/academy-platform": "/etc/agent-platform/credentials/stage-token-academy-platform"
+        })
+    );
+    let named = json!([&p["repositories"], &p["units"]["github"]["stage_tokens"]]).to_string();
+    for old in [
+        "agent-platform\"",
+        "ontology-platform",
+        "agent-vps-operations",
+        "education-dc-gang-a",
+        "education-problem-edit",
+        "education-platform",
+    ] {
+        assert!(!named.contains(old), "{old} in {named}");
+    }
+    // The engine's tree is guarded as the rest of the protected paths.
+    let guarded = p["units"]["approval"]["guarded"].as_array().unwrap();
+    assert!(guarded.contains(&json!("engine/**")), "{guarded:?}");
 }
