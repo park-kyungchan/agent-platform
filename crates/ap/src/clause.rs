@@ -18,6 +18,10 @@ use std::{
 pub const DIRECTORY: &str = "/var/lib/agent-platform/clause";
 /// The record source of the clauses.
 pub const SOURCE: &str = "clauses";
+/// The specifications of the engine in this repository: `engine/specs/ont/` (R3), and the prefix of a
+/// citation of them in a file under `engine/` (R4).
+const ENGINE: &str = "engine/";
+const ENGINE_SPECS: &str = "specs/ont/";
 /// A file larger than this is not indexed, and not read for citations (R3, R4).
 pub const FILE_BYTES: u64 = 1_000_000;
 /// The citations a clause shows (R4).
@@ -139,7 +143,10 @@ fn repository_records(
     let mut cited: BTreeMap<(String, String), Vec<(String, usize)>> = BTreeMap::new();
     for (mode, kind, object, size, path) in entries {
         let markdown = path.ends_with(".md");
-        let spec = markdown && path.starts_with("specs/");
+        let engine_spec = path
+            .strip_prefix(ENGINE)
+            .is_some_and(|p| p.starts_with(ENGINE_SPECS));
+        let spec = markdown && (path.starts_with("specs/") || engine_spec);
         if !route::regular(&mode, &kind) || size > FILE_BYTES || (markdown && !spec) {
             continue;
         }
@@ -149,8 +156,14 @@ fn repository_records(
             continue;
         }
         let text = String::from_utf8_lossy(&bytes);
+        let in_engine = path.starts_with(ENGINE);
         for (n, line) in text.split('\n').enumerate() {
             for (spec, rule) in citations(line) {
+                // A file of the engine cites its specifications as `specs/ont/...` (R4).
+                let spec = match in_engine && spec.starts_with(ENGINE_SPECS) {
+                    true => format!("{ENGINE}{spec}"),
+                    false => spec,
+                };
                 cited
                     .entry((spec, rule))
                     .or_default()

@@ -4,7 +4,7 @@ What the repository is and who uses it: `README.md`. Start reading from `map.jso
 
 This repository holds the command `ap`, the shared instructions every coding CLI on this host loads, the specifications of the `ap` contracts, and the checks that hold them. Its users are the Lead, the workers and verifiers of a unit in this repository, and agents of every CLI that call `ap`.
 
-`engine/` is the Ontology engine, a workspace of its own whose rules are in `engine/AGENTS.md` and `engine/REVIEW.md`; `ci/check-map.py` does not read it. While a tree holds `ontology/ENGINE-PIN`, the engine in use is the one the pin names; a tree without that file builds, checks and delivers the engine from `engine/` of the same commit, named by the Git tree id of `engine/` (`deploy/README.md`, "An engine change"): the root `./check` then takes that engine and runs `engine/check` when it had to build it.
+`engine/` is the Ontology engine, a Cargo workspace of its own in this repository; its rules are in "The engine" below, and `ci/check-map.py` reads it with the rest of the tree. The engine in use is the one built from `engine/` of the same commit, named by the Git tree id of `engine/` (`deploy/README.md`, "An engine change"): the root `./check` takes that engine and runs the engine's own steps (`./check engine`) when it had to build it.
 
 ## The check
 
@@ -19,14 +19,14 @@ This repository holds the command `ap`, the shared instructions every coding CLI
 | Contract | Where it is stated | What relies on it |
 | --- | --- | --- |
 | The schema of the Lead's records, `ontology/work.schema.json` | `ontology/README.md`, the schema's text by version: its value types, among them `nonempty_text`, which refuses `""` with `invalid_parameter` for the string parameters of the version 9 actions, while the actions of versions 10 and 11 refuse an empty string by a `<parameter>_empty` criterion with a rehearsal row (not every string parameter), and what the store does not check; the check `ont schema check ontology/work.schema.json`; `ontology/rehearsal.sh`, which installs the schema into a disposable store and asserts every action answer that `ap` parses | `ap` and every reader of the store |
-| The engine revision, `ontology/ENGINE-PIN`, or in a tree without it the Git tree id of `engine/` | `ontology/ENGINE-PIN`; `specs/ap/deliver.md` R66; changed only with a passing rehearsal (`ontology/rehearsal.sh`) and the answer shapes named in the pull request | `ap` parsing an engine answer; `ontology/rehearsal.sh` |
+| The engine revision, the Git tree id of `engine/` | `specs/ap/deliver.md` R66; a change of `engine/` comes with a passing rehearsal (`ontology/rehearsal.sh`) and the answer shapes named in the pull request | `ap` parsing an engine answer; `ontology/rehearsal.sh` |
 | The shared instructions, `content/` with `content/SHA256SUMS` | `content/SHA256SUMS`, the one list of the content | Every coding CLI that loads the installed instructions; `ci/check-content.py` |
 | The rulesets and settings under `github/` | `github/repositories.json`, `github/ruleset-main.json`, `github/ruleset-tags.json`; compared and applied by `github/apply` | The repositories the files name; `./check` |
 | The map, `map.json` | `map.json`; `ci/check-map.py` checks it | `ap unit page`, which prints one line per entry that meets a unit's write set, and `./check` |
 
 A new action or value type of the work schema follows the latest version section of `ontology/README.md` (`## Version 11`) and adds a rehearsal row for each new refusal; it also adds the action or function to the grants (`specs/ap/roles.md` R2).
 
-A pull request that adds, removes or renames a file under the coverage roots (`crates/`, `ci/`, `content/`, `deploy/`, `evals/`, `github/`, `ontology/`, `scripts/`, `specs/`, `.github/`, `check`, `rust-toolchain.toml`, `Cargo.toml`, `Cargo.lock`), or shortens a file below an entry's range, changes `map.json` in the same pull request; a removed root also changes the root list in `check`. A file added to or removed from `content/` is added to or removed from `content/SHA256SUMS`; every changed file gets its new checksum. Never edit the installed copy of the content.
+A pull request that adds, removes or renames a file under the coverage roots (`crates/`, `ci/`, `content/`, `deploy/`, `engine/`, `evals/`, `github/`, `ontology/`, `scripts/`, `specs/`, `.github/`, `check`, `rust-toolchain.toml`, `Cargo.toml`, `Cargo.lock`), or shortens a file below an entry's range, changes `map.json` in the same pull request; a removed root also changes the root list in `check`. A file added to or removed from `content/` is added to or removed from `content/SHA256SUMS`; every changed file gets its new checksum. Never edit the installed copy of the content.
 
 ## Rules of this repository
 
@@ -39,6 +39,27 @@ A pull request that adds, removes or renames a file under the coverage roots (`c
 - One pull request per unit of work, able to merge alone. Its description is your plan and your proof. Never force-push. A repair is a new commit.
 - The required check is `rust`; the required status is `lead-review`. Review policy: `REVIEW.md`.
 - `ap` and `content/` are installed by `ap deliver` (its timer) after the merge; the `scripts/install-ap.sh` and `scripts/install-content.sh` files are delivery's own steps. A merged change is not an installed one.
+
+## The engine
+
+`engine/` is one generic engine, no domain knowledge. A domain describes its world in a schema file kept in the domain's own repository (object types with typed properties, link types, action types with submission criteria, views); the engine stores observations of those objects, answers reads over them and applies actions. What it holds: `engine/README.md`; its components are the entries `engine-*` of `map.json`.
+
+- Agents of every CLI on this host, through the installed command `ont` and its MCP server.
+- This repository: its schema and the command `ap`, which calls the installed `ont`.
+- Domain crates in other repositories, which pin this repository by Git revision and link `ont`, `ont-core` and `ont-store` as libraries.
+
+The engine is generic: a change that names a domain (a lesson, a student, a packet) belongs in that domain's schema or repository, not in `engine/`. The engine changes only for a named use: say in the pull request which consumer needs it and which real run will show it. Its steps of the check (`./check engine`: rustfmt, clippy and the tests of its workspace, `engine/scripts/check-spec-trace.py`, `engine/scripts/test-install-ont.sh`) run inside `./check` when the engine had to be built, and in the CI job `test` when `engine/` changed. `engine/rust-toolchain.toml` names the root's channel: `engine/scripts/install-ont.sh` builds from `engine/` alone.
+
+| Contract | Where it is stated | What relies on it |
+| --- | --- | --- |
+| The schema language | `engine/specs/ont/schema-language.md` | Every installed schema |
+| The JSON answers of each command and of the MCP tools | `engine/specs/ont/` | `ap`, every agent that reads an answer |
+| The store format | `engine/specs/ont/store.md` | Every store file on the host; a format change needs an upgrade path and a design note before the build |
+| The library boundary (`ont`, `ont-core`, `ont-store` as dependencies) | The crates' public items | Domain crates that pin a revision of this repository |
+
+A change of one of these says so in the pull request and comes with the test that fails on the old behaviour.
+
+Not in the engine: no daemon, no scheduler, no second copy of the action log, no domain parser. `ont serve` is the single tailnet listener exception to "No daemon". No student data, credentials or host paths of private data in source, tests or fixtures: fixtures are synthetic.
 
 ## Why Rust
 

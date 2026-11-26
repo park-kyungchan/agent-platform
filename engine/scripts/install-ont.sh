@@ -1,12 +1,10 @@
 #!/bin/bash
 # Install, check or roll back the `ont` binary. No schema is installed and
 # no index is run here; install prints those commands for the host step.
-# This script serves the rule of a tree without ontology/ENGINE-PIN
-# (specs/ap/deliver.md R66, R67): `install <commit>` builds engine/ of that
-# commit of the repository around it, named by the Git tree id of engine/.
-# It fetches nothing and makes no ancestor test: the review that accepted the
-# commit accepted its engine. Delivery under the pin rule runs the old
-# engine clone's own script.
+# The engine of a commit is engine/ of that commit (specs/ap/deliver.md R66,
+# R67): `install <commit>` builds engine/ of that commit of the repository
+# around it, named by the Git tree id of engine/. It fetches nothing and makes
+# no ancestor test: the review that accepted the commit accepted its engine.
 set -euo pipefail
 
 # Never let the caller redirect git away from the checkout named by -C.

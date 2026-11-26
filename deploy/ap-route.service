@@ -4,8 +4,8 @@ Documentation=https://github.com/park-kyungchan/agent-platform/blob/main/deploy/
 
 [Service]
 Type=oneshot
-ExecStart=/usr/local/bin/ap route index --prune --repository park-kyungchan/agent-platform --repository park-kyungchan/ontology-platform --repository park-kyungchan/agent-vps-operations --instructions /root/.agents
-# A run fetches three clones, reads their Markdown at origin/main and indexes two sources: well under a minute.
+ExecStart=/usr/local/bin/ap route index --prune --repository park-kyungchan/agent-platform --repository park-kyungchan/agent-vps-operations --instructions /root/.agents
+# A run fetches two clones, reads their Markdown at origin/main and indexes two sources: well under a minute.
 TimeoutStartSec=600
 Slice=agents.slice
 Nice=10

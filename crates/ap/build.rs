@@ -4,9 +4,7 @@ use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 
-/// The text the revision of the engine must print (`ont --version`) is this, then the pin.
-const VERSION_PREFIX: &str = "ont 0.1.0 ";
-/// Where the engine of a pin is installed besides `PATH` (`ci/engine-pin.sh`, `check`).
+/// Where an engine of a tree id is installed besides `PATH` (`ci/engine.sh`, `check`).
 const INSTALLED: &str = "/usr/local/bin";
 /// The most bytes of an engine's output a failure line shows.
 const SHOWN: usize = 600;
@@ -150,22 +148,6 @@ fn root_of(manifest_dir: &Path) -> PathBuf {
     up.unwrap_or(manifest_dir).to_path_buf()
 }
 
-/// The pin of `ontology/ENGINE-PIN` of this tree: 40 lowercase hexadecimal digits without whitespace.
-fn pin_of(file: &Path) -> String {
-    let Ok(text) = fs::read_to_string(file) else {
-        refuse("engine_pin_invalid", "ontology/ENGINE-PIN cannot be read");
-    };
-    let pin: String = text.chars().filter(|c| !c.is_whitespace()).collect();
-    let shape = pin.len() == 40 && pin.bytes().all(|c| matches!(c, b'0'..=b'9' | b'a'..=b'f'));
-    if !shape {
-        refuse(
-            "engine_pin_invalid",
-            "ontology/ENGINE-PIN is not 40 lowercase hexadecimal digits",
-        );
-    }
-    pin
-}
-
 fn executable(path: &Path) -> bool {
     let meta = fs::metadata(path);
     meta.is_ok_and(|m| m.is_file() && m.permissions().mode() & 0o111 != 0)
@@ -198,45 +180,18 @@ fn version_of(path: &Path) -> Option<String> {
     Some(text.trim_end_matches('\n').to_owned())
 }
 
-/// Which rule of two trees names the engine (`specs/ap/deliver.md` R66): the pin of
-/// `ontology/ENGINE-PIN`, whose engine prints exactly `ont 0.1.0 <pin>`; or the Git tree id of `engine/`
-/// at `HEAD`, whose engine prints `ont <version> <id>`.
-enum Rule {
-    Pin(String),
-    Tree(String),
+/// Whether a printed version line names the engine of the tree id `id`: `ont <version> <id>`.
+fn names(id: &str, printed: &str) -> bool {
+    let words: Vec<&str> = printed.split(' ').collect();
+    words.len() == 3 && words[0] == "ont" && !words[1].is_empty() && words[2] == id
 }
 
-impl Rule {
-    fn id(&self) -> &str {
-        match self {
-            Rule::Pin(id) | Rule::Tree(id) => id,
-        }
-    }
-    /// Whether a printed version line names this rule's engine.
-    fn names(&self, printed: &str) -> bool {
-        match self {
-            Rule::Pin(pin) => printed == format!("{VERSION_PREFIX}{pin}"),
-            Rule::Tree(id) => {
-                let words: Vec<&str> = printed.split(' ').collect();
-                words.len() == 3 && words[0] == "ont" && !words[1].is_empty() && words[2] == id
-            }
-        }
-    }
-    /// What the refusal `engine_differs` says the engine should name.
-    fn wanted(&self) -> String {
-        match self {
-            Rule::Pin(pin) => format!("the pin is {pin}"),
-            Rule::Tree(id) => format!("the tree id of engine/ at HEAD is {id}"),
-        }
-    }
-}
-
-/// The engine of `rule`: the path `ONT_BIN` names when it is set and not empty, and then no other; else
-/// `ont-<id>` of `PATH`, `/usr/local/bin/ont-<id>`, `ont` of `PATH` (and, under the tree rule,
-/// `/usr/local/bin/ont`). Only an executable file whose `--version` names the rule's engine is taken.
-fn engine_of(rule: &Rule) -> PathBuf {
+/// The engine of the tree id `id`: the path `ONT_BIN` names when it is set and not empty, and then no
+/// other; else `ont-<id>` of `PATH`, `/usr/local/bin/ont-<id>`, `ont` of `PATH` and `/usr/local/bin/ont`.
+/// Only an executable file whose `--version` names the engine of the id is taken.
+fn engine_of(id: &str) -> PathBuf {
     let named = env::var_os("ONT_BIN").filter(|path| !path.is_empty());
-    let pinned = format!("ont-{}", rule.id());
+    let pinned = format!("ont-{id}");
     let (looked, listed): (String, Vec<PathBuf>) = match named {
         Some(path) => (
             format!("ONT_BIN {}", PathBuf::from(&path).display()),
@@ -246,11 +201,8 @@ fn engine_of(rule: &Rule) -> PathBuf {
             let mut all = on_path(&pinned);
             all.push(Path::new(INSTALLED).join(&pinned));
             all.extend(on_path("ont"));
-            let mut looked = format!("{pinned} and ont on PATH, {INSTALLED}/{pinned}");
-            if let Rule::Tree(_) = rule {
-                all.push(Path::new(INSTALLED).join("ont"));
-                looked.push_str(&format!(", {INSTALLED}/ont"));
-            }
+            all.push(Path::new(INSTALLED).join("ont"));
+            let looked = format!("{pinned} and ont on PATH, {INSTALLED}/{pinned}, {INSTALLED}/ont");
             (looked, all)
         }
     };
@@ -266,19 +218,18 @@ fn engine_of(rule: &Rule) -> PathBuf {
     let mut seen = vec![];
     for path in &candidates {
         let printed = version_of(path);
-        if printed.as_deref().is_some_and(|text| rule.names(text)) {
+        if printed.as_deref().is_some_and(|text| names(id, text)) {
             return path.clone();
         }
-        let revision = printed.map(|text| match text.strip_prefix(VERSION_PREFIX) {
-            Some(revision) => revision.to_owned(),
-            None => text,
-        });
-        let revision = revision.unwrap_or_else(|| "none".to_owned());
+        let revision = printed.unwrap_or_else(|| "none".to_owned());
         seen.push(format!("{} prints {revision}", path.display()));
     }
     refuse(
         "engine_differs",
-        &format!("{}; {}", seen.join("; "), rule.wanted()),
+        &format!(
+            "{}; the tree id of engine/ at HEAD is {id}",
+            seen.join("; ")
+        ),
     )
 }
 
@@ -373,27 +324,17 @@ fn main() {
         println!("cargo:rustc-env=AP_BUILD_REVISION=unknown");
     }
     let root = root_of(&manifest_dir);
-    let (schema, pin_file) = (
-        root.join("ontology/work.schema.json"),
-        root.join("ontology/ENGINE-PIN"),
-    );
+    let schema = root.join("ontology/work.schema.json");
     println!("cargo:rerun-if-changed={}", schema.display());
     println!("cargo:rerun-if-env-changed=ONT_BIN");
     println!("cargo:rerun-if-env-changed=PATH");
-    // The rule of two trees (`specs/ap/deliver.md` R66): a tree that holds `ontology/ENGINE-PIN` keeps
-    // the pin's rule; one without it that holds `engine/` names its engine by the tree id of `engine/`.
-    let rule = if fs::symlink_metadata(&pin_file).is_ok() {
-        println!("cargo:rerun-if-changed={}", pin_file.display());
-        Rule::Pin(pin_of(&pin_file))
-    } else if fs::symlink_metadata(root.join("engine")).is_ok_and(|m| m.is_dir()) {
-        // `HEAD` and its ref are watched by `emit_rerun`: the tree id moves only with them.
-        Rule::Tree(tree_id(&root))
-    } else {
-        refuse(
-            "engine_missing",
-            "the tree holds neither ontology/ENGINE-PIN nor engine/",
-        )
-    };
-    let engine = engine_of(&rule);
+    // The engine of this tree is named by the Git tree id of `engine/` (`specs/ap/deliver.md` R66); a tree
+    // without `engine/` has none. A file the tree may still hold beside it (an older branch's pin) is not read.
+    if !fs::symlink_metadata(root.join("engine")).is_ok_and(|m| m.is_dir()) {
+        refuse("engine_missing", "no engine/");
+    }
+    // `HEAD` and its ref are watched by `emit_rerun`: the tree id moves only with them.
+    let id = tree_id(&root);
+    let engine = engine_of(&id);
     generate(&engine, &schema);
 }

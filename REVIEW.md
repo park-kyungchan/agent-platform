@@ -6,13 +6,14 @@ For the one reviewer session of a pull request (and for the automatic reviewer).
 
 1. Wrong behaviour of `ap` or of a script: a request that must be refused is admitted or the reverse; an answer that contradicts `crates/ap/README.md`, or, for a kept verb, its specification under `specs/ap/` (the README routes to it); an install, a recovery or a close that leaves the host or the store in a state the contract excludes.
 2. Loss or exposure of data: an installation that destroys bytes it does not own or keeps no previous bytes; a credential, a private path's content or student data in the tree.
-3. A broken contract: `ap` parses an engine answer in a shape the engine revision of `ontology/ENGINE-PIN` (in a tree without it, the engine of `engine/` of the same commit) does not give; the schema `work` changes its installed meaning; `content/SHA256SUMS` and the files of `content/` disagree.
+3. A broken contract: `ap` parses an engine answer in a shape the engine of `engine/` of the same commit does not give; the engine's schema language, an answer's shape, its store format or a public library item of its crates changes without the pull request saying so, or an installed schema no longer installs; the schema `work` changes its installed meaning; `content/SHA256SUMS` and the files of `content/` disagree.
 4. Instructions an agent cannot follow: two sentences of `content/` that contradict each other so that an agent following both cannot act (quote both with file and line); a route to a missing file or section; a sentence that removes a safety rule (holds, never force-push, merge only on the reviewed head, install with readback, privacy limits).
-5. An irreversible effect on a real target without a guard.
+5. An irreversible effect on a real target without a guard (an install script, a store upgrade).
+6. In the engine (`engine/`), shown by a sequence of commands of its binaries on a store they produced: a read that omits or wrongly returns a head or a count, an action applied or refused against its criteria, or an answer that contradicts `engine/specs/ont/`; a write, a migration, `backup` or an interrupted run that loses or damages rows; a reader that learns of objects outside its grants; the work of one read or one action that grows without a stated bound.
 
 ## Not blocking (at most five notes)
 
-Wording, length, a test gap, a surviving mutant, a name, a preference for another structure. Do not write mutants by hand. A change that deletes the only tests of code that stays says so in the pull request; when it does not, that is a finding of kind 3.
+Wording, length, a test gap, a surviving mutant, a name, a preference for another structure, hardening against a same-user adversary. Do not write mutants by hand. A change that deletes the only tests of code that stays says so in the pull request; when it does not, that is a finding of kind 3.
 
 ## Form
 

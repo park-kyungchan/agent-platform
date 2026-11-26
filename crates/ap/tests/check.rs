@@ -1802,18 +1802,18 @@ cat @PC@/ont-version
 // spec: specs/ap/check.md#R15
 // spec: specs/ap/check.md#R19
 #[test]
-fn r19_a_pinned_engine_the_pc_does_not_have_runs_here_as_pc_engine_differs() {
+fn r19_an_engine_the_pc_does_not_have_runs_here_as_pc_engine_differs() {
     let w = World::new();
     let d = w.dir();
     let tree = w.tree();
     let tree = tree.to_str().unwrap().to_owned();
-    let pin = "0123456789abcdef0123456789abcdef01234567";
-    let other = "fedcba9876543210fedcba9876543210fedcba98";
-    write(
-        &w.repo.join("ontology/ENGINE-PIN"),
-        &format!("{pin}\n"),
-        0o644,
+    write(&w.repo.join("engine/Cargo.toml"), "[workspace]\n", 0o644);
+    sh(
+        &w.repo,
+        "git add -A && git -c user.name=t -c user.email=t@e commit -q -m engine",
     );
+    let pin = sh(&w.repo, "git rev-parse HEAD:engine").trim().to_owned();
+    let other = "fedcba9876543210fedcba9876543210fedcba98";
     let ont = FAKE_ONT.replace("@PC@", &w.s("pc"));
     write(&w.p("pc/bin/ont"), &ont, 0o755);
     write(
@@ -1870,22 +1870,11 @@ fn r19_a_pinned_engine_the_pc_does_not_have_runs_here_as_pc_engine_differs() {
     // No ont at all: the probe has still answered.
     fs::remove_file(w.p("pc/bin/ont")).unwrap();
     differs("no ont", 0.1);
-    // A pin that is not 40 hexadecimal digits equals none, even the same text.
-    write(&w.repo.join("ontology/ENGINE-PIN"), "abc\n", 0o644);
-    write(&w.p("pc/bin/ont"), &ont, 0o755);
-    write(&w.p("pc/ont-version"), "ont 0.1.0 abc\n", 0o644);
-    differs("a pin that is no revision", 0.1);
     // The same revision, from the ont the account's .profile puts on PATH: the PC takes the call.
-    fs::remove_file(w.p("pc/bin/ont")).unwrap();
     write(&w.p("pc/home/.cargo/bin/ont"), &ont, 0o755);
     write(
         &w.p("pc/home/.profile"),
         "PATH=\"$HOME/.cargo/bin:$PATH\"\n",
-        0o644,
-    );
-    write(
-        &w.repo.join("ontology/ENGINE-PIN"),
-        &format!(" {pin} \n"),
         0o644,
     );
     write(&w.p("pc/ont-version"), &format!("ont 0.1.0 {pin}\n"), 0o644);
@@ -1907,22 +1896,26 @@ fn r19_a_pinned_engine_the_pc_does_not_have_runs_here_as_pc_engine_differs() {
     };
     on_pc("the same engine");
     assert_eq!(ont_calls(), ["--version"]);
-    // A worktree without the file is placed as before, whatever the PC's engine.
+    // A worktree without engine/ is placed as before, whatever the PC's engine.
     write(
         &w.p("pc/ont-version"),
         &format!("ont 0.1.0 {other}\n"),
         0o644,
     );
-    fs::remove_file(w.repo.join("ontology/ENGINE-PIN")).unwrap();
-    on_pc("no pin");
+    fs::remove_dir_all(w.repo.join("engine")).unwrap();
+    sh(
+        &w.repo,
+        "git add -A && git -c user.name=t -c user.email=t@e commit -q -m none",
+    );
+    on_pc("no engine");
     fs::remove_file(w.p("pc/home/.cargo/bin/ont")).unwrap();
-    on_pc("no pin and no ont");
+    on_pc("no engine and no ont");
 }
 
 // spec: specs/ap/check.md#R19
 // spec: specs/ap/check.md#R25
 #[test]
-fn r25_engine_tree_a_worktree_without_the_pin_names_the_tree_id_of_engine() {
+fn r25_engine_tree_a_worktree_names_the_tree_id_of_engine() {
     let w = World::new();
     let d = w.dir();
     let tree = w.tree();
@@ -1992,18 +1985,20 @@ fn r25_engine_tree_a_worktree_without_the_pin_names_the_tree_id_of_engine() {
     // A change elsewhere does not touch the engine's id.
     write(&w.repo.join("a.txt"), "changed\n", 0o644);
     placed("a change outside engine", "pc");
-    // A tree that holds ontology/ENGINE-PIN keeps the pin's rule, beside engine/.
+    // A tree that still holds the file of the retired pin (an older branch, a rollback target) is read by
+    // the tree rule: the file is not read.
     let pin = "0123456789abcdef0123456789abcdef01234567";
-    write(
-        &w.repo.join("ontology/ENGINE-PIN"),
-        &format!("{pin}\n"),
-        0o644,
+    let old_pin = w.repo.join(concat!("ontology/ENGINE", "-PIN"));
+    write(&old_pin, &format!("{pin}\n"), 0o644);
+    sh(
+        &w.repo,
+        "git add -A && git -c user.name=t -c user.email=t@e commit -q -m pin",
     );
-    placed("the pin's rule beside engine", "here");
+    placed("the old file beside engine", "pc");
     write(&w.p("pc/ont-version"), &format!("ont 0.1.0 {pin}\n"), 0o644);
-    placed("the pin's engine", "pc");
-    // Neither the pin nor engine/: placed as R4 says, whatever the PC's engine.
-    fs::remove_file(w.repo.join("ontology/ENGINE-PIN")).unwrap();
+    placed("the engine of the old file", "here");
+    // No engine/: placed as R4 says, whatever the PC's engine.
+    fs::remove_file(&old_pin).unwrap();
     fs::remove_dir_all(w.repo.join("engine")).unwrap();
     sh(
         &w.repo,

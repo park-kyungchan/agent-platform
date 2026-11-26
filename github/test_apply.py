@@ -628,7 +628,6 @@ class Files(unittest.TestCase):
                   "vulnerability_alerts": True, "automated_security_fixes": True}
         self.assertEqual(entries, [
             dict(public, repository="park-kyungchan/agent-platform"),
-            dict(public, repository="park-kyungchan/ontology-platform"),
             {"repository": "park-kyungchan/education-platform", "settings": settings,
              "actions": {"enabled": True, "allowed_actions": "all", "sha_pinning_required": True}},
             {"repository": "park-kyungchan/agent-vps-operations"},

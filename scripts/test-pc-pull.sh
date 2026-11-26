@@ -9,48 +9,30 @@ t=$(mktemp -d)
 trap 'rm -rf -- "$t"' EXIT
 
 export HOME="$t/home"
-mkdir -p "$HOME" "$t/ap-bare.git" "$t/ont-bare.git" "$t/work" "$t/bin" "$t/state"
+mkdir -p "$HOME" "$t/ap-bare.git" "$t/work" "$t/bin" "$t/state"
 git init --quiet --bare --initial-branch=main "$t/ap-bare.git"
-git init --quiet --bare --initial-branch=main "$t/ont-bare.git"
 
-# Helper to build commits in local work clones and push to bare repos.
-git clone --quiet "$t/ont-bare.git" "$t/work/ont"
-git -C "$t/work/ont" config user.email t@example.invalid
-git -C "$t/work/ont" config user.name t
-echo "ont v1" > "$t/work/ont/README"
-git -C "$t/work/ont" add README
-git -C "$t/work/ont" commit --quiet -m "ont 1"
-pin1=$(git -C "$t/work/ont" rev-parse HEAD)
-git -C "$t/work/ont" push --quiet origin main
-
-echo "ont v2" > "$t/work/ont/README"
-git -C "$t/work/ont" add README
-git -C "$t/work/ont" commit --quiet -m "ont 2"
-pin2=$(git -C "$t/work/ont" rev-parse HEAD)
-git -C "$t/work/ont" push --quiet origin main
-
-# An unmerged ont commit on a side branch (not on origin/main).
-git -C "$t/work/ont" checkout --quiet -b side
-echo "ont side" > "$t/work/ont/README"
-git -C "$t/work/ont" add README
-git -C "$t/work/ont" commit --quiet -m "ont side"
-pin_off_main=$(git -C "$t/work/ont" rev-parse HEAD)
-git -C "$t/work/ont" push --quiet origin side
-
+# The repository: each commit holds engine/, whose Git tree id names its engine. The first commit also holds
+# the file of the retired engine pin (named indirectly here), which the tree rule does not read.
+old_pin="ENGINE""-PIN"
 git clone --quiet "$t/ap-bare.git" "$t/work/ap"
 git -C "$t/work/ap" config user.email t@example.invalid
 git -C "$t/work/ap" config user.name t
-mkdir -p "$t/work/ap/ontology"
-printf '%s\n' "$pin1" > "$t/work/ap/ontology/ENGINE-PIN"
-git -C "$t/work/ap" add ontology/ENGINE-PIN
+mkdir -p "$t/work/ap/engine" "$t/work/ap/ontology"
+printf '[workspace]\n# v1\n' > "$t/work/ap/engine/Cargo.toml"
+printf '%s\n' 0123456789abcdef0123456789abcdef01234567 > "$t/work/ap/ontology/$old_pin"
+git -C "$t/work/ap" add -A
 git -C "$t/work/ap" commit --quiet -m "ap 1"
 ap1=$(git -C "$t/work/ap" rev-parse HEAD)
+id1=$(git -C "$t/work/ap" rev-parse HEAD:engine)
 git -C "$t/work/ap" push --quiet origin main
 
-printf '%s\n' "$pin2" > "$t/work/ap/ontology/ENGINE-PIN"
-git -C "$t/work/ap" add ontology/ENGINE-PIN
+git -C "$t/work/ap" rm --quiet "ontology/$old_pin"
+printf '[workspace]\n# v2\n' > "$t/work/ap/engine/Cargo.toml"
+git -C "$t/work/ap" add -A
 git -C "$t/work/ap" commit --quiet -m "ap 2"
 ap2=$(git -C "$t/work/ap" rev-parse HEAD)
+id2=$(git -C "$t/work/ap" rev-parse HEAD:engine)
 git -C "$t/work/ap" push --quiet origin main
 
 # An unmerged ap commit on a side branch (not on origin/main).
@@ -61,30 +43,7 @@ git -C "$t/work/ap" commit --quiet -m "ap side"
 ap_off_main=$(git -C "$t/work/ap" rev-parse HEAD)
 git -C "$t/work/ap" push --quiet origin side
 
-# A separate bare repo where origin/main pins an ont commit that is off ont's origin/main.
-git init --quiet --bare --initial-branch=main "$t/ap-badpin.git"
-git clone --quiet "$t/ap-badpin.git" "$t/work/ap-badpin"
-git -C "$t/work/ap-badpin" config user.email t@example.invalid
-git -C "$t/work/ap-badpin" config user.name t
-mkdir -p "$t/work/ap-badpin/ontology"
-printf '%s\n' "$pin_off_main" > "$t/work/ap-badpin/ontology/ENGINE-PIN"
-git -C "$t/work/ap-badpin" add ontology/ENGINE-PIN
-git -C "$t/work/ap-badpin" commit --quiet -m "bad pin"
-git -C "$t/work/ap-badpin" push --quiet origin main
-
-# engine_tree: a repository whose commits hold engine/ and no ontology/ENGINE-PIN (the tree rule), and one
-# whose commit holds neither.
-git init --quiet --bare --initial-branch=main "$t/ap-tree.git"
-git clone --quiet "$t/ap-tree.git" "$t/work/ap-tree"
-git -C "$t/work/ap-tree" config user.email t@example.invalid
-git -C "$t/work/ap-tree" config user.name t
-mkdir -p "$t/work/ap-tree/engine"
-printf '[workspace]\n' > "$t/work/ap-tree/engine/Cargo.toml"
-git -C "$t/work/ap-tree" add engine
-git -C "$t/work/ap-tree" commit --quiet -m "ap tree 1"
-tree_commit=$(git -C "$t/work/ap-tree" rev-parse HEAD)
-tree_id=$(git -C "$t/work/ap-tree" rev-parse HEAD:engine)
-git -C "$t/work/ap-tree" push --quiet origin main
+# A repository whose commit holds no engine/.
 git init --quiet --bare --initial-branch=main "$t/ap-neither.git"
 git clone --quiet "$t/ap-neither.git" "$t/work/ap-neither"
 git -C "$t/work/ap-neither" config user.email t@example.invalid
@@ -94,8 +53,8 @@ git -C "$t/work/ap-neither" add README
 git -C "$t/work/ap-neither" commit --quiet -m "neither"
 git -C "$t/work/ap-neither" push --quiet origin main
 
-# Fake build stub: verifies detached worktree HEAD (for the engine of a tree: the exported engine/ and
-# ONT_TREE_ID instead), verifies ONT_BIN for ap build,
+# Fake build stub: for the engine, verifies the exported engine/ and ONT_TREE_ID; for ap, verifies the
+# detached worktree HEAD and ONT_BIN,
 # and emits executable shell scripts whose --version names the commit.
 cat > "$t/fake-build.sh" <<'EOF'
 #!/usr/bin/env bash
@@ -104,8 +63,8 @@ kind="$1"
 wt="$2"
 out="$3"
 rev="$4"
-if [[ "$kind" == "ont" && -n "${ONT_TREE_ID:-}" ]]; then
-  if [[ "$ONT_TREE_ID" != "$rev" || ! -f "$wt/Cargo.toml" || "$(basename "$wt")" != engine ]]; then
+if [[ "$kind" == "ont" ]]; then
+  if [[ "${ONT_TREE_ID:-}" != "$rev" || ! -f "$wt/Cargo.toml" || "$(basename "$wt")" != engine ]]; then
     echo "engine of a tree: ONT_TREE_ID=$ONT_TREE_ID rev=$rev wt=$wt" >&2
     exit 1
   fi
@@ -175,17 +134,19 @@ run_pull() {
   bash "$script" "$@" > "$t/out" 2> "$t/err"
 }
 
-# 1. Source build mode at explicit ancestor commit ap1 (pin1).
-run_pull --ap-url "$t/ap-bare.git" --ont-url "$t/ont-bare.git" --commit "$ap1" \
-  --bin-dir "$t/bin" --state-dir "$t/state"
+# 1. Source build mode at explicit ancestor commit ap1: the engine is built from engine/ of ap1 with its tree
+#    id, the file of the retired pin at ap1 is not read, and no other repository is fetched.
+run_pull --ap-url "$t/ap-bare.git" --commit "$ap1" --bin-dir "$t/bin" --state-dir "$t/state"
 rc=$?
 if [[ "$rc" -eq 0 ]] \
-  && [[ "$("$t/bin/ont" --version)" == "ont 0.1.0 $pin1" ]] \
+  && [[ "$("$t/bin/ont" --version)" == "ont 0.1.0 $id1" ]] \
   && [[ "$("$t/bin/ap" --version)" == "ap 0.1.0 $ap1" ]] \
-  && grep -q "|ont 0.1.0 $pin1$" "$FAKE_AP_RECORD" \
+  && [[ "$(cat "$FAKE_TREE_RECORD")" == "$id1" ]] \
+  && grep -q "|ont 0.1.0 $id1$" "$FAKE_AP_RECORD" \
+  && [[ "$(ls "$t/state")" == $'agent-platform\ntarget-ap\ntarget-ont' ]] \
   && python3 -I -B -c 'import json,sys; d=json.load(open(sys.argv[1])); assert d["status"]=="installed" and d["mode"]=="build" and d["commit"]==sys.argv[2] and d["pin"]==sys.argv[3] and d["ap_sha256"]==sys.argv[4] and d["ont_sha256"]==sys.argv[5]' \
-     "$t/out" "$ap1" "$pin1" "$(sha_of "$t/bin/ap")" "$(sha_of "$t/bin/ont")"; then
-  ok "source build at ancestor commit passes ONT_BIN and installs both binaries"
+     "$t/out" "$ap1" "$id1" "$(sha_of "$t/bin/ap")" "$(sha_of "$t/bin/ont")"; then
+  ok "source build at ancestor commit builds engine/ with its tree id, passes ONT_BIN and installs both binaries"
 else
   bad "source build ap1 rc=$rc out=$(cat "$t/out") err=$(cat "$t/err")"
 fi
@@ -193,12 +154,11 @@ fi
 ap1_sha=$(sha_of "$t/bin/ap")
 ont1_sha=$(sha_of "$t/bin/ont")
 
-# 2. Source build mode at default origin/main tip (ap2, pin2) keeps .before-<sha12> backups.
-run_pull --ap-url "$t/ap-bare.git" --ont-url "$t/ont-bare.git" \
-  --bin-dir "$t/bin" --state-dir "$t/state"
+# 2. Source build mode at default origin/main tip (ap2, id2) keeps .before-<sha12> backups.
+run_pull --ap-url "$t/ap-bare.git" --bin-dir "$t/bin" --state-dir "$t/state"
 rc=$?
 if [[ "$rc" -eq 0 ]] \
-  && [[ "$("$t/bin/ont" --version)" == "ont 0.1.0 $pin2" ]] \
+  && [[ "$("$t/bin/ont" --version)" == "ont 0.1.0 $id2" ]] \
   && [[ "$("$t/bin/ap" --version)" == "ap 0.1.0 $ap2" ]] \
   && [[ "$(sha_of "$t/bin/ap.before-${ap1_sha:0:12}")" == "$ap1_sha" ]] \
   && [[ "$(sha_of "$t/bin/ont.before-${ont1_sha:0:12}")" == "$ont1_sha" ]]; then
@@ -207,12 +167,23 @@ else
   bad "second source build rc=$rc out=$(cat "$t/out") err=$(cat "$t/err")"
 fi
 
+# 3. An installed ont that already names the tree id is not built again.
+rm -f -- "$FAKE_TREE_RECORD"
+FAKE_ONT_ANY=1 run_pull --ap-url "$t/ap-bare.git" --bin-dir "$t/bin" --state-dir "$t/state"
+rc=$?
+if [[ "$rc" -eq 0 ]] && [[ ! -e "$FAKE_TREE_RECORD" ]] \
+  && [[ "$("$t/bin/ont" --version)" == "ont 0.1.0 $id2" ]] \
+  && grep -q "|ont 0.1.0 $id2$" "$FAKE_AP_RECORD"; then
+  ok "an engine that names the tree id is kept without a build"
+else
+  bad "engine skip rc=$rc out=$(cat "$t/out") err=$(cat "$t/err")"
+fi
+
 ap2_sha=$(sha_of "$t/bin/ap")
 ont2_sha=$(sha_of "$t/bin/ont")
 
-# 3. Commit off origin/main refused not_on_main (exit 2), existing binaries untouched.
-run_pull --ap-url "$t/ap-bare.git" --ont-url "$t/ont-bare.git" --commit "$ap_off_main" \
-  --bin-dir "$t/bin" --state-dir "$t/state"
+# 4. Commit off origin/main refused not_on_main (exit 2), existing binaries untouched.
+run_pull --ap-url "$t/ap-bare.git" --commit "$ap_off_main" --bin-dir "$t/bin" --state-dir "$t/state"
 rc=$?
 if [[ "$rc" -eq 2 ]] && grep -q '^not_on_main@pc-pull\.sh:' "$t/err" \
   && [[ "$(sha_of "$t/bin/ap")" == "$ap2_sha" ]] && [[ "$(sha_of "$t/bin/ont")" == "$ont2_sha" ]]; then
@@ -221,21 +192,20 @@ else
   bad "commit off origin/main rc=$rc err=$(cat "$t/err")"
 fi
 
-# 4. Pin off origin/main refused pin_not_on_main (exit 2), existing binaries untouched.
-run_pull --ap-url "$t/ap-badpin.git" --ont-url "$t/ont-bare.git" \
-  --bin-dir "$t/bin" --state-dir "$t/state-badpin"
+# 4b. The option of the retired engine repository is an unknown argument.
+run_pull --ap-url "$t/ap-bare.git" --ont-url "$t/elsewhere.git" --bin-dir "$t/bin" --state-dir "$t/state"
 rc=$?
-if [[ "$rc" -eq 2 ]] && grep -q '^pin_not_on_main@pc-pull\.sh:' "$t/err" \
-  && [[ "$(sha_of "$t/bin/ap")" == "$ap2_sha" ]] && [[ "$(sha_of "$t/bin/ont")" == "$ont2_sha" ]]; then
-  ok "pin off origin/main refused pin_not_on_main without modifying binaries"
+if [[ "$rc" -eq 2 ]] && grep -q '^invalid_args@pc-pull\.sh:[0-9]*: unknown argument: --ont-url' "$t/err" \
+  && [[ "$(sha_of "$t/bin/ap")" == "$ap2_sha" ]]; then
+  ok "--ont-url is refused invalid_args"
 else
-  bad "pin off origin/main rc=$rc err=$(cat "$t/err")"
+  bad "--ont-url rc=$rc err=$(cat "$t/err")"
 fi
 
 # 5. Digest-verified pair mode (--from-dir) with matching digests installs cleanly.
 mkdir -p "$t/pair"
 printf '#!/usr/bin/env bash\necho "ap 0.1.0 %s"\n' "$ap1" > "$t/pair/ap"
-printf '#!/usr/bin/env bash\necho "ont 0.1.0 %s"\n' "$pin1" > "$t/pair/ont"
+printf '#!/usr/bin/env bash\necho "ont 0.1.0 %s"\n' "$id1" > "$t/pair/ont"
 chmod 0755 "$t/pair/ap" "$t/pair/ont"
 pair_ap_sha=$(sha_of "$t/pair/ap")
 pair_ont_sha=$(sha_of "$t/pair/ont")
@@ -281,7 +251,7 @@ else
 fi
 
 # 7. Failed post-install readback restores BOTH .before-<sha12> backups.
-FAKE_FAIL_READBACK_PATH="$t/bin/ap" run_pull --ap-url "$t/ap-bare.git" --ont-url "$t/ont-bare.git" \
+FAKE_FAIL_READBACK_PATH="$t/bin/ap" run_pull --ap-url "$t/ap-bare.git" \
   --commit "$ap2" --bin-dir "$t/bin" --state-dir "$t/state"
 rc=$?
 if [[ "$rc" -eq 1 ]] && grep -q '^readback_failed_restored@pc-pull\.sh:' "$t/err" \
@@ -294,48 +264,15 @@ else
   bad "failed readback rollback rc=$rc err=$(cat "$t/err")"
 fi
 
-# 8. engine_tree: a commit without ontology/ENGINE-PIN builds engine/ of the commit with its tree id
-#    (HEAD:engine), fetching no other repository (the ontology URL does not exist).
-mkdir -p "$t/bin-tree"
-run_pull --ap-url "$t/ap-tree.git" --ont-url "$t/no-such-ontology.git" \
-  --bin-dir "$t/bin-tree" --state-dir "$t/state-tree"
+# 8. A commit without engine/ is refused engine_missing (exit 2), nothing written.
+pair_ap_now=$(sha_of "$t/bin/ap")
+run_pull --ap-url "$t/ap-neither.git" --bin-dir "$t/bin" --state-dir "$t/state-neither"
 rc=$?
-if [[ "$rc" -eq 0 ]] \
-  && [[ "$("$t/bin-tree/ont" --version)" == "ont 0.1.0 $tree_id" ]] \
-  && [[ "$("$t/bin-tree/ap" --version)" == "ap 0.1.0 $tree_commit" ]] \
-  && [[ "$(cat "$FAKE_TREE_RECORD")" == "$tree_id" ]] \
-  && grep -q "|ont 0.1.0 $tree_id$" "$FAKE_AP_RECORD" \
-  && [[ ! -e "$t/state-tree/ontology-platform" ]] \
-  && python3 -I -B -c 'import json,sys; d=json.load(open(sys.argv[1])); assert d["status"]=="installed" and d["mode"]=="build" and d["commit"]==sys.argv[2] and d["pin"]==sys.argv[3]' \
-     "$t/out" "$tree_commit" "$tree_id"; then
-  ok "engine_tree: the engine is built from engine/ of the commit with its tree id, no other repository fetched"
+if [[ "$rc" -eq 2 ]] && grep -q '^engine_missing@pc-pull\.sh:[0-9]*: .*holds no engine/' "$t/err" \
+  && [[ "$(sha_of "$t/bin/ap")" == "$pair_ap_now" ]]; then
+  ok "a commit without engine/ is refused engine_missing"
 else
-  bad "engine_tree build rc=$rc out=$(cat "$t/out") err=$(cat "$t/err")"
-fi
-
-# 9. engine_tree: an installed ont that already names the tree id is not built again.
-rm -f -- "$FAKE_TREE_RECORD"
-FAKE_ONT_ANY=1 run_pull --ap-url "$t/ap-tree.git" --ont-url "$t/no-such-ontology.git" \
-  --bin-dir "$t/bin-tree" --state-dir "$t/state-tree"
-rc=$?
-if [[ "$rc" -eq 0 ]] && [[ ! -e "$FAKE_TREE_RECORD" ]] \
-  && [[ "$("$t/bin-tree/ont" --version)" == "ont 0.1.0 $tree_id" ]] \
-  && grep -q "|ont 0.1.0 $tree_id$" "$FAKE_AP_RECORD"; then
-  ok "engine_tree: an engine that names the tree id is kept without a build"
-else
-  bad "engine_tree skip rc=$rc out=$(cat "$t/out") err=$(cat "$t/err")"
-fi
-
-# 10. A commit with neither ontology/ENGINE-PIN nor engine/ is refused engine_missing (exit 2), nothing written.
-tree_ap_sha=$(sha_of "$t/bin-tree/ap")
-run_pull --ap-url "$t/ap-neither.git" --ont-url "$t/no-such-ontology.git" \
-  --bin-dir "$t/bin-tree" --state-dir "$t/state-neither"
-rc=$?
-if [[ "$rc" -eq 2 ]] && grep -q '^engine_missing@pc-pull\.sh:[0-9]*: .*neither ontology/ENGINE-PIN nor engine/' "$t/err" \
-  && [[ "$(sha_of "$t/bin-tree/ap")" == "$tree_ap_sha" ]]; then
-  ok "a commit with neither the pin nor engine/ is refused engine_missing"
-else
-  bad "neither rc=$rc err=$(cat "$t/err")"
+  bad "no engine rc=$rc err=$(cat "$t/err")"
 fi
 
 if [[ "$fails" -eq 0 ]]; then

@@ -8,14 +8,16 @@
 # installer variable, AP_DELIVER_LOCK and AP_UNIT_DIR. It never calls the host's systemctl: a `systemctl`
 # shim first on PATH records its arguments and answers `enabled` to is-enabled. The origin's install-content.sh is
 # this repository's file unchanged; its install-ap.sh differs only in the build lock's path; a `cargo`
-# shim writes a file that answers --version with the commit it is built from. Passes i and j give the
-# request the member `engine`: a scratch engine repository whose `scripts/install-ont.sh` is a fake (the
-# real script's own `git fetch origin` and ancestor check, then a file that answers --version with the
-# pin), and a merged higher version of the work schema with an `ontology/migrate` that records its call,
-# installed on the scratch store. The engine file and the store lie under ONT_INSTALL_BIN_DIR and
-# ONT_INSTALL_STATE_DIR of that directory. The origin carries deploy/walk.service and deploy/walk.timer, which
-# pass a writes under AP_UNIT_DIR and pass k changes, edits by hand, rolls back and leaves after a tip
-# without an accepting review. Pass l gives the request the members `engine` and `etc`: a scratch operations
+# shim writes a file that answers --version with the commit it is built from. Every call reads the engine:
+# the origin holds engine/, whose `scripts/install-ont.sh` is a fake (the real script's verbs: `install <T>`
+# makes the engine file answer --version with the Git tree id of engine/ at T, `rollback` puts the kept file
+# back), and the engine file, a wrapper of the scratch store under ONT_INSTALL_BIN_DIR, answers the tree id of
+# engine/ that the pair's commit holds. Pass i merges a change of engine/: one call installs the engine and ends,
+# the next installs the pair. Pass j merges a higher version of the work schema with an `ontology/migrate` that
+# records its call, installed on the scratch store under ONT_INSTALL_STATE_DIR. From pass i on the request also
+# carries the member `engine`, which is accepted and ignored. The origin carries deploy/walk.service and
+# deploy/walk.timer, which pass a writes under AP_UNIT_DIR and pass k changes, edits by hand, rolls back and
+# leaves after a tip without an accepting review. Pass l gives the request the members `engine` and `etc`: a scratch operations
 # origin whose `scripts/install-etc.sh` is a fake with the real script's verbs and exits, which writes the
 # policy file, its record and its kept copies under the scratch root AP_ETC_ROOT of that directory.
 # One line `walk pass=<a..l> k=<k> pair=<commit or neither> outcome=<outcome>` per case, then
@@ -97,8 +99,8 @@ O=$W/origin
 mkdir -p "$O/scripts" "$O/ontology"
 printf '# walk\n\nOwner: walk\n' > "$W/work/walk/STATE.md"
 # The roles file the engine reads beside the store (engine action.md R113), mode 0644, this user's uid to every role of
-# the schema's grants; the origin carries the same bytes as deploy/roles.json, so the roles step of a call with `engine`
-# finds the host's file the same (specs/ap/deliver.md R58).
+# the schema's grants; the origin carries the same bytes as deploy/roles.json, so the roles step of every call finds the
+# host's file the same (specs/ap/deliver.md R58).
 python3 -I - "$REPO/ontology/work.schema.json" "$O/ontology/work.schema.json" "$W/work" "$ONT_INSTALL_STATE_DIR/ont/roles.json" "$O/deploy/roles.json" <<'PY'
 import json, os, sys
 d = json.load(open(sys.argv[1]))
@@ -113,7 +115,25 @@ for path in sys.argv[4:]:
 PY
 ont schema install "$O/ontology/work.schema.json" > /dev/null
 ont index --source task_states --source installed_binaries > /dev/null
-"$ONT" --version | awk '{print $3}' > "$O/ontology/ENGINE-PIN"
+# The origin's engine/: the walk's engine installer, with the real script's verbs. `install <T>` makes the engine
+# file answer the Git tree id of engine/ at T, keeping the file before; `rollback` puts that file back.
+mkdir -p "$O/engine/scripts"
+cat > "$O/engine/scripts/install-ont.sh" <<'EOF'
+#!/bin/bash
+set -euo pipefail
+REPO_ROOT=$(cd -- "$(dirname -- "$0")/../.." && pwd -P)
+BIN=$ONT_INSTALL_BIN_DIR/ont; KEEP=$ONT_INSTALL_STATE_DIR/install
+case ${1:-} in
+  install)
+    id=$(git -C "$REPO_ROOT" rev-parse "$2:engine") || { echo "refused: no engine/ at $2" >&2; exit 2; }
+    mkdir -p "$KEEP"; sha=$(sha256sum "$BIN" | awk '{print $1}')
+    cp "$BIN" "$KEEP/ont.before-${sha:0:12}"; echo "$sha" > "$KEEP/previous"
+    sed "s/^REV=.*/REV=$id/" "$BIN" > "$BIN.new"; chmod 0755 "$BIN.new"; mv "$BIN.new" "$BIN" ;;
+  rollback)
+    sha=$(cat "$KEEP/previous"); install -m 0755 "$KEEP/ont.before-${sha:0:12}" "$BIN.new"; mv "$BIN.new" "$BIN" ;;
+  *) exit 2 ;;
+esac
+EOF
 cp -p "$REPO/scripts/install-content.sh" "$O/scripts/install-content.sh"
 sed "s|^LOCK_FILE=\".*\"$|LOCK_FILE=\"$W/build.lock\"|" "$REPO/scripts/install-ap.sh" > "$O/scripts/install-ap.sh"
 [ "$(diff "$REPO/scripts/install-ap.sh" "$O/scripts/install-ap.sh" | grep -c '^[<>]')" = 2 ] || fail "the build lock line of install-ap.sh"
@@ -133,14 +153,18 @@ printf '[Unit]\nDescription=walk\n\n[Service]\nType=oneshot\nExecStart=/bin/true
 printf '[Timer]\nOnCalendar=*:0/10\n\n[Install]\nWantedBy=timers.target\n' > "$O/deploy/walk.timer"
 git -C "$O" add -A && git -C "$O" commit -q -m "walk 0"
 C0=$(git -C "$O" rev-parse HEAD)
+# The installed engine: it answers the tree id of engine/ at C0 and passes every other word to the scratch store.
+printf '#!/bin/sh\nREV=%s\nif [ "$1" = --version ]; then echo "ont 0.1.0 $REV"; exit 0; fi\nexec %q --store %q "$@"\n' \
+  "$(git -C "$O" rev-parse "$C0:engine")" "$ONT" "$STORE" > "$ONT_INSTALL_BIN_DIR/ont"
+chmod 0755 "$ONT_INSTALL_BIN_DIR/ont"
 # A merge of a branch that changes every content file, and an accepting review of its head; it prints
 # the merge (it runs in a command substitution, so its number comes from the origin).
 merge() {
   local n; n=$(git -C "$O" rev-list --first-parent --count main)
   git -C "$O" checkout -q -b "b$n" main
   content "$n"
-  # A move of the pin, a schema, a migration: the files $W/next-* name, when they exist.
-  [ ! -e "$W/next-pin" ] || cp "$W/next-pin" "$O/ontology/ENGINE-PIN"
+  # A change of engine/, a schema, a migration: the files $W/next-* name, when they exist.
+  [ ! -e "$W/next-engine" ] || cp "$W/next-engine" "$O/engine/VERSION"
   [ ! -e "$W/next-schema" ] || cp "$W/next-schema" "$O/ontology/work.schema.json"
   [ ! -e "$W/next-migrate" ] || install -m 0755 "$W/next-migrate" "$O/ontology/migrate"
   [ ! -e "$W/next-timer" ] || cp "$W/next-timer" "$O/deploy/walk.timer"
@@ -170,7 +194,7 @@ apply('close_review', 'rv-' + head + '-close', dict(review=review, verdict='acce
 PY
 }
 
-# The requests: a Lead's install, a Lead's rollback, a Lead's install with `engine`.
+# The requests: a Lead's install, a Lead's rollback, a Lead's install that still carries the member `engine` (ignored).
 request() {
   python3 -I -c 'import json, sys; w = sys.argv[1]; r = dict(repository="walk/origin", url=w + "/origin", state=w + "/state", build_lock=w + "/build.lock", by="walk", reason="the walk")
 if sys.argv[2] == "rollback": r["rollback"] = True
@@ -396,54 +420,26 @@ call lead
 [ ! -s "$W/err" ] || fail "pass h k=3: free lock printed a waiting line"
 line h 3 "$(pair)" installed
 
-# spec: specs/ap/deliver.md#R43
-# (i) The engine: a scratch engine repository at E0 (its fake installer) and one accepted merge E1; the
-# engine file answers E0. A merge moves ontology/ENGINE-PIN to E1; one call installs the engine and ends,
-# the next installs the pair.
-E=$W/engine-origin
-mkdir -p "$E/scripts"
-cat > "$E/scripts/install-ont.sh" <<'EOF'
-#!/bin/bash
-# The walk's engine installer: the real script's fetch and ancestor check, then the file answers the pin.
-set -euo pipefail
-REPO_ROOT=$(cd -- "$(dirname -- "$0")/.." && pwd -P)
-BIN=$ONT_INSTALL_BIN_DIR/ont; KEEP=$ONT_INSTALL_STATE_DIR/install
-case ${1:-} in
-  install)
-    git -C "$REPO_ROOT" fetch origin +refs/heads/main:refs/remotes/origin/main --refmap= || { echo "refused: git_unavailable: fetch origin failed" >&2; exit 2; }
-    git -C "$REPO_ROOT" merge-base --is-ancestor "$2" refs/remotes/origin/main || { echo "refused: commit_not_merged" >&2; exit 2; }
-    mkdir -p "$KEEP"; sha=$(sha256sum "$BIN" | awk '{print $1}')
-    cp "$BIN" "$KEEP/ont.before-${sha:0:12}"; echo "$sha" > "$KEEP/previous"
-    sed "s/^REV=.*/REV=$2/" "$BIN" > "$BIN.new"; chmod 0755 "$BIN.new"; mv "$BIN.new" "$BIN" ;;
-  rollback)
-    sha=$(cat "$KEEP/previous"); install -m 0755 "$KEEP/ont.before-${sha:0:12}" "$BIN.new"; mv "$BIN.new" "$BIN" ;;
-  *) exit 2 ;;
-esac
-EOF
-git -C "$E" init -q -b main
-git -C "$E" add -A && git -C "$E" commit -q -m "engine 0"
-E0=$(git -C "$E" rev-parse HEAD)
-git -C "$E" checkout -q -b e1 && echo 1 > "$E/VERSION" && git -C "$E" add -A && git -C "$E" commit -q -m "engine change"
-EH=$(git -C "$E" rev-parse HEAD)
-git -C "$E" checkout -q main && git -C "$E" merge -q --no-ff -m "engine merge" e1
-E1=$(git -C "$E" rev-parse HEAD)
-accept "$EH" walk/engine
-printf '#!/bin/sh\nREV=%s\nif [ "$1" = --version ]; then echo "ont 0.1.0 $REV"; exit 0; fi\nexec %q --store %q "$@"\n' "$E0" "$ONT" "$STORE" > "$ONT_INSTALL_BIN_DIR/ont"
-chmod 0755 "$ONT_INSTALL_BIN_DIR/ont"
-echo "$E1" > "$W/next-pin"; M=$(merge); rm "$W/next-pin"
+# spec: specs/ap/deliver.md#R66
+# spec: specs/ap/deliver.md#R67
+# (i) The engine: a merge changes engine/ of the origin; one call, whose request still carries the member
+# `engine` (ignored), installs the engine of engine/ at the tip from the clone and ends, the next installs the
+# pair. No clone of another repository is made.
+E0=$(git -C "$O" rev-parse "$(pair):engine")
+echo 1 > "$W/next-engine"; M=$(merge); rm "$W/next-engine"
+E1=$(git -C "$O" rev-parse "$M:engine")
+[ "$E1" != "$E0" ] || fail "pass i: the merge did not change engine/"
 BEFORE=$(pair)
 call engine
 [ "$RC" = 0 ] && [ "$(member 'r["target"]')" = /usr/local/bin/ont ] && [ "$(member 'r["end"]')" = installed ] &&
-  [ "$(member 'r["to"]')" = "$E1" ] && [ "$("$ONT_INSTALL_BIN_DIR/ont" --version)" = "ont 0.1.0 $E1" ] &&
+  [ "$(member 'r["from"]')" = "$E0" ] && [ "$(member 'r["to"]')" = "$E1" ] &&
+  [ "$("$ONT_INSTALL_BIN_DIR/ont" --version)" = "ont 0.1.0 $E1" ] &&
   [ "$(pair)" = "$BEFORE" ] || fail "pass i: the engine (exit $RC)"
 printf '{"object_type":"install","where":{"all":[{"eq":["commit","%s"]}]},"limit":10}\n' "$E1" | ont search |
   python3 -I -c 'import json, sys; o = json.load(sys.stdin)["result"]["objects"]; f = {k: v.get("value") for k, v in o[0]["head"]["fields"].items()}
-assert len(o) == 1 and f["target"]["native_key"] == "/usr/local/bin/ont" and f["outcome"] == "installed" and f["repository"] == "walk/engine", f' ||
+assert len(o) == 1 and f["target"]["native_key"] == "/usr/local/bin/ont" and f["outcome"] == "installed" and f["repository"] == "walk/origin", f' ||
   fail "pass i: the engine's attempt"
-# The engine's clone has the remote origin: the installer's own fetch, run again here, answers.
-CE=$W/state/engine
-[ "$(git -C "$CE" remote get-url origin)" = "$E" ] || fail "pass i: the clone's remote"
-git -C "$CE" fetch origin +refs/heads/main:refs/remotes/origin/main --refmap= || fail "pass i: the installer's fetch"
+[ ! -e "$W/state/engine" ] || fail "pass i: a clone of the ignored member engine was made"
 [ "$(attempt_host "$E1")" = local ] || fail "pass i: the attempt's host"
 [ "$(member 'r["roles"]')" = null ] || fail "pass i: the roles step on engine move"
 line i 0 "$(pair)" "$(member 'r["outcome"]')"

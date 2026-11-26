@@ -19,9 +19,13 @@ these six members are equal as JSON values. A member an entry of `repositories.j
 managed: it is never compared and never written. A live ruleset that no file names is reported with
 `wanted` null and is never changed or deleted.
 
-`park-kyungchan/agent-platform` and `park-kyungchan/ontology-platform` are private: GitHub answers
-`security_and_analysis` null for them, so their entries hold neither `secret_scanning` nor
-`secret_scanning_push_protection`; they hold Actions policy `selected` with a pattern.
+`park-kyungchan/agent-platform` is private: GitHub answers `security_and_analysis` null for it, so its
+entry holds neither `secret_scanning` nor `secret_scanning_push_protection`; it holds Actions policy
+`selected` with a pattern.
+
+`park-kyungchan/ontology-platform`, the engine's former repository, has no entry: the engine is `engine/` of
+`park-kyungchan/agent-platform`, and the old repository is archived. Its archive on GitHub is a step of the
+user's, and nothing here compares or writes its settings.
 
 The entry `park-kyungchan/agent-vps-operations` holds `repository` alone: it gets both rulesets and nothing
 else of it is compared or written. While the classic protection of its `main` is present, `--check`
@@ -82,7 +86,7 @@ the example are invented.
 makes, copies or prints one.
 
 (ii) The App. `kc-ap-lead`, id 5863852, holds the repository permission `Commit statuses: read and write`
-and no other. It is installed on agent-platform, ontology-platform and agent-vps-operations, on each
+and no other. It is installed on agent-platform and agent-vps-operations, on each
 before the Lead applies `ruleset-main.json` there. Its one private key, from the App's page, is in the
 file `units.github.lead_app.key` names. `ap` names the key by its path to `openssl` and never opens it;
 each status gets a fresh installation token, which reaches the statuses of that one repository.

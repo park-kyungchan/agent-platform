@@ -3185,7 +3185,7 @@ mod tests {
             "crates/x/rust-toolchain.toml",
             "sub/rust-toolchain",
             "ontology/rehearsal.sh",
-            "ontology/ENGINE-PIN",
+            "ontology/notes.md",
             "clippy.toml",
             ".clippy.toml",
             "crates/x/clippy.toml",
