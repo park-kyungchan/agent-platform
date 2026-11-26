@@ -1,0 +1,14 @@
+[Unit]
+Description=Public interface eth0: inbound only replies, ICMP and Tailscale UDP 41641
+Wants=network-pre.target
+After=network-pre.target
+Before=network-online.target tailscaled.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/sbin/nft -f /etc/host-firewall.nft
+ExecStop=/usr/sbin/nft delete table inet hostfw
+
+[Install]
+WantedBy=multi-user.target

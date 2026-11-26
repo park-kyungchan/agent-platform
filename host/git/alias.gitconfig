@@ -1,0 +1,25 @@
+# The alias `git task-new <name>`: a new task directory under the work
+# directory, one empty first commit, and the branch task/<name> on the remote.
+# POSIX sh. The function wrapper keeps the arguments Git appends ("$@") out of
+# the last command. Installed as /usr/local/lib/agents-git/alias.gitconfig.
+[alias]
+	task-new = "!f() { \
+unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE GIT_COMMON_DIR GIT_OBJECT_DIRECTORY; \
+[ \"$#\" -eq 1 ] || { echo 'task-new: invalid name' >&2; return 1; }; \
+n=$1; \
+[ \"${#n}\" -le 64 ] || { echo 'task-new: invalid name' >&2; return 1; }; \
+case \"$n\" in \
+*[!abcdefghijklmnopqrstuvwxyz0123456789-]*|*--*|*-) echo 'task-new: invalid name' >&2; return 1;; \
+ws-*|ap-*|ont-*|mem-*) ;; \
+*) echo 'task-new: invalid name' >&2; return 1;; \
+esac; \
+root=${AGENTS_WORK_ROOT:-/home/palantirkc/work}; \
+remote=${AGENTS_TASK_REMOTE:-https://github.com/park-kyungchan/agent-vps-program.git}; \
+dir=$root/$n; \
+if [ -e \"$dir\" ] || [ -L \"$dir\" ]; then echo 'task-new: exists' >&2; return 1; fi; \
+mkdir \"$dir\" \
+&& git -C \"$dir\" init -q -b main \
+&& git -C \"$dir\" remote add origin \"$remote\" \
+&& git -C \"$dir\" commit -q --allow-empty -m \"task $n started\" \
+&& git -C \"$dir\" push -q -u origin \"main:task/$n\"; \
+}; f"
