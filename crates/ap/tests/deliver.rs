@@ -7423,7 +7423,11 @@ fn r67_engine_tree_the_engine_of_t_is_built_from_its_engine_and_the_call_ends() 
     let launch = w.calls.iter().find(|(p, _, _)| p == "bash").unwrap();
     assert_eq!(
         launch.1,
-        args(&[&format!("{clone}/engine/scripts/install-ont.sh"), "install", &c(2)])
+        args(&[
+            &format!("{clone}/engine/scripts/install-ont.sh"),
+            "install",
+            &c(2)
+        ])
     );
     let env: serde_json::Map<String, Value> = w
         .environment()
@@ -7453,7 +7457,11 @@ fn r67_engine_tree_the_engine_of_t_is_built_from_its_engine_and_the_call_ends() 
     let mut w = W::engine_tree();
     w.ont_install = (None, 2);
     let (v, exit) = w.run();
-    assert_eq!((v["outcome"].clone(), exit), (json!("failed_restored"), 3), "{v}");
+    assert_eq!(
+        (v["outcome"].clone(), exit),
+        (json!("failed_restored"), 3),
+        "{v}"
+    );
     assert_eq!(rows(&v), [row("ont", 2, Some("engine_refused"))]);
 }
 
@@ -7465,7 +7473,10 @@ fn r66_engine_tree_the_id_is_compared_and_a_tree_with_neither_is_refused() {
     w.engine_tree = Some(etree());
     let (v, exit) = w.run();
     refused(&w, &v, exit, "engine_differs");
-    assert_eq!(v["detail"], json!({"tip": etree(), "installed": "e".repeat(40)}));
+    assert_eq!(
+        v["detail"],
+        json!({"tip": etree(), "installed": "e".repeat(40)})
+    );
     let mut w = W::new();
     w.engine_tree = Some(etree());
     w.ont = etree();
@@ -7475,7 +7486,11 @@ fn r66_engine_tree_the_id_is_compared_and_a_tree_with_neither_is_refused() {
     let mut w = W::engine_tree();
     w.ont = etree();
     let (v, exit) = w.run();
-    assert_eq!((end(&v), exit, v["target"].clone()), (("installed", ""), 0, json!(TARGET)), "{v}");
+    assert_eq!(
+        (end(&v), exit, v["target"].clone()),
+        (("installed", ""), 0, json!(TARGET)),
+        "{v}"
+    );
     assert!(!w.engine_clone_touched());
     // Neither ontology/ENGINE-PIN nor engine/: engine_missing before any attempt, with or without
     // `engine`.
@@ -7496,7 +7511,11 @@ fn r66_engine_tree_the_id_is_compared_and_a_tree_with_neither_is_refused() {
     w.ont = w.pin.clone();
     let (v, _) = w.run();
     assert_eq!(end(&v), ("installed", ""), "{v}");
-    assert!(!w.calls.iter().any(|(_, a, _)| a.iter().any(|x| x == "engine")));
+    assert!(
+        !w.calls
+            .iter()
+            .any(|(_, a, _)| a.iter().any(|x| x == "engine"))
+    );
 }
 
 // spec: specs/ap/deliver.md#R38
@@ -7513,9 +7532,9 @@ fn r68_engine_tree_a_dead_engine_attempt_reaches_no_checkout_and_no_rev_list() {
     // Before the dead attempt is closed, no program checks out or walks a chain.
     let quiet_until_close = |w: &W| {
         let close = w.at("close_install").unwrap();
-        w.calls[..close].iter().all(|(p, a, _)| {
-            p != "git" || !a.iter().any(|x| x == "checkout" || x == "rev-list")
-        })
+        w.calls[..close]
+            .iter()
+            .all(|(p, a, _)| p != "git" || !a.iter().any(|x| x == "checkout" || x == "rev-list"))
     };
     // At its commit: installed, and the call goes on to the pair.
     let mut w = W::engine_tree();
@@ -7529,9 +7548,15 @@ fn r68_engine_tree_a_dead_engine_attempt_reaches_no_checkout_and_no_rev_list() {
     let mut w = W::engine_tree();
     let id = dead(&mut w);
     let (v, _) = w.run();
-    assert_eq!(v["closed"], json!({"install": id, "outcome": "not_started"}));
+    assert_eq!(
+        v["closed"],
+        json!({"install": id, "outcome": "not_started"})
+    );
     assert!(quiet_until_close(&w));
-    assert_eq!((v["target"].clone(), v["to"].clone()), (json!(ENGINE), json!(etree())));
+    assert_eq!(
+        (v["target"].clone(), v["to"].clone()),
+        (json!(ENGINE), json!(etree()))
+    );
     // At neither: this repository's installer rolls back once, from the clone as it stands.
     for (back, want) in [(Some(ec(0)), "failed_restored"), (None, "failed")] {
         let mut w = W::engine_tree();

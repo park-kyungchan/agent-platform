@@ -300,7 +300,11 @@ fn tree_id(root: &Path) -> String {
         .and_then(|rest| rest.trim_end().strip_suffix("\tengine"))
         .map(str::to_owned);
     match id {
-        Some(id) if id.len() == 40 && id.bytes().all(|c| matches!(c, b'0'..=b'9' | b'a'..=b'f')) => id,
+        Some(id)
+            if id.len() == 40 && id.bytes().all(|c| matches!(c, b'0'..=b'9' | b'a'..=b'f')) =>
+        {
+            id
+        }
         _ => refuse(
             "engine_differs",
             "the tree id of engine/ at HEAD cannot be read (git rev-parse HEAD:engine)",

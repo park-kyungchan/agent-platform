@@ -1937,13 +1937,7 @@ fn r25_engine_tree_a_worktree_without_the_pin_names_the_tree_id_of_engine() {
     let other = "fedcba9876543210fedcba9876543210fedcba98";
     let ont = FAKE_ONT.replace("@PC@", &w.s("pc"));
     write(&w.p("pc/bin/ont"), &ont, 0o755);
-    let version = |rev: &str| {
-        write(
-            &w.p("pc/ont-version"),
-            &format!("ont 0.2.0 {rev}\n"),
-            0o644,
-        )
-    };
+    let version = |rev: &str| write(&w.p("pc/ont-version"), &format!("ont 0.2.0 {rev}\n"), 0o644);
     let where_ = ["--", "sh", "-c", "echo \"in $PWD\""];
     let args = [&[d.as_str()][..], &where_].concat();
     let placed = |what: &str, want: &str| {
@@ -1958,7 +1952,11 @@ fn r25_engine_tree_a_worktree_without_the_pin_names_the_tree_id_of_engine() {
                 "{what}"
             );
             assert_eq!(lines(&out.stdout), [format!("in {tree}")], "{what}");
-            assert_eq!((r["host"].as_str(), &r["reason"]), (Some("pc"), &Value::Null), "{what}");
+            assert_eq!(
+                (r["host"].as_str(), &r["reason"]),
+                (Some("pc"), &Value::Null),
+                "{what}"
+            );
         } else {
             assert_eq!(
                 lines(&out.stderr),
@@ -1980,7 +1978,11 @@ fn r25_engine_tree_a_worktree_without_the_pin_names_the_tree_id_of_engine() {
     version(&id);
     placed("the engine of the tree", "pc");
     // A modified engine/ names no tree: here, until the change is committed.
-    write(&w.repo.join("engine/Cargo.toml"), "[workspace]\n# edited\n", 0o644);
+    write(
+        &w.repo.join("engine/Cargo.toml"),
+        "[workspace]\n# edited\n",
+        0o644,
+    );
     placed("a modified engine", "here");
     write(&w.repo.join("engine/new.rs"), "\n", 0o644);
     write(&w.repo.join("engine/Cargo.toml"), "[workspace]\n", 0o644);
@@ -1992,7 +1994,11 @@ fn r25_engine_tree_a_worktree_without_the_pin_names_the_tree_id_of_engine() {
     placed("a change outside engine", "pc");
     // A tree that holds ontology/ENGINE-PIN keeps the pin's rule, beside engine/.
     let pin = "0123456789abcdef0123456789abcdef01234567";
-    write(&w.repo.join("ontology/ENGINE-PIN"), &format!("{pin}\n"), 0o644);
+    write(
+        &w.repo.join("ontology/ENGINE-PIN"),
+        &format!("{pin}\n"),
+        0o644,
+    );
     placed("the pin's rule beside engine", "here");
     write(&w.p("pc/ont-version"), &format!("ont 0.1.0 {pin}\n"), 0o644);
     placed("the pin's engine", "pc");

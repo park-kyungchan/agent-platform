@@ -97,8 +97,8 @@ pub(super) const PROTECTED_NAMES: [&str; 9] = [
 pub(super) const PROTECTED_CONFIGS: [&str; 2] = [".cargo/config.toml", ".cargo/config"];
 /// The first component: the path itself or anything under it.
 pub(super) const PROTECTED_TREES: [&str; 11] = [
-    "ci", ".github", "specs", "scripts", ".cargo", "deploy", "etc", "content", "github", "ontology",
-    "engine",
+    "ci", ".github", "specs", "scripts", ".cargo", "deploy", "etc", "content", "github",
+    "ontology", "engine",
 ];
 /// Whether the first component of `path` is one of the protected trees, compared without case: the
 /// path itself and everything under it is protected (R36).

@@ -577,7 +577,8 @@ pub(crate) fn worktree_engine(ctx: &Ctx, dir: &str) -> Option<String> {
     if !fs::symlink_metadata(root.join("engine")).is_ok_and(|m| m.is_dir()) {
         return None;
     }
-    let clean = git(ctx, dir, &["status", "--porcelain", "--", "engine"]).is_some_and(|o| o.is_empty());
+    let clean =
+        git(ctx, dir, &["status", "--porcelain", "--", "engine"]).is_some_and(|o| o.is_empty());
     let id = clean
         .then(|| git(ctx, dir, &["rev-parse", "HEAD:engine"]).and_then(line))
         .flatten()

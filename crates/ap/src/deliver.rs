@@ -1134,7 +1134,8 @@ fn deliver(s: &mut impl System, c: &mut Call) -> Step<()> {
     }
     if engine_moves {
         // Under the tree rule the review that accepts T accepts its engine (R67).
-        let own = (c.tree_rule == Some(true)).then(|| (head.clone(), review.clone(), reviews.clone()));
+        let own =
+            (c.tree_rule == Some(true)).then(|| (head.clone(), review.clone(), reviews.clone()));
         return engine_install(s, c, &pin, &engine.unwrap_or_default(), own);
     }
     if c.engine.is_some() {
@@ -1557,7 +1558,9 @@ fn engine_dead(s: &mut impl System, c: &mut Call) -> Step<bool> {
     } else {
         // An attempt of this repository is one of the tree rule: its rollback is this repository's
         // installer, from the clone as it stands, with no checkout and no rev-list (R68).
-        let ours = c.r["repository"].as_str().is_some_and(|r| f("repository") == r);
+        let ours = c.r["repository"]
+            .as_str()
+            .is_some_and(|r| f("repository") == r);
         c.tree_rule = ours.then_some(true);
         let script = match ours {
             true => format!("{}/engine/scripts/install-ont.sh", c.clone),
@@ -1622,7 +1625,13 @@ fn engine_install(
         Some((head, review, reviews)) => {
             let repository = request["repository"].as_str().unwrap_or_default();
             let tip = c.rec["tip"].as_str().unwrap_or_default().to_owned();
-            (head, review, reviews, repository, ["install".to_owned(), tip])
+            (
+                head,
+                review,
+                reviews,
+                repository,
+                ["install".to_owned(), tip],
+            )
         }
         None => {
             let (head, review, reviews, repository) = engine_clone_at(s, c, pin, from)?;
@@ -2476,11 +2485,11 @@ fn pc_push(s: &mut impl System, c: &mut Call) -> Value {
     // Under the tree rule the PC attempt names this repository, as the local one does (R69).
     let repository = match tree {
         true => c.r["repository"].as_str().unwrap_or_default(),
-        false => c
-            .r
-            .get("engine")
-            .and_then(|e| e["repository"].as_str())
-            .unwrap_or(DEFAULT_ENGINE_REPO),
+        false => {
+            c.r.get("engine")
+                .and_then(|e| e["repository"].as_str())
+                .unwrap_or(DEFAULT_ENGINE_REPO)
+        }
     };
     let from_param = remote_commit.clone().unwrap_or_else(|| "0".repeat(40));
     let request = format!("pc.{}.{pin}.{attempt}", pc.host);
