@@ -5,6 +5,7 @@
 # configuration matching; no network, no root, no host path.
 set -euo pipefail
 
+# The directory host/ of the repository: git/ and scripts/ lie in it.
 repo_root=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)
 
 # Nothing of the caller's Git environment reaches the scratch repositories.
@@ -153,7 +154,18 @@ make_repo "$scratch/platforms/agent-vps-operations"
 pass_if "second named clone: hooksPath" \
   equals "$(git -C "$scratch/platforms/agent-vps-operations" config --get core.hooksPath)" "$scratch/lib/hooks"
 
-for unmatched in "$scratch/other/plain" "$scratch/platforms/agent-platform" \
+# agent-platform, whose engine/ and host/ the check covers: its main checkout and its linked worktrees.
+platform="$scratch/platforms/agent-platform"
+make_repo "$platform"
+pass_if "agent-platform: hooksPath" equals "$(git -C "$platform" config --get core.hooksPath)" "$scratch/lib/hooks"
+pass_if "agent-platform: no push.default" equals "$(git -C "$platform" config --get push.default || true)" ""
+git -C "$platform" worktree add -q -b unit "$scratch/elsewhere/platform-worktree"
+mkdir -p "$scratch/elsewhere/platform-worktree/host"
+stage "$scratch/elsewhere/platform-worktree" host/note.txt 'Zelda Quillfeather'
+commit_try "$scratch/elsewhere/platform-worktree"
+refused_with "agent-platform worktree holds a term under host/" '^private_term_staged@host/note.txt: 1 added lines' 1
+
+for unmatched in "$scratch/other/plain" "$scratch/platforms/agent-platform-other" \
     "$scratch/platforms/education-platform" "$scratch/work/wsx-demo" "$scratch/work/other-demo"; do
   make_repo "$unmatched"
   pass_if "unmatched $(basename "$unmatched"): no hooksPath" equals "$(git -C "$unmatched" config --get core.hooksPath || true)" ""
@@ -169,8 +181,10 @@ done
 # The system file names no excluded repository, and the clones' lines carry no ".git".
 system_file="$repo_root/git/system.gitconfig"
 pass_if "system file: no excluded name" \
-  not grep -qE 'agent-platform|education-platform|education-dc-gang-a|/work/edu-' "$system_file"
-pass_if "system file: six gitdir lines" equals "$(grep -c '^\[includeIf "gitdir:' "$system_file")" 6
+  not grep -qE 'education-platform|education-dc-gang-a|/work/edu-' "$system_file"
+pass_if "system file: agent-platform's line" \
+  grep -qx '\[includeIf "gitdir:/home/palantirkc/platforms/agent-platform/"\]' "$system_file"
+pass_if "system file: seven gitdir lines" equals "$(grep -c '^\[includeIf "gitdir:' "$system_file")" 7
 pass_if "system file: no .git in a gitdir line" not grep -q '^\[includeIf.*\.git' "$system_file"
 pass_if "hook is executable" test -x "$repo_root/git/hooks/pre-commit"
 pass_if "work file has push.default upstream" \

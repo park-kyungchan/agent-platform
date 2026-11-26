@@ -1,91 +1,111 @@
-# Host configuration records
+# The host's configuration
 
-Recorded copies of host configuration files (the login path and the public-interface
-firewall among them), the source of the host's policy file with the script that
-installs it (`scripts/install-etc.sh`), and the system Git configuration. No program is
-built here. Agents follow [`AGENTS.md`](AGENTS.md).
+`host/` of agent-platform holds the files that configure the host: the source of
+the policy file `/etc/agent-platform/policy.json` with the script that installs it,
+the recorded copies of host configuration files (the login path and the
+public-interface firewall among them) with their inventory, the system Git
+configuration, and the script that retired the legacy memory service. No program is
+built here. Its history is that of the former operations repository, merged in.
+The repository's `AGENTS.md`, `REVIEW.md` and `./check` hold for it; this file adds
+only the rules of these files.
 
 ## Contents
 
 | Path | What it is |
 | --- | --- |
-| `deployments/host-artifacts.json` | The inventory: for each recorded copy, the host file (`source`), the copy (`destination`) and the SHA-256 of the copy's bytes (`sha256`) |
+| `deployments/host-artifacts.json` | The inventory: for each recorded copy, the host file (`source`), the copy (`destination`, relative to `host/`) and the SHA-256 of the copy's bytes (`sha256`) |
 | `deployments/ssh/` | The Tailscale-only sshd drop-in, the plain-ssh drop-in `00-01-ssh-only.conf` and the `ssh.socket` override |
 | `deployments/tsidp/compose.yaml` | The tsidp compose file |
 | `deployments/host-cron/` | The Docker prune cron files |
+| `deployments/host-firewall/` | The nftables table of the public interface `eth0` and the unit that loads it at boot; its `README.md` maps each file to its host path |
+| `deployments/api-credit/`, `deployments/pc-account/`, `deployments/pc-stage-account/` | Notes on the API credit's key file and the PC's accounts (`README.md` only) |
 | `etc/agent-platform/policy.json` | The source of the host's `/etc/agent-platform/policy.json` (section "The policy file") |
 | `scripts/install-etc.sh` | Installs the policy file from a merged commit, checks it against the host, or puts a kept copy back |
-| `scripts/test-install-etc.sh` | The tests of `install-etc.sh`, run by `./check` |
-| `scripts/retire-hindsight.sh` | Retires the legacy long-term memory service from the host: `check`, `copy`, `delete <copy directory>`, `verify <copy directory>` (section "Retiring the legacy memory service") |
-| `scripts/retire-hindsight.json` | The script's list: the containers, volumes, network, directory, copy root and settings entries it removes, and the settings files it only scans |
-| `scripts/test-retire-hindsight.sh` | The tests of `retire-hindsight.sh` against a scratch root and a stand-in docker program, run by `./check` |
-| `git/` | The system Git configuration for the engineering scopes: the roster check (`git/hooks/pre-commit`), the configuration files and the alias `git task-new` (section "Git configuration") |
-| `scripts/test-git-config.sh` | The tests of `git/`, run by `./check` |
-| `deployments/host-firewall/` | The nftables table of the public interface `eth0` and the unit that loads it at boot; its `README.md` maps each file to its host path |
+| `scripts/test-install-etc.sh` | The tests of `install-etc.sh` |
+| `scripts/retire-hindsight.sh`, `scripts/retire-hindsight.json` | The retirement of the legacy long-term memory service and its list (section "Retiring the legacy memory service") |
+| `scripts/test-retire-hindsight.sh` | The tests of `retire-hindsight.sh` against a scratch root and a stand-in docker program |
+| `git/` | The system Git configuration: the roster check (`git/hooks/pre-commit`), the configuration files and the alias `git task-new` (section "Git configuration") |
+| `scripts/test-git-config.sh` | The tests of `git/` |
 
-The copies the inventory names are byte copies of the host files: `deployments/ssh/00-01-ssh-only.conf`
-and `deployments/host-firewall/` as captured on 2026-11-22, the others on 2026-11-04. Each
-directory's `README.md` maps its files to their host paths.
+The copies the inventory names are byte copies of the host files:
+`deployments/ssh/00-01-ssh-only.conf` and `deployments/host-firewall/` as captured
+on 2026-11-22, the others on 2026-11-04. Each directory's `README.md` maps its
+files to their host paths.
 
 ## Who uses it
 
-The Lead reads these records. `ap deliver` runs `scripts/install-etc.sh` (`check`,
-then `install` of a merged commit), because the host's `/etc/agent-platform/deliver.json`
-has the member `etc` since 2026-11-21 22:39Z; the Lead runs it by hand only for a
-rollback or a fast-path order. The Lead runs `scripts/retire-hindsight.sh` by hand, once,
-in the order of the section "Retiring the legacy memory service"; it reads its list
-`scripts/retire-hindsight.json` and nothing runs it on its own. The watch's drift detector compares the host's policy
-file with `etc/`. The recorded copies under `deployments/` change on the host only by
-the Lead's hand under the procedure in `AGENTS.md`.
+`ap deliver` runs `scripts/install-etc.sh` (`check`, then `install` of the tip it
+delivered) when the host's request names this repository in its member `etc`
+(`specs/ap/deliver.md` R71 to R74, `deploy/README.md` "The configuration files"); the
+Lead runs it by hand only for a rollback, a fast-path order or a merge the
+installer cannot judge. The watch's detector `drift` compares the inventory's host
+files with their digests and the host's `/etc/` with `etc/` of the commit `ap` was
+installed from (`specs/ap/watch.md` R27, R29, R34). The Lead installs `git/` by hand
+(section "Git configuration") and ran `scripts/retire-hindsight.sh` once. The
+recorded copies under `deployments/` change on the host only by the Lead's hand,
+under the procedure below.
 
-## Check
+## The check
 
-```bash
-./check
-```
+The repository's `./check` runs, without a Rust build, the steps of this tree
+(`ci/check-host.py`): every tracked JSON file under `host/` parses, every shell
+script passes `bash -n`, every inventory row's copy exists and matches its recorded
+SHA-256, and every file under `deployments/` is the inventory, a row's copy or a
+`README.md`; then `scripts/test-git-config.sh`, `scripts/test-install-etc.sh` and
+`scripts/test-retire-hindsight.sh` (scratch directories, fakes of `ont`, `ap` and
+docker; no network, no root, no host file). The check compares each copy with its
+recorded digest, never with the host: a difference between a copy and the host is
+found only by reading the host (the watch).
 
-A healthy run ends with `check: ok`. The check needs no network, no root and no
-host path. It parses every tracked JSON file, runs `bash -n` on every tracked shell
-script, verifies that every inventory row's copy exists and matches its recorded
-SHA-256, and fails on a file under `deployments/` that is not the inventory, a row's
-copy or a `README.md`, and runs
-`scripts/test-git-config.sh`, `scripts/test-install-etc.sh` and
-`scripts/test-retire-hindsight.sh` (the four words of the retirement script against a
-scratch root, a stand-in docker program and a tar wrapper; no docker and no host file). The GitHub Actions job
-`rust` runs the same command and is the required check of `main`.
+## Changing a record
 
-The check compares each copy with its recorded digest, never with the host. A copy
-is refreshed only from the host: its bytes unchanged, with its new digest written
-into the inventory in the same commit.
+- Never edit a recorded copy by hand. A copy is refreshed only from the host: copy
+  the host file's bytes unchanged, and write the new SHA-256 of those bytes into its
+  inventory row in the same commit.
+- A new recorded copy gets a row in the inventory; a file under `deployments/`
+  without a row fails the check.
+- Environment files and their values stay untracked (`host/.gitignore`). Existing
+  `${VAR}` references in a copy stay as they are. Never commit a credential, a host
+  key, an environment file or private data.
 
 ## The policy file
 
-`etc/agent-platform/policy.json` is the source of `/etc/agent-platform/policy.json`.
-A change is a pull request; after the merge `ap deliver` runs
-`scripts/install-etc.sh` (`check`, then `install <merge>`), because the host's
-`/etc/agent-platform/deliver.json` has the member `etc` since 2026-11-21 22:39Z; the
-Lead runs it by hand only for a rollback or a fast-path order. The script installs
-only that one file:
+`etc/agent-platform/policy.json` is the host's policy of models and accounts for `ap
+run` (and the settings `ap quota`, `ap unit` and `ap work` read from the same file).
+The host copy `/etc/agent-platform/policy.json` is installed from a merged commit and
+by no other means, but the fast path below. It is the only file under `etc/`.
+`deliver.json` is not here: its source is `deploy/deliver.json`, installed as
+`deploy/README.md` says. A change of the policy is a pull request that edits the
+file, together with the code that reads a new member; the next delivery installs
+both.
 
 | Form | What it does |
 | --- | --- |
-| `install <commit> [--past <commit>:<reason>]...` | Installs the file from a commit on the first-parent history of `origin/main`, after the accepted check (each merge since the installed one has the tree of its second parent and a closed accepting review in the store (a review that `ap unit run` carried to an updated head counts by the pull request of the review it was carried from)) and `ap policy check` on the staged bytes. It keeps the previous bytes in `/var/backups/agent-platform-etc/policy.json.before-<UTC stamp>`, replaces the target by rename, reads it back and records the commit and digest in `/var/lib/agent-platform/etc/installed` |
-| `check [<commit>]` | Prints `same` (exit 0) or `differs <target>` (exit 1) against `<commit>`, by default the tip of `origin/main`; it writes nothing but its own clone |
-| `rollback <kept file>` | Puts one kept `policy.json.before-<stamp>` back, after `ap policy check`, keeping the current bytes first |
+| `install <commit> [--past <commit>:<reason>]...` | Installs the file from `<commit>`, read from the objects of the Git repository of the working directory (no clone, no fetch, no remote), after the accepted check and `ap policy check` on the staged bytes. The accepted check starts at the commit the installer recorded: it must be an ancestor of `<commit>` through any parent (a commit of the former operations repository is, through the merge that imported its history) and not `<commit>` itself (`not_forward`); every commit of the first-parent walk from `<commit>` back to that record, or to the first merge whose first parent does not hold it, must be a merge with the tree of its second parent and a closed accepting review of its head in the store (a review that `ap unit run` carried to an updated head counts by the pull request of the review it was carried from); without a record `<commit>` alone. When the target already holds the bytes it writes nothing and keeps no copy; else it keeps the previous bytes in `/var/backups/agent-platform-etc/policy.json.before-<UTC stamp>`, replaces the target by rename and reads it back. Either way it records the commit and digest in `/var/lib/agent-platform/etc/installed` |
+| `check [<commit>]` | Prints `same` (exit 0) or `differs <target>` (exit 1) against `<commit>`, by default the working directory's `HEAD`; it writes nothing but its lock |
+| `rollback <kept file>` | Puts one kept `policy.json.before-<stamp>` back, after `ap policy check`, keeping the current bytes first; it needs no repository |
+
+The script holds the lock `/var/lib/agent-platform/etc/lock` and refuses with a code
+on stderr and exit 2 before any write (`busy`, `not_forward`, `not_accepted`,
+`tree_differs`, `record_invalid`, `commit_unknown`, `verify_failed`,
+`target_changed`, `target_not_regular` and others). `AP_ETC_ROOT` prefixes every host
+path for the tests. It writes no other path, never runs `systemctl` and never
+touches a login part.
 
 The policy's v3 members: `units.approval` says which unit of class contract merges on its verifier's accept (its head meets no path of `guarded`, and `sample` sets how many accepted merges are drawn for a later look); `work.slots` is how many units the dispatch pass runs at once (6); and `routing` holds the tier `order`, the `large_lines` bound, the `map` of implementer and verifier tiers by kind and size, and the `bar` a tier must meet.
 The member `routing.order` names two AGY pairs: `["agy","gemini-4-hydrogen-high"]` stands directly after `["claude","sonnet"]` and `["agy","gemini-4-neon-high"]` directly after `["claude","opus"]`. The order decides: a tier is admitted where its pair stands at or after the row's pair, so Neon is admitted wherever the map gives Sonnet or Opus, and Hydrogen only where it gives Sonnet or a pair before it; no row of the map changes.
 A unit whose tier names a runtime outside `routing.order` is refused `tier_not_in_order` until a later policy unit adds it.
 Muse left the policy on the user's word of 2026-11-24: its models and its account are no longer in the file.
 
-The script works in its own clone, `/var/lib/agent-platform/clones/agent-vps-operations`
-(never in a main checkout), holds the lock `/var/lib/agent-platform/etc/lock`, and
-refuses with a code on stderr and exit 2 before any write (`busy`, `not_forward`,
-`not_accepted`, `tree_differs`, `verify_failed`, `target_changed`,
-`target_not_regular` and others). `AP_ETC_ROOT` prefixes every host path for the
-tests. `ap deliver` and the Lead run it; `deliver.json` is not installed from here (its source
-is `agent-platform` `deploy/deliver.json`). `AGENTS.md` states the rules, including
-the fast path for a change that must take effect at once.
+- `host/` is a protected tree (`specs/ap/unit-run.md` R36): a change under it is a
+  unit of class `contract` or `effect`, which the Lead reads.
+- The Lead runs `install-etc.sh check` before a hand install and at each STATE
+  checkpoint.
+- The fast path: when the user orders a change that must take effect at once, the
+  Lead edits the host file by hand, records the user's request in STATE, and opens
+  the pull request that makes the source equal within the hour. Until it is merged
+  and installed, `install-etc.sh check` prints the difference, and `install` refuses
+  `target_changed` for a hand edit that is not yet in the source.
 
 ## Retiring the legacy memory service
 
@@ -114,7 +134,7 @@ mention anywhere else is none. The service's banks are the data of the two volum
 <program>` names the program used as docker. The archives hold the directory's `.env`
 files; the script prints paths, names, ids and digests only.
 
-**The Lead's order**, on the host, from a clean worktree at the merge commit:
+**The Lead's order**, on the host, from a clean worktree at the merge commit (the paths below are under `host/`):
 
 1. open a finding that names the user's request as the user's word for the listed
    paths in the Academy workspace, and lift the hold on them by that request;
@@ -135,18 +155,29 @@ and owner its manifest record names. The images are not in the copy: `docker com
 pull` pulls them again by the names the compose file gives. The copy root stays until
 the user says otherwise.
 
-## Not changed here
+## The login path
 
-The login path as it is now (`deployments/ssh/90-tailscale-only.conf`,
-`deployments/ssh/00-01-ssh-only.conf`, the `ssh.socket` override and
-`deployments/host-firewall/`) is changed only by the user's procedure described in
-`AGENTS.md`.
-Environment files, credentials and host keys are never tracked.
+The sshd drop-ins (`deployments/ssh/90-tailscale-only.conf` and
+`deployments/ssh/00-01-ssh-only.conf`), the `ssh.socket` override
+(`deployments/ssh/ssh.socket.d/override.conf`) and `deployments/host-firewall/` are
+records of the login path as it is now. Nothing of this tree installs or reloads
+them, and no agent runs a script of the login path; the policy file under `etc/` is
+the only file a script of this tree installs. A change of the login path is made
+only when the user orders it, by the user's procedure and by no timer:
+
+1. the user confirms that the provider's console is the way back in;
+2. the new file is written;
+3. `sshd -t` passes and `sshd -T` prints the expected setting, both before any
+   reload; on a mismatch the previous bytes return and nothing is reloaded;
+4. a timed restore of the previous bytes with a reload is armed;
+5. the reload;
+6. the timed restore is cancelled only after the user reports a new login from a
+   device. An agent's session on the host proves nothing about a new login.
 
 ## Git configuration
 
 `git/` holds what the Lead installs into `/usr/local/lib/agents-git/` and
-`/etc/gitconfig`. Nothing here installs it.
+`/etc/gitconfig`. Nothing here installs it; the commands below run in `host/`.
 
 | File | What it is |
 | --- | --- |
@@ -157,13 +188,15 @@ Environment files, credentials and host keys are never tracked.
 | `git/hooks/pre-commit` | The roster check |
 
 **Scopes.** The task directories `work/ws-*`, `work/ap-*`, `work/ont-*` and
-`work/mem-*`, and the clones `platforms/ontology-platform` and
-`platforms/agent-vps-operations`, each with its linked worktrees (the patterns
-end in a slash and carry no `.git`, so Git matches the main checkout's `.git`
-and every `.git/worktrees/<n>`). `agent-platform` and `education-platform` are
-not named: a worktree of each lies in an Academy directory, and the Academy's
-files stay out of this configuration. `agent-platform` gets one more
-`includeIf` line later. The configuration is the system file, not
+`work/mem-*`, and the clones `platforms/ontology-platform`,
+`platforms/agent-vps-operations` and `platforms/agent-platform`, each with its
+linked worktrees (the patterns end in a slash and carry no `.git`, so Git
+matches the main checkout's `.git` and every `.git/worktrees/<n>`).
+`agent-platform` is named so that a commit under `engine/` and `host/` runs the
+roster check; every linked worktree of its main checkout is matched with it,
+the worktrees of `ap unit run` among them, which therefore need a readable
+roster. `education-platform` is not named: the Academy's own repositories stay
+out of this configuration. The configuration is the system file, not
 `/root/.gitconfig`, so that a session whose `HOME` is not `/root` reads it too.
 
 **A repository inside a scope directory is a linked worktree, never a full

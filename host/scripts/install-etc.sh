@@ -1,25 +1,26 @@
 #!/usr/bin/env bash
 # Install the host's policy file from reviewed source, or put a kept copy back.
-#   scripts/install-etc.sh install <commit> [--past <commit>:<reason>]...
-#   scripts/install-etc.sh check [<commit>]
-#   scripts/install-etc.sh rollback <kept file>
-# The one target is etc/agent-platform/policy.json -> /etc/agent-platform/policy.json. No other path
+#   host/scripts/install-etc.sh install <commit> [--past <commit>:<reason>]...
+#   host/scripts/install-etc.sh check [<commit>]
+#   host/scripts/install-etc.sh rollback <kept file>
+# The one target is host/etc/agent-platform/policy.json -> /etc/agent-platform/policy.json. No other path
 # of the host is ever written. AP_ETC_ROOT (default empty) prefixes every host path, for the tests.
-# The script works in its own clone (AP_ETC_CLONE, default /var/lib/agent-platform/clones/agent-vps-operations),
-# never in a main checkout of this repository, and reads the files with `git show`.
+# The script reads the commit from the objects of the Git repository of its working directory (ap deliver runs it
+# from its clone of this repository, which has no remote): no clone, no fetch, no remote, and nothing is written
+# into that repository; the staged bytes lie in a directory of mktemp -d.
 # Exit codes: 0 done (check: same), 1 check differs / a failure after a write began, 2 refused before any write.
-# Order of install: lock, clone clean and fetched, <commit> on origin/main's first-parent history, the accepted
-# check of every merge after the recorded commit, stage the file, `ap policy check` on the staged bytes, target
-# checks, the kept copy (read back), the write by rename (read back), the record.
+# Order of install: lock, the record, the repository, the accepted check of every main merge from the first one
+# whose first parent does not hold the recorded commit up to <commit>, stage the file, `ap policy check` on the staged
+# bytes, target checks, the kept copy (read back) and the write by rename (read back) unless the target already holds
+# the bytes, the record.
 set -euo pipefail
 umask 077
 unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE GIT_COMMON_DIR GIT_OBJECT_DIRECTORY \
   GIT_ALTERNATE_OBJECT_DIRECTORIES GIT_NAMESPACE GIT_CEILING_DIRECTORIES
 
-REPOSITORY=park-kyungchan/agent-vps-operations
-SOURCE_REL=etc/agent-platform/policy.json
+REPOSITORY=park-kyungchan/agent-platform
+SOURCE_REL=host/etc/agent-platform/policy.json
 NAME=policy.json
-PLATFORMS=/home/palantirkc/platforms
 
 refuse() { printf '%s\n' "$*" >&2; exit 2; }
 fail() { printf '%s\n' "$*" >&2; exit 1; }
@@ -40,8 +41,7 @@ STATE_DIR=$ROOT/var/lib/agent-platform/etc
 LOCK=$STATE_DIR/lock
 RECORD=$STATE_DIR/installed
 BACKUP_DIR=$ROOT/var/backups/agent-platform-etc
-CLONE=${AP_ETC_CLONE:-/var/lib/agent-platform/clones/agent-vps-operations}
-SCRIPT_REPO=$(cd -- "$(dirname -- "$(realpath -- "${BASH_SOURCE[0]}")")/.." && pwd -P)
+REPO=
 
 STAGE=
 TMP_TARGET=
@@ -99,56 +99,16 @@ write_record() { # <commit|none> <sha256>
   TMP_RECORD=
 }
 
-# ---- the clone --------------------------------------------------------------------------------------
-g() { git -C "$CLONE" --no-optional-locks -c core.hooksPath=/dev/null -c gc.auto=0 -c maintenance.auto=false "$@"; }
+# ---- the repository ----------------------------------------------------------------------------------
+g() { git -C "$REPO" --no-optional-locks -c core.hooksPath=/dev/null -c gc.auto=0 -c maintenance.auto=false "$@"; }
 
-prepare_clone() {
-  [[ $CLONE == /* ]] || refuse "clone_invalid not_absolute"
-  local resolved
-  resolved=$(realpath -m -- "$CLONE") || refuse "clone_invalid unresolvable"
-  case $resolved/ in
-    "$PLATFORMS"/*) refuse "clone_refused $CLONE" ;;
-  esac
-  case $CLONE/ in
-    "$PLATFORMS"/*) refuse "clone_refused $CLONE" ;;
-  esac
-  if [[ ! -e $CLONE ]]; then
-    local url=${AP_ETC_ORIGIN:-}
-    if [[ -z $url ]]; then
-      url=$(git -C "$SCRIPT_REPO" remote get-url origin 2>/dev/null) || refuse "origin_unknown"
-    fi
-    mkdir -p -- "$(dirname -- "$CLONE")"
-    timeout 300 git clone --quiet -- "$url" "$CLONE" || refuse "clone_failed"
-    chmod 0700 -- "$CLONE"
-  fi
-  [[ -d $CLONE/.git && ! -L $CLONE/.git ]] || refuse "clone_invalid not_a_clone $CLONE"
-  [[ "$(g rev-parse --show-toplevel 2>/dev/null)" == "$(realpath -e -- "$CLONE")" ]] ||
-    refuse "clone_invalid not_a_clone $CLONE"
-  local dirty
-  dirty=$(g status --porcelain --untracked-files=all) || refuse "clone_invalid status_failed"
-  [[ -z $dirty ]] || refuse "clone_dirty $CLONE"
-  timeout 300 git -C "$CLONE" -c core.hooksPath=/dev/null -c gc.auto=0 -c maintenance.auto=false \
-    fetch --quiet --no-tags "${AP_ETC_ORIGIN:-origin}" '+refs/heads/main:refs/remotes/origin/main' ||
-    refuse "fetch_failed"
+# The Git repository of the working directory, whose objects hold the commits: no remote is read.
+prepare_repo() {
+  REPO=$(git rev-parse --show-toplevel 2>/dev/null) || refuse "repository_invalid not_a_repository $PWD"
+  [[ -n $REPO ]] || refuse "repository_invalid not_a_repository $PWD"
 }
-
-FIRST_PARENT=() # first-parent commits of origin/main, newest first
-TIP=
-load_history() {
-  local out
-  TIP=$(g rev-parse --verify --quiet 'refs/remotes/origin/main^{commit}') || refuse "fetch_failed no_origin_main"
-  out=$(g rev-list --first-parent "$TIP") || refuse "history_unreadable"
-  mapfile -t FIRST_PARENT <<<"$out"
-}
-index_of() { # <commit>: its index in FIRST_PARENT, empty when absent
-  local i
-  for i in "${!FIRST_PARENT[@]}"; do
-    if [[ ${FIRST_PARENT[$i]} == "$1" ]]; then
-      printf '%s' "$i"
-      return 0
-    fi
-  done
-  return 0
+commit_known() { # <commit>: a commit of the repository's objects
+  g cat-file -e "$1^{commit}" 2>/dev/null
 }
 
 source_ok() { # <commit>: the policy file is a regular blob there
@@ -300,15 +260,35 @@ accepted_one() { # <commit>: a merge, same tree as its second parent, a closed a
 PAST_COMMITS=()
 PAST_REASONS=()
 accepted_chain() { # <commit>: the commits after the recorded one up to <commit>
-  local commit=$1 at rec_at i p found
+  local commit=$1 at parent rc i p found
   local chain=()
-  at=$(index_of "$commit")
-  [[ -n $at ]] || refuse "not_on_origin_main $commit"
+  commit_known "$commit" || refuse "commit_unknown $commit"
   if [[ -n $REC_COMMIT && $REC_COMMIT != none ]]; then
-    rec_at=$(index_of "$REC_COMMIT")
-    [[ -n $rec_at ]] || refuse "record_invalid $REC_COMMIT"
-    ((at < rec_at)) || refuse "not_forward $commit"
-    for ((i = rec_at - 1; i >= at; i--)); do chain+=("${FIRST_PARENT[$i]}"); done
+    commit_known "$REC_COMMIT" || refuse "record_invalid $REC_COMMIT"
+    [[ $REC_COMMIT != "$commit" ]] || refuse "not_forward $commit"
+    # Forward: the recorded commit is an ancestor of <commit> through any parent (also through the second parent
+    # of the merge that imported this tree's history).
+    rc=0
+    g merge-base --is-ancestor "$REC_COMMIT" "$commit" || rc=$?
+    case $rc in
+      0) ;;
+      1) refuse "not_forward $commit" ;;
+      *) refuse "history_unreadable $commit" ;;
+    esac
+    # The first-parent walk from <commit> stops at the recorded commit, or at the first merge M whose first parent
+    # does not hold it; the commits from M (or after the recorded commit) up to <commit> are judged, oldest first.
+    at=$commit
+    while [[ $at != "$REC_COMMIT" ]]; do
+      chain=("$at" "${chain[@]}")
+      parent=$(g rev-parse --verify --quiet "$at^1^{commit}") || break
+      rc=0
+      g merge-base --is-ancestor "$REC_COMMIT" "$parent" || rc=$?
+      case $rc in
+        0) at=$parent ;;
+        1) break ;;
+        *) refuse "history_unreadable $parent" ;;
+      esac
+    done
   else
     chain=("$commit")
   fi
@@ -391,11 +371,10 @@ do_install() {
   local commit=$1 src sum cur
   take_lock
   read_record
-  prepare_clone
-  load_history
+  prepare_repo
   accepted_chain "$commit"
   source_ok "$commit" || refuse "source_missing $commit:$SOURCE_REL"
-  STAGE=$(mktemp -d "$CLONE/.git/etc-stage.XXXXXX")
+  STAGE=$(mktemp -d "${TMPDIR:-/tmp}/etc-stage.XXXXXX")
   src=$STAGE/$NAME
   g cat-file blob "$commit:$SOURCE_REL" >"$src" || refuse "source_missing $commit:$SOURCE_REL"
   verify "$src"
@@ -405,7 +384,11 @@ do_install() {
   if [[ $cur != "$sum" && ( -z $REC_SHA || $cur != "$REC_SHA" ) ]]; then
     refuse "target_changed $TARGET"
   fi
-  put_bytes "$src" "$sum"
+  # The target already holds the bytes: no write and no kept copy; the record still follows the commit.
+  KEPT=none
+  if [[ $cur != "$sum" ]]; then
+    put_bytes "$src" "$sum"
+  fi
   write_record "$commit" "$sum" || fail "record_failed $RECORD: the target holds the new bytes; the kept copy is $KEPT"
   printf 'installed %s %s kept %s\n' "$TARGET" "$sum" "$KEPT"
 }
@@ -413,15 +396,13 @@ do_install() {
 do_check() {
   local commit=${1:-} src
   take_lock
-  prepare_clone
-  load_history
+  prepare_repo
   if [[ -z $commit ]]; then
-    commit=$TIP
-  else
-    [[ -n "$(index_of "$commit")" ]] || refuse "not_on_origin_main $commit"
+    commit=$(g rev-parse --verify --quiet 'HEAD^{commit}') || refuse "commit_unknown HEAD"
   fi
+  commit_known "$commit" || refuse "commit_unknown $commit"
   source_ok "$commit" || refuse "source_missing $commit:$SOURCE_REL"
-  STAGE=$(mktemp -d "$CLONE/.git/etc-stage.XXXXXX")
+  STAGE=$(mktemp -d "${TMPDIR:-/tmp}/etc-stage.XXXXXX")
   src=$STAGE/$NAME
   g cat-file blob "$commit:$SOURCE_REL" >"$src" || refuse "source_missing $commit:$SOURCE_REL"
   if [[ -f $TARGET && ! -L $TARGET ]] && cmp -s -- "$src" "$TARGET"; then

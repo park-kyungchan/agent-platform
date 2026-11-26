@@ -6,6 +6,8 @@ This repository holds the command `ap`, the shared instructions every coding CLI
 
 `engine/` is the Ontology engine, a Cargo workspace of its own in this repository; its rules are in "The engine" below, and `ci/check-map.py` reads it with the rest of the tree. The engine in use is the one built from `engine/` of the same commit, named by the Git tree id of `engine/` (`deploy/README.md`, "An engine change"): the root `./check` takes that engine and runs the engine's own steps (`./check engine`) when it had to build it.
 
+`host/` is the host's configuration: the policy `/etc/agent-platform/policy.json` that `ap deliver` installs from `host/etc/` of the commit it delivers (`specs/ap/deliver.md` R71 to R74), so that a new member of the policy and the code that reads it are one pull request; the recorded copies of host files, which the watch compares; and the system Git configuration, which the Lead installs by hand. It is a protected tree; its own rules (a record is refreshed only from the host, the login path changes only by the user's procedure) are in `host/README.md`, and `./check` runs its steps without a Rust build.
+
 ## The check
 
 `./check` at the repository root, until it prints `check: ok`. The CI job `rust` runs the same file and is the required check of `main`. `./check content` runs only the steps without a Rust build, until it prints `check: ok (content)`; it is enough for a change of `content/` or of documents. The whole `./check` is for the rest. The script takes the build lock by itself (do not wrap it in `flock`) and builds into `target/` inside your worktree. `ap check <worktree>` runs it on the local PC when the host's policy names the PC and the PC is free, else here; `ap check <worktree> -- <command>` does the same for one cargo command (`specs/ap/check.md`). Do not push before it passes.
@@ -26,7 +28,7 @@ This repository holds the command `ap`, the shared instructions every coding CLI
 
 A new action or value type of the work schema follows the latest version section of `ontology/README.md` (`## Version 11`) and adds a rehearsal row for each new refusal; it also adds the action or function to the grants (`specs/ap/roles.md` R2).
 
-A pull request that adds, removes or renames a file under the coverage roots (`crates/`, `ci/`, `content/`, `deploy/`, `engine/`, `evals/`, `github/`, `ontology/`, `scripts/`, `specs/`, `.github/`, `check`, `rust-toolchain.toml`, `Cargo.toml`, `Cargo.lock`), or shortens a file below an entry's range, changes `map.json` in the same pull request; a removed root also changes the root list in `check`. A file added to or removed from `content/` is added to or removed from `content/SHA256SUMS`; every changed file gets its new checksum. Never edit the installed copy of the content.
+A pull request that adds, removes or renames a file under the coverage roots (`crates/`, `ci/`, `content/`, `deploy/`, `engine/`, `evals/`, `github/`, `host/`, `ontology/`, `scripts/`, `specs/`, `.github/`, `check`, `rust-toolchain.toml`, `Cargo.toml`, `Cargo.lock`), or shortens a file below an entry's range, changes `map.json` in the same pull request; a removed root also changes the root list in `check`. A file added to or removed from `content/` is added to or removed from `content/SHA256SUMS`; every changed file gets its new checksum. Never edit the installed copy of the content.
 
 ## Rules of this repository
 

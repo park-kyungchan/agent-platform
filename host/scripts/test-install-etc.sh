@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
-# Tests of scripts/install-etc.sh. Everything runs in scratch directories from mktemp -d: the real git with a
-# scratch bare repository as origin (file://), fakes of `ont`, `ap`, `cmp` and `date` first on PATH, and a
-# scratch AP_ETC_ROOT. No network, no root, no host file.
+# Tests of host/scripts/install-etc.sh. Everything runs in scratch directories from mktemp -d: the real git with a
+# scratch repository whose main the clone fetches as delivery's clone does (by URL, no remote), fakes of `ont`, `ap`,
+# `cmp` and `date` first on PATH, and a scratch AP_ETC_ROOT. The script runs with the clone as its working
+# directory. No network, no root, no host file.
 set -euo pipefail
 
 repo_root=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)
@@ -10,7 +11,7 @@ script=$repo_root/scripts/install-etc.sh
 while IFS= read -r name; do
   unset "$name"
 done < <(env | sed -n 's/^\(GIT_[A-Za-z0-9_]*\)=.*/\1/p')
-unset AP_ETC_ROOT AP_ETC_CLONE AP_ETC_ORIGIN
+unset AP_ETC_ROOT
 
 scratch=$(mktemp -d)
 scratch=$(cd -P "$scratch" && pwd)
@@ -35,17 +36,16 @@ contains() { [[ "$1" == *"$2"* ]]; }
 export GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_SYSTEM=/dev/null GIT_CONFIG_NOSYSTEM=1
 export GIT_AUTHOR_NAME=test GIT_AUTHOR_EMAIL=test@example.invalid
 export GIT_COMMITTER_NAME=test GIT_COMMITTER_EMAIL=test@example.invalid
-export HOME=$scratch/home
-mkdir -p "$HOME" "$scratch/bin"
+export HOME=$scratch/home TMPDIR=$scratch/tmp
+mkdir -p "$HOME" "$scratch/bin" "$TMPDIR"
 
 root=$scratch/root
 clone=$scratch/clone
-origin=$scratch/origin.git
 target=$root/etc/agent-platform/policy.json
 state=$root/var/lib/agent-platform/etc
 record=$state/installed
 kept_dir=$root/var/backups/agent-platform-etc
-export AP_ETC_ROOT=$root AP_ETC_CLONE=$clone AP_ETC_ORIGIN=file://$origin
+export AP_ETC_ROOT=$root
 export FAKE_ONT_DB=$scratch/reviews.jsonl
 : >"$FAKE_ONT_DB"
 export FAKE_ONT_GETS=$scratch/gets.log
@@ -122,16 +122,14 @@ EOF
 chmod 0755 "$scratch/bin/ap" "$scratch/bin/cmp" "$scratch/bin/date" "$scratch/bin/ont"
 export PATH=$scratch/bin:$PATH
 
-# ---- the history of the scratch origin ----------------------------------------------------------------------
+# ---- the history of the scratch repository ------------------------------------------------------------------
 policy_text() { printf 'policy version %s\n' "$1"; }
 sha_of() { sha256sum | cut -d' ' -f1; }
 declare -A M H # merge commit and head of merge n
 work=$scratch/work
 git init -q -b main "$work"
-git init -q --bare -b main "$origin"
-git -C "$work" remote add origin "file://$origin"
-mkdir -p "$work/etc/agent-platform"
-policy_text 0 >"$work/etc/agent-platform/policy.json"
+mkdir -p "$work/host/etc/agent-platform"
+policy_text 0 >"$work/host/etc/agent-platform/policy.json"
 git -C "$work" add -A
 git -C "$work" commit -q -m "base"
 
@@ -139,14 +137,14 @@ add_review() { # <key> <kind> <head> <status> <verdict> <repository> <pull_reque
   printf '{"key":"%s","kind":"%s","head":"%s","status":"%s","verdict":"%s","repository":"%s","pull_request":%s}\n' \
     "$@" >>"$FAKE_ONT_DB"
 }
-repo=park-kyungchan/agent-vps-operations
+repo=park-kyungchan/agent-platform
 merge_pr() { # <n> <extra file or ->: a feature branch with policy version n, merged without a fast-forward
   local n=$1 branch=feature-$1
   git -C "$work" checkout -q -b "$branch" main
   if [[ $n == 10 ]]; then
-    printf 'INVALID\n' >"$work/etc/agent-platform/policy.json"
+    printf 'INVALID\n' >"$work/host/etc/agent-platform/policy.json"
   else
-    policy_text "$n" >"$work/etc/agent-platform/policy.json"
+    policy_text "$n" >"$work/host/etc/agent-platform/policy.json"
   fi
   if [[ ${2:--} != - ]]; then
     mkdir -p "$(dirname "$work/$2")"
@@ -167,12 +165,19 @@ merge_pr() { # <n> <extra file or ->: a feature branch with policy version n, me
   M[$n]=$(git -C "$work" rev-parse HEAD)
 }
 for n in 1 2 3 4 5 6 7 8 9 10 11 12; do
-  if [[ $n == 2 ]]; then merge_pr 2 etc/ssh/x; else merge_pr "$n" -; fi
+  if [[ $n == 2 ]]; then merge_pr 2 host/etc/ssh/x; else merge_pr "$n" -; fi
 done
-policy_text 13 >"$work/etc/agent-platform/policy.json"
+policy_text 13 >"$work/host/etc/agent-platform/policy.json"
 git -C "$work" commit -q -a -m "a direct commit"
 M[13]=$(git -C "$work" rev-parse HEAD)
-git -C "$work" push -q origin main
+# The clone as delivery makes it: git init, a fetch of main by URL into refs/remotes/origin/main, no remote, and a
+# checkout of the tip.
+refresh() {
+  git init -q "$clone"
+  git -C "$clone" fetch -q --no-tags "file://$work" '+refs/heads/main:refs/remotes/origin/main'
+  git -C "$clone" checkout -q --force --detach refs/remotes/origin/main
+}
+refresh
 other_head=$(printf 'f%.0s' {1..40})
 add_review r1 packet "${H[1]}" closed accept "$repo" 1
 add_review r2 packet "${H[2]}" closed accept "$repo" 2
@@ -194,7 +199,14 @@ run() {
   OUT=$("$@" 2>"$scratch/err") || RC=$?
   ERR=$(<"$scratch/err")
 }
-inst() { run bash "$script" "$@"; }
+inst() { run_in "$clone" bash "$script" "$@"; }
+run_in() { # <directory> <command...>: run in that working directory
+  local dir=$1
+  shift
+  RC=0
+  OUT=$(cd "$dir" && "$@" 2>"$scratch/err") || RC=$?
+  ERR=$(<"$scratch/err")
+}
 rc_is() { [[ $RC == "$1" ]]; }
 
 set_state() { # <commit or -> <policy version>: the target and the record as an earlier install left them
@@ -234,12 +246,12 @@ for bad in "$root/" /etc /etc/x "$scratch/etclink" "$scratch/etclink/x" relative
   ok "AP_ETC_ROOT=$bad names etc_root_invalid" contains "$ERR" etc_root_invalid
 done
 ok "no root, no state: nothing was made" not test -e "$root"
-ln -s /home/palantirkc/platforms "$scratch/pl"
-for bad in /home/palantirkc/platforms/agent-vps-operations /home/palantirkc/platforms "$scratch/pl/agent-vps-operations"; do
-  AP_ETC_CLONE=$bad inst check
-  ok "AP_ETC_CLONE=$bad is refused" rc_is 2
-  ok "AP_ETC_CLONE=$bad names clone_refused" contains "$ERR" clone_refused
-done
+mkdir -p "$scratch/plain"
+run_in "$scratch/plain" bash "$script" check
+ok "a working directory outside a Git repository is refused" rc_is 2
+ok "it names repository_invalid" contains "$ERR" repository_invalid
+ok "the clone has no remote" equals "$(git -C "$clone" remote | wc -l)" 0
+ok "the script reads no remote and makes no clone" not grep -qE '^[^#]*(git clone|fetch |remote get-url)' "$script"
 ok "the script never runs systemctl" not grep -q 'systemctl [a-z]' "$script"
 
 # ---- check ---------------------------------------------------------------------------------------------------------
@@ -248,28 +260,18 @@ before=$(sig)
 inst check "${M[1]}"
 ok "check at the merge of the starting file prints same" equals "$OUT" same
 ok "check same exits 0" rc_is 0
-ok "the first check made the clone with mode 0700" equals "$(mode_of "$clone")" 700
 ok "the lock directory has mode 0700" equals "$(mode_of "$state")" 700
 inst check "${M[2]}"
 ok "check against another commit prints differs <target>" equals "$OUT" "differs $target"
 ok "check differs exits 1" rc_is 1
 inst check
-ok "check at origin/main (a later file) differs" equals "$OUT" "differs $target"
-ok "check wrote nothing but the lock and the clone" equals "$(sig)" "$before"
-inst check "${H[1]}"
-ok "check refuses a commit off the first-parent history" rc_is 2
-ok "check names not_on_origin_main" contains "$ERR" not_on_origin_main
+ok "check of the clone's HEAD (a later file) differs" equals "$OUT" "differs $target"
+ok "check wrote nothing but the lock" equals "$(sig)" "$before"
 inst check "$other_head"
-ok "check refuses an unknown commit" contains "$ERR" not_on_origin_main
-echo junk >"$clone/junk"
-inst check
-ok "a dirty clone is refused" rc_is 2
-ok "a dirty clone names clone_dirty" contains "$ERR" clone_dirty
-rm -f -- "$clone/junk"
-AP_ETC_ORIGIN=file://$scratch/nowhere.git inst check
-ok "a failed fetch is refused" rc_is 2
-ok "a failed fetch names fetch_failed" contains "$ERR" fetch_failed
-ok "no staging directory is left in the clone" not compgen -G "$clone/.git/etc-stage.*"
+ok "check refuses an unknown commit" rc_is 2
+ok "check names commit_unknown" contains "$ERR" commit_unknown
+ok "check wrote nothing into the clone" equals "$(git -C "$clone" status --porcelain --untracked-files=all)" ""
+ok "no staging directory is left" not compgen -G "$TMPDIR/etc-stage.*"
 rm -f -- "$target"
 inst check "${M[1]}"
 ok "check with an absent target differs" rc_is 1
@@ -284,20 +286,22 @@ ok "install refuses busy" contains "$ERR" busy
 run flock -n "$state/lock" bash "$script" rollback "$kept_dir/policy.json.before-20261101T000000Z"
 ok "rollback refuses busy" contains "$ERR" busy
 
+# spec: specs/ap/deliver.md#R73
 # ---- the starting point: no record, the target equals the source ----------------------------------------------------
+before_inode=$(stat -c %i -- "$target")
 FAKE_DATE=20261101T000001Z inst install "${M[1]}"
 ok "the starting install succeeds" rc_is 0
 d1=$(policy_text 1 | sha_of)
-ok "the starting install prints one line with the digest and the kept copy" \
-  equals "$OUT" "installed $target $d1 kept $kept_dir/policy.json.before-20261101T000001Z"
+ok "the starting install of equal bytes prints one line with the digest and no kept copy" \
+  equals "$OUT" "installed $target $d1 kept none"
 ok "the starting install changes no byte" target_is 1
+ok "equal bytes are not written: the target is the same file" equals "$(stat -c %i -- "$target")" "$before_inode"
+ok "equal bytes keep no copy" not test -e "$kept_dir"
 ok "the record holds the merge and the digest" \
   equals "$(<"$record")" "$(printf 'commit %s\nsha256 policy.json %s' "${M[1]}" "$d1")"
 ok "the record has mode 0600" equals "$(mode_of "$record")" 600
-ok "the kept copy has mode 0600" equals "$(mode_of "$kept_dir/policy.json.before-20261101T000001Z")" 600
-ok "the kept directory has mode 0700" equals "$(mode_of "$kept_dir")" 700
 ok "the target kept its mode" equals "$(mode_of "$target")" 644
-ok "install left no staging directory" not compgen -G "$clone/.git/etc-stage.*"
+ok "install left no staging directory" not compgen -G "$TMPDIR/etc-stage.*"
 
 # ---- an install and its read-back; a commit planting etc/ssh/x --------------------------------------------------------
 FAKE_DATE=20261101T000002Z inst install "${M[2]}"
@@ -307,10 +311,12 @@ ok "the install prints the digest and the kept copy" \
   equals "$OUT" "installed $target $d2 kept $kept_dir/policy.json.before-20261101T000002Z"
 ok "the target holds the new bytes" target_is 2
 ok "the target kept its mode" equals "$(mode_of "$target")" 644
+ok "the kept copy has mode 0600" equals "$(mode_of "$kept_dir/policy.json.before-20261101T000002Z")" 600
+ok "the kept directory has mode 0700" equals "$(mode_of "$kept_dir")" 700
 ok "the kept copy holds the previous bytes" \
   equals "$(<"$kept_dir/policy.json.before-20261101T000002Z")" "$(policy_text 1)"
-ok "a planted etc/ssh/x wrote nothing" not test -e "$root/etc/ssh"
-ok "a planted etc/ssh/x wrote nothing elsewhere under the root" \
+ok "a planted host/etc/ssh/x wrote nothing" not test -e "$root/etc/ssh"
+ok "a planted host/etc/ssh/x wrote nothing elsewhere under the root" \
   equals "$(cd "$root" && find . -name x | wc -l)" 0
 ok "the record names the new merge and digest" \
   equals "$(<"$record")" "$(printf 'commit %s\nsha256 policy.json %s' "${M[2]}" "$d2")"
@@ -326,6 +332,7 @@ inst install "${M[1]}"
 ok "a commit before the recorded one names not_forward" contains "$ERR" not_forward
 ok "not_forward writes nothing" equals "$(sig)" "$before"
 
+# spec: specs/ap/deliver.md#R74
 # ---- the accepted check -------------------------------------------------------------------------------------------------
 for n in 3 4 5 6 7 8; do
   set_state "${M[$((n - 1))]}" "$((n - 1))"
@@ -348,9 +355,9 @@ inst install "${M[13]}"
 ok "a commit that is not a merge is not_accepted" equals "$ERR" "not_accepted ${M[13]}"
 set_state "${M[2]}" 2
 inst install "${H[1]}"
-ok "a head off the first-parent history is refused" contains "$ERR" not_on_origin_main
+ok "a head that does not hold the recorded commit is not_forward" contains "$ERR" not_forward
 inst install "$other_head"
-ok "an unknown commit is refused" contains "$ERR" not_on_origin_main
+ok "an unknown commit is refused" contains "$ERR" commit_unknown
 set_state - 5
 before=$(sig)
 inst install "${M[5]}"
@@ -362,6 +369,9 @@ ok "a malformed record is refused" contains "$ERR" record_invalid
 printf 'commit %s\nsha256 policy.json %s\n' "${M[12]}" "$(policy_text 12 | sha_of)" >"$record"
 inst install "${M[12]}"
 ok "a record naming the commit makes it not_forward" contains "$ERR" not_forward
+printf 'commit %s\nsha256 policy.json %s\n' "$other_head" "$(policy_text 12 | sha_of)" >"$record"
+inst install "${M[12]}"
+ok "a record naming a commit the repository does not hold is record_invalid" contains "$ERR" record_invalid
 set_state "${M[11]}" 11
 FAKE_ONT_FAIL=1 inst install "${M[12]}"
 ok "an unreadable store is refused as store_unreadable" contains "$ERR" store_unreadable
@@ -399,7 +409,7 @@ inst install "${M[10]}"
 ok "a policy file ap refuses is verify_failed" equals "$ERR" "$(printf '{"error":{"code":"policy_invalid"}}\nverify_failed %s' "$target")"
 ok "verify_failed is exit 2" rc_is 2
 ok "verify_failed writes nothing: no kept copy, the old bytes, the old record" equals "$(sig)" "$before"
-ok "verify_failed left no staging directory" not compgen -G "$clone/.git/etc-stage.*"
+ok "verify_failed left no staging directory" not compgen -G "$TMPDIR/etc-stage.*"
 
 # ---- the target ---------------------------------------------------------------------------------------------------------
 set_state "${M[11]}" 11
@@ -505,24 +515,22 @@ inst rollback "$kept_dir/policy.json.before-20261101T000098Z"
 ok "rollback runs the verify on the kept file" equals "$ERR" "$(printf '{"error":{"code":"policy_invalid"}}\nverify_failed %s' "$target")"
 rm -f -- "$kept_dir/policy.json.before-20261101T000098Z"
 ok "the refused rollbacks wrote nothing" equals "$(sig)" "$before"
-# a legacy kept file in the target's directory; no record; no clone needed
+# a legacy kept file in the target's directory; no record; no repository needed
 rm -f -- "$record"
 policy_text 7 >"$root/etc/agent-platform/policy.json.before-20261118T014522Z"
-rm -rf -- "$clone"
-AP_ETC_ORIGIN=file://$scratch/nowhere.git FAKE_DATE=20261101T000032Z inst rollback "$root/etc/agent-platform/policy.json.before-20261118T014522Z"
-ok "rollback of a kept file in /etc/agent-platform needs no clone and no fetch" rc_is 0
-ok "rollback made no clone" not test -e "$clone"
+FAKE_DATE=20261101T000032Z run_in "$scratch/plain" bash "$script" rollback "$root/etc/agent-platform/policy.json.before-20261118T014522Z"
+ok "rollback of a kept file in /etc/agent-platform needs no repository" rc_is 0
 ok "rollback put the legacy bytes back" target_is 7
 ok "rollback without a record writes commit none and the digest" \
   equals "$(<"$record")" "$(printf 'commit none\nsha256 policy.json %s' "$(policy_text 7 | sha_of)")"
 FAKE_DATE=20261101T000033Z inst install "${M[12]}"
 ok "install after a rollback with no commit recorded checks the commit alone" rc_is 0
 ok "and checks the target against the recorded digest" target_is 12
-ok "no staging directory is left after the cases" not compgen -G "$clone/.git/etc-stage.*"
+ok "no staging directory is left after the cases" not compgen -G "$TMPDIR/etc-stage.*"
 
 # ---- a review that ap unit run carried to an updated head ----------------------------------------------------------
 # A carried review has carried_from and no pull_request: it counts by the number of the review it was carried from,
-# read with ont get. The merges 14 to 26 are added to the origin after every case above.
+# read with ont get. The merges 14 to 26 are added to the repository after every case above.
 add_row() { # <key> <kind> <head> <status> <verdict> <repository> <pull_request or -> <carried_from or ->
   python3 -I -c '
 import json, sys
@@ -547,7 +555,7 @@ carried_chain() { # <n> <length>: reviews c<n>_1 .. c<n>_<length>, the first of 
   done
 }
 for n in 14 15 16 17 18 19 20 21 22 23 24 25 26; do merge_pr "$n" -; done
-git -C "$work" push -q origin main
+refresh
 add_row c14 packet "${H[14]}" closed accept "$repo" - o14 # one step
 add_row o14 packet "$other_head" closed accept "$repo" 14 -
 add_row c15 packet "${H[15]}" closed accept "$repo" - m15 # two steps
@@ -614,6 +622,68 @@ ok "a failing get wrote nothing" equals "$(sig)" "$before"
 carried_state 26
 FAKE_DATE=20261103T000026Z inst install "${M[26]}"
 ok "the same merge installs when the get answers" rc_is 0
+
+# ---- a recorded commit of the imported history ----------------------------------------------------------------------
+# The policy came from another repository whose history a merge read into this one: that merge's second parent holds
+# the commit the old installer recorded. Such a commit is forward; the chain starts at the first main merge whose
+# first parent does not hold it, here the merge of the pull request that imported the history.
+old=$scratch/old
+git init -q -b main "$old"
+mkdir -p "$old/etc/agent-platform"
+policy_text 26 >"$old/etc/agent-platform/policy.json"
+git -C "$old" add -A
+git -C "$old" commit -q -m "old base"
+policy_text 26 >"$old/etc/agent-platform/policy.json"
+echo more >"$old/more.txt"
+git -C "$old" add -A
+git -C "$old" commit -q -m "old tip"
+old_tip=$(git -C "$old" rev-parse HEAD)
+old_base=$(git -C "$old" rev-parse HEAD~1)
+git -C "$work" fetch -q "$old" main
+git -C "$work" checkout -q -b feature-27 main
+git -C "$work" merge -q -s ours --no-commit --allow-unrelated-histories FETCH_HEAD >/dev/null 2>&1
+git -C "$work" read-tree --prefix=old/ -u FETCH_HEAD
+git -C "$work" commit -q -m "import the old history"
+H[27]=$(git -C "$work" rev-parse HEAD)
+git -C "$work" checkout -q main
+git -C "$work" merge -q --no-ff -m "Merge pull request #27 from owner/feature-27" feature-27
+M[27]=$(git -C "$work" rev-parse HEAD)
+merge_pr 28 -
+refresh
+add_review r27 packet "${H[27]}" closed accept "$repo" 27
+add_review r28 packet "${H[28]}" closed accept "$repo" 28
+ok "the old tip is no first-parent commit of main" \
+  not grep -qx "$old_tip" <(git -C "$clone" rev-list --first-parent refs/remotes/origin/main)
+set_state "$old_tip" 26
+: >"$FAKE_ONT_GETS"
+FAKE_DATE=20261104T000028Z inst install "${M[28]}"
+ok "a recorded commit reached through a second parent is forward" rc_is 0
+ok "the import's merge and the next one were judged and the file installed" target_is 28
+ok "the record follows the merge" equals "$(head -n 1 "$record")" "commit ${M[28]}"
+set_state "$old_base" 26
+FAKE_DATE=20261104T000029Z inst install "${M[27]}"
+ok "an older commit of the imported history is forward too, its chain the import's merge alone" rc_is 0
+ok "the import's merge holds the file of merge 26" target_is 26
+set_state "$old_tip" 26
+sed -i '/"key":"r27"/d' "$FAKE_ONT_DB"
+before=$(sig)
+inst install "${M[28]}"
+ok "the import's merge is judged: without its review the install is not_accepted" equals "$ERR" "not_accepted ${M[27]}"
+ok "and writes nothing" equals "$(sig)" "$before"
+add_review r27 packet "${H[27]}" closed accept "$repo" 27
+set_state "${M[27]}" 27
+mkdir -p "$scratch/unrelated"
+git -C "$scratch/unrelated" init -q -b main
+echo x >"$scratch/unrelated/x"
+git -C "$scratch/unrelated" add -A
+git -C "$scratch/unrelated" commit -q -m unrelated
+git -C "$clone" fetch -q "$scratch/unrelated" main
+unrelated=$(git -C "$clone" rev-parse FETCH_HEAD)
+printf 'commit %s\nsha256 policy.json %s\n' "$unrelated" "$(policy_text 27 | sha_of)" >"$record"
+before=$(sig)
+inst install "${M[28]}"
+ok "a recorded commit the repository holds but that is no ancestor is not_forward" contains "$ERR" not_forward
+ok "not_forward of an unrelated record writes nothing" equals "$(sig)" "$before"
 
 if [[ $failures -ne 0 ]]; then
   printf 'test-install-etc: failed (%d of %d)\n' "$failures" "$checks" >&2

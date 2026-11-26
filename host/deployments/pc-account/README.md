@@ -176,7 +176,7 @@ Where the admin console refuses an entry's form (for example a tag as the `src` 
 
 ### The VPS's tag (the user's procedure)
 
-The tag changes the VPS's node identity, and it can cut the user's way into the VPS. It falls under the user's procedure of `AGENTS.md` ("Never changed or run here without the user's procedure"), and the user does every step:
+The tag changes the VPS's node identity, and it can cut the user's way into the VPS. It falls under the user's procedure of `host/README.md` ("The login path"), and the user does every step:
 
 1. The user confirms that the provider's console is the way back into the VPS.
 2. The grants of E6 and E7 are saved before the tag (step 3 of "The order").
@@ -272,4 +272,4 @@ A worktree whose `ontology/ENGINE-PIN` the account's `ont --version` does not na
 ## Not closed by this
 
 - **Processes of `apcheck` outside the sandbox.** The command of a check has no network and sees of the account's home only the toolchain (R8, R18). A process of `apcheck` outside that sandbox, though, is in the one network of "What the two distributions share" and sees the home. Two such processes exist: whatever a `tailscale ssh` session from the VPS runs, and the step before the command that fetches the dependencies with the PC's network. Where the `ip -br addr` readback shows the interface of the user's node, a socket that such a process opens towards a tailnet address leaves through that interface. It then sends as the user's node to whatever the tailnet's rule admits from that node, the VPS among them (E6). Such a process can also address whatever listens on the loopback. What would close it: the user's `tailscaled` without an interface, or a virtual machine in place of the distribution.
-- **Root's `authorized_keys` on the VPS** is unchanged. What would close it: a change of the VPS's login path, by the user's procedure of `AGENTS.md`.
+- **Root's `authorized_keys` on the VPS** is unchanged. What would close it: a change of the VPS's login path, by the user's procedure of `host/README.md` ("The login path").

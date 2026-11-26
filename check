@@ -46,7 +46,15 @@ bash scripts/test-install-content.sh
 bash scripts/test-pc-pull.sh
 bash scripts/test-backup-store.sh
 python3 -I -B -m unittest discover -s github -p 'test_*.py'
-python3 -I -B ci/check-map.py crates/ ci/ content/ deploy/ engine/ evals/ github/ ontology/ scripts/ specs/ .github/ check rust-toolchain.toml Cargo.toml Cargo.lock
+# host/, the host's configuration files: the steps of the operations repository's own check (its JSON parses, its
+# shell scripts pass bash -n, the inventory's copies match their digests, nothing unlisted under deployments/), then
+# the tests of the Git configuration, of the policy's installer and of the retirement script (scratch directories
+# and fakes; no network, no root, no host file).
+python3 -I -B ci/check-host.py
+bash host/scripts/test-git-config.sh
+bash host/scripts/test-install-etc.sh
+bash host/scripts/test-retire-hindsight.sh
+python3 -I -B ci/check-map.py crates/ ci/ content/ deploy/ engine/ evals/ github/ host/ ontology/ scripts/ specs/ .github/ check rust-toolchain.toml Cargo.toml Cargo.lock
 python3 -I -B ci/check-spec-trace.py
 # The work schema declares no action type and no view that the code, the content and the host's scripts do not name.
 python3 -I -B ci/check-schema-use.py

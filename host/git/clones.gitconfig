@@ -1,5 +1,6 @@
-# Included by /etc/gitconfig for the clones ontology-platform and
-# agent-vps-operations (main checkout and every linked worktree). No
+# Included by /etc/gitconfig for the clones ontology-platform,
+# agent-vps-operations and agent-platform (main checkout and every linked
+# worktree). No
 # push.default here: a branch made by `ap unit run` tracks origin/main, and
 # `upstream` would push it to main. Installed as
 # /usr/local/lib/agents-git/clones.gitconfig.

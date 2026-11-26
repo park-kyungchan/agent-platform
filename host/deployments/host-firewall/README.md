@@ -19,4 +19,4 @@ What the files set:
 
 Undo: `systemctl disable --now host-firewall.service`.
 
-The login path and this firewall change only by the user's procedure in `AGENTS.md`.
+The login path and this firewall change only by the user's procedure in `host/README.md` ("The login path").
