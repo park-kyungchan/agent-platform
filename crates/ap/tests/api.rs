@@ -1005,6 +1005,17 @@ fn the_form_and_the_academy_are_refused_before_any_effect() {
                 "batch",
                 "drift",
                 "--requests",
+                "/nowhere/academy-platform/r.jsonl",
+                "--out",
+                &out,
+            ],
+            "requests",
+        ),
+        (
+            vec![
+                "batch",
+                "drift",
+                "--requests",
                 "/nowhere/evals/lesson/r.jsonl",
                 "--out",
                 &out,
@@ -1029,6 +1040,8 @@ fn the_form_and_the_academy_are_refused_before_any_effect() {
         before_any_effect(&f, &r, "academy_path", field);
     }
     assert!(ap::api::academy("/a/evals/lesson"));
+    assert!(ap::api::academy("/a/academy-platform/x") && ap::api::academy("academy-x"));
+    assert!(!ap::api::academy("/a/my-academy-x/evals") && !ap::api::academy("/a/academy/x"));
     assert!(!ap::api::academy("/a/evals/lessons/x") && !ap::api::academy("/a/my-edu-x/evals"));
 }
 

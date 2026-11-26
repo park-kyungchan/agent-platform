@@ -128,10 +128,10 @@ pub(crate) fn options_of(
     }
     for r in &o.repositories {
         let name = r.split_once('/').map_or(r.as_str(), |(_, n)| n);
-        if name.starts_with("education-") {
+        if name.starts_with("education-") || name.starts_with("academy-") {
             return Err(invalid(
                 "repository",
-                "an education- repository is the Academy's",
+                "an education- or academy- repository is the Academy's",
             ));
         }
         if !repository_form(r) {

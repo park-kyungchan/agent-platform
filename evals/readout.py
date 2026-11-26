@@ -97,9 +97,10 @@ def jsonl(path, lines):
 
 def academy_name(name, project=False):
     """With --without-academy, a walk does not open a directory of this name (specs/ap/measure.md R3): a name that
-    begins with `edu-`, and for a project directory (one directly in a `projects` directory) a name that holds `-edu-`
-    or `-education-platform`."""
-    return name.startswith("edu-") or (project and ("-edu-" in name or "-education-platform" in name))
+    begins with `edu-` or `academy-`, and for a project directory (one directly in a `projects` directory) a name that
+    holds `-edu-`, `-academy-` or `-education-platform`."""
+    return name.startswith(("edu-", "academy-")) or (
+        project and ("-edu-" in name or "-academy-" in name or "-education-platform" in name))
 
 
 def projects_dirs(accounts, without_academy=False):

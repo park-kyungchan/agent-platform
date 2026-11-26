@@ -434,7 +434,9 @@ class BatchDriftTest(Case):
         table = {"edu-x": True, "a/edu-x/b": True, "/x/education-platform": True, "o/education-platform": True,
                  "a/evals/lesson": True, "evals/lesson/x.sh": True, "/evals/lesson/": True,
                  "evals/lessons": False, "lesson/evals": False, "a/xedu-b": False, "educational/x": False,
-                 "evals/x/lesson": False, "medu-x/y": False, "edu": False, "education": False, "": False}
+                 "evals/x/lesson": False, "medu-x/y": False, "edu": False, "education": False, "": False,
+                 "/x/academy-platform": True, "o/academy-platform/b": True, "academy-x": True,
+                 "my-academy-x/y": False, "academy": False, "xacademy-b": False}
         for path, want in table.items():
             self.assertEqual(LIB.is_academy(path), want, path)
         repo = self.repo({"specs/a.md": spec(req(1, "one."), req(2, "two.")),

@@ -369,12 +369,12 @@ fn arguments(argv: &[OsString]) -> Result<Args, Failure> {
         store: options.get("store").map(|s| (*s).to_owned()),
     })
 }
-/// A path of the Academy (R2): a component that begins with `education-` or `edu-`, or `evals` then `lesson`.
+/// A path of the Academy (R2): a component that begins with `education-`, `edu-` or `academy-`, or `evals` then `lesson`.
 pub fn academy(path: &str) -> bool {
     let parts: Vec<&str> = path.split('/').collect();
     parts
         .iter()
-        .any(|c| c.starts_with("education-") || c.starts_with("edu-"))
+        .any(|c| c.starts_with("education-") || c.starts_with("edu-") || c.starts_with("academy-"))
         || parts.windows(2).any(|w| w == ["evals", "lesson"])
 }
 

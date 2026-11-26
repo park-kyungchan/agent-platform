@@ -378,6 +378,10 @@ class WithoutAcademy(unittest.TestCase):
         self.assertTrue(readout.academy_name("edu-lessons", project=True))
         self.assertTrue(readout.academy_name("-home-palantirkc-work-edu-lessons", project=True))
         self.assertTrue(readout.academy_name("-home-palantirkc-platforms-education-platform", project=True))
+        self.assertTrue(readout.academy_name("academy-platform"))
+        self.assertTrue(readout.academy_name("-home-palantirkc-platforms-academy-platform", project=True))
+        self.assertFalse(readout.academy_name("-home-palantirkc-platforms-academy-platform"))  # a project directory's
+        self.assertFalse(readout.academy_name("academy", project=True))
         self.assertFalse(readout.academy_name("-home-palantirkc-work-edu-lessons"))  # the substring rule is a project directory's
         self.assertFalse(readout.academy_name("-home-palantirkc-work-task", project=True))
         self.assertFalse(readout.academy_name("reduce-x"))
