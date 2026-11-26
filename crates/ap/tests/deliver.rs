@@ -7621,7 +7621,11 @@ fn etc_same_repository() {
     w.xruns = vec![(1, String::new()), (0, String::new()), (0, String::new())];
     let start = w.calls.len();
     let (v, _) = w.run();
-    assert_eq!(v["etc"], own_record(Some(&tip), Some(&tip), "installed"));
+    assert_eq!(
+        v["etc"],
+        own_record(Some(&tip), Some(&tip), "installed"),
+        "{v}"
+    );
     assert_eq!(
         w.own_calls(start),
         [
