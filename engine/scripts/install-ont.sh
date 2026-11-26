@@ -1,6 +1,12 @@
 #!/bin/bash
 # Install, check or roll back the `ont` binary. No schema is installed and
 # no index is run here; install prints those commands for the host step.
+# This script serves the rule of a tree without ontology/ENGINE-PIN
+# (specs/ap/deliver.md R66, R67): `install <commit>` builds engine/ of that
+# commit of the repository around it, named by the Git tree id of engine/.
+# It fetches nothing and makes no ancestor test: the review that accepted the
+# commit accepted its engine. Delivery under the pin rule runs the old
+# engine clone's own script.
 set -euo pipefail
 
 # Never let the caller redirect git away from the checkout named by -C.
@@ -10,7 +16,8 @@ REAL_BIN_DIR=/usr/local/bin
 REAL_STATE_DIR=/var/lib/ontology-platform
 CARGO_LOCK=/var/lib/agent-platform/build.lock
 SCRIPT_PATH=$(cd -- "$(dirname -- "$0")" && pwd -P)/$(basename -- "$0")
-REPO_ROOT=$(cd -- "$(dirname -- "$0")/.." && pwd -P)
+# Every Git command runs at the repository's top level, never from engine/.
+REPO_ROOT=$(git -C "$(dirname -- "$SCRIPT_PATH")" rev-parse --show-toplevel 2>/dev/null) || REPO_ROOT=""
 
 BIN_DIR=${ONT_INSTALL_BIN_DIR:-$REAL_BIN_DIR}
 STATE_DIR=${ONT_INSTALL_STATE_DIR:-$REAL_STATE_DIR}
@@ -210,37 +217,33 @@ make_build_dir() {
 do_install() {
   local commit=${1:-}
   [[ $commit =~ ^[0-9a-f]{40}$ ]] || refuse "commit must be 40 lowercase hex"
-  if [ "$DRY_RUN" = "1" ]; then
-    printf 'dry-run: git -C %s fetch origin +refs/heads/main:refs/remotes/origin/main --refmap= before the ancestor check\n' "$REPO_ROOT"
-  else
-    printf 'fetch: git -C %s fetch origin +refs/heads/main:refs/remotes/origin/main --refmap=\n' "$REPO_ROOT"
-    git -C "$REPO_ROOT" fetch origin +refs/heads/main:refs/remotes/origin/main --refmap= || refuse "git_unavailable: fetch origin failed"
-  fi
+  [ -n "$REPO_ROOT" ] || refuse "git_unavailable: the repository around the script has no top level"
   local commit_type
   commit_type=$(printf '%s\n' "$commit" | git -C "$REPO_ROOT" cat-file --batch-check='%(objecttype)' 2>/dev/null) \
     || refuse "git_unavailable: commit lookup failed"
   [ "$commit_type" = "commit" ] || refuse "commit_unknown: $commit is not a known commit in the checkout"
-  local ancestor_status=0
-  git -C "$REPO_ROOT" merge-base --is-ancestor "$commit" refs/remotes/origin/main 2>/dev/null || ancestor_status=$?
-  case $ancestor_status in
-    0) ;;
-    1) refuse "commit_not_merged: $commit is not an ancestor of refs/remotes/origin/main" ;;
-    *) refuse "git_unavailable: ancestor check failed (status $ancestor_status)" ;;
-  esac
+  # The engine's identity: the tree id of engine/ at the commit.
+  local tree tree_type
+  tree_type=$(printf '%s\n' "$commit:engine" | git -C "$REPO_ROOT" cat-file --batch-check='%(objecttype)' 2>/dev/null) \
+    || refuse "git_unavailable: engine lookup failed"
+  [ "$tree_type" = "tree" ] || refuse "engine_missing: $commit holds no engine/"
+  tree=$(git -C "$REPO_ROOT" rev-parse --verify --quiet "$commit:engine" 2>/dev/null) || refuse "git_unavailable: engine lookup failed"
+  [[ $tree =~ ^[0-9a-f]{40}$ ]] || refuse "git_unavailable: engine lookup failed"
   if [ "$DRY_RUN" = "1" ]; then
+    printf 'dry-run: engine/ of %s is the tree %s; no fetch and no ancestor check\n' "$commit" "$tree"
     if [ -n "${ONT_INSTALL_PREBUILT:-}" ]; then
       printf 'dry-run: create %s with mode 0700 when absent, take %s with flock -n, remove its other entries and make a new 0700 directory in it\n' "$BUILD_BASE" "$BUILD_BASE/.lock"
       printf 'dry-run: use prebuilt binary %s (build skipped)\n' "$ONT_INSTALL_PREBUILT"
     else
       printf 'dry-run: check build base %s (each existing component a directory, not a link, owned by uid 0 or the running uid, not writable by group or other), create it with mode 0700 when absent, take %s with flock -n, remove its other entries\n' "$BUILD_BASE" "$BUILD_BASE/.lock"
-      printf 'dry-run: git -C %s archive %s | tar -x into a new 0700 directory under %s\n' "$REPO_ROOT" "$commit" "$BUILD_BASE"
-      printf 'dry-run: flock %s cargo build --release -p ont --locked (CARGO_TARGET_DIR under the new build directory, CARGO_BUILD_JOBS=2)\n' "$CARGO_LOCK"
+      printf 'dry-run: git -C %s archive %s engine | tar -x into a new 0700 directory under %s\n' "$REPO_ROOT" "$commit" "$BUILD_BASE"
+      printf 'dry-run: flock %s cargo build --release -p ont --locked in engine/ (ONT_TREE_ID=%s, CARGO_TARGET_DIR under the new build directory, CARGO_BUILD_JOBS=2)\n' "$CARGO_LOCK" "$tree"
     fi
-    printf 'dry-run: check the built binary prints ont <version> %s\n' "$commit"
+    printf 'dry-run: check the built binary prints ont <version> %s\n' "$tree"
     printf 'dry-run: create %s and %s with mode 0700\n' "$STORE_DIR" "$INSTALL_DIR"
     printf 'dry-run: keep any previous binary as %s/ont.before-<first 12 hex of its sha256>\n' "$INSTALL_DIR"
     printf 'dry-run: install -m 0755 the new binary as a temporary name in %s, then mv over %s\n' "$BIN_DIR" "$BIN_PATH"
-    printf 'dry-run: write %s by temporary name and rename; remove the temporary build directory\n' "$INSTALLED_JSON"
+    printf 'dry-run: write %s (commit %s) by temporary name and rename; remove the temporary build directory\n' "$INSTALLED_JSON" "$tree"
     return 0
   fi
 
@@ -260,20 +263,16 @@ do_install() {
     [ -n "$avail_gib" ] || avail_gib=0
     [ "$avail_gib" -ge 10 ] || refuse "free space on the build file system is under 10 GiB"
     mkdir -p "$tmp/src" "$tmp/target"
-    git -C "$REPO_ROOT" archive "$commit" | tar -x -C "$tmp/src"
-    # The build script reads the build commit from git HEAD; give the
-    # exported tree that exact HEAD (fetch + reset --mixed keeps the
-    # exported files and a clean status).
-    git -C "$tmp/src" init -q
-    git -C "$tmp/src" fetch -q "$REPO_ROOT" "$commit"
-    git -C "$tmp/src" reset -q --mixed FETCH_HEAD
-    (cd "$tmp/src" && flock "$CARGO_LOCK" env CARGO_TARGET_DIR="$tmp/target" CARGO_BUILD_JOBS=2 cargo build --release -p ont --locked)
+    git -C "$REPO_ROOT" archive "$commit" engine | tar -x -C "$tmp/src"
+    [ -f "$tmp/src/engine/Cargo.toml" ] || refuse "engine_missing: $commit holds no engine/Cargo.toml"
+    # The exported tree has no Git: the build script takes the tree id from ONT_TREE_ID.
+    (cd "$tmp/src/engine" && flock "$CARGO_LOCK" env CARGO_TARGET_DIR="$tmp/target" CARGO_BUILD_JOBS=2 ONT_TREE_ID="$tree" cargo build --release -p ont --locked)
     built=$tmp/target/release/ont
   fi
   [ -x "$built" ] || refuse "built binary not found: $built"
   local got_commit
   got_commit=$(version_commit "$built" || true)
-  [ "$got_commit" = "$commit" ] || refuse "built binary does not print commit $commit (got: ${got_commit:-none})"
+  [ "$got_commit" = "$tree" ] || refuse "built binary does not print the tree $tree of engine/ at $commit (got: ${got_commit:-none})"
 
   mkdir -p "$BIN_DIR"
   mkdir -p "$STORE_DIR" "$INSTALL_DIR"
@@ -295,7 +294,7 @@ do_install() {
   install -m 0755 "$built" "$tmp_bin"
   mv "$tmp_bin" "$BIN_PATH"
   new_sha=$(sha256_of "$BIN_PATH")
-  if ! write_installed_json "$commit" "$new_sha" "$previous_sha"; then
+  if ! write_installed_json "$tree" "$new_sha" "$previous_sha"; then
     state_write_failed install "$previous_sha"
   fi
   prune_previous

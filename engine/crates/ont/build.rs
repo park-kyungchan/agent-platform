@@ -45,29 +45,23 @@ fn git_dir_for(manifest_dir: &Path) -> Option<PathBuf> {
     None
 }
 
-fn emit_rerun(manifest_dir: &Path) {
-    let workspace_root = run_git(manifest_dir, &["rev-parse", "--show-toplevel"])
+/// The top level of the repository around `manifest_dir`, as Git names it; None without Git.
+fn top_level(manifest_dir: &Path) -> Option<PathBuf> {
+    run_git(manifest_dir, &["rev-parse", "--show-toplevel"])
         .map(|text| PathBuf::from(text.trim()))
         .filter(|path| !path.as_os_str().is_empty())
-        .unwrap_or_else(|| {
-            manifest_dir
-                .parent()
-                .and_then(|parent| parent.parent())
-                .map(|path| path.to_path_buf())
-                .unwrap_or_else(|| manifest_dir.to_path_buf())
-        });
-    println!(
-        "cargo:rerun-if-changed={}",
-        workspace_root.join("Cargo.toml").display()
-    );
-    println!(
-        "cargo:rerun-if-changed={}",
-        workspace_root.join("Cargo.lock").display()
-    );
-    println!(
-        "cargo:rerun-if-changed={}",
-        workspace_root.join("crates").display()
-    );
+}
+
+fn emit_rerun(manifest_dir: &Path) {
+    // The engine's own sources, not `engine/` whole, which holds `engine/target`.
+    let engine = manifest_dir
+        .parent()
+        .and_then(Path::parent)
+        .unwrap_or(manifest_dir);
+    for part in ["crates", "Cargo.toml", "Cargo.lock"] {
+        println!("cargo:rerun-if-changed={}", engine.join(part).display());
+    }
+    println!("cargo:rerun-if-env-changed=ONT_TREE_ID");
     let Some(git_dir) = git_dir_for(manifest_dir) else {
         return;
     };
@@ -108,24 +102,40 @@ fn emit_rerun(manifest_dir: &Path) {
     println!("cargo:rerun-if-changed={}", ref_path.display());
 }
 
+fn hex40(text: &str) -> bool {
+    text.len() == 40 && text.bytes().all(|c| matches!(c, b'0'..=b'9' | b'a'..=b'f'))
+}
+
+/// The id `ont --version` names: the Git tree id of `engine/` at the commit the engine is built from
+/// (`specs/ap/deliver.md` R66). `ONT_TREE_ID` when it holds 40 hexadecimal digits; else, from Git at the
+/// repository's top level, `HEAD:engine` when `git status --porcelain -- engine` prints nothing and the
+/// manifest is that tree's `engine/crates/ont`; else `unknown` (no Git, or a modified `engine/`: a dirty
+/// build names no tree).
 fn build_revision(manifest_dir: &Path) -> String {
-    let repo_root = run_git(manifest_dir, &["rev-parse", "--show-toplevel"])
-        .map(|text| PathBuf::from(text.trim()))
-        .filter(|path| !path.as_os_str().is_empty())
-        .unwrap_or_else(|| manifest_dir.to_path_buf());
-    let Some(commit) = run_git(&repo_root, &["rev-parse", "HEAD"]) else {
-        return "unknown".to_string();
-    };
-    let commit = commit.trim().to_ascii_lowercase();
-    if commit.len() != 40 || !commit.chars().all(|c| c.is_ascii_hexdigit()) {
-        return "unknown".to_string();
+    if let Ok(id) = env::var("ONT_TREE_ID") {
+        let id = id.to_ascii_lowercase();
+        if hex40(&id) {
+            return id;
+        }
     }
-    let dirty =
-        run_git(&repo_root, &["status", "--porcelain"]).is_some_and(|text| !text.trim().is_empty());
-    if dirty {
-        format!("{commit}-dirty")
-    } else {
-        commit
+    let unknown = || "unknown".to_string();
+    let Some(top) = top_level(manifest_dir) else {
+        return unknown();
+    };
+    // Every Git command runs at the top level, never from `engine/` or a crate directory.
+    let ours = fs::canonicalize(top.join("engine/crates/ont")).ok();
+    if ours.is_none() || ours != fs::canonicalize(manifest_dir).ok() {
+        return unknown();
+    }
+    let Some(status) = run_git(&top, &["status", "--porcelain", "--", "engine"]) else {
+        return unknown();
+    };
+    if !status.trim().is_empty() {
+        return unknown();
+    }
+    match run_git(&top, &["rev-parse", "HEAD:engine"]) {
+        Some(id) if hex40(id.trim()) => id.trim().to_owned(),
+        _ => unknown(),
     }
 }
 

@@ -63,6 +63,7 @@ PROTECTED_TREES = (
     "content",
     "github",
     "ontology",
+    "engine",
 )
 
 PAGE_TEXT_MEMBERS = ("objective", "interface", "invariants", "not_built", "notes", "verifier_questions")

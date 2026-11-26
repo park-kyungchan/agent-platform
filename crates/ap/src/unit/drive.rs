@@ -96,8 +96,9 @@ pub(super) const PROTECTED_NAMES: [&str; 9] = [
 /// The last two components, in any directory: Cargo's configuration below the root.
 pub(super) const PROTECTED_CONFIGS: [&str; 2] = [".cargo/config.toml", ".cargo/config"];
 /// The first component: the path itself or anything under it.
-pub(super) const PROTECTED_TREES: [&str; 10] = [
+pub(super) const PROTECTED_TREES: [&str; 11] = [
     "ci", ".github", "specs", "scripts", ".cargo", "deploy", "etc", "content", "github", "ontology",
+    "engine",
 ];
 /// Whether the first component of `path` is one of the protected trees, compared without case: the
 /// path itself and everything under it is protected (R36).
@@ -3154,7 +3155,7 @@ mod tests {
             PROTECTED_TREES,
             [
                 "ci", ".github", "specs", "scripts", ".cargo", "deploy", "etc", "content",
-                "github", "ontology",
+                "github", "ontology", "engine",
             ]
         );
         let held = [

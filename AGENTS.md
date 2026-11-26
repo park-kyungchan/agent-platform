@@ -4,7 +4,7 @@ What the repository is and who uses it: `README.md`. Start reading from `map.jso
 
 This repository holds the command `ap`, the shared instructions every coding CLI on this host loads, the specifications of the `ap` contracts, and the checks that hold them. Its users are the Lead, the workers and verifiers of a unit in this repository, and agents of every CLI that call `ap`.
 
-`engine/` is the Ontology engine, a workspace of its own whose rules are in `engine/AGENTS.md` and `engine/REVIEW.md`; the root `./check` and `ci/check-map.py` neither read nor build it, and nothing builds from it yet (the engine in use is the one `ontology/ENGINE-PIN` names).
+`engine/` is the Ontology engine, a workspace of its own whose rules are in `engine/AGENTS.md` and `engine/REVIEW.md`; `ci/check-map.py` does not read it. While a tree holds `ontology/ENGINE-PIN`, the engine in use is the one the pin names; a tree without that file builds, checks and delivers the engine from `engine/` of the same commit, named by the Git tree id of `engine/` (`deploy/README.md`, "An engine change"): the root `./check` then takes that engine and runs `engine/check` when it had to build it.
 
 ## The check
 
@@ -19,7 +19,7 @@ This repository holds the command `ap`, the shared instructions every coding CLI
 | Contract | Where it is stated | What relies on it |
 | --- | --- | --- |
 | The schema of the Lead's records, `ontology/work.schema.json` | `ontology/README.md`, the schema's text by version: its value types, among them `nonempty_text`, which refuses `""` with `invalid_parameter` for the string parameters of the version 9 actions, while the actions of versions 10 and 11 refuse an empty string by a `<parameter>_empty` criterion with a rehearsal row (not every string parameter), and what the store does not check; the check `ont schema check ontology/work.schema.json`; `ontology/rehearsal.sh`, which installs the schema into a disposable store and asserts every action answer that `ap` parses | `ap` and every reader of the store |
-| The engine revision, `ontology/ENGINE-PIN` | `ontology/ENGINE-PIN`; changed only with a passing rehearsal (`ontology/rehearsal.sh`) and the answer shapes named in the pull request | `ap` parsing an engine answer; `ontology/rehearsal.sh` |
+| The engine revision, `ontology/ENGINE-PIN`, or in a tree without it the Git tree id of `engine/` | `ontology/ENGINE-PIN`; `specs/ap/deliver.md` R66; changed only with a passing rehearsal (`ontology/rehearsal.sh`) and the answer shapes named in the pull request | `ap` parsing an engine answer; `ontology/rehearsal.sh` |
 | The shared instructions, `content/` with `content/SHA256SUMS` | `content/SHA256SUMS`, the one list of the content | Every coding CLI that loads the installed instructions; `ci/check-content.py` |
 | The rulesets and settings under `github/` | `github/repositories.json`, `github/ruleset-main.json`, `github/ruleset-tags.json`; compared and applied by `github/apply` | The repositories the files name; `./check` |
 | The map, `map.json` | `map.json`; `ci/check-map.py` checks it | `ap unit page`, which prints one line per entry that meets a unit's write set, and `./check` |

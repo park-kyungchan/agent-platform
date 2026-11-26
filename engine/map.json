@@ -134,18 +134,6 @@
    "tests": []
   },
   {
-   "name": "github",
-   "purpose": "GitHub Actions workflow and Dependabot configuration of this repository.",
-   "paths": [
-    ".github/"
-   ],
-   "entry": [
-    ".github/workflows/rust.yml:1-30"
-   ],
-   "spec": [],
-   "tests": []
-  },
-  {
    "name": "repo-check",
    "purpose": "The one check of this repository and its pinned Rust toolchain.",
    "paths": [

@@ -11,10 +11,12 @@ unknown verb.
 `./check` is the one check of this repository and what the CI job `rust` runs:
 the content check, the test of the install script,
 format, lints as errors, all tests, and the rehearsal of `ontology/work.schema.json`
-against the engine revision in `ontology/ENGINE-PIN`.
+against the engine revision in `ontology/ENGINE-PIN`, or, in a tree without that
+file, against the engine built from `engine/` and named by its Git tree id
+([deploy/README.md](deploy/README.md), "An engine change").
 `engine/` holds the source of the Ontology engine with its history, a
 workspace of its own with its own check ([engine/README.md](engine/README.md));
-nothing builds from it yet.
+while a tree holds `ontology/ENGINE-PIN` nothing builds from it.
 How an agent works here: [AGENTS.md](AGENTS.md). What blocks a pull request: [REVIEW.md](REVIEW.md).
 
 Source changes require independent review and Lead integration. Real-host

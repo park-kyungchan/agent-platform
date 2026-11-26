@@ -6,6 +6,9 @@
 #   1. GitHub-anchored source build (default):
 #      scripts/pc-pull.sh [--ap-url <url>] [--ont-url <url>] [--commit <40-hex>]
 #                         [--bin-dir <dir>] [--state-dir <dir>]
+#      The engine follows the rule of two trees of the commit (specs/ap/deliver.md R66, R70): with
+#      ontology/ENGINE-PIN, the pin's commit of ontology-platform; without it, engine/ of the commit
+#      itself, named by its Git tree id (no second clone, no fetch of another repository).
 #   2. Digest-verified pair install:
 #      scripts/pc-pull.sh --from-dir <dir> --ap-sha256 <64-hex> --ont-sha256 <64-hex>
 #                         [--bin-dir <dir>]
@@ -344,6 +347,20 @@ if ! git_safe -C "$AP_CLONE" cat-file -e "${commit}^{commit}" 2>/dev/null \
   refuse "not_on_main" "$LINENO" "$commit"
 fi
 
+# The rule of two trees: the pin when the commit holds ontology/ENGINE-PIN, else the tree id of engine/.
+rule=pin
+entries=$(git_safe -C "$AP_CLONE" ls-tree "$commit" -- ontology/ENGINE-PIN engine 2>/dev/null) \
+  || fail "git_failed" "$LINENO" "ls-tree $commit"
+if ! grep -q $'\tontology/ENGINE-PIN$' <<<"$entries"; then
+  tree_line=$(grep $'^040000 tree [0-9a-f]\{40\}\tengine$' <<<"$entries" || true)
+  if [[ -z "$tree_line" ]]; then
+    refuse "engine_missing" "$LINENO" "$commit holds neither ontology/ENGINE-PIN nor engine/"
+  fi
+  rule=tree
+  pin=${tree_line#040000 tree }
+  pin=${pin%$'\t'engine}
+fi
+if [[ "$rule" == pin ]]; then
 pin=$(git_safe -C "$AP_CLONE" show "${commit}:ontology/ENGINE-PIN" 2>/dev/null | tr -d '[:space:]') || pin=""
 if ! is_hex40 "$pin"; then
   refuse "engine_pin_invalid" "$LINENO" "$commit"
@@ -359,6 +376,7 @@ if ! git_safe -C "$ONT_CLONE" cat-file -e "${pin}^{commit}" 2>/dev/null \
   || ! git_safe -C "$ONT_CLONE" merge-base --is-ancestor "$pin" refs/remotes/origin/main 2>/dev/null; then
   refuse "pin_not_on_main" "$LINENO" "$pin"
 fi
+fi
 
 BUILD_TMP=$(mktemp -d "${TMPDIR:-/tmp}/ap-pc-pull.XXXXXXXX")
 chmod 0700 -- "$BUILD_TMP"
@@ -368,15 +386,37 @@ ont_target="$state_dir/target-ont"
 ap_target="$state_dir/target-ap"
 mkdir -p -- "$ont_target" "$ap_target"
 
-git_safe -C "$ONT_CLONE" worktree add --quiet --detach "$ONT_WT" "$pin" \
-  || fail "worktree_failed" "$LINENO" "ontology-platform"
+if [[ "$rule" == pin ]]; then
+  git_safe -C "$ONT_CLONE" worktree add --quiet --detach "$ONT_WT" "$pin" \
+    || fail "worktree_failed" "$LINENO" "ontology-platform"
+fi
 git_safe -C "$AP_CLONE" worktree add --quiet --detach "$AP_WT" "$commit" \
   || fail "worktree_failed" "$LINENO" "agent-platform"
 
 built_ont="$ont_target/release/ont"
 built_ap="$ap_target/release/ap"
 
-if [[ -n "${AP_PULL_BUILD_CMD:-}" ]]; then
+if [[ "$rule" == tree && -f "$bin_dir/ont" && ! -L "$bin_dir/ont" && -x "$bin_dir/ont" ]] \
+  && check_version "$bin_dir/ont" "ont" "$pin"; then
+  # The installed engine already names the tree: no build.
+  built_ont="$BUILD_TMP/ont"
+  cp -- "$bin_dir/ont" "$built_ont" || fail "stage_failed" "$LINENO" "ont"
+  chmod 0755 -- "$built_ont"
+elif [[ "$rule" == tree ]]; then
+  # engine/ of the commit, exported at the clone's top level, built with its tree id (as
+  # engine/scripts/install-ont.sh builds it on the VPS).
+  ENGINE_SRC="$BUILD_TMP/engine-src"
+  mkdir -p -- "$ENGINE_SRC"
+  git_safe -C "$AP_CLONE" archive "$commit" engine | tar -x -C "$ENGINE_SRC" \
+    || fail "build_failed" "$LINENO" "git archive $commit engine"
+  if [[ -n "${AP_PULL_BUILD_CMD:-}" ]]; then
+    (cd "$ENGINE_SRC/engine" && CARGO_TARGET_DIR="$ont_target" ONT_TREE_ID="$pin" "$AP_PULL_BUILD_CMD" ont "$ENGINE_SRC/engine" "$built_ont" "$pin" >&2) \
+      || fail "build_failed" "$LINENO" "ont"
+  else
+    (cd "$ENGINE_SRC/engine" && CARGO_TARGET_DIR="$ont_target" ONT_TREE_ID="$pin" cargo build --release --locked -p ont >&2) \
+      || fail "build_failed" "$LINENO" "ont"
+  fi
+elif [[ -n "${AP_PULL_BUILD_CMD:-}" ]]; then
   (cd "$ONT_WT" && CARGO_TARGET_DIR="$ont_target" "$AP_PULL_BUILD_CMD" ont "$ONT_WT" "$built_ont" "$pin" >&2) \
     || fail "build_failed" "$LINENO" "ont"
 else

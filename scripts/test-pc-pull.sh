@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Offline tests of scripts/pc-pull.sh in temporary directories (no network, no real $HOME/.local/bin).
 # spec: specs/ap/deliver.md#R64
+# spec: specs/ap/deliver.md#R70
 set -uo pipefail
 
 script=${1:-$(cd "$(dirname "$0")" && pwd -P)/pc-pull.sh}
@@ -71,7 +72,30 @@ git -C "$t/work/ap-badpin" add ontology/ENGINE-PIN
 git -C "$t/work/ap-badpin" commit --quiet -m "bad pin"
 git -C "$t/work/ap-badpin" push --quiet origin main
 
-# Fake build stub: verifies detached worktree HEAD, verifies ONT_BIN for ap build,
+# engine_tree: a repository whose commits hold engine/ and no ontology/ENGINE-PIN (the tree rule), and one
+# whose commit holds neither.
+git init --quiet --bare --initial-branch=main "$t/ap-tree.git"
+git clone --quiet "$t/ap-tree.git" "$t/work/ap-tree"
+git -C "$t/work/ap-tree" config user.email t@example.invalid
+git -C "$t/work/ap-tree" config user.name t
+mkdir -p "$t/work/ap-tree/engine"
+printf '[workspace]\n' > "$t/work/ap-tree/engine/Cargo.toml"
+git -C "$t/work/ap-tree" add engine
+git -C "$t/work/ap-tree" commit --quiet -m "ap tree 1"
+tree_commit=$(git -C "$t/work/ap-tree" rev-parse HEAD)
+tree_id=$(git -C "$t/work/ap-tree" rev-parse HEAD:engine)
+git -C "$t/work/ap-tree" push --quiet origin main
+git init --quiet --bare --initial-branch=main "$t/ap-neither.git"
+git clone --quiet "$t/ap-neither.git" "$t/work/ap-neither"
+git -C "$t/work/ap-neither" config user.email t@example.invalid
+git -C "$t/work/ap-neither" config user.name t
+echo "neither" > "$t/work/ap-neither/README"
+git -C "$t/work/ap-neither" add README
+git -C "$t/work/ap-neither" commit --quiet -m "neither"
+git -C "$t/work/ap-neither" push --quiet origin main
+
+# Fake build stub: verifies detached worktree HEAD (for the engine of a tree: the exported engine/ and
+# ONT_TREE_ID instead), verifies ONT_BIN for ap build,
 # and emits executable shell scripts whose --version names the commit.
 cat > "$t/fake-build.sh" <<'EOF'
 #!/usr/bin/env bash
@@ -80,10 +104,18 @@ kind="$1"
 wt="$2"
 out="$3"
 rev="$4"
+if [[ "$kind" == "ont" && -n "${ONT_TREE_ID:-}" ]]; then
+  if [[ "$ONT_TREE_ID" != "$rev" || ! -f "$wt/Cargo.toml" || "$(basename "$wt")" != engine ]]; then
+    echo "engine of a tree: ONT_TREE_ID=$ONT_TREE_ID rev=$rev wt=$wt" >&2
+    exit 1
+  fi
+  printf '%s\n' "$ONT_TREE_ID" > "$FAKE_TREE_RECORD"
+else
 head_rev=$(git -C "$wt" rev-parse HEAD)
 if [[ "$head_rev" != "$rev" ]]; then
   echo "worktree HEAD $head_rev != $rev" >&2
   exit 1
+fi
 fi
 mkdir -p "$(dirname "$out")"
 if [[ "$kind" == "ont" ]]; then
@@ -103,7 +135,7 @@ elif [[ "$kind" == "ap" ]]; then
     exit 1
   fi
   expected_ont=$(cat "$FAKE_ONT_RECORD")
-  if [[ "$ONT_BIN" != "$expected_ont" ]]; then
+  if [[ "$ONT_BIN" != "$expected_ont" && "${FAKE_ONT_ANY:-}" != 1 ]]; then
     echo "ONT_BIN=$ONT_BIN != expected $expected_ont" >&2
     exit 1
   fi
@@ -132,6 +164,7 @@ chmod 0755 "$t/fake-build.sh"
 export AP_PULL_BUILD_CMD="$t/fake-build.sh"
 export FAKE_ONT_RECORD="$t/ont-built-path"
 export FAKE_AP_RECORD="$t/ap-saw-ont"
+export FAKE_TREE_RECORD="$t/tree-built"
 
 fails=0
 ok() { echo "ok   $1"; }
@@ -259,6 +292,50 @@ if [[ "$rc" -eq 1 ]] && grep -q '^readback_failed_restored@pc-pull\.sh:' "$t/err
   ok "failed post-install readback restores both binaries from .before-* backups"
 else
   bad "failed readback rollback rc=$rc err=$(cat "$t/err")"
+fi
+
+# 8. engine_tree: a commit without ontology/ENGINE-PIN builds engine/ of the commit with its tree id
+#    (HEAD:engine), fetching no other repository (the ontology URL does not exist).
+mkdir -p "$t/bin-tree"
+run_pull --ap-url "$t/ap-tree.git" --ont-url "$t/no-such-ontology.git" \
+  --bin-dir "$t/bin-tree" --state-dir "$t/state-tree"
+rc=$?
+if [[ "$rc" -eq 0 ]] \
+  && [[ "$("$t/bin-tree/ont" --version)" == "ont 0.1.0 $tree_id" ]] \
+  && [[ "$("$t/bin-tree/ap" --version)" == "ap 0.1.0 $tree_commit" ]] \
+  && [[ "$(cat "$FAKE_TREE_RECORD")" == "$tree_id" ]] \
+  && grep -q "|ont 0.1.0 $tree_id$" "$FAKE_AP_RECORD" \
+  && [[ ! -e "$t/state-tree/ontology-platform" ]] \
+  && python3 -I -B -c 'import json,sys; d=json.load(open(sys.argv[1])); assert d["status"]=="installed" and d["mode"]=="build" and d["commit"]==sys.argv[2] and d["pin"]==sys.argv[3]' \
+     "$t/out" "$tree_commit" "$tree_id"; then
+  ok "engine_tree: the engine is built from engine/ of the commit with its tree id, no other repository fetched"
+else
+  bad "engine_tree build rc=$rc out=$(cat "$t/out") err=$(cat "$t/err")"
+fi
+
+# 9. engine_tree: an installed ont that already names the tree id is not built again.
+rm -f -- "$FAKE_TREE_RECORD"
+FAKE_ONT_ANY=1 run_pull --ap-url "$t/ap-tree.git" --ont-url "$t/no-such-ontology.git" \
+  --bin-dir "$t/bin-tree" --state-dir "$t/state-tree"
+rc=$?
+if [[ "$rc" -eq 0 ]] && [[ ! -e "$FAKE_TREE_RECORD" ]] \
+  && [[ "$("$t/bin-tree/ont" --version)" == "ont 0.1.0 $tree_id" ]] \
+  && grep -q "|ont 0.1.0 $tree_id$" "$FAKE_AP_RECORD"; then
+  ok "engine_tree: an engine that names the tree id is kept without a build"
+else
+  bad "engine_tree skip rc=$rc out=$(cat "$t/out") err=$(cat "$t/err")"
+fi
+
+# 10. A commit with neither ontology/ENGINE-PIN nor engine/ is refused engine_missing (exit 2), nothing written.
+tree_ap_sha=$(sha_of "$t/bin-tree/ap")
+run_pull --ap-url "$t/ap-neither.git" --ont-url "$t/no-such-ontology.git" \
+  --bin-dir "$t/bin-tree" --state-dir "$t/state-neither"
+rc=$?
+if [[ "$rc" -eq 2 ]] && grep -q '^engine_missing@pc-pull\.sh:[0-9]*: .*neither ontology/ENGINE-PIN nor engine/' "$t/err" \
+  && [[ "$(sha_of "$t/bin-tree/ap")" == "$tree_ap_sha" ]]; then
+  ok "a commit with neither the pin nor engine/ is refused engine_missing"
+else
+  bad "neither rc=$rc err=$(cat "$t/err")"
 fi
 
 if [[ "$fails" -eq 0 ]]; then

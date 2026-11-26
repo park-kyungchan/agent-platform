@@ -1,7 +1,10 @@
 #!/bin/sh
 # Test scripts/install-ont.sh in a temporary directory with a small
 # stand-in binary (a shell script that prints the expected version line).
-# No root, no host path is touched.
+# No root, no host path is touched. The script serves the rule of a tree
+# without ontology/ENGINE-PIN (specs/ap/deliver.md R67): the fixture is a
+# repository whose engine/ holds the script, and the engine's id is the tree
+# id of engine/ at the commit installed.
 set -eu
 
 SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
@@ -16,16 +19,18 @@ fail() {
   exit 1
 }
 
-# Exercise fetch against a disposable local remote, never the host checkout.
-mkdir -p "$TMP/checkout/scripts"
-cp "$INSTALL" "$TMP/checkout/scripts/install-ont.sh"
-INSTALL=$TMP/checkout/scripts/install-ont.sh
+# A disposable repository around engine/, never the host checkout. Its
+# remote names a path that does not exist: the script fetches nothing.
+mkdir -p "$TMP/checkout/engine/scripts"
+cp "$INSTALL" "$TMP/checkout/engine/scripts/install-ont.sh"
+printf '[workspace]\n' >"$TMP/checkout/engine/Cargo.toml"
+INSTALL=$TMP/checkout/engine/scripts/install-ont.sh
 git -C "$TMP/checkout" init -q -b main
-git -C "$TMP/checkout" -c user.name=Test -c user.email=test@example.invalid commit -qm fixture --allow-empty
-git clone -q --bare "$TMP/checkout" "$TMP/origin.git"
-git -C "$TMP/checkout" remote add origin "$TMP/origin.git"
-git -C "$TMP/checkout" fetch -q origin
-GOOD=$(git -C "$TMP/checkout" rev-parse HEAD)
+git -C "$TMP/checkout" add -A
+git -C "$TMP/checkout" -c user.name=Test -c user.email=test@example.invalid commit -qm fixture
+git -C "$TMP/checkout" remote add origin "$TMP/no-such-origin.git"
+COMMIT=$(git -C "$TMP/checkout" rev-parse HEAD)
+GOOD=$(git -C "$TMP/checkout" rev-parse HEAD:engine)
 
 make_standin() {
   # $1 = path, $2 = marker comment (makes the bytes differ)
@@ -48,19 +53,20 @@ SHA_V2=$(sha256sum "$TMP/ont-v2" | awk '{print $1}')
 run_test_install() {
   # $1 = prebuilt path; extra env is inherited from the caller.
   ONT_INSTALL_TEST=1 ONT_INSTALL_BIN_DIR="$BIN1" ONT_INSTALL_STATE_DIR="$STATE1" \
-    ONT_INSTALL_PREBUILT="$1" "$INSTALL" install "$GOOD" >/dev/null
+    ONT_INSTALL_PREBUILT="$1" "$INSTALL" install "$COMMIT" >/dev/null
 }
 
-# install (prebuilt stand-in) and check passes.
+# install (prebuilt stand-in) and check passes; installed.json names the tree id.
 run_test_install "$TMP/ont-v1"
 [ -x "$BIN1/ont" ] || fail "binary was not installed"
+grep -q "\"commit\":\"$GOOD\"" "$STATE1/install/installed.json" || fail "installed.json does not name the tree id"
 ONT_INSTALL_TEST=1 ONT_INSTALL_BIN_DIR="$BIN1" ONT_INSTALL_STATE_DIR="$STATE1" \
   "$INSTALL" check >/dev/null || fail "check failed after first install"
 
 # A dry-run install changes nothing.
 before=$(sha256sum "$BIN1/ont" | awk '{print $1}')
 ONT_INSTALL_TEST=1 ONT_INSTALL_BIN_DIR="$BIN1" ONT_INSTALL_STATE_DIR="$STATE1" \
-  ONT_INSTALL_PREBUILT="$TMP/ont-v2" "$INSTALL" install "$GOOD" --dry-run >/dev/null
+  ONT_INSTALL_PREBUILT="$TMP/ont-v2" "$INSTALL" install "$COMMIT" --dry-run >/dev/null
 after=$(sha256sum "$BIN1/ont" | awk '{print $1}')
 [ "$before" = "$after" ] || fail "dry-run changed the installed binary"
 
@@ -98,14 +104,14 @@ code=$?
 [ "$code" -eq 2 ] || fail "bad commit exited $code, want 2"
 
 ONT_INSTALL_BIN_DIR="$BIN1" ONT_INSTALL_STATE_DIR="$STATE1" \
-  ONT_INSTALL_PREBUILT="$TMP/ont-v1" "$INSTALL" install "$GOOD" >"$TMP/guard.err" 2>&1
+  ONT_INSTALL_PREBUILT="$TMP/ont-v1" "$INSTALL" install "$COMMIT" >"$TMP/guard.err" 2>&1
 code=$?
 [ "$code" -eq 2 ] || fail "overrides without ONT_INSTALL_TEST exited $code, want 2"
 rg_guard=$(cat "$TMP/guard.err")
 case $rg_guard in *"require ONT_INSTALL_TEST=1"*) ;; *) fail "wrong override guard reason" ;; esac
 
 ONT_INSTALL_TEST=1 ONT_INSTALL_BIN_DIR=/usr/local/bin ONT_INSTALL_STATE_DIR="$STATE1" \
-  ONT_INSTALL_PREBUILT="$TMP/ont-v1" "$INSTALL" install "$GOOD" >/dev/null 2>&1
+  ONT_INSTALL_PREBUILT="$TMP/ont-v1" "$INSTALL" install "$COMMIT" >/dev/null 2>&1
 code=$?
 set -e
 [ "$code" -eq 2 ] || fail "override equal to the real directory exited $code, want 2"
@@ -179,46 +185,52 @@ fixture rollback >/dev/null || fail 'rollback did not create missing binary dire
 fixture check >/dev/null || fail 'check failed after recreating binary directory'
 
 # spec: specs/ont/cli.md#R1
-# Refresh a stale ref before checking ancestry.
-git -C "$TMP/checkout" -c user.name=Test -c user.email=test@example.invalid commit -qm newer --allow-empty
-git -C "$TMP/checkout" push -q origin main
-GOOD=$(git -C "$TMP/checkout" rev-parse HEAD)
+# No fetch and no ancestor check: the remote does not exist, and a commit on
+# no branch installs; the refs are unchanged.
+refs_before=$(git -C "$TMP/checkout" for-each-ref)
+fixture install "$COMMIT" --dry-run >"$TMP/dry"
+case $(cat "$TMP/dry") in *"engine/ of $COMMIT is the tree $GOOD; no fetch and no ancestor check"*) ;; *) fail 'dry run did not name the tree' ;; esac
+case $(cat "$TMP/dry") in *fetch\ origin*) fail 'dry run names a fetch' ;; esac
+printf 'side\n' >"$TMP/checkout/side.txt"
+git -C "$TMP/checkout" add side.txt
+git -C "$TMP/checkout" -c user.name=Test -c user.email=test@example.invalid commit -qm side
+SIDE=$(git -C "$TMP/checkout" rev-parse HEAD)
+git -C "$TMP/checkout" reset -q --hard "$COMMIT"
+refs_before=$(git -C "$TMP/checkout" for-each-ref)
 make_standin "$TMP/new-head" newer
-old_ref=$(git -C "$TMP/checkout" rev-parse refs/remotes/origin/main)
-git -C "$TMP/checkout" update-ref refs/remotes/origin/main "$old_ref~1"
-fixture install "$(git -C "$TMP/checkout" rev-parse "$old_ref~1")" --dry-run >"$TMP/dry"
-case $(cat "$TMP/dry") in *'fetch origin +refs/heads/main:refs/remotes/origin/main --refmap= before the ancestor check'*) ;; *) fail 'dry run omitted fetch step' ;; esac
-[ "$(git -C "$TMP/checkout" rev-parse refs/remotes/origin/main)" = "$(git -C "$TMP/checkout" rev-parse "$old_ref~1")" ] || fail 'dry run fetched'
-run_test_install "$TMP/new-head"
-[ "$(git -C "$TMP/checkout" rev-parse refs/remotes/origin/main)" = "$GOOD" ] || fail 'install did not fetch'
-
-# fetch_uses_only_main: do not honor a broader configured fetch destination.
-git -C "$TMP/checkout" config remote.origin.fetch '+refs/heads/*:refs/ont-test/*'
-run_test_install "$TMP/new-head"
-[ -z "$(git -C "$TMP/checkout" for-each-ref refs/ont-test/)" ] || fail 'fetch used the configured refspec'
+ONT_INSTALL_TEST=1 ONT_INSTALL_BIN_DIR="$BIN1" ONT_INSTALL_STATE_DIR="$STATE1" \
+  ONT_INSTALL_PREBUILT="$TMP/new-head" "$INSTALL" install "$SIDE" >/dev/null || fail 'a commit on no branch did not install'
+[ "$(git -C "$TMP/checkout" for-each-ref)" = "$refs_before" ] || fail 'install changed a ref'
+fixture check >/dev/null || fail 'check failed after the install of a side commit'
 # spec: specs/ont/cli.md#R6
 # inherited_git_environment_does_not_change_other_repository_refs.
 mkdir "$TMP/other"
 git -C "$TMP/other" init -q
-git -C "$TMP/other" remote add origin "$TMP/origin.git"
+git -C "$TMP/other" remote add origin "$TMP/no-such-origin.git"
 other_before=$(git -C "$TMP/other" for-each-ref)
 env GIT_DIR="$TMP/other/.git" GIT_WORK_TREE="$TMP/other" GIT_INDEX_FILE="$TMP/other/index" GIT_COMMON_DIR="$TMP/other/.git" \
-  ONT_INSTALL_TEST=1 ONT_INSTALL_BIN_DIR="$BIN1" ONT_INSTALL_STATE_DIR="$STATE1" ONT_INSTALL_PREBUILT="$TMP/new-head" "$INSTALL" install "$GOOD" >/dev/null
+  ONT_INSTALL_TEST=1 ONT_INSTALL_BIN_DIR="$BIN1" ONT_INSTALL_STATE_DIR="$STATE1" ONT_INSTALL_PREBUILT="$TMP/new-head" "$INSTALL" install "$COMMIT" >/dev/null
 [ "$(git -C "$TMP/other" for-each-ref)" = "$other_before" ] || fail 'inherited Git environment changed another repository ref'
 # spec: specs/ont/cli.md#R7
-# unknown_commit_has_its_own_refusal after a successful fetch.
+# unknown_commit_has_its_own_refusal; a commit without engine/ is engine_missing.
 expect_refusal 'commit_unknown: 0000000000000000000000000000000000000000' fixture install 0000000000000000000000000000000000000000
+git -C "$TMP/checkout" checkout -q --orphan bare
+git -C "$TMP/checkout" rm -rq --cached .
+git -C "$TMP/checkout" -c user.name=Test -c user.email=test@example.invalid commit -qm none --allow-empty
+NOENGINE=$(git -C "$TMP/checkout" rev-parse HEAD)
+git -C "$TMP/checkout" checkout -qf main
+expect_refusal "engine_missing: $NOENGINE holds no engine/" fixture install "$NOENGINE"
+printf '#!/bin/sh\ncase "$*" in *cat-file*) exit 128 ;; esac\nexec /usr/bin/git "$@"\n' >"$TMP/tools/git"
+chmod +x "$TMP/tools/git"
+expect_refusal 'git_unavailable: commit lookup failed' env PATH="$TMP/tools:$PATH" ONT_INSTALL_TEST=1 ONT_INSTALL_BIN_DIR="$BIN1" ONT_INSTALL_STATE_DIR="$STATE1" ONT_INSTALL_PREBUILT="$TMP/new-head" "$INSTALL" install "$COMMIT"
+rm "$TMP/tools/git"
 
 # Fault injection uses PATH wrappers only in the disposable fixture.
-printf '#!/bin/sh\ncase "$*" in *merge-base*) exit 128 ;; esac\nexec /usr/bin/git "$@"\n' >"$TMP/tools/git"
-chmod +x "$TMP/tools/git"
-expect_refusal 'git_unavailable: ancestor check failed (status 128)' env PATH="$TMP/tools:$PATH" ONT_INSTALL_TEST=1 ONT_INSTALL_BIN_DIR="$BIN1" ONT_INSTALL_STATE_DIR="$STATE1" ONT_INSTALL_PREBUILT="$TMP/new-head" "$INSTALL" install "$GOOD"
-rm "$TMP/tools/git"
 # spec: specs/ont/cli.md#R4
 # A corrupted backup copy must be refused before replacement.
 printf '#!/bin/sh\n/usr/bin/cp "$@" || exit $?\nprintf x >>"$2"\n' >"$TMP/tools/cp"
 chmod +x "$TMP/tools/cp"
-expect_refusal 'previous binary copy is missing or has the wrong sha256' env PATH="$TMP/tools:$PATH" ONT_INSTALL_TEST=1 ONT_INSTALL_BIN_DIR="$BIN1" ONT_INSTALL_STATE_DIR="$STATE1" ONT_INSTALL_PREBUILT="$TMP/new-head" "$INSTALL" install "$GOOD"
+expect_refusal 'previous binary copy is missing or has the wrong sha256' env PATH="$TMP/tools:$PATH" ONT_INSTALL_TEST=1 ONT_INSTALL_BIN_DIR="$BIN1" ONT_INSTALL_STATE_DIR="$STATE1" ONT_INSTALL_PREBUILT="$TMP/new-head" "$INSTALL" install "$COMMIT"
 cmp "$TMP/new-head" "$BIN1/ont" || fail 'bad backup replaced binary'
 rm "$TMP/tools/cp"
 # spec: specs/ont/cli.md#R8
@@ -227,7 +239,7 @@ printf '#!/bin/sh\ncase "$2" in */installed.json) exit 1 ;; esac\nexec /usr/bin/
 chmod +x "$TMP/tools/mv"
 make_standin "$TMP/last" last
 set +e
-env PATH="$TMP/tools:$PATH" ONT_INSTALL_TEST=1 ONT_INSTALL_BIN_DIR="$BIN1" ONT_INSTALL_STATE_DIR="$STATE1" ONT_INSTALL_PREBUILT="$TMP/last" "$INSTALL" install "$GOOD" >"$TMP/recovery" 2>&1
+env PATH="$TMP/tools:$PATH" ONT_INSTALL_TEST=1 ONT_INSTALL_BIN_DIR="$BIN1" ONT_INSTALL_STATE_DIR="$STATE1" ONT_INSTALL_PREBUILT="$TMP/last" "$INSTALL" install "$COMMIT" >"$TMP/recovery" 2>&1
 code=$?
 set -e
 [ "$code" -ne 0 ] || fail 'state write failure succeeded'
@@ -258,7 +270,7 @@ fixture check >/dev/null || fail 'printed rollback recovery command did not repa
 printf '#!/bin/sh\nexit 1\n' >"$TMP/tools/install"
 chmod +x "$TMP/tools/install"
 set +e
-env PATH="$TMP/tools:$PATH" ONT_INSTALL_TEST=1 ONT_INSTALL_BIN_DIR="$BIN1" ONT_INSTALL_STATE_DIR="$STATE1" ONT_INSTALL_PREBUILT="$TMP/last" "$INSTALL" install "$GOOD" >/dev/null 2>&1
+env PATH="$TMP/tools:$PATH" ONT_INSTALL_TEST=1 ONT_INSTALL_BIN_DIR="$BIN1" ONT_INSTALL_STATE_DIR="$STATE1" ONT_INSTALL_PREBUILT="$TMP/last" "$INSTALL" install "$COMMIT" >/dev/null 2>&1
 code=$?
 set -e
 [ "$code" -ne 0 ] || fail 'temporary install failure succeeded'
@@ -269,21 +281,23 @@ rm "$TMP/tools/install"
 printf '#!/bin/sh\nprintf "%%s\\n" "$3" >"$ONT_DF_LOG"\nprintf "Avail\\n${ONT_TEST_AVAIL:-9}G\\n"\n' >"$TMP/tools/df"
 chmod +x "$TMP/tools/df"
 # The fixture root is trusted so the case holds wherever $TMP lies.
-expect_refusal 'free space on the build file system is under 10 GiB' env PATH="$TMP/tools:$PATH" ONT_DF_LOG="$TMP/df-path" TMPDIR="$TMP" ONT_INSTALL_TEST=1 ONT_INSTALL_TEST_TRUST="$TMP" ONT_INSTALL_BIN_DIR="$BIN1" ONT_INSTALL_STATE_DIR="$STATE1" "$INSTALL" install "$GOOD"
+expect_refusal 'free space on the build file system is under 10 GiB' env PATH="$TMP/tools:$PATH" ONT_DF_LOG="$TMP/df-path" TMPDIR="$TMP" ONT_INSTALL_TEST=1 ONT_INSTALL_TEST_TRUST="$TMP" ONT_INSTALL_BIN_DIR="$BIN1" ONT_INSTALL_STATE_DIR="$STATE1" "$INSTALL" install "$COMMIT"
 case $(cat "$TMP/df-path") in "$STATE1"/build/install.*) ;; *) fail 'df did not inspect the new directory under the build base' ;; esac
 
 # At exactly 10 GiB, the guard passes and the disposable build reaches cargo.
-printf '#!/bin/sh\nexit 77\n' >"$TMP/tools/cargo"
+printf '#!/bin/sh\nprintf "%%s %%s\\n" "$PWD" "$ONT_TREE_ID" >"$ONT_CARGO_LOG"\nexit 77\n' >"$TMP/tools/cargo"
 # The Cargo stub does no build; CI hosts need no real host-specific lock path.
 # The stub grants the build base lock (flock -n <fd>) and runs the command
 # under the Cargo lock.
 printf '#!/bin/sh\n[ "$1" != -n ] || exit 0\nshift\nexec "$@"\n' >"$TMP/tools/flock"
 chmod +x "$TMP/tools/cargo" "$TMP/tools/flock"
 set +e
-env PATH="$TMP/tools:$PATH" ONT_TEST_AVAIL=10 ONT_DF_LOG="$TMP/df-path" TMPDIR="$TMP" ONT_INSTALL_TEST=1 ONT_INSTALL_TEST_TRUST="$TMP" ONT_INSTALL_BIN_DIR="$BIN1" ONT_INSTALL_STATE_DIR="$STATE1" "$INSTALL" install "$GOOD" >"$TMP/ten-gib" 2>&1
+env PATH="$TMP/tools:$PATH" ONT_CARGO_LOG="$TMP/cargo-log" ONT_TEST_AVAIL=10 ONT_DF_LOG="$TMP/df-path" TMPDIR="$TMP" ONT_INSTALL_TEST=1 ONT_INSTALL_TEST_TRUST="$TMP" ONT_INSTALL_BIN_DIR="$BIN1" ONT_INSTALL_STATE_DIR="$STATE1" "$INSTALL" install "$COMMIT" >"$TMP/ten-gib" 2>&1
 code=$?
 set -e
 [ "$code" -eq 77 ] || fail "10 GiB did not reach the stand-in cargo (status $code)"
+# Cargo ran in engine/ of the archive of the commit, with the tree id in ONT_TREE_ID.
+case $(cat "$TMP/cargo-log") in "$STATE1"/build/install.*/src/engine\ "$GOOD") ;; *) fail "cargo did not build engine/ of the archive with ONT_TREE_ID: $(cat "$TMP/cargo-log")" ;; esac
 
 # spec: specs/ont/cli.md#R14
 # The build base: every existing component of its path is checked without
@@ -296,7 +310,7 @@ printf '#!/bin/sh\nprintf "Avail\\n9G\\n"\n' >"$R14/tools/df"
 chmod +x "$R14/tools/df"
 r14_install() {
   # $1 = state directory; the fixture root is trusted.
-  env PATH="$R14/tools:$PATH" ONT_INSTALL_TEST=1 ONT_INSTALL_TEST_TRUST="$TMP" ONT_INSTALL_BIN_DIR="$R14/bin" ONT_INSTALL_STATE_DIR="$1" "$INSTALL" install "$GOOD"
+  env PATH="$R14/tools:$PATH" ONT_INSTALL_TEST=1 ONT_INSTALL_TEST_TRUST="$TMP" ONT_INSTALL_BIN_DIR="$R14/bin" ONT_INSTALL_STATE_DIR="$1" "$INSTALL" install "$COMMIT"
 }
 expect_line() {
   # $1 = the exact line the last refusal must hold.
@@ -352,8 +366,8 @@ expect_refusal 'free space on the build file system is under 10 GiB' r14_install
 [ -f "$R14/new/p/s/build/.lock" ] || fail 'the lock file was removed'
 # The trust hook needs the test flag and must lie above the base.
 expect_refusal 'ONT_INSTALL_TEST_TRUST require ONT_INSTALL_TEST=1' env ONT_INSTALL_TEST_TRUST="$TMP" "$INSTALL" check
-expect_refusal 'ONT_INSTALL_TEST_TRUST must be a directory above the build base' env PATH="$R14/tools:$PATH" ONT_INSTALL_TEST=1 ONT_INSTALL_TEST_TRUST="$R14/elsewhere" ONT_INSTALL_BIN_DIR="$R14/bin" ONT_INSTALL_STATE_DIR="$R14/new/p/s" "$INSTALL" install "$GOOD"
+expect_refusal 'ONT_INSTALL_TEST_TRUST must be a directory above the build base' env PATH="$R14/tools:$PATH" ONT_INSTALL_TEST=1 ONT_INSTALL_TEST_TRUST="$R14/elsewhere" ONT_INSTALL_BIN_DIR="$R14/bin" ONT_INSTALL_STATE_DIR="$R14/new/p/s" "$INSTALL" install "$COMMIT"
 # A relative base is refused.
-expect_refusal 'build_dir_unsafe' env PATH="$R14/tools:$PATH" ONT_INSTALL_TEST=1 ONT_INSTALL_BIN_DIR="$R14/bin" ONT_INSTALL_STATE_DIR=relative-state "$INSTALL" install "$GOOD"
+expect_refusal 'build_dir_unsafe' env PATH="$R14/tools:$PATH" ONT_INSTALL_TEST=1 ONT_INSTALL_BIN_DIR="$R14/bin" ONT_INSTALL_STATE_DIR=relative-state "$INSTALL" install "$COMMIT"
 expect_line 'refused: build_dir_unsafe: relative-state/build'
 printf 'test-install-ont: PASS\n'
