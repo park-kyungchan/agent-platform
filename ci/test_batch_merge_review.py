@@ -522,7 +522,7 @@ class BatchMergeReviewTest(Case):
             "crates/ap/build.rs", "Cargo.toml", "crates/ap/Cargo.toml", "Cargo.lock",
             ".cargo/config", "sub/.cargo/config.toml", ".cargo", "ci/test.py", ".github/x",
             "specs/ap/unit.md", "scripts/install-ap.sh", "deploy/x", "etc/x", "content/AGENTS.md",
-            "github/apply", "ontology/rehearsal.sh", "ontology/ENGINE-PIN", "ontology/work.schema.json",
+            "github/apply", "ontology/rehearsal.sh", "ontology/notes.md", "ontology/work.schema.json",
             "ontology/migrate",
         ]
         unprotected_examples = [

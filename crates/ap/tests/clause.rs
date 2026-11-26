@@ -535,6 +535,57 @@ fn r4_the_tests_that_cite_a_clause() {
     assert_eq!(tests[1], "tests/a.sh:1");
     assert_eq!(tests[99], "tests/a.sh:99");
     assert_eq!(by("R3")["tests"], json!(["ci/x.py:1"]));
+    // The engine's specifications under engine/specs/ont/ are clauses, and a file under engine/ cites them as
+    // specs/ont/...; a citation of specs/ont/ outside engine/ stays as written.
+    let repo = alpha()
+        .file(
+            "engine/specs/ont/cli.md",
+            "# CLI\n\n- R4: The command.\n",
+            6,
+        )
+        .file(
+            "engine/specs/other.md",
+            "- R1: Not of the engine's specifications.\n",
+            7,
+        )
+        .file(
+            "engine/crates/ont/tests/cli.rs",
+            "// spec:\x20specs/ont/cli.md#R4\n// spec:\x20specs/w.md#R1\n",
+            8,
+        )
+        .file(
+            "engine/scripts/test-install-ont.sh",
+            "# spec:\x20specs/ont/cli.md#R4\n",
+            9,
+        )
+        .file("tests/b.rs", "// spec:\x20specs/ont/cli.md#R4\n", 10);
+    let mut fake = Fake::new(&dir, &[("o/alpha", repo)]);
+    run(&mut fake, &dir, &["--repository", "o/alpha"]);
+    let all = records(&dir.at("clause/o__alpha.clauses.jsonl"));
+    let engine: Vec<&Value> = all
+        .iter()
+        .filter(|x| x["path"] == "engine/specs/ont/cli.md")
+        .collect();
+    assert_eq!(engine.len(), 1);
+    assert_eq!(engine[0]["key"], "o/alpha:engine/specs/ont/cli.md#R4");
+    assert_eq!(
+        engine[0]["tests"],
+        json!([
+            "engine/crates/ont/tests/cli.rs:1",
+            "engine/scripts/test-install-ont.sh:1"
+        ])
+    );
+    assert!(!all.iter().any(|x| x["path"] == "engine/specs/other.md"));
+    let w1 = all
+        .iter()
+        .find(|x| x["path"] == "specs/w.md" && x["rule"] == "R1")
+        .unwrap();
+    assert!(
+        w1["tests"]
+            .as_array()
+            .unwrap()
+            .contains(&json!("engine/crates/ont/tests/cli.rs:2"))
+    );
     assert_eq!(
         clause::citations(
             "a spec:\x20specs/a/b.md#R7, spec:\x20specs/c.md#R8x spec:\x20specs/d.txt#R1"
@@ -872,7 +923,7 @@ fn r11_the_service_and_its_timer() {
     let service = std::fs::read_to_string(root.join("deploy/ap-clause.service")).unwrap();
     let route = std::fs::read_to_string(root.join("deploy/ap-route.service")).unwrap();
     assert!(service.lines().any(|l| l
-        == "ExecStart=/usr/local/bin/ap clause index --prune --repository park-kyungchan/agent-platform --repository park-kyungchan/ontology-platform --repository park-kyungchan/agent-vps-operations"));
+        == "ExecStart=/usr/local/bin/ap clause index --prune --repository park-kyungchan/agent-platform --repository park-kyungchan/agent-vps-operations"));
     // The lines of the route service, but its description, its comment and its command.
     let rest = |text: &str| -> Vec<String> {
         (text.lines())

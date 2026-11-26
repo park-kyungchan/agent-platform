@@ -1087,7 +1087,7 @@ apply('set_request_aside', 'reason-empty', dict(request=r1, reason=''), 'reason_
 tick(); apply('set_request_aside', 'r1', dict(request=r1, reason='a question answered at once'))
 f = fields(r1); assert f['route'] == 'aside' and f['route_reason'] == 'a question answered at once' and f.get('intent') is None and f['routed_at'] == stamp() and f['words'] == 'Invented words of r1.', f
 print('v10_walk_rows_complete')
-# The role of the actor: the engine of ontology/ENGINE-PIN knows it and ships the verb log.
+# The role of the actor: the engine of engine/ knows it and ships the verb log.
 tick(); assumed = oid('intent', 'widget-assume'); apply('draft_intent', 'assume', dict(dp, intent=assumed, origin=request('o-assume', 'order')))
 apply('add_criterion', 'assume', dict(cp, intent=assumed))
 apply('assume_intent', 'no-role', dict(intent=assumed, reason='the user is away'), 'not_the_lead')

@@ -1129,7 +1129,9 @@ fn engine_tree(s: &mut impl System, c: &Call, commit: &str) -> Tree {
         return Tree::Unreadable;
     };
     let id = list.lines().find_map(|line| {
-        let id = line.strip_prefix("040000 tree ")?.strip_suffix("\tengine")?;
+        let id = line
+            .strip_prefix("040000 tree ")?
+            .strip_suffix("\tengine")?;
         hex40(id).then(|| id.to_owned())
     });
     id.map_or(Tree::Missing, Tree::Id)
@@ -1465,7 +1467,12 @@ fn rollback(s: &mut impl System, c: &mut Call, target: &Value) -> Step<()> {
 }
 /// The commit `<ONT_INSTALL_BIN_DIR>/ont --version` names (README "The engine and the schema").
 fn engine_at(s: &mut impl System, c: &Call) -> Option<String> {
-    let out = run(s, &format!("{}/ont", c.ont_dir), args(&["--version"]), 10_000)?;
+    let out = run(
+        s,
+        &format!("{}/ont", c.ont_dir),
+        args(&["--version"]),
+        10_000,
+    )?;
     let words: Vec<&str> = out.lines().next()?.split_whitespace().collect();
     (words.len() == 3 && words[0] == "ont" && hex40(words[2])).then(|| words[2].to_owned())
 }
@@ -1557,7 +1564,7 @@ fn engine_install(
     let words = ["install".to_owned(), tip];
     engine_attempt(s, c, pin, from, own, repository, &words)
 }
-/// The engine's attempt (R43): the index run, `start_install`, the installer with `words`, the read,
+/// The engine's attempt (R67): the index run, `start_install`, the installer with `words`, the read,
 /// the rollback when at neither, the close, the index run.
 fn engine_attempt(
     s: &mut impl System,

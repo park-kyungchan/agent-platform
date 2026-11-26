@@ -546,34 +546,18 @@ pub fn engine_line(line: &str) -> Option<String> {
     let words: Vec<&str> = line.split_whitespace().collect();
     (words.len() == 3 && words[0] == "ont" && hex40(words[2])).then(|| words[2].to_owned())
 }
-/// Whether the call runs here for its engine (R19): the worktree has a pinned engine and the PC's
-/// `ont` names no revision equal to it; a pin that is not 40 hexadecimal digits equals none.
+/// Whether the call runs here for its engine (R19): the worktree names an engine (R25) and the PC's
+/// `ont` names no revision equal to it; a name that is not 40 hexadecimal digits equals none.
 pub fn engine_differs(pin: Option<&str>, engine: Option<&str>) -> bool {
     pin.is_some_and(|p| !(hex40(p) && engine == Some(p)))
 }
-/// The pinned engine of a worktree (R19): the text of `<dir>/ontology/ENGINE-PIN` without whitespace
-/// when that is a regular file of its working tree, read here; None without one. A file that cannot
-/// be read is an empty pin, which no engine names.
-pub fn engine_pin(dir: &str) -> Option<String> {
-    let ontology = Path::new(dir).join("ontology");
-    let file = ontology.join("ENGINE-PIN");
-    let regular = fs::symlink_metadata(&ontology).is_ok_and(|m| m.is_dir())
-        && fs::symlink_metadata(&file).is_ok_and(|m| m.is_file());
-    regular.then(|| {
-        let bytes = fs::read(&file).unwrap_or_default();
-        String::from_utf8_lossy(&bytes).split_whitespace().collect()
-    })
-}
 /// The engine a worktree names (R19, R25), read on this host without running anything of the worktree.
-/// A worktree that holds `ontology/ENGINE-PIN` (any entry) keeps R19's pin (`engine_pin`). One without it
-/// whose working tree holds the directory `engine/` names the Git tree id of `engine/` at `HEAD`
+/// A worktree whose working tree holds the directory `engine/` names the Git tree id of `engine/` at `HEAD`
 /// (`git rev-parse HEAD:engine`); a modified `engine/` (`git status --porcelain -- engine` prints anything)
-/// or an id that cannot be read is an empty pin, which no engine names. Neither: no engine, as R19 says.
+/// or an id that cannot be read is an empty name, which no engine names. Any other file of the worktree is
+/// not read. Without `engine/`: no engine, and the call is placed as R4 says.
 pub(crate) fn worktree_engine(ctx: &Ctx, dir: &str) -> Option<String> {
     let root = Path::new(dir);
-    if fs::symlink_metadata(root.join("ontology/ENGINE-PIN")).is_ok() {
-        return engine_pin(dir);
-    }
     if !fs::symlink_metadata(root.join("engine")).is_ok_and(|m| m.is_dir()) {
         return None;
     }
@@ -1558,14 +1542,14 @@ mod tests {
         ] {
             assert_eq!(engine_line(&bad), None, "{bad:?}");
         }
-        // No pin: the engine does not matter. A pin: only the same revision is equal.
+        // No engine named: the PC's engine does not matter. A name: only the same revision is equal.
         assert!(!engine_differs(None, None));
         assert!(!engine_differs(None, Some(rev)));
         assert!(!engine_differs(Some(rev), Some(rev)));
         assert!(engine_differs(Some(rev), None));
         let other = "1123456789abcdef0123456789abcdef01234567";
         assert!(engine_differs(Some(rev), Some(other)));
-        // A pin that is not 40 hexadecimal digits equals none.
+        // A name that is not 40 hexadecimal digits equals none.
         for pin in ["", "abc", "0123456789ABCDEF0123456789ABCDEF01234567"] {
             assert!(engine_differs(Some(pin), Some(pin)), "{pin:?}");
         }
@@ -1590,29 +1574,6 @@ mod tests {
         // The readings unread: no answer, whatever the engine.
         assert_eq!(probe_answer(&format!("4 0.5\nont 0.1.0 {rev}\n")), None);
         assert_eq!(probe_answer(""), None);
-    }
-
-    // spec: specs/ap/check.md#R19
-    #[test]
-    fn the_pin_is_a_regular_file_of_the_working_tree_without_whitespace() {
-        let root = std::env::temp_dir().join(format!("ap-check-pin.{}", std::process::id()));
-        let _ = fs::remove_dir_all(&root);
-        let dir = root.to_str().unwrap().to_owned();
-        fs::create_dir_all(root.join("ontology")).unwrap();
-        assert_eq!(engine_pin(&dir), None);
-        fs::write(root.join("ontology/ENGINE-PIN"), " abc\n def \n").unwrap();
-        assert_eq!(engine_pin(&dir).as_deref(), Some("abcdef"));
-        fs::write(root.join("ontology/ENGINE-PIN"), "").unwrap();
-        assert_eq!(engine_pin(&dir).as_deref(), Some(""));
-        // A link or a directory is no pinned engine.
-        fs::remove_file(root.join("ontology/ENGINE-PIN")).unwrap();
-        fs::write(root.join("elsewhere"), "abc").unwrap();
-        std::os::unix::fs::symlink("../elsewhere", root.join("ontology/ENGINE-PIN")).unwrap();
-        assert_eq!(engine_pin(&dir), None);
-        fs::remove_file(root.join("ontology/ENGINE-PIN")).unwrap();
-        fs::create_dir(root.join("ontology/ENGINE-PIN")).unwrap();
-        assert_eq!(engine_pin(&dir), None);
-        fs::remove_dir_all(&root).unwrap();
     }
 
     #[test]

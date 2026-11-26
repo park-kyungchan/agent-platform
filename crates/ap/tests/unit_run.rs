@@ -2814,9 +2814,9 @@ fn r36_a_plain_unit_stops_on_a_protected_path_and_a_contract_unit_goes_on() {
         (".cargo", ".cargo", &[], "ln -s elsewhere .cargo"),
         (
             "ontology/**",
-            "ontology/ENGINE-PIN",
+            "ontology/notes.md",
             &[],
-            "mkdir ontology; echo x > ontology/ENGINE-PIN",
+            "mkdir ontology; echo x > ontology/notes.md",
         ),
         // Trees that delivery runs or installs as root: a changed file, and a file added beside
         // `ontology/migrate` that Python would load in its place.
@@ -3759,13 +3759,13 @@ fn r20_the_read_after_a_verifier_includes_the_state_and_its_failure_closes_the_r
     );
 }
 
-/// One walk by the real engine of `ontology/ENGINE-PIN` on a scratch store, the fake CLI and the fakes of
+/// One walk by the real engine of `engine/` on a scratch store, the fake CLI and the fakes of
 /// the hosting service above: `AP_UNIT_RUN_TEMPLATE` names a directory whose `store.sqlite` holds the
 /// schema of this repository, installed from a copy redirected as `ontology/rehearsal.sh` redirects it,
 /// and the `ready` unit `widgets-list` (of the lane `objective`, class `plain`, under a confirmed intent
 /// whose plan is reviewed and whose Lead session is `lead-1`). Each walk prints one line.
 #[test]
-#[ignore = "the walk: needs the pinned engine and a scratch store named by AP_UNIT_RUN_TEMPLATE"]
+#[ignore = "the walk: needs the engine of engine/ and a scratch store named by AP_UNIT_RUN_TEMPLATE"]
 fn walk_with_the_real_engine() {
     let line = |name: &str, f: &F, a: &Value| {
         let stopped: Vec<String> = f
@@ -3950,7 +3950,7 @@ fn walk_with_the_real_engine() {
 /// scratch store of `walk_with_the_real_engine` (its unit of the lane `objective`, class `plain`, under
 /// an intent whose Lead session is `lead-1`). Each walk prints one line.
 #[test]
-#[ignore = "the walk: needs the pinned engine and a scratch store named by AP_UNIT_RUN_TEMPLATE"]
+#[ignore = "the walk: needs the engine of engine/ and a scratch store named by AP_UNIT_RUN_TEMPLATE"]
 fn walk_the_merge_with_the_real_engine() {
     let line = |name: &str, f: &F, a: &Value, status: u8| {
         println!(

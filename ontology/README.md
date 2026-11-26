@@ -1,6 +1,8 @@
 # ontology
 `work.schema.json` declares the `work` domain for the `ont` command of the
-`ontology-platform` repository: object types built from files of this host's
+engine, `engine/` of this repository (until the engine moved in, the
+`ontology-platform` repository; the sections of older versions below name its
+pins as they were): object types built from files of this host's
 daily work, plus Ontology-owned program state. Files remain authoritative for
 source-owned types; actions alone write the Ontology-owned types.
 
@@ -884,7 +886,7 @@ applied by hand without its aside (1 carried, 2 already), three unknown pairs (e
 and the pair the repository's file names. Then every action of this section is applied and every refusal
 above is asserted, each before the action it guards. The rows that need the role of the actor
 (`assume_intent`, `confirm_intent_delegated`, `end_delegation`, and the read back with `ont log`) run with the
-engine of `ontology/ENGINE-PIN`, which knows the role and has the verb `log`. Since version 11 the second store
+engine of `engine/`, which knows the role and has the verb `log`. Since version 11 the second store
 installs version 10 from Git instead of the repository's file (section "Version 11"), runs the migration
 again after a carried row was triaged with the old verb (0 carried, 3 already), and names the pairs it uses
 by number.
@@ -1292,7 +1294,7 @@ The routes answer where a fact lives, so a reader asks once instead of reading f
 "Routes"); `ont fn route` answers from the current objects.
 
 ### `section`: one heading of a Markdown file
-One object per heading of each `*.md` file at `origin/main` of agent-platform, ontology-platform and
+One object per heading of each `*.md` file at `origin/main` of agent-platform (the engine's `engine/` included) and
 agent-vps-operations, and of the installed shared instructions under `/root/.agents`, with the text above a file's
 first heading (or a whole file without a heading) as one more. The Academy's repositories are not indexed. Keyed by
 the hex SHA-256 of the repository (or `instructions`), the path, the heading path and the ordinal among equal heading
