@@ -16,6 +16,9 @@ against the engine built from `engine/` and named by its Git tree id
 `engine/` holds the source of the Ontology engine with its history, a
 workspace of its own whose steps `./check engine` runs
 ([engine/README.md](engine/README.md)).
+`host/` holds the host's configuration with its history: the policy file that
+`ap deliver` installs through `host/scripts/install-etc.sh`, the recorded copies of
+host files and the system Git configuration ([host/README.md](host/README.md)).
 How an agent works here: [AGENTS.md](AGENTS.md). What blocks a pull request: [REVIEW.md](REVIEW.md).
 
 Source changes require independent review and Lead integration. Real-host

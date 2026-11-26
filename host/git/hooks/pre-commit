@@ -1,0 +1,155 @@
+#!/usr/bin/env bash
+# The roster check: refuses a commit that stages a roster name or id, and
+# refuses when the roster cannot be read. Installed as
+# /usr/local/lib/agents-git/hooks/pre-commit and run by Git through
+# core.hooksPath for the scopes in git/system.gitconfig.
+#
+# It prints no roster term, no line of a diff, no roster value and no path
+# that holds a term; it makes no network call. Terms are written only to a
+# 0600 file from mktemp, removed on every exit, and reach grep only through
+# `grep -f` of that file.
+set +x
+set -uo pipefail
+
+export LC_ALL=C
+
+terms=
+paths=
+trap 'rm -f -- "$terms" "$paths"' EXIT
+trap 'exit 1' HUP INT TERM
+
+roster_unreadable() {
+  echo 'roster_unreadable: agents.roster names no readable roster that yields a name or an id' >&2
+  exit 1
+}
+
+staged_unreadable() {
+  echo 'staged_unreadable: Git could not read the staged changes' >&2
+  exit 1
+}
+
+terms=$(mktemp) || roster_unreadable
+paths=$(mktemp) || staged_unreadable
+
+# 1. The roster: the files of the glob in agents.roster, each a JSON array of
+# objects; every object yields a term (student_name or student_id, a string or
+# a number, at least 2 characters; a value is split at a newline or NUL, so no
+# empty pattern reaches grep). An empty array is no object and passes beside
+# other files; the files together must yield at least one term.
+roster=$(git config --get agents.roster 2>/dev/null) || roster=
+[[ -n "$roster" ]] || roster_unreadable
+
+python3 -I - "$roster" "$terms" 2>/dev/null <<'PY' || roster_unreadable
+import glob, json, os, re, sys
+
+def main():
+    pattern, out = sys.argv[1], sys.argv[2]
+    files = sorted(set(glob.glob(pattern)))
+    if not files:
+        return 2
+    found = set()
+    for name in files:
+        if not os.path.isfile(name):
+            return 2
+        with open(name, "rb") as handle:
+            data = json.loads(handle.read(), parse_int=str, parse_float=str)
+        if not isinstance(data, list):
+            return 2
+        for obj in data:
+            if not isinstance(obj, dict):
+                return 2
+            mine = set()
+            for key in ("student_name", "student_id"):
+                value = obj.get(key)
+                if isinstance(value, str):
+                    for part in re.split("[\n\x00]", value):
+                        if len(part) >= 2:
+                            mine.add(part.encode("utf-8"))
+            if not mine:
+                return 2
+            found |= mine
+    if not found:
+        return 2
+    with open(out, "wb") as handle:
+        for term in sorted(found):
+            handle.write(term + b"\n")
+    return 0
+
+try:
+    code = main()
+except BaseException:
+    code = 2
+sys.exit(code)
+PY
+
+[[ -s "$terms" ]] || roster_unreadable
+
+# Added lines of a staged diff: the lines beginning "+" after the first "@@"
+# line of each per-path diff, without the "+". The header lines before it are
+# not content.
+read -r -d '' extract <<'PY' || true
+import sys
+out = sys.stdout.buffer
+hunk = False
+for line in sys.stdin.buffer:
+    if line.startswith(b"diff --git "):
+        hunk = False
+    elif line.startswith(b"@@ "):
+        hunk = True
+    elif hunk and line.startswith(b"+"):
+        out.write(line[1:] if line.endswith(b"\n") else line[1:] + b"\n")
+PY
+
+# added_hits <extra git diff arguments>: prints the number of added lines that
+# hold a term. Returns 2 when Git, the extraction or grep failed.
+added_hits() {
+  local out status
+  out=$(git --literal-pathspecs diff --cached --text --no-color --no-ext-diff \
+          --no-textconv -U0 --diff-filter=ACMRT "$@" 2>/dev/null \
+        | python3 -I -c "$extract" 2>/dev/null \
+        | grep -a -c -F -f "$terms" 2>/dev/null
+        printf '\n%s' "${PIPESTATUS[*]}")
+  status=${out##*$'\n'}
+  case "$status" in
+    "0 0 0" | "0 0 1") ;;
+    *) return 2 ;;
+  esac
+  out=${out%%$'\n'*}
+  printf '%s\n' "$out"
+}
+
+refused=0
+
+# 2. The staged paths (the new name of each entry), NUL separated.
+git diff --cached --name-only -z --diff-filter=ACMRT >"$paths" 2>/dev/null || staged_unreadable
+
+path_hits=0
+rc=0
+path_hits=$(grep -a -z -c -F -f "$terms" <"$paths" 2>/dev/null) || rc=$?
+if (( rc > 1 )); then
+  staged_unreadable
+fi
+if (( path_hits > 0 )); then
+  printf 'private_term_staged: %s staged paths hold a roster name or id\n' "$path_hits" >&2
+  refused=1
+fi
+
+# 3. The added lines. One diff over every staged path (without rename
+# detection, so a renamed file counts as added, as in the per-path diffs) says
+# whether any line holds a term; only then is each path read by itself.
+total=$(added_hits --no-renames) || staged_unreadable
+if (( total > 0 )); then
+  while IFS= read -r -d '' path; do
+    if (( path_hits > 0 )) && grep -a -q -F -f "$terms" <<<"$path"; then
+      continue
+    fi
+    n=$(added_hits -- "$path") || staged_unreadable
+    if (( n > 0 )); then
+      shown=${path//[[:cntrl:]]/?}
+      printf 'private_term_staged@%s: %s added lines hold a roster name or id\n' "$shown" "$n" >&2
+      refused=1
+    fi
+  done <"$paths"
+fi
+
+exit "$refused"

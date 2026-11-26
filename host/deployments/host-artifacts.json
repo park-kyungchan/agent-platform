@@ -1,0 +1,50 @@
+[
+  {
+    "source": "/etc/ssh/sshd_config.d/90-tailscale-only.conf",
+    "destination": "deployments/ssh/90-tailscale-only.conf",
+    "sha256": "b814188133213986b5707033fc1f2488d34c62d0f60e5d3419970004c3333a81",
+    "sanitization": "none; existing environment placeholders preserved"
+  },
+  {
+    "source": "/etc/systemd/system/ssh.socket.d/override.conf",
+    "destination": "deployments/ssh/ssh.socket.d/override.conf",
+    "sha256": "498869329befd222f141ba3ac88acc29171861cafa2d4b0d330119342462aa16",
+    "sanitization": "none; existing environment placeholders preserved"
+  },
+  {
+    "source": "/docker/tsidp/compose.yaml",
+    "destination": "deployments/tsidp/compose.yaml",
+    "sha256": "e443d39ade6d9c247a7aca24cd59e68d1b7e00fa7c5eefebc77755ddf2d1f006",
+    "sanitization": "none; existing environment placeholders preserved"
+  },
+  {
+    "source": "/etc/cron.d/docker-builder-prune",
+    "destination": "deployments/host-cron/docker-builder-prune",
+    "sha256": "fa1d1b036998ea50948d9f17baa2a12ff7bdc9f155f47be01f74cb1ae58247c7",
+    "sanitization": "none; existing environment placeholders preserved"
+  },
+  {
+    "source": "/etc/cron.d/docker-image-prune",
+    "destination": "deployments/host-cron/docker-image-prune",
+    "sha256": "14b4efd4e22f39e53f1660dc81e40835d4ee1adcb41a5cd3f066bcab1c9b5b11",
+    "sanitization": "none; existing environment placeholders preserved"
+  },
+  {
+    "source": "/etc/ssh/sshd_config.d/00-01-ssh-only.conf",
+    "destination": "deployments/ssh/00-01-ssh-only.conf",
+    "sha256": "ff5ca36fdeb5c68550960e437944cd7f51b73a9bf825f70fc1fa842e8b1330a2",
+    "sanitization": "none"
+  },
+  {
+    "source": "/etc/host-firewall.nft",
+    "destination": "deployments/host-firewall/host-firewall.nft",
+    "sha256": "01254abef4f73d14af7483118a721a82d0d74f968462bdd85ecebd3431eb2a51",
+    "sanitization": "none"
+  },
+  {
+    "source": "/etc/systemd/system/host-firewall.service",
+    "destination": "deployments/host-firewall/host-firewall.service",
+    "sha256": "e492d2f4ceaf65b207d4744eb4277ce4e0a9a52ae585d9f8ce53d3429380df0d",
+    "sanitization": "none"
+  }
+]

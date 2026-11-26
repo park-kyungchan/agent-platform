@@ -19,8 +19,11 @@
 # deploy/walk.timer, which pass a writes under AP_UNIT_DIR and pass k changes, edits by hand, rolls back and
 # leaves after a tip without an accepting review. Pass l gives the request the members `engine` and `etc`: a scratch operations
 # origin whose `scripts/install-etc.sh` is a fake with the real script's verbs and exits, which writes the
-# policy file, its record and its kept copies under the scratch root AP_ETC_ROOT of that directory.
-# One line `walk pass=<a..l> k=<k> pair=<commit or neither> outcome=<outcome>` per case, then
+# policy file, its record and its kept copies under the scratch root AP_ETC_ROOT of that directory. Pass m gives the
+# request an `etc` that names the origin itself: a merge adds host/ (the walk's installer at
+# host/scripts/install-etc.sh, the policy at host/etc/agent-platform/policy.json), and the step runs that installer
+# from the pair's clone, which has no remote, at T, with F read from <state>/etc.tip.
+# One line `walk pass=<a..m> k=<k> pair=<commit or neither> outcome=<outcome>` per case, then
 # `deliver-walk: ok`. Under CI=true it is skipped: the engine there has no object for the target's key.
 # Under AP_CHECK_HOST=pc it is skipped too (`deliver-walk: skipped (pc)`): the walk needs this host's engine
 # store and the installed `ap`, which the local PC lacks. AP_CHECK_HOST is `ap check`'s marker of a command
@@ -169,6 +172,7 @@ merge() {
   [ ! -e "$W/next-migrate" ] || install -m 0755 "$W/next-migrate" "$O/ontology/migrate"
   [ ! -e "$W/next-timer" ] || cp "$W/next-timer" "$O/deploy/walk.timer"
   [ ! -e "$W/next-service" ] || cp "$W/next-service" "$O/deploy/walk.service"
+  [ ! -d "$W/next-host" ] || { rm -rf "$O/host"; cp -R "$W/next-host" "$O/host"; }
   git -C "$O" add -A && git -C "$O" commit -q -m "change $n"
   local head; head=$(git -C "$O" rev-parse HEAD)
   git -C "$O" checkout -q main
@@ -200,9 +204,10 @@ request() {
 if sys.argv[2] == "rollback": r["rollback"] = True
 if sys.argv[2] in ("engine", "etc"): r["engine"] = dict(repository="walk/engine", url=w + "/engine-origin")
 if sys.argv[2] == "etc": r["etc"] = dict(repository="walk/ops", url=w + "/ops-origin")
+if sys.argv[2] == "own": r["etc"] = dict(repository="walk/origin", url=w + "/nowhere")
 print(json.dumps(r))' "$W" "$1" > "$W/$1.json"
 }
-request lead; request rollback; request engine; request etc
+request lead; request rollback; request engine; request etc; request own
 CLONE=$W/state/origin
 
 # One call of the built ap in a process group of its own; RC its exit, $W/out.json its record.
@@ -590,6 +595,39 @@ call etc
   [ "$(etc_rows)" = "[]" ] && [ "$(sha256sum < "$POLICY")" = "$HAND" ] && [ "$(git -C "$XC" rev-parse HEAD)" = "$X1" ] ||
   fail "pass l: a tip without an accepting review (exit $RC)"
 line l 3 "$(pair)" "$(member 'r["etc"]["result"]')"
+
+# spec: specs/ap/deliver.md#R71
+# spec: specs/ap/deliver.md#R72
+# spec: specs/ap/deliver.md#R73
+# (m) `etc` names the delivered repository: a merge adds host/ with the walk's installer, moved to
+# host/scripts/install-etc.sh and reading host/etc/agent-platform/policy.json of the Git repository of its working
+# directory; the call installs the pair, then runs that installer from the pair's clone at T. No other clone and no
+# fetch of `etc.url` (it names no repository); F is the tip the last call recorded, in <state>/etc.tip.
+export AP_ETC_ROOT=$W/own-root
+POLICY=$AP_ETC_ROOT/etc/agent-platform/policy.json
+mkdir -p "$W/next-host/scripts" "$W/next-host/etc/agent-platform"
+sed -e 's|^REPO=.*|REPO=$(git rev-parse --show-toplevel)|' \
+  -e 's|"$1:etc/agent-platform/policy.json"|"$1:host/etc/agent-platform/policy.json"|' \
+  "$X/scripts/install-etc.sh" > "$W/next-host/scripts/install-etc.sh"
+grep -q 'host/etc/agent-platform/policy.json' "$W/next-host/scripts/install-etc.sh" || fail "pass m: the installer's policy path"
+printf '{"version": 10}\n' > "$W/next-host/etc/agent-platform/policy.json"
+M=$(merge)
+rm -rf "$W/next-host"
+[ ! -e "$W/state/etc.tip" ] || fail "pass m: etc.tip before the first same-repository call"
+call own
+[ "$RC" = 0 ] && [ "$(member 'r["end"]')" = installed ] && [ "$(pair)" = "$M" ] &&
+  [ "$(member '(r["etc"]["repository"], r["etc"]["result"], r["etc"]["from"], r["etc"]["tip"], r["etc"]["code"])')" = "('walk/origin', 'installed', None, '$M', None)" ] ||
+  fail "pass m: the install (exit $RC)"
+[ "$(etc_rows)" = "[('etc-check', 1, None), ('etc', 0, None), ('etc-check', 0, None)]" ] || fail "pass m: the rows of the install"
+git -C "$O" show "$M:host/etc/agent-platform/policy.json" | cmp -s - "$POLICY" || fail "pass m: the policy file"
+[ -z "$(git -C "$CLONE" remote)" ] && [ "$(git -C "$CLONE" rev-parse HEAD)" = "$M" ] || fail "pass m: the clone"
+[ ! -e "$W/state/nowhere" ] && [ "$(cat "$W/state/etc.tip")" = "$M" ] || fail "pass m: no other clone, F recorded"
+line m 0 "$(pair)" "$(member 'r["etc"]["result"]')"
+call own
+[ "$RC" = 0 ] && [ "$(member 'r["end"]')" = current ] &&
+  [ "$(member '(r["etc"]["result"], r["etc"]["from"], r["etc"]["tip"])')" = "('same', '$M', '$M')" ] &&
+  [ "$(etc_rows)" = "[('etc-check', 0, None)]" ] || fail "pass m: the call after the install (exit $RC)"
+line m 1 "$(pair)" "$(member 'r["etc"]["result"]')"
 
 [ "$(host_count)" = "$host_before" ] || fail "the host store's install objects changed"
 echo "deliver-walk: ok"

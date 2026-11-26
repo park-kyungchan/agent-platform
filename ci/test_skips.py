@@ -240,7 +240,7 @@ class CheckSkips(unittest.TestCase):
         self.tmp = self.root / "tmp"
         self.tmp.mkdir()
         repo = self.repo = self.root / "repo"
-        for d in ("ci", "scripts", "github"):
+        for d in ("ci", "scripts", "github", "host/scripts"):
             (repo / d).mkdir(parents=True)
         shutil.copy2(REPO / "check", repo / "check")
         # Stand-ins of the content steps: the first appends two ids and one of them twice, as skip sites do.
@@ -249,10 +249,12 @@ class CheckSkips(unittest.TestCase):
             "for i in ('second', 'first', 'second'):\n"
             "    with open(os.environ.get('CHECK_SKIPS') or os.devnull, 'a') as f: f.write(i + '\\n')\n"
             "print('skipped here: ' + os.environ.get('CHECK_SKIPS', 'unset'))\n")
-        for name in ("check-map.py", "check-spec-trace.py", "check-schema-use.py", "skips.py"):
+        for name in ("check-map.py", "check-spec-trace.py", "check-schema-use.py", "skips.py", "check-host.py"):
             (repo / "ci" / name).write_text("")
         for name in ("test-install-content.sh", "test-pc-pull.sh", "test-backup-store.sh"):
             (repo / "scripts" / name).write_text("exit 0\n")
+        for name in ("test-git-config.sh", "test-install-etc.sh", "test-retire-hindsight.sh"):
+            (repo / "host" / "scripts" / name).write_text("exit 0\n")
         for d in ("github", "ci"):
             (repo / d / "test_none.py").write_text("import unittest\nclass T(unittest.TestCase):\n    def test_x(self): pass\n")
 

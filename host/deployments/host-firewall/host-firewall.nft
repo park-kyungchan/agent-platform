@@ -1,0 +1,18 @@
+#!/usr/sbin/nft -f
+# The public interface eth0 takes no new inbound connection except Tailscale's UDP port 41641;
+# replies to the host's own connections and ICMP pass. Every other interface is untouched.
+# 2026-11-22, the user's order to block everything unnecessary (ap request act-rq-966eb833...).
+# Undo: systemctl disable --now host-firewall.service
+table inet hostfw
+delete table inet hostfw
+table inet hostfw {
+	chain input {
+		type filter hook input priority filter - 10; policy accept;
+		iifname != "eth0" accept
+		ct state established,related accept
+		ct state invalid drop
+		meta l4proto { icmp, ipv6-icmp } accept
+		udp dport 41641 accept
+		counter drop
+	}
+}

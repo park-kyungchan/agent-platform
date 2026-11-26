@@ -1,0 +1,51 @@
+{
+  "name": "hindsight",
+  "containers": ["hindsight-hindsight-1", "hindsight-postgres-1"],
+  "volumes": ["hindsight_hindsight-home", "hindsight_postgres-data"],
+  "networks": ["hindsight_database"],
+  "directory": "/docker/hindsight",
+  "copy_root": "/root/.hindsight-recovery",
+  "entries": [
+    {
+      "kind": "json_member",
+      "file": "/home/palantirkc/work/edu-lessons/.mcp.json",
+      "member": ["mcpServers", "hindsight"]
+    },
+    {
+      "kind": "file",
+      "file": "/home/palantirkc/work/edu-lessons/.mcp-launchers/hindsight.sh"
+    },
+    {
+      "kind": "toml_table",
+      "file": "/home/palantirkc/work/edu-lessons/.grok/config.toml",
+      "table": ["mcp_servers", "hindsight"]
+    },
+    {
+      "kind": "json_key_suffix",
+      "file": "/root/.config/muse/settings.json",
+      "suffixes": ["hindsight-coding-agent/SKILL.md", "hindsight-control/SKILL.md"]
+    }
+  ],
+  "scanned": [
+    {
+      "file": "/root/.claude/settings.json",
+      "format": "json",
+      "key_paths": [["hooks"], ["mcpServers"], ["permissions"]]
+    },
+    {
+      "file": "/root/.claude.json",
+      "format": "json",
+      "key_paths": [["hooks"], ["mcpServers"], ["projects", "*", "mcpServers"], ["projects", "*", "allowedTools"]]
+    },
+    {
+      "file": "/root/.codex/config.toml",
+      "format": "toml",
+      "key_paths": [["notify"], ["hooks"], ["mcp_servers"], ["sandbox_workspace_write"]]
+    },
+    {
+      "file": "/root/.gemini/config/mcp_config.json",
+      "format": "json",
+      "key_paths": [["hooks"], ["mcpServers"]]
+    }
+  ]
+}
