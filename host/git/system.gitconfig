@@ -1,8 +1,8 @@
 # The lines of /etc/gitconfig. The gitdir patterns end in a slash and carry no
 # `.git`: Git matches the main checkout's `.git` directory and every linked
 # worktree's `.git/worktrees/<n>` directory against them. A repository outside
-# these lines gets the alias only. The Academy's own repositories are not here;
-# agent-platform is, so that a commit under engine/ and host/ runs the roster check.
+# these lines gets the alias only. The Academy's own repository is not here;
+# lifecycle-platform is, so that a commit under engine/ and host/ runs the roster check.
 [include]
 	path = /usr/local/lib/agents-git/alias.gitconfig
 [includeIf "gitdir:/home/palantirkc/work/ws-*/"]
@@ -13,9 +13,5 @@
 	path = /usr/local/lib/agents-git/work.gitconfig
 [includeIf "gitdir:/home/palantirkc/work/mem-*/"]
 	path = /usr/local/lib/agents-git/work.gitconfig
-[includeIf "gitdir:/home/palantirkc/platforms/ontology-platform/"]
-	path = /usr/local/lib/agents-git/clones.gitconfig
-[includeIf "gitdir:/home/palantirkc/platforms/agent-vps-operations/"]
-	path = /usr/local/lib/agents-git/clones.gitconfig
-[includeIf "gitdir:/home/palantirkc/platforms/agent-platform/"]
+[includeIf "gitdir:/home/palantirkc/platforms/lifecycle-platform/"]
 	path = /usr/local/lib/agents-git/clones.gitconfig

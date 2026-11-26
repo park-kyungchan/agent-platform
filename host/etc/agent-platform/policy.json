@@ -39,20 +39,11 @@
   ]
  },
  "repositories": {
-  "park-kyungchan/agent-platform": {
-   "clone": "/home/palantirkc/platforms/agent-platform"
+  "park-kyungchan/lifecycle-platform": {
+   "clone": "/home/palantirkc/platforms/lifecycle-platform"
   },
-  "park-kyungchan/ontology-platform": {
-   "clone": "/home/palantirkc/platforms/ontology-platform"
-  },
-  "park-kyungchan/agent-vps-operations": {
-   "clone": "/home/palantirkc/platforms/agent-vps-operations"
-  },
-  "park-kyungchan/education-platform": {
-   "clone": "/home/palantirkc/platforms/education-platform"
-  },
-  "park-kyungchan/education-dc-gang-a": {
-   "clone": "/home/palantirkc/platforms/education-dc-gang-a"
+  "park-kyungchan/academy-platform": {
+   "clone": "/home/palantirkc/platforms/academy-platform"
   }
  },
  "reviews": {
@@ -84,15 +75,14 @@
     "key": "/etc/agent-platform/credentials/kc-ap-lead.pem"
    },
    "stage_tokens": {
-    "park-kyungchan/agent-platform": "/etc/agent-platform/credentials/stage-token-agent-platform",
-    "park-kyungchan/ontology-platform": "/etc/agent-platform/credentials/stage-token-ontology-platform",
-    "park-kyungchan/agent-vps-operations": "/etc/agent-platform/credentials/stage-token-agent-vps-operations",
-    "park-kyungchan/education-platform": "/etc/agent-platform/credentials/stage-token-education-platform"
+    "park-kyungchan/lifecycle-platform": "/etc/agent-platform/credentials/stage-token-lifecycle-platform",
+    "park-kyungchan/academy-platform": "/etc/agent-platform/credentials/stage-token-academy-platform"
    }
   },
   "approval": {
    "contract": "verifier",
    "guarded": [
+    "engine/**",
     "ontology/**",
     "deploy/**",
     "host/**",

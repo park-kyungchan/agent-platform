@@ -26,7 +26,7 @@ When a script can do all of a unit, write the script. A page states the objectiv
 ## 2. One good page
 
 ```text
-Unit status-holds: class plain, lane objective, agent-platform
+Unit status-holds: class plain, lane objective, lifecycle-platform
 Objective: `ap status --text` prints the count of active holds on its first line, so a Lead
   sees a hold before any effect; first use: the Lead's first `ap status` of the next turn.
 Invariants: the JSON form of `ap status` is unchanged.

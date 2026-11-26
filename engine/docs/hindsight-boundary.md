@@ -56,7 +56,7 @@ or memory tag is not authentication. [O1][O2][O3]
 
 Academy lesson archive exception (user decision 2026-11-06): because the academy
 server removes older rows, Hindsight archives dated Academy teacher statements and
-source observations under real student names, as education-platform
+source observations under real student names, as academy-platform
 `content/skills/academy-student-context/references/lesson-archive.md` specifies.
 An archived observation is a dated snapshot and history, not current operational
 state. It grants no admission or action, and a fresh owner read wins while the

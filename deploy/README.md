@@ -6,9 +6,9 @@ The files of this directory make `ap deliver` run with no session in the path. T
 | --- | --- | --- |
 | `ap-deliver.service` | One run of `/usr/local/bin/ap deliver` with the host's request on stdin (`Type=oneshot`, in `agents.slice`, which holds the host's CPU and memory limits; `Nice=10`; at most an hour). `SuccessExitStatus=2`: a refusal (exit 2, nothing installed) is no failure of the unit; the exits 3, 4 and 5 fail it | `/etc/systemd/system/ap-deliver.service` |
 | `ap-deliver.timer` | Starts the service ten minutes after boot and ten minutes after each run ended | `/etc/systemd/system/ap-deliver.timer` |
-| `deliver.json` | The timer's request of this host: `repository`, `url`, `state` (`/var/lib/agent-platform/deliver`), `build_lock` (the build lock `scripts/install-ap.sh` names), `build_wait_seconds: 480` (wait up to eight minutes for that lock), `etc` (this repository itself, `park-kyungchan/agent-platform`: delivery also runs `host/scripts/install-etc.sh` of the tip it delivered, which installs the host's configuration files from `host/etc/`, section "The configuration files"), and `pc` (the PC checks account `apcheck@ap-checks`, host `pc`, and target `/home/apcheck/.cargo/bin/ont`: delivery pushes the host's `ont` binary to the checks account when the PC is reachable, section "The PC checks engine"). It has no `by` and no `reason`: that is the timer's form. It has no member `engine`: every call installs the engine of `engine/` of the tip and a higher version of `ontology/work.schema.json` (section "The engine and the schema"); a request that still carries `engine` is accepted and the member ignored (`specs/ap/deliver.md` R14) | `/etc/agent-platform/deliver.json` |
+| `deliver.json` | The timer's request of this host: `repository`, `url`, `state` (`/var/lib/agent-platform/deliver`), `build_lock` (the build lock `scripts/install-ap.sh` names), `build_wait_seconds: 480` (wait up to eight minutes for that lock), `etc` (this repository itself, `park-kyungchan/lifecycle-platform`: delivery also runs `host/scripts/install-etc.sh` of the tip it delivered, which installs the host's configuration files from `host/etc/`, section "The configuration files"), and `pc` (the PC checks account `apcheck@ap-checks`, host `pc`, and target `/home/apcheck/.cargo/bin/ont`: delivery pushes the host's `ont` binary to the checks account when the PC is reachable, section "The PC checks engine"). It has no `by` and no `reason`: that is the timer's form. It has no member `engine`: every call installs the engine of `engine/` of the tip and a higher version of `ontology/work.schema.json` (section "The engine and the schema"); a request that still carries `engine` is accepted and the member ignored (`specs/ap/deliver.md` R14) | `/etc/agent-platform/deliver.json` |
 
-The build lock is one file for every repository of the host, `/var/lib/agent-platform/build.lock`: the `check` of each repository and the installers that build (`scripts/install-ap.sh` and `engine/scripts/install-ont.sh` here) take it. The `check` of `education-platform` also makes its fixture directory beside the lock, so a directory `edu-check.*` under `/var/lib/agent-platform` belongs to a running check of that repository and is removed when it ends.
+The build lock is one file for every repository of the host, `/var/lib/agent-platform/build.lock`: the `check` of each repository and the installers that build (`scripts/install-ap.sh` and `engine/scripts/install-ont.sh` here) take it. The `check` of `academy-platform` also makes its fixture directory beside the lock, so a directory `edu-check.*` under `/var/lib/agent-platform` belongs to a running check of that repository and is removed when it ends.
 
 `ap deliver` installs `ap` and `content/`, the engine `ont` of `engine/` and the work schema, with the member `etc` the host's configuration files through the installer of `host/` (section "The configuration files"), and the unit files of this directory (section "The unit files"); `deliver.json` and the drop-ins stay by hand. The service relies on systemd's default search path for `cargo`, `git`, `flock` and `ont` (on the host these files are written for, `/usr/bin/cargo`, the rustup proxy, answers in a system service with only `HOME=/root`); on a host where `cargo` lies elsewhere, add the drop-in `/etc/systemd/system/ap-deliver.service.d/path.conf` with the lines `[Service]` and `Environment=PATH=<the directory of cargo>:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin`.
 
@@ -41,7 +41,7 @@ python3 -I -c 'import json, sys; print(json.dumps({"id": json.loads(sys.argv[1])
 
 `last.json` holds `units` only until the next call replaces it, about ten minutes later, and no exit, detector or status line shows a `units_failed`: read the journal or the store.
 
-- `units_host_differs`: compare the host's copy with the installed commit's file, `git -C /var/lib/agent-platform/deliver/agent-platform show <installed commit>:deploy/<name> | diff -u - /etc/systemd/system/<name>`. Then keep the hand edit as a drop-in `/etc/systemd/system/<name>.d/<file>.conf`, or copy the installed commit's file over it by hand (`git -C /var/lib/agent-platform/deliver/agent-platform show <installed commit>:deploy/<name> > /etc/systemd/system/<name>`, then `systemctl daemon-reload`); after that the next install manages the file.
+- `units_host_differs`: compare the host's copy with the installed commit's file, `git -C /var/lib/agent-platform/deliver/lifecycle-platform show <installed commit>:deploy/<name> | diff -u - /etc/systemd/system/<name>`. Then keep the hand edit as a drop-in `/etc/systemd/system/<name>.d/<file>.conf`, or copy the installed commit's file over it by hand (`git -C /var/lib/agent-platform/deliver/lifecycle-platform show <installed commit>:deploy/<name> > /etc/systemd/system/<name>`, then `systemctl daemon-reload`); after that the next install manages the file.
 - `units_failed`: read the row and `systemctl status <name>`. The next install writes again what is not at its tip's bytes.
 
 What stays by hand: the first enable of `ap-deliver.service` and `ap-deliver.timer` on a new host (section "Enable"), `/etc/agent-platform/deliver.json`, `scripts/backup-store.sh` (section "The store's backup"), the drop-ins `<name>.service.d/`, `ap watch --record-login` (section "The watch") and `tailscale serve` (section "The status page").
@@ -76,7 +76,7 @@ ont --version                                                      # the engine'
 
 `schema_install_failed` and `migrate_failed` end a run with exit 4 and keep the service failed. A marker that cannot clear: stop the timer, run the corrected `ontology/migrate` by hand with the store's path and the marker's two versions, read the result, remove the marker, start the timer.
 
-Undo: an installed engine goes back with its own rollback, with the timer stopped: `bash /var/lib/agent-platform/deliver/agent-platform/engine/scripts/install-ont.sh rollback` ("An engine change"); an engine a Lead rolled back by hand stays rolled back, since the timer installs an id at most once (`attempt_exists`), until a Lead's call installs forward. The member `engine` no longer switches this step off: every call installs an engine or a higher schema the tip names. A schema is repaired by a higher version, installed forward; delivery never restores the store from a backup.
+Undo: an installed engine goes back with its own rollback, with the timer stopped: `bash /var/lib/agent-platform/deliver/lifecycle-platform/engine/scripts/install-ont.sh rollback` ("An engine change"); an engine a Lead rolled back by hand stays rolled back, since the timer installs an id at most once (`attempt_exists`), until a Lead's call installs forward. The member `engine` no longer switches this step off: every call installs an engine or a higher schema the tip names. A schema is repaired by a higher version, installed forward; delivery never restores the store from a backup.
 
 ## Roles
 
@@ -113,20 +113,20 @@ Delivered: the first call after the merge finds the installed engine's id is not
 
 ```sh
 python3 -I -c 'import json; r = json.load(open("/var/lib/agent-platform/deliver/last.json")); print(r["target"], r["end"], r["to"], r["install"])'   # /usr/local/bin/ont installed <id> ..., then /usr/local/bin/ap installed <T> ...
-git -C /var/lib/agent-platform/deliver/agent-platform rev-parse <T>:engine                                                                   # <id>
+git -C /var/lib/agent-platform/deliver/lifecycle-platform rev-parse <T>:engine                                                                   # <id>
 ont --version                                                                                                                                 # ont <version> <id>
 ```
 
-The engine attempt names this repository and the id as its `commit`. Rollback of the engine, with the timer stopped: `bash /var/lib/agent-platform/deliver/agent-platform/engine/scripts/install-ont.sh rollback` (it restores the binary installed before, whichever rule installed it). A tree without `engine/` is refused `engine_missing`. The PC: delivery's push (R69) sends the host's engine once a local attempt installed it at the id; the user's own account runs `scripts/pc-pull.sh`, which builds `engine/` of the pulled commit (R70) and skips the build when its `ont` already names the id.
+The engine attempt names this repository and the id as its `commit`. Rollback of the engine, with the timer stopped: `bash /var/lib/agent-platform/deliver/lifecycle-platform/engine/scripts/install-ont.sh rollback` (it restores the binary installed before, whichever rule installed it). A tree without `engine/` is refused `engine_missing`. The PC: delivery's push (R69) sends the host's engine once a local attempt installed it at the id; the user's own account runs `scripts/pc-pull.sh`, which builds `engine/` of the pulled commit (R70) and skips the build when its `ont` already names the id.
 
 ## The configuration files
 
 With the member `etc` (`specs/ap/deliver.md` R53 to R57, R71 to R74) the host's configuration files follow a reviewed tree; today that is `/etc/agent-platform/policy.json`, the policy of models and accounts that `ap run` enforces. Its source is `host/etc/agent-platform/policy.json` of this repository: a change of the policy, and of the code that reads it, is one merged unit here, and the next run of the timer installs both. In each call that ends `current` or `installed` and is no rollback, after every other step and before the checkouts, delivery, when `etc` names this repository (`deploy/deliver.json`):
 
 1. takes E, the tip T the call delivered, and F, the last tip a call of this kind recorded (`/var/lib/agent-platform/deliver/etc.tip`, written by every such call and kept by a call that refuses or rolls back); it makes no second clone, fetches nothing and judges nothing of its own (T's chain was judged for the pair);
-2. checks its clone `/var/lib/agent-platform/deliver/agent-platform` out at T when its `HEAD` is not T, and runs from it `bash host/scripts/install-etc.sh check <T>`, and unless that answered `same` for a T equal to F, `install <T>` and `check <T>` again. The installer reads `host/etc/agent-platform/policy.json` of T from the clone's objects (the clone has no remote), judges every main merge since its own record (`/var/lib/agent-platform/etc/installed`) by the reviews of this repository, runs `ap policy check` on the new bytes, and writes nothing when the host already holds them; else it keeps the replaced file under `/var/backups/agent-platform-etc/` and writes only its own target.
+2. checks its clone `/var/lib/agent-platform/deliver/lifecycle-platform` out at T when its `HEAD` is not T, and runs from it `bash host/scripts/install-etc.sh check <T>`, and unless that answered `same` for a T equal to F, `install <T>` and `check <T>` again. The installer reads `host/etc/agent-platform/policy.json` of T from the clone's objects (the clone has no remote), judges every main merge since its own record (`/var/lib/agent-platform/etc/installed`) by the reviews of this repository, runs `ap policy check` on the new bytes, and writes nothing when the host already holds them; else it keeps the replaced file under `/var/backups/agent-platform-etc/` and writes only its own target.
 
-An `etc` that names another repository (the request before the change below: `park-kyungchan/agent-vps-operations`) is served as before: delivery
+An `etc` that names another repository (the request before the host's configuration moved into `host/` named the former operations repository) is served as before: delivery
 
 1. makes or reuses its clone `/var/lib/agent-platform/deliver/<name>` with the remote `origin` at `etc.url`, and fetches `main` (every call that reaches the step fetches that repository);
 2. judges the merges from the clone's `HEAD` (F) up to the fetched tip (E) by the rule of the pair's chain: each a merge whose tree is its second parent's, with an accepting packet review of that head for that repository, and the report of the tip's review on disk with its digest; a new clone judges E alone; E equal to F judges nothing;
@@ -157,7 +157,7 @@ What follows each result, read with its `code`:
 - `installed`: the tip is on the host and read back by the installer's own `check`.
 - `same`: the host already was at the tip. With the code `not_forward` it is the normal answer of the first call of a clone new to delivery when the installer's own record already names the tip.
 - `differs`: the host's file is not at the tip; only `code` tells the states apart. `not_forward`: a hand edit of the host's file while the tip has not moved; `target_changed`: a hand edit when the tip has moved; in both the installer refuses to overwrite the file: compare the edit with the tip's file, then make the change a unit of `host/etc/` (of the operations repository, for an `etc` of that repository) or put the kept copy back. `verify_failed`: `ap policy check` refuses the tip's bytes, on every call until a merge repairs them. `not_accepted` as a code: the installer's own accepted check, which walks from its own record and also wants the review's pull request number to be the merge's.
-- `not_accepted` as a code of this repository's installer, or `tree_differs`: a merge from the installer's record up to T cannot pass (`specs/ap/deliver.md` R74). The hand path, with the timer stopped: in delivery's clone at T, `cd /var/lib/agent-platform/deliver/agent-platform && bash host/scripts/install-etc.sh install <T> --past <merge>:<reason>`, then `bash host/scripts/install-etc.sh check <T>` (exit 0); then start the timer, and the next call answers `same`.
+- `not_accepted` as a code of this repository's installer, or `tree_differs`: a merge from the installer's record up to T cannot pass (`specs/ap/deliver.md` R74). The hand path, with the timer stopped: in delivery's clone at T, `cd /var/lib/agent-platform/deliver/lifecycle-platform && bash host/scripts/install-etc.sh install <T> --past <merge>:<reason>`, then `bash host/scripts/install-etc.sh check <T>` (exit 0); then start the timer, and the next call answers `same`.
 - `not_accepted` as the result (an `etc` of another repository only): delivery's own judgement, with no program run and the clone's `HEAD` where it was; review the commit `detail` names. For a commit on the chain that cannot be reviewed, the hand path, with the timer stopped: run the installer by hand from a clean checkout of the operations repository at the tip, `bash scripts/install-etc.sh install <tip> --past <commit>:<reason>`, then remove delivery's clone of the operations repository (`rm -rf /var/lib/agent-platform/deliver/agent-vps-operations`), so that the next call judges the tip alone; then start the timer.
 - `fetch_failed`: the clone could not be made, fetched, read or checked out; the next call tries again.
 - `failed`: the first `check` refused or did not start (its code, `busy` for the installer's lock), the last `check` did not answer, or the store could not be read (`store_unreadable`); the next call tries again.
@@ -221,12 +221,12 @@ Start it again afterwards: `systemctl start ap-deliver.timer`.
 
 ## After `failed`
 
-An end `failed` leaves the pair at no single commit, and every later request refuses `pair_differs`. The timer's runs then exit 3 and keep `ap-deliver.service` failed: a pair at no one commit is never repaired by waiting. Each such run replaces `last.json` with its refusal, whose `detail.install` names the failed attempt (`detail` is null when the call found none: the snippet below then reads the newest attempt of the target from the store, by `started_at`, and says so); the handles to restore (`from`, `rollback_content`, `rollback_binary`) are then that attempt's in the store. With the clone `C=/var/lib/agent-platform/deliver/agent-platform`:
+An end `failed` leaves the pair at no single commit, and every later request refuses `pair_differs`. The timer's runs then exit 3 and keep `ap-deliver.service` failed: a pair at no one commit is never repaired by waiting. Each such run replaces `last.json` with its refusal, whose `detail.install` names the failed attempt (`detail` is null when the call found none: the snippet below then reads the newest attempt of the target from the store, by `started_at`, and says so); the handles to restore (`from`, `rollback_content`, `rollback_binary`) are then that attempt's in the store. With the clone `C=/var/lib/agent-platform/deliver/lifecycle-platform`:
 
 ```sh
 systemctl stop ap-deliver.timer
 systemctl is-active ap-deliver.service       # until it answers inactive or failed
-C=/var/lib/agent-platform/deliver/agent-platform
+C=/var/lib/agent-platform/deliver/lifecycle-platform
 python3 -I - <<'PY'   # from, rollback_content, rollback_binary: of the record, or of the attempt it names
 import json, subprocess
 def ont(verb, request):
@@ -377,7 +377,7 @@ systemctl is-active ap-work.service                   # until it answers inactiv
 
 ## Routes
 
-`ap route index` (`specs/ap/route.md`) writes one record per heading of each `*.md` file at `origin/main` of agent-platform (the engine's `engine/` included) and agent-vps-operations (after `git fetch origin main` in each clone the policy's `repositories` names; no checkout is read or changed) and of the installed shared instructions under `/root/.agents`, and one per component of each repository's `map.json`, into `/var/lib/agent-platform/route`, which the store's sources `sections` and `components` read (schema version 14), and indexes the two sources. `ont fn route` answers from them. `ap-route.service` (`Type=oneshot`, run of `/usr/local/bin/ap route index --prune` with the two repositories and `--instructions /root/.agents`, in `agents.slice`, `Nice=10`) is one run; `ap-route.timer` starts it every ten minutes (`OnCalendar=*:0/10`, `Persistent=true`). With `--prune`, the files of a repository the service no longer names are removed and their sections retracted. A fetch that fails (also on Git's ref lock while `ap deliver` or `ap unit ready` fetches the same clone) keeps that repository's previous file until the next run; the other way round, their fetch can fail on this run's lock for the seconds it holds it, and they recover on their next run. The education repositories are never named: the command refuses an `education-` name.
+`ap route index` (`specs/ap/route.md`) writes one record per heading of each `*.md` file at `origin/main` of lifecycle-platform (the engine's `engine/` included; after `git fetch origin main` in the clone the policy's `repositories` names for it; no checkout is read or changed) and of the installed shared instructions under `/root/.agents`, and one per component of each repository's `map.json`, into `/var/lib/agent-platform/route`, which the store's sources `sections` and `components` read (schema version 14), and indexes the two sources. `ont fn route` answers from them. `ap-route.service` (`Type=oneshot`, run of `/usr/local/bin/ap route index --prune` with the repository and `--instructions /root/.agents`, in `agents.slice`, `Nice=10`) is one run; `ap-route.timer` starts it every ten minutes (`OnCalendar=*:0/10`, `Persistent=true`). With `--prune`, the files of a repository the service no longer names are removed and their sections retracted. A fetch that fails (also on Git's ref lock while `ap deliver` or `ap unit ready` fetches the same clone) keeps that repository's previous file until the next run; the other way round, their fetch can fail on this run's lock for the seconds it holds it, and they recover on their next run. The Academy's repository is never named: the command refuses an `education-` or `academy-` name.
 
 `ap deliver` installs `ap-route.service` and `ap-route.timer` and enables the timer (section "The unit files"); a run needs the engine and the schema of version 14, which delivery installs too. For a first run now, not at the next tenth minute, as root: `systemctl start ap-route.service`.
 
@@ -410,7 +410,7 @@ systemctl is-active ap-route.service                  # until it answers inactiv
 - `accounts`: checks Claude account `.credentials.json` expiry (only the expiry timestamp is kept) and recent `run` usage limits (`>= 0.9`).
 - `checks`: checks GitHub `main` workflow conclusions, open Dependabot alerts and `github/apply --check` settings drift for policy repositories.
 - `runtimes`: checks `--version` and `--help` flags of `claude` and `agy` against the flags `ap run` invokes.
-- `drift`: compares by SHA-256, without fetching, four sources, the first three at the commit K the installed `ap` names, read from delivery's clone `/var/lib/agent-platform/deliver/agent-platform` (`specs/ap/watch.md` R34): the files listed in `host/deployments/host-artifacts.json`; the unit files of `deploy/`, with `/etc/systemd/system/<name>`; the files of `host/etc/`, `host/etc/x` with the host's `/etc/x` (between the delivery that installs K and the Lead's change of the member `etc`, the operations repository's installer still writes the host's policy, from a source with the same bytes at the import; a merge there in that window is a `drift` finding until the change); and, when the policy names a valid `apcheck@<node>` in `hosts.pc.ssh` and the PC is reachable, the checks account's `ont` binary (read-only digest probe over `tailscale ssh`, `specs/ap/watch.md` R33) against the host's `/usr/local/bin/ont`.
+- `drift`: compares by SHA-256, without fetching, four sources, the first three at the commit K the installed `ap` names, read from delivery's clone `/var/lib/agent-platform/deliver/lifecycle-platform` (`specs/ap/watch.md` R34): the files listed in `host/deployments/host-artifacts.json`; the unit files of `deploy/`, with `/etc/systemd/system/<name>`; the files of `host/etc/`, `host/etc/x` with the host's `/etc/x` (between the delivery that installs K and the Lead's change of the member `etc`, the operations repository's installer still writes the host's policy, from a source with the same bytes at the import; a merge there in that window is a `drift` finding until the change); and, when the policy names a valid `apcheck@<node>` in `hosts.pc.ssh` and the PC is reachable, the checks account's `ont` binary (read-only digest probe over `tailscale ssh`, `specs/ap/watch.md` R33) against the host's `/usr/local/bin/ont`.
 - `credit`: when the policy has the member `api` (`specs/ap/api.md` R3), reads the runs of role `batch` of the store by the rule `ap api batch` counts with: the month's counted spend at 80 % of a stop (`stop standard`, `stop soak`), a batch run still running more than 26 hours after its start (`unsettled <run>`), and the key file's mode by `stat` alone, never its bytes (`key mode`, urgent, when it is not a regular file of mode 600); without the member it reads nothing and its findings are neither seen nor closed.
 
 `ap-watch.service` (`Type=oneshot`, run of `/usr/local/bin/ap watch`, `Nice=10`, `TZ=UTC` so that `systemctl` prints the times the pass reads in UTC, a `PATH` with `/usr/sbin` for `sshd`, no `Restart=`) is one pass; `ap-watch.timer` starts one at every fifth minute (`OnCalendar=*:0/5`) and makes up no pass missed while the host was down. Each pass is a new process of the installed `ap`: a delivery of `ap` reaches the next pass with no restart. The answer of each pass is one line in the journal.
@@ -452,7 +452,7 @@ systemctl is-active ap-watch.service                  # until it answers inactiv
 
 ## The API queue
 
-`ap-api-nightly.service` and `ap-api-weekly.service` (`Type=oneshot`, `python3 -I -B` of `evals/batch/queue` in delivery's clone `/var/lib/agent-platform/deliver/agent-platform`, in `agents.slice`, `Nice=10`, `TZ=UTC`, `TimeoutStartSec=26h` because `ap api batch` polls a batch up to 25 hours, `StateDirectory=agent-platform/api` with mode 0700, no `Restart=`) each run one pass of the drift job on the API credit with no session. `ap-api-nightly.timer` starts the nightly pass at 18:00 UTC every day (`--pass nightly --model claude-sonnet-5-5`: only the groups no earlier pass settled); `ap-api-weekly.timer` the weekly pass at 06:00 UTC on Sundays (`--pass weekly --model claude-opus-5-5`: the full pass). Both timers are `Persistent=true`: a time missed while the host was down is made up at boot.
+`ap-api-nightly.service` and `ap-api-weekly.service` (`Type=oneshot`, `python3 -I -B` of `evals/batch/queue` in delivery's clone `/var/lib/agent-platform/deliver/lifecycle-platform`, in `agents.slice`, `Nice=10`, `TZ=UTC`, `TimeoutStartSec=26h` because `ap api batch` polls a batch up to 25 hours, `StateDirectory=agent-platform/api` with mode 0700, no `Restart=`) each run one pass of the drift job on the API credit with no session. `ap-api-nightly.timer` starts the nightly pass at 18:00 UTC every day (`--pass nightly --model claude-sonnet-5-5`: only the groups no earlier pass settled); `ap-api-weekly.timer` the weekly pass at 06:00 UTC on Sundays (`--pass weekly --model claude-opus-5-5`: the full pass). Both timers are `Persistent=true`: a time missed while the host was down is made up at boot.
 
 A pass (`evals/batch/README.md`, section "The queue"): it checks that delivery's clone is at the commit K the installed `ap` names (else it writes nothing and answers `not_installed`), copies `evals/batch` of K into its directory `/var/lib/agent-platform/api/drift/<start>-<pass>/`, and runs from that copy the builder, one `ap api batch drift` (`--queue soak` in the last six days of the UTC month, else `standard`) and the reader, which opens at most ten findings of the detector `batch:drift` a pass and counts the rest. The queue computes no amount: the admission, the caps and the stops are `ap api batch`'s. The answer of each pass is one JSON line in the journal: `status`, `queue`, `commit`, `dir` and per step `exit` and `answer`.
 
@@ -587,3 +587,318 @@ wsl -d ap-checks --exec tailscale nc -w 3 100.95.133.99 7432
 ```
 
 Undo: remove the TCP 7432 grant from the Tailscale ACL and verify `tailscale nc 100.95.133.99 7432` / `curl -fsS http://100.95.133.99:7432/healthz` from `kcpalantir-wsl` fails.
+
+## The regroup cutover
+
+The repositories of the host were regrouped by function into two, on the user's decision of 2026-11-24, which also
+delegates every step below to the Lead. This section is that procedure, step by step: what each step does, its command, its
+read-back and its undo. Each step starts only after the read-back of the step before it shows what it says.
+
+| Repository on GitHub | At the cutover |
+| --- | --- |
+| `park-kyungchan/agent-platform` | renamed `park-kyungchan/lifecycle-platform` (this repository: `ap`, `content/`, `engine/`, `host/`); not archived |
+| `park-kyungchan/education-platform` | renamed `park-kyungchan/academy-platform` (the Academy's domain); not archived |
+| `park-kyungchan/ontology-platform` | archived (the engine is `engine/` here) |
+| `park-kyungchan/agent-vps-operations` | archived (the host's configuration is `host/` here) |
+| `park-kyungchan/education-dc-gang-a` | archived |
+| `park-kyungchan/education-problem-edit` | already archived: read back only |
+
+`bible-commentary-station` is neither renamed nor archived. The installed paths keep their names:
+`/etc/agent-platform`, `/var/lib/agent-platform` and `/var/lib/ontology-platform` (the store) are host paths, not
+repository names, and so are the names of the services `ap-*` and `ont-*`. The only paths of the host's installed
+state that move: delivery's clone `/var/lib/agent-platform/deliver/agent-platform`, which becomes
+`/var/lib/agent-platform/deliver/lifecycle-platform` in the switch of step (f), and the two stage-token files of
+step (f). The store's backup needs no remote (the user's decision of 2026-11-24): no step waits for a copy of the store
+off the host. A GitHub rename keeps the old name redirecting (web, API and Git), so a domain crate that pins this
+repository by its old URL keeps resolving.
+
+What reads an old name after the cutover. A record of the store keeps the repository it was stored under: a unit, a
+review, an install attempt of `park-kyungchan/agent-platform`. `ap` reads an old name as its new one wherever it maps a
+repository to a clone, a stage token or a review (`specs/ap/unit.md` R55), so a review stored under the old name still
+accepts a merge of the new one, and an install attempt names the repository of the review that accepts it (which the
+store's `start_install` compares exactly); `ontology/migrate` rewrites no stored value. A unit that has not ended and
+whose `repository` is an old name is amended to the new name in step (f) and plan-reviewed again before its next start.
+
+### Before the approval
+
+The Lead's owed rows, in a worktree of this head: the rehearsal of the work schema, whose last line is
+`v28 renamed checkout: ok`, and the list of units not ended under an old name (amended in step (f)):
+
+```sh
+bash ontology/rehearsal.sh "$(command -v ont)" | tail -n 1                      # v28 renamed checkout: ok
+for r in park-kyungchan/agent-platform park-kyungchan/education-platform; do
+  printf '{"object_type":"unit","where":{"eq":["repository","%s"]},"limit":1000}' "$r" | ont search \
+    | python3 -I -c 'import json,sys; v=json.load(sys.stdin); [print(o["id"]["native_key"], o["head"]["fields"]["state"]["value"]) for o in v["result"]["objects"] if o["head"]["fields"]["state"]["value"] not in ("merged","done","dropped")]'
+done
+```
+
+Then the timers stop, before the Lead approves this head (the approval merges it), so that nothing delivers the merged
+head early and no pass starts a unit:
+
+```sh
+systemctl stop ap-deliver.timer ap-work.timer ap-api-nightly.timer ap-api-weekly.timer
+systemctl is-active ap-deliver.timer ap-work.timer ap-api-nightly.timer ap-api-weekly.timer   # inactive, four times
+systemctl is-active ap-deliver.service ap-work.service ap-api-nightly.service ap-api-weekly.service   # none active or activating
+```
+
+Undo: `systemctl start` of the four timers. The Lead approves this head (`ap unit approve`) only after that read-back,
+and before steps (c) and (d): the approval's token call still names the old repository. The timers start again only at
+the end of step (f).
+
+### (a) Every branch and tag of an archived repository is on GitHub
+
+Before an archive, every branch and tag of its checkout is on GitHub at the same commit: GitHub is its copy off the
+host. The command reads references only, no file of a tree:
+
+```sh
+scratch=$(mktemp -d)
+for r in ontology-platform agent-vps-operations education-dc-gang-a; do
+  c=/home/palantirkc/platforms/$r
+  test -d "$c" || { echo "$r: no checkout on this host"; continue; }
+  git -C "$c" for-each-ref --format='%(objectname)%09%(refname)' refs/heads refs/tags | sort > "$scratch/$r.local"
+  git ls-remote --heads --tags "https://github.com/park-kyungchan/$r.git" | grep -v '\^{}$' | sort > "$scratch/$r.remote"
+  echo "$r: $(comm -23 "$scratch/$r.local" "$scratch/$r.remote" | wc -l) missing"
+done
+```
+
+Read-back: each repository answers `0 missing` (or has no checkout here). A branch or tag that is missing is pushed,
+or the user decides about it, before its archive. Undo: none; the step only reads.
+
+### (b) No process works in a checkout that moves
+
+No process has its working directory under `/home/palantirkc/platforms/agent-platform` or
+`/home/palantirkc/platforms/education-platform`. Read with `ps`; no session is stopped or sent input: the step waits
+and reads again until nothing is printed.
+
+```sh
+ps -e -o pid= | while read -r p; do d=$(readlink "/proc/$p/cwd" 2>/dev/null) || continue
+  case "$d/" in /home/palantirkc/platforms/agent-platform/*|/home/palantirkc/platforms/education-platform/*) echo "$p $d";; esac
+done
+```
+
+Read-back: nothing printed. Undo: none.
+
+### (c) The archive of the absorbed repositories
+
+```sh
+for r in ontology-platform agent-vps-operations education-dc-gang-a; do gh repo archive "park-kyungchan/$r" --yes; done
+for r in ontology-platform agent-vps-operations education-dc-gang-a education-problem-edit; do
+  gh repo view "park-kyungchan/$r" --json isArchived --jq .isArchived          # true, four times
+done
+```
+
+Undo: `gh repo unarchive park-kyungchan/<name> --yes`, then the same read answers `false`.
+
+### (d) The rename of the two regrouped repositories
+
+From this step until the read-back of the switch in step (f), no unit starts or runs (the hold): `ap-work.timer` is
+stopped, and the Lead starts none by hand. Before the rename, and again before step (f), `ap status --brief` shows no
+unit running.
+
+```sh
+gh repo rename lifecycle-platform --repo park-kyungchan/agent-platform --yes
+gh repo rename academy-platform --repo park-kyungchan/education-platform --yes
+gh repo view park-kyungchan/lifecycle-platform --json name,isArchived --jq '"\(.name) \(.isArchived)"'   # lifecycle-platform false
+gh repo view park-kyungchan/academy-platform --json name,isArchived --jq '"\(.name) \(.isArchived)"'     # academy-platform false
+git ls-remote https://github.com/park-kyungchan/agent-platform.git HEAD        # the same commit as the next line: the old URL redirects
+git ls-remote https://github.com/park-kyungchan/lifecycle-platform.git HEAD
+```
+
+Undo: the rename back, `gh repo rename agent-platform --repo park-kyungchan/lifecycle-platform --yes` (and
+`education-platform` for the other); the same reads then answer the old names.
+
+### (e) The checkouts and the remotes of the clones
+
+The main checkout of this repository moves; the old path stays a symbolic link to it until this head's delivery is
+read back at the end of step (f), so that every reader that still resolves the old path finds it. The Academy's
+checkout moves under the user's delegation, by `mv` and `git -C <clone> remote set-url` only: no file of the Academy's
+tree is read, and the Academy's own task repairs its worktrees.
+
+```sh
+cd /home/palantirkc/platforms
+mv agent-platform lifecycle-platform && ln -s lifecycle-platform agent-platform
+git -C lifecycle-platform remote set-url origin https://github.com/park-kyungchan/lifecycle-platform.git
+git -C lifecycle-platform worktree repair
+mv education-platform academy-platform
+git -C academy-platform remote set-url origin https://github.com/park-kyungchan/academy-platform.git
+git -C lifecycle-platform remote get-url origin; git -C academy-platform remote get-url origin   # the new URLs
+readlink agent-platform                                                          # lifecycle-platform
+git -C lifecycle-platform worktree list                                          # no worktree marked prunable
+```
+
+The clones under `/var/lib/agent-platform`: every clone whose remote names an old URL gets the new one; delivery's
+clone `/var/lib/agent-platform/deliver/agent-platform` has no remote (delivery fetches by the request's `url`) and is
+left alone here: it moves in the switch of step (f).
+
+```sh
+find /var/lib/agent-platform -maxdepth 4 -name .git -prune | while read -r g; do c=${g%/.git}
+  git -C "$c" remote -v | grep -E 'park-kyungchan/(agent-platform|education-platform)(\.git)? ' && echo "  in $c"
+done
+git -C <clone> remote set-url origin https://github.com/park-kyungchan/<new name>.git   # for each clone printed above
+git -C /var/lib/agent-platform/deliver/agent-platform remote                    # prints nothing
+```
+
+On the PC (when it is on), the installed pair is refreshed by `scripts/pc-pull.sh`, whose default URL names the new
+repository; a clone of the user's on the PC is the user's own to move. The roster hook: from this move until
+`/etc/gitconfig` is installed again in step (f), the system file's line for `platforms/agent-platform/` no longer
+matches the moved checkout's Git directory, so no commit is made by hand in that checkout or its worktrees in that
+window. Undo: `rm agent-platform && mv lifecycle-platform agent-platform`, `mv academy-platform education-platform`,
+`git -C <clone> remote set-url origin <old URL>` for each clone changed, and `git -C agent-platform worktree repair`.
+
+### (f) The delivery of this head, the stage tokens and the switch
+
+The delivery runs with `/etc/agent-platform/deliver.json` as it is: its `repository` and `etc.repository` still
+`park-kyungchan/agent-platform` (its `url` may stay the old one, which redirects), and delivery's clone
+`/var/lib/agent-platform/deliver/agent-platform` in place, because the installed `ap`'s review match and the store's
+`start_install` compare the repository of the merged head's review, stored under the old name, exactly.
+
+First the two stage-token files that the new policy names, renamed by name; their content is not read:
+
+```sh
+cd /etc/agent-platform/credentials
+mv stage-token-agent-platform stage-token-lifecycle-platform
+mv stage-token-education-platform stage-token-academy-platform
+test -f stage-token-lifecycle-platform && test -f stage-token-academy-platform && echo both
+```
+
+Undo: the two `mv` back. Then the Lead's own calls, as many as the engine, the schema and the pair need (each ends;
+the next goes on), until one ends `current`:
+
+```sh
+ONT_ROLE=deliver ap deliver < /etc/agent-platform/deliver.json
+python3 -I -c 'import json; r = json.load(open("/var/lib/agent-platform/deliver/last.json")); print(r["target"], r["end"], r["code"], r.get("schema"), (r.get("etc") or {}).get("result"))'
+ap --version                                                                     # names the merged head
+ap policy check
+python3 -I -c 'import json; p = json.load(open("/etc/agent-platform/policy.json")); print(sorted(p["repositories"].items())); print(sorted(p["units"]["github"]["stage_tokens"].items())); print("engine/**" in p["units"]["approval"]["guarded"])'
+```
+
+Read-back: the end `current` with the policy installed (`etc` `installed` or `same`); `ap policy check` answers `ok`;
+`repositories` holds exactly `park-kyungchan/lifecycle-platform` with the clone
+`/home/palantirkc/platforms/lifecycle-platform` and `park-kyungchan/academy-platform` with
+`/home/palantirkc/platforms/academy-platform`; `stage_tokens` exactly those two, at
+`/etc/agent-platform/credentials/stage-token-lifecycle-platform` and `.../stage-token-academy-platform`; and `True`
+for `engine/**`. Undo: the policy and the pair go back as section "Undo" and section "The configuration files" say
+(the installer's kept copy). From this delivery until the switch below, the watch's `drift` cannot read its clone
+under the new name: that finding is expected.
+
+The stage tokens of the two archived repositories: the user revokes them in GitHub's token settings, and the user's
+confirmation is the read-back the Lead waits for. Only then the Lead removes the two files by name; the removal is
+irreversible:
+
+```sh
+rm /etc/agent-platform/credentials/stage-token-ontology-platform /etc/agent-platform/credentials/stage-token-agent-vps-operations
+test ! -e /etc/agent-platform/credentials/stage-token-ontology-platform && test ! -e /etc/agent-platform/credentials/stage-token-agent-vps-operations && echo removed
+```
+
+The units not ended whose `repository` is an old name (the list of "Before the approval", read again now): each is
+amended to the new name with `ap unit amend` (member `repository`), which changes its plan's digest, so each is
+plan-reviewed again (`ap unit review`) before its next start.
+
+The system Git configuration, from host/git/ of the merged head (in a worktree of it, in `host/`), keeping the present
+file as the undo; when `/etc/gitconfig` holds lines that are not those of the old `git/system.gitconfig` (a
+`git config --system` value), the `includeIf` lines alone are replaced and the other lines kept:
+
+```sh
+cp -p /etc/gitconfig /etc/gitconfig.before-cutover
+install -m 0644 git/work.gitconfig git/clones.gitconfig git/alias.gitconfig /usr/local/lib/agents-git/
+install -m 0755 git/hooks/pre-commit /usr/local/lib/agents-git/hooks/pre-commit
+install -m 0644 git/system.gitconfig /etc/gitconfig
+for f in work clones alias; do cmp git/$f.gitconfig /usr/local/lib/agents-git/$f.gitconfig; done
+cmp git/hooks/pre-commit /usr/local/lib/agents-git/hooks/pre-commit; cmp git/system.gitconfig /etc/gitconfig
+grep -nE 'platforms/(agent-platform|ontology-platform|agent-vps-operations|education-platform)/' /etc/gitconfig   # prints nothing
+```
+
+Undo: `cp -p /etc/gitconfig.before-cutover /etc/gitconfig` and the files of `/usr/local/lib/agents-git/` from the
+commit installed before.
+
+The switch, after the read-back of this head's delivery: the request names the new repository, and delivery's clone
+takes the new name. The request is changed in its members `repository`, `url`, `etc` and `checkouts` (each path
+`/home/palantirkc/platforms/agent-platform` or `.../education-platform` gets the new name); every other member stays:
+
+```sh
+cp -p /etc/agent-platform/deliver.json /etc/agent-platform/deliver.json.before-cutover
+python3 -I - <<'PY'
+import json, os
+path = "/etc/agent-platform/deliver.json"
+r = json.load(open(path))
+new, url = "park-kyungchan/lifecycle-platform", "https://github.com/park-kyungchan/lifecycle-platform.git"
+r["repository"], r["url"] = new, url
+r["etc"] = {"repository": new, "url": url}
+moved = {"/home/palantirkc/platforms/agent-platform": "/home/palantirkc/platforms/lifecycle-platform",
+         "/home/palantirkc/platforms/education-platform": "/home/palantirkc/platforms/academy-platform"}
+if "checkouts" in r:
+    r["checkouts"] = [moved.get(c, c) for c in r["checkouts"]]
+with open(path + ".new", "w") as f:
+    json.dump(r, f, indent=2); f.write("\n")
+os.chmod(path + ".new", 0o644)
+PY
+ap deliver check < /etc/agent-platform/deliver.json.new && mv /etc/agent-platform/deliver.json.new /etc/agent-platform/deliver.json
+mv /var/lib/agent-platform/deliver/agent-platform /var/lib/agent-platform/deliver/lifecycle-platform
+ONT_ROLE=deliver ap deliver < /etc/agent-platform/deliver.json
+python3 -I -c 'import json; r = json.load(open("/var/lib/agent-platform/deliver/last.json")); print(r["end"], r["code"], r.get("install"))'
+systemctl cat ap-api-nightly.service | grep ExecStart                           # .../deliver/lifecycle-platform/evals/batch/queue
+test -f /var/lib/agent-platform/deliver/lifecycle-platform/evals/batch/queue && echo queue
+git -C /var/lib/agent-platform/deliver/lifecycle-platform remote                # prints nothing
+```
+
+Read-back: `ap deliver check` answers `ok`; the last call ends `current` and makes no new install attempt; the
+service names the clone under the new name and the queue is there. Undo:
+`mv /var/lib/agent-platform/deliver/lifecycle-platform /var/lib/agent-platform/deliver/agent-platform` and
+`cp -p /etc/agent-platform/deliver.json.before-cutover /etc/agent-platform/deliver.json`.
+
+Then the old path of the checkout goes, and the timers start again; the hold ends:
+
+```sh
+test -L /home/palantirkc/platforms/agent-platform && rm /home/palantirkc/platforms/agent-platform
+test ! -e /home/palantirkc/platforms/agent-platform && echo gone
+systemctl start ap-deliver.timer ap-work.timer ap-api-nightly.timer ap-api-weekly.timer
+systemctl is-active ap-deliver.timer ap-work.timer ap-api-nightly.timer ap-api-weekly.timer     # active, four times
+```
+
+Undo: `ln -s lifecycle-platform /home/palantirkc/platforms/agent-platform`; `systemctl stop` of the four timers.
+
+### (g) The rulesets under the new names
+
+In a worktree of the merged head, `github/apply --check` (it only reads) compares both repositories under their new
+names (section "Who applies" of `github/README.md`):
+
+```sh
+python3 -I -B github/apply --check
+```
+
+Read-back: `park-kyungchan/lifecycle-platform` answers `same`; `park-kyungchan/academy-platform` answers as it did
+before the rename (its finding stays expected until the App is installed there, `github/README.md`). Undo: none; the
+step only reads.
+
+### (h) The criterion
+
+A grep of the old repository names over the policy, the delivery request, the installed services and the installed
+instructions prints nothing. It names exactly the owner-qualified names, the checkout paths, the token files and
+delivery's clone; the installed paths `/etc/agent-platform`, `/var/lib/agent-platform` and `/var/lib/ontology-platform`
+are not among them, and `/etc/agent-platform/deliver.json.before-cutover` (the undo of the switch) is not read:
+
+```sh
+grep -rnF \
+  -e park-kyungchan/agent-platform -e park-kyungchan/education-platform -e park-kyungchan/ontology-platform \
+  -e park-kyungchan/agent-vps-operations -e park-kyungchan/education-dc-gang-a -e park-kyungchan/education-problem-edit \
+  -e platforms/agent-platform -e platforms/education-platform -e platforms/ontology-platform \
+  -e platforms/agent-vps-operations -e platforms/education-dc-gang-a -e platforms/education-problem-edit \
+  -e stage-token-agent-platform -e stage-token-education-platform -e stage-token-ontology-platform \
+  -e stage-token-agent-vps-operations -e stage-token-education-dc-gang-a -e stage-token-education-problem-edit \
+  -e deliver/agent-platform \
+  /etc/agent-platform/policy.json /etc/agent-platform/deliver.json \
+  /etc/systemd/system/ap-*.service /etc/systemd/system/ap-*.timer /etc/systemd/system/ont-*.service /etc/systemd/system/ont-*.timer \
+  /root/.agents
+for r in ontology-platform agent-vps-operations education-dc-gang-a education-problem-edit; do
+  gh repo view "park-kyungchan/$r" --json isArchived --jq .isArchived          # true
+done
+for r in lifecycle-platform academy-platform bible-commentary-station; do
+  gh repo view "park-kyungchan/$r" --json name,isArchived --jq '"\(.name) \(.isArchived)"'   # its own name, false
+done
+gh repo view park-kyungchan/agent-platform --json name --jq .name                 # lifecycle-platform: renamed, not archived
+gh repo view park-kyungchan/education-platform --json name --jq .name             # academy-platform: renamed, not archived
+```
+
+Read-back: the grep prints nothing; the four archived repositories answer `true`; `lifecycle-platform`,
+`academy-platform` and `bible-commentary-station` answer their own names and `false`; each old name of a renamed
+repository answers the new name. Undo: none; the step only reads.

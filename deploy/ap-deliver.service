@@ -1,6 +1,6 @@
 [Unit]
-Description=ap deliver: install the accepted tip of agent-platform (ap and the shared instructions)
-Documentation=https://github.com/park-kyungchan/agent-platform/blob/main/deploy/README.md
+Description=ap deliver: install the accepted tip of lifecycle-platform (ap and the shared instructions)
+Documentation=https://github.com/park-kyungchan/lifecycle-platform/blob/main/deploy/README.md
 Wants=network-online.target
 After=network-online.target
 

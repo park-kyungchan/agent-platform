@@ -21,9 +21,9 @@ pub const INSTALLED_AP: &str = "/usr/local/bin/ap";
 pub const INSTALLED_ONT: &str = "/usr/local/bin/ont";
 /// Default remote binary path on the PC checks account when `deploy/deliver.json` names none (R33).
 pub const DEFAULT_PC_ONT: &str = "/home/apcheck/.cargo/bin/ont";
-/// Delivery's clone of agent-platform: `<state>/<name>` of `deploy/deliver.json`, its `repository`
+/// Delivery's clone of lifecycle-platform: `<state>/<name>` of `deploy/deliver.json`, its `repository`
 /// (R27 to R29).
-pub const DELIVER_CLONE: &str = "/var/lib/agent-platform/deliver/agent-platform";
+pub const DELIVER_CLONE: &str = "/var/lib/agent-platform/deliver/lifecycle-platform";
 /// The host's directory of the unit files delivery installs (`specs/ap/deliver.md` R48).
 pub const UNIT_DIR: &str = "/etc/systemd/system";
 const MS: u64 = 10_000;

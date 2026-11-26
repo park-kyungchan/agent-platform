@@ -1,6 +1,6 @@
 [Unit]
 Description=ap API queue, weekly on Sundays at 06:00 UTC
-Documentation=https://github.com/park-kyungchan/agent-platform/blob/main/deploy/README.md
+Documentation=https://github.com/park-kyungchan/lifecycle-platform/blob/main/deploy/README.md
 
 [Timer]
 OnCalendar=Sun *-*-* 06:00:00 UTC

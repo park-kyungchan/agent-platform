@@ -1,7 +1,7 @@
 {
   "format": "ontology-schema/v1",
   "domain": "work",
-  "version": 27,
+  "version": 28,
   "namespace": {
     "instance": "vps://palantirkc",
     "account": "root"
@@ -299,9 +299,9 @@
         "/root/.agents/AGENTS.md",
         "/root/.agents/runtime-references/*.md",
         "/root/.agents/skills/*/SKILL.md",
-        "/home/palantirkc/platforms/agent-platform/content/AGENTS.md",
-        "/home/palantirkc/platforms/agent-platform/content/runtime-references/*.md",
-        "/home/palantirkc/platforms/agent-platform/content/skills/*/SKILL.md"
+        "/home/palantirkc/platforms/lifecycle-platform/content/AGENTS.md",
+        "/home/palantirkc/platforms/lifecycle-platform/content/runtime-references/*.md",
+        "/home/palantirkc/platforms/lifecycle-platform/content/skills/*/SKILL.md"
       ],
       "complete_listing": true,
       "fresh_for_s": 86400
@@ -519,7 +519,7 @@
       }
     },
     "instruction_file": {
-      "description": "One shared instruction file, installed under /root/.agents or its source under agent-platform/content. Properties: path, sha256, size, mtime, mode of the file; source_copy points, for an installed file, to the file with the same relative path under agent-platform/content. A reference has two special states. No value: the rule could not build a key (for example a report named REPORT.md has no packet id). The target may not exist as an object: the packet file has another name, or the directory has no STATE.md.",
+      "description": "One shared instruction file, installed under /root/.agents or its source under lifecycle-platform/content. Properties: path, sha256, size, mtime, mode of the file; source_copy points, for an installed file, to the file with the same relative path under lifecycle-platform/content. A reference has two special states. No value: the rule could not build a key (for example a report named REPORT.md has no packet id). The target may not exist as an object: the packet file has another name, or the directory has no STATE.md.",
       "owner": {
         "source": "instructions"
       },
@@ -567,10 +567,10 @@
           "transform": {
             "replace_prefix": [
               "/root/.agents/",
-              "/home/palantirkc/platforms/agent-platform/content/"
+              "/home/palantirkc/platforms/lifecycle-platform/content/"
             ]
           },
-          "description": "Reference from installed shared instructions to their source file under agent-platform/content."
+          "description": "Reference from installed shared instructions to their source file under lifecycle-platform/content."
         }
       }
     },

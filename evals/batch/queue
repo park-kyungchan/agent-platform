@@ -21,7 +21,7 @@ import sys
 import tarfile
 
 PASSES = ("nightly", "weekly")
-REPOSITORIES = ("park-kyungchan/agent-platform", "park-kyungchan/ontology-platform")
+REPOSITORIES = ("park-kyungchan/lifecycle-platform",)
 MODEL = re.compile(r"^claude-[a-z0-9.-]{1,57}$")
 COMMIT = re.compile(r"^[0-9a-f]{40}$")
 NOW = re.compile(r"^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$")
@@ -197,7 +197,7 @@ def step(argv, cwd, answer_on_error=False):
 def run(argv):
     name, model = arguments(argv)
     ap_bin = variable("AP_BIN", "/usr/local/bin/ap")
-    clone = variable("AP_DELIVER_CLONE", "/var/lib/agent-platform/deliver/agent-platform")
+    clone = variable("AP_DELIVER_CLONE", "/var/lib/agent-platform/deliver/lifecycle-platform")
     state = variable("AP_API_STATE", "/var/lib/agent-platform/api")
     start = start_time()
     # (a) K, and the programs of K; (b) the clones; nothing is written before both are read.

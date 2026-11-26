@@ -1,6 +1,6 @@
 [Unit]
 Description=ap work: start the units of the store that may start now (one dispatch pass)
-Documentation=https://github.com/park-kyungchan/agent-platform/blob/main/deploy/README.md
+Documentation=https://github.com/park-kyungchan/lifecycle-platform/blob/main/deploy/README.md
 
 [Service]
 Type=oneshot

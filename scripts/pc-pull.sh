@@ -13,7 +13,7 @@
 set -euo pipefail
 umask 077
 
-DEFAULT_AP_URL="https://github.com/park-kyungchan/agent-platform.git"
+DEFAULT_AP_URL="https://github.com/park-kyungchan/lifecycle-platform.git"
 
 refuse() {
   local code="$1" line="$2" msg="${3:-}"

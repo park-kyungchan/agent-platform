@@ -971,8 +971,13 @@ fn delivered(s: &mut impl System, files: &status::DeliveryFiles, d: &Value) -> b
     let Some(request) = &files.request else {
         return false;
     };
-    let main = request["repository"].as_str() == Some(repository);
-    let etc = !main && request["etc"]["repository"].as_str() == Some(repository);
+    // An old name of the regroup reads as its new one, in the request and in the unit (R26).
+    let named = |v: &Value| {
+        v.as_str()
+            .is_some_and(|r| object::same_repository(r, repository))
+    };
+    let main = named(&request["repository"]);
+    let etc = !main && named(&request["etc"]["repository"]);
     if !main && !etc {
         return merged;
     }

@@ -981,7 +981,7 @@ apply('triage_decision', 'v9-after-carry', dict(decision=third, triage='none', r
 unchanged = fingerprint()
 assert migrate(9, 10) == dict(carried=0, already=3)
 assert fingerprint() == unchanged and fields(third_request)['route_reason'] == 'carried from version 9'
-for before, after in [(9, 28), (10, 10), (10, 9)]:
+for before, after in [(9, 29), (10, 10), (10, 9)]:
     assert migrate(before, after, 2) == dict(status='unknown_pair')
 assert fingerprint() == unchanged
 assert migrate(9, 10) == dict(carried=0, already=3)
@@ -2747,7 +2747,7 @@ unchanged = fingerprint()
 assert migrate(21, 23) == dict(carried=0, already=0)
 assert migrate(20, 23) == dict(carried=0, already=0)
 assert migrate(22, 23) == dict(carried=0, already=0)
-assert migrate(23, 28, 2) == dict(status='unknown_pair')
+assert migrate(23, 29, 2) == dict(status='unknown_pair')
 assert fingerprint() == unchanged and [obj(i) for i in v21_objects] == v21_before
 print('v22_migration_rows_complete')
 phase = 'v22'
@@ -2881,7 +2881,7 @@ assert 'subject' in (listed_interfaces if isinstance(listed_interfaces, dict) el
 unchanged = fingerprint()
 assert migrate(23, 24) == dict(carried=0, already=0)
 assert migrate(22, 24) == dict(carried=0, already=0)
-assert migrate(24, 28, 2) == dict(status='unknown_pair')
+assert migrate(24, 29, 2) == dict(status='unknown_pair')
 assert fingerprint() == unchanged and [obj(i) for i in v23_objects] == v23_before
 print('v24_migration_rows_complete')
 # The walk. Each refusal row is before the action it guards; a refusal writes nothing.
@@ -3079,7 +3079,7 @@ assert described.returncode == 0 and json.loads(described.stdout)['schema']['wor
 unchanged = fingerprint()
 assert migrate(24, 25) == dict(carried=0, already=0)
 assert migrate(23, 25) == dict(carried=0, already=0)
-assert migrate(25, 28, 2) == dict(status='unknown_pair')
+assert migrate(25, 29, 2) == dict(status='unknown_pair')
 assert fingerprint() == unchanged and [obj(i) for i in v24_objects] == v24_before
 print('v25_migration_rows_complete')
 # The removed actions are unknown to the store.
@@ -3248,7 +3248,7 @@ print('v26_describe_bytes=' + str(len(described.stdout.encode())), file=sys.stde
 unchanged = fingerprint()
 assert migrate(25, 26) == dict(carried=0, already=0)
 assert migrate(24, 26) == dict(carried=0, already=0)
-assert migrate(26, 28, 2) == dict(status='unknown_pair')
+assert migrate(26, 29, 2) == dict(status='unknown_pair')
 assert fingerprint() == unchanged and [obj(i) for i in v25_objects] == v25_before
 print('v26_migration_rows_complete')
 # The removed actions are unknown to the store.
@@ -3292,7 +3292,11 @@ v26_before = [obj(i) for i in v26_objects]
 v26_views = [(view, args, call(['render'], dict(view=view, args=args))) for view, args in [(name, {a: ARGS22[a] for a in body.get('args', [])}) for name, body in v26_schema['views'].items()]]
 assert len(v26_views) == 16
 phase = 'v27'
-schema = json.loads(pathlib.Path(repo, 'ontology/work.schema.json').read_text())
+V27_PIN = ('04ee17d1045f9f3d60871d0bd5e211ddbf9718a4', '52d4fcae56e4f30084c0b407bb1ca03a9b1181c2b475ee536a2360802d9024da')
+v27_bytes = subprocess.check_output(['git', '-C', repo, 'show', V27_PIN[0] + ':ontology/work.schema.json'], timeout=10)
+assert hashlib.sha256(v27_bytes).hexdigest() == V27_PIN[1]
+v27_path = pathlib.Path(store).with_name('pinned-' + V27_PIN[0] + '.json'); v27_path.write_bytes(v27_bytes)
+schema = json.loads(v27_bytes)
 assert schema['version'] == 27
 head, old = json.loads(json.dumps(schema)), v26_schema
 changed = lambda sec: {k for k in set(head[sec]) | set(old[sec]) if head[sec].get(k) != old[sec].get(k)}
@@ -3343,7 +3347,7 @@ for g_new, g_old in zip(head['grants'], old['grants']):
 held27 = {g['role']: g for g in head['grants'] if 'role' in g}
 assert held27['lead']['actions'] == sorted(head['action_types']) and [r for r, g in held27.items() if NEW27 & set(g['actions'])] == ['lead']
 print('gate_row=v27-only-points-1-to-6 expected=admitted actions=' + str(len(schema['action_types'])) + ' views=' + str(len(schema['views'])))
-copy27 = cases_copy(pathlib.Path(repo, 'ontology/work.schema.json'), 'repository.json', 'repository-route.json')
+copy27 = cases_copy(v27_path, 'pinned-v27.json', 'pinned-v27-route.json')
 copy27_schema = json.loads(copy27.read_text())
 for fn_ in copy27_schema['functions'].values(): fn_['program'] = str(fake_fn)
 copy27.write_text(json.dumps(copy27_schema))
@@ -3366,7 +3370,7 @@ print('v27_describe_bytes=' + str(len(described.stdout.encode())), file=sys.stde
 unchanged = fingerprint()
 assert migrate(26, 27) == dict(carried=0, already=0)
 assert migrate(25, 27) == dict(carried=0, already=0)
-assert migrate(27, 28, 2) == dict(status='unknown_pair')
+assert migrate(27, 29, 2) == dict(status='unknown_pair')
 assert fingerprint() == unchanged and [obj(i) for i in v26_objects] == v26_before
 print('v27_migration_rows_complete')
 # The walk. Each refusal row is before the action it guards; a refusal writes nothing.
@@ -3446,4 +3450,55 @@ claim('open_finding', 'v27-measure', dict(FINDING25, finding=oid('finding', 'v27
 claim('close_finding', 'v27-measure', dict(finding=oid('finding', 'v27-measure'), reason='v27 gone'), 'measure')
 print('v27_gate_rows_complete')
 print('v27 plan bound: ok')
+# Version 28, the repository's file, over the objects made under version 27 (pinned in Git above). The schema differs from
+# version 27 only by the points of ontology/README.md, "Version 28: the renamed checkout": the three paths of the source
+# instructions under the checkout, the replace_prefix of source_copy of instruction_file, and the descriptions that name it.
+v27_schema, v27_sizes = schema, sizes
+v27_objects = [o['id'] for t in TYPES25 for o in call(['search'], dict(object_type=t, limit=1000))['objects']]
+v27_before = [obj(i) for i in v27_objects]
+v27_views = [(view, args, call(['render'], dict(view=view, args=args))) for view, args in [(name, {a: ARGS22[a] for a in body.get('args', [])}) for name, body in v27_schema['views'].items()]]
+assert len(v27_views) == 16
+phase = 'v28'
+schema = json.loads(pathlib.Path(repo, 'ontology/work.schema.json').read_text())
+assert schema['version'] == 28
+head, old = json.loads(json.dumps(schema)), v27_schema
+OLD28, NEW28 = 'platforms/agent-platform/content/', 'platforms/lifecycle-platform/content/'
+# 1: the source instructions: its three paths under the checkout name the new one; nothing else of it changes.
+paths28 = head['sources']['instructions']['paths']
+assert paths28 == [p_.replace(OLD28, NEW28) for p_ in old['sources']['instructions']['paths']] and sum(NEW28 in p_ for p_ in paths28) == 3, paths28
+# 2: instruction_file: the replace_prefix of source_copy names the new checkout.
+assert head['object_types']['instruction_file']['properties']['source_copy']['transform']['replace_prefix'] == ['/root/.agents/', '/home/palantirkc/' + NEW28]
+assert old['object_types']['instruction_file']['properties']['source_copy']['transform']['replace_prefix'] == ['/root/.agents/', '/home/palantirkc/' + OLD28]
+# 3: nothing else: read back with the old name, version 28 is version 27 but for its version; the old name is gone.
+text28 = json.dumps(dict(head, version=27))
+assert json.loads(text28.replace('lifecycle-platform/content', 'agent-platform/content')) == old
+assert 'agent-platform/content' not in text28 and text28.count('lifecycle-platform/content') == json.dumps(old).count('agent-platform/content') == 7
+print('gate_row=v28-only-the-checkout-path expected=admitted actions=' + str(len(schema['action_types'])) + ' views=' + str(len(schema['views'])))
+copy28 = cases_copy(pathlib.Path(repo, 'ontology/work.schema.json'), 'repository.json', 'repository-route.json')
+copy28_schema = json.loads(copy28.read_text())
+for fn_ in copy28_schema['functions'].values(): fn_['program'] = str(fake_fn)
+copy28.write_text(json.dumps(copy28_schema))
+call(['schema', 'install', str(copy28)])
+redirect.trace(work, copies)
+assert [obj(i) for i in v27_objects] == v27_before
+for view, args, before in v27_views:
+    answer = call(['render'], dict(view=view, args=args))
+    assert answer['rows'] == before['rows'] and answer['markdown'] == before['markdown'].replace('schema=work@27', 'schema=work@28'), view
+print('gate_row=v28-v27-objects-and-views-unchanged expected=admitted objects=' + str(len(v27_objects)) + ' views=' + str(len(v27_views)))
+sizes = []
+for name in ('ont_describe', 'ont_action_list'):
+    wire = subprocess.run([binary, '--store', store, 'mcp'], input=json.dumps(dict(jsonrpc='2.0', id=1, method='tools/call', params=dict(name=name, arguments={}))) + '\n', text=True, capture_output=True, timeout=60)
+    answer = json.loads(wire.stdout.splitlines()[0])['result']; assert wire.returncode == 0 and not answer['isError'], answer
+    sizes.append(len(answer['content'][0]['text'].encode())); assert sizes[-1] <= 262144, (name, sizes[-1])
+print('v28_mcp_bytes=' + ','.join(map(str, sizes)) + ' v27=' + ','.join(map(str, v27_sizes)), file=sys.stderr)
+described = subprocess.run([binary, '--store', store, 'describe'], input='{}', text=True, capture_output=True, timeout=60, env=env)
+assert described.returncode == 0 and json.loads(described.stdout)['schema']['work']['version'] == 28, described.stdout[:300]
+print('v28_describe_bytes=' + str(len(described.stdout.encode())), file=sys.stderr)
+unchanged = fingerprint()
+assert migrate(27, 28) == dict(carried=0, already=0)
+assert migrate(26, 28) == dict(carried=0, already=0)
+assert migrate(28, 29, 2) == dict(status='unknown_pair')
+assert fingerprint() == unchanged and [obj(i) for i in v27_objects] == v27_before
+print('v28_migration_rows_complete')
+print('v28 renamed checkout: ok')
 PY

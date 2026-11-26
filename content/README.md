@@ -4,9 +4,9 @@ Reviewed distribution source for canonical `AGENTS.md`, runtime references and
 the generic `herdr`, `lead` and `report` skill bundles. Repository source is edited through review and then installed on the host.
 This README is repository documentation, not an owned host entry.
 
-Generic Academy routing belongs to education-platform; private teaching/reporting
-ownership is planned for education-dc-gang-a after verified source/consumer transfer.
-Both Academy skills are excluded here; their retained education-platform copies
+Generic Academy routing belongs to academy-platform; private teaching/reporting
+ownership is planned within academy-platform after verified source/consumer transfer.
+Both Academy skills are excluded here; their retained academy-platform copies
 do not release the disabled-tool hold or authorize direct fallback. Native Herdr hooks, per-CLI pointer files,
 third-party skills are not copied or owned. Skills
 assign no permanent role to a CLI and add no instruction loader.

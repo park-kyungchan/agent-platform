@@ -1832,7 +1832,7 @@ fn holding(record: &[Value]) -> F {
 /// The input of `UserPromptSubmit` for `prompt`, with members of the CLI the verb does not read.
 fn submitted(prompt: &str) -> Value {
     json!({"hook_event_name": "UserPromptSubmit", "session_id": "sess-1", "transcript_path": hooked(),
-        "cwd": "/w/work/walk-topic/wt/agent-platform", "permission_mode": "default", "prompt": prompt})
+        "cwd": "/w/work/walk-topic/wt/lifecycle-platform", "permission_mode": "default", "prompt": prompt})
 }
 fn stopped(session: &str) -> Value {
     json!({"hook_event_name": "Stop", "session_id": session, "transcript_path": hooked(),
@@ -2048,7 +2048,10 @@ fn r27_a_typed_prompt_is_recorded_verified_and_unrouted() {
 #[test]
 fn r27_the_topic_is_the_task_directory_else_the_last_component() {
     for (cwd, topic) in [
-        (json!("/w/work/walk-topic/wt/agent-platform"), "walk-topic"),
+        (
+            json!("/w/work/walk-topic/wt/lifecycle-platform"),
+            "walk-topic",
+        ),
         (json!("/w/work/walk-topic"), "walk-topic"),
         (json!("/w/work"), "work"),
         (json!("/w/workshop/a/b"), "b"),

@@ -1412,7 +1412,7 @@ fn r22_the_timer_and_its_service() {
         .unwrap();
     assert_eq!(
         exec,
-        "/usr/local/bin/ap route index --prune --repository park-kyungchan/agent-platform --repository park-kyungchan/agent-vps-operations --instructions /root/.agents"
+        "/usr/local/bin/ap route index --prune --repository park-kyungchan/lifecycle-platform --instructions /root/.agents"
     );
     assert!(!service.contains("education"));
     assert!(timer.lines().any(|l| l == "OnCalendar=*:0/10"));
@@ -1424,7 +1424,7 @@ fn r22_the_timer_and_its_service() {
             .collect::<Vec<_>>(),
     )
     .unwrap();
-    assert!(options.prune && options.repositories.len() == 2 && options.store.is_none());
+    assert!(options.prune && options.repositories.len() == 1 && options.store.is_none());
     let readme = include_str!("../../../deploy/README.md");
     let (_, section) = readme.split_once("\n## Routes\n").unwrap();
     let section = section

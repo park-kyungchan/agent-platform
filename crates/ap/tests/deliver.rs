@@ -226,6 +226,8 @@ struct W {
     /// the tip holds no `engine/`; `git ls-tree` of its `engine` fails.
     neither: bool,
     engine_ls_fails: bool,
+    /// The name of the delivered repository, which names its clone `state/<name>`.
+    name: &'static str,
 }
 
 #[derive(Clone)]
@@ -352,6 +354,7 @@ impl W {
             advance_on_pause: std::time::Duration::ZERO,
             neither: false,
             engine_ls_fails: false,
+            name: "r",
         };
         w.lock = w.p("deliver.lock");
         for n in 1..=k {
@@ -605,7 +608,7 @@ impl W {
         if a[0] == "--no-optional-locks" {
             return self.checkout(a, ms);
         }
-        let clone = self.p("state/r");
+        let clone = self.p(&format!("state/{}", self.name));
         let xclone = self.p("state/ops");
         if a[0] == "init" && a[2] == xclone {
             assert_eq!(a.len(), 3);
@@ -751,7 +754,7 @@ impl W {
                 Self::ok(json!({"status": status, "result": {"path": path}, "schema": schema}))
             }
             "schema" => {
-                let (clone, tip) = (self.p("state/r"), self.tip());
+                let (clone, tip) = (self.p(&format!("state/{}", self.name)), self.tip());
                 let want = ["schema", "install", "--from", &clone, "--commit", &tip];
                 assert_eq!(
                     a,
@@ -7659,4 +7662,55 @@ fn etc_same_repository() {
     let (v, _) = w.run_with(&w.rollback());
     assert_eq!(v["etc"], Value::Null, "{v}");
     assert_eq!(w.own_tip(), Some(format!("{tip}\n")));
+}
+
+// spec: specs/ap/deliver.md#R25
+// spec: specs/ap/deliver.md#R27
+// spec: specs/ap/unit.md#R55
+#[test]
+fn old_name_review_accepts() {
+    const OLD: &str = "park-kyungchan/agent-platform";
+    const NEW: &str = "park-kyungchan/lifecycle-platform";
+    let renamed = |w: &mut W, to: &str| {
+        for r in w.reviews.iter_mut().filter(|r| r["repository"] == "o/r") {
+            r["repository"] = json!(to);
+        }
+    };
+    let request = |w: &mut W| {
+        w.name = "lifecycle-platform";
+        let mut r = w.request();
+        r["repository"] = json!(NEW);
+        r["url"] = json!("https://example.invalid/park-kyungchan/lifecycle-platform.git");
+        r
+    };
+    // Every review of the chain is stored under the old name: they accept a merge of the new one, and
+    // the attempt names the review's own repository, which the store's start_install compares.
+    let mut w = W::new();
+    renamed(&mut w, OLD);
+    let r = request(&mut w);
+    let (v, exit) = w.run_with(&r);
+    assert_eq!((end(&v), exit), (("installed", ""), 0), "{v}");
+    let start = &w.applies("start_install")[0]["parameters"];
+    assert_eq!(start["repository"], OLD, "{start}");
+    assert_eq!(start["head"], h(2));
+    // A review stored under the new name: the attempt names the new name.
+    let mut w = W::new();
+    renamed(&mut w, NEW);
+    let r = request(&mut w);
+    let (v, _) = w.run_with(&r);
+    assert_eq!(end(&v), ("installed", ""), "{v}");
+    assert_eq!(
+        w.applies("start_install")[0]["parameters"]["repository"],
+        NEW
+    );
+    // A review of another renamed repository accepts nothing here.
+    let mut w = W::new();
+    renamed(&mut w, "park-kyungchan/education-platform");
+    let r = request(&mut w);
+    let (v, exit) = w.run_with(&r);
+    refused(&w, &v, exit, "not_accepted");
+    assert_eq!(
+        v["detail"],
+        json!({"commit": c(1), "why": "no_accepting_review"})
+    );
 }

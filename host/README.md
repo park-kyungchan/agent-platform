@@ -1,6 +1,6 @@
 # The host's configuration
 
-`host/` of agent-platform holds the files that configure the host: the source of
+`host/` of lifecycle-platform holds the files that configure the host: the source of
 the policy file `/etc/agent-platform/policy.json` with the script that installs it,
 the recorded copies of host configuration files (the login path and the
 public-interface firewall among them) with their inventory, the system Git
@@ -183,19 +183,18 @@ only when the user orders it, by the user's procedure and by no timer:
 | --- | --- |
 | `git/system.gitconfig` | The lines of `/etc/gitconfig`: the alias file for every repository, and the `includeIf "gitdir:…"` lines for the scopes below |
 | `git/work.gitconfig` | For a task directory: `core.hooksPath` (the hook directory), `push.default = upstream`, `agents.roster` (a glob of the Academy's roster files) |
-| `git/clones.gitconfig` | For the two clones: `core.hooksPath` and `agents.roster`, no `push.default` (a branch made by `ap unit run` tracks `origin/main`, and `upstream` would push it to `main`) |
+| `git/clones.gitconfig` | For the clone `lifecycle-platform`: `core.hooksPath` and `agents.roster`, no `push.default` (a branch made by `ap unit run` tracks `origin/main`, and `upstream` would push it to `main`) |
 | `git/alias.gitconfig` | The alias `git task-new <name>` |
 | `git/hooks/pre-commit` | The roster check |
 
 **Scopes.** The task directories `work/ws-*`, `work/ap-*`, `work/ont-*` and
-`work/mem-*`, and the clones `platforms/ontology-platform`,
-`platforms/agent-vps-operations` and `platforms/agent-platform`, each with its
+`work/mem-*`, and the clone `platforms/lifecycle-platform` with its
 linked worktrees (the patterns end in a slash and carry no `.git`, so Git
 matches the main checkout's `.git` and every `.git/worktrees/<n>`).
-`agent-platform` is named so that a commit under `engine/` and `host/` runs the
+`lifecycle-platform` is named so that a commit under `engine/` and `host/` runs the
 roster check; every linked worktree of its main checkout is matched with it,
 the worktrees of `ap unit run` among them, which therefore need a readable
-roster. `education-platform` is not named: the Academy's own repositories stay
+roster. `academy-platform` is not named: the Academy's own repository stays
 out of this configuration. The configuration is the system file, not
 `/root/.gitconfig`, so that a session whose `HOME` is not `/root` reads it too.
 

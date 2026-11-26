@@ -88,8 +88,8 @@ Do not export a hook-disable variable and do not remove an MCP server to isolate
 
 | Skill | Source |
 | --- | --- |
-| `lead`, `herdr`, `report` | `agent-platform` `content/skills/` |
-| `academy-lesson-day`, `academy-dailyrecord-authoring`, `academy-prestudy-review` | `education-platform` `content/skills/` |
+| `lead`, `herdr`, `report` | `lifecycle-platform` `content/skills/` |
+| `academy-lesson-day`, `academy-dailyrecord-authoring`, `academy-prestudy-review` | `academy-platform` `content/skills/` |
 | Account-synced, marketplace and built-in skills | Their CLI or vendor; changed only through that CLI |
 
 Installed shared path: `/root/.agents/skills/<skill>/SKILL.md`. Change a skill in its source repository through review, then install it (`BUILD-AND-DELIVERY.md` section 6); never edit only the installed copy. Frontmatter fields other than `name` and `description` do not behave the same in every CLI.
@@ -105,7 +105,7 @@ This memory is private to one CLI and one directory, so no other agent sees it a
 
 ## 9. A stage or a unit of work on this host
 
-- A stage (one implementer, reviewer or fixer session of Claude Code, or of the Antigravity CLI with `runtime: "agy"` in the request; `crates/ap/README.md`, "One stage", the part headed A stage on the Antigravity CLI) is started with `ap run < request.json`: one headless run in its own systemd scope, with a time bound (`timeout_seconds`), its record `<out>.run.json` that another command reads, and, for Claude Code, the flags of section 10 set for you (no MCP server of the account, no hook, no auto-memory, no skill unless asked). A unit (implementer, gate, verifier, acceptance) is run with `ap unit run <key>` (`specs/ap/unit-run.md`). The contract of a stage: `agent-platform` `crates/ap/README.md`, section "One stage". On the Antigravity CLI, a stage admitted before it exists, from a page (`ap unit`'s case) or for a verifier's look, is a reviewer alone (`crates/ap/src/run.rs`, `admit_stage`).
+- A stage (one implementer, reviewer or fixer session of Claude Code, or of the Antigravity CLI with `runtime: "agy"` in the request; `crates/ap/README.md`, "One stage", the part headed A stage on the Antigravity CLI) is started with `ap run < request.json`: one headless run in its own systemd scope, with a time bound (`timeout_seconds`), its record `<out>.run.json` that another command reads, and, for Claude Code, the flags of section 10 set for you (no MCP server of the account, no hook, no auto-memory, no skill unless asked). A unit (implementer, gate, verifier, acceptance) is run with `ap unit run <key>` (`specs/ap/unit-run.md`). The contract of a stage: `lifecycle-platform` `crates/ap/README.md`, section "One stage". On the Antigravity CLI, a stage admitted before it exists, from a page (`ap unit`'s case) or for a verifier's look, is a reviewer alone (`crates/ap/src/run.rs`, `admit_stage`).
 - The raw commands of sections 10 and 11 are for what those two commands do not cover: an Antigravity CLI run that is not a stage, a probe of what a session loads, a reader of a test.
 - A Claude stage states its compaction window in the request's `compact_window` (`crates/ap/README.md`, "One stage"): an integer from 100000 to 1000000, carried as `CLAUDE_CODE_AUTO_COMPACT_WINDOW` in the `env` of the CLI's `--settings` value; without it the account's settings decide. A stage of the Antigravity CLI refuses the member: `invalid_input` at the field `compact_window` (`crates/ap/src/run.rs`, `unbuilt`). A request's `env` still refuses a name beginning `CLAUDE_` (`env_forbidden`).
 

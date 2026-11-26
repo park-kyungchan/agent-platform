@@ -1,12 +1,12 @@
 {
-  "repository": "park-kyungchan/agent-platform",
-  "url": "https://github.com/park-kyungchan/agent-platform.git",
+  "repository": "park-kyungchan/lifecycle-platform",
+  "url": "https://github.com/park-kyungchan/lifecycle-platform.git",
   "state": "/var/lib/agent-platform/deliver",
   "build_lock": "/var/lib/agent-platform/build.lock",
   "build_wait_seconds": 480,
   "etc": {
-    "repository": "park-kyungchan/agent-platform",
-    "url": "https://github.com/park-kyungchan/agent-platform.git"
+    "repository": "park-kyungchan/lifecycle-platform",
+    "url": "https://github.com/park-kyungchan/lifecycle-platform.git"
   },
   "pc": {
     "host": "pc",

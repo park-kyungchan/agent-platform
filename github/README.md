@@ -19,20 +19,24 @@ these six members are equal as JSON values. A member an entry of `repositories.j
 managed: it is never compared and never written. A live ruleset that no file names is reported with
 `wanted` null and is never changed or deleted.
 
-`park-kyungchan/agent-platform` is private: GitHub answers `security_and_analysis` null for it, so its
+The file names the two repositories of the host by the names of the regroup: `park-kyungchan/lifecycle-platform`
+(formerly `agent-platform`: `ap`, the shared instructions, the engine in `engine/`, the host's configuration in
+`host/`) and `park-kyungchan/academy-platform` (formerly `education-platform`). GitHub renamed both and redirects
+the old names.
+
+`park-kyungchan/lifecycle-platform` is private: GitHub answers `security_and_analysis` null for it, so its
 entry holds neither `secret_scanning` nor `secret_scanning_push_protection`; it holds Actions policy
 `selected` with a pattern.
 
-`park-kyungchan/ontology-platform`, the engine's former repository, has no entry: the engine is `engine/` of
-`park-kyungchan/agent-platform`, and the old repository is archived. Its archive on GitHub is a step of the
-user's, and nothing here compares or writes its settings.
-
-The entry `park-kyungchan/agent-vps-operations` holds `repository` alone: it gets both rulesets and nothing
-else of it is compared or written. While the classic protection of its `main` is present, `--check`
-answers `refused` and an apply writes nothing.
-
-The entry `park-kyungchan/education-platform` differs: its Actions policy stays `all`, and it has no alerts
+The entry `park-kyungchan/academy-platform` differs: its Actions policy stays `all`, and it has no alerts
 and no Dependabot member, because those are decided by the owner of that repository.
+
+The archived repositories have no entry, and nothing here compares or writes their settings:
+`ontology-platform` (the engine's former repository, now `engine/`), `agent-vps-operations` (the former
+operations repository, now `host/`) and `education-dc-gang-a` (an Academy module), each archived by the Lead
+at the regroup cutover (`deploy/README.md`, "The regroup cutover", step (c)) on the user's decision of
+2026-11-24, after its branches and tags were read on GitHub; and `education-problem-edit`, archived before.
+An archive is undone with `gh repo unarchive`. `bible-commentary-station` is neither renamed nor archived.
 
 ## The two commands
 
@@ -86,8 +90,8 @@ the example are invented.
 makes, copies or prints one.
 
 (ii) The App. `kc-ap-lead`, id 5863852, holds the repository permission `Commit statuses: read and write`
-and no other. It is installed on agent-platform and agent-vps-operations, on each
-before the Lead applies `ruleset-main.json` there. Its one private key, from the App's page, is in the
+and no other. It is installed on lifecycle-platform (it was installed on the former operations repository
+too), on each before the Lead applies `ruleset-main.json` there. Its one private key, from the App's page, is in the
 file `units.github.lead_app.key` names. `ap` names the key by its path to `openssl` and never opens it;
 each status gets a fresh installation token, which reaches the statuses of that one repository.
 
@@ -110,7 +114,7 @@ show each author's credential, `token` or `host`.
 "github": {
   "lead_app": {"id": 5863852, "key": "/etc/agent-platform/credentials/invented-app.pem"},
   "stage_tokens": {
-    "park-kyungchan/agent-platform": "/etc/agent-platform/credentials/invented-agent-platform.token"
+    "park-kyungchan/lifecycle-platform": "/etc/agent-platform/credentials/invented-lifecycle-platform.token"
   }
 }
 ```
@@ -121,8 +125,8 @@ anything.
 (v) The order, each step by the one named:
 
 1. The user writes the secrets.
-2. A unit of agent-vps-operations adds `units.github` to its `etc/agent-platform/policy.json` (the host
-   policy's source) and merges under the older `ap`, which installs nothing: its
+2. A unit of the former operations repository adds `units.github` to its `etc/agent-platform/policy.json`
+   (the host policy's source then; it is `host/etc/` here now) and merges under the older `ap`, which installs nothing: its
    `scripts/install-etc.sh` runs `ap policy check` first, and an older `ap` refuses the member
    (`policy_invalid`).
 3. Before this change merges, the Lead stops `ap-work.timer` (then no pass starts a unit,
@@ -139,7 +143,7 @@ anything.
    there), no pull request there merges until that apply's undo script runs.
 
 Until step 6 the watch's `settings <repository> ruleset:...` (`specs/ap/watch.md` R25) is expected for
-each listed repository, and is not acted on before step 5. `park-kyungchan/education-platform`, which
+each listed repository, and is not acted on before step 5. `park-kyungchan/academy-platform`, which
 `repositories.json` also lists, is not applied in step 6: only once the App is installed on it under the
 Academy's own task. Until then its finding stays, expected, and an apply there would block every pull
 request of it.

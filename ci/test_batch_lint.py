@@ -172,8 +172,8 @@ class Case(unittest.TestCase):
         return "batch-spec-lint-" + sha("%s:%s#%s:%s" % (repository, path, anchor, kind))[:16]
 
 
-AGENT = "park-kyungchan/agent-platform"
-ONTOLOGY = "park-kyungchan/ontology-platform"
+AGENT = "park-kyungchan/lifecycle-platform"
+ONTOLOGY = "zinvented/second-platform"
 TWO = {"specs/a.md": spec(1, 2), "specs/ap/b.md": spec(7, head="# B\n") + req(7, "again"),
        "docs/readme.md": "# Docs\n" + req(1), "specs/notes.txt": "not markdown\n"}
 

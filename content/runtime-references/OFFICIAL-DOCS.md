@@ -51,7 +51,7 @@ Infrastructure:
 
 Known dead routes, so nobody retries them: `https://developers.hostinger.com/llms.txt` returns 404; `https://tailscale.com/kb/llms.txt` redirects to an HTML page. Do not guess an `llms-full.txt` address.
 
-When you verify a correction to this file, change it in the `agent-platform` source through review.
+When you verify a correction to this file, change it in the `lifecycle-platform` source through review.
 
 ## 4. Local copies of the design sources
 

@@ -1,6 +1,6 @@
 [Unit]
 Description=ap clause index every ten minutes, five minutes after ap route index
-Documentation=https://github.com/park-kyungchan/agent-platform/blob/main/deploy/README.md
+Documentation=https://github.com/park-kyungchan/lifecycle-platform/blob/main/deploy/README.md
 
 [Timer]
 OnCalendar=*:5/10

@@ -325,8 +325,8 @@ impl Bed {
         for d in [
             "accounts/claude-a/projects",
             "accounts/claude-b/projects",
-            "work/task-a/wt/agent-platform",
-            "platforms/agent-platform",
+            "work/task-a/wt/lifecycle-platform",
+            "platforms/lifecycle-platform",
             "units",
             "reviews",
             "home",
@@ -860,7 +860,7 @@ fn r5_a_session_of_a_temporary_or_other_directory_is_not_recorded() {
         &[msg(
             "s-worker",
             "2026-11-18T10:00:00Z",
-            &bed.work("task-a/wt/agent-platform"),
+            &bed.work("task-a/wt/lifecycle-platform"),
             "x3",
         )],
         "2026-11-18T10:00:01Z",
@@ -902,7 +902,7 @@ fn r5_a_session_run_takes_the_intent_of_its_directory_or_its_lead() {
         &[msg(
             "s-led",
             "2026-11-18T10:00:00Z",
-            &bed.dir.path("platforms/agent-platform"),
+            &bed.dir.path("platforms/lifecycle-platform"),
             "i2",
         )],
         "2026-11-18T10:00:01Z",
@@ -923,7 +923,7 @@ fn r5_a_session_run_takes_the_intent_of_its_directory_or_its_lead() {
 fn r5_a_runs_model_is_not_synthetic_while_it_has_another() {
     let bed = Bed::new();
     let mut f = Fake::new(&bed.dir);
-    let e = bed.dir.path("platforms/agent-platform");
+    let e = bed.dir.path("platforms/lifecycle-platform");
     // A code-mode line as the session records it: a message id and a usage of zero tokens, the model `<synthetic>`.
     let code = |sid: &str, ts: &str, mid: &str| {
         json!({"type": "assistant", "sessionId": sid, "timestamp": ts, "cwd": e,

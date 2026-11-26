@@ -47,7 +47,7 @@ BLOCKING_LINE = re.compile(r"(?:[ \-*]|\d+\.)*blocking(?:[ ]([a-z_]+):)?")
 UNIT_KEY = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*")
 REVIEW_KEY = re.compile(r"act-rq-[0-9a-f]{32}")
 MODEL_NAME = re.compile(r"[A-Za-z0-9._:/+-]{1,80}")
-REPOS = ("park-kyungchan/agent-platform", "park-kyungchan/ontology-platform", "park-kyungchan/education-platform")
+REPOS = ("park-kyungchan/lifecycle-platform", "park-kyungchan/academy-platform")
 
 
 def load_prices(path):

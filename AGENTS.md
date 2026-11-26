@@ -1,4 +1,4 @@
-# Working in agent-platform
+# Working in lifecycle-platform
 
 What the repository is and who uses it: `README.md`. Start reading from `map.json`, which names each component, where a reader starts in it, its specification and its tests.
 

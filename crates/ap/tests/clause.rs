@@ -923,7 +923,7 @@ fn r11_the_service_and_its_timer() {
     let service = std::fs::read_to_string(root.join("deploy/ap-clause.service")).unwrap();
     let route = std::fs::read_to_string(root.join("deploy/ap-route.service")).unwrap();
     assert!(service.lines().any(|l| l
-        == "ExecStart=/usr/local/bin/ap clause index --prune --repository park-kyungchan/agent-platform --repository park-kyungchan/agent-vps-operations"));
+        == "ExecStart=/usr/local/bin/ap clause index --prune --repository park-kyungchan/lifecycle-platform"));
     // The lines of the route service, but its description, its comment and its command.
     let rest = |text: &str| -> Vec<String> {
         (text.lines())
