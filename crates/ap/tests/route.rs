@@ -308,7 +308,12 @@ fn r2_a_scratch_store_needs_a_scratch_directory_and_back() {
 #[test]
 fn r3_an_education_repository_is_refused_before_any_fetch() {
     let dir = Scratch::new();
-    for name in ["park-kyungchan/education-platform", "someone/education-x"] {
+    for name in [
+        "park-kyungchan/education-platform",
+        "someone/education-x",
+        "park-kyungchan/academy-platform",
+        "someone/academy-x",
+    ] {
         let e = route::options(&os(&["--repository", "a/b", "--repository", name])).unwrap_err();
         assert_eq!((e.code, e.field.as_str()), ("invalid_input", "repository"));
         // The installed command refuses it with nothing done: no directory is made, no Git runs.

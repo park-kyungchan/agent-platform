@@ -50,11 +50,11 @@ def main(run):
 
 # The Academy rule.
 def is_academy(path):
-    """A path is the Academy's when a component begins with `education-` or `edu-`, or a component `evals` is
-    directly followed by a component `lesson`."""
+    """A path is the Academy's when a component begins with `education-`, `edu-` or `academy-`, or a component
+    `evals` is directly followed by a component `lesson`."""
     parts = [p for p in str(path).split("/") if p]
     for i, part in enumerate(parts):
-        if part.startswith(("education-", "edu-")):
+        if part.startswith(("education-", "edu-", "academy-")):
             return True
         if part == "evals" and i + 1 < len(parts) and parts[i + 1] == "lesson":
             return True

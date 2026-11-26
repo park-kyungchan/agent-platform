@@ -579,10 +579,20 @@ fn r3_the_academy_is_skipped_by_its_names() {
         "-home-palantirkc-platforms-education-platform",
         true
     ));
+    assert!(measure::academy("academy-platform", false));
+    assert!(measure::academy(
+        "-home-palantirkc-platforms-academy-platform",
+        true
+    ));
     assert!(
         !measure::academy("-home-palantirkc-work-edu-lessons", false),
         "the substring rule is a project directory's"
     );
+    assert!(
+        !measure::academy("-home-palantirkc-platforms-academy-platform", false),
+        "the substring rule is a project directory's"
+    );
+    assert!(!measure::academy("academy", true));
     assert!(!measure::academy("-home-palantirkc-work-task-a", true));
     assert!(!measure::academy("education", true));
     assert!(!measure::academy("reduce-x", false));
@@ -600,12 +610,17 @@ fn r3_a_project_directory_of_the_academy_is_not_read() {
         "2026-11-18T10:00:01Z",
     );
     bed.file(
+        "accounts/claude-a/projects/-home-palantirkc-platforms-academy-platform/s-skip-academy.jsonl",
+        &[msg("s-skip-academy", "2026-11-18T10:00:00Z", &cwd, "m-skip-academy")],
+        "2026-11-18T10:00:01Z",
+    );
+    bed.file(
         "accounts/claude-a/projects/-scratch-work-task-a/s-kept.jsonl",
         &[msg("s-kept", "2026-11-18T10:00:00Z", &cwd, "m-kept")],
         "2026-11-18T10:00:01Z",
     );
     let line = bed.pass(&mut f, "2026-11-18");
-    assert_eq!(line["files"]["skipped_academy"], 1);
+    assert_eq!(line["files"]["skipped_academy"], 2);
     assert_eq!(line["files"]["read"], 1);
     assert_eq!(f.runs().len(), 1);
     f.run_of("session", "s-kept");

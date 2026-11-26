@@ -52,7 +52,7 @@ PROMPT = ("You are an agent on this host. Your assignment: {situation}\n\n"
           "/root/.agents: start at {root}/AGENTS.md and follow what it routes you to; read nothing under /root/.agents "
           "unless {root} is that directory. For everything else (repositories under /home/palantirkc/platforms/, task "
           "directories under /home/palantirkc/work/, the store) use the host as it is. Never open anything under "
-          "/home/palantirkc/work/edu-* or under context/, apps/, modules/ or migration/ of education-platform. Read, "
+          "/home/palantirkc/work/edu-* or under context/, apps/, modules/ or migration/ of education-platform or academy-platform. Read, "
           "search and run any reading command you need (for this test the host's files are read-only to you): change "
           "nothing, use no web page. Do not do the assignment.\n\n"
           "Answer with the context you would load before acting, as a list: for each item its path (with the "
@@ -62,9 +62,12 @@ PROMPT = ("You are an agent on this host. Your assignment: {situation}\n\n"
 # `~` is the caller's home, expanded at the start of each session.
 EDU = "/home/palantirkc/platforms/education-platform"
 EDU_WT = "/home/palantirkc/work/*/wt/education-platform*"
+ACAD = "/home/palantirkc/platforms/academy-platform"
+ACAD_WT = "/home/palantirkc/work/*/wt/academy-platform*"
 DENY = (["/home/palantirkc/work/edu-*"]
-        + ["%s/%s" % (base, d) for base in (EDU, EDU_WT) for d in ("context", "apps", "modules", "migration")]
-        + ["~/.claude*/projects/*edu-*", "~/.claude*/projects/*education-platform*"])
+        + ["%s/%s" % (base, d) for base in (EDU, EDU_WT, ACAD, ACAD_WT) for d in ("context", "apps", "modules", "migration")]
+        + ["~/.claude*/projects/*edu-*", "~/.claude*/projects/*education-platform*",
+           "~/.claude*/projects/*academy-platform*"])
 
 
 class Refuse(Exception):

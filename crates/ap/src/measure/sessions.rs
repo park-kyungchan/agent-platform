@@ -30,11 +30,16 @@ const RUNTIME: &str = "claude";
 const SYNTHETIC: &str = "<synthetic>";
 const DAY: u64 = 86_400;
 
-/// Whether a walk skips a directory of this name (R3): a name that begins with `edu-`, and, for a project directory
-/// (one directly in a `projects` directory), a name that holds `-edu-` or `-education-platform`.
+/// Whether a walk skips a directory of this name (R3): a name that begins with `edu-` or `academy-`, and, for a
+/// project directory (one directly in a `projects` directory), a name that holds `-edu-`, `-academy-` or
+/// `-education-platform`.
 pub fn academy(name: &str, project: bool) -> bool {
     name.starts_with("edu-")
-        || (project && (name.contains("-edu-") || name.contains("-education-platform")))
+        || name.starts_with("academy-")
+        || (project
+            && (name.contains("-edu-")
+                || name.contains("-academy-")
+                || name.contains("-education-platform")))
 }
 
 // The options (R2).

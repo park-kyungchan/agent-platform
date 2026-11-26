@@ -595,11 +595,15 @@ class Deny(unittest.TestCase):
     def test_the_fixed_deny_patterns(self):
         edu = "/home/palantirkc/platforms/education-platform"
         wt = "/home/palantirkc/work/*/wt/education-platform*"
+        acad = "/home/palantirkc/platforms/academy-platform"
+        acad_wt = "/home/palantirkc/work/*/wt/academy-platform*"
         want = (["/home/palantirkc/work/edu-*"]
-                + ["%s/%s" % (base, d) for base in (edu, wt) for d in ("context", "apps", "modules", "migration")]
-                + ["~/.claude*/projects/*edu-*", "~/.claude*/projects/*education-platform*"])
+                + ["%s/%s" % (base, d) for base in (edu, wt, acad, acad_wt)
+                   for d in ("context", "apps", "modules", "migration")]
+                + ["~/.claude*/projects/*edu-*", "~/.claude*/projects/*education-platform*",
+                   "~/.claude*/projects/*academy-platform*"])
         self.assertEqual(want, load_module().DENY)
-        self.assertEqual(len(want), 11)
+        self.assertEqual(len(want), 20)
 
 
 class WorkDirs(unittest.TestCase):
