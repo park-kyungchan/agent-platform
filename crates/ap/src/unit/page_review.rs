@@ -654,6 +654,13 @@ fn look_at(
     if look.page {
         object::complete(&subject)?;
         object::write_set_judged(&subject)?;
+        // The Lead's look at a draft unit runs first the checks of `ready` that read only the page, the
+        // store and the policy (R28); the look of `ap unit write` does not (R31).
+        if look.actor.role == "lead" && subject["state"] == "draft" {
+            let rid = format!("{}-ready", look.rid);
+            let unit = (look.key, &subject, revision.clone());
+            object::program_first(s, look.store, (&look.actor, rid), unit)?;
+        }
         let at = copy
             .as_ref()
             .map(|(clone, commit)| (clone.as_str(), commit.as_str()));
