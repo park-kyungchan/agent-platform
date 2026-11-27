@@ -22,35 +22,41 @@ use std::{
     sync::atomic::{AtomicU32, Ordering},
 };
 
-/// `spawn_settled` starts a command and returns once the child has let go of the descriptors it was
-/// forked with. A child holds the open file descriptions of every descriptor of this process until its
-/// `exec` has closed those with close-on-exec, and `spawn()` returns a moment before that: a lock the
-/// process closes and takes again in that moment (as a second call of one `W` does) is still held.
-trait SpawnSettled {
-    fn spawn_settled(&mut self) -> std::io::Result<Child>;
+static MARKS: AtomicU32 = AtomicU32::new(0);
+/// A command that runs `program` behind a wrapper `sh`, which writes a marker file after its `exec` and
+/// then execs the program: `spawn_marked` waits for that file. `spawn()` returns before the child has closed
+/// the descriptors it was forked with (a close that is deferred past the end of its `exec`), and until then
+/// the child still holds the open file description of every lock of this process; the marker shows that it
+/// no longer does. Arguments, environment and standard streams are set on the result as on any command.
+fn marked(program: impl AsRef<std::ffi::OsStr>) -> Command {
+    let mark = std::env::temp_dir().join(format!(
+        "ap-exec-{}-{}",
+        std::process::id(),
+        MARKS.fetch_add(1, Ordering::SeqCst)
+    ));
+    let mut c = Command::new("sh");
+    c.args(["-c", ": > \"$1\"; shift; exec \"$@\"", "sh"])
+        .arg(mark)
+        .arg(program);
+    c
 }
-impl SpawnSettled for Command {
-    fn spawn_settled(&mut self) -> std::io::Result<Child> {
-        let numbers = |dir: &str| -> Option<Vec<u32>> {
-            let d = std::fs::read_dir(dir).ok()?;
-            Some(
-                d.flatten()
-                    .filter_map(|e| e.file_name().to_str()?.parse().ok())
-                    .filter(|n| *n > 2)
-                    .collect(),
-            )
-        };
-        let mine = numbers("/proc/self/fd").unwrap_or_default();
+/// `spawn_marked` starts a command made by `marked` and returns once its marker exists, that is once the
+/// child's `exec` is done. It takes no lock: the caller holds `LAUNCH`, or is inside a launch that deliver
+/// holds it for.
+trait SpawnMarked {
+    fn spawn_marked(&mut self) -> std::io::Result<Child>;
+}
+impl SpawnMarked for Command {
+    fn spawn_marked(&mut self) -> std::io::Result<Child> {
+        let mark = PathBuf::from(self.get_args().nth(3).expect("a command of `marked`"));
         let child = self.spawn()?;
-        for _ in 0..250 {
-            // Names only: no descriptor is opened or read, so no reference to one is taken here.
-            match numbers(&format!("/proc/{}/fd", child.id())) {
-                Some(theirs) if theirs.iter().any(|n| mine.contains(n)) => {
-                    std::thread::sleep(std::time::Duration::from_micros(200));
-                }
-                _ => break,
+        for _ in 0..200_000 {
+            if mark.exists() {
+                break;
             }
+            std::thread::sleep(std::time::Duration::from_micros(50));
         }
+        let _ = std::fs::remove_file(&mark);
         Ok(child)
     }
 }
@@ -60,7 +66,7 @@ fn spawn_locked(cmd: &mut Command) -> std::io::Result<Child> {
     let _g = ap::host::LAUNCH
         .lock()
         .unwrap_or_else(std::sync::PoisonError::into_inner);
-    cmd.spawn_settled()
+    cmd.spawn_marked()
 }
 /// `Command::output` with the spawn under the lock; the wait runs after the guard is dropped.
 fn output_locked(cmd: &mut Command) -> std::io::Result<Output> {
@@ -1079,15 +1085,15 @@ impl System for W {
             assert_eq!(argv[1], "ssh");
             let [stdin, stdout, stderr] = files;
             return match &mut self.pc_ssh {
-                PcSsh::Local => Command::new("sh")
+                PcSsh::Local => marked("sh")
                     .args(["-c", &argv[3]])
                     .stdin(stdin)
                     .stdout(stdout)
                     .stderr(stderr)
-                    .spawn_settled(),
+                    .spawn_marked(),
                 PcSsh::Script(q) => {
                     let (exit, out) = q.pop_front().unwrap_or((1, String::new()));
-                    Command::new("sh")
+                    marked("sh")
                         .args([
                             "-c",
                             "printf '%s' \"$1\"; exit \"$2\"",
@@ -1099,14 +1105,14 @@ impl System for W {
                         .stdin(stdin)
                         .stdout(stdout)
                         .stderr(stderr)
-                        .spawn_settled()
+                        .spawn_marked()
                 }
-                PcSsh::Hang => Command::new("sh")
+                PcSsh::Hang => marked("sh")
                     .args(["-c", "sleep 60"])
                     .stdin(stdin)
                     .stdout(stdout)
                     .stderr(stderr)
-                    .spawn_settled(),
+                    .spawn_marked(),
             };
         }
         if argv[0].ends_with("/ontology/migrate") || argv[1].ends_with("/scripts/install-ont.sh") {
@@ -1150,7 +1156,7 @@ impl System for W {
             self.tree = t;
         }
         let [stdin, stdout, stderr] = files;
-        Command::new("sh")
+        marked("sh")
             .args([
                 "-c",
                 "printf '%s' \"$1\"; printf '%s' \"$2\" >&2; exit \"$3\"",
@@ -1161,7 +1167,7 @@ impl System for W {
             .stdin(stdin)
             .stdout(stdout)
             .stderr(stderr)
-            .spawn_settled()
+            .spawn_marked()
     }
     fn now(&self) -> std::time::Instant {
         std::time::Instant::now() + self.clock_offset
@@ -1802,7 +1808,7 @@ fn d5_refusals_apply_nothing() {
     // step: no installer, no store read of the pair, no attempt applied.
     let mut w = W::new();
     let mut holder = spawn_locked(
-        Command::new("flock")
+        marked("flock")
             .args(["-n", &w.lock, "-c", "echo held; exec sleep 60"])
             .stdout(std::process::Stdio::piped()),
     )
@@ -3269,7 +3275,7 @@ fn d9_a_child_of_another_thread_does_not_hold_the_lock() {
     std::thread::scope(|scope| {
         scope.spawn(|| {
             while !stop.load(Ordering::SeqCst) {
-                let mut child = spawn_locked(Command::new("sh").args(["-c", "sleep 2"])).unwrap();
+                let mut child = spawn_locked(marked("sh").args(["-c", "sleep 2"])).unwrap();
                 std::thread::sleep(std::time::Duration::from_millis(1));
                 child.kill().unwrap();
                 child.wait().unwrap();
@@ -3652,7 +3658,7 @@ fn w2_waiting_line_only_when_the_call_waits() {
     }
     for case in ["free", "zero", "wait"] {
         let out = output_locked(
-            Command::new(std::env::current_exe().unwrap())
+            marked(std::env::current_exe().unwrap())
                 .args([
                     "--exact",
                     "w2_waiting_line_only_when_the_call_waits",
@@ -3701,7 +3707,7 @@ fn etarget() -> Value {
 /// test reads back.
 fn real_git(a: &[String]) -> bool {
     output_locked(
-        Command::new("git")
+        marked("git")
             .args(a)
             .env("GIT_CONFIG_GLOBAL", "/dev/null")
             .env("GIT_CONFIG_NOSYSTEM", "1"),
@@ -3710,7 +3716,7 @@ fn real_git(a: &[String]) -> bool {
 }
 fn git_config(clone: &str, key: &str) -> Option<String> {
     let out = output_locked(
-        Command::new("git")
+        marked("git")
             .args(["-C", clone, "config", "--get", key])
             .env("GIT_CONFIG_GLOBAL", "/dev/null")
             .env("GIT_CONFIG_NOSYSTEM", "1"),
@@ -3752,7 +3758,7 @@ impl W {
     /// process started while this call's lock was inheritable may hold it a moment (as in
     /// `d9_second_call_is_busy`). No new holder can appear once the call ended.
     fn settle(&self) {
-        let free = status_locked(Command::new("flock").args(["-w", "30", &self.lock, "true"]))
+        let free = status_locked(marked("flock").args(["-w", "30", &self.lock, "true"]))
             .is_ok_and(|s| s.success());
         assert!(free, "the host lock stayed held");
     }
@@ -3802,13 +3808,13 @@ impl W {
             exit
         };
         let [stdin, stdout, stderr] = files;
-        Command::new("sh")
+        marked("sh")
             .args(["-c", "exit \"$1\"", "sh", &exit.to_string()])
             .env_clear()
             .stdin(stdin)
             .stdout(stdout)
             .stderr(stderr)
-            .spawn_settled()
+            .spawn_marked()
     }
 }
 fn ekept(w: &W) -> String {
@@ -4486,7 +4492,7 @@ fn merge_words(co: &Co) -> String {
 }
 fn real_checkout(a: &[String]) -> Answer {
     let out = output_locked(
-        Command::new("git")
+        marked("git")
             .args(a)
             .env("GIT_CONFIG_GLOBAL", "/dev/null")
             .env("GIT_CONFIG_NOSYSTEM", "1")
@@ -4926,7 +4932,7 @@ fn co_checkouts_are_valid_or_refused() {
 /// `git <words>` in `dir` with an identity of its own and no configuration of the host; its output.
 fn plain(dir: &str, words: &[&str]) -> String {
     let out = output_locked(
-        Command::new("git")
+        marked("git")
             .args([
                 "-C",
                 dir,
@@ -5141,7 +5147,7 @@ fn r8_check_passes_today_s_request_and_is_refused_as_deliver_refuses() {
 fn ap_deliver(args: &[&str], stdin: &[u8], lock: &str) -> std::process::Output {
     use std::io::Write;
     let mut child = spawn_locked(
-        Command::new(env!("CARGO_BIN_EXE_ap"))
+        marked(env!("CARGO_BIN_EXE_ap"))
             .arg("deliver")
             .args(args)
             .env("AP_DELIVER_LOCK", lock)
@@ -6033,14 +6039,14 @@ impl W {
         );
         let (exit, err) = self.xruns.remove(0);
         let [stdin, stdout, stderr] = files;
-        Command::new("sh")
+        marked("sh")
             .args(["-c", "printf '%s' \"$1\" >&2; exit \"$2\"", "sh"])
             .args([&err, &exit.to_string()])
             .env_clear()
             .stdin(stdin)
             .stdout(stdout)
             .stderr(stderr)
-            .spawn_settled()
+            .spawn_marked()
     }
 }
 fn etc_rows(v: &Value) -> Vec<(String, Value, Value)> {
