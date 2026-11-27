@@ -30,7 +30,7 @@ One leading thread puts something of the user's world into use; others run besid
 
 ### Execution mode
 
-- A wave runs in a session of its own, which takes the Lead with `ap intent` op `lead` by the user's word routed to the intent (the word that named the Lead before, where the user gave no newer one): a long context is paid again every turn.
+- Start each wave in a fresh session of its own, which takes the Lead with `ap intent` op `lead` by the user's word routed to the intent (the word that named the Lead before, where the user gave no newer one): the store holds state; a long context is paid again every turn.
 - A turn: `ap status --brief` in the task's directory, then its lines in order: a stopped unit (`references/judging.md` section 4); `waits lead: approve` (section 3 there); `use owed` (make or observe the named run, `ap unit used` with evidence); a finding that names a host step or sampled merge. Make the next wave's draft units ready (`ap unit ready`).
 - Wait only in one blocking `ap status --wait <intent>`, never by a repeated `ap status` or by sleeping; between two waits, at most one `ap status --brief` and the reads a stopped unit needs.
 - The stages do the work: you start no subagent and write no page.
