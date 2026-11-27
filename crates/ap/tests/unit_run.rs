@@ -2488,6 +2488,143 @@ fn r13_a_stop_amended_and_run_again_gives_the_author_one_turn() {
     assert_eq!(f.launches, 3);
 }
 
+/// The line before the frame of an author stage that starts fresh on the page's runtime (R11).
+const NEW_SESSION: &str = "This is a new session on another runtime, not a resumption; this line overrides every statement of the frame below that this is your own earlier, resumed session. Read git status and git log origin/main..HEAD in the worktree to see what the earlier stage left.";
+
+impl F {
+    /// The Lead moves the page's implementer from `agy` to Claude: the policy maps
+    /// `claude/implementer` beside the `agy` accounts, and the page is amended.
+    fn amend_to_claude(&mut self) {
+        let accounts = json!({"agy/implementer": [self.p("a4"), self.p("a5")],
+            "agy/reviewer": [self.p("a5")], "claude/implementer": [self.p("a1")]});
+        let models = json!({"allowed": ["opus", "gemini-4-neon-high", "gemini-4-neon-medium"],
+            "never": []});
+        self.policy(json!({"accounts": accounts, "models": models}));
+        std::thread::sleep(Duration::from_millis(1100));
+        let tier = json!({"runtime": "claude", "model": "opus", "effort": "high"});
+        self.set_unit(json!({"implementer": tier, "amended_at": now()}));
+    }
+    /// Launch `n` started fresh on Claude with `auto`, after the page the new-session line, then
+    /// `continue.md`.
+    fn fresh_on_claude(&self, n: usize, rel: &str) -> Value {
+        let (line, prompt) = self.launch(n);
+        assert!(
+            line.starts_with(&format!("{}/homes/", self.p("a1"))),
+            "{line}"
+        );
+        assert!(line.contains("--permission-mode auto"), "{line}");
+        assert!(
+            line.contains("--session-id") && !line.contains("--resume"),
+            "{line}"
+        );
+        assert!(
+            prompt.ends_with(&format!("\n{NEW_SESSION}\n\n{CONTINUE}")),
+            "{prompt}"
+        );
+        let rec = self.record(rel);
+        assert_eq!(
+            (&rec["runtime"], &rec["permission_denials"]),
+            (&json!("claude"), &json!([])),
+            "{rec}"
+        );
+        assert_eq!(rec["resumes"], Value::Null, "{rec}");
+        assert_eq!(rec["account"], json!(self.p("a1")), "{rec}");
+        rec
+    }
+}
+
+// spec: specs/ap/unit-run.md#R11
+// spec: specs/ap/unit-run.md#R12
+// spec: specs/ap/unit-run.md#R13
+// spec: specs/ap/run.md#R9
+#[test]
+fn resume_follows_the_page_runtime() {
+    // (a) A cut `agy` implementer leaves the worktree dirty; the page moves to Claude. The next
+    // stage starts fresh on Claude (`auto`, no resume, `continue_dirty`: the worktree is not
+    // clean) with the new-session line, under the same read-only paths.
+    let mut f = F::new();
+    f.agy_tiers();
+    f.steps(&["dirty", "settle", "accept"]);
+    f.die_at_launch = Some(1);
+    assert_eq!(f.refusal().status, 3);
+    let record = f.home().join("1.implementer.md.run.json");
+    f.cut(&record);
+    let cut: Value = serde_json::from_slice(&std::fs::read(&record).unwrap()).unwrap();
+    assert_eq!(cut["runtime"], "agy");
+    assert!(!git(&f.wt(), &["status", "--porcelain"]).is_empty());
+    f.amend_to_claude();
+    let (a, _) = f.ok();
+    assert_eq!(a["state"], "merged", "{a}");
+    let rec = f.fresh_on_claude(2, "2.implementer.md.run.json");
+    assert_ne!(rec["session"], cut["session"]);
+    assert_eq!(rec["limits"]["read_only"], cut["limits"]["read_only"]);
+    assert!(rec["limits"]["read_only"].is_array(), "{rec}");
+    // What the cut stage left was kept and settled by the fresh stage.
+    let head = a["head"].as_str().unwrap();
+    assert_eq!(f.origin(&["show", &format!("{head}:src/left.rs")]), "left");
+    assert_eq!(f.launches, 3);
+    // The same without a pull request: a dirty worktree is no `worktree_dirty` stop.
+    let mut f = F::new();
+    f.agy_tiers();
+    f.steps(&["local", "settle", "accept"]);
+    f.die_at_launch = Some(1);
+    assert_eq!(f.refusal().status, 3);
+    let record = f.home().join("1.implementer.md.run.json");
+    f.cut(&record);
+    let cut: Value = serde_json::from_slice(&std::fs::read(&record).unwrap()).unwrap();
+    std::fs::write(f.wt().join("src/left.rs"), "left\n").unwrap();
+    f.amend_to_claude();
+    let (a, _) = f.ok();
+    assert_eq!(a["state"], "merged", "{a}");
+    let rec = f.fresh_on_claude(2, "2.implementer.md.run.json");
+    assert_eq!(rec["limits"]["read_only"], cut["limits"]["read_only"]);
+
+    // (b) The turn of R13: the `agy` stage ended clean at its pushed head with a session; the page
+    // is amended to Claude; the turn starts fresh on Claude with the line.
+    let mut f = F::new();
+    f.agy_tiers();
+    f.set_unit(json!({"acceptance": [{"check": "grep -q amended src/widgets.rs", "kind": "fails_on_base"}]}));
+    f.steps(&["implement", "fix", "accept"]);
+    f.stopped("acceptance_failed");
+    let first = f.record("1.implementer.md.run.json");
+    assert_eq!(
+        (&first["runtime"], &first["state"]),
+        (&json!("agy"), &json!("ok"))
+    );
+    assert!(first["session"].is_string(), "{first}");
+    f.amend_to_claude();
+    f.set_unit(
+        json!({"acceptance": [{"check": "test -f src/widgets.rs", "kind": "fails_on_base"}],
+        "state": "ready"}),
+    );
+    let (a, _) = f.ok();
+    assert_eq!(a["state"], "merged", "{a}");
+    let rec = f.fresh_on_claude(2, "2.implementer.md.run.json");
+    assert_eq!(rec["limits"]["read_only"], first["limits"]["read_only"]);
+    assert_eq!(f.launches, 3);
+
+    // (c) A cut Claude record with a Claude page is still resumed, without the line.
+    let mut f = F::new();
+    f.steps(&["dirty", "settle", "accept"]);
+    f.die_at_launch = Some(1);
+    assert_eq!(f.refusal().status, 3);
+    let record = f.home().join("1.implementer.md.run.json");
+    f.cut(&record);
+    let cut: Value = serde_json::from_slice(&std::fs::read(&record).unwrap()).unwrap();
+    let (a, _) = f.ok();
+    assert_eq!(a["state"], "merged", "{a}");
+    let (line, prompt) = f.launch(2);
+    assert!(
+        line.contains(&format!("--resume {}", cut["session"].as_str().unwrap())),
+        "{line}"
+    );
+    assert!(
+        prompt.ends_with(CONTINUE) && !prompt.contains(NEW_SESSION),
+        "{prompt}"
+    );
+    assert!(!f.record("2.implementer.md.run.json")["resumes"].is_null());
+}
+
 // spec: specs/ap/unit-run.md#R14
 #[test]
 fn r14_the_writers_hold_every_session_of_every_author_attempt() {
