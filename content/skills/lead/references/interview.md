@@ -1,6 +1,6 @@
 # The interview and the intent
 
-Read when a message starts or changes an objective, a word of the user is unclear, or you write an intent.
+Read when a message starts or changes an objective, a word of the user is unclear, or you write an intent, its criteria or its card.
 
 ## 1. Hearing a message
 

@@ -1,5 +1,6 @@
 """Tests of ci/check-content.py: the verbs of `ap` and the sections of crates/ap/README.md that content/ names,
-the model names and byte limits, the paths and design routes, and the form of AGENTS.md.
+the model names and byte limits, the words of the Lead skill's execution mode, the paths and design routes, and the form
+of AGENTS.md.
 
 Each test copies what the check reads into a scratch directory, changes one file of content/ there
 (and its line of SHA256SUMS, so that only the case under test fails) and runs the copied check.
@@ -184,6 +185,60 @@ class ModelNamesAndLimits(Scratch, unittest.TestCase):
                 code, out = run_check(root)
                 self.assertEqual(code, 1, out)
                 self.assertIn(f"file_over_limit@content/{name}: {limit + 1} bytes, limit {limit}", out)
+
+
+class LeadExecutionMode(Scratch, unittest.TestCase):
+    """specs/content/lead-skill.md R4: the execution mode of the Lead skill holds the fixed words of its five rules."""
+
+    SKILL = "skills/lead/SKILL.md"
+    WORDS = ("session of its own", "ap status --wait", "never by a repeated", "subagent", "only the member", "ont render")
+
+    def rewrite(self, root, change):
+        """Apply change(execution mode text) -> new text to the section, and refresh its checksum."""
+        path = root / "content" / self.SKILL
+        text = path.read_text(encoding="utf-8")
+        start = text.index("### Execution mode\n")
+        end = text.index("\n## 3. ", start)
+        path.write_text(text[:start] + change(text[start:end]) + text[end:], encoding="utf-8")
+        sums = root / "content/SHA256SUMS"
+        digest = hashlib.sha256(path.read_bytes()).hexdigest()
+        sums.write_text("".join(f"{digest}  {self.SKILL}\n" if l.endswith("  " + self.SKILL) else l + "\n" for l in sums.read_text().splitlines()))
+
+    def test_the_skill_holds_every_word(self):
+        section = (REPO / "content" / self.SKILL).read_text(encoding="utf-8").split("### Execution mode\n", 1)[1].split("\n## ", 1)[0]
+        for word in self.WORDS:
+            with self.subTest(word=word):
+                self.assertIn(word, section.lower())
+
+    def test_a_missing_word_fails_with_the_word(self):
+        for word in self.WORDS:
+            with self.subTest(word=word):
+                root = self.fixture()
+                self.rewrite(root, lambda section: section.replace(word, "x").replace(word.capitalize(), "x"))
+                code, out = run_check(root)
+                self.assertEqual(code, 1, out)
+                self.assertIn(f"lead_execution_rule_missing@content/{self.SKILL}: `### Execution mode` lacks '{word}'", out)
+                self.assertEqual(out.count("lead_execution_rule_missing@"), 1, out)
+
+    def test_a_word_outside_the_execution_mode_does_not_count(self):
+        root = self.fixture()
+        self.rewrite(root, lambda section: section.replace("ont render", "a view"))
+        path = root / "content" / self.SKILL
+        text = path.read_text(encoding="utf-8").replace("### Design mode\n", "### Design mode\n\nRead the store by `ont render`.\n", 1)
+        path.write_text(text, encoding="utf-8")
+        sums = root / "content/SHA256SUMS"
+        digest = hashlib.sha256(path.read_bytes()).hexdigest()
+        sums.write_text("".join(f"{digest}  {self.SKILL}\n" if l.endswith("  " + self.SKILL) else l + "\n" for l in sums.read_text().splitlines()))
+        code, out = run_check(root)
+        self.assertEqual(code, 1, out)
+        self.assertIn("lacks 'ont render'", out)
+
+    def test_a_skill_without_the_execution_mode_fails_with_every_word(self):
+        root = self.fixture()
+        self.rewrite(root, lambda section: section.replace("### Execution mode", "### Running"))
+        code, out = run_check(root)
+        self.assertEqual(code, 1, out)
+        self.assertIn("lacks " + ", ".join(repr(w) for w in self.WORDS), out)
 
 
 class PathsAndDesignRoutes(Scratch, unittest.TestCase):

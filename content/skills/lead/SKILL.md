@@ -22,17 +22,20 @@ One leading thread puts something of the user's world into use; others run besid
 
 ### Design mode
 
-- Request and intent: a message that starts an objective gets interview, `ap intent` `draft`, card and `confirm` with the user's routed word; an answer to a question is stored by op `answer` (`references/interview.md`).
+- Request and intent: interview, `ap intent` `draft`, card, `confirm` and `answer` (`references/interview.md`).
 - Analysis: measure what exists before designing (`ont fn cost`, `flow`, `share`; action log; who calls what), read design sources by routes; let cheaper sessions extract quotations a script checks against lines. Design note: `DESIGN-<topic>.md` (`references/judging.md` section 1).
 - Spec: before the plan, put the contract in `specs/` of the owning repository as a spec unit (`contract`, `kind` `instructions`), `OFFICIAL-DOCS.md` section 4 rows cited as `path:line`, reviewed and merged first; or cite existing `<path>#R<n>` in `specs`.
-- Plan and pages: add every unit of the plan in one context (`ap unit add`: `kind`, `use`, `depends_on`, `depends_delivered`, `wave`, tiers at or above the routing map, `references/unit-page.md`); run one review of the plan and one of each `contract` or `effect` page by a session that did not write them (`ap unit review`). A host step no unit can make is a finding that names command, readback and undo.
+- Plan and pages: add every unit of the plan in one context (`ap unit add`: `kind`, `use`, `depends_on`, `depends_delivered`, `wave`, tiers at or above the routing map, `references/unit-page.md`); run one review of the plan and one of each `contract` or `effect` page by a session that did not write them (`ap unit review`).
 - Hand over: next action in each intent's notes (`ap intent`, op `note`), nothing running, no estimate presented as a fact.
 
 ### Execution mode
 
-- A turn: `ap status --brief` in the task's directory, then its lines in order: a stopped unit (`references/judging.md` section 4); `waits lead: approve` (read that head's diff, `ap unit approve` or `reject`); `use owed` (make or observe the named run, `ap unit used` with evidence); a finding that names a host step or sampled merge. Make the next wave's draft units ready (`ap unit ready`) and wait in one blocking `ap status --wait <intent>`.
-- You write no page. A page the driver refuses is amended in the refused field alone; past five refused pages of one plan, stop and ask the user for a design session.
-- Start each wave in a fresh session: the store holds state; a long context is paid again every turn.
+- Start each wave in a fresh session of its own, which takes the Lead with `ap intent` op `lead` by the user's word routed to the intent (the word that named the Lead before, where the user gave no newer one): the store holds state; a long context is paid again every turn.
+- A turn: `ap status --brief` in the task's directory, then its lines in order: a stopped unit (`references/judging.md` section 4); `waits lead: approve` (section 3 there); `use owed` (make or observe the named run, `ap unit used` with evidence); a finding that names a host step or sampled merge. Make the next wave's draft units ready (`ap unit ready`).
+- Wait only in one blocking `ap status --wait <intent>`, never by a repeated `ap status` or by sleeping; between two waits, at most one `ap status --brief` and the reads a stopped unit needs.
+- The stages do the work: you start no subagent and write no page.
+- An amend sends only the member a refusal or a report names; past five refused pages of one plan, stop and ask the user for a design session.
+- Read a fact of the store through a view (`ont render`) or `ap status`, never through a search and a parser of your own.
 
 ## 3. Your own limits
 
@@ -49,8 +52,4 @@ One leading thread puts something of the user's world into use; others run besid
 
 The store is the home: next action is the intent's notes; a lesson is a finding of kind `lesson`, closed with `prevented_by` once what prevents it is delivered; a unit's page and notes change by `ap unit amend`, user's words by `ap request`, an incident, hold and want that outlives one intent by `ont action apply` with role `lead` (`open_finding`, `set_hold`, `record_principle`). A task directory keeps only what no object holds: design note and working files of analysis. No `STATE.md`, handoff file or table of bottlenecks is written; user's wants are `ont render` of view `principles`. In Claude Code's code mode a turn is one script (`CLI-RUNTIMES.md` section 12). With no unit of the intent running, ready or owed, end the session. The next Lead may replace a decision of yours with a reason; user's decisions and holds stay.
 
-| Read | When |
-| --- | --- |
-| `references/interview.md` | A message starts or changes an objective; a user's word is unclear; you write criteria or a card |
-| `references/unit-page.md` | Design mode: you write or amend a page, choose its class, kind and tiers |
-| `references/judging.md` | A design note is due; a unit is stopped or waits for approval; findings arrive; you take a task over |
+Each reference says in its first lines when to read it: `references/interview.md`, `references/unit-page.md`, `references/judging.md`.
