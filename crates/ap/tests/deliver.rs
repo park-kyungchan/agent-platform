@@ -18,9 +18,31 @@ use sha2::Digest;
 use std::{
     collections::BTreeMap,
     path::PathBuf,
-    process::{Child, Command},
+    process::{Child, Command, ExitStatus, Output, Stdio},
     sync::atomic::{AtomicU32, Ordering},
 };
+
+/// Starts `cmd` under the process-wide launch lock of the library (poison-tolerant), held only across
+/// `spawn()`: a child started while a deliver call has the host lock inheritable would hold that lock.
+fn spawn_locked(cmd: &mut Command) -> std::io::Result<Child> {
+    let _g = ap::host::LAUNCH
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
+    cmd.spawn()
+}
+/// `Command::output` with the spawn under the lock; the wait runs after the guard is dropped.
+fn output_locked(cmd: &mut Command) -> std::io::Result<Output> {
+    spawn_locked(
+        cmd.stdin(Stdio::null())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped()),
+    )?
+    .wait_with_output()
+}
+/// `Command::status` with the spawn under the lock.
+fn status_locked(cmd: &mut Command) -> std::io::Result<ExitStatus> {
+    spawn_locked(cmd)?.wait()
+}
 
 static NEXT: AtomicU32 = AtomicU32::new(0);
 const TARGET: &str = "/usr/local/bin/ap";
@@ -1747,11 +1769,12 @@ fn d5_refusals_apply_nothing() {
     // Step 1 (R20): the host lock is held by another process, so the call is `busy` before any
     // step: no installer, no store read of the pair, no attempt applied.
     let mut w = W::new();
-    let mut holder = Command::new("flock")
-        .args(["-n", &w.lock, "-c", "echo held; exec sleep 60"])
-        .stdout(std::process::Stdio::piped())
-        .spawn()
-        .unwrap();
+    let mut holder = spawn_locked(
+        Command::new("flock")
+            .args(["-n", &w.lock, "-c", "echo held; exec sleep 60"])
+            .stdout(std::process::Stdio::piped()),
+    )
+    .unwrap();
     let mut held = String::new();
     std::io::BufRead::read_line(
         &mut std::io::BufReader::new(holder.stdout.take().unwrap()),
@@ -3198,18 +3221,37 @@ fn d9_second_call_is_busy() {
         (second["detail"].clone(), second["installers"].clone()),
         (Value::Null, json!([]))
     );
-    // After the first call ended the lock is free: the same second call goes on. (A child that
-    // another test of this process started while the lock was inheritable may hold it a moment.)
-    let free = (0..100).any(|_| {
-        let mut again = W::new();
-        again.lock = w.lock.clone();
-        let (v, exit) = again.run();
-        if v["code"] == "busy" {
-            std::thread::sleep(std::time::Duration::from_millis(20));
+    // After the first call ended the lock is free: the same second call goes on.
+    let mut again = W::new();
+    again.lock = w.lock.clone();
+    let (v, exit) = again.run();
+    assert_eq!(exit, 0, "{v}");
+}
+
+// spec: specs/ap/deliver.md#R16
+#[test]
+fn d9_a_child_of_another_thread_does_not_hold_the_lock() {
+    // A second thread starts short-lived children all along; none of them may inherit the lock of
+    // the calls the main thread makes, so no call is refused `busy`.
+    let stop = std::sync::atomic::AtomicBool::new(false);
+    std::thread::scope(|scope| {
+        scope.spawn(|| {
+            while !stop.load(Ordering::SeqCst) {
+                let mut child = spawn_locked(Command::new("sh").args(["-c", "sleep 2"])).unwrap();
+                std::thread::sleep(std::time::Duration::from_millis(1));
+                child.kill().unwrap();
+                child.wait().unwrap();
+            }
+        });
+        let mut w = W::own();
+        for run in 0..30 {
+            w.xruns = vec![(0, String::new()); 3];
+            let (v, exit) = w.run();
+            let want = if run == 0 { "installed" } else { "current" };
+            assert_eq!((end(&v), exit), ((want, ""), 0), "run {run}: {v}");
         }
-        exit == 0
+        stop.store(true, Ordering::SeqCst);
     });
-    assert!(free);
 }
 
 // spec: specs/ap/deliver.md#R16
@@ -3570,15 +3612,16 @@ fn w2_waiting_line_only_when_the_call_waits() {
         return;
     }
     for case in ["free", "zero", "wait"] {
-        let out = Command::new(std::env::current_exe().unwrap())
-            .args([
-                "--exact",
-                "w2_waiting_line_only_when_the_call_waits",
-                "--nocapture",
-            ])
-            .env(CASE, case)
-            .output()
-            .unwrap();
+        let out = output_locked(
+            Command::new(std::env::current_exe().unwrap())
+                .args([
+                    "--exact",
+                    "w2_waiting_line_only_when_the_call_waits",
+                    "--nocapture",
+                ])
+                .env(CASE, case),
+        )
+        .unwrap();
         assert!(
             out.status.success(),
             "{}",
@@ -3618,20 +3661,22 @@ fn etarget() -> Value {
 /// Real `git` for the operations clone's `init` and `config`, so that its configuration is a file a
 /// test reads back.
 fn real_git(a: &[String]) -> bool {
-    Command::new("git")
-        .args(a)
-        .env("GIT_CONFIG_GLOBAL", "/dev/null")
-        .env("GIT_CONFIG_NOSYSTEM", "1")
-        .output()
-        .is_ok_and(|o| o.status.success())
+    output_locked(
+        Command::new("git")
+            .args(a)
+            .env("GIT_CONFIG_GLOBAL", "/dev/null")
+            .env("GIT_CONFIG_NOSYSTEM", "1"),
+    )
+    .is_ok_and(|o| o.status.success())
 }
 fn git_config(clone: &str, key: &str) -> Option<String> {
-    let out = Command::new("git")
-        .args(["-C", clone, "config", "--get", key])
-        .env("GIT_CONFIG_GLOBAL", "/dev/null")
-        .env("GIT_CONFIG_NOSYSTEM", "1")
-        .output()
-        .ok()?;
+    let out = output_locked(
+        Command::new("git")
+            .args(["-C", clone, "config", "--get", key])
+            .env("GIT_CONFIG_GLOBAL", "/dev/null")
+            .env("GIT_CONFIG_NOSYSTEM", "1"),
+    )
+    .ok()?;
     out.status
         .success()
         .then(|| String::from_utf8_lossy(&out.stdout).trim().to_owned())
@@ -3668,9 +3713,7 @@ impl W {
     /// process started while this call's lock was inheritable may hold it a moment (as in
     /// `d9_second_call_is_busy`). No new holder can appear once the call ended.
     fn settle(&self) {
-        let free = Command::new("flock")
-            .args(["-w", "30", &self.lock, "true"])
-            .status()
+        let free = status_locked(Command::new("flock").args(["-w", "30", &self.lock, "true"]))
             .is_ok_and(|s| s.success());
         assert!(free, "the host lock stayed held");
     }
@@ -4403,13 +4446,14 @@ fn merge_words(co: &Co) -> String {
     format!("merge --ff-only --quiet {}", co.tip)
 }
 fn real_checkout(a: &[String]) -> Answer {
-    let out = Command::new("git")
-        .args(a)
-        .env("GIT_CONFIG_GLOBAL", "/dev/null")
-        .env("GIT_CONFIG_NOSYSTEM", "1")
-        .env("GIT_TERMINAL_PROMPT", "0")
-        .output()
-        .unwrap();
+    let out = output_locked(
+        Command::new("git")
+            .args(a)
+            .env("GIT_CONFIG_GLOBAL", "/dev/null")
+            .env("GIT_CONFIG_NOSYSTEM", "1")
+            .env("GIT_TERMINAL_PROMPT", "0"),
+    )
+    .unwrap();
     Ok(Reply {
         success: out.status.success(),
         bytes: out.stdout.clone(),
@@ -4842,26 +4886,27 @@ fn co_checkouts_are_valid_or_refused() {
 
 /// `git <words>` in `dir` with an identity of its own and no configuration of the host; its output.
 fn plain(dir: &str, words: &[&str]) -> String {
-    let out = Command::new("git")
-        .args([
-            "-C",
-            dir,
-            "-c",
-            "user.name=t",
-            "-c",
-            "user.email=t@example.invalid",
-        ])
-        .args([
-            "-c",
-            "init.defaultBranch=main",
-            "-c",
-            "commit.gpgsign=false",
-        ])
-        .args(words)
-        .env("GIT_CONFIG_GLOBAL", "/dev/null")
-        .env("GIT_CONFIG_NOSYSTEM", "1")
-        .output()
-        .unwrap();
+    let out = output_locked(
+        Command::new("git")
+            .args([
+                "-C",
+                dir,
+                "-c",
+                "user.name=t",
+                "-c",
+                "user.email=t@example.invalid",
+            ])
+            .args([
+                "-c",
+                "init.defaultBranch=main",
+                "-c",
+                "commit.gpgsign=false",
+            ])
+            .args(words)
+            .env("GIT_CONFIG_GLOBAL", "/dev/null")
+            .env("GIT_CONFIG_NOSYSTEM", "1"),
+    )
+    .unwrap();
     assert!(out.status.success(), "git {words:?}: {out:?}");
     String::from_utf8(out.stdout).unwrap().trim().to_owned()
 }
@@ -5056,15 +5101,16 @@ fn r8_check_passes_today_s_request_and_is_refused_as_deliver_refuses() {
 
 fn ap_deliver(args: &[&str], stdin: &[u8], lock: &str) -> std::process::Output {
     use std::io::Write;
-    let mut child = Command::new(env!("CARGO_BIN_EXE_ap"))
-        .arg("deliver")
-        .args(args)
-        .env("AP_DELIVER_LOCK", lock)
-        .stdin(std::process::Stdio::piped())
-        .stdout(std::process::Stdio::piped())
-        .stderr(std::process::Stdio::piped())
-        .spawn()
-        .unwrap();
+    let mut child = spawn_locked(
+        Command::new(env!("CARGO_BIN_EXE_ap"))
+            .arg("deliver")
+            .args(args)
+            .env("AP_DELIVER_LOCK", lock)
+            .stdin(std::process::Stdio::piped())
+            .stdout(std::process::Stdio::piped())
+            .stderr(std::process::Stdio::piped()),
+    )
+    .unwrap();
     child.stdin.take().unwrap().write_all(stdin).unwrap();
     child.wait_with_output().unwrap()
 }
