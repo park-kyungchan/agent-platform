@@ -13,7 +13,7 @@ The page is the unit object (`crates/ap/README.md` "The unit object"), written b
 | `not_built` | The neighbouring things left out on purpose |
 | `write_set` | The area: crates and directories as patterns (`dir/**`), never lines |
 | `read_first` | First word `path` or `path:a-b`, relative to the repository root, of the base `ap unit ready` and `ap unit review` fetch (`read_first_missing`, `read_first_range`), then what it is for |
-| `specs` | `<path>#R<n>`, `<path>` or a directory (`specs/ap`); a clause whose citing test is in the write set and whose file is not is named (`clause_missing`, `clause_unnamed`) |
+| `specs` | `<path>#R<n>`, `<path>` or a directory (`specs/ap`), required in lane `objective` at `ap unit ready` (`specs_missing`, `design_missing`); a clause whose citing test is in the write set and whose file is not is named (`clause_missing`, `clause_unnamed`) |
 | `notes` | What you run before or after the merge; no claim about the base (section 3) |
 | `verifier_questions` | Things to run with inputs of the verifier's own, never a verdict |
 | `kind` | The kind of work, one of the schema's `unit_kind`: it selects the row of the routing map |
