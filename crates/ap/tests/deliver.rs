@@ -7694,6 +7694,7 @@ fn etc_same_repository() {
     // The next call ends `current`: F is the recorded tip, E the same T, one `check` that answers the
     // host at T, `same`.
     w.xruns = vec![(0, String::new())];
+    w.settle();
     let (v, exit) = w.run();
     assert_eq!((end(&v), exit), (("current", ""), 0), "{v}");
     assert_eq!(v["etc"], own_record(Some(&tip), Some(&tip), "same"));
@@ -7701,6 +7702,7 @@ fn etc_same_repository() {
 
     // A call whose record has `etc` null (a refusal) keeps F.
     w.fetch_fails = true;
+    w.settle();
     let (v, _) = w.run();
     assert_eq!(
         (v["code"].clone(), v["etc"].clone()),
@@ -7714,6 +7716,7 @@ fn etc_same_repository() {
     w.rhead = Some(c(1));
     w.xruns = vec![(1, String::new()), (0, String::new()), (0, String::new())];
     let start = w.calls.len();
+    w.settle();
     let (v, _) = w.run();
     assert_eq!(
         v["etc"],
@@ -7734,6 +7737,7 @@ fn etc_same_repository() {
     w.rhead = Some(c(1));
     w.rcheckout_fails = true;
     w.xruns = vec![];
+    w.settle();
     let (v, _) = w.run();
     assert_eq!(end(&v), ("current", ""), "{v}");
     assert_eq!(v["etc"], own_record(Some(&tip), Some(&tip), "fetch_failed"));
@@ -7744,12 +7748,14 @@ fn etc_same_repository() {
     // the installer's own record follows T.
     std::fs::remove_file(w.p("state/etc.tip")).unwrap();
     w.xruns = vec![(0, String::new()); 3];
+    w.settle();
     let (v, _) = w.run();
     assert_eq!(v["etc"], own_record(None, Some(&tip), "installed"));
     // A rollback runs no step and leaves F.
     let mut w = W::own();
     w.run();
     installed_by_a(&mut w);
+    w.settle();
     let (v, _) = w.run_with(&w.rollback());
     assert_eq!(v["etc"], Value::Null, "{v}");
     assert_eq!(w.own_tip(), Some(format!("{tip}\n")));
