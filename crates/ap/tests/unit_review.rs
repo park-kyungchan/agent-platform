@@ -1368,7 +1368,11 @@ fn plan_fixture(f: &mut F) {
     );
     f.objects.remove(&k("unit", "u1"));
     // The plan part of the base names no design record (R26).
-    f.modify("intent", "widgets", json!({"design": null, "plan_design": null}));
+    f.modify(
+        "intent",
+        "widgets",
+        json!({"design": null, "plan_design": null}),
+    );
 }
 
 // spec: specs/ap/unit-review.md#R7
@@ -3614,7 +3618,8 @@ fn ready_of(f: &mut F, key: &str) -> Result<Value, (String, String, Value)> {
     use ap::unit::object;
     let call = object::arguments(&["ready", "--store", STORE].map(OsString::from)).unwrap();
     let n = NEXT.fetch_add(1, Ordering::SeqCst);
-    let r = json!({"request_id": format!("rd{n}"), "agent": "lead", "session": "lead-1", "unit": key});
+    let r =
+        json!({"request_id": format!("rd{n}"), "agent": "lead", "session": "lead-1", "unit": key});
     match object::execute(f, &call, &r) {
         Ok(text) => Ok(serde_json::from_str(&text).unwrap()),
         Err(e) => Err((e.code.to_string(), e.field.clone(), e.detail.clone())),
@@ -3657,7 +3662,7 @@ fn routing_policy(f: &F) {
 // spec: specs/ap/unit.md#R56
 // spec: specs/ap/unit.md#R57
 #[test]
-fn r28_program_first_a_draft_page_without_specs_or_a_reviewed_design_is_refused_before_any_review() {
+fn r28_program_first_a_page_without_specs_or_a_reviewed_design_is_refused() {
     let mut f = F::new();
     // The real run: a draft unit whose `specs` is empty, refused as `ap unit ready` refuses it.
     f.modify("unit", "u1", json!({"specs": []}));
@@ -3733,7 +3738,7 @@ fn r28_program_first_a_draft_page_without_specs_or_a_reviewed_design_is_refused_
 // spec: specs/ap/unit.md#R56
 // spec: specs/ap/unit.md#R57
 #[test]
-fn r28_program_first_a_draft_page_whose_tiers_the_routing_map_refuses_is_refused_as_ready_refuses_it() {
+fn r28_program_first_tiers_the_routing_map_refuses_are_refused_as_ready_does() {
     let mut f = F::new();
     routing_policy(&f);
     // A plain page, so that `ap unit ready` reaches the tiers without a page review.
@@ -3785,9 +3790,15 @@ fn r28_program_first_the_store_s_criteria_of_ready_unit_refuse_a_look_but_page_n
         body["expected"],
         json!([{"id": oid("unit", "u1"), "revision": format!("r#{revision}")}])
     );
-    let rid = start["request_id"].as_str().unwrap().trim_end_matches("-start");
+    let rid = start["request_id"]
+        .as_str()
+        .unwrap()
+        .trim_end_matches("-start");
     assert_eq!(body["request_id"], json!(format!("{rid}-ready")));
-    assert_eq!((&body["role"], &body["agent"]), (&json!("lead"), &json!("lead")));
+    assert_eq!(
+        (&body["role"], &body["agent"]),
+        (&json!("lead"), &json!("lead"))
+    );
     // Another criterion fails: the first in the store's order, every failed code but `page_not_reviewed`.
     f.ready_fails = vec!["plan_not_reviewed"];
     let e = refused_first(&mut f, "u1");
@@ -3810,7 +3821,10 @@ fn r28_program_first_the_store_s_criteria_of_ready_unit_refuse_a_look_but_page_n
         )
     );
     // `ap unit ready` refuses the same criterion first.
-    assert_eq!(ready_of(&mut f, "u1").unwrap_err().0, "intent_not_open_for_units");
+    assert_eq!(
+        ready_of(&mut f, "u1").unwrap_err().0,
+        "intent_not_open_for_units"
+    );
     f.ready_fails = vec![];
     // A refusal of the validate itself is passed on (R5).
     f.ready_refused = Some("revision_conflict");
@@ -3843,7 +3857,12 @@ fn r30_program_first_status_129_on_the_base_is_not_runnable_on_a_look_and_on_rea
         json!([{"check": "exit 129", "kind": "fails_on_base"}]),
     );
     assert_eq!(
-        (code(&e), &e.detail["index"], &e.detail["status"], &e.detail["check"]),
+        (
+            code(&e),
+            &e.detail["index"],
+            &e.detail["status"],
+            &e.detail["check"]
+        ),
         (
             ("acceptance_not_runnable".into(), "acceptance".into()),
             &json!(1),
@@ -3896,7 +3915,10 @@ fn r31_program_first_the_look_of_ap_unit_write_runs_what_it_ran_but_status_129()
     let (v, _) = execute_as(&mut f, Some(STORE), &r, "dispatch").unwrap();
     assert_eq!(v["verdict"], "accept", "{v}");
     assert!(f.bodies("validate", "ready_unit").is_empty(), "no validate");
-    assert_eq!(f.bodies("apply", "start_unit_review")[0]["role"], "dispatch");
+    assert_eq!(
+        f.bodies("apply", "start_unit_review")[0]["role"],
+        "dispatch"
+    );
     // Status 129 on the base is not runnable for it too.
     f.modify(
         "unit",
