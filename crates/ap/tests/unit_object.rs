@@ -207,6 +207,8 @@ struct F {
     bump_after_get: Option<&'static str>,
     /// Whether the page of a search of `clause` is qualified.
     clauses_qualified: bool,
+    /// The directory of the reviewed design record of the default intent `widgets`.
+    _design: Tmp,
 }
 impl F {
     fn new() -> Self {
@@ -233,13 +235,19 @@ impl F {
             lose_read_back: false,
             bump_after_get: None,
             clauses_qualified: true,
+            _design: Tmp::new(),
         };
-        // Invented objects: a confirmed intent with an accepted plan, and a current request of the user.
+        // Invented objects: a confirmed intent with an accepted plan, and a current request of the user. The
+        // intent names a design record a plan review read (`specs/ap/unit.md` R53).
+        let design = f._design.at("DESIGN.md");
+        std::fs::write(&design, "# Design\n\nD1: one list.\n").unwrap();
+        let reviewed = format!("{:x}", Sha256::digest(std::fs::read(&design).unwrap()));
         f.put(
             "intent",
             "widgets",
             json!({"status": "confirmed", "outcome": "Every widget is listed once.",
-                "first_user": "An invented reader of the widget list."}),
+                "first_user": "An invented reader of the widget list.",
+                "design": design.to_str().unwrap(), "plan_design": reviewed}),
         );
         f.put(
             "review",
@@ -377,6 +385,10 @@ impl F {
                     p.get("intent").is_none_or(|i| *i == u("intent")),
                     "intent_differs",
                 );
+                let open = self
+                    .the(&u("intent"), "intent")
+                    .is_some_and(|i| i["status"] == "confirmed" || i["status"] == "assumed");
+                need(!objective || open, "intent_not_open_for_units");
                 // Version 16: a plan review counts only when it started after the unit was added; version 27:
                 // a unit with plan_digest needs plan_reviewed equal to it.
                 let added = u("added_at");
@@ -773,6 +785,7 @@ fn added(key: &str) -> Value {
         writer(&format!("a-{key}")),
         json!({"unit": key, "lane": "objective", "class": "plain", "intent": "widgets",
             "objective": "The widget list holds every widget once.", "use": USE,
+            "specs": ["specs/widgets.md"],
             "acceptance": [{"check": "test -f list.txt", "kind": "fails_on_base"}],
             "write_set": ["src/list/**"],
             "implementer": {"runtime": "claude", "model": "m", "effort": "high"},
@@ -5075,7 +5088,7 @@ fn r52_add_sends_the_plan_digest_and_an_amendment_of_no_plan_field_keeps_it_plan
     // The block: the heading line, the objective and the lines of the plan, without the tiers and the estimate.
     assert_eq!(
         plan_block("u-plan", &stored),
-        "### u-plan: plain, lane objective, no repository\n\nThe widget list holds every widget once.\nWrite set: src/list/**\n"
+        "### u-plan: plain, lane objective, no repository\n\nThe widget list holds every widget once.\nWrite set: src/list/**\nSpecifications: specs/widgets.md\n"
     );
     assert_eq!(
         digest,
@@ -5184,7 +5197,11 @@ fn r53_design_not_reviewed_refuses_ready_until_a_plan_review_read_the_record() {
     let path = design.to_str().unwrap().to_owned();
     let sha = |p: &Path| format!("{:x}", Sha256::digest(std::fs::read(p).unwrap()));
     let mut f = F::new();
-    f.modify("intent", "widgets", json!({"design": path}));
+    f.modify(
+        "intent",
+        "widgets",
+        json!({"design": path, "plan_design": null}),
+    );
     for key in ["u-d1", "u-d2", "u-d3", "u-d4"] {
         plain_unit(&mut f, key, check("test -f list.txt", "fails_on_base"));
     }
@@ -5262,6 +5279,73 @@ fn r53_design_not_reviewed_refuses_ready_until_a_plan_review_read_the_record() {
     let e = unmarked(&mut f, "u-d1", "r53-again").unwrap_err();
     assert_eq!(e.code, "unit_not_draft");
     assert!(!f.names().contains(&"get intent".to_owned()));
+}
+
+// spec: specs/ap/unit.md#R53
+#[test]
+fn r53_specs_missing_and_design_missing_refuse_ready_of_an_objective_unit() {
+    let mut f = F::new();
+    // `specs` omitted or empty: refused before the intent is read, nothing applied.
+    for (name, req) in [
+        ("u-omitted", without(added("u-omitted"), "specs")),
+        ("u-empty", with(added("u-empty"), json!({"specs": []}))),
+    ] {
+        yes(&mut f, &["add"], req);
+        f.calls.clear();
+        let e = ready(&mut f, name).unwrap_err();
+        assert_eq!(
+            (e.code.as_str(), e.field.as_str(), &e.detail, &e.after),
+            ("specs_missing", "specs", &Value::Null, &None),
+            "{name}"
+        );
+        assert_eq!(f.names(), ["get unit"], "{name}");
+        assert_eq!(f.unit(name)["state"], "draft");
+    }
+    // `specs` present, the intent without a design (absent, then empty): refused after one read of the intent.
+    plain_unit(&mut f, "u-d", check("test -f list.txt", "fails_on_base"));
+    for design in [None, Some("")] {
+        f.forget("intent", "widgets", "design");
+        if let Some(d) = design {
+            f.modify("intent", "widgets", json!({"design": d}));
+        }
+        f.calls.clear();
+        let e = ready(&mut f, "u-d").unwrap_err();
+        assert_eq!(
+            (e.code.as_str(), e.field.as_str(), &e.detail, &e.after),
+            (
+                "design_missing",
+                "unit",
+                &json!({"intent": "widgets"}),
+                &None
+            ),
+            "{design:?}"
+        );
+        assert_eq!(f.names(), ["get unit", "get intent"], "{design:?}");
+    }
+    // The lane small without `specs`: neither code, and the intent is not read.
+    let small = with(
+        writer("s1"),
+        json!({"unit": "u-small", "lane": "small", "class": "plain", "origin": "q-small", "objective": "o",
+            "repository": "invented/widgets", "write_set": ["a"], "acceptance": [{"check": "x", "kind": "invariant"}]}),
+    );
+    yes(&mut f, &["add"], small);
+    f.calls.clear();
+    if let Err(e) = ready(&mut f, "u-small") {
+        assert!(!["specs_missing", "design_missing"].contains(&e.code.as_str()));
+    }
+    assert!(!f.names().contains(&"get intent".to_owned()));
+    // A unit that is not draft, without `specs` and design: answered as before.
+    f.edit("unit", "u-omitted", json!({"state": "ready"}));
+    f.calls.clear();
+    let e = unmarked(&mut f, "u-omitted", "r53-ready").unwrap_err();
+    assert_eq!(e.code, "unit_not_draft");
+    assert_eq!(f.names(), ["get unit", "apply ready_unit"]);
+    // An intent that does not exist in the store: the store's refusal answers.
+    f.objects.remove(&k("intent", "widgets"));
+    f.calls.clear();
+    let e = ready(&mut f, "u-d").unwrap_err();
+    assert_eq!(e.code, "intent_not_open_for_units");
+    assert_eq!(f.names()[..2], ["get unit", "get intent"]);
 }
 
 // spec: specs/ap/unit.md#R55
