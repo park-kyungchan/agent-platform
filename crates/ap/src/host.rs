@@ -15,7 +15,8 @@ use std::{
 
 /// The lock of a process's spawns that must not overlap `ap deliver`'s launch of an installer, during which the
 /// deliver lock's descriptor is inheritable (`specs/ap/deliver.md` R16): every `System::launch` call of `deliver`
-/// runs under it, and a thread that starts a child of its own in the same process takes it across `spawn()`.
+/// runs under it, as does the taking of the deliver lock itself, and a thread that starts a child of its own in the
+/// same process takes it across `spawn()`.
 pub static LAUNCH: std::sync::Mutex<()> = std::sync::Mutex::new(());
 pub(crate) const LIMIT: u64 = 1_048_576;
 /// The bound of the standard output of a call of the store engine `ont` (8 MiB): an `ont get` answer holds up to 100
