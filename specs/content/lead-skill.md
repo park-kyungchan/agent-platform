@@ -1,0 +1,20 @@
+# The Lead skill: `content/skills/lead`
+
+Purpose: the session the store names Lead of an intent loads `content/skills/lead/SKILL.md`, installed as `/root/.agents/skills/lead/SKILL.md`, and reads its references under `content/skills/lead/references/` where a step routes to them. The skill holds the Lead's whole view, its design mode and execution mode, its own limits and where the state is. Its design mode puts the contract of a change into `specs/` of the owning repository, as a spec unit reviewed and merged first, before the plan of the units that build it, so no Lead of any CLI goes from a confirmed intent to units without the Spec stage of the order of work (`specs/content/agents-file.md` R3, section 2).
+
+## Requirements
+
+- R1: `content/skills/lead/SKILL.md` is at most 6,500 bytes (`SKILL_BYTE_LIMIT` of `ci/check-content.py`, `file_over_limit`), begins with a `---` frontmatter of `name` and `description` holding no changing value or model name (`skill_without_frontmatter`, `changing_value_in_always_loaded_text`, `model_name_in_content`), and keeps its four numbered headings `## 1. The whole view`, `## 2. The two modes`, `## 3. Your own limits` and `## 4. Where the state is`, in this order.
+- R2: In `## 2. The two modes`, `### Design mode` lists its steps in this order: `Request and intent`; `Analysis` (the design note `DESIGN-<topic>.md`); `Spec` (before the plan, put the contract in `specs/` of the owning repository as a spec unit of class `contract` and `kind` `instructions`, with the rows of `OFFICIAL-DOCS.md` section 4 it rests on cited as `path:line`, reviewed and merged first; or cite the existing `<path>#R<n>` in the units' `specs`); `Plan and pages`; and `Hand over`. The frontmatter's `description` names `a spec` between `a design` and `a plan`. The row `specs` of section 1 of `content/skills/lead/references/unit-page.md` notes that `specs` is required in the lane `objective` at `ap unit ready` (`specs_missing`, `design_missing`; `specs/ap/unit.md` R53).
+- R3: A pull request that changes `content/skills/lead/SKILL.md` or `content/skills/lead/references/*.md` passes `ci/check-content.py`, passes `evals/cases/select` without unaccepted `lost_facts` (`evals/cases/README.md`), and passes the suites of `specs/content/agents-file.md` R9 before it is approved; after delivery, `/root/.agents/skills/lead/SKILL.md` equals the merged file by SHA-256.
+
+## Interface
+
+`content/skills/lead/SKILL.md` in the form of R1 and R2, and `content/skills/lead/references/unit-page.md` with the row of R2. `ci/check-content.py` holds the size, the frontmatter and its values of R1 (`file_over_limit`, `skill_without_frontmatter`, `changing_value_in_always_loaded_text`, `model_name_in_content`); the headings of R1 and the steps, the description and the row of R2 are held by the tests that cite them and by the verifier's reading. R3 is held by the gate, which the Lead runs, and by the readback after delivery; `./check` does not run the suites.
+
+## Not included
+
+- No change of the order of work in `content/AGENTS.md`: its section 2 already names the Spec stage; this skill is where the Lead does it.
+- No check that a cited `path:line` of `OFFICIAL-DOCS.md` section 4 says what the specification takes from it: the reviewer of the spec unit reads the lines.
+- No refusal in the skill itself: `ap unit ready` refuses a unit of the lane `objective` without `specs` or whose intent names no design (`specs/ap/unit.md` R53).
+- The execution mode, the limits and the state of the skill are unchanged by R2.
