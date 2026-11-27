@@ -1880,7 +1880,10 @@ fn r19_a_verifier_runs_the_whole_check_only_for_a_doubt_of_the_gate() {
         "{second}"
     );
     // An author still runs the whole check.
-    assert!(include_str!("../src/unit/frames/implementer.md").contains("`ap check <worktree>` runs `./check`"));
+    assert!(
+        include_str!("../src/unit/frames/implementer.md")
+            .contains("`ap check <worktree>` runs `./check`")
+    );
     assert!(FIXER.contains("the repository's check through `ap check <worktree>` until it passes"));
 }
 
