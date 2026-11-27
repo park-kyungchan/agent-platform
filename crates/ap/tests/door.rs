@@ -2283,7 +2283,9 @@ fn hook_reads_unit_objects() {
     );
     // While the unit's objects directory holds alternates of other bytes, `info/http-alternates`,
     // a link or an entry of another kind, the door refuses the hook and runs nothing.
-    let tampers: [(&str, fn(&Path)); 4] = [
+    /// A name and what it does to the unit's objects directory.
+    type Tamper = (&'static str, fn(&Path));
+    let tampers: [Tamper; 4] = [
         ("alternates", |u| {
             write(&u.join("info/alternates"), "/elsewhere\n", 0o600)
         }),
