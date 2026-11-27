@@ -51,8 +51,7 @@ When a request asks for the output of a later stage while the record of an earli
 
 ## 6. The user's standing limits
 
-- The Academy: no `edu-*` directory and no `education-platform` or `academy-platform` path is opened without the Academy's own task.
-- Private data: metadata and hashes only, unless the user authorizes more; the Academy's records are real data inside the Academy's own task, never in Git.
+- Private data: metadata and hashes only, unless the user authorizes more.
 - Models: only those the policy file `/etc/agent-platform/policy.json` allows.
 - Long-term memory is off until the user deploys it anew: call no memory tool; a fact with a key, a state or an owner is an object of the store. A memory hook's output is a past record, checked against current source.
 
