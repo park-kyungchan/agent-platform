@@ -3243,6 +3243,14 @@ fn d9_a_child_of_another_thread_does_not_hold_the_lock() {
                 child.wait().unwrap();
             }
         });
+        // A failed assertion must also end the other thread, or the scope would wait for it forever.
+        struct Stop<'a>(&'a std::sync::atomic::AtomicBool);
+        impl Drop for Stop<'_> {
+            fn drop(&mut self) {
+                self.0.store(true, Ordering::SeqCst);
+            }
+        }
+        let _stop = Stop(&stop);
         let mut w = W::own();
         for run in 0..30 {
             w.xruns = vec![(0, String::new()); 3];
@@ -3250,7 +3258,6 @@ fn d9_a_child_of_another_thread_does_not_hold_the_lock() {
             let want = if run == 0 { "installed" } else { "current" };
             assert_eq!((end(&v), exit), ((want, ""), 0), "run {run}: {v}");
         }
-        stop.store(true, Ordering::SeqCst);
     });
 }
 
