@@ -93,6 +93,9 @@ pub(crate) struct Stage {
     pub run: String,
     pub cwd: String,
     pub store: Option<String>,
+    /// An author's own objects directory and the path its `info/alternates` names, from the
+    /// request's `limits` (R9): the hook reads the objects the stage wrote there.
+    pub objects: Option<(String, String)>,
 }
 
 /// One of the two output streams of an answer.
@@ -569,6 +572,14 @@ fn hook_of(shared: &Shared, o: &serde_json::Map<String, Value>) -> Result<What, 
     else {
         return not_admitted("dir");
     };
+    // The unit's objects directory holds what the run wrote in `info` and no link (R9).
+    if let Some((objects, base)) = &shared.stage.objects {
+        let bytes = format!("{base}\n");
+        let walked = crate::unit::drive::walk_objects(Path::new(objects), bytes.as_bytes());
+        if !matches!(walked, crate::unit::drive::Walked::Clear(_)) {
+            return not_admitted("objects");
+        }
+    }
     Ok(What::Hook(cwd.clone(), file, index.to_owned()))
 }
 /// A `fn` request (R5).
@@ -874,6 +885,9 @@ fn call_hook(
         .stdin(Stdio::null())
         .stdout(Stdio::null())
         .stderr(Stdio::piped());
+    if let Some((objects, _)) = &shared.stage.objects {
+        hook.env("GIT_ALTERNATE_OBJECT_DIRECTORIES", objects);
+    }
     let Some((status, line)) = run_group(req, hook, arrival + HOOK_BOUND, first_line) else {
         return Closing::Exit(127);
     };

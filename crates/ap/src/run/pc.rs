@@ -317,7 +317,7 @@ pub(super) fn stage(
     if !limits.read_only.is_empty() {
         fs::create_dir(x.join("ro")).map_err(|_| "stage")?;
         let mut names = vec![];
-        for (i, path) in limits.read_only.iter().enumerate() {
+        for (i, (path, _)) in limits.read_only.iter().enumerate() {
             fs::copy(path, x.join("ro").join(i.to_string())).map_err(|_| "read_only")?;
             names.extend_from_slice(path.as_bytes());
             names.push(0);

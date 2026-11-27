@@ -8166,8 +8166,8 @@ fn limits_r1_an_implementer_and_a_fixer_with_the_four_members() {
             Box::new(|r| set(r, "over", json!([[p("src"), p("dst"), p("w1")]]))),
         ),
         (
-            "over of five",
-            Box::new(|r| set(r, "over", json!(vec![json!([p("src"), p("dst")]); 5]))),
+            "over of seven",
+            Box::new(|r| set(r, "over", json!(vec![json!([p("src"), p("dst")]); 7]))),
         ),
         ("over empty", Box::new(|r| set(r, "over", json!([])))),
         (
@@ -8189,6 +8189,34 @@ fn limits_r1_an_implementer_and_a_fixer_with_the_four_members() {
         (
             "read_only with ..",
             Box::new(|r| set(r, "read_only", json!([p("w1/../w1/keep")]))),
+        ),
+        (
+            "read_only pair of three",
+            Box::new(|r| set(r, "read_only", json!([[p("src"), p("dst"), p("w1")]]))),
+        ),
+        (
+            "read_only pair of one",
+            Box::new(|r| set(r, "read_only", json!([[p("src")]]))),
+        ),
+        (
+            "read_only pair target /",
+            Box::new(|r| set(r, "read_only", json!([[p("src"), "/"]]))),
+        ),
+        (
+            "read_only pair source with ..",
+            Box::new(|r| set(r, "read_only", json!([[p("x/../src"), p("dst")]]))),
+        ),
+        (
+            "read_only pair source in ~/.ssh",
+            Box::new(|r| set(r, "read_only", json!([[p("home/.ssh"), p("dst")]]))),
+        ),
+        (
+            "read_only pair target an edu- name",
+            Box::new(|r| set(r, "read_only", json!([[p("src"), p("work/edu-a")]]))),
+        ),
+        (
+            "read_only pair source in the account",
+            Box::new(|r| set(r, "read_only", json!([[p("a1/x"), p("dst")]]))),
         ),
         (
             "show another path",
@@ -8338,6 +8366,27 @@ fn limits_r11_the_paths_a_request_names_exist_without_a_link_before_the_probe_an
             Box::new(|r| set(r, "read_only", json!([p("link/inner")]))),
         ),
         (
+            "read_only pair source absent",
+            p("absent"),
+            Box::new(|r| set(r, "read_only", json!([[p("absent"), p("dst")]]))),
+        ),
+        (
+            "read_only pair target absent",
+            p("absent"),
+            Box::new(|r| {
+                set(
+                    r,
+                    "read_only",
+                    json!([p("w1/keep"), [p("src"), p("absent")]]),
+                )
+            }),
+        ),
+        (
+            "read_only pair target a link",
+            p("w2link"),
+            Box::new(|r| set(r, "read_only", json!([[p("src"), p("w2link")]]))),
+        ),
+        (
             "write before over before read_only",
             p("gone-w"),
             Box::new(|r| {
@@ -8394,7 +8443,8 @@ fn limits_r5_the_named_paths_follow_the_scratch_in_their_order_and_the_record_na
     let mut r = f.named_request("x.md", "implementer");
     r["limits"]["write"] = json!([f.p("w2"), f.p("w1")]);
     r["limits"]["over"] = json!([[f.p("src"), f.p("dst")], [f.p("w2"), f.p("src")]]);
-    r["limits"]["read_only"] = json!([f.p("w1/keep"), f.p("dst")]);
+    // A `read_only` pair binds its source read-only at its target.
+    r["limits"]["read_only"] = json!([f.p("w1/keep"), f.p("dst"), [f.p("src"), f.p("w2")]]);
     let (v, _) = f.run(&r).unwrap();
     assert_eq!(v["state"], "ok", "{v}");
     let after = f.after_unit(0);
@@ -8418,6 +8468,9 @@ fn limits_r5_the_named_paths_follow_the_scratch_in_their_order_and_the_record_na
         "--ro-bind",
         &f.p("dst"),
         &f.p("dst"),
+        "--ro-bind",
+        &f.p("src"),
+        &f.p("w2"),
     ]
     .map(str::to_owned)
     .to_vec();
