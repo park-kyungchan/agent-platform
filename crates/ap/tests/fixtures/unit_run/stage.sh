@@ -9,6 +9,15 @@ b=$(cat "$here/branch")
 export GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1
 commit() { mkdir -p src; echo "$1" >> "$2"; git add -A; git -c user.name=Invented -c user.email=invented@example.invalid commit -qm "$1"; }
 push() { git push -q origin "HEAD:refs/heads/$b" 2>/dev/null; }
+# As an author's view does it (specs/ap/unit-run.md R38): the objects go to the unit's own directory
+# `../objects`, the clone's objects are its alternate, the branch's ref is the file of `../heads`.
+u=$(cd .. && pwd); leaf=${b##*/}
+view() { GIT_OBJECT_DIRECTORY="$u/objects" GIT_ALTERNATE_OBJECT_DIRECTORIES="$(git rev-parse --path-format=absolute --git-common-dir)/objects" "$@"; }
+viewcommit() {
+  mkdir -p src; echo "$1" >> "$2"; view git add -A; tree=$(view git write-tree)
+  c=$(view git -c user.name=Invented -c user.email=invented@example.invalid commit-tree "$tree" -p "$(cat "$u/heads/$leaf")" -m "$1")
+  printf '%s\n' "$c" > "$u/heads/$leaf"; view git push -q origin "$c:refs/heads/$b" 2>/dev/null
+}
 verdict() { printf 'Verdict: %s\n%s\nAn invented report.\n' "$1" "$(git rev-parse HEAD)"; }
 # main moves on the origin by one commit that sets file $1 to $2, the worktree untouched.
 mainmove() {
@@ -32,6 +41,11 @@ case "$act" in
   close)     touch "$here/pr-closed"; verdict accept ;;
   ghdown)    touch "$here/gh-down"; verdict accept ;;
   nopr)      cat "$here/nopr-answer" 2>/dev/null || echo "A rule of the page cannot hold: an invented reason." ;;
+  viewimplement) viewcommit "widget $n" src/widgets.rs; touch "$here/pr-open"; echo "Implemented." ;;
+  viewfix)   viewcommit "fix $n" src/widgets.rs; echo "Fixed: the finding." ;;
+  # Whether the object the file `probe` names is in the clone when the stage starts.
+  probe)     if git cat-file -e "$(cat "$here/probe")" 2>/dev/null; then echo present; else echo absent; fi > "$here/probe.$n"
+             echo "A rule of the page cannot hold: an invented reason." ;;
   local)     commit "local $n" src/widgets.rs; echo "Cut before the push." ;;
   dirty)     commit "widget $n" src/widgets.rs; push; touch "$here/pr-open"; echo left > src/left.rs; echo "Cut." ;;
   settle)    git add -A; git -c user.name=Invented -c user.email=invented@example.invalid commit -qm "settle $n" 2>/dev/null; push; touch "$here/pr-open"; echo "Settled." ;;

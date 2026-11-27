@@ -1317,6 +1317,18 @@ fn r10_a_branch_a_run_can_check_out_push_to_and_delete() {
         (e.code.as_str(), e.field.as_str()),
         ("invalid_input", "branch")
     );
+    // A branch of one component is one `branch_ok` takes, and `add` refuses it: `ap unit run`
+    // binds the unit's own directory over the one that holds the branch's ref.
+    assert!(branch_ok("widgets"));
+    let e = no(
+        &mut f,
+        &["add"],
+        with(added("u-one"), json!({"branch": "widgets"})),
+    );
+    assert_eq!(
+        (e.code.as_str(), e.field.as_str()),
+        ("invalid_input", "branch")
+    );
     yes(
         &mut f,
         &["add"],

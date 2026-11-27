@@ -304,6 +304,141 @@ fn read_links(g: &str, admin: Option<&str>, branch: &str) -> Links {
         false => Links::Found(links),
     }
 }
+/// What the walk of a unit's objects directory found (R51, `specs/ap/door.md` R9).
+#[derive(Debug, PartialEq)]
+pub(crate) enum Walked {
+    /// No link and nothing that is neither a regular file nor a directory, `info/alternates` the
+    /// run's bytes and no `info/http-alternates`: the regular files, each with its path below the
+    /// directory.
+    Clear(Vec<(PathBuf, PathBuf)>),
+    /// The links, the entries of another kind, `info/http-alternates` and an `info/alternates` of
+    /// other bytes, in the order of their raw bytes.
+    Found(Vec<PathBuf>),
+    /// The first entry the walk could not read, or the directory for the bound.
+    Unreadable(PathBuf),
+}
+/// The walk of a unit's objects directory `dir`, as R40 walks `<A>`: each entry by `lstat`, no link
+/// followed or entered, no recursion, at most 10,000 entries; then `info/alternates` must hold
+/// exactly `alternates` and `info/http-alternates` must not exist (R51).
+pub(crate) fn walk_objects(dir: &Path, alternates: &[u8]) -> Walked {
+    match dir.symlink_metadata() {
+        Ok(m) if m.is_dir() => {}
+        Ok(_) => return Walked::Found(vec![dir.to_path_buf()]),
+        Err(_) => return Walked::Unreadable(dir.to_path_buf()),
+    }
+    let (mut found, mut files) = (vec![], vec![]);
+    let mut todo = vec![dir.to_path_buf()];
+    let mut seen = 0;
+    while let Some(at) = todo.pop() {
+        let Ok(listing) = std::fs::read_dir(&at) else {
+            return Walked::Unreadable(at);
+        };
+        for entry in listing {
+            let Ok(entry) = entry else {
+                return Walked::Unreadable(at);
+            };
+            seen += 1;
+            if seen > ENTRIES {
+                return Walked::Unreadable(dir.to_path_buf());
+            }
+            let path = entry.path();
+            match path.symlink_metadata() {
+                Ok(m) if m.is_dir() => todo.push(path),
+                Ok(m) if m.is_file() => {
+                    let below = path.strip_prefix(dir).map(Path::to_path_buf);
+                    files.push((path.clone(), below.unwrap_or_default()));
+                }
+                Ok(_) => found.push(path),
+                Err(e) if absent(&e) => {}
+                Err(_) => return Walked::Unreadable(path),
+            }
+        }
+    }
+    let info = dir.join("info");
+    if info.join("http-alternates").symlink_metadata().is_ok() {
+        found.push(info.join("http-alternates"));
+    }
+    let named = info.join("alternates");
+    let ours = files.iter().any(|(p, _)| *p == named)
+        && std::fs::read(&named).is_ok_and(|b| b == alternates);
+    if !ours && !found.contains(&named) {
+        found.push(named);
+    }
+    found.sort_by(|a, b| a.as_os_str().as_bytes().cmp(b.as_os_str().as_bytes()));
+    match found.is_empty() {
+        true => Walked::Clear(files),
+        false => Walked::Found(found),
+    }
+}
+/// A file of the unit's directory as the import reads it (R51): absent, its bytes (a regular file
+/// opened without following a link), or unreadable.
+#[derive(Debug)]
+enum Read {
+    Absent,
+    Bytes(Vec<u8>),
+    Unreadable,
+}
+impl Read {
+    fn of(p: &Path) -> Self {
+        let mut options = std::fs::OpenOptions::new();
+        options.read(true);
+        options.custom_flags(rustix::fs::OFlags::NOFOLLOW.bits() as i32);
+        let mut file = match options.open(p) {
+            Ok(f) => f,
+            Err(e) if absent(&e) => return Self::Absent,
+            Err(_) => return Self::Unreadable,
+        };
+        let mut bytes = vec![];
+        let regular = file
+            .metadata()
+            .is_ok_and(|m| m.is_file() && m.len() <= 4_096);
+        match regular && std::io::Read::read_to_end(&mut file, &mut bytes).is_ok() {
+            true => Self::Bytes(bytes),
+            false => Self::Unreadable,
+        }
+    }
+    /// Two reads are the same only when both are absent or both hold the same bytes.
+    fn same(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Self::Absent, Self::Absent) => true,
+            (Self::Bytes(a), Self::Bytes(b)) => a == b,
+            _ => false,
+        }
+    }
+    /// The commit of a ref's file: exactly 40 hexadecimal digits and a line feed.
+    fn commit(&self) -> Option<String> {
+        let Self::Bytes(b) = self else { return None };
+        let text = std::str::from_utf8(b.strip_suffix(b"\n")?).ok()?;
+        hex40(text).then(|| text.to_owned())
+    }
+}
+/// The script that runs `git` with R39's words in the repository `$1`, reading its standard input
+/// from the file `$2` and writing its standard output to the file `$3`, with the command words
+/// after them (R51): the list of the fresh repository's objects and its pack.
+const GIT_FILES: &str = "d=$1 i=$2 o=$3; shift 3; exec git --no-replace-objects -C \"$d\" -c core.hooksPath=/dev/null -c core.fsmonitor=false \"$@\" <\"$i\" >\"$o\"";
+/// The names under `<directory>/<key>` of the unit's objects, of the directories that stand for
+/// the directories of its ref and its reflog, of the view of `<G>/objects`, and of the run's own
+/// record of the commit it wrote into the stage's ref (R38, R51).
+const OBJECTS: &str = "objects";
+const HEADS: &str = "heads";
+const LOGS: &str = "logs";
+const BASE: &str = "base";
+const WRITTEN: &str = "written";
+/// The fresh repository of an import, removed after it.
+const IMPORT: &str = "import";
+/// A new file of the run's own at `new`, in a directory no stage can write, with `text`, renamed
+/// over `to`; a directory a stage left at `to` is first removed, without following a link (R38).
+fn renamed(new: &Path, to: &Path, text: &[u8]) -> std::io::Result<()> {
+    if to.symlink_metadata().is_ok_and(|m| m.is_dir()) {
+        std::fs::remove_dir_all(to)?;
+    }
+    let _ = std::fs::remove_file(new);
+    let mut options = std::fs::OpenOptions::new();
+    options.write(true).create_new(true).mode(0o600);
+    options.custom_flags(rustix::fs::OFlags::NOFOLLOW.bits() as i32);
+    options.open(new)?.write_all(text)?;
+    std::fs::rename(new, to)
+}
 /// A path as UTF-8, U+FFFD in place of a byte sequence that is not (R40).
 fn shown(p: &Path) -> String {
     String::from_utf8_lossy(p.as_os_str().as_bytes()).into_owned()
@@ -1590,9 +1725,21 @@ impl Run {
             }
             return Ok((limits, env));
         }
+        // The directories of the ref and the reflog are bound over: a branch of one component would
+        // put the unit's own directories over every branch of the clone (R38).
+        if !self.branch.contains('/') {
+            return stop("invalid_input", json!({"field": "branch"}));
+        }
         let (g, admin) = self.git_dirs(s)?;
+        // The commits of an earlier stage reach `<G>` before the run writes the stage's ref (R51).
+        self.import(s)?;
         let text = |p: &Path| p.to_string_lossy().into_owned();
         let (gp, branch) = (Path::new(&g), Path::new(&self.branch));
+        // A relative line of `<G>`'s alternates would be read against the view's `base` (R38).
+        let lines = std::fs::read_to_string(gp.join("objects/info/alternates")).unwrap_or_default();
+        if (lines.lines()).any(|l| !l.is_empty() && !l.starts_with('#') && !l.starts_with('/')) {
+            return stop("worktree_failed", "git directory alternates");
+        }
         let holder = |p: PathBuf| p.parent().map(Path::to_path_buf).unwrap_or(p);
         let refs = holder(gp.join("refs/heads").join(branch));
         let logs = holder(gp.join("logs/refs/heads").join(branch));
@@ -1602,8 +1749,19 @@ impl Run {
             gp.join("refs/tags"),
         ];
         let failed = |what: &str| Halt::Stop("worktree_failed".into(), what.into());
-        for d in [&refs, &logs].into_iter().chain(&targets) {
+        let info = gp.join("objects/info");
+        for d in [&refs, &logs, &info].into_iter().chain(&targets) {
             std::fs::create_dir_all(d).map_err(|_| failed("git directory"))?;
+        }
+        // The unit's own objects, the directories of its ref and its reflog, and the place of the
+        // clone's objects in the view, each a directory of mode 0700 and not a link (R38).
+        let own = [OBJECTS, HEADS, LOGS, BASE].map(|d| self.home.join(d));
+        let own_info = own[0].join("info");
+        for d in own.iter().chain([&own_info]) {
+            made(&dirs, d).map_err(|_| failed("objects"))?;
+            if !real_dir(d) {
+                return stop("worktree_failed", "objects");
+            }
         }
         let remotes = self.home.join("remotes");
         let sources = ["refs", "logs", "tags"].map(|d| remotes.join(d));
@@ -1640,28 +1798,256 @@ impl Run {
             .and_then(|mut f| f.write_all(format!("{}\n", self.base).as_bytes()));
         written.map_err(|_| failed("remotes"))?;
         std::fs::rename(&new, &main).map_err(|_| failed("remotes"))?;
+        // The stage's ref is `<G>`'s value of the branch, which the run also keeps in `written`;
+        // the alternates of the unit's objects name the clone's objects as the view shows them.
+        let reference = format!("refs/heads/{}", self.branch);
+        let value = self.git(
+            s,
+            &self.clone,
+            &["rev-parse", "--verify", "--quiet", &reference],
+        )?;
+        if !hex40(&value) {
+            return stop("worktree_failed", "heads");
+        }
+        let line = format!("{value}\n");
+        let new = self.home.join("heads.new");
+        renamed(&new, &self.heads_file(), line.as_bytes()).map_err(|_| failed("heads"))?;
+        let new = self.home.join("written.new");
+        renamed(&new, &self.home.join(WRITTEN), line.as_bytes()).map_err(|_| failed("heads"))?;
+        let new = self.home.join("alternates.new");
+        let alternates = self.alternates();
+        renamed(&new, &own_info.join("alternates"), alternates.as_bytes())
+            .map_err(|_| failed("objects"))?;
         let wt = Path::new(&self.wt);
         let a = Path::new(&admin);
-        limits["write"] = json!([
-            self.wt,
-            text(&gp.join("objects")),
-            admin,
-            text(&refs),
-            text(&logs)
-        ]);
-        let pairs: Vec<Value> = (sources.iter().zip(&targets))
+        // The clone's objects, ref and reflog of the branch are reached only through the `over`
+        // pairs: the stage writes its own directories, never `<G>` (R38).
+        limits["write"] = json!([self.wt, admin]);
+        let mut pairs: Vec<Value> = (sources.iter().zip(&targets))
             .map(|(from, to)| json!([text(from), text(to)]))
             .collect();
+        pairs.push(json!([text(&own[0]), text(&gp.join("objects"))]));
+        pairs.push(json!([text(&own[1]), text(&refs)]));
+        pairs.push(json!([text(&own[2]), text(&logs)]));
         limits["over"] = json!(pairs);
         let mut read_only = vec![
-            text(&wt.join(".git")),
-            text(&a.join("commondir")),
-            text(&a.join("gitdir")),
-            text(&worktree_config),
+            json!(text(&wt.join(".git"))),
+            json!(text(&a.join("commondir"))),
+            json!(text(&a.join("gitdir"))),
+            json!(text(&worktree_config)),
+            json!([text(&gp.join("objects")), text(&own[3])]),
+            json!([text(&own_info), text(&info)]),
         ];
-        read_only.extend(files.iter().cloned());
+        read_only.extend(files.iter().map(|f| json!(f)));
         limits["read_only"] = json!(read_only);
         Ok((limits, env))
+    }
+    /// The file of the unit's branch in `<directory>/<key>/heads`: its last component (R38).
+    fn heads_file(&self) -> PathBuf {
+        let leaf = self.branch.rsplit('/').next().unwrap_or(&self.branch);
+        self.home.join(HEADS).join(leaf)
+    }
+    /// The bytes of `<directory>/<key>/objects/info/alternates` (R38).
+    fn alternates(&self) -> String {
+        format!("{}\n", self.home.join(BASE).to_string_lossy())
+    }
+    /// A call with no `GIT_` variable: `env -i` with the port's `PATH` alone, then `words` (R51).
+    fn plain(&self, s: &mut impl System, words: &[&str]) -> bool {
+        let env = s.environment();
+        let path = env
+            .iter()
+            .find(|(k, _)| k == "PATH")
+            .map(|(_, v)| v.as_str());
+        let path = format!("PATH={}", path.unwrap_or("/usr/bin:/bin"));
+        let mut argv = vec!["-i", &path];
+        argv.extend(words);
+        let answer = s.call("env", &args(&argv), &Value::Null, 600_000);
+        answer.is_ok_and(|r| r.success)
+    }
+    /// `git` with R39's words in `dir`, with no `GIT_` variable (R51).
+    fn plain_git(&self, s: &mut impl System, dir: &str, words: &[&str]) -> bool {
+        let mut argv = vec!["git", "--no-replace-objects", "-C", dir];
+        argv.extend(GIT_SAFE);
+        argv.extend(words);
+        self.plain(s, &argv)
+    }
+    /// Whether an import is due (R51): the stage's ref differs from what the run wrote, or the unit's
+    /// objects directory holds an entry besides `info` and `info/alternates`.
+    fn import_due(&self) -> bool {
+        let heads = Read::of(&self.heads_file());
+        if !heads.same(&Read::of(&self.home.join(WRITTEN))) {
+            return true;
+        }
+        let objects = self.home.join(OBJECTS);
+        match objects.symlink_metadata() {
+            Err(e) if absent(&e) => return false,
+            Ok(m) if m.is_dir() => {}
+            _ => return true,
+        }
+        let names = |p: &Path| -> Option<Vec<OsString>> {
+            let list = std::fs::read_dir(p).ok()?;
+            list.map(|e| e.ok().map(|e| e.file_name())).collect()
+        };
+        let Some(top) = names(&objects) else {
+            return true;
+        };
+        let info = objects.join("info");
+        let inner = || real_dir(&info).then(|| names(&info)).flatten();
+        top.iter().any(|n| n != "info")
+            || (!top.is_empty() && inner().is_none_or(|i| i.iter().any(|n| n != "alternates")))
+    }
+    /// The import (R51): the stage's commits and objects in the unit's objects directory reach
+    /// `<G>` through a fresh repository of the run and `index-pack --strict` of the clone, then the
+    /// branch moves from what the run wrote to the stage's ref, and the unit's objects go.
+    fn import(&self, s: &mut impl System) -> Step {
+        if !self.import_due() {
+            return Ok(());
+        }
+        let failed = |step: &str| {
+            let detail = json!({"step": step}).to_string();
+            Halt::Stop("objects_import_failed".into(), detail)
+        };
+        let heads = Read::of(&self.heads_file());
+        let written = Read::of(&self.home.join(WRITTEN));
+        let moved = match heads.same(&written) {
+            true => None,
+            false => {
+                let value = heads.commit().ok_or_else(|| failed("heads"))?;
+                Some((value, written.commit().ok_or_else(|| failed("written"))?))
+            }
+        };
+        let g = self.common_dir(s)?;
+        let objects = self.home.join(OBJECTS);
+        let files = match objects.symlink_metadata() {
+            Err(e) if absent(&e) => vec![],
+            _ => match walk_objects(&objects, self.alternates().as_bytes()) {
+                Walked::Clear(files) => files,
+                Walked::Found(found) => return stop("git_dir_link", link_detail(&found)),
+                Walked::Unreadable(_) => return Err(failed("walk")),
+            },
+        };
+        // The fresh repository: the unit's loose objects and packs copied, no link followed.
+        let fresh = self.home.join(IMPORT);
+        match fresh.symlink_metadata() {
+            Ok(m) if m.is_dir() => std::fs::remove_dir_all(&fresh).map_err(|_| failed("copy"))?,
+            Ok(_) => std::fs::remove_file(&fresh).map_err(|_| failed("copy"))?,
+            Err(_) => {}
+        }
+        let at = fresh.to_string_lossy().into_owned();
+        if !self.plain(s, &["git", "init", "--quiet", "--bare", &at]) {
+            return Err(failed("copy"));
+        }
+        let loose = |p: &Path| {
+            let parts: Vec<_> = p
+                .components()
+                .map(|c| c.as_os_str().to_string_lossy())
+                .collect();
+            match parts.as_slice() {
+                [d, f] if d.len() == 2 && f.len() == 38 => hex40(&format!("{d}{f}")),
+                [d, _] => d == "pack",
+                _ => false,
+            }
+        };
+        for (path, below) in files.iter().filter(|(_, b)| loose(b)) {
+            let to = fresh.join("objects").join(below);
+            let copied = (|| -> std::io::Result<()> {
+                let mut options = std::fs::OpenOptions::new();
+                options.read(true);
+                options.custom_flags(rustix::fs::OFlags::NOFOLLOW.bits() as i32);
+                let mut from = options.open(path)?;
+                if !from.metadata()?.is_file() {
+                    return Err(std::io::ErrorKind::InvalidInput.into());
+                }
+                if let Some(parent) = to.parent() {
+                    std::fs::create_dir_all(parent)?;
+                }
+                let mut out = std::fs::File::create_new(&to)?;
+                std::io::copy(&mut from, &mut out).map(|_| ())
+            })();
+            copied.map_err(|_| failed("copy"))?;
+        }
+        // Every object of the fresh repository's own directory, then a pack of those `<G>` lacks.
+        let list = fresh.join("list").to_string_lossy().into_owned();
+        let check = "--batch-check=%(objectname)";
+        let listed = ["cat-file", "--batch-all-objects", check];
+        let script = ["sh", "-c", GIT_FILES, "sh", &at, "/dev/null", &list];
+        if !self.plain(s, &[&script[..], &listed[..]].concat()) {
+            return Err(failed("pack"));
+        }
+        let any = std::fs::metadata(&list).map_err(|_| failed("pack"))?.len() > 0;
+        if any {
+            let alternate = format!("{g}/objects\n");
+            let info = fresh.join("objects/info");
+            let _ = std::fs::create_dir_all(&info);
+            std::fs::write(info.join("alternates"), alternate).map_err(|_| failed("pack"))?;
+            let pack = fresh.join("out.pack").to_string_lossy().into_owned();
+            let script = ["sh", "-c", GIT_FILES, "sh", &at, &list, &pack];
+            let packed = ["pack-objects", "--local", "--stdout", "-q"];
+            if !self.plain(s, &[&script[..], &packed[..]].concat()) {
+                return Err(failed("pack"));
+            }
+            // The pack's header counts its objects: none when `<G>` had them all.
+            let header = std::fs::read(&pack).map_err(|_| failed("pack"))?;
+            let count = header
+                .get(8..12)
+                .map(|c| u32::from_be_bytes([c[0], c[1], c[2], c[3]]));
+            let count = count.ok_or_else(|| failed("pack"))?;
+            let script = ["sh", "-c", GIT_FILES, "sh", &self.clone, &pack, "/dev/null"];
+            let indexed = ["index-pack", "--strict", "--stdin"];
+            if count > 0 && !self.plain(s, &[&script[..], &indexed[..]].concat()) {
+                return Err(failed("index-pack"));
+            }
+        }
+        if let Some((value, since)) = &moved {
+            let clone = self.clone.clone();
+            let proof = ["rev-list", "--objects", "--quiet", value, "--not", since];
+            if !self.plain_git(s, &clone, &proof) {
+                return Err(failed("rev-list"));
+            }
+            if !self.plain_git(s, &clone, &["merge-base", "--is-ancestor", since, value]) {
+                return Err(failed("descent"));
+            }
+            let reference = format!("refs/heads/{}", self.branch);
+            let now = review::git(s, &clone, &["rev-parse", "--verify", "--quiet", &reference]);
+            if now.map(|n| n.trim().to_owned()).as_deref().ok() != Some(value.as_str()) {
+                self.no_links(&g, None)?;
+                let words = [
+                    "update-ref",
+                    "-m",
+                    "ap unit run: import",
+                    &reference,
+                    value,
+                    since,
+                ];
+                if !self.plain_git(s, &clone, &words) {
+                    return Err(failed("update-ref"));
+                }
+            }
+            let new = self.home.join("written.new");
+            let to = self.home.join(WRITTEN);
+            renamed(&new, &to, format!("{value}\n").as_bytes()).map_err(|_| failed("written"))?;
+        }
+        // Every loose object and pack of the unit's objects goes, `info/alternates` stays.
+        for (path, below) in &files {
+            if below != Path::new("info/alternates") {
+                std::fs::remove_file(path).map_err(|_| failed("unlink"))?;
+            }
+        }
+        let mut dirs: Vec<PathBuf> = std::fs::read_dir(&objects)
+            .into_iter()
+            .flatten()
+            .flatten()
+            .map(|e| e.path())
+            .filter(|p| p.file_name() != Some(std::ffi::OsStr::new("info")))
+            .collect();
+        dirs.sort();
+        for d in dirs {
+            if real_dir(&d) {
+                std::fs::remove_dir_all(&d).map_err(|_| failed("unlink"))?;
+            }
+        }
+        let _ = std::fs::remove_dir_all(&fresh);
+        Ok(())
     }
     fn page(&mut self, s: &mut impl System, role: Role) -> Step<String> {
         let u = self.u.clone();
@@ -1707,6 +2093,8 @@ impl Run {
         let (rec, _) = crate::run::execute(s, &req).map_err(refused)?;
         let admitted = json!({"stage": n, "role": role, "credential": credential});
         self.done.credentials.push(admitted);
+        // The stage's commits reach `<G>` before anything reads the branch (R51).
+        self.import(s)?;
         if role == "fixer" {
             self.done.fixer_answer = Some(out.clone());
         }
@@ -2427,6 +2815,10 @@ impl Run {
     }
     /// The loop: each pass reads, then takes the first step that applies (R8 to R21, R26 to R30).
     fn drive(&mut self, s: &mut impl System) -> Step<Outcome> {
+        // What a stage of a cut call left in the unit's objects reaches `<G>` first (R51).
+        if self.u["state"] == "running" {
+            self.import(s)?;
+        }
         loop {
             if self.u["state"] == "accepted" {
                 match self.land(s)? {
@@ -2891,8 +3283,17 @@ impl Run {
             c["pull_request_open"] = json!(n);
         }
         // The stages' scratch directories and the remote-tracking refs of their views: only a
-        // directory that is not a link, and no link inside it followed (R32).
-        for d in ["scratch", "remotes"].map(|d| self.home.join(d)) {
+        // directory that is not a link, and no link inside it followed (R32); the unit's objects,
+        // heads, logs and base only after the worktree went (or was never made), with no import.
+        let gone = matches!(c["worktree"].as_str(), Some("removed" | "nothing"));
+        let own = [OBJECTS, HEADS, LOGS, BASE, IMPORT]
+            .into_iter()
+            .filter(|_| gone);
+        for d in ["scratch", "remotes"]
+            .into_iter()
+            .chain(own)
+            .map(|d| self.home.join(d))
+        {
             if real_dir(&d) {
                 let _ = std::fs::remove_dir_all(&d);
             }

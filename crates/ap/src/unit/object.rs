@@ -375,6 +375,12 @@ pub fn branch_ok(b: &str) -> bool {
         && b.split('/')
             .all(|c| !c.is_empty() && !c.starts_with('.') && !c.ends_with(".lock"))
 }
+/// A branch `add` and `amend` take (R10): one `branch_ok` takes, of at least two components, since
+/// `ap unit run` binds the unit's own directory over the one that holds the branch's ref
+/// (`specs/ap/unit-run.md` R38).
+fn new_branch_ok(b: &str) -> bool {
+    branch_ok(b) && b.contains('/')
+}
 /// The patterns of a stored or requested `write_set`: its entries that are strings, in order (the
 /// store types the property as an array of strings; another entry is skipped, as `outside` skips it).
 fn patterns(list: Option<&Value>) -> Vec<&str> {
@@ -950,7 +956,7 @@ fn page_parameters(b: &mut Breaks, r: &Value, op: &str, key: &str) -> (Value, De
     };
     for (k, ok, bound) in [
         ("repository", repository_ok as fn(&str) -> bool, 200),
-        ("branch", branch_ok, BRANCH_BYTES),
+        ("branch", new_branch_ok, BRANCH_BYTES),
     ] {
         if let Some(f) = form(k, ok) {
             b.text::<()>(Err(f), r.get(k), bound);

@@ -299,7 +299,9 @@ struct Limits {
     home: String,
     write: Vec<String>,
     over: Vec<(String, String)>,
-    read_only: Vec<String>,
+    /// Each `read_only` entry as a pair: a path `p` is `(p, p)`, a pair binds its source at its
+    /// target (R1, R5).
+    read_only: Vec<(String, String)>,
     show: bool,
     /// `over`, `read_only` and `show` as the request gave them, for the record (R7).
     given: serde_json::Map<String, Value>,
@@ -324,7 +326,7 @@ impl Limits {
             .into_iter()
             .chain(self.write.iter().cloned())
             .chain(targets)
-            .chain(self.read_only.iter().cloned())
+            .chain(self.read_only.iter().map(|(_, t)| t.clone()))
             .collect()
     }
     /// The `bwrap` words of the paths the request names, after the scratch directory: `write`,
@@ -337,8 +339,8 @@ impl Limits {
         for (source, target) in &self.over {
             words.extend(args(&["--bind", source, target]));
         }
-        for p in &self.read_only {
-            words.extend(args(&["--ro-bind", p, p]));
+        for (source, target) in &self.read_only {
+            words.extend(args(&["--ro-bind", source, target]));
         }
         words
     }
@@ -360,7 +362,9 @@ impl Limits {
             .over
             .iter()
             .flat_map(|(a, b)| [(a.as_str(), false), (b.as_str(), false)]);
-        let read_only = self.read_only.iter().map(|p| (p.as_str(), true));
+        // Both members of a pair; a path is its own pair (R11).
+        let read_only =
+            (self.read_only.iter()).flat_map(|(a, b)| [(a.as_str(), true), (b.as_str(), true)]);
         write.chain(over).chain(read_only)
     }
 }
@@ -804,19 +808,39 @@ fn scratch(
     require!(o.keys().all(|k| known.contains(&k.as_str())) => "invalid_input", "limits");
     let p = path(v, "scratch").map_err(|_| bad())?;
     let write = listed_paths(o, "write", 8).ok_or_else(bad)?;
-    let read_only = listed_paths(o, "read_only", 8).ok_or_else(bad)?;
+    let pair = |p: &Value| {
+        let p = p.as_array().filter(|p| p.len() == 2)?;
+        Some((listed(&p[0])?, listed(&p[1])?))
+    };
+    // A `read_only` entry is a path, its own pair, or a pair that binds its source at its target.
+    let read_only = match o.get("read_only") {
+        None => vec![],
+        Some(v) => {
+            let list = v.as_array().filter(|a| (1..=8).contains(&a.len()));
+            let entry = |e: &Value| match e {
+                Value::Array(_) => pair(e).map(|(a, b)| (a, b, true)),
+                _ => listed(e).map(|p| (p.clone(), p, false)),
+            };
+            let entries = list.and_then(|l| l.iter().map(entry).collect::<Option<Vec<_>>>());
+            entries.ok_or_else(bad)?
+        }
+    };
     let over = match o.get("over") {
         None => vec![],
         Some(v) => {
-            let list = v.as_array().filter(|a| (1..=4).contains(&a.len()));
-            let pair = |p: &Value| {
-                let p = p.as_array().filter(|p| p.len() == 2)?;
-                Some((listed(&p[0])?, listed(&p[1])?))
-            };
+            let list = v.as_array().filter(|a| (1..=6).contains(&a.len()));
             let pairs = list.and_then(|l| l.iter().map(pair).collect::<Option<Vec<_>>>());
             pairs.ok_or_else(bad)?
         }
     };
+    // The members of the `read_only` pairs, which R1's checks of the hidden list and of the
+    // accounts take as they take an `over` pair's.
+    let paired: Vec<String> = (read_only.iter())
+        .filter(|(_, _, pair)| *pair)
+        .flat_map(|(a, b, _)| [a.clone(), b.clone()])
+        .collect();
+    let read_only: Vec<(String, String)> =
+        (read_only.into_iter()).map(|(a, b, _)| (a, b)).collect();
     let show = match o.get("show") {
         None => false,
         Some(v) => {
@@ -845,7 +869,7 @@ fn scratch(
     // the stage works in or names may lie in one.
     let in_account = ([cwd].into_iter())
         .chain(writes.iter().copied())
-        .chain(read_only.iter().map(String::as_str))
+        .chain(read_only.iter().flat_map(|(a, b)| [a.as_str(), b.as_str()]))
         .any(|p| accounts.iter().any(|a| Path::new(p).starts_with(a)));
     let roles = ["reviewer", "implementer", "fixer", "writer"];
     // A writer's `limits` names no path but its scratch directory (`specs/ap/run.md` R53).
@@ -860,6 +884,7 @@ fn scratch(
     let hidden = (accounts.iter().map(String::as_str))
         .chain([cwd, p.as_str()])
         .chain(writes.iter().copied())
+        .chain(paired.iter().map(String::as_str))
         .any(|a| in_hidden(a, &home, &root));
     require!(!hidden => "invalid_input", "limits");
     let mut given = serde_json::Map::new();
@@ -1386,7 +1411,8 @@ fn request_at(
         let regular =
             |p: &String| std::fs::metadata(p).is_ok_and(|m| m.is_file() && m.len() <= 1 << 20);
         let fits = limits.as_ref().is_some_and(|l| {
-            l.write.is_empty() && l.over.is_empty() && !l.show && l.read_only.iter().all(regular)
+            let paths = l.read_only.iter().all(|(a, b)| a == b && regular(a));
+            l.write.is_empty() && l.over.is_empty() && !l.show && paths
         });
         require!(runtime == Runtime::Claude && role == "reviewer" && actor_role == "verifier"
             && fits && resume.is_none() && mcp.is_empty() && expect_file.is_none()
@@ -3220,7 +3246,19 @@ fn door_stage(q: &Request) -> crate::door::Stage {
         run: record_path(&q.out),
         cwd: q.cwd.clone(),
         store: q.store.clone(),
+        objects: q.limits.as_ref().and_then(unit_objects),
     }
+}
+/// The unit's objects directory of an author's `limits` and the path its `info/alternates` names
+/// (`specs/ap/door.md` R9): the source of the `over` pair whose target is the source of a
+/// `read_only` pair, and that pair's target.
+fn unit_objects(l: &Limits) -> Option<(String, String)> {
+    (l.read_only.iter())
+        .filter(|(source, target)| source != target)
+        .find_map(|(source, target)| {
+            let over = l.over.iter().find(|(_, t)| t == source)?;
+            Some((over.0.clone(), target.clone()))
+        })
 }
 /// What the launches of a call here need (`specs/ap/run-limits.md` R4, R13, R17): the scratch
 /// directory (removed by the call whose `mkdir` made it, after its last launch, R8), the door and the

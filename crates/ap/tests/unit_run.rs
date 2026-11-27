@@ -1190,9 +1190,10 @@ impl F {
         let opened = self.t.join("bin/pr-open").exists() && head.is_some();
         match (a[0].as_str(), a[1].as_str()) {
             ("pr", "list") => {
+                let branch = self.unit()["branch"].as_str().map(str::to_owned);
+                let branch = branch.unwrap_or_else(|| format!("unit/{KEY}"));
                 assert!(
-                    a.windows(2)
-                        .any(|w| w[0] == "--head" && w[1] == format!("unit/{KEY}")),
+                    a.windows(2).any(|w| w[0] == "--head" && w[1] == branch),
                     "{a:?}"
                 );
                 let mut list = vec![];
@@ -4542,33 +4543,34 @@ impl F {
         if author {
             let pairs = [
                 (wt.clone(), wt.clone()),
-                (g.join("objects"), g.join("objects")),
                 (admin.clone(), admin.clone()),
-                (g.join("refs/heads/unit"), g.join("refs/heads/unit")),
-                (
-                    g.join("logs/refs/heads/unit"),
-                    g.join("logs/refs/heads/unit"),
-                ),
                 (home.join("remotes/refs"), g.join("refs/remotes/origin")),
                 (
                     home.join("remotes/logs"),
                     g.join("logs/refs/remotes/origin"),
                 ),
                 (home.join("remotes/tags"), g.join("refs/tags")),
+                (home.join("objects"), g.join("objects")),
+                (home.join("heads"), g.join("refs/heads/unit")),
+                (home.join("logs"), g.join("logs/refs/heads/unit")),
             ];
             for (from, to) in pairs {
                 words.extend(["--bind".to_owned(), text(&from), text(&to)]);
             }
-            read_only.extend([
+            for p in [
                 wt.join(".git"),
                 admin.join("commondir"),
                 admin.join("gitdir"),
                 admin.join("config.worktree"),
-            ]);
+            ] {
+                read_only.push((p.clone(), p));
+            }
+            read_only.push((g.join("objects"), home.join("base")));
+            read_only.push((home.join("objects/info"), g.join("objects/info")));
         }
-        read_only.extend(files.iter().cloned());
-        for p in read_only {
-            words.extend(["--ro-bind".to_owned(), text(&p), text(&p)]);
+        read_only.extend(files.iter().map(|p| (p.clone(), p.clone())));
+        for (from, to) in read_only {
+            words.extend(["--ro-bind".to_owned(), text(&from), text(&to)]);
         }
         words
     }
@@ -4725,15 +4727,17 @@ fn r38_every_stage_runs_under_limits_and_an_author_writes_its_worktree_and_its_o
         );
         assert_eq!(limits.get("over").is_some(), author, "{role}: {limits}");
         let mut read_only: Vec<Value> = match author {
-            true => [
-                wt.join(".git"),
-                f.git_dirs().1.join("commondir"),
-                f.git_dirs().1.join("gitdir"),
-                f.git_dirs().1.join("config.worktree"),
-            ]
-            .iter()
-            .map(|p| json!(p))
-            .collect(),
+            true => {
+                let (g, admin) = f.git_dirs();
+                vec![
+                    json!(wt.join(".git")),
+                    json!(admin.join("commondir")),
+                    json!(admin.join("gitdir")),
+                    json!(admin.join("config.worktree")),
+                    json!([g.join("objects"), home.join("base")]),
+                    json!([home.join("objects/info"), g.join("objects/info")]),
+                ]
+            }
             false => vec![],
         };
         read_only.extend(files.iter().map(|p| json!(p)));
@@ -4822,8 +4826,9 @@ fn r38_a_fixer_and_a_verifier_read_the_files_their_prompts_name() {
         let tail = &read_only[read_only.len() - files.len()..];
         let want: Vec<Value> = files.iter().map(|p| json!(p)).collect();
         assert_eq!(tail, &want[..], "{i}: {}", records[i]["limits"]);
-        // The fixer's five, a verifier's one or two (`specs/ap/run-limits.md` R1: at most 8).
-        let count = [4, 1, 5, 2][i];
+        // The implementer's six (four paths and the two pairs of R38), the fixer's seven, a
+        // verifier's one or two (`specs/ap/run-limits.md` R1: at most 8).
+        let count = [6, 1, 7, 2][i];
         assert_eq!(read_only.len(), count, "{i}");
         // Each a read-only bind of the stage's launch.
         for p in files {
@@ -6864,4 +6869,346 @@ fn r50_plain_stopped_by_skip_rows_on_a_path_they_cover() {
     f.steps(&["implement", "accept"]);
     let (a, _) = f.ok();
     assert_eq!(a["state"], "accepted", "{a}");
+}
+
+// ---- The unit's own objects, ref and reflog in an author's view, and their import (R38, R51) ---
+
+/// The four directories of the unit's own objects, ref, reflog and view of the clone's objects.
+const OWN: [&str; 4] = ["objects", "heads", "logs", "base"];
+/// `git` in `dir` with the tests' configuration and no other variable: whether it succeeded.
+fn git_ok(dir: &Path, words: &[&str]) -> bool {
+    let out = forks::forking(|| {
+        Command::new("git")
+            .arg("-C")
+            .arg(dir)
+            .args(words)
+            .env_clear()
+            .env("PATH", std::env::var("PATH").unwrap_or_default())
+            .env("GIT_CONFIG_NOSYSTEM", "1")
+            .env("GIT_CONFIG_GLOBAL", "/dev/null")
+            .output()
+    })
+    .unwrap();
+    out.status.success()
+}
+/// `git` in the worktree as an author's view runs it: its objects in the unit's own directory, the
+/// clone's objects its alternate (R38).
+fn in_view(f: &F, words: &[&str]) -> String {
+    let (g, _) = f.git_dirs();
+    let out = forks::forking(|| {
+        Command::new("git")
+            .arg("-C")
+            .arg(f.wt())
+            .args(words)
+            .env("GIT_OBJECT_DIRECTORY", f.home().join("objects"))
+            .env("GIT_ALTERNATE_OBJECT_DIRECTORIES", g.join("objects"))
+            .env("GIT_AUTHOR_NAME", "Invented")
+            .env("GIT_AUTHOR_EMAIL", "invented@example.invalid")
+            .env("GIT_COMMITTER_NAME", "Invented")
+            .env("GIT_COMMITTER_EMAIL", "invented@example.invalid")
+            .env("GIT_CONFIG_NOSYSTEM", "1")
+            .env("GIT_CONFIG_GLOBAL", "/dev/null")
+            .output()
+    })
+    .unwrap();
+    assert!(out.status.success(), "git {words:?}: {out:?}");
+    String::from_utf8(out.stdout).unwrap().trim().to_owned()
+}
+/// The names of the entries of a directory, sorted.
+fn names(p: &Path) -> Vec<String> {
+    let mut n: Vec<String> = std::fs::read_dir(p)
+        .unwrap()
+        .map(|e| e.unwrap().file_name().to_string_lossy().into_owned())
+        .collect();
+    n.sort();
+    n
+}
+
+// spec: specs/ap/unit-run.md#R38
+// spec: specs/ap/unit-run.md#R51
+#[test]
+fn objects_own_directory() {
+    let mut f = F::new();
+    f.set_unit(json!({"class": "contract"}));
+    f.steps(&["viewimplement", "accept"]);
+    let (a, _) = f.ok();
+    assert_eq!(
+        (a["state"].as_str(), a["waits_for"].as_str()),
+        (Some("accepted"), Some("approve")),
+        "{a}"
+    );
+    let home = f.home();
+    let (g, _) = f.git_dirs();
+    // The record of the author: its objects, ref and reflog through `over` alone, the clone's
+    // objects read-only at `base`, its alternates read-only.
+    let limits = f.record("1.implementer.md.run.json")["limits"].clone();
+    let over = limits["over"].as_array().unwrap();
+    assert_eq!(over.len(), 6, "{limits}");
+    assert_eq!(
+        over[3..],
+        [
+            json!([home.join("objects"), g.join("objects")]),
+            json!([home.join("heads"), g.join("refs/heads/unit")]),
+            json!([home.join("logs"), g.join("logs/refs/heads/unit")]),
+        ]
+    );
+    let read_only = limits["read_only"].as_array().unwrap();
+    assert_eq!(
+        read_only[4..6],
+        [
+            json!([g.join("objects"), home.join("base")]),
+            json!([home.join("objects/info"), g.join("objects/info")]),
+        ],
+        "{limits}"
+    );
+    let writable: Vec<&str> = (limits["writable"].as_array().unwrap().iter())
+        .map(|w| w.as_str().unwrap())
+        .collect();
+    for p in ["objects", "refs/heads/unit", "logs/refs/heads/unit"] {
+        let p = g.join(p);
+        let count = writable.iter().filter(|w| Path::new(w) == p).count();
+        assert_eq!(count, 1, "{p:?}: {writable:?}");
+    }
+    // The stage's environment gains no `GIT_` variable (the repositories its tests make are their
+    // own): its `GIT_` variables are the author's identity of `git_author` alone.
+    let git_vars: BTreeSet<&str> = (f.launch_envs[0].iter())
+        .map(|(k, _)| k.as_str())
+        .filter(|k| k.starts_with("GIT_"))
+        .collect();
+    let identity = [
+        "GIT_AUTHOR_EMAIL",
+        "GIT_AUTHOR_NAME",
+        "GIT_COMMITTER_EMAIL",
+        "GIT_COMMITTER_NAME",
+    ];
+    assert_eq!(git_vars, identity.into(), "{:?}", f.launch_envs[0]);
+    // The four directories, made by the run, mode 0700, and the run's alternates.
+    for d in OWN {
+        let m = std::fs::symlink_metadata(home.join(d)).unwrap();
+        assert!(m.is_dir(), "{d}");
+        assert_eq!(mode(&home.join(d)), 0o700, "{d}");
+    }
+    assert_eq!(
+        std::fs::read_to_string(home.join("objects/info/alternates")).unwrap(),
+        format!("{}\n", home.join("base").display())
+    );
+    // The stage's commit reached the clone and its branch; the unit's objects hold only the
+    // run's alternates, and the stage's ref and the run's `written` name the commit.
+    let head = f.origin_head().unwrap();
+    let clone = f.t.join("clone");
+    assert_eq!(
+        git(&clone, &["rev-parse", &format!("refs/heads/unit/{KEY}")]),
+        head
+    );
+    assert!(git_ok(
+        &clone,
+        &["cat-file", "-e", &format!("{head}^{{tree}}")]
+    ));
+    assert_eq!(names(&home.join("objects")), ["info"]);
+    assert_eq!(names(&home.join("objects/info")), ["alternates"]);
+    for file in [format!("heads/{KEY}"), "written".to_owned()] {
+        assert_eq!(
+            std::fs::read_to_string(home.join(&file)).unwrap(),
+            format!("{head}\n"),
+            "{file}"
+        );
+    }
+    // The import's proof ran with no `GIT_` variable, then the branch moved from what the run wrote.
+    let proofs: Vec<&Vec<String>> = (f.calls.iter())
+        .filter(|c| c.0 == "env" && c.1.iter().any(|a| a == "rev-list"))
+        .map(|c| &c.1)
+        .collect();
+    assert_eq!(proofs.len(), 1, "{proofs:?}");
+    assert!(proofs[0][0] == "-i" && proofs[0][1].starts_with("PATH=") && proofs[0][2] == "git");
+    assert_eq!(calls_with(&f, 0, "update-ref"), 1);
+    // A branch of one component stops the unit before any launch: the directory of its ref would
+    // be the clone's `refs/heads`.
+    let mut f = F::new();
+    f.set_unit(json!({"branch": "widgets"}));
+    f.steps(&["implement"]);
+    let a = f.stopped("invalid_input");
+    assert_eq!(a["stop_detail"], json!({"field": "branch"}).to_string());
+    assert_eq!(f.launches, 0);
+}
+
+// spec: specs/ap/unit-run.md#R51
+// spec: specs/ap/unit-run.md#R32
+#[test]
+fn objects_clone_stays_whole() {
+    // An author's commit made as its view makes it, in a clone where another unit has its worktree.
+    let mut f = F::new();
+    f.set_unit(json!({"class": "contract"}));
+    let clone = f.t.join("clone");
+    let other = f.t.join("other");
+    let other_text = other.to_str().unwrap().to_owned();
+    git(
+        &clone,
+        &[
+            "worktree",
+            "add",
+            "--quiet",
+            "-b",
+            "unit/other",
+            &other_text,
+            "origin/main",
+        ],
+    );
+    f.steps(&["viewimplement", "accept"]);
+    let (a, _) = f.ok();
+    assert_eq!(a["state"], "accepted", "{a}");
+    let head = f.origin_head().unwrap();
+    assert_eq!(
+        git(&clone, &["rev-parse", &format!("refs/heads/unit/{KEY}")]),
+        head
+    );
+    assert!(git_ok(&clone, &["fsck", "--no-progress", "--no-dangling"]));
+    // The other unit's fetch and its commit, the fetch of `ap unit ready`, and a gc of the clone.
+    f.push_from_elsewhere("main", "src/main-moved.rs");
+    assert!(git_ok(&clone, &["fetch", "--quiet", "origin", "main"]));
+    git(&other, &["merge", "--quiet", "--ff-only", "origin/main"]);
+    std::fs::write(other.join("other.rs"), "other\n").unwrap();
+    git(&other, &["add", "-A"]);
+    git(&other, &["commit", "--quiet", "-m", "other unit"]);
+    assert!(git_ok(&clone, &["fetch", "--quiet", "origin", "main"]));
+    assert!(git_ok(&clone, &["gc", "--quiet"]));
+    assert!(git_ok(&clone, &["fsck", "--no-progress", "--no-dangling"]));
+    // R32 after the commit: the dropped unit's worktree goes, then its four directories, no import.
+    let calls = f.calls.len();
+    f.set_unit(json!({"state": "dropped"}));
+    let (a, _) = f.ok();
+    assert_eq!(a["cleanup"]["worktree"], "removed", "{a}");
+    for d in OWN {
+        assert!(!f.home().join(d).exists(), "{d}");
+    }
+    assert_eq!(calls_with(&f, calls, "index-pack"), 0);
+    assert!(git_ok(&clone, &["gc", "--quiet"]));
+    assert!(git_ok(&clone, &["fsck", "--no-progress", "--no-dangling"]));
+
+    // A stage that only staged a file and was cut before the import: its blob is in the unit's
+    // objects alone, so a gc of the clone fails, until the next call imports it before its stage.
+    let mut f = F::new();
+    f.steps(&["nopr", "probe"]);
+    f.stopped("no_pull_request");
+    let clone = f.t.join("clone");
+    let wt = f.wt();
+    std::fs::create_dir_all(wt.join("src")).unwrap();
+    std::fs::write(wt.join("src/staged.rs"), "staged by a cut stage\n").unwrap();
+    in_view(&f, &["add", "-A"]);
+    let blob = git(&wt, &["rev-parse", ":src/staged.rs"]);
+    assert!(!git_ok(&clone, &["cat-file", "-e", &blob]));
+    assert!(!git_ok(&clone, &["gc", "--quiet"]));
+    std::fs::write(f.t.join("bin/probe"), &blob).unwrap();
+    f.stopped("no_pull_request");
+    assert_eq!(
+        std::fs::read_to_string(f.t.join("bin/probe.2")).unwrap(),
+        "present\n"
+    );
+    assert!(git_ok(&clone, &["gc", "--quiet"]));
+    assert!(git_ok(&clone, &["fsck", "--no-progress", "--no-dangling"]));
+    assert_eq!(names(&f.home().join("objects")), ["info"]);
+}
+
+// spec: specs/ap/unit-run.md#R51
+#[test]
+fn objects_import_refuses() {
+    let mut f = F::new();
+    f.steps(&["nopr"]);
+    f.stopped("no_pull_request");
+    let home = f.home();
+    let (g, _) = f.git_dirs();
+    let clone = f.t.join("clone");
+    let objects = home.join("objects");
+    let heads = home.join(format!("heads/{KEY}"));
+    let written = std::fs::read_to_string(home.join("written")).unwrap();
+    let branch = |f: &F| {
+        git(
+            &f.t.join("clone"),
+            &["rev-parse", &format!("refs/heads/unit/{KEY}")],
+        )
+    };
+    let before = branch(&f);
+    assert_eq!(written, format!("{before}\n"));
+    let launches = f.launches;
+    let step = |a: &Value| detail(a)["step"].as_str().unwrap().to_owned();
+    // A link in the unit's objects: `git_dir_link` naming it, its target untouched.
+    let outside = target(&f, "objects");
+    link_to(&objects.join("ab"), &outside);
+    let a = f.stopped("git_dir_link");
+    assert_eq!(
+        detail(&a)["paths"],
+        json!([text(&objects.join("ab"))]),
+        "{a}"
+    );
+    assert_eq!(std::fs::read_to_string(&outside).unwrap(), "objects kept\n");
+    std::fs::remove_file(objects.join("ab")).unwrap();
+    // Alternates of other bytes, and `info/http-alternates`, beside a stray file that makes the
+    // import due.
+    std::fs::create_dir_all(objects.join("pack")).unwrap();
+    std::fs::write(objects.join("pack/stray"), "stray\n").unwrap();
+    let alternates = objects.join("info/alternates");
+    let ours = std::fs::read(&alternates).unwrap();
+    std::fs::write(&alternates, format!("{}\n", g.join("objects").display())).unwrap();
+    let a = f.stopped("git_dir_link");
+    assert_eq!(detail(&a)["paths"], json!([text(&alternates)]), "{a}");
+    std::fs::write(&alternates, &ours).unwrap();
+    let http = objects.join("info/http-alternates");
+    std::fs::write(&http, "https://example.invalid/objects\n").unwrap();
+    let a = f.stopped("git_dir_link");
+    assert_eq!(detail(&a)["paths"], json!([text(&http)]), "{a}");
+    std::fs::remove_file(&http).unwrap();
+    // The walk's bound: 10,001 entries.
+    let many = objects.join("zz");
+    std::fs::create_dir(&many).unwrap();
+    for i in 0..10_001 {
+        std::fs::write(many.join(format!("{i:038}")), "").unwrap();
+    }
+    let a = f.stopped("objects_import_failed");
+    assert_eq!(step(&a), "walk", "{a}");
+    std::fs::remove_dir_all(&many).unwrap();
+    // A stage's ref of another form.
+    std::fs::write(&heads, "not a commit\n").unwrap();
+    let a = f.stopped("objects_import_failed");
+    assert_eq!(step(&a), "heads", "{a}");
+    std::fs::write(&heads, &written).unwrap();
+    // An odd `.gitmodules` committed in the view: `index-pack --strict` refuses the pack.
+    let wt = f.wt();
+    std::fs::write(
+        wt.join(".gitmodules"),
+        "[submodule \"x\"]\n\tpath = x\n\turl = --upload-pack=invented\n",
+    )
+    .unwrap();
+    in_view(&f, &["add", ".gitmodules"]);
+    let tree = in_view(&f, &["write-tree"]);
+    let odd = in_view(&f, &["commit-tree", &tree, "-p", &before, "-m", "odd"]);
+    std::fs::write(&heads, format!("{odd}\n")).unwrap();
+    let a = f.stopped("objects_import_failed");
+    assert_eq!(step(&a), "index-pack", "{a}");
+    assert_eq!(branch(&f), before);
+    // What the odd commit left goes: the ref, the index, the file, the unit's objects.
+    std::fs::write(&heads, &written).unwrap();
+    std::fs::remove_file(wt.join(".gitmodules")).unwrap();
+    git(&wt, &["reset", "--quiet"]);
+    for e in names(&objects).into_iter().filter(|n| n != "info") {
+        std::fs::remove_dir_all(objects.join(e)).unwrap();
+    }
+    // A commit that does not descend from what the run wrote stops every call that goes on to a
+    // pass, the branch unmoved; a drop removes the four directories with no import.
+    let empty = git(&clone, &["hash-object", "-t", "tree", "-w", "/dev/null"]);
+    let root = git(&clone, &["commit-tree", &empty, "-m", "an invented root"]);
+    std::fs::write(&heads, format!("{root}\n")).unwrap();
+    for _ in 0..2 {
+        let a = f.stopped("objects_import_failed");
+        assert_eq!(step(&a), "descent", "{a}");
+        assert_eq!(branch(&f), before);
+    }
+    assert_eq!(f.launches, launches, "no stage started");
+    let calls = f.calls.len();
+    f.set_unit(json!({"state": "dropped"}));
+    let (a, _) = f.ok();
+    assert_eq!(a["cleanup"]["worktree"], "removed", "{a}");
+    for d in OWN {
+        assert!(!home.join(d).exists(), "{d}");
+    }
+    assert_eq!(calls_with(&f, calls, "rev-list"), 0);
+    assert_eq!(calls_with(&f, calls, "update-ref"), 0);
 }

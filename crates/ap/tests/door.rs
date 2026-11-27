@@ -2201,3 +2201,128 @@ fn r10_ap_hook_refuses_before_any_connection_and_says_no_door() {
     );
     server.join().unwrap();
 }
+
+/// The host hook of the unit's objects: it reads the staged file `staged.txt` from the index Git
+/// is committing, a blob only the unit's objects directory holds, and refuses when it cannot.
+const OBJECTS_HOOK: &str = r#"#!/bin/sh
+d=@D@
+n=$(( $(cat "$d/hook.count" 2>/dev/null || echo 0) + 1 )); echo "$n" > "$d/hook.count"
+env | sort > "$d/hook.env.$n"
+git cat-file -p :staged.txt > "$d/hook.read.$n" 2>/dev/null || { echo 'fake_unread: the staged blob' >&2; exit 1; }
+exit 0
+"#;
+/// The stage's commit as an author's view makes it (`specs/ap/unit-run.md` R38): its objects in
+/// the unit's own directory `@U@`, the clone's objects `@O@` its alternate.
+const UNIT_COMMIT: &str = r#"export GIT_OBJECT_DIRECTORY=@U@ GIT_ALTERNATE_OBJECT_DIRECTORIES=@O@
+echo unit-only > staged.txt; git add staged.txt; git commit -q -m staged; echo $? > @D@/rc.1
+exit 0
+"#;
+impl Fake {
+    /// The unit's objects directory `<t>/uobj` with the run's alternates naming `<t>/base`, and an
+    /// implementer's request in the worktree whose `limits` name them as `ap unit run` does.
+    fn unit_objects(&self) -> Value {
+        fs::create_dir_all(self.t.join("uobj/info")).unwrap();
+        fs::create_dir_all(self.t.join("base")).unwrap();
+        write(
+            &self.t.join("uobj/info/alternates"),
+            &format!("{}\n", self.s("base")),
+            0o600,
+        );
+        let g = self.s("repo/.git/objects");
+        let mut r = self.request("implementer");
+        r["cwd"] = json!(self.s("wt"));
+        r["limits"]["over"] = json!([[self.s("uobj"), g]]);
+        r["limits"]["read_only"] = json!([
+            [g, self.s("base")],
+            [self.s("uobj/info"), format!("{g}/info")]
+        ]);
+        r
+    }
+}
+
+// spec: specs/ap/door.md#R9
+#[test]
+fn hook_reads_unit_objects() {
+    if on_pc() {
+        return;
+    }
+    let f = Fake::new();
+    let body = OBJECTS_HOOK.replace("@D@", f.t.to_str().unwrap());
+    let f = f.with_hook(&body, 0o755);
+    f.worktree();
+    f.then(
+        &UNIT_COMMIT
+            .replace("@D@", f.t.to_str().unwrap())
+            .replace("@U@", &f.s("uobj"))
+            .replace("@O@", &f.s("repo/.git/objects")),
+    );
+    let r = f.unit_objects();
+    let (f, result) = f.run(r);
+    let (v, status) = result.unwrap();
+    assert_eq!((status, &v["state"]), (0, &json!("ok")), "{v}");
+    // The hook read the blob the stage staged in its own objects, through the variable the door
+    // gave it; the commit passed.
+    assert_eq!(f.text("rc.1").trim(), "0", "{}", f.text("bin/then.err"));
+    assert_eq!(f.text("hook.read.1"), "unit-only\n");
+    let env = f.text("hook.env.1");
+    let alternate = format!("GIT_ALTERNATE_OBJECT_DIRECTORIES={}", f.s("uobj"));
+    assert!(env.lines().any(|l| l == alternate), "{env}");
+    assert!(
+        !env.lines().any(|l| l.starts_with("GIT_OBJECT_DIRECTORY=")),
+        "{env}"
+    );
+    // The record keeps the pairs as the request gave them.
+    let g = f.s("repo/.git/objects");
+    assert_eq!(
+        v["limits"]["read_only"],
+        json!([[g, f.s("base")], [f.s("uobj/info"), format!("{g}/info")]])
+    );
+    assert_eq!(
+        hook_lines(&f.lines("door.jsonl")),
+        [(json!(0), Value::Null)]
+    );
+    // While the unit's objects directory holds alternates of other bytes, `info/http-alternates`,
+    // a link or an entry of another kind, the door refuses the hook and runs nothing.
+    /// A name and what it does to the unit's objects directory.
+    type Tamper = (&'static str, fn(&Path));
+    let tampers: [Tamper; 4] = [
+        ("alternates", |u| {
+            write(&u.join("info/alternates"), "/elsewhere\n", 0o600)
+        }),
+        ("http-alternates", |u| {
+            write(
+                &u.join("info/http-alternates"),
+                "https://example.invalid/\n",
+                0o600,
+            )
+        }),
+        ("link", |u| {
+            std::os::unix::fs::symlink("/etc", u.join("ab")).unwrap()
+        }),
+        ("fifo", |u| {
+            let made = forks::forking(|| Command::new("mkfifo").arg(u.join("fifo")).status());
+            assert!(made.unwrap().success());
+        }),
+    ];
+    for (name, tamper) in tampers {
+        let f = Fake::new();
+        let body = OBJECTS_HOOK.replace("@D@", f.t.to_str().unwrap());
+        let f = f.with_hook(&body, 0o755);
+        f.worktree();
+        let mut r = f.unit_objects();
+        r["cwd"] = json!(f.s("wt"));
+        let (door, wt, u) = (f.door(), f.s("wt"), f.t.join("uobj"));
+        let running = f.start(r, true);
+        tamper(&u);
+        let refused_now = ask(&door, &hook_request(&wt, "index")).2;
+        let (f, result) = running.finish();
+        assert_eq!(result.unwrap().1, 0, "{name}");
+        assert_eq!(refused_now, refused("not_admitted", "objects"), "{name}");
+        assert!(!f.t.join("hook.count").exists(), "{name}");
+        assert_eq!(
+            hook_lines(&f.lines("door.jsonl")),
+            [(Value::Null, json!("not_admitted"))],
+            "{name}"
+        );
+    }
+}

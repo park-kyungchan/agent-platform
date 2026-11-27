@@ -18,8 +18,9 @@
 # account's CLAUDE.md, each read-only; the account's sign-in and settings are unchanged after it, no
 # derived `*.sign-in` is left, and a resume whose home holds a link at `.credentials.json` launches
 # nothing and creates nothing at the link's target; an implementer whose `limits` name a
-# `write` directory, an `over` pair, a `read_only` file and `show` writes that directory and, through
-# the target, the source, but neither its cwd nor the `read_only` file; a stage with `limits` sees
+# `write` directory, an `over` pair, a `read_only` file, a `read_only` pair and `show` writes that
+# directory and, through the target, the source, but neither its cwd, the `read_only` file nor the
+# pair's target, which shows the pair's source; a stage with `limits` sees
 # only its view (specs/ap/run-limits.md R16): no key, login, store, socket of the host or other
 # account, its uid map not the host's, no capability, no user namespace of its own, and its `ap check`
 # reads its policy and asks the door; a reviewer stage with `limits` has `lo` alone in a network
@@ -90,7 +91,7 @@ elif [ "$(cat "$here/mode")" = named ]; then
   w() { if e=$( (: > "$1") 2>&1 ); then echo "$2 written"; else echo "$2 refused (${e##*: })"; fi; }
   c() { if e=$("$@" 2>&1); then echo "written"; else echo "refused (${e##*: })"; fi; }
   top=${here%/bin}
-  said="$(w "$top/wdir/x" write); $(w "$top/dst/y" over); $(w "$top/wdir/keep" keep); keep removal $(c rm -f "$top/wdir/keep"); keep rename $(c mv "$top/wdir/keep" "$top/wdir/moved"); $(w "$PWD/n" cwd); $(w "/proc/1/root$PWD/m" root)"
+  said="$(w "$top/wdir/x" write); $(w "$top/dst/y" over); $(w "$top/wdir/keep" keep); keep removal $(c rm -f "$top/wdir/keep"); keep rename $(c mv "$top/wdir/keep" "$top/wdir/moved"); $(w "$PWD/n" cwd); $(w "/proc/1/root$PWD/m" root); $(w "$top/pdst/z" pair); pair shows $(cat "$top/pdst/seen" 2>&1)"
   printf '{"type":"result","subtype":"success","is_error":false,"num_turns":1,"result":"%s","session_id":"%s","usage":{"input_tokens":1,"output_tokens":1},"permission_denials":[]}\n' "$said" "$sid"
   exit 0
 elif [ "$(cat "$here/mode")" = egress ]; then
@@ -304,20 +305,21 @@ sys.exit(r.get("home") != t+"/acctB/homes/"+r["session"] or r["limits"]["writabl
     && ok "limits: a resume whose home holds a link at .credentials.json launched nothing, and nothing was made at its target" \
     || bad "limits: link in the home: rc=$rc $(field "$t/k2.md.run.json" state) $(field "$t/k2.md.run.json" unmet) $(ls -d "$t/no-such-file" 2> /dev/null)"
   # An implementer with the four members of limits (specs/ap/run-limits.md R1, R5, R7, R11).
-  mkdir -p "$t/wdir" "$t/src" "$t/dst"; echo kept > "$t/wdir/keep"; echo named > "$t/bin/mode"
-  req n.md ",\"limits\":{\"scratch\":\"$t/scratch2\",\"write\":[\"$t/wdir\"],\"over\":[[\"$t/src\",\"$t/dst\"]],\"read_only\":[\"$t/wdir/keep\",\"$t/bin\"],\"show\":[\"~/.config/gh\"]}" \
+  mkdir -p "$t/wdir" "$t/src" "$t/dst" "$t/psrc" "$t/pdst"; echo kept > "$t/wdir/keep"; echo seen > "$t/psrc/seen"; echo named > "$t/bin/mode"
+  req n.md ",\"limits\":{\"scratch\":\"$t/scratch2\",\"write\":[\"$t/wdir\"],\"over\":[[\"$t/src\",\"$t/dst\"]],\"read_only\":[\"$t/wdir/keep\",\"$t/bin\",[\"$t/psrc\",\"$t/pdst\"]],\"show\":[\"~/.config/gh\"]}" \
     | sed 's/"role":"reviewer"/"role":"implementer"/' | apr > "$t/n.out" 2> "$t/n.err"; rc=$?
   ans=$(cat "$t/n.md" 2> /dev/null)
   { [ "$rc" -eq 0 ] && [ "$(field "$t/n.md.run.json" state)" = ok ] && [ -e "$t/wdir/x" ] && [ -e "$t/src/y" ] && [ ! -e "$t/dst/y" ] \
     && [ "$(cat "$t/wdir/keep")" = kept ] && [ ! -e "$t/wdir/moved" ] && [ ! -e "$t/cwd/n" ] && [ ! -e "$t/cwd/m" ] \
-    && [[ "$ans" == "write written; over written; keep refused ("*"); keep removal refused ("*"); keep rename refused ("*"); cwd refused (Read-only file system); root refused ("*")" ]]; } \
-    && ok "limits: an implementer wrote its write directory and the over source, not the read_only file, its cwd or /proc/1/root: $ans" \
+    && [ ! -e "$t/psrc/z" ] && [ ! -e "$t/pdst/z" ] \
+    && [[ "$ans" == "write written; over written; keep refused ("*"); keep removal refused ("*"); keep rename refused ("*"); cwd refused (Read-only file system); root refused ("*"); pair refused ("*"); pair shows seen" ]]; } \
+    && ok "limits: an implementer wrote its write directory and the over source, not the read_only file, the read_only pair's target (which shows its source), its cwd or /proc/1/root: $ans" \
     || bad "limits: named paths: rc=$rc $ans $(tail -c 400 "$t/n.err")"
   python3 -I -c 'import json,sys; t=sys.argv[1]; l=json.load(open(t+"/n.md.run.json"))["limits"]
 hidden = l.pop("hidden", None); l.pop("view", None); l.pop("egress", None)
 r = json.load(open(t+"/n.md.run.json"))
 sys.exit(l != {"scratch": t+"/scratch2", "writable": [r["home"], t+"/scratch2", t+"/wdir", t+"/dst"], "bwrap": "/usr/bin/bwrap",
-               "over": [[t+"/src", t+"/dst"]], "read_only": [t+"/wdir/keep", t+"/bin"], "show": ["~/.config/gh"]}
+               "over": [[t+"/src", t+"/dst"]], "read_only": [t+"/wdir/keep", t+"/bin", [t+"/psrc", t+"/pdst"]], "show": ["~/.config/gh"]}
          or not isinstance(hidden, list) or any(p.endswith("/.config/gh") for p in hidden))' "$t" \
     && ok "limits: the implementer's record names what it writes, the members as given, and ~/.config/gh shown" || bad "limits member of the implementer: $(field "$t/n.md.run.json" limits)"
   # spec: specs/ap/run-limits.md#R17
