@@ -1337,20 +1337,29 @@ fn ready(
         "checks": checks}),
     )
 }
-/// A draft unit of the lane `objective` whose intent names a design record: the record's bytes as read now have
-/// the digest the intent's last accepting plan review marked, else `design_not_reviewed` (R53).
+/// A draft unit of the lane `objective`: its `specs` hold a string (`specs_missing`), its intent, when it exists in
+/// the store, names a design record (`design_missing`), and the record's bytes as read now have the digest the
+/// intent's last accepting plan review marked, else `design_not_reviewed` (R53).
 fn design_reviewed(s: &mut impl System, store: Option<&str>, u: &Value) -> Result<(), Failure> {
-    let intent = u["intent"]["native_key"]
-        .as_str()
-        .filter(|_| u["lane"] == "objective");
-    let Some(intent) = intent else {
+    if u["lane"] != "objective" {
+        return Ok(());
+    }
+    let specs = u["specs"].as_array();
+    if !specs.is_some_and(|a| a.iter().any(Value::is_string)) {
+        return Err(fail("specs_missing", "specs", Value::Null));
+    }
+    let Some(intent) = u["intent"]["native_key"].as_str() else {
         return Ok(());
     };
     let read = at(store::get_of::<objects::Intent>(s, store, intent), "intent")?;
-    let Some(path) = read.as_ref().and_then(|i| i["design"].as_str()) else {
+    let Some(read) = read else {
         return Ok(());
     };
-    let reviewed = read.as_ref().and_then(|i| i["plan_design"].as_str());
+    let path = match read["design"].as_str() {
+        Some(path) if !path.is_empty() => path,
+        _ => return Err(fail("design_missing", "unit", json!({"intent": intent}))),
+    };
+    let reviewed = read["plan_design"].as_str();
     let now = design_record(path)
         .ok()
         .map(|r| crate::host::digest(r.as_bytes()));

@@ -2361,6 +2361,17 @@ fn r21_a_page_amended_while_its_review_ran_is_not_made_ready() {
     use ap::unit::object;
     let mut f = F::new();
     f.unit("u2", "contract", false);
+    // The unit names a specification and its intent a design record that a plan review read (`specs/ap/unit.md`
+    // R53); the shared fixture names neither, so that its golden texts stay as they are.
+    f.modify("unit", "u2", json!({"specs": ["specs/widgets.md"]}));
+    let design = f.t.join("DESIGN.md");
+    std::fs::write(&design, "# Design\n\nD1: one list.\n").unwrap();
+    let sha = format!("{:x}", Sha256::digest(std::fs::read(&design).unwrap()));
+    f.modify(
+        "intent",
+        "widgets",
+        json!({"design": design.to_str().unwrap(), "plan_design": sha}),
+    );
     let ready = |f: &mut F| {
         let call = object::arguments(&["ready", "--store", STORE].map(OsString::from)).unwrap();
         let n = NEXT.fetch_add(1, Ordering::SeqCst);
