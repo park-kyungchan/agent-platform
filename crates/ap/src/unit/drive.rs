@@ -35,6 +35,9 @@ const DESCRIPTION_TAIL: &str =
 const PAT: &str = "github_pat_";
 const SECOND_LOOK: &str = include_str!("frames/second-look.md");
 const CONTINUE: &str = include_str!("frames/continue.md");
+/// The line before the frame of an author stage that starts fresh on the page's runtime instead of
+/// resuming a record of another runtime (R11).
+const NEW_SESSION: &str = "This is a new session on another runtime, not a resumption; this line overrides every statement of the frame below that this is your own earlier, resumed session. Read git status and git log origin/main..HEAD in the worktree to see what the earlier stage left.";
 const UNITS: &str = "/var/lib/agent-platform/units";
 const REVIEWS: &str = "/var/lib/agent-platform/reviews";
 /// The bound of each stage by role, in seconds (R3).
@@ -502,6 +505,10 @@ fn text<'a>(v: &'a Value, k: &str) -> Option<&'a str> {
 /// The session a record names: 1 to 200 bytes.
 fn session(rec: &Value) -> Option<&str> {
     text(rec, "session").filter(|t| t.len() <= 200)
+}
+/// The runtime of a tier or a record, an absent member read as `claude` (as `ap run` reads it).
+fn runtime_of(v: &Value) -> Option<&str> {
+    v.get("runtime").map_or(Some("claude"), Value::as_str)
 }
 fn hex40(h: &str) -> bool {
     h.len() == 40
@@ -2054,15 +2061,26 @@ impl Run {
         Ok(render::page_text(s, self.store(), &self.key, &u, Some(role))?.0)
     }
     /// One author stage of `role` with `git_author`, resuming `from` when given, reading `files`
-    /// beside its worktree: its record and its answer's path (R11 to R13, R21, R38).
+    /// beside its worktree: its record and its answer's path (R11 to R13, R21, R38). Its text is the
+    /// page, then the frame when there is one. A `from` of another runtime than the page's
+    /// implementer tier is not resumed: the stage starts fresh on the tier, with `continue_dirty` and
+    /// the line `NEW_SESSION` before the frame (R11).
     fn author(
         &mut self,
         s: &mut impl System,
         role: &str,
         from: Option<&Author>,
-        text: &str,
+        (page, frame): (&str, &str),
         files: &[String],
     ) -> Step<(Value, String)> {
+        let other = |a: &&Author| runtime_of(&a.rec) != runtime_of(&self.implementer);
+        let fresh = from.filter(other).is_some();
+        let from = from.filter(|_| !fresh);
+        let text = match (frame.is_empty(), fresh) {
+            (true, _) => page.to_owned(),
+            (false, false) => format!("{page}\n{frame}"),
+            (false, true) => format!("{page}\n{NEW_SESSION}\n\n{frame}"),
+        };
         let n = self.next();
         // The credential: the stage token read anew, or the host's login; named in its file (R41).
         let token = self.stage_token(s)?;
@@ -2072,7 +2090,7 @@ impl Run {
         if let Some(t) = token {
             env["GH_TOKEN"] = json!(t);
         }
-        let prompt = self.prompt(&format!("{n}.{role}.prompt.md"), text)?;
+        let prompt = self.prompt(&format!("{n}.{role}.prompt.md"), &text)?;
         let out = self
             .home
             .join(format!("{n}.{role}.md"))
@@ -2081,6 +2099,9 @@ impl Run {
         let mut req = self.stage(&self.implementer, role, role, (&prompt, &out));
         req["git_author"] = json!(true);
         (req["limits"], req["env"]) = (limits, env);
+        if fresh {
+            req["continue_dirty"] = json!(true);
+        }
         if let Some(a) = from {
             for k in ["model", "effort", "runtime"]
                 .iter()
@@ -2129,15 +2150,15 @@ impl Run {
         let authors = self.authors();
         let named = |a: &&Author| a.role == "implementer" && session(&a.rec).is_some();
         let from = authors.iter().rev().find(named);
-        let mut text = self.page(s, Role::Implementer)?;
-        match from {
-            Some(_) => text.push_str(&format!("\n{CONTINUE}")),
+        let page = self.page(s, Role::Implementer)?;
+        let frame = match from {
+            Some(_) => CONTINUE,
             None if !t.clean || !t.on_branch || t.ahead != "0" => {
                 return stop("worktree_dirty", t.shown());
             }
-            None => {}
-        }
-        let (rec, out) = self.author(s, "implementer", from, &text, &[])?;
+            None => "",
+        };
+        let (rec, out) = self.author(s, "implementer", from, (&page, frame), &[])?;
         self.wait(s)?;
         match self.list(s)? {
             None => stop("no_pull_request", Self::answered(&out, &rec)),
@@ -2166,10 +2187,11 @@ impl Run {
             None => stop("worktree_dirty", t.shown()),
         }
     }
-    /// The settling stage: the session of `a` resumed under its role with `continue.md` (R12, R13).
+    /// The settling stage: the session of `a` resumed under its role with `continue.md` (R12, R13),
+    /// or a fresh stage on the page's runtime when `a` ran on another one (R11).
     fn turn(&mut self, s: &mut impl System, a: &Author) -> Step {
-        let text = format!("{}\n{CONTINUE}", self.page(s, Role::Implementer)?);
-        self.author(s, &a.role, Some(a), &text, &[])?;
+        let page = self.page(s, Role::Implementer)?;
+        self.author(s, &a.role, Some(a), (&page, CONTINUE), &[])?;
         self.wait(s)
     }
     /// The newest author record, when the author's one turn on an amended page is due (R13).
@@ -2642,8 +2664,8 @@ impl Run {
         };
         let page = self.page(s, Role::Implementer)?;
         let round = format!("Head judged: {judged}\nVerifier report: {report}\n");
-        let text = format!("{page}\n{FIXER}\n## The round\n\n{round}");
-        let (rec, out) = self.author(s, "fixer", Some(from), &text, &[report])?;
+        let frame = format!("{FIXER}\n## The round\n\n{round}");
+        let (rec, out) = self.author(s, "fixer", Some(from), (&page, &frame), &[report])?;
         let now = self.git(s, &self.wt, &["rev-parse", "HEAD"])?;
         if now == judged {
             return stop("repair_refused", Self::answered(&out, &rec));
