@@ -2561,10 +2561,7 @@ fn resume_follows_the_page_runtime() {
     assert!(rec["limits"]["read_only"].is_array(), "{rec}");
     // What the cut stage left was kept and settled by the fresh stage.
     let head = a["head"].as_str().unwrap();
-    assert_eq!(
-        f.origin(&["show", &format!("{head}:src/left.rs")]),
-        "left"
-    );
+    assert_eq!(f.origin(&["show", &format!("{head}:src/left.rs")]), "left");
     assert_eq!(f.launches, 3);
     // The same without a pull request: a dirty worktree is no `worktree_dirty` stop.
     let mut f = F::new();
@@ -2590,7 +2587,10 @@ fn resume_follows_the_page_runtime() {
     f.steps(&["implement", "fix", "accept"]);
     f.stopped("acceptance_failed");
     let first = f.record("1.implementer.md.run.json");
-    assert_eq!((&first["runtime"], &first["state"]), (&json!("agy"), &json!("ok")));
+    assert_eq!(
+        (&first["runtime"], &first["state"]),
+        (&json!("agy"), &json!("ok"))
+    );
     assert!(first["session"].is_string(), "{first}");
     f.amend_to_claude();
     f.set_unit(
@@ -2618,7 +2618,10 @@ fn resume_follows_the_page_runtime() {
         line.contains(&format!("--resume {}", cut["session"].as_str().unwrap())),
         "{line}"
     );
-    assert!(prompt.ends_with(CONTINUE) && !prompt.contains(NEW_SESSION), "{prompt}");
+    assert!(
+        prompt.ends_with(CONTINUE) && !prompt.contains(NEW_SESSION),
+        "{prompt}"
+    );
     assert!(!f.record("2.implementer.md.run.json")["resumes"].is_null());
 }
 
