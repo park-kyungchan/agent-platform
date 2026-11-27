@@ -1848,6 +1848,42 @@ fn r3_the_units_member_and_where_a_run_keeps_its_files() {
     );
 }
 
+// spec: specs/ap/unit-run.md#R19
+#[test]
+fn r19_a_verifier_runs_the_whole_check_only_for_a_doubt_of_the_gate() {
+    let mut f = F::new();
+    f.steps(&["implement", "repair", "fix", "accept"]);
+    assert_eq!(f.ok().0["state"], "merged");
+    let verifier = include_str!("../src/unit/frames/verifier.md");
+    let item = verifier
+        .lines()
+        .find(|l| l.starts_with("- The repository's required check passed on this head at the gate"))
+        .unwrap();
+    for words in [
+        "`ap check <worktree> -- <command>`",
+        "a command without a shell",
+        "in the foreground",
+        "Never call the build tool directly",
+        "Run the whole `ap check <worktree>` only when you have a reason to doubt the gate's result on this head, and name that reason in the report.",
+    ] {
+        assert!(item.contains(words), "{words}: {item}");
+    }
+    assert!(!verifier.contains("for the repository's own check"), "{verifier}");
+    // A fresh verifier round and a second look each carry the rule.
+    let (_, first) = f.launch(2);
+    assert!(first.contains(item), "{first}");
+    let (_, second) = f.launch(4);
+    assert!(
+        second.contains(item)
+            && SECOND_LOOK.contains("on the gate holds for this look too")
+            && second.contains(SECOND_LOOK),
+        "{second}"
+    );
+    // An author still runs the whole check.
+    assert!(include_str!("../src/unit/frames/implementer.md").contains("`ap check <worktree>` runs `./check`"));
+    assert!(FIXER.contains("the repository's check through `ap check <worktree>` until it passes"));
+}
+
 // spec: specs/ap/unit-run.md#R4
 #[test]
 fn r4_the_accounts_of_each_stage_by_the_policy_order() {
