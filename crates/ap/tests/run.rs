@@ -740,10 +740,24 @@ fn code(r: Result<(Value, u8), Failure>) -> String {
     }
 }
 fn gone(pid_file: &Path) -> bool {
-    let pid = std::fs::read_to_string(pid_file).unwrap();
-    let stat = std::fs::read_to_string(format!("/proc/{}/stat", pid.trim()));
-    // Gone, or a zombie waiting for init: either way nothing runs.
-    stat.map_or(true, |s| s.split_whitespace().nth(2) == Some("Z"))
+    // A process killed under load may need a moment to leave: wait this long before saying it stayed.
+    const BOUND: std::time::Duration = std::time::Duration::from_secs(10);
+    let start = std::time::Instant::now();
+    loop {
+        let pid = std::fs::read_to_string(pid_file).unwrap_or_default();
+        let pid = pid.trim();
+        if !pid.is_empty() {
+            let stat = std::fs::read_to_string(format!("/proc/{pid}/stat"));
+            // Gone, or a zombie waiting for init: either way nothing runs.
+            if stat.map_or(true, |s| s.split_whitespace().nth(2) == Some("Z")) {
+                return true;
+            }
+        }
+        if start.elapsed() >= BOUND {
+            return false;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(50));
+    }
 }
 
 // ---- A1 ------------------------------------------------------------------------------------
