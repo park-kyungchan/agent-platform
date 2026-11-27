@@ -13,7 +13,7 @@
     reason = "a test fails by panicking, so an unwrap or an expect in its helpers is how it reports"
 )]
 use ap::host::{Answer, Failure, Host, Reply, System};
-use ap::unit::page_review::{Refusal, arguments, execute};
+use ap::unit::page_review::{Refusal, arguments, execute, execute_as};
 use ap::unit::render::{Role, page, page_digest, page_part, plan_block};
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
@@ -41,6 +41,21 @@ const STORE: &str = "/invented/scratch/store";
 const BWRAP: &str = "/usr/bin/bwrap";
 /// The epoch second of `2026-11-18T00:00:00Z`, the fake store's clock at 0.
 const EPOCH: u64 = 1_794_960_000;
+/// The submission criteria of `ready_unit` in the store's order (`ontology/work.schema.json`).
+const READY_CRITERIA: [&str; 12] = [
+    "unit_not_draft",
+    "write_set_missing",
+    "acceptance_missing",
+    "tiers_missing",
+    "dependency_dropped",
+    "intent_not_open_for_units",
+    "intent_differs",
+    "intent_parameter_required",
+    "plan_not_reviewed",
+    "page_digest_differs",
+    "page_not_reviewed",
+    "deferred",
+];
 
 fn oid(kind: &str, key: &str) -> Value {
     json!({"object_type":kind,"namespace":{"instance":"vps://palantirkc","account":"root"},"native_key":key})
@@ -164,6 +179,10 @@ struct F {
     probes: usize,
     /// The mark of this unit (or `design`) is lost on its way: the call gets no answer.
     mark_fails: Option<&'static str>,
+    /// The criteria a validate of `ready_unit` fails besides those the fake judges itself.
+    ready_fails: Vec<&'static str>,
+    /// The store refuses a validate of `ready_unit` with this code, not by a criterion.
+    ready_refused: Option<&'static str>,
 }
 impl F {
     fn new() -> Self {
@@ -227,6 +246,8 @@ impl F {
             bwrap: true,
             probes: 0,
             mark_fails: None,
+            ready_fails: vec![],
+            ready_refused: None,
         };
         f.write_policy(json!({}));
         f.put("task", "invented-task", json!({"status": "open"}));
@@ -237,8 +258,26 @@ impl F {
                 "first_user": "An invented reader of the widget list.",
                 "not_included": "No prices of widgets.", "constraints": "One line per widget."}),
         );
-        f.unit("u1", "contract", true);
+        f.page_unit("u1", "contract", true);
+        f.reviewed_design();
         f
+    }
+    /// A unit of `unit` that also names a specification, as the Lead's look at a draft unit asks first
+    /// (`specs/ap/unit-review.md` R28, `specs/ap/unit.md` R53), in the same first revision.
+    fn page_unit(&mut self, key: &str, class: &str, repository: bool) {
+        self.unit(key, class, repository);
+        self.objects.get_mut(&k("unit", key)).unwrap()["specs"] = json!(["specs/widgets.md"]);
+    }
+    /// The intent `widgets` names the design record `DESIGN.md`, marked as a plan review read it (R53).
+    fn reviewed_design(&mut self) {
+        let design = self.t.join("DESIGN.md");
+        std::fs::write(&design, "# Design\n\nD1: one list.\n").unwrap();
+        let sha = format!("{:x}", Sha256::digest(std::fs::read(&design).unwrap()));
+        self.modify(
+            "intent",
+            "widgets",
+            json!({"design": design.to_str().unwrap(), "plan_design": sha}),
+        );
     }
     fn p(&self, rel: &str) -> String {
         self.t.join(rel).to_string_lossy().into_owned()
@@ -501,7 +540,48 @@ impl F {
             other => panic!("ont {other}"),
         }
     }
+    /// The criteria of `ready_unit` that fail for the parameters `p`: `unit_not_draft` and
+    /// `page_not_reviewed` as the apply judges them, and `ready_fails`.
+    fn ready_failed(&self, p: &Value) -> Vec<&'static str> {
+        let key = p["unit"]["native_key"].as_str().unwrap();
+        let u = self.get("unit", key);
+        let mut failed = vec![];
+        if u["state"] != "draft" {
+            failed.push("unit_not_draft");
+        }
+        // Version 12: an accept whose head is `page_digest`, whenever it started.
+        let reviewed = self.reviews_of("unit", key).iter().any(|(_, r)| {
+            r["kind"] == "page"
+                && r["status"] == "closed"
+                && r["verdict"] == "accept"
+                && p.get("page_digest").is_some_and(|d| &r["head"] == d)
+        });
+        let class = &u["class"];
+        if (class == "contract" || class == "effect") && !reviewed {
+            failed.push("page_not_reviewed");
+        }
+        failed.extend(self.ready_fails.iter().copied());
+        failed
+    }
     fn validate(&mut self, body: &Value) -> Answer {
+        if body["action_type"] == "ready_unit" {
+            if let Some(code) = self.ready_refused {
+                return reply(false, &refused(code, json!({})));
+            }
+            if let Some(conflict) = self.expected(body) {
+                return reply(false, &conflict);
+            }
+            let failed = self.ready_failed(&body["parameters"]);
+            let criteria: Vec<Value> = READY_CRITERIA
+                .iter()
+                .map(|c| json!({"code": c, "passed": !failed.contains(c)}))
+                .collect();
+            return reply(
+                true,
+                &json!({"status": "ok", "now": EPOCH + self.clock, "result": {
+                "valid": failed.is_empty(), "criteria": criteria, "edits": []}}),
+            );
+        }
         assert_eq!(body["action_type"], "start_unit_review");
         if let Some(key) = self.amend_at_validate.take() {
             self.amend(key);
@@ -665,22 +745,9 @@ impl F {
             }
             "ready_unit" => {
                 let key = p["unit"]["native_key"].as_str().unwrap().to_owned();
-                let u = self.get("unit", &key);
-                let mut failed = vec![];
-                if u["state"] != "draft" {
-                    failed.push("unit_not_draft");
-                }
-                // Version 12: an accept whose head is `page_digest`, whenever it started.
-                let reviewed = self.reviews_of("unit", &key).iter().any(|(_, r)| {
-                    r["kind"] == "page"
-                        && r["status"] == "closed"
-                        && r["verdict"] == "accept"
-                        && p.get("page_digest").is_some_and(|d| &r["head"] == d)
-                });
-                let class = &u["class"];
-                if (class == "contract" || class == "effect") && !reviewed {
-                    failed.push("page_not_reviewed");
-                }
+                let mut failed = self.ready_failed(p);
+                // The order of the store's criteria.
+                failed.sort_by_key(|c| READY_CRITERIA.iter().position(|r| r == c));
                 if !failed.is_empty() {
                     return reply(false, &criteria(failed));
                 }
@@ -1300,6 +1367,12 @@ fn plan_fixture(f: &mut F) {
         json!({"lane": "small", "origin": oid("request", "q-small"), "estimate_lines": 12}),
     );
     f.objects.remove(&k("unit", "u1"));
+    // The plan part of the base names no design record (R26).
+    f.modify(
+        "intent",
+        "widgets",
+        json!({"design": null, "plan_design": null}),
+    );
 }
 
 // spec: specs/ap/unit-review.md#R7
@@ -1557,9 +1630,14 @@ fn r10_the_start_is_validated_and_the_stage_admitted_before_anything_is_written(
         .filter(|c| c.0 == "ont" && c.1[0] == "action")
         .map(|c| format!("{} {}", c.1[1], c.2["action_type"].as_str().unwrap()))
         .collect();
+    // The Lead's look at a draft unit validates `ready_unit` first, and applies nothing of it (R28).
     assert_eq!(
-        order[..2],
-        ["validate start_unit_review", "apply start_unit_review"]
+        order[..3],
+        [
+            "validate ready_unit",
+            "validate start_unit_review",
+            "apply start_unit_review"
+        ]
     );
     assert!(
         f.calls
@@ -1729,7 +1807,7 @@ fn r12_the_working_directory_is_a_throwaway_copy_removed_after_the_stage() {
     assert_eq!(shown(&clone), before, "nothing added to the clone");
     f.answer("touch", None);
     // Without a repository: an empty directory.
-    f.unit("u2", "contract", false);
+    f.page_unit("u2", "contract", false);
     let (v, _) = f.ok(&f.req("unit", "u2"));
     assert_eq!(f.seen("ls"), "");
     assert_eq!(
@@ -1983,7 +2061,7 @@ fn r15_abandon_and_finish_read_the_review_first() {
         .unwrap()
         .to_owned();
     std::fs::create_dir_all(f.dir().join("work").join(&closed)).unwrap();
-    f.unit("u2", "contract", false);
+    f.page_unit("u2", "contract", false);
     f.die_after = Some("start_unit_review");
     f.refusal(&f.req("unit", "u2"));
     (f.dead, f.die_after) = (false, None);
@@ -2362,16 +2440,8 @@ fn r21_a_page_amended_while_its_review_ran_is_not_made_ready() {
     let mut f = F::new();
     f.unit("u2", "contract", false);
     // The unit names a specification and its intent a design record that a plan review read (`specs/ap/unit.md`
-    // R53); the shared fixture names neither, so that its golden texts stay as they are.
+    // R53), as the shared fixture's.
     f.modify("unit", "u2", json!({"specs": ["specs/widgets.md"]}));
-    let design = f.t.join("DESIGN.md");
-    std::fs::write(&design, "# Design\n\nD1: one list.\n").unwrap();
-    let sha = format!("{:x}", Sha256::digest(std::fs::read(&design).unwrap()));
-    f.modify(
-        "intent",
-        "widgets",
-        json!({"design": design.to_str().unwrap(), "plan_design": sha}),
-    );
     let ready = |f: &mut F| {
         let call = object::arguments(&["ready", "--store", STORE].map(OsString::from)).unwrap();
         let n = NEXT.fetch_add(1, Ordering::SeqCst);
@@ -2526,7 +2596,9 @@ fn r23_a_look_runs_the_checks_of_ready_on_the_base_at_the_commit_of_its_text() {
     let validate = f
         .calls
         .iter()
-        .position(|c| c.1.get(1).is_some_and(|w| w == "validate"))
+        .position(|c| {
+            c.1.get(1).is_some_and(|w| w == "validate") && c.2["action_type"] == "start_unit_review"
+        })
         .unwrap();
     let checks: Vec<&Vec<String>> = f.calls[..validate]
         .iter()
@@ -2629,7 +2701,7 @@ fn r23_a_check_that_does_not_hold_on_the_base_refuses_the_look_before_anything_s
         )
     );
     // A unit without a repository: an empty directory, `AP_BASE` and `AP_HEAD` empty.
-    f.unit("u2", "contract", false);
+    f.page_unit("u2", "contract", false);
     let empty = r#"test -z "$(ls -A)" && test -z "$AP_BASE$AP_HEAD" && exit 1"#;
     let e = refused_look(&mut f, "u2", json!([{"check": empty, "kind": "invariant"}]));
     assert_eq!(code(&e).0, "invariant_fails_on_base");
@@ -2639,7 +2711,7 @@ fn r23_a_check_that_does_not_hold_on_the_base_refuses_the_look_before_anything_s
         ("u4", "contract", "ready"),
         ("u5", "effect", "stopped"),
     ] {
-        f.unit(key, class, true);
+        f.page_unit(key, class, true);
         f.modify("unit", key, json!({"state": state}));
         let e = refused_look(
             &mut f,
@@ -2710,7 +2782,7 @@ fn r23_a_look_refuses_a_pattern_outside_the_grammar_and_a_plain_page_of_protecte
         );
     }
     // A plain page whose pattern can only match protected paths; the class contract and effect are not refused.
-    f.unit("u6", "plain", true);
+    f.page_unit("u6", "plain", true);
     let e = refused(
         &mut f,
         "u6",
@@ -3539,4 +3611,325 @@ fn r27_the_plan_frame_judges_the_units_against_a_design_record() {
         );
     }
     assert_eq!(PLAN_REVIEWER.matches("`blocking ").count(), 5);
+}
+
+/// `ap unit ready` of `key` (`specs/ap/unit.md` R20): its answer, or its refusal as `(code, field, detail)`.
+fn ready_of(f: &mut F, key: &str) -> Result<Value, (String, String, Value)> {
+    use ap::unit::object;
+    let call = object::arguments(&["ready", "--store", STORE].map(OsString::from)).unwrap();
+    let n = NEXT.fetch_add(1, Ordering::SeqCst);
+    let r =
+        json!({"request_id": format!("rd{n}"), "agent": "lead", "session": "lead-1", "unit": key});
+    match object::execute(f, &call, &r) {
+        Ok(text) => Ok(serde_json::from_str(&text).unwrap()),
+        Err(e) => Err((e.code.to_string(), e.field.clone(), e.detail.clone())),
+    }
+}
+/// A look of the Lead at `key` refused by R28 and R29: nothing validated of the start, no prompt, no copy of
+/// the clone, no check on the base, the unit as it was; the refusal as `(code, field, detail)`.
+fn refused_first(f: &mut F, key: &str) -> (String, String, Value) {
+    f.git.clear();
+    let calls = f.calls.len();
+    let before = untouched(f, key);
+    let e = f.refusal(&f.req("unit", key));
+    assert_eq!(e.after, None, "{e:?}");
+    assert_eq!(untouched(f, key), before, "{e:?}");
+    assert!(
+        f.git.iter().all(|a| !a.iter().any(|w| w == "clone")),
+        "no copy of the clone: {:?}",
+        f.git
+    );
+    assert!(
+        f.calls[calls..].iter().all(|c| c.0 != "systemctl"),
+        "no check ran"
+    );
+    (e.code.clone(), e.field.clone(), e.detail.clone())
+}
+/// The policy file of the fake with the member `routing`: two Claude tiers, the strongest the lowest of every row.
+fn routing_policy(f: &F) {
+    let path = f.t.join("policy.json");
+    let mut policy: Value = serde_json::from_slice(&std::fs::read(&path).unwrap()).unwrap();
+    let both = json!({"implementer": ["claude", "opus"], "verifier": ["claude", "opus"]});
+    policy["routing"] = json!({"order": [["claude", "sonnet"], ["claude", "opus"]],
+        "large_lines": 400, "map": {"default": {"small": both, "large": both}},
+        "bar": {"rate": 0.4, "window_days": 7, "min_merged": 3}});
+    std::fs::write(&path, policy.to_string()).unwrap();
+}
+
+// spec: specs/ap/unit-review.md#R28
+// spec: specs/ap/unit-review.md#R29
+// spec: specs/ap/unit.md#R53
+// spec: specs/ap/unit.md#R56
+// spec: specs/ap/unit.md#R57
+#[test]
+fn r28_program_first_a_page_without_specs_or_a_reviewed_design_is_refused() {
+    let mut f = F::new();
+    // The real run: a draft unit whose `specs` is empty, refused as `ap unit ready` refuses it.
+    f.modify("unit", "u1", json!({"specs": []}));
+    let e = refused_first(&mut f, "u1");
+    assert_eq!(e, ("specs_missing".into(), "specs".into(), Value::Null));
+    assert_eq!(ready_of(&mut f, "u1").unwrap_err(), e);
+    assert!(f.bodies("validate", "ready_unit").is_empty(), "no validate");
+    assert!(f.reviews_of("unit", "u1").is_empty(), "no review started");
+    // The fetch and the text come first (R6): the one fetch is made before the refusal.
+    let fetches = f.git.iter().filter(|a| a.iter().any(|w| w == "fetch"));
+    assert_eq!(fetches.count(), 1, "{:?}", f.git);
+    // The judgement of the write set comes before, the citations after.
+    f.modify("unit", "u1", json!({"write_set": ["a/[b]/**"]}));
+    assert_eq!(refused_first(&mut f, "u1").0, "write_set_form");
+    f.modify(
+        "unit",
+        "u1",
+        json!({"write_set": ["src/widgets.rs"], "read_first": ["no/such/file.md"]}),
+    );
+    assert_eq!(refused_first(&mut f, "u1").0, "specs_missing");
+    f.modify(
+        "unit",
+        "u1",
+        json!({"read_first": [], "specs": ["specs/widgets.md"]}),
+    );
+    // The intent's design: absent, then not the one a plan review read.
+    let design = f.get("intent", "widgets")["design"].clone();
+    f.modify("intent", "widgets", json!({"design": null}));
+    let e = refused_first(&mut f, "u1");
+    assert_eq!(
+        e,
+        (
+            "design_missing".into(),
+            "unit".into(),
+            json!({"intent": "widgets"})
+        )
+    );
+    assert_eq!(ready_of(&mut f, "u1").unwrap_err(), e);
+    f.modify("intent", "widgets", json!({"design": design}));
+    std::fs::write(f.t.join("DESIGN.md"), "# Design\n\nD1: two lists.\n").unwrap();
+    let e = refused_first(&mut f, "u1");
+    let reviewed = f.get("intent", "widgets")["plan_design"].clone();
+    assert_eq!(
+        e,
+        (
+            "design_not_reviewed".into(),
+            "unit".into(),
+            json!({"design": design, "reviewed": reviewed})
+        )
+    );
+    assert_eq!(ready_of(&mut f, "u1").unwrap_err(), e);
+    assert!(f.bodies("validate", "ready_unit").is_empty(), "no validate");
+    // A unit of the lane `small` has none of these checks.
+    f.reviewed_design();
+    f.put(
+        "request",
+        "q-small",
+        json!({"words": "List each invented widget once."}),
+    );
+    f.unit("s1", "contract", true);
+    f.modify(
+        "unit",
+        "s1",
+        json!({"lane": "small", "intent": null, "origin": oid("request", "q-small")}),
+    );
+    let (v, _) = f.ok(&f.req("unit", "s1"));
+    assert_eq!(v["verdict"], "accept", "{v}");
+}
+
+// spec: specs/ap/unit-review.md#R28
+// spec: specs/ap/unit-review.md#R29
+// spec: specs/ap/unit.md#R51
+// spec: specs/ap/unit.md#R56
+// spec: specs/ap/unit.md#R57
+#[test]
+fn r28_program_first_tiers_the_routing_map_refuses_are_refused_as_ready_does() {
+    let mut f = F::new();
+    routing_policy(&f);
+    // A plain page, so that `ap unit ready` reaches the tiers without a page review.
+    f.page_unit("p1", "plain", true);
+    f.modify(
+        "unit",
+        "p1",
+        json!({"kind": "rust", "verifier": {"runtime": "claude", "model": "sonnet", "effort": "high"}}),
+    );
+    let e = refused_first(&mut f, "p1");
+    assert_eq!((e.0.as_str(), e.1.as_str()), ("tier_below_map", "verifier"));
+    assert_eq!(ready_of(&mut f, "p1").unwrap_err(), e);
+    assert!(f.bodies("validate", "ready_unit").is_empty(), "no validate");
+    // Specifications missing come before the tiers.
+    f.modify("unit", "p1", json!({"specs": []}));
+    assert_eq!(refused_first(&mut f, "p1").0, "specs_missing");
+    // Tiers the map takes: the look goes on.
+    f.modify(
+        "unit",
+        "p1",
+        json!({"specs": ["specs/widgets.md"],
+            "verifier": {"runtime": "claude", "model": "opus", "effort": "high"}}),
+    );
+    let (v, _) = f.ok(&f.req("unit", "p1"));
+    assert_eq!(v["verdict"], "accept", "{v}");
+}
+
+// spec: specs/ap/unit-review.md#R28
+// spec: specs/ap/unit-review.md#R29
+// spec: specs/ap/unit.md#R56
+#[test]
+fn r28_program_first_the_store_s_criteria_of_ready_unit_refuse_a_look_but_page_not_reviewed() {
+    let mut f = F::new();
+    // A contract page without an accepting review fails `page_not_reviewed` alone: no refusal.
+    let revision = f.revisions[&k("unit", "u1")];
+    let (v, _) = f.ok(&f.req("unit", "u1"));
+    assert_eq!(v["verdict"], "accept", "{v}");
+    let validates = f.bodies("validate", "ready_unit");
+    assert_eq!(validates.len(), 1);
+    let body = &validates[0];
+    let start = &f.bodies("apply", "start_unit_review")[0];
+    // The parameters `ap unit ready` applies, as the Lead, with the revision read.
+    assert_eq!(
+        body["parameters"],
+        json!({"unit": oid("unit", "u1"), "intent": oid("intent", "widgets"),
+            "page_digest": start["parameters"]["head"]})
+    );
+    assert_eq!(
+        body["expected"],
+        json!([{"id": oid("unit", "u1"), "revision": format!("r#{revision}")}])
+    );
+    let rid = start["request_id"]
+        .as_str()
+        .unwrap()
+        .trim_end_matches("-start");
+    assert_eq!(body["request_id"], json!(format!("{rid}-ready")));
+    assert_eq!(
+        (&body["role"], &body["agent"]),
+        (&json!("lead"), &json!("lead"))
+    );
+    // Another criterion fails: the first in the store's order, every failed code but `page_not_reviewed`.
+    f.ready_fails = vec!["plan_not_reviewed"];
+    let e = refused_first(&mut f, "u1");
+    assert_eq!(
+        e,
+        (
+            "plan_not_reviewed".into(),
+            "unit".into(),
+            json!({"failed": ["plan_not_reviewed"]})
+        )
+    );
+    f.ready_fails = vec!["intent_not_open_for_units", "plan_not_reviewed"];
+    let e = refused_first(&mut f, "u1");
+    assert_eq!(
+        e,
+        (
+            "intent_not_open_for_units".into(),
+            "unit".into(),
+            json!({"failed": ["intent_not_open_for_units", "plan_not_reviewed"]})
+        )
+    );
+    // `ap unit ready` refuses the same criterion first.
+    assert_eq!(
+        ready_of(&mut f, "u1").unwrap_err().0,
+        "intent_not_open_for_units"
+    );
+    f.ready_fails = vec![];
+    // A refusal of the validate itself is passed on (R5).
+    f.ready_refused = Some("revision_conflict");
+    let e = refused_first(&mut f, "u1");
+    assert_eq!(
+        (e.0.as_str(), e.1.as_str(), &e.2["code"]),
+        ("revision_conflict", "ready", &json!("revision_conflict"))
+    );
+    f.ready_refused = None;
+    // A unit that is not `draft` and a plan look validate no `ready_unit`.
+    let before = f.bodies("validate", "ready_unit").len();
+    f.page_unit("r1", "contract", true);
+    f.modify("unit", "r1", json!({"state": "ready", "specs": []}));
+    let (v, _) = f.ok(&f.req("unit", "r1"));
+    assert_eq!(v["verdict"], "accept", "{v}");
+    plan_fixture(&mut f);
+    f.ok(&f.req("intent", "widgets"));
+    assert_eq!(f.bodies("validate", "ready_unit").len(), before);
+}
+
+// spec: specs/ap/unit-review.md#R30
+// spec: specs/ap/unit.md#R26
+// spec: specs/ap/unit.md#R58
+#[test]
+fn r30_program_first_status_129_on_the_base_is_not_runnable_on_a_look_and_on_ready() {
+    let mut f = F::new();
+    let e = refused_look(
+        &mut f,
+        "u1",
+        json!([{"check": "exit 129", "kind": "fails_on_base"}]),
+    );
+    assert_eq!(
+        (
+            code(&e),
+            &e.detail["index"],
+            &e.detail["status"],
+            &e.detail["check"]
+        ),
+        (
+            ("acceptance_not_runnable".into(), "acceptance".into()),
+            &json!(1),
+            &json!(129),
+            &json!("exit 129")
+        )
+    );
+    // 2 and 128 stay failures on the base.
+    for status in [2, 128] {
+        f.modify(
+            "unit",
+            "u1",
+            json!({"acceptance": [{"check": format!("exit {status}"), "kind": "fails_on_base"}]}),
+        );
+        let (v, _) = f.ok(&f.req("unit", "u1"));
+        assert_eq!(v["verdict"], "accept", "{status}");
+    }
+    // `ap unit ready` reads 129 alike, and 2 as a failure on the base.
+    f.page_unit("p1", "plain", true);
+    f.modify(
+        "unit",
+        "p1",
+        json!({"acceptance": [{"check": "exit 129", "kind": "fails_on_base"}]}),
+    );
+    let e = ready_of(&mut f, "p1").unwrap_err();
+    assert_eq!(
+        (e.0.as_str(), e.1.as_str(), &e.2["status"]),
+        ("acceptance_not_runnable", "acceptance", &json!(129))
+    );
+    f.modify(
+        "unit",
+        "p1",
+        json!({"acceptance": [{"check": "exit 2", "kind": "fails_on_base"}]}),
+    );
+    assert_eq!(ready_of(&mut f, "p1").unwrap()["state"], "ready");
+}
+
+// spec: specs/ap/unit-review.md#R30
+// spec: specs/ap/unit-review.md#R31
+// spec: specs/ap/unit.md#R59
+#[test]
+fn r31_program_first_the_look_of_ap_unit_write_runs_what_it_ran_but_status_129() {
+    let mut f = F::new();
+    // A draft page without specs, of an intent without a design: the look under `dispatch` is made.
+    f.modify("unit", "u1", json!({"specs": []}));
+    f.modify("intent", "widgets", json!({"design": null}));
+    f.ready_fails = vec!["plan_not_reviewed"];
+    let n = NEXT.fetch_add(1, Ordering::SeqCst);
+    let r = json!({"request_id": format!("wr{n}"), "agent": "ap-write", "session": "p-u1", "unit": "u1"});
+    let (v, _) = execute_as(&mut f, Some(STORE), &r, "dispatch").unwrap();
+    assert_eq!(v["verdict"], "accept", "{v}");
+    assert!(f.bodies("validate", "ready_unit").is_empty(), "no validate");
+    assert_eq!(
+        f.bodies("apply", "start_unit_review")[0]["role"],
+        "dispatch"
+    );
+    // Status 129 on the base is not runnable for it too.
+    f.modify(
+        "unit",
+        "u1",
+        json!({"acceptance": [{"check": "exit 129", "kind": "fails_on_base"}]}),
+    );
+    let n = NEXT.fetch_add(1, Ordering::SeqCst);
+    let r = json!({"request_id": format!("wr{n}"), "agent": "ap-write", "session": "p-u1", "unit": "u1"});
+    let e = execute_as(&mut f, Some(STORE), &r, "dispatch").unwrap_err();
+    assert_eq!(
+        (e.code.as_str(), &e.detail["status"], e.after),
+        ("acceptance_not_runnable", &json!(129), None)
+    );
 }

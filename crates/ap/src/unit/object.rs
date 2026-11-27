@@ -1319,20 +1319,9 @@ fn ready(
         super::routing::check_unit(s, store, &u)?;
         (base, checks) = on_base(s, store, &u)?;
     }
-    // The intent is copied from the unit's head, which the store may have written unreadable: the form ends
-    // here, nothing applied.
-    let intent = match u["lane"] == "objective" {
-        true => store::id_of::<objects::Intent>(&u["intent"], NAME_READY)?,
-        false => None,
-    };
-    let action = actions::ReadyUnit {
-        intent,
-        page_digest: Some(values::Sha256Hex(digest)),
-        unit: Id::new(key),
-    };
-    let expected = vec![(id::<objects::Unit>(key), revision)];
+    let action = ready_action(key, &u, digest)?;
     let call = work::Call {
-        expected,
+        expected: vec![(id::<objects::Unit>(key), revision)],
         ..actor.call(rid)
     };
     let applied = at(store::apply_action(s, store, &call, &action), "ready")?;
@@ -1343,6 +1332,87 @@ fn ready(
         "checks": checks}),
     )
 }
+/// The action `ready` applies to the unit `key` read as `u`, with the page digest `digest` computed from
+/// that read (R20). The intent is copied from the unit's head, which the store may have written unreadable:
+/// the form ends here, nothing applied.
+fn ready_action(key: &str, u: &Value, digest: String) -> Result<actions::ReadyUnit, Failure> {
+    let intent = match u["lane"] == "objective" {
+        true => store::id_of::<objects::Intent>(&u["intent"], NAME_READY)?,
+        false => None,
+    };
+    Ok(actions::ReadyUnit {
+        intent,
+        page_digest: Some(values::Sha256Hex(digest)),
+        unit: Id::new(key),
+    })
+}
+/// The checks of `ready` that read only the page, the store and the policy, for the Lead's look at a
+/// draft unit (R56, `specs/ap/unit-review.md` R28): R53 for the lane `objective`, the tiers of R51, then ONE
+/// validate of `ready_unit` with the parameters `ready` applies, as `actor` with `rid`, `expected` the
+/// unit at `revision`. A failed criterion other than `page_not_reviewed` refuses the look with the first
+/// in the store's order (field `unit`, `detail` `{"failed"}` with every such code); `page_not_reviewed`
+/// alone passes. A refusal of the validate itself is passed on (R5, field `ready`).
+pub(super) fn program_first(
+    s: &mut impl System,
+    store: Option<&str>,
+    (actor, rid): (&Actor, String),
+    (key, u, revision): (&str, &Value, String),
+) -> Result<(), Failure> {
+    design_reviewed(s, store, u)?;
+    super::routing::check_unit(s, store, u)?;
+    let action = ready_action(key, u, render::page_digest(key, u))?;
+    let call = work::Call {
+        expected: vec![(id::<objects::Unit>(key), revision)],
+        ..actor.call(rid)
+    };
+    let v = at(store::validate_action(s, store, &call, &action), "ready")?;
+    let failed = match v["result"]["valid"].as_bool() {
+        Some(true) => return Ok(()),
+        Some(false) => v["result"]["criteria"].as_array(),
+        None => None,
+    };
+    let failed: Vec<&str> = failed
+        .into_iter()
+        .flatten()
+        .filter(|c| c["passed"] == false)
+        .filter_map(|c| c["code"].as_str())
+        .collect();
+    if failed.is_empty() {
+        return Err(error("store_answer_unreadable", "ready"));
+    }
+    let blocking: Vec<&str> = failed
+        .into_iter()
+        .filter(|c| *c != "page_not_reviewed")
+        .collect();
+    let Some(first) = blocking.first() else {
+        return Ok(());
+    };
+    // A code of the schema's `ready_unit` is the refusal's own; another one the store names is passed
+    // on as the store's (R5), so that its code is still the first failed criterion.
+    match READY_CRITERIA.into_iter().find(|c| c == first) {
+        Some(code) => Err(fail(code, "unit", json!({"failed": blocking}))),
+        None => {
+            let detail = json!({"status": "refused", "code": "submission_criteria",
+                "failed": blocking});
+            Err(fail(store::REFUSED, "unit", detail))
+        }
+    }
+}
+/// The submission criteria of the store's `ready_unit` (`ontology/work.schema.json`), in its order.
+const READY_CRITERIA: [&str; 12] = [
+    "unit_not_draft",
+    "write_set_missing",
+    "acceptance_missing",
+    "tiers_missing",
+    "dependency_dropped",
+    "intent_not_open_for_units",
+    "intent_differs",
+    "intent_parameter_required",
+    "plan_not_reviewed",
+    "page_digest_differs",
+    "page_not_reviewed",
+    "deferred",
+];
 /// A draft unit of the lane `objective`: its `specs` hold a string (`specs_missing`), its intent, when it exists in
 /// the store, names a design record (`design_missing`), and the record's bytes as read now have the digest the
 /// intent's last accepting plan review marked, else `design_not_reviewed` (R53).
@@ -1662,7 +1732,7 @@ pub(super) fn checks_on_base(
         let code = match (status, kind) {
             (None, _) => Some("acceptance_not_runnable"),
             (Some(124 | 137), _) => Some("acceptance_timeout"),
-            (Some(125..=127), "fails_on_base") => Some("acceptance_not_runnable"),
+            (Some(125..=127 | 129), "fails_on_base") => Some("acceptance_not_runnable"),
             (Some(n), "fails_on_base") if n >= 200 => Some("acceptance_not_runnable"),
             (Some(0), "fails_on_base") => Some("acceptance_passes_on_base"),
             (Some(0), _) | (Some(_), "fails_on_base") => None,
