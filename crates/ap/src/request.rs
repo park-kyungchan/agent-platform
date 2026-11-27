@@ -46,8 +46,22 @@ struct Words {
     record: Option<String>,
     said_at: String,
 }
+/// The prefixes of a harness or channel envelope (R7 (b)): a message that begins with one is no human's.
+const ENVELOPES: [&str; 8] = [
+    "<event>",
+    "<event ",
+    "<task-notification>",
+    "<task-notification ",
+    "<agent-message>",
+    "<agent-message ",
+    "<command-message>",
+    "<local-command-",
+];
+fn envelope(text: &str) -> bool {
+    ENVELOPES.iter().any(|p| text.starts_with(p))
+}
 /// The words of a session record at the second `at`: the strings of the user's lines of that second
-/// (`specs/ap/request.md` R7, without the harness's lines), byte-equal ones counted once; exactly one is the words.
+/// (`specs/ap/request.md` R7 (a) to (c)), byte-equal ones counted once; exactly one is the words.
 fn from_record(bytes: &[u8], at: &str) -> Result<String, Failure> {
     let mut found: Vec<String> = vec![];
     for line in bytes.split(|b| *b == b'\n') {
@@ -61,14 +75,31 @@ fn from_record(bytes: &[u8], at: &str) -> Result<String, Failure> {
             continue;
         }
         let said = match v["type"].as_str() {
-            Some("user") => &v["message"]["content"],
+            Some("user") => {
+                let human = match &v["origin"] {
+                    Value::Null => true,
+                    o => o["kind"] == "human",
+                };
+                let row = v["rowSource"].as_str();
+                if !human || matches!(row, Some("harness" | "local" | "hook")) {
+                    continue;
+                }
+                &v["message"]["content"]
+            }
             Some("queue-operation") if v["operation"] == "enqueue" => &v["content"],
+            Some("attachment")
+                if v["attachment"]["type"] == "queued_command"
+                    && v["attachment"]["origin"]["kind"] == "human" =>
+            {
+                &v["attachment"]["prompt"]
+            }
             _ => continue,
         };
         let (Some(time), Some(w)) = (v["timestamp"].as_str(), said.as_str()) else {
             continue;
         };
-        if time.starts_with(at) && !found.iter().any(|f| f == w) {
+        let by_user = v["type"] == "user";
+        if (by_user || !envelope(w)) && time.starts_with(at) && !found.iter().any(|f| f == w) {
             found.push(w.to_owned());
         }
     }
@@ -533,11 +564,11 @@ pub fn hook(s: &mut impl System, store: Option<&str>, r: &Value) -> Option<Strin
         _ => None,
     }
 }
-/// `UserPromptSubmit` (R27): the prompt recorded from the session record, or why it is not.
+/// `UserPromptSubmit` (R27): the prompt recorded, verified or not, or why it is not.
 fn prompt_hook(s: &mut impl System, store: Option<&str>, r: &Value) -> String {
     let path = r["transcript_path"].as_str().filter(|p| admitted(s, p));
     match prompt_recorded(s, store, r, path) {
-        Ok((key, at)) => {
+        Ok((key, Some(at))) => {
             let path = serde_json::to_string(path.unwrap_or_default()).unwrap_or_default();
             format!(
                 "ap request: recorded {key} (verified, unrouted) by the hook. Do not record this message again: \
@@ -545,6 +576,10 @@ fn prompt_hook(s: &mut impl System, store: Option<&str>, r: &Value) -> String {
                  \"words_from\":{{\"record\":{path},\"at\":\"{at}\"}}."
             )
         }
+        Ok((key, None)) => format!(
+            "ap request: recorded {key} (unverified, unrouted) by the hook. Do not record this message again: \
+             route it (op route, request {key}), or supersede it with your kind and reading."
+        ),
         Err(code) => {
             let record = path.map_or(String::new(), |p| format!("; its session record is {p}"));
             format!(
@@ -554,13 +589,28 @@ fn prompt_hook(s: &mut impl System, store: Option<&str>, r: &Value) -> String {
         }
     }
 }
-/// The request's key and the second of its line, or the code of the end `not recorded`.
+/// A prompt that is a slash command: its first token (up to the first ASCII whitespace byte) is `/` and
+/// one or more bytes of ASCII letters, digits, `_`, `:` or `-`.
+fn slash_command(prompt: &str) -> bool {
+    let end = prompt
+        .bytes()
+        .position(|b| b.is_ascii_whitespace())
+        .unwrap_or(prompt.len());
+    let token = &prompt.as_bytes()[..end];
+    token.len() > 1
+        && token[0] == b'/'
+        && token[1..]
+            .iter()
+            .all(|b| b.is_ascii_alphanumeric() || b"_:-".contains(b))
+}
+/// The request's key, and the second of its line when verified (None: recorded unverified at the port's
+/// wall second), or the code of the end `not recorded`.
 fn prompt_recorded(
     s: &mut impl System,
     store: Option<&str>,
     r: &Value,
     path: Option<&str>,
-) -> Result<(String, String), String> {
+) -> Result<(String, Option<String>), String> {
     let invalid = || "invalid_input".to_owned();
     let session = shaped(r, "session_id", 64, "._:-").map_err(|_| invalid())?;
     let path = path.ok_or_else(invalid)?;
@@ -569,19 +619,38 @@ fn prompt_recorded(
         .filter(|p| !p.is_empty())
         .ok_or_else(invalid)?;
     let not_found = || "words_not_found".to_owned();
-    let bytes = s.read(path).map_err(|_| not_found())?;
-    let at = prompt_line(&bytes, prompt).ok_or_else(not_found)?;
-    match from_record(&bytes, &at) {
-        Ok(w) if w == prompt => {}
-        Ok(_) => return Err(not_found()),
-        Err(f) => return Err(f.code.to_owned()),
+    // The skip rules come before any file read or call to the store.
+    if r.get("agent_id").is_some_and(|a| !a.is_null()) || envelope(prompt) || slash_command(prompt)
+    {
+        return Err(not_found());
     }
+    let line = match s.read(path) {
+        Ok(bytes) => prompt_line(&bytes, prompt).map(|at| (bytes, at)),
+        Err(_) => None,
+    };
+    let (verified, at) = match line {
+        Some((bytes, at)) => {
+            match from_record(&bytes, &at) {
+                Ok(w) if w == prompt => {}
+                Ok(_) => return Err(not_found()),
+                Err(f) => return Err(f.code.to_owned()),
+            }
+            (true, at)
+        }
+        None => {
+            let secs = s
+                .wall()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map_or(0, |d| d.as_secs());
+            (false, crate::watch::utc(secs)[..19].to_owned())
+        }
+    };
     let (text, truncated) = bound(prompt.to_owned());
     let w = Words {
         text,
-        verified: true,
+        verified,
         truncated,
-        record: Some(path.to_owned()),
+        record: verified.then(|| path.to_owned()),
         said_at: format!("{at}Z"),
     };
     let topic = hook_topic(s, r);
@@ -599,7 +668,8 @@ fn prompt_recorded(
     let applied =
         store::record_request(s, store, &actor, format!("{rid}-record"), p).map_err(failed)?;
     if applied.outcome != "applied" {
-        // A line that already has its request is an earlier message's with the same text.
+        // A request that already exists is an earlier message's with the same text (or, unverified, a
+        // second prompt of the same words in the same second).
         return Err(not_found());
     }
     let key = applied.created().and_then(|i| i["native_key"].as_str());
@@ -610,7 +680,7 @@ fn prompt_recorded(
     if back["words"].as_str() != Some(w.text.as_str()) {
         return Err("readback_differs".to_owned());
     }
-    Ok((key, at))
+    Ok((key, verified.then_some(at)))
 }
 /// The second (`YYYY-MM-DDTHH:MM:SS`) of the prompt's line: the last line of a typed prompt (`origin.kind`
 /// `human`) whose string is `prompt`, when no answer of the main thread follows it.

@@ -59,6 +59,8 @@ struct F {
     work: std::path::PathBuf,
     /// How many files were read.
     reads: std::cell::Cell<usize>,
+    /// The port's wall clock: fixed, and no later than the store's `NOW`.
+    wall: std::time::SystemTime,
 }
 /// The bound of `Host::call`: an answer over 1 MiB is `process_failed`.
 const LIMIT: usize = 1_048_576;
@@ -97,6 +99,8 @@ impl F {
             home: Some(HOME.into()),
             work: WORK.into(),
             reads: std::cell::Cell::new(0),
+            wall: std::time::UNIX_EPOCH
+                + std::time::Duration::from_secs(ap::watch::epoch(NOW).unwrap()),
         };
         f.files.insert(PATH.into(), RECORD.to_vec());
         for (key, status) in [("open", "draft"), ("met", "met"), ("gone", "retired")] {
@@ -359,6 +363,9 @@ impl System for F {
     }
     fn work_root(&self) -> std::path::PathBuf {
         self.work.clone()
+    }
+    fn wall(&self) -> std::time::SystemTime {
+        self.wall
     }
 }
 fn rec() -> Value {
@@ -1847,6 +1854,13 @@ fn recorded(key: &str, at: &str) -> String {
         hooked()
     )
 }
+/// The line of R27 (f) for a request recorded unverified.
+fn unverified(key: &str) -> String {
+    format!(
+        "ap request: recorded {key} (unverified, unrouted) by the hook. Do not record this message again: route it \
+         (op route, request {key}), or supersede it with your kind and reading."
+    )
+}
 /// The line of 3f for `not recorded`; the record named when it is admitted.
 fn not_recorded(code: &str, record: Option<&str>) -> String {
     let tail = record.map_or(String::new(), |r| format!("; its session record is {r}"));
@@ -2134,7 +2148,7 @@ fn r27_an_input_out_of_form_is_not_recorded_as_invalid_input() {
 }
 // spec: specs/ap/request.md#R27
 #[test]
-fn r27_a_prompt_the_record_does_not_hold_as_a_human_line_now_is_not_recorded() {
+fn r27_a_prompt_the_record_does_not_hold_as_a_human_line_now_is_recorded_unverified() {
     let human_meta = with(typed(T, "hello"), "isMeta", json!(true));
     let sidechain = with(typed(T, "hello"), "isSidechain", json!(true));
     let no_origin = without(typed(T, "hello"), "origin");
@@ -2187,11 +2201,17 @@ fn r27_a_prompt_the_record_does_not_hold_as_a_human_line_now_is_not_recorded() {
         }
         assert_eq!(
             hook(&mut f, None, &submitted("hello")),
-            Some(not_recorded("words_not_found", Some(&hooked()))),
+            Some(unverified("rq3")),
             "{name}"
         );
-        assert!(f.calls.is_empty(), "{name}");
-        assert!(f.requests().is_empty(), "{name}");
+        let p = applied_params(&f, "record_request");
+        assert_eq!(
+            (&p["words"], &p["words_verified"], &p["said_at"]),
+            (&json!("hello"), &json!(false), &json!(NOW)),
+            "{name}"
+        );
+        assert!(p.get("record").is_none(), "{name}");
+        assert_eq!(f.requests().len(), 1, "{name}");
     }
     // The last such line counts: an answered earlier one, then the same text again unanswered.
     let mut f = holding(&[
@@ -2203,6 +2223,156 @@ fn r27_a_prompt_the_record_does_not_hold_as_a_human_line_now_is_not_recorded() {
         hook(&mut f, None, &submitted("hello")),
         Some(recorded("rq3", AT))
     );
+}
+// spec: specs/ap/request.md#R27
+#[test]
+fn r27_pre_flush_human_prompt_records_at_wall_and_non_human_inputs_skip() {
+    // No line of the prompt in the record: recorded unverified at the port's wall second.
+    let cases: Vec<(&str, Option<Vec<Value>>, &str)> = vec![
+        ("absent", None, "hello"),
+        ("empty", Some(vec![]), "hello"),
+        (
+            "answered earlier turn",
+            Some(vec![typed(T, "hello"), answer("2026-11-16T05:00:02.0Z")]),
+            "hello",
+        ),
+        ("path prompt", None, "/home/x/file.rs is broken"),
+        ("pasted content", None, "<pasted_content>x</pasted_content>"),
+    ];
+    for (name, record, prompt) in cases {
+        let mut f = F::new();
+        if let Some(record) = record {
+            f.files.insert(hooked(), lines(&record));
+        }
+        assert_eq!(
+            hook(&mut f, None, &submitted(prompt)),
+            Some(unverified("rq3")),
+            "{name}"
+        );
+        let p = applied_params(&f, "record_request");
+        assert_eq!(
+            (
+                &p["words"],
+                &p["words_verified"],
+                &p["said_at"],
+                &p["runtime"]
+            ),
+            (&json!(prompt), &json!(false), &json!(NOW), &json!("claude")),
+            "{name}"
+        );
+        assert!(p.get("record").is_none(), "{name}");
+        let id = f.calls[0].1["request_id"].as_str().unwrap().to_owned();
+        assert_eq!(
+            id, "hook-75ec691436b53573dcd4d8fd55b7c803b3137722-record",
+            "{name}"
+        );
+        assert_eq!(
+            f.names(),
+            ["apply record_request", "search request"],
+            "{name}"
+        );
+        // A second identical prompt in that second is not recorded again.
+        f.calls.clear();
+        assert_eq!(
+            hook(&mut f, None, &submitted(prompt)),
+            Some(not_recorded("words_not_found", Some(&hooked()))),
+            "{name}"
+        );
+        assert_eq!(f.names(), ["apply record_request"], "{name}");
+        assert_eq!(f.requests().len(), 1, "{name}");
+        // One with other words in that second ends with the store's code.
+        assert_eq!(
+            hook(&mut f, None, &submitted("other words")),
+            Some(not_recorded("request_id_reused", Some(&hooked()))),
+            "{name}"
+        );
+        assert_eq!(f.requests().len(), 1, "{name}");
+    }
+    // A subagent's prompt, a slash command and the harness and channel envelopes: no read, no call.
+    let skipped = [
+        ("agent_id", "hello"),
+        ("/compact", "/compact"),
+        ("/plugin:cmd arg", "/plugin:cmd arg"),
+        ("/etc", "/etc"),
+        (
+            "task-notification",
+            "<task-notification>done</task-notification>",
+        ),
+        ("event", "<event kind=\"x\">y</event>"),
+        ("agent-message", "<agent-message>hi</agent-message>"),
+        ("command-message", "<command-message>x</command-message>"),
+        (
+            "local-command",
+            "<local-command-stdout>x</local-command-stdout>",
+        ),
+    ];
+    for (name, prompt) in skipped {
+        let mut f = holding(&[typed(T, prompt)]);
+        let mut q = submitted(prompt);
+        if name == "agent_id" {
+            q["agent_id"] = json!("agent-1");
+        }
+        assert_eq!(
+            hook(&mut f, None, &q),
+            Some(not_recorded("words_not_found", Some(&hooked()))),
+            "{name}"
+        );
+        assert_eq!((f.reads.get(), f.calls.len()), (0, 0), "{name}");
+    }
+    // A null `agent_id` is no subagent's.
+    let mut q = submitted("hello");
+    q["agent_id"] = Value::Null;
+    let mut f = F::new();
+    assert_eq!(hook(&mut f, None, &q), Some(unverified("rq3")));
+}
+// spec: specs/ap/request.md#R7
+#[test]
+fn r7_envelopes_and_non_human_lines_do_not_count_and_a_human_queued_command_does() {
+    let enqueue = |t: &str, c: &str| json!({"type": "queue-operation", "timestamp": t, "operation": "enqueue", "content": c});
+    let at = "2026-11-16T05:00:00";
+    // An `<event ...>` enqueue beside a human enqueue in one second is no ambiguity.
+    let rec = lines(&[
+        enqueue("2026-11-16T05:00:00.100Z", "<event kind=\"x\">y</event>"),
+        enqueue("2026-11-16T05:00:00.200Z", "a human words"),
+    ]);
+    assert_eq!(from_record_words(&rec, at), "a human words");
+    // User lines of a task notification or of the harness do not count.
+    let notified = with(
+        typed("2026-11-16T05:00:00.300Z", "note"),
+        "origin",
+        json!({"kind": "task-notification"}),
+    );
+    let harness = with(
+        typed("2026-11-16T05:00:00.400Z", "harness"),
+        "rowSource",
+        json!("harness"),
+    );
+    let rec = lines(&[notified, harness, typed(T, "the human")]);
+    assert_eq!(from_record_words(&rec, at), "the human");
+    // A human queued_command attachment counts; one of another origin or with an envelope does not.
+    let queued = |origin: Value, prompt: &str| {
+        json!({"type": "attachment", "timestamp": "2026-11-16T05:00:00.500Z",
+            "attachment": {"type": "queued_command", "origin": origin, "prompt": prompt}})
+    };
+    let rec = lines(&[
+        queued(json!({"kind": "human"}), "queued words"),
+        queued(json!({"kind": "task-notification"}), "other"),
+        queued(
+            json!({"kind": "human"}),
+            "<task-notification>x</task-notification>",
+        ),
+    ]);
+    assert_eq!(from_record_words(&rec, at), "queued words");
+}
+/// The words `ap request` reads from a record at `at`, through a `record` call.
+fn from_record_words(record: &[u8], at: &str) -> String {
+    let mut f = F::new();
+    f.files.insert(PATH.into(), record.to_vec());
+    run(&mut f, &from(at));
+    applied_params(&f, "record_request")["words"]
+        .as_str()
+        .unwrap()
+        .to_owned()
 }
 // spec: specs/ap/request.md#R27
 #[test]
