@@ -101,6 +101,8 @@
     "AGENTS.md",
     "REVIEW.md",
     "content/AGENTS.md",
+    "content/skills/**",
+    "content/runtime-references/**",
     "crates/ap/src/deliver.rs",
     "crates/ap/src/run.rs",
     "crates/ap/src/run/**",
