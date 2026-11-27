@@ -1857,7 +1857,9 @@ fn r19_a_verifier_runs_the_whole_check_only_for_a_doubt_of_the_gate() {
     let verifier = include_str!("../src/unit/frames/verifier.md");
     let item = verifier
         .lines()
-        .find(|l| l.starts_with("- The repository's required check passed on this head at the gate"))
+        .find(|l| {
+            l.starts_with("- The repository's required check passed on this head at the gate")
+        })
         .unwrap();
     for words in [
         "`ap check <worktree> -- <command>`",
@@ -1868,7 +1870,10 @@ fn r19_a_verifier_runs_the_whole_check_only_for_a_doubt_of_the_gate() {
     ] {
         assert!(item.contains(words), "{words}: {item}");
     }
-    assert!(!verifier.contains("for the repository's own check"), "{verifier}");
+    assert!(
+        !verifier.contains("for the repository's own check"),
+        "{verifier}"
+    );
     // A fresh verifier round and a second look each carry the rule.
     let (_, first) = f.launch(2);
     assert!(first.contains(item), "{first}");
