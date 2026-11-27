@@ -350,6 +350,11 @@ fn var(env: &[(String, String)], key: &str, default: &str) -> String {
 }
 /// The host lock, taken without waiting; None when another holds it or it cannot be opened.
 fn take(path: &str) -> Option<File> {
+    // A child another thread forked while the previous holder's descriptor was open holds that lock's open file
+    // description until its exec; a spawn finishes under the launch lock, so none is in flight here.
+    let _quiet = crate::host::LAUNCH
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
     let f = OpenOptions::new()
         .read(true)
         .write(true)
@@ -920,7 +925,13 @@ fn installer(s: &mut impl System, c: &mut Call, name: &str, words: &[&str]) -> R
         ];
         // The installer inherits the lock: it stays held while one lives.
         // The guard sets close-on-exec again when the launch ends, on every path out of it.
+        // The process-wide launch lock is held for the whole window, so no other spawn of this process can
+        // inherit the descriptor; it is declared before `_inherit` and so dropped after the guard that
+        // sets close-on-exec again.
         let child = {
+            let _launching = crate::host::LAUNCH
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner);
             let _inherit = c.lock.as_ref().map(|l| {
                 let _ = rustix::io::fcntl_setfd(l, rustix::io::FdFlags::empty());
                 std::mem::DropGuard::new(l, |l| {
@@ -2077,7 +2088,14 @@ pub(crate) fn tailscale_ssh(
         .cloned()
         .collect();
     let argv = args(&["tailscale", "ssh", call.ssh, call.cmd]);
-    let mut child = s.launch(&argv, &ts_env, call.cwd, files).ok()?;
+    let launched = {
+        // Every launch of a System runs under the process-wide launch lock (see `host::LAUNCH`).
+        let _launching = crate::host::LAUNCH
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        s.launch(&argv, &ts_env, call.cwd, files)
+    };
+    let mut child = launched.ok()?;
     let deadline = s.now() + std::time::Duration::from_millis(call.ms);
     let status = loop {
         match child.try_wait() {
