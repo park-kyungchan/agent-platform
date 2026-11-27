@@ -8,7 +8,8 @@ is elided or points into a main checkout's files, (6) on a host that has the cor
 design sources, a line range of OFFICIAL-DOCS.md section 4 falls outside its file, (7) a file names a retired name
 (RETIRED_NAMES), (8) a file names the legacy memory service (RETIRED_MEMORY, without case), or (9) AGENTS.md
 breaks its form (specs/content/agents-file.md): over 6,500 bytes, its eight section headings not in
-order, a line over 400 characters or a table row, or, on the host, an absolute path that does not exist.
+order, a line over 400 characters or a table row, or, on the host, an absolute path that does not exist, or (10) the
+Lead skill's execution mode lacks the words of one of its rules (specs/content/lead-skill.md R4).
 Reads the repository, and the corpus and the host's paths when they are present. Run: python3 -I -B ci/check-content.py
 """
 import hashlib
@@ -128,6 +129,12 @@ for path, limit in LIMITS:
     used = len(texts.get(path, "").encode())
     if used > limit:
         fail("file_over_limit", path, f"{used} bytes, limit {limit}: cut or move text before adding")
+# The execution mode of the Lead skill (specs/content/lead-skill.md R4): each of its five rules holds its fixed words.
+LEAD_EXECUTION_WORDS = ("session of its own", "ap status --wait", "never by a repeated", "subagent", "only the member", "ont render")
+execution = re.search(r"^### Execution mode\n(.*?)(?=^#{1,3} |\Z)", texts.get("skills/lead/SKILL.md", ""), re.M | re.S)
+missing = [w for w in LEAD_EXECUTION_WORDS if w not in (execution.group(1).lower() if execution else "")]
+if missing:
+    fail("lead_execution_rule_missing", "skills/lead/SKILL.md", f"`### Execution mode` lacks {', '.join(repr(w) for w in missing)}: specs/content/lead-skill.md R4")
 
 # What content/ says about the command `ap` must exist: a verb in backticks, a section of its README by its heading.
 CRATE = ROOT.parent / "crates/ap"

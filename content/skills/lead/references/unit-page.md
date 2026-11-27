@@ -1,5 +1,7 @@
 # Writing a unit's page
 
+Read in design mode when you write or amend a page, choose its class, kind and tiers, or plan a host step: a host step no unit can make is a finding that names command, readback and undo.
+
 The page is the unit object (`crates/ap/README.md` "The unit object"), written by `ap unit write <key>` (`specs/ap/unit-write.md`) or by `ap unit add` and `amend` (`specs/ap/unit.md`). `ap unit page <key>` renders it with the repository's `AGENTS.md`, its map and the role's frame (`crates/ap/src/unit/frames/`): the frame tells the worker and the verifier how they work, so a page restates no shared rule.
 
 ## 1. The fields
