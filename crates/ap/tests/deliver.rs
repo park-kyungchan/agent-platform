@@ -22,13 +22,45 @@ use std::{
     sync::atomic::{AtomicU32, Ordering},
 };
 
+/// `spawn_settled` starts a command and returns once the child has let go of the descriptors it was
+/// forked with. A child holds the open file descriptions of every descriptor of this process until its
+/// `exec` has closed those with close-on-exec, and `spawn()` returns a moment before that: a lock the
+/// process closes and takes again in that moment (as a second call of one `W` does) is still held.
+trait SpawnSettled {
+    fn spawn_settled(&mut self) -> std::io::Result<Child>;
+}
+impl SpawnSettled for Command {
+    fn spawn_settled(&mut self) -> std::io::Result<Child> {
+        let numbers = |dir: &str| -> Option<Vec<u32>> {
+            let d = std::fs::read_dir(dir).ok()?;
+            Some(
+                d.flatten()
+                    .filter_map(|e| e.file_name().to_str()?.parse().ok())
+                    .filter(|n| *n > 2)
+                    .collect(),
+            )
+        };
+        let mine = numbers("/proc/self/fd").unwrap_or_default();
+        let child = self.spawn()?;
+        for _ in 0..250 {
+            // Names only: no descriptor is opened or read, so no reference to one is taken here.
+            match numbers(&format!("/proc/{}/fd", child.id())) {
+                Some(theirs) if theirs.iter().any(|n| mine.contains(n)) => {
+                    std::thread::sleep(std::time::Duration::from_micros(200));
+                }
+                _ => break,
+            }
+        }
+        Ok(child)
+    }
+}
 /// Starts `cmd` under the process-wide launch lock of the library (poison-tolerant), held only across
-/// `spawn()`: a child started while a deliver call has the host lock inheritable would hold that lock.
+/// the start: a child started while a deliver call has the host lock inheritable would hold that lock.
 fn spawn_locked(cmd: &mut Command) -> std::io::Result<Child> {
     let _g = ap::host::LAUNCH
         .lock()
         .unwrap_or_else(std::sync::PoisonError::into_inner);
-    cmd.spawn()
+    cmd.spawn_settled()
 }
 /// `Command::output` with the spawn under the lock; the wait runs after the guard is dropped.
 fn output_locked(cmd: &mut Command) -> std::io::Result<Output> {
@@ -1052,7 +1084,7 @@ impl System for W {
                     .stdin(stdin)
                     .stdout(stdout)
                     .stderr(stderr)
-                    .spawn(),
+                    .spawn_settled(),
                 PcSsh::Script(q) => {
                     let (exit, out) = q.pop_front().unwrap_or((1, String::new()));
                     Command::new("sh")
@@ -1067,14 +1099,14 @@ impl System for W {
                         .stdin(stdin)
                         .stdout(stdout)
                         .stderr(stderr)
-                        .spawn()
+                        .spawn_settled()
                 }
                 PcSsh::Hang => Command::new("sh")
                     .args(["-c", "sleep 60"])
                     .stdin(stdin)
                     .stdout(stdout)
                     .stderr(stderr)
-                    .spawn(),
+                    .spawn_settled(),
             };
         }
         if argv[0].ends_with("/ontology/migrate") || argv[1].ends_with("/scripts/install-ont.sh") {
@@ -1129,7 +1161,7 @@ impl System for W {
             .stdin(stdin)
             .stdout(stdout)
             .stderr(stderr)
-            .spawn()
+            .spawn_settled()
     }
     fn now(&self) -> std::time::Instant {
         std::time::Instant::now() + self.clock_offset
@@ -3776,7 +3808,7 @@ impl W {
             .stdin(stdin)
             .stdout(stdout)
             .stderr(stderr)
-            .spawn()
+            .spawn_settled()
     }
 }
 fn ekept(w: &W) -> String {
@@ -6008,7 +6040,7 @@ impl W {
             .stdin(stdin)
             .stdout(stdout)
             .stderr(stderr)
-            .spawn()
+            .spawn_settled()
     }
 }
 fn etc_rows(v: &Value) -> Vec<(String, Value, Value)> {
