@@ -13,7 +13,7 @@
     reason = "a test fails by panicking, so an unwrap or an expect in its helpers is how it reports"
 )]
 use ap::host::{Answer, Failure, Host, Reply, System};
-use ap::unit::page_review::{Refusal, arguments, execute, execute_as};
+use ap::unit::page_review::{Refusal, arguments, execute, execute_as, key_form};
 use ap::unit::render::{Role, page, page_digest, page_part, plan_block, plan_structure};
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
@@ -4003,5 +4003,273 @@ fn r31_program_first_the_look_of_ap_unit_write_runs_what_it_ran_but_status_129()
     assert_eq!(
         (e.code.as_str(), &e.detail["status"], e.after),
         ("acceptance_not_runnable", &json!(129), None)
+    );
+}
+
+/// A key form of `ap unit review` on the scratch store: its words, then `--store`.
+fn keyed(f: &mut F, words: &[&str]) -> Result<(Value, u8), Box<Refusal>> {
+    let mut argv: Vec<OsString> = words.iter().map(OsString::from).collect();
+    argv.extend(["--store", STORE].map(OsString::from));
+    key_form(f, &argv)
+}
+fn keyed_ok(f: &mut F, words: &[&str]) -> Value {
+    keyed(f, words)
+        .unwrap_or_else(|e| panic!("refused: {e:?}"))
+        .0
+}
+/// The section of earlier reports with these reviews, in this order.
+fn earlier_section(reviews: &[&Value]) -> String {
+    let lines: String = reviews
+        .iter()
+        .map(|v| {
+            format!(
+                "- {}: {}\n",
+                v["review"].as_str().unwrap(),
+                v["report"].as_str().unwrap()
+            )
+        })
+        .collect();
+    format!(
+        "\n## Earlier reports (claims of earlier reviewers; check them, do not trust them)\n\n{lines}\nDigest: "
+    )
+}
+
+// spec: specs/ap/unit-review.md#R32
+#[test]
+fn r32_key_form_resumes_the_newest_session_three_times_then_gives_earlier_reports() {
+    let mut f = F::new();
+    let me = ["u1", "--session", "lead-1"];
+    // No review: a new session, with neither the repair frame nor earlier reports.
+    f.answer("verdict", Some("repair"));
+    let first = keyed_ok(&mut f, &me);
+    f.answer("verdict", None);
+    let start = f.bodies("apply", "start_unit_review")[0].clone();
+    let rid = start["request_id"].as_str().unwrap();
+    assert!(
+        rid.starts_with("uk-") && rid.ends_with("-start") && rid.len() == 41,
+        "{rid}"
+    );
+    assert_eq!(
+        (&start["agent"], &start["session"]),
+        (&json!("lead"), &json!("lead-1"))
+    );
+    let prompt = prompt_of(&f, &first);
+    assert!(!prompt.contains(REPAIR_LOOK) && !prompt.contains("## Earlier reports"));
+    let dir = f.dir().join("work").join(first["review"].as_str().unwrap());
+    f.tick(5);
+    f.amend("u1");
+    f.tick(5);
+    // The newest closed review's session looks again, in the same directory, twice more.
+    let second = keyed_ok(&mut f, &me);
+    assert_eq!(second["session"], first["session"]);
+    assert_eq!(f.seen("cwd").trim(), dir.to_str().unwrap());
+    assert!(prompt_of(&f, &second).contains(&format!("\n{REPAIR_LOOK}\nDigest: ")));
+    let third = keyed_ok(&mut f, &me);
+    assert_eq!(third["session"], first["session"]);
+    // Its fourth look would be `resume_limit`: a new session with the earlier reports instead.
+    let fourth = keyed_ok(&mut f, &me);
+    assert_ne!(fourth["session"], first["session"]);
+    let prompt = prompt_of(&f, &fourth);
+    assert!(!prompt.contains(REPAIR_LOOK));
+    assert!(
+        prompt.contains(&earlier_section(&[&first, &second, &third])),
+        "{prompt}"
+    );
+    // That new session is then the newest: it is resumed.
+    let fifth = keyed_ok(&mut f, &me);
+    assert_eq!(fifth["session"], fourth["session"]);
+    // Two more sessions of three looks each: the earlier reports are the newest five.
+    let sixth = keyed_ok(&mut f, &me);
+    assert_eq!(sixth["session"], fourth["session"]);
+    let seventh = keyed_ok(&mut f, &me);
+    assert!(![&first["session"], &fourth["session"]].contains(&&seventh["session"]));
+    assert!(prompt_of(&f, &seventh).contains(&earlier_section(&[
+        &second, &third, &fourth, &fifth, &sixth
+    ])));
+    // The answer's list is the list of R20, every look of the subject.
+    assert_eq!(seventh["reviews"].as_array().unwrap().len(), 7);
+}
+
+// spec: specs/ap/unit-review.md#R32
+#[test]
+fn r32_key_form_gives_earlier_where_a_resume_would_be_refused() {
+    let mut f = F::new();
+    let me = ["u1", "--session", "lead-1"];
+    f.answer("verdict", Some("repair"));
+    let first = keyed_ok(&mut f, &me);
+    f.answer("verdict", None);
+    let report = first["report"].as_str().unwrap().to_owned();
+    let path = format!("{report}.run.json");
+    let kept = std::fs::read(&path).unwrap();
+    // A record whose cwd is no working directory of a review of the unit (R8): earlier, not a refusal.
+    let mut rec = record(&report);
+    rec["cwd"] = json!(f.p("another-directory"));
+    std::fs::write(&path, rec.to_string()).unwrap();
+    let v = keyed_ok(&mut f, &me);
+    assert_ne!(v["session"], first["session"]);
+    assert!(prompt_of(&f, &v).contains(&earlier_section(&[&first])));
+    // The newest closed review is now that new look, its record unreadable: earlier again.
+    std::fs::write(&path, &kept).unwrap();
+    let newest = format!("{}.run.json", v["report"].as_str().unwrap());
+    std::fs::write(&newest, "not JSON").unwrap();
+    let w = keyed_ok(&mut f, &me);
+    assert!(![&first["session"], &v["session"]].contains(&&w["session"]));
+    assert!(prompt_of(&f, &w).contains(&earlier_section(&[&first, &v])));
+    // The record's account is no longer in the policy's accounts: a new session on the policy's.
+    let policy: Value =
+        serde_json::from_slice(&std::fs::read(f.t.join("policy.json")).unwrap()).unwrap();
+    let mut moved = policy.clone();
+    moved["accounts"]["claude"] = json!([f.p("a2")]);
+    moved["reviews"]["account"] = json!(f.p("a2"));
+    std::fs::write(f.t.join("policy.json"), moved.to_string()).unwrap();
+    let x = keyed_ok(&mut f, &me);
+    assert!(![&first["session"], &v["session"], &w["session"]].contains(&&x["session"]));
+    assert_eq!(
+        record(x["report"].as_str().unwrap())["account"],
+        json!(f.p("a2"))
+    );
+    assert!(prompt_of(&f, &x).contains(&earlier_section(&[&first, &v, &w])));
+    std::fs::write(f.t.join("policy.json"), policy.to_string()).unwrap();
+    // A stage of the record whose unit still lives (`run_still_active` at admission): earlier.
+    let rec = record(x["report"].as_str().unwrap());
+    let unit = rec["unit"].as_str().unwrap().to_owned();
+    f.alive.insert(unit.clone());
+    let y = keyed_ok(&mut f, &me);
+    assert_ne!(y["session"], x["session"]);
+    f.alive.remove(&unit);
+    // While a review of the unit runs, no resume: the call goes on as a look without `resume`
+    // does, and is refused as the request form with the same `earlier` is.
+    f.die_after = Some("close_run");
+    let e = keyed(&mut f, &me).unwrap_err();
+    assert_eq!(e.after, Some("start"));
+    f.die_after = None;
+    f.dead = false;
+    let running = f
+        .reviews_of("unit", "u1")
+        .into_iter()
+        .find(|(_, r)| r["status"] == "running")
+        .unwrap()
+        .0;
+    let closed = y["reviews"].as_array().unwrap().iter();
+    let reported: Vec<Value> = closed
+        .filter(|r| r["status"] == "closed")
+        .map(|r| r["review"].clone())
+        .collect();
+    assert_eq!(reported.len(), 5);
+    let mut r = f.req("unit", "u1");
+    r["earlier"] = json!(reported[reported.len() - 5..]);
+    let want = f.refusal(&r);
+    let e = keyed(&mut f, &me).unwrap_err();
+    assert_eq!((code(&e), &e.after), (code(&want), &want.after));
+    assert_ne!(code(&e).0, "resume_not_possible");
+    let mut r = f.req("unit", "u1");
+    r["finish"] = json!(running);
+    f.ok(&r);
+}
+
+// spec: specs/ap/unit-review.md#R32
+#[test]
+fn r32_key_form_of_an_intent_and_the_refusals_of_the_request_form() {
+    let mut f = F::new();
+    f.env.retain(|(k, _)| k != "CLAUDE_CODE_SESSION_ID");
+    let e = keyed(&mut f, &["u1"]).unwrap_err();
+    assert_eq!(
+        (code(&e), e.after, &e.unit, &e.reviews),
+        (
+            ("usage".into(), "session".into()),
+            None,
+            &None,
+            &Value::Null
+        )
+    );
+    for words in [
+        &[][..],
+        &["u1", "--intent", "widgets"],
+        &["--intent"],
+        &["u1", "u2"],
+        &["u1", "--resume", "x"],
+        &["u1", "--session", "a", "--session", "b"],
+        &["u1", "--agent"],
+    ] {
+        let e = keyed(&mut f, words).unwrap_err();
+        assert_eq!(code(&e), ("usage".into(), "args".into()), "{words:?}");
+    }
+    // The request form's refusals for the same members, before any call.
+    let e = keyed(&mut f, &["u1", "--session", "a b"]).unwrap_err();
+    let mut r = f.req("unit", "u1");
+    r["session"] = json!("a b");
+    assert_eq!(code(&e), code(&f.refusal(&r)));
+    assert_eq!(code(&e), ("invalid_input".into(), "session".into()));
+    let e = keyed(&mut f, &["u/1", "--session", "lead-1"]).unwrap_err();
+    assert_eq!(code(&e), ("invalid_input".into(), "unit".into()));
+    assert!(f.calls.is_empty(), "{:?}", f.calls);
+    let e = keyed(&mut f, &["u9", "--session", "lead-1"]).unwrap_err();
+    assert_eq!(
+        (code(&e), e.unit.as_deref()),
+        (("unknown_unit".into(), "unit".into()), Some("u9"))
+    );
+    // The session of the environment and the agent of `--agent`.
+    f.env
+        .push(("CLAUDE_CODE_SESSION_ID".into(), "lead-1".into()));
+    keyed_ok(&mut f, &["--agent", "lead-b", "u1"]);
+    let start = f.bodies("apply", "start_unit_review").pop().unwrap();
+    assert_eq!(
+        (&start["agent"], &start["session"]),
+        (&json!("lead-b"), &json!("lead-1"))
+    );
+    // A plan: the same rule over the plan's reviews.
+    let mut f = F::new();
+    plan_fixture(&mut f);
+    let me = ["--intent", "widgets", "--session", "lead-1"];
+    let first = keyed_ok(&mut f, &me);
+    assert_eq!(
+        (&first["kind"], &first["intent"]),
+        (&json!("plan"), &json!("widgets"))
+    );
+    let second = keyed_ok(&mut f, &me);
+    assert_eq!(second["session"], first["session"]);
+    assert!(prompt_of(&f, &second).contains(REPAIR_LOOK));
+    let e = keyed(
+        &mut f,
+        &["--intent", "no-such-intent", "--session", "lead-1"],
+    )
+    .unwrap_err();
+    assert_eq!(code(&e), ("unknown_intent".into(), "intent".into()));
+}
+
+// spec: specs/ap/unit-review.md#R32
+#[test]
+fn r32_key_form_of_the_command_reads_no_standard_input() {
+    let mut child = Command::new(env!("CARGO_BIN_EXE_ap"))
+        .args(["unit", "review", "u1", "--store", "/invented/none"])
+        .env_remove("ONT_ROLE")
+        .env_remove("CLAUDE_CODE_SESSION_ID")
+        .stdin(std::process::Stdio::piped())
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped())
+        .spawn()
+        .unwrap();
+    // The pipe stays open and empty while the call runs: a read of it would never end.
+    let stdin = child.stdin.take();
+    let out = child.wait_with_output().unwrap();
+    drop(stdin);
+    let e: Value = serde_json::from_slice(&out.stderr).unwrap();
+    assert_eq!(
+        (out.status.code(), &e["error"]["code"], &e["error"]["field"]),
+        (Some(2), &json!("usage"), &json!("session"))
+    );
+    let help = String::from_utf8(
+        Command::new(env!("CARGO_BIN_EXE_ap"))
+            .args(["unit", "--help"])
+            .output()
+            .unwrap()
+            .stdout,
+    )
+    .unwrap();
+    assert!(
+        help.contains(
+            "ap unit review <key>|--intent <intent> [--store <path>] [--session <id>] [--agent <name>]"
+        ),
+        "{help}"
     );
 }

@@ -16,7 +16,7 @@
 #[path = "fixtures/work/forks.rs"]
 mod forks;
 use ap::host::{Answer, Failure, Host, Reply, System};
-use ap::unit::drive::{Refusal, arguments, decide, execute};
+use ap::unit::drive::{Refusal, approve_key_form, arguments, decide, execute};
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 use std::{
@@ -7392,4 +7392,252 @@ fn objects_import_refuses() {
     }
     assert_eq!(calls_with(&f, calls, "rev-list"), 0);
     assert_eq!(calls_with(&f, calls, "update-ref"), 0);
+}
+
+/// `ap unit approve` in its key form on the scratch store: the answer, or the refusal, `after` and `unit`.
+#[allow(
+    clippy::type_complexity,
+    reason = "the three outputs of the call, as the command prints them"
+)]
+fn approve_keyed(
+    f: &mut F,
+    words: &[&str],
+) -> Result<Value, (Failure, Option<String>, Option<String>)> {
+    let mut argv: Vec<std::ffi::OsString> = words.iter().map(Into::into).collect();
+    argv.extend(["--store", STORE].map(Into::into));
+    let (mut after, mut unit) = (None, None);
+    forks::settled();
+    approve_key_form(f, &argv, &mut after, &mut unit).map_err(|e| (e, after, unit))
+}
+
+// spec: specs/ap/unit-run.md#R52
+#[test]
+fn r52_key_form_of_approve_resolves_a_prefix_of_the_head_from_the_unit_read() {
+    let mut f = F::new();
+    f.set_unit(json!({"class": "contract"}));
+    f.steps(&["implement", "accept"]);
+    let (a, _) = f.ok();
+    assert_eq!(a["waits_for"], "approve", "{a}");
+    let head = a["head"].as_str().unwrap().to_owned();
+    let reason = "Read the diff.";
+    // Checked before any call: the session, the form, the head's form.
+    f.env.retain(|(k, _)| k != "CLAUDE_CODE_SESSION_ID");
+    f.calls.clear();
+    let (e, after, unit) =
+        approve_keyed(&mut f, &[KEY, "--head", &head[..7], "--reason", reason]).unwrap_err();
+    assert_eq!(
+        (e.code, e.field.as_str(), after, unit),
+        ("usage", "session", None, None)
+    );
+    for words in [
+        &[KEY, "--reason", reason][..],
+        &[KEY, "--head", &head[..7]],
+        &["--head", &head[..7], "--reason", reason],
+        &[
+            KEY,
+            "--head",
+            &head[..7],
+            "--head",
+            &head[..7],
+            "--reason",
+            reason,
+        ],
+        &[
+            KEY,
+            "--head",
+            &head[..7],
+            "--reason",
+            reason,
+            "--colour",
+            "x",
+        ],
+    ] {
+        let (e, ..) = approve_keyed(&mut f, words).unwrap_err();
+        assert_eq!((e.code, e.field.as_str()), ("usage", "args"), "{words:?}");
+    }
+    let upper = head[..12].to_uppercase();
+    let long = format!("{head}0");
+    for bad in [&head[..6], upper.as_str(), long.as_str(), "abcdefg-"] {
+        let (e, ..) = approve_keyed(
+            &mut f,
+            &[
+                KEY,
+                "--session",
+                "lead-1",
+                "--head",
+                bad,
+                "--reason",
+                reason,
+            ],
+        )
+        .unwrap_err();
+        assert_eq!(
+            (e.code, e.field.as_str()),
+            ("invalid_input", "head"),
+            "{bad}"
+        );
+        // The request form refuses the same head as the key form, a short one too.
+        let r = json!({"request_id": "ap-x", "head": bad, "reason": reason});
+        let (same, _) = f.decide("approve", "lead-1", r).unwrap_err();
+        assert_eq!((same.code, same.field), (e.code, e.field));
+    }
+    assert!(f.actions().is_empty(), "{:?}", f.actions());
+    // Another session than the intent's Lead, by the environment's variable: the request form's refusal.
+    f.env
+        .push(("CLAUDE_CODE_SESSION_ID".into(), "someone-else".into()));
+    let (e, after, unit) =
+        approve_keyed(&mut f, &[KEY, "--head", &head[..7], "--reason", reason]).unwrap_err();
+    assert_eq!(
+        (e.code, e.field.as_str(), &e.detail, after, unit.as_deref()),
+        ("not_the_lead", "session", &json!("lead-1"), None, Some(KEY))
+    );
+    // A prefix that is not the head's: the digits followed by zeros, refused by the store as the
+    // request form with that head is.
+    let other = if head.starts_with('0') {
+        "1111111"
+    } else {
+        "0000000"
+    };
+    let padded = format!("{other:0<40}");
+    let (e, after, _) = approve_keyed(
+        &mut f,
+        &[
+            "--session",
+            "lead-1",
+            KEY,
+            "--head",
+            other,
+            "--reason",
+            reason,
+        ],
+    )
+    .unwrap_err();
+    let r = json!({"request_id": "ap-p", "head": padded, "reason": reason});
+    let (same, same_after) = f.decide("approve", "lead-1", r).unwrap_err();
+    assert_eq!(
+        (store_code(&e), e.field.as_str(), after),
+        ("head_differs".into(), "approve", None)
+    );
+    assert_eq!(
+        (e.code, e.field.as_str(), &e.detail),
+        (same.code, same.field.as_str(), &same.detail)
+    );
+    assert_eq!(same_after, None);
+    let sent: Vec<Value> = f
+        .bodies("approve_unit")
+        .iter()
+        .map(|b| b["parameters"]["head"].clone())
+        .collect();
+    assert_eq!(sent, [json!(padded), json!(padded)]);
+    // The prefix of the head: the unit's head is sent, with a request id drawn anew and the agent
+    // `--agent` names.
+    let answer = approve_keyed(
+        &mut f,
+        &[
+            KEY,
+            "--head",
+            &head[..7],
+            "--reason",
+            reason,
+            "--session",
+            "lead-1",
+            "--agent",
+            "lead-b",
+        ],
+    )
+    .unwrap();
+    assert_eq!(
+        (
+            &answer["unit"],
+            &answer["outcome"],
+            &answer["approved_head"]
+        ),
+        (&json!(KEY), &json!("applied"), &json!(head))
+    );
+    let body = f.bodies("approve_unit").pop().unwrap();
+    let rid = body["request_id"].as_str().unwrap();
+    assert!(
+        rid.starts_with("uk-") && rid.ends_with("-approve") && rid.len() == 43,
+        "{rid}"
+    );
+    assert_eq!(
+        (
+            &body["role"],
+            &body["agent"],
+            &body["session"],
+            &body["parameters"]["head"]
+        ),
+        (
+            &json!("lead"),
+            &json!("lead-b"),
+            &json!("lead-1"),
+            &json!(head)
+        )
+    );
+    // Forty digits are sent as given.
+    let again = approve_keyed(
+        &mut f,
+        &[
+            KEY,
+            "--head",
+            &head,
+            "--reason",
+            reason,
+            "--session",
+            "lead-1",
+        ],
+    )
+    .unwrap();
+    assert_eq!(again["approved_head"], json!(head));
+}
+
+// spec: specs/ap/unit-run.md#R52
+#[test]
+fn r52_key_form_of_approve_reads_no_standard_input_and_reject_has_none() {
+    let ap = |args: &[&str]| {
+        let mut child = forks::forking(|| {
+            Command::new(env!("CARGO_BIN_EXE_ap"))
+                .args(args)
+                .env_remove("ONT_ROLE")
+                .env_remove("CLAUDE_CODE_SESSION_ID")
+                .stdin(std::process::Stdio::piped())
+                .stdout(std::process::Stdio::piped())
+                .stderr(std::process::Stdio::piped())
+                .spawn()
+        })
+        .unwrap();
+        // The pipe stays open and empty while the call runs: a read of it would never end.
+        let stdin = child.stdin.take();
+        let out = child.wait_with_output().unwrap();
+        drop(stdin);
+        let e: Value = serde_json::from_slice(&out.stderr).unwrap();
+        (out.status.code(), e)
+    };
+    let (status, e) = ap(&["unit", "approve", KEY, "--head", "abcdef0", "--reason", "r"]);
+    assert_eq!(
+        (status, e),
+        (
+            Some(2),
+            json!({"error": {"code": "usage", "field": "session", "detail": null, "after": null,
+                "unit": null}})
+        )
+    );
+    let (status, e) = ap(&["unit", "reject", KEY, "--reason", "r", "--session", "s"]);
+    assert_eq!(
+        (status, &e["error"]["code"], &e["error"]["field"]),
+        (Some(2), &json!("usage"), &json!("args"))
+    );
+    let help = forks::forking(|| {
+        Command::new(env!("CARGO_BIN_EXE_ap"))
+            .args(["unit", "--help"])
+            .output()
+    })
+    .unwrap();
+    let help = String::from_utf8(help.stdout).unwrap();
+    assert!(
+        help.contains(
+            "ap unit approve <key> --head <hex> --reason <text> [--store <path>] [--session <id>] [--agent <name>]"
+        ),
+        "{help}"
+    );
 }

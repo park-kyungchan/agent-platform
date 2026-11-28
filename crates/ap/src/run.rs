@@ -1510,45 +1510,10 @@ fn request_at(
     let earlier = match &resume {
         None => None,
         Some(file) => {
-            let rec: Value = std::fs::read(file)
-                .ok()
-                .and_then(|b| serde_json::from_slice(&b).ok())
-                .ok_or_else(|| error("resume_record_missing", "resume"))?;
-            let missing = |_| error("resume_record_missing", "resume");
-            require!(Runtime::of(rec.get("runtime")) == Some(runtime) => "resume_runtime_differs", "runtime");
-            let (session, account) = (
-                text(&rec, "session").map_err(missing)?,
-                text(&rec, "account").map_err(missing)?,
-            );
-            // A CLI takes the session as an argument of its own: never one it reads as a flag.
-            require!(!session.starts_with('-') => "resume_record_missing", "resume");
-            require!(accounts.iter().any(|a| a == account) => "resume_account_differs", "account");
-            require!(rec["cwd"] == cwd.as_str() => "resume_cwd_differs", "cwd");
-            let fixes = role == "fixer" && (rec["role"] == "implementer" || rec["role"] == "fixer");
-            require!(rec["role"] == role || fixes => "resume_role_differs", "role");
-            // Whatever the record says (`failed` with `unmet: stop` too): nothing of its unit may live.
-            if let Some(unit) = rec["unit"].as_str() {
-                require!(ended(s, unit) => "run_still_active", "resume");
-            }
-            // Under `limits` a session continues in its home, which a session that ran without
-            // them has not; a session that ran in a home continues only there (`specs/ap/run-limits.md`
-            // R14).
-            if runtime == Runtime::Claude {
-                let fits = match &limits {
-                    Some(_) => session_home(account, session).is_some(),
-                    None => rec.get("home").is_none(),
-                };
-                require!(fits => "invalid_input", "resume");
-            }
-            if runtime == Runtime::Agy {
-                home = Some(
-                    resumed_home(&rec, account).ok_or_else(|| error("invalid_input", "resume"))?,
-                );
-            }
-            Some((
-                rec.clone(),
-                (session.to_owned(), account.to_owned(), file.clone()),
-            ))
+            let (rec, session, account, at) =
+                resumed_record(s, file, runtime, &accounts, &cwd, role, limits.is_some())?;
+            home = at;
+            Some((rec, (session, account, file.clone())))
         }
     };
     if at_cwd && earlier.is_none() && role == "implementer" {
@@ -1692,6 +1657,87 @@ fn request_at(
         host,
         pc_env,
     })
+}
+/// The checks of admission on a resumed record (`specs/ap/run.md` R10, `specs/ap/run-limits.md` R14), in
+/// their order: the record, its runtime, its session and account, its `cwd`, its role, the end of its
+/// unit, and the home its session continues in. The record, its session and account, and for `agy`
+/// the home of the record.
+fn resumed_record(
+    s: &mut impl System,
+    file: &str,
+    runtime: Runtime,
+    accounts: &[String],
+    cwd: &str,
+    role: &str,
+    limits: bool,
+) -> Result<(Value, String, String, Option<String>), Failure> {
+    let rec: Value = std::fs::read(file)
+        .ok()
+        .and_then(|b| serde_json::from_slice(&b).ok())
+        .ok_or_else(|| error("resume_record_missing", "resume"))?;
+    let missing = |_| error("resume_record_missing", "resume");
+    require!(Runtime::of(rec.get("runtime")) == Some(runtime) => "resume_runtime_differs", "runtime");
+    let (session, account) = (
+        text(&rec, "session").map_err(missing)?,
+        text(&rec, "account").map_err(missing)?,
+    );
+    // A CLI takes the session as an argument of its own: never one it reads as a flag.
+    require!(!session.starts_with('-') => "resume_record_missing", "resume");
+    require!(accounts.iter().any(|a| a == account) => "resume_account_differs", "account");
+    require!(rec["cwd"] == cwd => "resume_cwd_differs", "cwd");
+    let fixes = role == "fixer" && (rec["role"] == "implementer" || rec["role"] == "fixer");
+    require!(rec["role"] == role || fixes => "resume_role_differs", "role");
+    // Whatever the record says (`failed` with `unmet: stop` too): nothing of its unit may live.
+    if let Some(unit) = rec["unit"].as_str() {
+        require!(ended(s, unit) => "run_still_active", "resume");
+    }
+    // Under `limits` a session continues in its home, which a session that ran without
+    // them has not; a session that ran in a home continues only there (`specs/ap/run-limits.md`
+    // R14).
+    if runtime == Runtime::Claude {
+        let fits = match limits {
+            true => session_home(account, session).is_some(),
+            false => rec.get("home").is_none(),
+        };
+        require!(fits => "invalid_input", "resume");
+    }
+    let home = match runtime {
+        Runtime::Agy => {
+            Some(resumed_home(&rec, account).ok_or_else(|| error("invalid_input", "resume"))?)
+        }
+        Runtime::Claude => None,
+    };
+    let (session, account) = (session.to_owned(), account.to_owned());
+    Ok((rec, session, account, home))
+}
+/// Whether the admission of a reviewer's stage under `limits` on `runtime` that resumes the record at
+/// `file`, in the record's own `cwd` and on the record's account and model, passes the checks of
+/// `resumed_record` and the policy's model and account rule: the choice of the key form of `ap unit
+/// review` (`specs/ap/unit-review.md` R32). Reads; applies nothing.
+pub(crate) fn resume_admitted(s: &mut impl System, file: &str, runtime: &str) -> bool {
+    let Some(runtime) = Runtime::of(Some(&json!(runtime))) else {
+        return false;
+    };
+    let read = std::fs::read(file).ok();
+    let Some(rec) = read.and_then(|b| serde_json::from_slice::<Value>(&b).ok()) else {
+        return false;
+    };
+    let (Some(account), Some(cwd), Some(model)) = (
+        rec["account"].as_str(),
+        rec["cwd"].as_str(),
+        rec["model"].as_str(),
+    ) else {
+        return false;
+    };
+    let accounts = [account.to_owned()];
+    if resumed_record(s, file, runtime, &accounts, cwd, "reviewer", true).is_err() {
+        return false;
+    }
+    match policy_for(s, false) {
+        Ok(None) => true,
+        Ok(Some(p)) => p.admit(runtime, "reviewer", model, &accounts).is_ok(),
+        Err(_) => false,
+    }
 }
 /// The `home` of an `agy` record that a resume runs in: a directory under `<account>/homes` (links
 /// and `..` resolved), the `homes` directory itself excluded. None otherwise.

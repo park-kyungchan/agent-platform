@@ -164,13 +164,24 @@ pub fn cli(argv: &[OsString]) -> ExitCode {
             fields: None,
         })
     };
-    let result = arguments(argv).map_err(refused).and_then(|call| {
-        let r = match call.op {
-            "page" => Value::Null,
-            _ => request().map_err(refused)?,
-        };
-        execute(&mut Host, &call, &r)
-    });
+    let result = match arguments(argv) {
+        Ok(call) => {
+            let r = match call.op {
+                "page" => Ok(Value::Null),
+                _ => request().map_err(refused),
+            };
+            r.and_then(|r| execute(&mut Host, &call, &r))
+        }
+        // The key forms of `ready` and `used`, read beside the request form (R60).
+        Err(_)
+            if KEY_FORMS
+                .iter()
+                .any(|w| argv.first().is_some_and(|a| a == w)) =>
+        {
+            key_form(&mut Host, argv)
+        }
+        Err(f) => Err(refused(f)),
+    };
     let (written, status) = match result {
         Ok(out) => (std::io::stdout().write_all(out.as_bytes()), 0),
         Err(e) => {
@@ -183,6 +194,42 @@ pub fn cli(argv: &[OsString]) -> ExitCode {
         }
     };
     ExitCode::from(if written.is_ok() { status } else { 4 })
+}
+/// The words that have a key form besides their request form (R60).
+const KEY_FORMS: [&str; 2] = ["ready", "used"];
+/// `ap unit ready <key>` and `ap unit used <key> --evidence <text>`, each with `--store`, `--session`
+/// and `--agent` in any order (R60): the request the words stand for, applied as the request form
+/// with the same members is; no standard input is read.
+pub fn key_form(s: &mut impl System, argv: &[OsString]) -> Result<String, Box<Refusal>> {
+    let refused = |f: Failure| {
+        Box::new(Refusal {
+            code: f.code.into(),
+            field: f.field,
+            detail: f.detail,
+            after: None,
+            unit: None,
+            fields: None,
+        })
+    };
+    let usage = || refused(error("usage", "args"));
+    let (first, rest) = argv.split_first().ok_or_else(usage)?;
+    let op = *KEY_FORMS.iter().find(|w| first == **w).ok_or_else(usage)?;
+    let named: &[&'static str] = if op == "used" { &["evidence"] } else { &[] };
+    let form = super::key_arguments(rest, named).map_err(refused)?;
+    let key = form.key.clone().ok_or_else(usage)?;
+    let evidence = form.named.get("evidence");
+    if op == "used" && evidence.is_none() {
+        return Err(usage());
+    }
+    let mut r = form.request(s).map_err(refused)?;
+    r["unit"] = json!(key);
+    if let Some(evidence) = evidence {
+        r["evidence"] = json!(evidence);
+    }
+    // The call of the request form of the op, with the key form's store.
+    let mut call = arguments(&[OsString::from(op)]).map_err(refused)?;
+    call.store = form.store;
+    execute(s, &call, &r)
 }
 /// The request of standard input: one JSON value of at most 1 MiB.
 pub(super) fn request() -> Result<Value, Failure> {
