@@ -1,0 +1,144 @@
+[
+ {
+  "id": "route-00d642ed022a",
+  "kind": "route",
+  "cell": "language.object-type",
+  "situation": "What does an invented interface list?\n\nCite the passage of the corpus that decides this as path:a-b, the file's path and the first and last line of the passage.",
+  "deciding": [
+   {
+    "source": "https://docs.example.invalid/foundry/object-types/",
+    "path": "palantir/docs/foundry/object-types.md",
+    "lines": [
+     15,
+     17
+    ]
+   }
+  ],
+  "wrong": []
+ },
+ {
+  "id": "route-3d1b053aeadc",
+  "kind": "route",
+  "cell": "logic.action-type",
+  "situation": "Is an invented action whose criteria fail applied in part?\n\nCite the passage of the corpus that decides this as path:a-b, the file's path and the first and last line of the passage.",
+  "deciding": [
+   {
+    "source": "palantir/docs/foundry/action-types.md",
+    "path": "palantir/docs/foundry/action-types.md",
+    "lines": [
+     3,
+     6
+    ]
+   }
+  ],
+  "wrong": []
+ },
+ {
+  "id": "route-80d41c933207",
+  "kind": "route",
+  "cell": "language.object-type",
+  "situation": "Where is an invented link type stored?\n\nCite the passage of the corpus that decides this as path:a-b, the file's path and the first and last line of the passage.",
+  "deciding": [
+   {
+    "source": "https://docs.example.invalid/foundry/object-types/",
+    "path": "palantir/docs/foundry/object-types.md",
+    "lines": [
+     11,
+     13
+    ]
+   }
+  ],
+  "wrong": []
+ },
+ {
+  "id": "route-a246f5d568b3",
+  "kind": "route",
+  "cell": "language.object-type",
+  "situation": "May the value type of an invented property be changed in place?\n\nCite the passage of the corpus that decides this as path:a-b, the file's path and the first and last line of the passage.",
+  "deciding": [
+   {
+    "source": "https://docs.example.invalid/foundry/object-types/",
+    "path": "palantir/docs/foundry/object-types.md",
+    "lines": [
+     7,
+     9
+    ]
+   }
+  ],
+  "wrong": []
+ },
+ {
+  "id": "route-ac0367aaf56a",
+  "kind": "route",
+  "cell": "engine.release",
+  "situation": "What did the invented page most recently say an action may name?\n\nCite the passage of the corpus that decides this as path:a-b, the file's path and the first and last line of the passage.",
+  "deciding": [
+   {
+    "source": "palantir/docs/foundry/action-types.md",
+    "path": "palantir/docs/foundry/action-types.md",
+    "lines": [
+     12,
+     14
+    ]
+   }
+  ],
+  "wrong": []
+ },
+ {
+  "id": "trend-6e758ec68046",
+  "kind": "trend",
+  "cell": "logic.action-type",
+  "situation": "What did the invented publisher most recently announce about action criteria?\n\nCite the passage of the corpus that decides this as path:a-b, the file's path and the first and last line of the passage.",
+  "deciding": [
+   {
+    "source": "https://blog.example.invalid/2026-launch",
+    "path": "palantir/blog/2026-launch.md",
+    "lines": [
+     3,
+     6
+    ]
+   }
+  ],
+  "wrong": []
+ },
+ {
+  "id": "trend-ac0367aaf56a",
+  "kind": "trend",
+  "cell": "engine.release",
+  "situation": "What did the invented page most recently say an action may name?\n\nCite the passage of the corpus that decides this as path:a-b, the file's path and the first and last line of the passage.",
+  "deciding": [
+   {
+    "source": "palantir/docs/foundry/action-types.md",
+    "path": "palantir/docs/foundry/action-types.md",
+    "lines": [
+     12,
+     14
+    ]
+   }
+  ],
+  "wrong": []
+ },
+ {
+  "id": "design-title-or-key",
+  "kind": "design",
+  "cell": "language.property",
+  "situation": "An invented object type shows its primary key to people as its name. Should the key stay the property shown first, or should a separate property be shown?\n\nCite the passage of the corpus that decides this as path:a-b, the file's path and the first and last line of the passage.",
+  "deciding": [
+   {
+    "source": "https://docs.example.invalid/foundry/object-types/",
+    "path": "palantir/docs/foundry/object-types.md",
+    "lines": [
+     19,
+     21
+    ]
+   }
+  ],
+  "wrong": [
+   {
+    "fact": [
+     "the primary key is the title"
+    ]
+   }
+  ]
+ }
+]

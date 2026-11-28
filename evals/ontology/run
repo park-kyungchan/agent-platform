@@ -1,0 +1,499 @@
+#!/usr/bin/env -S python3 -I -B
+"""The Ontology Engineering suite: given an engineering decision, or a question about what the publisher most recently
+said, does a reader that reads the corpus as an agent of this host does cite the passage that decides it? Several
+samples per case, scored by program: a citation `path:a-b` whose lines overlap the case's; no model judges.
+
+  run answers --reader claude-opus --out DIR --cases FILE [--samples N] [--case ID ...] [--corpus DIR]
+  run score --out DIR --cases FILE [--paths FILE] [--corpus DIR]
+  run gate --baseline SCORE.json --candidate SCORE.json
+  run reach --cases FILE --tables FILE [--tables FILE ...] [--entry FILE] [--instructions DIR] [--paths FILE]
+  run cases --inventory FILE --out FILE [--per-cell N]
+
+The readers, their command lines, the unit that holds a session, the files of a sample, run.json, the gate and every
+refusal they share are those of evals/routing/run, which this file loads as a module (it is not changed here). What
+differs: the one reader is claude-opus, the session's only message is the case's situation, and the score reads
+citations. Every refusal is one line {"status":"<code>"} with exit 2. Method and limits: evals/README.md, "The
+Ontology Engineering suite"; the contract: specs/evals/ontology.md.
+"""
+import hashlib
+import importlib.machinery
+import importlib.util
+import json
+import os
+import re
+import shutil
+import signal
+import statistics
+import sys
+import threading
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+SELF = os.path.abspath(__file__)
+REPO_CASES = os.path.join(HERE, "cases.json")
+HOST_DIGESTS = os.path.join(HERE, "host-cases.sha256")
+
+
+def load_routing():
+    loader = importlib.machinery.SourceFileLoader("routing_run", os.path.join(HERE, "..", "routing", "run"))
+    mod = importlib.util.module_from_spec(importlib.util.spec_from_loader("routing_run", loader))
+    loader.exec_module(mod)
+    return mod
+
+
+R = load_routing()
+READER = "claude-opus"
+READER_NAMES = (READER,)
+JOBS = 2  # sessions at a time
+ROOT = "/root/.agents"  # the session's added directory: the installed instructions
+CORPUS = "/home/palantirkc/external/reference-docs"
+INSTRUCTIONS = "/root/.agents"
+ENTRY = os.path.join("runtime-references", "OFFICIAL-DOCS.md")
+KINDS = ("route", "trend", "design")
+SOURCE_KINDS = ("official-doc", "official-blog", "official-announcement", "talk-asr", "secondary-synthesis", "catalog",
+                "work-file")
+STRENGTHS = ("normative", "descriptive", "promotional")
+# The fixed last sentence of every situation: it asks for the citation of the deciding passage.
+ASK = ("Cite the passage of the corpus that decides this as path:a-b, the file's path and the first and last line "
+       "of the passage.")
+# A citation: a path (no white space, quote, bracket or backtick), a colon, a line, and optionally a hyphen and a line.
+CITE = re.compile(r"(?P<path>[^\s`'\"()\[\]{}<>,;|*]+?):(?P<a>[0-9]+)(?:-(?P<b>[0-9]+))?(?![0-9])")
+
+# The reader of this suite: its row is built by the routing suite's own builder of a Claude command line.
+R.READERS[READER] = {"cli": "claude", "argv": R.claude_argv("opus"), "env": ("CLAUDE_CONFIG_DIR",),
+                     "state": R.claude_state}
+R.PROMPT = "{situation}"  # the case's situation is the whole first message
+
+# ---------------------------------------------------------------- cases
+
+
+def host_names():
+    names = {}
+    if os.path.exists(HOST_DIGESTS):
+        with open(HOST_DIGESTS, encoding="utf-8") as f:
+            for line in f:
+                parts = line.split()
+                if len(parts) == 2:
+                    names[parts[0]] = parts[1]
+    return names
+
+
+def is_lines(v):
+    return (isinstance(v, list) and len(v) == 2 and all(isinstance(x, int) and not isinstance(x, bool) for x in v)
+            and 1 <= v[0] <= v[1])
+
+
+def text(v):
+    return isinstance(v, str) and bool(v.strip())
+
+
+def valid_case(c):
+    return (isinstance(c, dict) and isinstance(c.get("id"), str) and c["id"] and "/" not in c["id"]
+            and not c["id"].startswith(".") and c.get("kind") in KINDS and text(c.get("cell"))
+            and text(c.get("situation")) and c["situation"].endswith(ASK)
+            and isinstance(c.get("deciding"), list) and bool(c["deciding"])
+            and all(isinstance(d, dict) and text(d.get("source")) and text(d.get("path")) and is_lines(d.get("lines"))
+                    for d in c["deciding"])
+            and R.fact_list(c.get("wrong")))
+
+
+def load_cases(path):
+    """The cases of the one case file of a call: (id -> case, {short name: SHA-256}). The file is the repository's
+    evals/ontology/cases.json or a host file admitted by its digest; the two never mix."""
+    if not os.path.isfile(path):
+        R.refuse("cases_unreadable")
+    digest = R.sha_file(path)
+    if os.path.realpath(path) == os.path.realpath(REPO_CASES):
+        name = "cases.json"
+    else:
+        known = host_names()
+        if digest not in known:
+            R.refuse("cases_digest_unknown")
+        name = known[digest]
+    data = R.read_json(path)
+    if not isinstance(data, list) or not all(valid_case(c) for c in data):
+        R.refuse("cases_invalid")
+    cases = {}
+    for c in data:
+        if c["id"] in cases:
+            R.refuse("case_id_twice")
+        cases[c["id"]] = c
+    return cases, {name: digest}
+
+
+def load_paths(path):
+    """The paths file: a JSON object from a source key to the list of every path the file has had, or None."""
+    if path is None:
+        return None
+    data = R.read_json(path)
+    if not (isinstance(data, dict) and all(isinstance(k, str) and k and isinstance(v, list)
+                                           and all(isinstance(p, str) and p for p in v) for k, v in data.items())):
+        R.refuse("paths_invalid")
+    return data
+
+
+# ---------------------------------------------------------------- citations
+
+
+def citations(s):
+    """Every citation of a text as (path, first line, last line)."""
+    found = []
+    for m in CITE.finditer(s):
+        a = int(m.group("a"))
+        b = int(m.group("b")) if m.group("b") else a
+        found.append((m.group("path"), min(a, b), max(a, b)))
+    return found
+
+
+def names(cited, path):
+    """A cited path names a path when it equals it or ends with it at a `/` boundary."""
+    return cited == path or cited.endswith("/" + path)
+
+
+def sources_of(cited, entry, paths):
+    """Whether a cited path names a deciding entry: through the paths file when one is given, else by its path or
+    source."""
+    if paths is not None:
+        return any(names(cited, p) for p in paths.get(entry["source"], []))
+    return names(cited, entry["path"]) or names(cited, entry["source"])
+
+
+def overlaps(a, b, lines):
+    return a <= lines[1] and lines[0] <= b
+
+
+def cites(case, s, paths):
+    """Whether a text holds a citation of a deciding passage of the case."""
+    return any(sources_of(p, d, paths) and overlaps(a, b, d["lines"]) for p, a, b in citations(s) for d in case["deciding"])
+
+
+def passes(case, answer, paths):
+    t = R.norm(answer)
+    return cites(case, answer, paths) and not any(R.holds(f, t) for f in case["wrong"])
+
+
+def corpus_bytes(stream, corpus):
+    """The UTF-8 bytes of the text of the `tool_result` blocks answering a `tool_use` block one of whose input strings
+    holds `<corpus>/`; each block counted once."""
+    mark, uses, results = corpus.rstrip("/") + "/", set(), {}
+    for e in R.events(stream):
+        message = e.get("message")
+        content = message.get("content") if isinstance(message, dict) else None
+        for b in content if isinstance(content, list) else []:
+            if not isinstance(b, dict):
+                continue
+            if b.get("type") == "tool_use" and isinstance(b.get("id"), str) \
+                    and any(mark in x for x in R.strings(b.get("input"))):
+                uses.add(b["id"])
+            elif b.get("type") == "tool_result" and isinstance(b.get("tool_use_id"), str) \
+                    and b["tool_use_id"] not in results:
+                c = b.get("content")
+                if isinstance(c, str):
+                    body = c
+                elif isinstance(c, list):
+                    body = "".join(x["text"] for x in c if isinstance(x, dict) and isinstance(x.get("text"), str))
+                else:
+                    body = ""
+                results[b["tool_use_id"]] = len(body.encode("utf-8"))
+    return sum(n for k, n in results.items() if k in uses)
+
+
+# ---------------------------------------------------------------- answers
+
+
+def corpus_of(a):
+    return os.path.normpath(os.path.abspath(a.corpus))
+
+
+def cmd_answers(a):
+    if a.reader != READER or not 1 <= a.samples <= 9:
+        R.refuse("usage")
+    a.root, a.deny, corpus = ROOT, [], corpus_of(a)
+    if not os.path.isdir(corpus):
+        R.refuse("corpus_invalid")
+    cases, digests = load_cases(a.cases)
+    if [c for c in a.case if c not in cases]:
+        R.refuse("case_unknown")
+    ids = sorted(set(a.case) if a.case else cases)
+    sandbox = R.Sandbox(a.reader, [])
+    if not shutil.which(R.READERS[a.reader]["cli"]):
+        R.refuse("cli_missing")
+    out = os.path.join(os.path.abspath(a.out), a.reader)
+    suite = hashlib.sha256((R.sha_file(SELF) + R.sha_file(R.SELF)).encode()).hexdigest()
+    record = {"samples": a.samples, "cases": ids, "case_files": digests, "suite": suite, "corpus": corpus}
+    path = os.path.join(out, "run.json")
+    old = R.read_json(path) if os.path.exists(path) else None
+    if os.path.exists(path) and (not isinstance(old, dict)
+                                 or any(old.get(k) != record[k] for k in ("cases", "case_files", "suite", "corpus"))
+                                 or not isinstance(old.get("samples"), int) or old["samples"] > a.samples):
+        R.refuse("run_differs")
+    key = lambda c, n: "%s__s%d" % (c, n)
+    states = {key(c, n): "done" for n in range(1, a.samples + 1) for c in ids if R.done(os.path.join(out, key(c, n)))}
+    todo = [(cases[c], n) for n in range(1, a.samples + 1) for c in ids if key(c, n) not in states]
+    if sandbox.active([R.unit_of(os.path.join(out, key(c["id"], n))) for c, n in todo]):
+        R.refuse("run_still_active")
+    R.sweep_dead_work()  # after the last refusal: the work directories of killed calls
+    os.makedirs(out, exist_ok=True)
+    if todo:
+        sandbox.probe(out)
+    if old is None or old.get("samples") != a.samples:
+        R.write_atomic(path, json.dumps(record, indent=1) + "\n")
+    broke, lost, lock = [], [], threading.Lock()
+
+    def worker():
+        while True:
+            with lock:
+                if not todo or broke or lost:
+                    return
+                c, n = todo.pop(0)
+            try:
+                m = R.run_sample(a, sandbox, {"id": c["id"], "situation": c["situation"]}, n,
+                                 os.path.join(out, key(c["id"], n)))
+            except Exception:  # an error of this program for one sample: the sample stays unanswered
+                m = {"state": "failed", "mcp_processes": []}
+            with lock:
+                states[key(c["id"], n)] = m["state"]
+                if m["state"] == "sandbox_unavailable":
+                    lost.append(key(c["id"], n))
+                if m["mcp_processes"]:
+                    broke.append(key(c["id"], n))  # the MCP rule did not hold: start no further session
+    threads = [threading.Thread(target=worker, daemon=True) for _ in range(JOBS)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+    if lost:
+        R.refuse("sandbox_unavailable")
+    for c, n in todo:
+        states[key(c["id"], n)] = "not_run"
+    print(json.dumps({"reader": a.reader, "samples": dict(sorted(states.items())), "mcp_rule_broken": sorted(broke)},
+                     indent=1))
+    return 2 if broke else 0
+
+
+# ---------------------------------------------------------------- score
+
+
+def score_reader(d, record, cases, paths, corpus):
+    n, ids = record["samples"], record["cases"]
+    passed, per_sample = {c: 0 for c in ids}, [0] * n
+    unanswered, tokens, metas, read = 0, [], [], []
+    by_kind, by_cell = {}, {}
+    for cid in ids:
+        for tally in (by_kind.setdefault(cases[cid]["kind"], {"passes": 0, "samples": 0}),
+                      by_cell.setdefault(cases[cid]["cell"], {"passes": 0, "samples": 0})):
+            tally["samples"] += n
+        for s in range(1, n + 1):
+            base = os.path.join(d, "%s__s%d" % (cid, s))
+            if not R.done(base):
+                unanswered += 1
+                continue
+            meta = R.read_json(base + ".json")
+            metas.append(meta)
+            with open(base + ".md", encoding="utf-8", errors="replace") as f:
+                answer = f.read()
+            try:
+                with open(base + ".jsonl", encoding="utf-8", errors="replace") as f:
+                    read.append(corpus_bytes(f.read(), corpus))
+            except OSError:
+                read.append(0)
+            if isinstance(meta.get("input_tokens"), int):
+                tokens.append(meta["input_tokens"])
+            if passes(cases[cid], answer, paths):
+                passed[cid] += 1
+                per_sample[s - 1] += 1
+                by_kind[cases[cid]["kind"]]["passes"] += 1
+                by_cell[cases[cid]["cell"]]["passes"] += 1
+    return {"n": n, "passes": passed, "samples": per_sample, "mean": round(sum(per_sample) / n, 4),
+            "majority": sorted(c for c in ids if passed[c] > n / 2), "unanswered": unanswered,
+            "tokens_median": statistics.median(tokens) if tokens else None, **R.cost_members(metas),
+            "by_kind": dict(sorted(by_kind.items())), "by_cell": dict(sorted(by_cell.items())),
+            "corpus_bytes_median": statistics.median(read) if read else None}
+
+
+def sheet(result):
+    lines = R.sheet(result).replace("# Routing suite: score", "# Ontology Engineering suite: score", 1)
+    lines = lines.rstrip("\n").split("\n")
+    kinds = sorted({k for x in result["readers"].values() for k in x["by_kind"]})
+    lines += ["", "Passed samples per kind, and the corpus bytes an answer read (median):", "",
+              "| Reader | " + " | ".join(kinds) + " | corpus bytes (median) |", "| --- |" + " --- |" * (len(kinds) + 1)]
+    for r, x in result["readers"].items():
+        cells = ["%d/%d" % (x["by_kind"][k]["passes"], x["by_kind"][k]["samples"]) if k in x["by_kind"] else "-"
+                 for k in kinds]
+        median = x["corpus_bytes_median"]
+        lines.append("| %s | %s | %s |" % (r, " | ".join(cells), "-" if median is None else median))
+    return "\n".join(lines) + "\n"
+
+
+def cmd_score(a):
+    a.record = None
+    out, corpus = os.path.abspath(a.out), corpus_of(a)
+    readers = [r for r in READER_NAMES if os.path.isdir(os.path.join(out, r))]
+    if not readers:
+        R.refuse("no_reader")
+    records = {}
+    for r in readers:
+        rec = R.read_json(os.path.join(out, r, "run.json"))
+        if not (isinstance(rec, dict) and isinstance(rec.get("samples"), int) and rec["samples"] >= 1
+                and isinstance(rec.get("cases"), list) and isinstance(rec.get("case_files"), dict)):
+            R.refuse("run_record_missing")
+        records[r] = rec
+    first = records[readers[0]]
+    if any(rec.get("suite") != first.get("suite") or rec["case_files"] != first["case_files"]
+           or rec.get("corpus") != corpus for rec in records.values()):
+        R.refuse("run_differs")
+    paths = load_paths(a.paths)
+    cases, digests = load_cases(a.cases)
+    if digests != first["case_files"] or any(c not in cases for rec in records.values() for c in rec["cases"]):
+        R.refuse("case_sets_differ")
+    result = {"suite": first.get("suite"), "case_files": digests,
+              "readers": {r: score_reader(os.path.join(out, r), records[r], cases, paths, corpus) for r in readers}}
+    sonnet = result["readers"].get("claude-sonnet", {}).get("majority")
+    result["parity"] = {r: (round(len(set(sonnet) & set(x["majority"])) / len(sonnet), 4) if sonnet else None)
+                        for r, x in result["readers"].items() if r != "claude-sonnet"}
+    text_ = json.dumps(result, indent=1)
+    R.write_atomic(os.path.join(out, "score.json"), text_ + "\n")
+    R.write_atomic(os.path.join(out, "sheet.md"), sheet(result))
+    return R.report(a, "ontology", out, records, result, text_)
+
+
+# ---------------------------------------------------------------- reach
+
+
+def read_text(path, code):
+    try:
+        with open(path, encoding="utf-8", errors="replace") as f:
+            return f.read()
+    except OSError:
+        R.refuse(code)
+
+
+def named(body, path, base=None):
+    """A file is named in a text by its path as given, its absolute path, its path under `base`, or its file name."""
+    forms = {path, os.path.abspath(path), os.path.basename(path)}
+    if base is not None:
+        forms.add(os.path.relpath(os.path.abspath(path), os.path.abspath(base)))
+    return any(f and f in body for f in forms)
+
+
+def cmd_reach(a):
+    cases, _ = load_cases(a.cases)
+    paths = load_paths(a.paths)
+    instructions = a.instructions
+    entry = a.entry if a.entry is not None else os.path.join(instructions, ENTRY)
+    agents = read_text(os.path.join(instructions, "AGENTS.md"), "instructions_unreadable")
+    entry_text = read_text(entry, "instructions_unreadable")
+    tables = [(t, read_text(t, "tables_unreadable")) for t in a.tables]
+    entry_named = named(agents, entry, instructions)
+    table_named = all(os.path.realpath(t) == os.path.realpath(entry) or named(entry_text, t) for t, _ in tables)
+    rows = [("%s:%d" % (t, no), line) for t, body in tables for no, line in enumerate(body.split("\n"), 1)
+            if citations(line)]
+    totals = {"cases": 0, "entry_named": 0, "table_named": 0, "row": 0, "reached": 0}
+    for cid in sorted(cases):
+        row = next((where for where, line in rows if cites(cases[cid], line, paths)), None)
+        print(json.dumps({"case": cid, "entry_named": entry_named, "table_named": table_named, "row": row},
+                         separators=(",", ":")))
+        totals["cases"] += 1
+        totals["entry_named"] += entry_named
+        totals["table_named"] += table_named
+        totals["row"] += row is not None
+        totals["reached"] += entry_named and table_named and row is not None
+    print(json.dumps(totals, separators=(",", ":")))
+    return 0
+
+
+# ---------------------------------------------------------------- cases
+
+
+def valid_inventory(data):
+    def passage(p):
+        return (isinstance(p, dict) and is_lines(p.get("lines")) and isinstance(p.get("concept"), str)
+                and isinstance(p.get("kind"), str) and p.get("strength") in STRENGTHS
+                and text(p.get("question")) and isinstance(p.get("quote"), str))
+    return isinstance(data, list) and all(
+        isinstance(f, dict) and text(f.get("path")) and f.get("source_kind") in SOURCE_KINDS
+        and (f.get("publisher_url") is None or text(f.get("publisher_url")))
+        and isinstance(f.get("passages"), list) and all(passage(p) for p in f["passages"]) for f in data)
+
+
+def cut(data, per_cell):
+    """The cases of an inventory: per kind, up to `per_cell` passages of each cell in the order of their draw digest."""
+    drawn = {}  # (kind, cell) -> [(digest, case)]
+    for f in data:
+        for p in f["passages"]:
+            if p["concept"].startswith(("out.", "other:")):
+                continue
+            a, b = p["lines"]
+            digest = hashlib.sha256(("%s:%d-%d" % (f["path"], a, b)).encode()).hexdigest()
+            kinds = []
+            if p["strength"] == "normative" and f["source_kind"] == "official-doc":
+                kinds.append("route")
+            if p["kind"] == "announcement":
+                kinds.append("trend")
+            for kind in kinds:
+                case = {"id": "%s-%s" % (kind, digest[:12]), "kind": kind, "cell": p["concept"],
+                        "situation": "%s\n\n%s" % (p["question"].strip(), ASK),
+                        "deciding": [{"source": f["publisher_url"] or f["path"], "path": f["path"], "lines": [a, b]}],
+                        "wrong": []}
+                drawn.setdefault((kind, p["concept"]), []).append((digest, case))
+    cases = {}
+    for key in sorted(drawn):
+        for _, case in sorted(drawn[key], key=lambda x: x[0])[:per_cell]:
+            cases.setdefault(case["id"], case)
+    return [cases[k] for k in sorted(cases)]
+
+
+def cmd_cases(a):
+    if a.per_cell < 1:
+        R.refuse("usage")
+    data = R.read_json(a.inventory)
+    if not valid_inventory(data):
+        R.refuse("inventory_invalid")
+    body = json.dumps(cut(data, a.per_cell), indent=1, ensure_ascii=False) + "\n"
+    try:
+        with open(a.out, "w", encoding="utf-8") as f:  # in place: --out /dev/stdout writes to standard output
+            f.write(body)
+    except OSError:
+        R.refuse("out_unwritable")
+    return 0
+
+
+def main():
+    signal.signal(signal.SIGTERM, lambda *_: sys.exit(143))
+    p = R.Parser(prog="run", allow_abbrev=False)
+    sub = p.add_subparsers(dest="verb", required=True, parser_class=R.Parser)
+    an = sub.add_parser("answers", allow_abbrev=False)
+    an.add_argument("--reader", required=True)
+    an.add_argument("--out", required=True)
+    an.add_argument("--cases", required=True)
+    an.add_argument("--samples", type=int, default=3)
+    an.add_argument("--case", action="append", default=[])
+    an.add_argument("--corpus", default=CORPUS)
+    sc = sub.add_parser("score", allow_abbrev=False)
+    sc.add_argument("--out", required=True)
+    sc.add_argument("--cases", required=True)
+    sc.add_argument("--paths", default=None)
+    sc.add_argument("--corpus", default=CORPUS)
+    ga = sub.add_parser("gate", allow_abbrev=False)
+    ga.add_argument("--baseline", required=True)
+    ga.add_argument("--candidate", required=True)
+    re_ = sub.add_parser("reach", allow_abbrev=False)
+    re_.add_argument("--cases", required=True)
+    re_.add_argument("--tables", action="append", required=True)
+    re_.add_argument("--entry", default=None)
+    re_.add_argument("--instructions", default=INSTRUCTIONS)
+    re_.add_argument("--paths", default=None)
+    cu = sub.add_parser("cases", allow_abbrev=False)
+    cu.add_argument("--inventory", required=True)
+    cu.add_argument("--out", required=True)
+    cu.add_argument("--per-cell", type=int, default=3)
+    try:
+        a = p.parse_args()
+        return {"answers": cmd_answers, "score": cmd_score, "gate": R.cmd_gate, "reach": cmd_reach,
+                "cases": cmd_cases}[a.verb](a)
+    except R.Refuse as e:
+        print(json.dumps({"status": e.args[0]}, separators=(",", ":")))
+        return 2
+
+
+if __name__ == "__main__":
+    sys.exit(main())
