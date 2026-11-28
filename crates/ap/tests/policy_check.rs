@@ -860,19 +860,21 @@ fn r12_the_repository_policy_names_the_regrouped_repositories() {
     let answer = check(&fake, None).unwrap();
     assert_eq!(answer["status"], "ok", "{answer}");
     let p: Value = serde_json::from_slice(bytes).unwrap();
-    // The two regrouped repositories by their new names, their clones and their stage tokens; no absorbed one.
+    // The two regrouped repositories by their new names and the corpus, their clones and their stage tokens; no absorbed one.
     assert_eq!(
         p["repositories"],
         json!({
             "park-kyungchan/lifecycle-platform": {"clone": "/home/palantirkc/platforms/lifecycle-platform"},
-            "park-kyungchan/academy-platform": {"clone": "/home/palantirkc/platforms/academy-platform"}
+            "park-kyungchan/academy-platform": {"clone": "/home/palantirkc/platforms/academy-platform"},
+            "park-kyungchan/lifecycle-corpus": {"clone": "/home/palantirkc/external/reference-docs"}
         })
     );
     assert_eq!(
         p["units"]["github"]["stage_tokens"],
         json!({
             "park-kyungchan/lifecycle-platform": "/etc/agent-platform/credentials/stage-token-lifecycle-platform",
-            "park-kyungchan/academy-platform": "/etc/agent-platform/credentials/stage-token-academy-platform"
+            "park-kyungchan/academy-platform": "/etc/agent-platform/credentials/stage-token-academy-platform",
+            "park-kyungchan/lifecycle-corpus": "/etc/agent-platform/credentials/stage-token-lifecycle-corpus"
         })
     );
     let named = json!([&p["repositories"], &p["units"]["github"]["stage_tokens"]]).to_string();
