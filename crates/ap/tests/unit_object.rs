@@ -5389,8 +5389,7 @@ fn r54_plan_structure_an_amend_of_the_write_set_or_specs_leaves_the_unit_reviewe
         assert_eq!(f.unit("u-mark")["state"], "draft");
         assert_eq!(f.unit("u-mark")["plan_digest"], json!(old));
         let v: Value =
-            serde_json::from_str(&unmarked(&mut f, "u-mark", &format!("w-r{n}")).unwrap())
-                .unwrap();
+            serde_json::from_str(&unmarked(&mut f, "u-mark", &format!("w-r{n}")).unwrap()).unwrap();
         assert_eq!(v["state"], "ready", "{n}");
     }
     // The objective amended: refused until a plan review marks the new digest.

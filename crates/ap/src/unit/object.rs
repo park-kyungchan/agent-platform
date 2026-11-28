@@ -1240,7 +1240,10 @@ fn write(
             // The structure of the block as the amendment leaves it, when the request gives a member of it
             // with another value than the stored one; else the stored digest itself, or none, and a unit
             // without one keeps the rule without one (R52).
-            if PLAN_FIELDS.iter().any(|k| p.get(k).is_some() && differs(k, &page, &stored)) {
+            if PLAN_FIELDS
+                .iter()
+                .any(|k| p.get(k).is_some() && differs(k, &page, &stored))
+            {
                 p["plan_digest"] = json!(render::plan_digest(key, &page));
             } else if let Some(d) = stored["plan_digest"].as_str() {
                 p["plan_digest"] = json!(d);
