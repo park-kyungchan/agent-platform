@@ -226,14 +226,9 @@ pub fn key_form(s: &mut impl System, argv: &[OsString]) -> Result<String, Box<Re
     if let Some(evidence) = evidence {
         r["evidence"] = json!(evidence);
     }
-    let call = Call {
-        op,
-        store: form.store,
-        key: None,
-        role: None,
-        digest: false,
-        claim: "lead",
-    };
+    // The call of the request form of the op, with the key form's store.
+    let mut call = arguments(&[OsString::from(op)]).map_err(refused)?;
+    call.store = form.store;
     execute(s, &call, &r)
 }
 /// The request of standard input: one JSON value of at most 1 MiB.
