@@ -1,0 +1,162 @@
+[
+ {
+  "path": "palantir/docs/foundry/object-types.md",
+  "source_kind": "official-doc",
+  "publisher_url": "https://docs.example.invalid/foundry/object-types/",
+  "passages": [
+   {
+    "lines": [
+     3,
+     5
+    ],
+    "concept": "language.object-type",
+    "kind": "rule",
+    "strength": "normative",
+    "question": "May the primary key of an invented object type change after it is made?",
+    "quote": "a single primary key property that never changes"
+   },
+   {
+    "lines": [
+     7,
+     9
+    ],
+    "concept": "language.object-type",
+    "kind": "rule",
+    "strength": "normative",
+    "question": "May the value type of an invented property be changed in place?",
+    "quote": "is not changed in place afterwards"
+   },
+   {
+    "lines": [
+     11,
+     13
+    ],
+    "concept": "language.object-type",
+    "kind": "rule",
+    "strength": "normative",
+    "question": "Where is an invented link type stored?",
+    "quote": "stored apart from either object"
+   },
+   {
+    "lines": [
+     15,
+     17
+    ],
+    "concept": "language.object-type",
+    "kind": "definition",
+    "strength": "normative",
+    "question": "What does an invented interface list?",
+    "quote": "lists properties that several object types share"
+   },
+   {
+    "lines": [
+     19,
+     21
+    ],
+    "concept": "language.property",
+    "kind": "guidance",
+    "strength": "descriptive",
+    "question": "What makes a good invented title property?",
+    "quote": "short and readable"
+   },
+   {
+    "lines": [
+     23,
+     24
+    ],
+    "concept": "language.property",
+    "kind": "guidance",
+    "strength": "promotional",
+    "question": "What follows a deprecated invented property?",
+    "quote": "says nothing about what follows"
+   }
+  ]
+ },
+ {
+  "path": "palantir/docs/foundry/action-types.md",
+  "source_kind": "official-doc",
+  "publisher_url": null,
+  "passages": [
+   {
+    "lines": [
+     3,
+     6
+    ],
+    "concept": "logic.action-type",
+    "kind": "rule",
+    "strength": "normative",
+    "question": "Is an invented action whose criteria fail applied in part?",
+    "quote": "refused as a whole"
+   },
+   {
+    "lines": [
+     8,
+     10
+    ],
+    "concept": "out.ui",
+    "kind": "rule",
+    "strength": "normative",
+    "question": "Does the schema decide the form of an invented action?",
+    "quote": "not decided by the schema"
+   },
+   {
+    "lines": [
+     12,
+     14
+    ],
+    "concept": "engine.release",
+    "kind": "announcement",
+    "strength": "normative",
+    "question": "What did the invented page most recently say an action may name?",
+    "quote": "a side effect that runs after it applies"
+   }
+  ]
+ },
+ {
+  "path": "palantir/blog/2026-launch.md",
+  "source_kind": "official-blog",
+  "publisher_url": "https://blog.example.invalid/2026-launch",
+  "passages": [
+   {
+    "lines": [
+     3,
+     6
+    ],
+    "concept": "logic.action-type",
+    "kind": "announcement",
+    "strength": "promotional",
+    "question": "What did the invented publisher most recently announce about action criteria?",
+    "quote": "criteria of an action can now read a linked object"
+   },
+   {
+    "lines": [
+     8,
+     9
+    ],
+    "concept": "other:hiring",
+    "kind": "announcement",
+    "strength": "promotional",
+    "question": "Is the invented publisher hiring?",
+    "quote": "We are hiring"
+   }
+  ]
+ },
+ {
+  "path": "palantir/notes/synthesis.md",
+  "source_kind": "secondary-synthesis",
+  "publisher_url": null,
+  "passages": [
+   {
+    "lines": [
+     2,
+     4
+    ],
+    "concept": "language.object-type",
+    "kind": "rule",
+    "strength": "normative",
+    "question": "How many primary keys does an invented object type have, says the note?",
+    "quote": "exactly one primary key"
+   }
+  ]
+ }
+]
