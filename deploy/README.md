@@ -80,7 +80,7 @@ Undo: an installed engine goes back with its own rollback, with the timer stoppe
 
 ## Roles
 
-Each service that runs `ap` or applies to the store has one line `Environment=ONT_ROLE=<role>` (`specs/ap/roles.md` R4): `ap-work` `dispatch`; `ap-deliver` `deliver`; `ap-watch` `watch`; `ap-route` and `ap-clause` `route`; `ap-resource`, `ap-quota`, `ap-status-page` and `ap-measure` `measure`; `ap-api-nightly` and `ap-api-weekly` `api`; `ont-backup.service` and `ont-serve.service` have none (`ont serve` authenticates remote peers over Tailscale and never inherits server `ONT_ROLE`). It is the role of the service's function calls and of a program it runs that is not `ap`; `ap` names its own role in each apply (R3). The roles of the grants are those of `deploy/roles.json`, `{"principals":{"ts:park-kyungchan@github":["lead"],"uid:0":[...]}}`, the file the engine reads beside the store (`/var/lib/ontology-platform/ont/roles.json`, mode 0644): without it every claimed role is refused `role_not_admitted` (`roles_file_absent`) and every apply with no role `not_granted`.
+Each service that runs `ap` or applies to the store has one line `Environment=ONT_ROLE=<role>` (`specs/ap/roles.md` R4): `ap-work` `dispatch`; `ap-deliver` `deliver`; `ap-watch` `watch`; `ap-route` and `ap-clause` `route`; `ap-resource`, `ap-quota`, `ap-status-page`, `ap-measure` and `ap-measure-sessions` `measure`; `ap-api-nightly` and `ap-api-weekly` `api`; `ont-backup.service` and `ont-serve.service` have none (`ont serve` authenticates remote peers over Tailscale and never inherits server `ONT_ROLE`). It is the role of the service's function calls and of a program it runs that is not `ap`; `ap` names its own role in each apply (R3). The roles of the grants are those of `deploy/roles.json`, `{"principals":{"ts:park-kyungchan@github":["lead"],"uid:0":[...]}}`, the file the engine reads beside the store (`/var/lib/ontology-platform/ont/roles.json`, mode 0644): without it every claimed role is refused `role_not_admitted` (`roles_file_absent`) and every apply with no role `not_granted`.
 
 A call of `ap deliver` installs a moving engine before running the roles step (`specs/ap/deliver.md` R42, R67, R58), so forward-only `roles.json` forms (such as `ts:` principals) wait until the new engine is installed and never brick an older engine; in that engine-move call the record's `roles` is `null` (R59). When the engine already names the tree id of `engine/` of the tip, `ap deliver` compares the blob `deploy/roles.json` of the tip with the host's file after the marker and before the schema and the pair (R58): equal bytes are `same`, a differing regular file is kept beside it as `roles.json.before-<12 hex>` and the tip's bytes are written (`written`), no blob at the tip is `absent`, and an entry that is not a regular file, or any failure, ends the call `roles_install_failed` (exit 4, `detail` `{"path"}`) with neither schema nor pair installed. The record's member `roles` is `{"before", "after", "result"}`. A change of the host's roles file by hand is put back only by the next merge's delivery (deliver.md R39, R58): the call that ends `current` does not look at it. No rollback of it is built: from the kept copy by hand (`install -m 0644 roles.json.before-<12 hex> roles.json` in that directory, read back by `sha256sum`).
 
@@ -94,7 +94,7 @@ python3 -I -c 'import json; r = json.load(open("/var/lib/agent-platform/deliver/
 
 The `ap` installed before this merge sends no role and puts no roles file, and the schema of this merge refuses an apply with no role, so the first delivery is the Lead's, by hand, in this order:
 
-1. Stop every timer of `deploy/` but `ont-backup.timer` (`systemctl stop ap-work.timer ap-deliver.timer ap-watch.timer ap-route.timer ap-clause.timer ap-resource.timer ap-quota.timer ap-status-page.timer ap-measure.timer ap-api-nightly.timer ap-api-weekly.timer`), and read that no service of them runs.
+1. Stop every timer of `deploy/` but `ont-backup.timer` (`systemctl stop ap-work.timer ap-deliver.timer ap-watch.timer ap-route.timer ap-clause.timer ap-resource.timer ap-quota.timer ap-status-page.timer ap-measure.timer ap-measure-sessions.timer ap-api-nightly.timer ap-api-weekly.timer`), and read that no service of them runs.
 2. Install `deploy/roles.json` of the merge at `/var/lib/ontology-platform/ont/roles.json` (owner root, mode 0644: `git -C <clone> show <merge>:deploy/roles.json` into a temporary name of that directory, then `mv`), and read it back by `sha256sum` against the blob.
 3. Run `ONT_ROLE=deliver ap deliver < /etc/agent-platform/deliver.json` twice back to back, as the delivery of the schema 21 did (deliver.md R42 to R44): the first call installs the engine of the tip (its record's `target` is `/usr/local/bin/ont`), the second, at once after it, the schema and the pair; its record names the pair at the merge, `schema` `{"from": 21, "to": 22, ...}` with `migrate` `ok` and `roles` `same`. The `ap` before the merge sends no role in its applies; the engine takes the role of the environment when the body has none (engine action.md R12), so `ONT_ROLE=deliver` makes the applies of the second call after the schema step (`start_install`, `close_install`) claim `deliver`, which the grant holds. If the second call ends `store_refused` with `not_granted` or `role_not_admitted`, read the record and put the file back (point 2) before the call is run again.
 4. Start the timers stopped in point 1, and read `systemctl list-timers` and the next pass of each.
@@ -522,6 +522,14 @@ systemctl is-active ap-status-page.service            # until it answers inactiv
 ```sh
 journalctl -u ap-measure.service -o cat | tail -n 3   # the last line of each pass
 ```
+
+`ap-measure-sessions.timer` fires at minute 50 of every hour (UTC) and `ap-measure-sessions.service` runs one step, `ap measure sessions` with its default `--since` (`specs/ap/measure.md` R19), so that a run started after the nightly pass is measured within an hour of its end and `ont fn cost` answers `unmeasured` only for runs started after the last hourly pass. It has no `Persistent=`: a missed hour is caught by the next one. The nightly files are unchanged.
+
+```sh
+journalctl -u ap-measure-sessions.service -o cat | tail -n 1   # the last hourly pass
+```
+
+Undo of the hourly pass: `systemctl disable --now ap-measure-sessions.timer`.
 
 Undo of the routing step: remove the member `routing` from the policy file (nothing is then refused, held or applied for a tier); a bar is lifted by the Lead's `close_finding` or, for good, `dismiss_finding`.
 
