@@ -1,0 +1,9 @@
+[Unit]
+Description=ap measure sessions every hour at minute 50 UTC
+Documentation=https://github.com/park-kyungchan/lifecycle-platform/blob/main/deploy/README.md
+
+[Timer]
+OnCalendar=*-*-* *:50:00 UTC
+
+[Install]
+WantedBy=timers.target
