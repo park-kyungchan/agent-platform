@@ -3416,11 +3416,15 @@ fn store_argument(argv: &[OsString]) -> Result<Option<String>, Failure> {
 pub fn decide_cli(op: &str, argv: &[OsString]) -> ExitCode {
     let mut after = None;
     let mut unit = None;
-    let result = store_argument(argv).and_then(|store| {
-        let r = object::request()?;
-        unit = r["unit"].as_str().map(str::to_owned);
-        decide(&mut Host, store.as_deref(), op, &r, &mut after)
-    });
+    let result = match store_argument(argv) {
+        Ok(store) => object::request().and_then(|r| {
+            unit = r["unit"].as_str().map(str::to_owned);
+            decide(&mut Host, store.as_deref(), op, &r, &mut after)
+        }),
+        // The key form of `approve`, read beside the request form (R52).
+        Err(_) if op == "approve" => approve_key_form(&mut Host, argv, &mut after, &mut unit),
+        Err(f) => Err(f),
+    };
     let (written, status) = match result {
         Ok(v) => (writeln!(std::io::stdout(), "{v}"), 0),
         Err(f) => {
@@ -3432,6 +3436,28 @@ pub fn decide_cli(op: &str, argv: &[OsString]) -> ExitCode {
     };
     ExitCode::from(if written.is_ok() { status } else { 4 })
 }
+/// `ap unit approve <key> --head <hex> --reason <text>` with `--store`, `--session` and `--agent` in any
+/// order (R52): the request the words stand for, its `head` 7 to 40 lower-case hexadecimal digits,
+/// decided as the request form is; no standard input is read. `unit` the key once the request is made.
+pub fn approve_key_form(
+    s: &mut impl System,
+    argv: &[OsString],
+    after: &mut Option<String>,
+    unit: &mut Option<String>,
+) -> Result<Value, Failure> {
+    let form = super::key_arguments(argv, &["head", "reason"])?;
+    let (Some(key), Some(head), Some(reason)) = (
+        form.key.as_deref(),
+        form.named.get("head"),
+        form.named.get("reason"),
+    ) else {
+        return Err(error("usage", "args"));
+    };
+    let mut r = form.request(s)?;
+    (r["unit"], r["head"], r["reason"]) = (json!(key), json!(head), json!(reason));
+    *unit = Some(key.to_owned());
+    decide_as(s, form.store.as_deref(), "approve", &r, after, true)
+}
 /// One `approve` or `reject` (R33 to R35): every check before the lock, the lock, the Lead read, the
 /// applies. `after` is the suffix of the last action applied.
 pub fn decide(
@@ -3440,6 +3466,24 @@ pub fn decide(
     op: &str,
     r: &Value,
     after: &mut Option<String>,
+) -> Result<Value, Failure> {
+    decide_as(s, store, op, r, after, false)
+}
+/// A head of the key form of `approve` (R52): 7 to 40 lower-case hexadecimal digits.
+fn head_prefix(h: &str) -> bool {
+    (7..=40).contains(&h.len())
+        && h.bytes()
+            .all(|c| c.is_ascii_digit() || (b'a'..=b'f').contains(&c))
+}
+/// `decide`; with `prefix` (the key form of R52) the head may be a prefix, resolved from the unit read
+/// after the lock.
+fn decide_as(
+    s: &mut impl System,
+    store: Option<&str>,
+    op: &str,
+    r: &Value,
+    after: &mut Option<String>,
+    prefix: bool,
 ) -> Result<Value, Failure> {
     let approve = op == "approve";
     let members = match approve {
@@ -3464,7 +3508,9 @@ pub fn decide(
         let detail = json!({"bytes": reason.len(), "limit": limit});
         return Err(fail("invalid_input", "reason", detail));
     }
-    let head = r["head"].as_str().filter(|h| hex40(h));
+    let head = r["head"]
+        .as_str()
+        .filter(|h| hex40(h) || (prefix && head_prefix(h)));
     if approve && head.is_none() {
         return Err(store::bad("head"));
     }
@@ -3487,8 +3533,16 @@ pub fn decide(
         return Err(fail("not_the_lead", "session", i["lead_session"].clone()));
     }
     if approve {
+        // A prefix names the unit's head when that head begins with it, else a head that is not the
+        // unit's, for the store to judge in its own order (R52).
+        let head = head.unwrap_or_default();
+        let head = match u["head"].as_str() {
+            _ if head.len() == 40 => head.to_owned(),
+            Some(full) if hex40(full) && full.starts_with(head) => full.to_owned(),
+            _ => format!("{head:0<40}"),
+        };
         let action = actions::ApproveUnit {
-            head: values::CommitOrDigest(head.unwrap_or_default().to_owned()),
+            head: values::CommitOrDigest(head),
             reason: reason.to_owned(),
             unit: Id::new(key),
         };

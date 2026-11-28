@@ -145,10 +145,13 @@ pub fn cli(argv: &[OsString]) -> ExitCode {
             reviews: Value::Null,
         })
     };
-    let read = arguments(argv).and_then(|store| Ok((store, object::request()?)));
-    let result = read
-        .map_err(refused)
-        .and_then(|(store, r)| execute(&mut Host, store.as_deref(), &r));
+    let result = match arguments(argv) {
+        Ok(store) => object::request()
+            .map_err(refused)
+            .and_then(|r| execute(&mut Host, store.as_deref(), &r)),
+        // The key forms, read beside the request form (R32).
+        Err(_) => key_form(&mut Host, argv),
+    };
     let (written, status) = match result {
         Ok((v, status)) => (writeln!(std::io::stdout(), "{v}"), status),
         Err(e) => {
@@ -158,6 +161,31 @@ pub fn cli(argv: &[OsString]) -> ExitCode {
         }
     };
     ExitCode::from(if written.is_ok() { status } else { 4 })
+}
+/// `ap unit review <key>` and `ap unit review --intent <intent>`, each with `--store`, `--session` and
+/// `--agent` in any order (R32): a new look of the request the words stand for, whose `resume` or
+/// `earlier` the call chooses itself from the list of reviews; no standard input is read.
+pub fn key_form(s: &mut impl System, argv: &[OsString]) -> Result<(Value, u8), Box<Refusal>> {
+    let refused = |f: Failure| {
+        Box::new(Refusal {
+            code: f.code.into(),
+            field: f.field,
+            detail: f.detail,
+            after: None,
+            unit: None,
+            intent: None,
+            reviews: Value::Null,
+        })
+    };
+    let form = super::key_arguments(argv, &["intent"]).map_err(refused)?;
+    let (member, subject) = match (&form.key, form.named.get("intent")) {
+        (Some(key), None) => ("unit", key),
+        (None, Some(intent)) => ("intent", intent),
+        _ => return Err(refused(error("usage", "args"))),
+    };
+    let mut r = form.request(s).map_err(refused)?;
+    r[member] = json!(subject);
+    look(s, form.store.as_deref(), &r, "lead", true)
 }
 /// One call: the answer and its exit (0 `accept` or `repair`, 3 `abandoned`), or the refusal.
 pub fn execute(
@@ -174,8 +202,18 @@ pub fn execute_as(
     r: &Value,
     claim: &str,
 ) -> Result<(Value, u8), Box<Refusal>> {
+    look(s, store, r, claim, false)
+}
+/// One call; `chooses` for the key form, whose `resume` and `earlier` the call chooses (R32).
+fn look(
+    s: &mut impl System,
+    store: Option<&str>,
+    r: &Value,
+    claim: &str,
+    chooses: bool,
+) -> Result<(Value, u8), Box<Refusal>> {
     let mut trace = Trace::default();
-    let result = call(s, store, r, claim, &mut trace);
+    let result = call(s, store, r, (claim, chooses), &mut trace);
     result.map_err(|f| {
         // A call refused before its start removes the prompt it wrote (R5).
         if let (None, false, Some(p)) = (trace.after, trace.sent, &trace.prompt) {
@@ -197,7 +235,7 @@ fn call(
     s: &mut impl System,
     store: Option<&str>,
     r: &Value,
-    claim: &str,
+    (claim, chooses): (&str, bool),
     trace: &mut Trace,
 ) -> Result<(Value, u8), Failure> {
     if !r.is_object() {
@@ -233,7 +271,10 @@ fn call(
             return Err(bad("discard"));
         }
     } else {
-        new = Some(request(r)?);
+        new = Some(New {
+            chooses,
+            ..request(r)?
+        });
     }
     if object::lead_in_environment(s) {
         return Err(error("role_in_environment", "ONT_ROLE"));
@@ -264,6 +305,8 @@ struct New<'a> {
     resume: Option<&'a str>,
     earlier: Vec<&'a str>,
     timeout: u64,
+    /// The key form: the call chooses `resume` or `earlier` once it has read the list (R32).
+    chooses: bool,
 }
 fn request(r: &Value) -> Result<New<'_>, Failure> {
     let task = r.get("task").map(|t| sized(t, "task", 512)).transpose()?;
@@ -304,6 +347,7 @@ fn request(r: &Value) -> Result<New<'_>, Failure> {
         resume,
         earlier,
         timeout,
+        chooses: false,
     })
 }
 /// The accounts of the first key present among `<runtime>/reviewer`, `<runtime>/<model>` and
@@ -446,6 +490,54 @@ fn work_of(look: &Look, cwd: &str, list: &[Found]) -> Option<PathBuf> {
     keys.map(|k| look.work(k))
         .find(|p| p.components().eq(Path::new(cwd).components()))
 }
+/// What the key form gives as `resume` and `earlier` (R32): the newest closed review of this subject
+/// and kind when a resume of it passes every check of R8 and the admission of `ap run`, its session
+/// has looked fewer than three times, and no review of the subject runs; else the newest five closed
+/// reviews with a report, in the list's order; else nothing.
+fn chosen(
+    s: &mut impl System,
+    look: &Look,
+    list: &[Found],
+    reviews: &Map<String, Value>,
+) -> (Option<String>, Vec<String>) {
+    let text_of = |v: &Value, k: &str| v[k].as_str().filter(|t| !t.is_empty()).map(str::to_owned);
+    let running = list.iter().any(|(_, v)| v["status"] == "running");
+    let newest = list.iter().rev().find(|(_, v)| v["status"] == "closed");
+    if let Some((k, v)) = newest.filter(|_| !running)
+        && key_ok(k)
+        && let (Some(session), Some(report)) = (text_of(v, "session"), text_of(v, "report"))
+    {
+        let record = format!("{report}.run.json");
+        let looks = list
+            .iter()
+            .filter(|(_, x)| x["session"] == session.as_str())
+            .count();
+        // The runtime of the look as R8 settles it: the record's, else the policy's, else Claude.
+        let rec = json_file(&record);
+        let runtime = rec
+            .as_ref()
+            .and_then(|r| r.get("runtime"))
+            .and_then(Value::as_str);
+        let runtime = runtime
+            .or(reviews.get("runtime").and_then(Value::as_str))
+            .unwrap_or("claude")
+            .to_owned();
+        let cwd = rec.as_ref().and_then(|r| r["cwd"].as_str());
+        if looks < 3
+            && cwd.is_some_and(|cwd| work_of(look, cwd, list).is_some())
+            && crate::run::resume_admitted(s, &record, &runtime)
+        {
+            return (Some(k.clone()), vec![]);
+        }
+    }
+    let reported: Vec<String> = list
+        .iter()
+        .filter(|(k, v)| v["status"] == "closed" && text_of(v, "report").is_some() && key_ok(k))
+        .map(|(k, _)| k.clone())
+        .collect();
+    let newest_five = reported[reported.len().saturating_sub(5)..].to_vec();
+    (None, newest_five)
+}
 /// Removes what is at `p` as written: a directory with everything in it, a link as a link (R22).
 fn remove_tree(p: &Path) {
     match std::fs::symlink_metadata(p) {
@@ -491,11 +583,20 @@ fn look_at(
     };
     let (revision, subject) = read?.ok_or_else(|| error(unknown, look.member()))?;
     let list = reviews_of(s, look, trace)?;
+    // The key form's choice, from the list as read here (R32).
+    let chosen = new.chooses.then(|| chosen(s, look, &list, reviews));
+    let (resume, earlier_keys): (Option<&str>, Vec<&str>) = match &chosen {
+        Some((resume, earlier)) => (
+            resume.as_deref(),
+            earlier.iter().map(String::as_str).collect(),
+        ),
+        None => (new.resume, new.earlier.clone()),
+    };
     let found = |k: &str| list.iter().find(|(key, _)| key == k).map(|(_, v)| v);
     let text_of = |v: &Value, k: &str| v[k].as_str().filter(|t| !t.is_empty()).map(str::to_owned);
     let mut resumed = None;
     let mut resumed_rec = None;
-    if let Some(k) = new.resume {
+    if let Some(k) = resume {
         let no = |why: &str| fail("resume_not_possible", "resume", json!(why));
         let v = found(k).ok_or_else(|| no("no review of this subject and kind has this key"))?;
         if v["status"] != "closed" {
@@ -579,7 +680,7 @@ fn look_at(
     // The paths the stage reads outside its working directory (R13): a plan's clones, then the
     // earlier reports.
     let mut reports = vec![];
-    for k in &new.earlier {
+    for k in &earlier_keys {
         let report = found(k)
             .filter(|v| v["status"] == "closed")
             .and_then(|v| text_of(v, "report"));

@@ -2,9 +2,10 @@
 //! request on standard input the case call (README "One case") or the refusal of a request of the unit
 //! object (`specs/ap/unit.md` R1). Any other form is refused as an argument list that reaches no verb
 //! (`specs/ap/verbs.md` R4).
-use crate::host::{Failure, Host, LIMIT, System, error, fail, require};
+use crate::host::{Failure, Host, LIMIT, System, error, fail, new_session_id, require};
 use serde_json::{Value, json};
 use std::{
+    collections::BTreeMap,
     ffi::OsString,
     io::{Read, Write},
     process::ExitCode,
@@ -22,6 +23,78 @@ pub mod scan;
 /// The refusal of an argument list that reaches no verb (`specs/ap/verbs.md` R4), byte for byte.
 const UNKNOWN: &[u8] = b"{\"error\":{\"code\":\"usage\",\"field\":\"args\"}}\n";
 
+/// The variable that names the caller's session when a key form has no `--session` (`specs/ap/unit.md` R60).
+pub const SESSION_VARIABLE: &str = "CLAUDE_CODE_SESSION_ID";
+/// The arguments of a key form (`specs/ap/unit.md` R60): at most one word that is no option (the key),
+/// and the options `--store`, `--session`, `--agent` and the verb's own, each with one value, each
+/// at most once, in any order.
+#[derive(Debug, Default)]
+pub struct KeyForm {
+    pub key: Option<String>,
+    pub store: Option<String>,
+    pub session: Option<String>,
+    pub agent: Option<String>,
+    /// The verb's own options by name, without `--`.
+    pub named: BTreeMap<&'static str, String>,
+}
+/// The words of a key form; `named` the verb's own options. Any other form is `usage` (field `args`).
+pub fn key_arguments(argv: &[OsString], named: &[&'static str]) -> Result<KeyForm, Failure> {
+    let usage = || error("usage", "args");
+    let words: Option<Vec<&str>> = argv.iter().map(|a| a.to_str()).collect();
+    let mut words = words.ok_or_else(usage)?.into_iter();
+    let mut form = KeyForm::default();
+    while let Some(word) = words.next() {
+        let Some(name) = word.strip_prefix("--") else {
+            if word.starts_with('-') || form.key.replace(word.to_owned()).is_some() {
+                return Err(usage());
+            }
+            continue;
+        };
+        let value = words.next().ok_or_else(usage)?.to_owned();
+        let slot = match name {
+            "store" => &mut form.store,
+            "session" => &mut form.session,
+            "agent" => &mut form.agent,
+            _ => {
+                let own = named.iter().find(|n| **n == name).ok_or_else(usage)?;
+                if form.named.insert(own, value).is_some() {
+                    return Err(usage());
+                }
+                continue;
+            }
+        };
+        if slot.replace(value).is_some() {
+            return Err(usage());
+        }
+    }
+    if form.store.as_deref().is_some_and(|p| !p.starts_with('/')) {
+        return Err(usage());
+    }
+    Ok(form)
+}
+impl KeyForm {
+    /// The members `request_id`, `agent` and `session` of the request the key form stands for: the
+    /// session `--session`, else the caller's `CLAUDE_CODE_SESSION_ID`, else `usage` (field
+    /// `session`) before any call to the store; the agent `--agent`, else `lead`; the request id drawn
+    /// anew (R60).
+    pub fn request(&self, s: &impl System) -> Result<Value, Failure> {
+        let caller = || {
+            let env = s.environment().into_iter();
+            env.filter(|(k, v)| k == SESSION_VARIABLE && !v.is_empty())
+                .map(|(_, v)| v)
+                .next()
+        };
+        let session = self.session.clone().or_else(caller);
+        let session = session.ok_or_else(|| error("usage", "session"))?;
+        let agent = self.agent.clone().unwrap_or_else(|| "lead".to_owned());
+        let rid = drawn_request_id(s)?;
+        Ok(json!({"request_id": rid, "agent": agent, "session": session}))
+    }
+}
+/// A request id drawn anew by the draw of `ap unit run`'s ids: `uk-` and 32 hex digits (R60).
+pub(crate) fn drawn_request_id(s: &impl System) -> Result<String, Failure> {
+    Ok(format!("uk-{}", new_session_id(s)?.replace('-', "")))
+}
 /// The bytes of the regular file at `path`, at most `LIMIT`; else `code` with `field`.
 pub(crate) fn regular(path: &str, code: &'static str, field: &str) -> Result<Vec<u8>, Failure> {
     let bad = || error(code, field);

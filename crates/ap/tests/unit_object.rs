@@ -12,7 +12,8 @@
 use ap::{
     host::{Answer, Failure, Host, Reply, System},
     unit::object::{
-        Refusal, arguments, branch_ok, clone_of, current_name, execute, member_of, same_repository,
+        Refusal, arguments, branch_ok, clone_of, current_name, execute, key_form, member_of,
+        same_repository,
     },
     unit::render::{page_digest, page_part, plan_block, plan_digest, plan_structure},
 };
@@ -5637,4 +5638,221 @@ fn r55_an_old_name_reads_as_its_new_one() {
         Some((NEW, &json!("/invented/token")))
     );
     assert_eq!(member_of(tokens, "invented/widgets"), None);
+}
+
+/// A key form of `ready` or `used` on the scratch store: its words, then `--store`.
+fn keyed(f: &mut F, words: &[&str]) -> Result<String, Box<Refusal>> {
+    let mut argv: Vec<OsString> = words.iter().map(OsString::from).collect();
+    argv.extend(["--store", "/scratch/store.sqlite"].map(OsString::from));
+    key_form(f, &argv)
+}
+/// The request id of a key form: `uk-` and 32 hex digits, then the op's suffix.
+fn drawn(rid: &Value, op: &str) -> bool {
+    let rid = rid.as_str().unwrap_or_default();
+    let digits = rid
+        .strip_prefix("uk-")
+        .and_then(|r| r.strip_suffix(&format!("-{op}")));
+    digits.is_some_and(|d| d.len() == 32 && d.bytes().all(|c| c.is_ascii_hexdigit()))
+}
+
+// spec: specs/ap/unit.md#R60
+#[test]
+fn r60_key_form_of_ready_and_used_applies_what_the_request_form_applies() {
+    let mut f = F::new();
+    plain_unit(&mut f, "u-one", check("exit 1", "fails_on_base"));
+    if let Some(u) = f.objects.get_mut(&k("unit", "u-one")) {
+        u["plan_reviewed"] = u["plan_digest"].clone();
+    }
+    f.env.retain(|(k, _)| k != "CLAUDE_CODE_SESSION_ID");
+    f.env
+        .push(("CLAUDE_CODE_SESSION_ID".into(), "s-env".into()));
+    f.calls.clear();
+    let v: Value = serde_json::from_str(&keyed(&mut f, &["ready", "u-one"]).unwrap()).unwrap();
+    assert_eq!(
+        (&v["unit"], &v["outcome"], &v["state"]),
+        (&json!("u-one"), &json!("applied"), &json!("ready"))
+    );
+    let b = f.applies()[0].clone();
+    assert_eq!(b["action_type"], "ready_unit");
+    assert!(drawn(&b["request_id"], "ready"), "{}", b["request_id"]);
+    // The session of the environment, the agent `lead`, the role `lead`.
+    assert_eq!(
+        (&b["agent"], &b["session"], &b["role"]),
+        (&json!("lead"), &json!("s-env"), &json!("lead"))
+    );
+    // `used`: the options in any order, `--session` over the environment.
+    f.edit("unit", "u-one", json!({"state": "merged"}));
+    let shown = "The Lead's run listed 12 widgets, each once.";
+    f.calls.clear();
+    let out = keyed(
+        &mut f,
+        &[
+            "used",
+            "--agent",
+            "lead-b",
+            "u-one",
+            "--evidence",
+            shown,
+            "--session",
+            "s-arg",
+        ],
+    )
+    .unwrap();
+    let v: Value = serde_json::from_str(&out).unwrap();
+    assert_eq!(
+        v,
+        json!({"unit": "u-one", "outcome": "applied", "state": "merged"})
+    );
+    let b = f.applies()[0].clone();
+    assert!(drawn(&b["request_id"], "used"), "{}", b["request_id"]);
+    assert_eq!(
+        (&b["agent"], &b["session"], &b["parameters"]),
+        (
+            &json!("lead-b"),
+            &json!("s-arg"),
+            &json!({"unit": oid("unit", "u-one"), "evidence": shown})
+        )
+    );
+    // Two calls draw two request ids.
+    let first = b["request_id"].clone();
+    keyed(&mut f, &["used", "u-one", "--evidence", shown]).unwrap();
+    assert_ne!(f.applies().last().unwrap()["request_id"], first);
+}
+
+// spec: specs/ap/unit.md#R60
+#[test]
+fn r60_key_form_refusals_are_those_of_the_request_form() {
+    let mut f = F::new();
+    f.env.retain(|(k, _)| k != "CLAUDE_CODE_SESSION_ID");
+    // No `--session` and no CLAUDE_CODE_SESSION_ID: `usage` (field `session`) before any call.
+    let e = keyed(&mut f, &["ready", "u-one"]).unwrap_err();
+    assert_eq!(
+        (e.code.as_str(), e.field.as_str(), &e.after, &e.unit),
+        ("usage", "session", &None, &None)
+    );
+    // Another form: `usage` (field `args`).
+    for words in [
+        &["ready"][..],
+        &["ready", "u-one", "u-two"],
+        &["ready", "u-one", "--evidence", "x"],
+        &["ready", "u-one", "--session", "a", "--session", "b"],
+        &["ready", "u-one", "--session"],
+        &["ready", "-u"],
+        &["used", "u-one"],
+        &["used", "u-one", "--evidence", "a", "--evidence", "b"],
+        &["drop", "u-one"],
+        &["page", "u-one"],
+    ] {
+        let e = keyed(&mut f, words).unwrap_err();
+        assert_eq!(
+            (e.code.as_str(), e.field.as_str()),
+            ("usage", "args"),
+            "{words:?}"
+        );
+    }
+    let mut argv: Vec<OsString> = ["ready", "u-one", "--store", "relative"]
+        .iter()
+        .map(OsString::from)
+        .collect();
+    assert_eq!(key_form(&mut f, &argv).unwrap_err().field, "args");
+    argv.truncate(2);
+    argv.extend(["--session", "s-1"].map(OsString::from));
+    // The request form's own refusals, for the same members: a malformed session, an unknown unit,
+    // an empty evidence, the role in the environment.
+    let e = keyed(&mut f, &["ready", "u-one", "--session", "a b"]).unwrap_err();
+    let same = no(
+        &mut f,
+        &["ready"],
+        json!({"request_id": "r", "agent": "lead", "session": "a b", "unit": "u-one"}),
+    );
+    assert_eq!(
+        (&e.code, &e.field, &e.fields),
+        (&same.code, &same.field, &same.fields)
+    );
+    assert_eq!(e.field, "session");
+    assert!(f.calls.is_empty(), "{:?}", f.calls);
+    let e = keyed(&mut f, &["ready", "u-ghost", "--session", "s-1"]).unwrap_err();
+    assert_eq!(
+        (
+            e.code.as_str(),
+            e.field.as_str(),
+            &e.after,
+            e.unit.as_deref()
+        ),
+        ("unknown_unit", "unit", &None, Some("u-ghost"))
+    );
+    yes(&mut f, &["add"], added("u-one"));
+    f.calls.clear();
+    let e = keyed(
+        &mut f,
+        &["used", "u-one", "--evidence", "", "--session", "s-1"],
+    )
+    .unwrap_err();
+    assert_eq!(
+        e.fields.unwrap(),
+        json!([entry("evidence", "required", None, None)])
+    );
+    let e = keyed(
+        &mut f,
+        &["used", "u-one", "--evidence", "e", "--session", "s-1"],
+    )
+    .unwrap_err();
+    assert_eq!(
+        (e.code.as_str(), e.field.as_str()),
+        ("unit_not_merged", "used")
+    );
+    f.env.push(("ONT_ROLE".into(), "lead".into()));
+    f.calls.clear();
+    let e = key_form(&mut f, &argv).unwrap_err();
+    assert_eq!(e.code, "role_in_environment");
+    assert!(f.calls.is_empty());
+}
+
+// spec: specs/ap/unit.md#R60
+#[test]
+fn r60_key_form_of_the_command_reads_no_standard_input() {
+    let ap = |args: &[&str]| {
+        let mut child = Command::new(env!("CARGO_BIN_EXE_ap"))
+            .args(args)
+            .env_remove("ONT_ROLE")
+            .env_remove("CLAUDE_CODE_SESSION_ID")
+            .stdin(std::process::Stdio::piped())
+            .stdout(std::process::Stdio::piped())
+            .stderr(std::process::Stdio::piped())
+            .spawn()
+            .unwrap();
+        // The pipe stays open and empty while the call runs: a read of it would never end.
+        let stdin = child.stdin.take();
+        let out = child.wait_with_output().unwrap();
+        drop(stdin);
+        out
+    };
+    let out = ap(&["unit", "ready", "u-one", "--store", "/scratch/none"]);
+    let e: Value = serde_json::from_slice(&out.stderr).unwrap();
+    assert_eq!(out.status.code(), Some(2));
+    assert_eq!(
+        e,
+        json!({"error": {"code": "usage", "field": "session", "detail": null, "after": null,
+            "unit": null}})
+    );
+    let out = ap(&["unit", "used", "u-one", "--session", "s-1"]);
+    let e: Value = serde_json::from_slice(&out.stderr).unwrap();
+    assert_eq!(
+        (out.status.code(), &e["error"]["code"], &e["error"]["field"]),
+        (Some(2), &json!("usage"), &json!("args"))
+    );
+    let help = String::from_utf8(
+        Command::new(env!("CARGO_BIN_EXE_ap"))
+            .args(["unit", "--help"])
+            .output()
+            .unwrap()
+            .stdout,
+    )
+    .unwrap();
+    for form in [
+        "ap unit ready <key> [--store <path>] [--session <id>] [--agent <name>]",
+        "ap unit used <key> --evidence <text> [--store <path>] [--session <id>] [--agent <name>]",
+    ] {
+        assert!(help.contains(form), "{help}");
+    }
 }
