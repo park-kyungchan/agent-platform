@@ -19,10 +19,11 @@ these six members are equal as JSON values. A member an entry of `repositories.j
 managed: it is never compared and never written. A live ruleset that no file names is reported with
 `wanted` null and is never changed or deleted.
 
-The file names the two repositories of the host by the names of the regroup: `park-kyungchan/lifecycle-platform`
-(formerly `agent-platform`: `ap`, the shared instructions, the engine in `engine/`, the host's configuration in
-`host/`) and `park-kyungchan/academy-platform` (formerly `education-platform`). GitHub renamed both and redirects
-the old names.
+The file names three repositories. Two are the repositories of the host, by the names of the regroup:
+`park-kyungchan/lifecycle-platform` (formerly `agent-platform`: `ap`, the shared instructions, the engine in
+`engine/`, the host's configuration in `host/`) and `park-kyungchan/academy-platform` (formerly
+`education-platform`); GitHub renamed both and redirects the old names. The third, `park-kyungchan/lifecycle-corpus`,
+is the private repository of the corpus of design sources, whose clone is under /home/palantirkc/external.
 
 `park-kyungchan/lifecycle-platform` is private: GitHub answers `security_and_analysis` null for it, so its
 entry holds neither `secret_scanning` nor `secret_scanning_push_protection`; it holds Actions policy

@@ -630,6 +630,10 @@ class Files(unittest.TestCase):
             dict(public, repository="park-kyungchan/lifecycle-platform"),
             {"repository": "park-kyungchan/academy-platform", "settings": settings,
              "actions": {"enabled": True, "allowed_actions": "all", "sha_pinning_required": True}},
+            {"repository": "park-kyungchan/lifecycle-corpus", "settings": settings,
+             "actions": {"enabled": True, "allowed_actions": "selected", "sha_pinning_required": True,
+                         "selected_actions": {"github_owned_allowed": True, "verified_allowed": False,
+                                              "patterns_allowed": []}}},
         ])
         # The archived repositories have no entry, and the two regrouped ones are named by their new names only.
         text = (HERE / "repositories.json").read_text()
