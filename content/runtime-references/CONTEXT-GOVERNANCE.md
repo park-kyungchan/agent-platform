@@ -27,7 +27,7 @@ Stop at the first step that answers; each step names the next one.
 | --- | --- | --- |
 | The files of a main checkout, `/home/palantirkc/platforms/<repo>/<path>` | It can lag `origin/main` and hold someone's uncommitted edit | `git -C /home/palantirkc/platforms/<repo> show origin/main:<path>`, or a task worktree |
 | The store's objects of the older generation (`ONTOLOGY-USE.md`) | Index copies of files whose refresh stopped | The file itself, in Git or in the task directory |
-| `text/` and `sources/` of `/home/palantirkc/external/reference-docs/` | The same text with other line numbers, and raw downloads | `docs/`, through the rows of `OFFICIAL-DOCS.md` section 4 |
+| `text/` and `sources/` of `/home/palantirkc/external/reference-docs/` | The same text with other line numbers, and raw downloads | `docs/`, through the rows of the corpus's route table, ROUTES.md, which `OFFICIAL-DOCS.md` section 4 names |
 | A path an older file names that no longer exists | It was retired or archived (`/home/palantirkc/archive/INDEX.md`); an archive carries no current rule | `ap status --brief` in the task's directory |
 | Instructions in another CLI's home, or a skill copied instead of linked | A second copy drifts from its source | `/root/.agents/` |
 | A file that says it was generated | A snapshot of its source at one revision | The source it names |
@@ -42,7 +42,7 @@ A weak model routes as well as a strong one only where a route asks for no judgm
 - At most three steps lead from `AGENTS.md` to a line: a reference in a directory its section 8 names, a table of the reference, a `path:a-b`.
 - Paths are written in full, never shortened or elided; a table is keyed by the situation, in the words an assignment uses.
 - A stale copy is taken off the path, not warned about.
-- A change of a route is accepted on the routing suite (`lifecycle-platform` `evals/README.md`, section "The routing suite"); its cases in the repository, `evals/routing/cases.json`, cover how each CLI runs without a terminal UI, not the routes of this file or of `OFFICIAL-DOCS.md` section 4, so such a change also names the reads it was tried on.
+- A change of a route is accepted on the routing suite (`lifecycle-platform` `evals/README.md`, section "The routing suite"); its cases in the repository, `evals/routing/cases.json`, cover how each CLI runs without a terminal UI, not the routes of this file or of the corpus's route table (ROUTES.md, which `OFFICIAL-DOCS.md` section 4 names), so such a change also names the reads it was tried on.
 
 ## 5. A task kind no row covers
 

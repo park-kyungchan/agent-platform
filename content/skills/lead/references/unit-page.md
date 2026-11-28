@@ -66,5 +66,5 @@ The allowed models are the policy file's member `models`; `ap run` refuses any o
 Where a form here differs, its specification holds.
 
 - `ap unit add|amend|ready|drop < request.json`: the op is the first argument, never a member (`specs/ap/unit.md` Interface).
-- `ap unit review < request.json`; `ap unit run <key>`; `ap unit approve|reject < request.json` (`specs/ap/unit-review.md`, `specs/ap/unit-run.md`).
+- `ap unit review < request.json`, or its key forms `ap unit review <key>` and `ap unit review --intent <intent>`; `ap unit run <key>`; `ap unit approve|reject < request.json`, or the key form `ap unit approve <key> --head <hex> --reason <text>` (`specs/ap/unit-review.md`, `specs/ap/unit-run.md`).
 - `ap request < request.json` and `ap intent < request.json`: the op is the member `op` (R2 of `specs/ap/request.md` and `specs/ap/intent.md`).

@@ -24,7 +24,7 @@ One leading thread puts something of the user's world into use; others run besid
 
 - Request and intent: interview, `ap intent` `draft`, card, `confirm` and `answer` (`references/interview.md`).
 - Analysis: measure what exists before designing (`ont fn cost`, `flow`, `share`; action log; who calls what), read design sources by routes; let cheaper sessions extract quotations a script checks against lines. Design note: `DESIGN-<topic>.md` (`references/judging.md` section 1).
-- Spec: before the plan, put the contract in `specs/` of the owning repository as a spec unit (`contract`, `kind` `instructions`), `OFFICIAL-DOCS.md` section 4 rows cited as `path:line`, reviewed and merged first; or cite existing `<path>#R<n>` in `specs`.
+- Spec: before the plan, put the contract in `specs/` of the owning repository as a spec unit (`contract`, `kind` `instructions`), ROUTES.md rows (`OFFICIAL-DOCS.md` section 4) cited as `path:line`, reviewed and merged first; or cite existing `<path>#R<n>` in `specs`.
 - Plan and pages: add every unit of the plan in one context (`ap unit add`: `kind`, `use`, `depends_on`, `depends_delivered`, `wave`, tiers at or above the routing map, `references/unit-page.md`); run one review of the plan and one of each `contract` or `effect` page by a session that did not write them (`ap unit review`).
 - Hand over: next action in each intent's notes (`ap intent`, op `note`), nothing running, no estimate presented as a fact.
 

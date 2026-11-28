@@ -73,7 +73,7 @@ It does not rest on the model: `add_unit` in the lane `objective` without an int
 | 새 Lead, 새 세션 | The Lead session that takes the task over next | — |
 | 라우팅 | Which file an agent opens, or which model does which work | `AGENTS.md` section 8, or a unit's tiers |
 | 컨텍스트 거버넌스, Context Governance | Which context each agent loads, from which home, in what order | `CONTEXT-GOVERNANCE.md` |
-| reference-docs, 레퍼런스 문서 | The design sources under `/home/palantirkc/external/reference-docs/` | Only the lines `OFFICIAL-DOCS.md` section 4 names |
+| reference-docs, 레퍼런스 문서 | The design sources under `/home/palantirkc/external/reference-docs/` | Only the lines a row of ROUTES.md names (`OFFICIAL-DOCS.md` section 4) |
 | 지표, 메트릭, KPI | A number the user wants watched | Write it as a criterion |
 | VPS, 코드베이스 전체 | This host: repositories, task directories, shared instructions | `CODEBASE-ORIENTATION.md` |
 | CI | The required checks of a pull request | Which repository |

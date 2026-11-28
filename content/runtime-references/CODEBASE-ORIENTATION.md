@@ -70,7 +70,7 @@ The state of the work (requests, intents, units, runs, findings, holds, KPIs) is
 
 Third-party tools are under `/home/palantirkc/tools/`; pinned third-party source is under `/home/palantirkc/external/`. They are not first-party source: do not edit them, and read the version and build state from the directory.
 
-Local copies of the Anthropic, Palantir and Rust design sources are under `/home/palantirkc/external/reference-docs/`; the entry is `OFFICIAL-DOCS.md` section 4.
+Local copies of the Anthropic, Palantir and Rust design sources are under `/home/palantirkc/external/reference-docs/`; the entry is a row of their route table, ROUTES.md, which `OFFICIAL-DOCS.md` section 4 names.
 
 | Tool | Path | Use here |
 | --- | --- | --- |

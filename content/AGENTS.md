@@ -66,4 +66,4 @@ Everything except a message to the user is in English, by every agent, down to a
 - `/home/palantirkc/external/`: pinned external source.
 - `/root/.agents/`: these instructions as installed; the skills in `skills/` and the references in `runtime-references/`, each of which says in its first lines when to read it.
 - The store: `ap status` and `ont`.
-- `/home/palantirkc/external/reference-docs/`: the corpus of design sources; read only the lines a row of `/root/.agents/runtime-references/OFFICIAL-DOCS.md` section 4 names.
+- `/home/palantirkc/external/reference-docs/`: the corpus of design sources; read only the lines a row of its route table names; `/root/.agents/runtime-references/OFFICIAL-DOCS.md` section 4 says where the table is.
