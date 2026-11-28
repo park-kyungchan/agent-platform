@@ -210,6 +210,7 @@ fn every_service_names_its_role() {
         ("ap-quota", "measure"),
         ("ap-status-page", "measure"),
         ("ap-measure", "measure"),
+        ("ap-measure-sessions", "measure"),
         ("ap-api-nightly", "api"),
         ("ap-api-weekly", "api"),
     ]);

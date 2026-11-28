@@ -1,0 +1,25 @@
+[Unit]
+Description=ap measure: the sessions pass alone, every hour
+Documentation=https://github.com/park-kyungchan/lifecycle-platform/blob/main/deploy/README.md
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/ap measure sessions
+# The pass takes its default --since (specs/ap/measure.md R2); a run that ended after the last pass waits at most an hour.
+TimeoutStartSec=1800
+Slice=agents.slice
+Nice=10
+Environment=HOME=/root
+Environment=PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin
+Environment=ONT_ROLE=measure
+NoNewPrivileges=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectKernelTunables=yes
+ProtectControlGroups=yes
+ProtectHostname=yes
+LockPersonality=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+SystemCallArchitectures=native
+ProtectSystem=full

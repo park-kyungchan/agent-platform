@@ -2884,6 +2884,76 @@ fn r16_the_timer_runs_the_sessions_pass_the_kpi_pass_and_the_routing_pass_each_n
     }
 }
 
+// spec: specs/ap/measure.md#R19
+#[test]
+fn r19_the_hourly_timer_runs_the_sessions_pass_alone() {
+    let service = include_str!("../../../deploy/ap-measure-sessions.service");
+    let timer = include_str!("../../../deploy/ap-measure-sessions.timer");
+    let nightly = include_str!("../../../deploy/ap-measure.service");
+    let lines: Vec<&str> = service.lines().collect();
+    let steps: Vec<&str> = lines
+        .iter()
+        .copied()
+        .filter(|l| l.starts_with("ExecStart="))
+        .collect();
+    assert_eq!(steps, ["ExecStart=/usr/local/bin/ap measure sessions"]);
+    for l in [
+        "Type=oneshot",
+        "TimeoutStartSec=1800",
+        "Slice=agents.slice",
+        "Nice=10",
+        "Environment=HOME=/root",
+        "Environment=PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin",
+        "Environment=ONT_ROLE=measure",
+        "ProtectSystem=full",
+        "NoNewPrivileges=yes",
+        "ProtectKernelModules=yes",
+        "ProtectKernelLogs=yes",
+        "ProtectKernelTunables=yes",
+        "ProtectControlGroups=yes",
+        "ProtectHostname=yes",
+        "LockPersonality=yes",
+        "RestrictRealtime=yes",
+        "RestrictSUIDSGID=yes",
+        "SystemCallArchitectures=native",
+    ] {
+        assert_eq!(lines.iter().filter(|x| **x == l).count(), 1, "{l}");
+    }
+    // The environment is the nightly service's, line for line.
+    for l in nightly.lines().filter(|l| l.starts_with("Environment=")) {
+        assert!(lines.contains(&l), "{l}");
+    }
+    let timer: Vec<&str> = timer.lines().collect();
+    assert_eq!(
+        timer
+            .iter()
+            .filter(|l| l.starts_with("OnCalendar="))
+            .count(),
+        1
+    );
+    for l in [
+        "OnCalendar=*-*-* *:50:00 UTC",
+        "WantedBy=timers.target",
+        "Description=ap measure sessions every hour at minute 50 UTC",
+    ] {
+        assert!(timer.contains(&l), "{l}");
+    }
+    assert!(!timer.iter().any(|l| l.starts_with("Persistent=")));
+    // The nightly service still has its three steps.
+    let steps: Vec<&str> = nightly
+        .lines()
+        .filter(|l| l.starts_with("ExecStart="))
+        .collect();
+    assert_eq!(
+        steps,
+        [
+            "ExecStart=-/usr/local/bin/ap measure sessions",
+            "ExecStart=-/usr/local/bin/ap measure kpis",
+            "ExecStart=/usr/local/bin/ap measure routing",
+        ]
+    );
+}
+
 #[test]
 fn run_object_r16_a_stage_run_is_measured_and_a_session_run_recorded_by_the_new_actions() {
     let schema: Value =
