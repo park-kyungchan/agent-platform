@@ -27,6 +27,8 @@ SPEC = REPO / "specs" / "evals" / "ontology.md"
 PY = sys.executable
 ASK = ("Cite the passage of the corpus that decides this as path:a-b, the file's path and the first and last line "
        "of the passage.")
+TREND = ("Answer from what Palantir most recently said about this in public, in a talk or an announcement, with its event "
+         "and date, and say whether a page of the publisher's documentation confirms it.")
 URL = "https://docs.example.invalid/foundry/object-types/"
 OBJ = "palantir/docs/foundry/object-types.md"
 ACT = "palantir/docs/foundry/action-types.md"
@@ -405,7 +407,8 @@ class Score(unittest.TestCase):
         stream = "\n".join(json.dumps(e) for e in [
             use("a", "cat %s/%s" % (corpus, OBJ)), res("a", "12345"), res("a", "12345"),
             use("b", "grep -r x %s/palantir" % corpus), res("b", [{"type": "text", "text": "éé"}, {"type": "image"}]),
-            use("c", "cat %s" % corpus), res("c", "not under the corpus"), res("z", "no use")])
+            use("c", "cat %s.old/x" % corpus), res("c", "a sibling of the corpus"), use("d", "ls %s" % corpus),
+            res("d", "xy"), res("z", "no use")])
         self.w.sample("route-aaaaaaaaaaaa", 1, answer="%s:7" % OBJ, stream=stream, samples=2)
         self.w.sample("route-aaaaaaaaaaaa", 2, answer="nothing", stream="")
         self.w.sample("design-bbbbbbbbbbbb", 1, answer="%s:3" % ACT, stream=stream)
@@ -417,7 +420,7 @@ class Score(unittest.TestCase):
         self.assertEqual(x["unanswered"], 1)
         self.assertEqual(x["by_kind"], {"design": {"passes": 1, "samples": 2}, "route": {"passes": 1, "samples": 2}})
         self.assertEqual(x["by_cell"], {"language.object-type": {"passes": 2, "samples": 4}})
-        self.assertEqual(x["corpus_bytes_median"], 9)  # 5 + 4 in each of two samples, 0 in the third
+        self.assertEqual(x["corpus_bytes_median"], 11)  # 5 + 4 + 2 in each of two samples, 0 in the third
         self.assertEqual(set(score), {"suite", "case_files", "readers", "parity"})
 
     def test_score_writes_only_score_and_sheet_and_refuses_another_corpus(self):
@@ -524,7 +527,8 @@ class Cut(unittest.TestCase):
             self.assertEqual(c["id"], "%s-%s" % (c["kind"], drawn(f, p)[:12]))
             self.assertEqual(d["source"], f["publisher_url"] or f["path"])
             self.assertEqual(c["cell"], p["concept"])
-            self.assertEqual(c["situation"], p["question"] + "\n\n" + ASK)
+            middle = "\n\n" + TREND if c["kind"] == "trend" else ""
+            self.assertEqual(c["situation"], p["question"].strip() + middle + "\n\n" + ASK)
             self.assertFalse(c["cell"].startswith(("out.", "other:")))
             if c["kind"] == "route":
                 self.assertEqual((f["source_kind"], p["strength"]), ("official-doc", "normative"))
@@ -584,6 +588,35 @@ class Cut(unittest.TestCase):
         self.assertEqual(code, 0, r.stdout)
         self.assertEqual(score["readers"]["claude-opus"]["passes"][c["id"]], 1)
 
+    def test_a_trend_case_holds_the_trend_sentence_and_a_route_case_does_not(self):
+        # spec: specs/evals/ontology.md#R6
+        cut = self.cut()
+        trend = [c for c in cut if c["kind"] == "trend"]
+        route = [c for c in cut if c["kind"] == "route"]
+        self.assertTrue(trend and route)
+        for c in trend:
+            self.assertIn("\n\n" + TREND + "\n\n", c["situation"])
+            self.assertTrue(c["situation"].endswith("\n\n" + TREND + "\n\n" + ASK), c["id"])
+        for c in route:
+            self.assertNotIn(TREND, c["situation"])
+            self.assertTrue(c["situation"].endswith("\n\n" + ASK), c["id"])
+
+
+class Bytes(unittest.TestCase):
+    def test_corpus_bytes_counts_the_corpus_path_at_a_path_boundary(self):
+        # spec: specs/evals/ontology.md#R4
+        mod = load(RUN, "ontology_run_bytes")
+        use = lambda i, c: json.dumps({"message": {"content": [{"type": "tool_use", "id": i, "input": {"command": c}}]}})
+        res = lambda i, t: json.dumps({"message": {"content": [{"type": "tool_result", "tool_use_id": i, "content": t}]}})
+        for command, counted in (("cd /c && sed -n 1,2p a.md", True), ("cat /c/b", True), ("cat /cx/a", False),
+                                 ("cat /c.old/a", False), ("ls /c", True)):
+            stream = "\n".join([use("1", command), res("1", "abc")])
+            for corpus in ("/c", "/c/"):
+                self.assertEqual(mod.corpus_bytes(stream, corpus), 3 if counted else 0, (command, corpus))
+        stream = "\n".join([use("1", "cd /c && x"), res("1", "abc"), use("2", "cat /cx/a"), res("2", "zz"),
+                             use("3", "cat /c/b"), res("3", "q")])
+        self.assertEqual(mod.corpus_bytes(stream, "/c"), 4)
+
 
 class Spec(unittest.TestCase):
     def test_every_requirement_names_a_test_of_this_file_and_every_test_cites_one(self):
@@ -600,7 +633,7 @@ class Spec(unittest.TestCase):
             self.assertLessEqual(named, tests, rid)
         mentioned = {t for _, body in reqs for t in named_by(body)}
         self.assertEqual(mentioned, tests)
-        for cls in (Answers, Readers, Cases, Score, Reach, Cut, Spec):
+        for cls in (Answers, Readers, Cases, Score, Reach, Cut, Bytes, Spec):
             for name, fn in inspect.getmembers(cls, inspect.isfunction):
                 if name.startswith("test_"):
                     cited = re.findall(r"spec: specs/evals/ontology\.md#(R[0-9]+)", inspect.getsource(fn))
