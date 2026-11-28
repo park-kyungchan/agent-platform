@@ -88,7 +88,7 @@
   "id": "trend-6e758ec68046",
   "kind": "trend",
   "cell": "logic.action-type",
-  "situation": "What did the invented publisher most recently announce about action criteria?\n\nCite the passage of the corpus that decides this as path:a-b, the file's path and the first and last line of the passage.",
+  "situation": "What did the invented publisher most recently announce about action criteria?\n\nAnswer from what Palantir most recently said about this in public, in a talk or an announcement, with its event and date, and say whether a page of the publisher's documentation confirms it.\n\nCite the passage of the corpus that decides this as path:a-b, the file's path and the first and last line of the passage.",
   "deciding": [
    {
     "source": "https://blog.example.invalid/2026-launch",
@@ -105,7 +105,7 @@
   "id": "trend-ac0367aaf56a",
   "kind": "trend",
   "cell": "engine.release",
-  "situation": "What did the invented page most recently say an action may name?\n\nCite the passage of the corpus that decides this as path:a-b, the file's path and the first and last line of the passage.",
+  "situation": "What did the invented page most recently say an action may name?\n\nAnswer from what Palantir most recently said about this in public, in a talk or an announcement, with its event and date, and say whether a page of the publisher's documentation confirms it.\n\nCite the passage of the corpus that decides this as path:a-b, the file's path and the first and last line of the passage.",
   "deciding": [
    {
     "source": "palantir/docs/foundry/action-types.md",

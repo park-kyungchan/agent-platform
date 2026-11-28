@@ -55,6 +55,9 @@ STRENGTHS = ("normative", "descriptive", "promotional")
 # The fixed last sentence of every situation: it asks for the citation of the deciding passage.
 ASK = ("Cite the passage of the corpus that decides this as path:a-b, the file's path and the first and last line "
        "of the passage.")
+# The fixed sentence a trend case's situation holds between its question and ASK: it asks for the talk or announcement.
+TREND = ("Answer from what Palantir most recently said about this in public, in a talk or an announcement, with its event "
+         "and date, and say whether a page of the publisher's documentation confirms it.")
 # A citation: a path (no white space, quote, bracket or backtick), a colon, a line, and optionally a hyphen and a line.
 CITE = re.compile(r"(?P<path>[^\s`'\"()\[\]{}<>,;|*]+?):(?P<a>[0-9]+)(?:-(?P<b>[0-9]+))?(?![0-9])")
 
@@ -173,8 +176,10 @@ def passes(case, answer, paths):
 
 def corpus_bytes(stream, corpus):
     """The UTF-8 bytes of the text of the `tool_result` blocks answering a `tool_use` block one of whose input strings
-    holds `<corpus>/`; each block counted once."""
-    mark, uses, results = corpus.rstrip("/") + "/", set(), {}
+    holds the corpus path at a path boundary (followed by `/`, the end of the string, or a character that is not an
+    ASCII letter, digit, `.`, `_` or `-`); each block counted once."""
+    mark = re.compile(re.escape(corpus.rstrip("/")) + r"(?:/|\Z|[^A-Za-z0-9._-])")
+    uses, results = set(), {}
     for e in R.events(stream):
         message = e.get("message")
         content = message.get("content") if isinstance(message, dict) else None
@@ -182,7 +187,7 @@ def corpus_bytes(stream, corpus):
             if not isinstance(b, dict):
                 continue
             if b.get("type") == "tool_use" and isinstance(b.get("id"), str) \
-                    and any(mark in x for x in R.strings(b.get("input"))):
+                    and any(mark.search(x) for x in R.strings(b.get("input"))):
                 uses.add(b["id"])
             elif b.get("type") == "tool_result" and isinstance(b.get("tool_use_id"), str) \
                     and b["tool_use_id"] not in results:
@@ -431,7 +436,8 @@ def cut(data, per_cell):
                 kinds.append("trend")
             for kind in kinds:
                 case = {"id": "%s-%s" % (kind, digest[:12]), "kind": kind, "cell": p["concept"],
-                        "situation": "%s\n\n%s" % (p["question"].strip(), ASK),
+                        "situation": ("%s\n\n%s\n\n%s" % (p["question"].strip(), TREND, ASK) if kind == "trend"
+                                      else "%s\n\n%s" % (p["question"].strip(), ASK)),
                         "deciding": [{"source": f["publisher_url"] or f["path"], "path": f["path"], "lines": [a, b]}],
                         "wrong": []}
                 drawn.setdefault((kind, p["concept"]), []).append((digest, case))
