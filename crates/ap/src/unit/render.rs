@@ -95,10 +95,10 @@ pub fn page_text(
 pub fn page_digest(key: &str, u: &Value) -> String {
     digest(part(key, u, true, false).as_bytes())
 }
-/// The unit's block of the plan (`specs/ap/unit-review.md` R7, R25): the heading line `### <key>: ...`, the
-/// objective and the lines `Depends on:`, `Write set:` and `Specifications:`, each left out when empty;
-/// without the lines `Estimate:`, `Implementer:` and `Verifier:`, which the plan part adds after it.
-pub fn plan_block(key: &str, u: &Value) -> String {
+/// The structure of the unit's block of the plan (`specs/ap/unit.md` R52): the heading line `### <key>: ...`,
+/// the empty line, the objective and the line `Depends on:` when the unit has dependencies; without the lines
+/// `Write set:` and `Specifications:`, which a page look judges, and without the tiers and the estimate.
+pub fn plan_structure(key: &str, u: &Value) -> String {
     let field = |n: &str| text(u, n).unwrap_or_default();
     let repository = text(u, "repository").unwrap_or("no repository");
     let mut out = format!(
@@ -109,12 +109,22 @@ pub fn plan_block(key: &str, u: &Value) -> String {
     if let Some(o) = text(u, "objective") {
         out.push_str(&lines(o));
     }
+    let depends = unit_keys(u, "depends_on").join(", ");
+    if !depends.is_empty() {
+        out.push_str(&lines(&format!("Depends on: {depends}")));
+    }
+    out
+}
+/// The unit's block of the plan as a plan reviewer reads it (`specs/ap/unit-review.md` R7, R25): its structure
+/// and then the lines `Write set:` and `Specifications:`, each left out when empty; without the lines
+/// `Estimate:`, `Implementer:` and `Verifier:`, which the plan part adds after it.
+pub fn plan_block(key: &str, u: &Value) -> String {
+    let mut out = plan_structure(key, u);
     let list = |n: &str| {
         let l = u[n].as_array().into_iter().flatten();
         l.filter_map(Value::as_str).collect::<Vec<_>>().join(", ")
     };
     for (label, value) in [
-        ("Depends on", unit_keys(u, "depends_on").join(", ")),
         ("Write set", list("write_set")),
         ("Specifications", list("specs")),
     ] {
@@ -124,9 +134,10 @@ pub fn plan_block(key: &str, u: &Value) -> String {
     }
     out
 }
-/// The SHA-256 in hex of the unit's block of the plan (`specs/ap/unit.md` R52): the unit's `plan_digest`.
+/// The SHA-256 in hex of the structure of the unit's block of the plan (`specs/ap/unit.md` R52): the
+/// `plan_digest` that `add` and an amendment of the structure send.
 pub fn plan_digest(key: &str, u: &Value) -> String {
-    digest(plan_block(key, u).as_bytes())
+    digest(plan_structure(key, u).as_bytes())
 }
 /// A nonempty string property.
 fn text<'a>(u: &'a Value, k: &str) -> Option<&'a str> {
