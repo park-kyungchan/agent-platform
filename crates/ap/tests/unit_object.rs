@@ -14,7 +14,7 @@ use ap::{
     unit::object::{
         Refusal, arguments, branch_ok, clone_of, current_name, execute, member_of, same_repository,
     },
-    unit::render::{page_digest, page_part, plan_block, plan_digest},
+    unit::render::{page_digest, page_part, plan_block, plan_digest, plan_structure},
 };
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
@@ -5102,9 +5102,10 @@ fn r52_add_sends_the_plan_digest_and_an_amendment_of_no_plan_field_keeps_it_plan
         plan_block("u-plan", &stored),
         "### u-plan: plain, lane objective, no repository\n\nThe widget list holds every widget once.\nWrite set: src/list/**\nSpecifications: specs/widgets.md\n"
     );
+    // The digest is of the block's structure, without its lines `Write set:` and `Specifications:`.
     assert_eq!(
         digest,
-        format!("{:x}", Sha256::digest(plan_block("u-plan", &stored)))
+        format!("{:x}", Sha256::digest(plan_structure("u-plan", &stored)))
     );
     assert_eq!(f.applies()[0]["parameters"]["plan_digest"], json!(digest));
     assert_eq!(stored["plan_digest"], json!(digest));
@@ -5123,9 +5124,9 @@ fn r52_add_sends_the_plan_digest_and_an_amendment_of_no_plan_field_keeps_it_plan
     yes(&mut f, &["amend"], with(writer("m2"), notes));
     assert!(f.applies()[0]["parameters"].get("plan_digest").is_none());
     assert!(f.unit("u-plan").get("plan_digest").is_none());
-    // An amendment that gives a field of the block sends the digest of the unit as the apply leaves it.
+    // An amendment that gives a member of the block's structure with another value sends the digest of the unit
+    // as the apply leaves it.
     for (n, member) in [
-        json!({"specs": ["specs/ap/unit.md#R52"]}),
         json!({"class": "contract"}),
         json!({"objective": "The widget list holds every widget once, sorted."}),
     ]
@@ -5174,9 +5175,10 @@ fn r54_a_plan_block_changed_since_its_mark_is_refused_plan_not_reviewed() {
     yes(&mut f, &["amend"], with(writer("m1"), notes));
     let v: Value = serde_json::from_str(&unmarked(&mut f, "u-mark", "r54-3").unwrap()).unwrap();
     assert_eq!(v["state"], "ready");
-    // The write set changed, then the dependencies: each change of the block is refused until a review marks it.
+    // The objective changed, then the dependencies: each change of the block's structure is refused until a
+    // review marks it.
     for (n, member) in [
-        json!({"write_set": ["src/list/**", "src/sort/**"]}),
+        json!({"objective": "The widget list holds every widget once, sorted."}),
         json!({"depends_on": ["u-dep"]}),
     ]
     .into_iter()
@@ -5198,6 +5200,206 @@ fn r54_a_plan_block_changed_since_its_mark_is_refused_plan_not_reviewed() {
     f.forget("unit", "u-dep", "plan_digest");
     let v: Value = serde_json::from_str(&unmarked(&mut f, "u-dep", "r54-5").unwrap()).unwrap();
     assert_eq!(v["state"], "ready");
+}
+
+// spec: specs/ap/unit.md#R52
+#[test]
+fn r52_plan_structure_the_digest_leaves_out_the_write_set_and_the_specifications() {
+    let mut f = F::new();
+    plain_unit(&mut f, "u-dep", check("test -f list.txt", "fails_on_base"));
+    f.calls.clear();
+    yes(
+        &mut f,
+        &["add"],
+        with(added("u-plan"), json!({"depends_on": ["u-dep"]})),
+    );
+    let stored = f.unit("u-plan").clone();
+    // The structure: the heading line, the empty line, the objective and the line `Depends on:`.
+    let structure = "### u-plan: plain, lane objective, no repository\n\nThe widget list holds every widget once.\nDepends on: u-dep\n";
+    assert_eq!(plan_structure("u-plan", &stored), structure);
+    // The block a plan reviewer reads keeps both lines after it.
+    assert_eq!(
+        plan_block("u-plan", &stored),
+        format!("{structure}Write set: src/list/**\nSpecifications: specs/widgets.md\n")
+    );
+    let digest = format!("{:x}", Sha256::digest(structure));
+    assert_eq!(plan_digest("u-plan", &stored), digest);
+    assert_eq!(f.applies()[0]["parameters"]["plan_digest"], json!(digest));
+    assert_eq!(stored["plan_digest"], json!(digest));
+    // Without dependencies the structure ends with the objective.
+    let dep = f.unit("u-dep").clone();
+    let bare = "### u-dep: plain, lane objective, no repository\n\nThe widget list holds every widget once.\n";
+    assert_eq!(plan_structure("u-dep", &dep), bare);
+    assert_eq!(
+        dep["plan_digest"],
+        json!(format!("{:x}", Sha256::digest(bare)))
+    );
+}
+
+// spec: specs/ap/unit.md#R52
+#[test]
+fn r52_plan_structure_an_amend_outside_the_structure_sends_the_stored_digest_itself() {
+    let mut f = F::new();
+    plain_unit(&mut f, "u-dep", check("test -f list.txt", "fails_on_base"));
+    yes(
+        &mut f,
+        &["add"],
+        with(added("u-plan"), json!({"depends_on": ["u-dep"]})),
+    );
+    // A digest stored under the formula before the structure: of the whole block, write set and specifications.
+    let old = format!(
+        "{:x}",
+        Sha256::digest(plan_block("u-plan", f.unit("u-plan")))
+    );
+    assert_ne!(json!(old), f.unit("u-plan")["plan_digest"]);
+    f.modify("unit", "u-plan", json!({"plan_digest": old}));
+    let same = f.unit("u-plan").clone();
+    for (n, member) in [
+        json!({"write_set": ["src/list/**", "src/sort/**"]}),
+        json!({"specs": ["specs/ap/unit.md#R52"]}),
+        json!({"write_set": ["src/list/**"], "specs": ["specs/widgets.md"], "notes": "Read the list."}),
+        // Members of the structure with the stored value: compared as values, not as forms.
+        json!({"objective": same["objective"], "class": same["class"], "depends_on": ["u-dep"]}),
+        json!({"objective": same["objective"], "write_set": ["src/other/**"]}),
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        f.calls.clear();
+        let r = with(
+            writer(&format!("s-{n}")),
+            with(json!({"unit": "u-plan"}), member),
+        );
+        yes(&mut f, &["amend"], r);
+        assert_eq!(
+            f.applies()[0]["parameters"]["plan_digest"],
+            json!(old),
+            "{n}"
+        );
+        assert_eq!(f.unit("u-plan")["plan_digest"], json!(old), "{n}");
+    }
+    // A unit without a digest: an amendment outside the structure, or of its members with their stored values,
+    // sends none.
+    f.forget("unit", "u-plan", "plan_digest");
+    for (n, member) in [
+        json!({"write_set": ["src/list/**"]}),
+        json!({"specs": ["specs/widgets.md"], "class": "plain", "depends_on": ["u-dep"]}),
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        f.calls.clear();
+        let r = with(
+            writer(&format!("n-{n}")),
+            with(json!({"unit": "u-plan"}), member),
+        );
+        yes(&mut f, &["amend"], r);
+        assert!(f.applies()[0]["parameters"].get("plan_digest").is_none());
+        assert!(f.unit("u-plan").get("plan_digest").is_none());
+    }
+}
+
+// spec: specs/ap/unit.md#R52
+#[test]
+fn r52_plan_structure_an_amend_of_a_structure_member_with_another_value_sends_a_new_digest() {
+    let mut f = F::new();
+    plain_unit(&mut f, "u-dep", check("test -f list.txt", "fails_on_base"));
+    plain_unit(&mut f, "u-two", check("test -f list.txt", "fails_on_base"));
+    plain_unit(&mut f, "u-plan", check("test -f list.txt", "fails_on_base"));
+    for (n, member) in [
+        json!({"objective": "The widget list holds every widget once, sorted."}),
+        json!({"class": "contract"}),
+        json!({"depends_on": ["u-dep"]}),
+        // The same keys in another order.
+        json!({"depends_on": ["u-dep", "u-two"]}),
+        json!({"depends_on": ["u-two", "u-dep"]}),
+        json!({"repository": "invented/widgets"}),
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        // With a stored digest of the formula before the structure, and without one.
+        for old in [true, false] {
+            if old {
+                let block = plan_block("u-plan", f.unit("u-plan"));
+                let d = format!("{:x}", Sha256::digest(block));
+                f.modify("unit", "u-plan", json!({"plan_digest": d}));
+            } else {
+                f.forget("unit", "u-plan", "plan_digest");
+            }
+            let before = f.unit("u-plan")["plan_digest"].clone();
+            f.calls.clear();
+            let r = with(
+                writer(&format!("d-{n}-{old}")),
+                with(json!({"unit": "u-plan"}), member.clone()),
+            );
+            yes(&mut f, &["amend"], r);
+            // The second pass gives the value the first one stored: nothing differs, and the unit has no digest.
+            let sent = f.applies()[0]["parameters"].get("plan_digest").cloned();
+            if old {
+                let new = json!(plan_digest("u-plan", f.unit("u-plan")));
+                assert_eq!(sent, Some(new.clone()), "{n}");
+                assert_ne!(new, before, "{n}");
+                assert_eq!(f.unit("u-plan")["plan_digest"], new, "{n}");
+            } else {
+                assert_eq!(sent, None, "{n}");
+            }
+        }
+    }
+    // A unit without a digest gets one by a member of its structure with another value.
+    f.forget("unit", "u-plan", "plan_digest");
+    f.calls.clear();
+    let r = with(
+        writer("d-none"),
+        json!({"unit": "u-plan", "objective": "The widget list holds each widget."}),
+    );
+    yes(&mut f, &["amend"], r);
+    let new = json!(plan_digest("u-plan", f.unit("u-plan")));
+    assert_eq!(f.applies()[0]["parameters"]["plan_digest"], new);
+    assert_eq!(f.unit("u-plan")["plan_digest"], new);
+}
+
+// spec: specs/ap/unit.md#R54
+#[test]
+fn r54_plan_structure_an_amend_of_the_write_set_or_specs_leaves_the_unit_reviewed() {
+    let mut f = F::new();
+    plain_unit(&mut f, "u-mark", check("test -f list.txt", "fails_on_base"));
+    // Reviewed under the formula before the structure: its mark is its stored digest of the whole block.
+    let old = format!(
+        "{:x}",
+        Sha256::digest(plan_block("u-mark", f.unit("u-mark")))
+    );
+    f.modify(
+        "unit",
+        "u-mark",
+        json!({"plan_digest": old, "plan_reviewed": old}),
+    );
+    for (n, member) in [
+        json!({"write_set": ["src/list/**", "src/sort/**"]}),
+        json!({"specs": ["specs/widgets.md", "specs/sort.md"]}),
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        let r = with(
+            writer(&format!("w-{n}")),
+            with(json!({"unit": "u-mark"}), member),
+        );
+        yes(&mut f, &["amend"], r);
+        assert_eq!(f.unit("u-mark")["state"], "draft");
+        assert_eq!(f.unit("u-mark")["plan_digest"], json!(old));
+        let v: Value =
+            serde_json::from_str(&unmarked(&mut f, "u-mark", &format!("w-r{n}")).unwrap()).unwrap();
+        assert_eq!(v["state"], "ready", "{n}");
+    }
+    // The objective amended: refused until a plan review marks the new digest.
+    let r = with(
+        writer("w-o"),
+        json!({"unit": "u-mark", "objective": "The widget list holds every widget once, sorted."}),
+    );
+    yes(&mut f, &["amend"], r);
+    let e = unmarked(&mut f, "u-mark", "w-r9").unwrap_err();
+    assert_eq!((e.code.as_str(), &e.after), ("plan_not_reviewed", &None));
 }
 
 // spec: specs/ap/unit.md#R53

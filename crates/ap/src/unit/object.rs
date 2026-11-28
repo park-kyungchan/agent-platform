@@ -37,15 +37,8 @@ const TEXTS: [(&str, usize); 9] = [
 ];
 /// The page properties `amend` takes; `add` takes `lane`, `intent` and `origin` too.
 const PAGE: &str = "class objective interface invariants acceptance not_built write_set read_first specs notes verifier_questions report repository branch implementer verifier estimate_lines depends_on wave kind use depends_delivered";
-/// The members of a request that the unit's block of the plan is built from (R52).
-const PLAN_FIELDS: [&str; 6] = [
-    "objective",
-    "depends_on",
-    "write_set",
-    "specs",
-    "class",
-    "repository",
-];
+/// The members of a request that the structure of the unit's block of the plan is built from (R52).
+const PLAN_FIELDS: [&str; 4] = ["objective", "depends_on", "class", "repository"];
 /// The most bytes of a design record (R53).
 const DESIGN_BYTES: u64 = 60_000;
 /// The most bytes of `use` (R47) and of the evidence of `used` (R50).
@@ -1021,6 +1014,19 @@ fn page_parameters(b: &mut Breaks, r: &Value, op: &str, key: &str) -> (Value, De
     }
     (p.into(), depends)
 }
+/// Whether the member `k` of the structure of the plan has another value in `page` than in `stored` (R52):
+/// `depends_on` as its keys in order, another member as its text, byte for byte.
+fn differs(k: &str, page: &Value, stored: &Value) -> bool {
+    let keys = |u: &Value| -> Vec<Option<String>> {
+        let l = u[k].as_array().into_iter().flatten();
+        l.map(|d| d["native_key"].as_str().map(str::to_owned))
+            .collect()
+    };
+    match k {
+        "depends_on" => keys(page) != keys(stored),
+        _ => page[k] != stored[k],
+    }
+}
 /// A list `k` of at most 20 keys of units, each of 1 to 512 bytes (R16, R47): their ids into `p`, the keys
 /// into `depends` with the list's name.
 fn keys(
@@ -1231,10 +1237,16 @@ fn write(
             }
             p["page_digest"] = json!(render::page_digest(key, &page));
             page_size(&call, op, &p)?;
-            // The block of the plan as the amendment leaves it, when the unit has a digest or the request
-            // gives a field of the block; else none, and the unit keeps the rule without one (R52).
-            if stored["plan_digest"].is_string() || PLAN_FIELDS.iter().any(|k| r.get(k).is_some()) {
+            // The structure of the block as the amendment leaves it, when the request gives a member of it
+            // with another value than the stored one; else the stored digest itself, or none, and a unit
+            // without one keeps the rule without one (R52).
+            if PLAN_FIELDS
+                .iter()
+                .any(|k| p.get(k).is_some() && differs(k, &page, &stored))
+            {
                 p["plan_digest"] = json!(render::plan_digest(key, &page));
+            } else if let Some(d) = stored["plan_digest"].as_str() {
+                p["plan_digest"] = json!(d);
             }
             routed = page;
         }

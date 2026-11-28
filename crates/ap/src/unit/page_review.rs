@@ -1356,9 +1356,14 @@ fn plan(
         if i == cycle {
             part.push_str(&format!("\n{CYCLE}\n"));
         }
-        // The unit's block, whose digest its mark carries (R25), then the lines the block leaves out.
+        // The unit's block, then the lines the block leaves out. Its mark carries the unit's `plan_digest` as
+        // this one read gave it, else the digest of the block's structure as read (R25).
         let block = render::plan_block(k, u);
-        blocks.push((k.clone(), digest(block.as_bytes())));
+        let mark = match u["plan_digest"].as_str() {
+            Some(stored) => stored.to_owned(),
+            None => render::plan_digest(k, u),
+        };
+        blocks.push((k.clone(), mark));
         part.push('\n');
         part.push_str(&block);
         let tier = |n: &str| {

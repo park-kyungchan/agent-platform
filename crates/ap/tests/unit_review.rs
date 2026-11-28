@@ -14,7 +14,7 @@
 )]
 use ap::host::{Answer, Failure, Host, Reply, System};
 use ap::unit::page_review::{Refusal, arguments, execute, execute_as};
-use ap::unit::render::{Role, page, page_digest, page_part, plan_block};
+use ap::unit::render::{Role, page, page_digest, page_part, plan_block, plan_structure};
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 use std::{
@@ -158,6 +158,8 @@ struct F {
     amend_at_launch: Option<&'static str>,
     /// When a stage launches, this unit's tiers and estimate are amended, and nothing else.
     tiers_at_launch: Option<&'static str>,
+    /// When a stage launches, this unit's structure is amended: its objective and the `plan_digest` `amend` sends.
+    structure_at_launch: Option<&'static str>,
     amend_at_validate: Option<&'static str>,
     /// When `close_run` is applied, the run's report is replaced.
     replace_report: bool,
@@ -235,6 +237,7 @@ impl F {
             dead: false,
             amend_at_launch: None,
             tiers_at_launch: None,
+            structure_at_launch: None,
             amend_at_validate: None,
             replace_report: false,
             stage_writes: false,
@@ -886,6 +889,15 @@ impl System for F {
         }
         if let Some(key) = self.amend_at_launch.take() {
             self.amend(key);
+        }
+        if let Some(key) = self.structure_at_launch.take() {
+            self.amend(key);
+            let u = self.get("unit", key);
+            self.modify(
+                "unit",
+                key,
+                json!({"plan_digest": sha(plan_structure(key, &u).as_bytes())}),
+            );
         }
         if let Some(key) = self.tiers_at_launch.take() {
             let now = stamp(self.clock);
@@ -3513,7 +3525,8 @@ fn r25_marks_on_accept_name_every_block_read_and_the_design_record() {
     assert_eq!((status, &v["verdict"]), (0, &json!("accept")));
     assert_eq!(v["marks"], json!({"applied": 6, "failed": []}));
     let review = v["review"].as_str().unwrap();
-    // One mark per unit, in the order of the plan part, with the digest of the block the text held.
+    // One mark per unit, in the order of the plan part; a unit stored without a digest (as here) with the digest
+    // of the structure of the block the text held.
     let prompt = prompt_of(&f, &v);
     let marks = f.bodies("apply", "mark_plan_reviewed");
     let order = ["a", "b", "g", "c", "d"];
@@ -3521,15 +3534,17 @@ fn r25_marks_on_accept_name_every_block_read_and_the_design_record() {
     for (n, (body, key)) in marks.iter().zip(order).enumerate() {
         let block = plan_block(key, &f.get("unit", key));
         assert!(prompt.contains(&format!("\n{block}")), "{key}");
+        let structure = plan_structure(key, &f.get("unit", key));
+        assert!(block.starts_with(&structure), "{key}");
         assert_eq!(body["request_id"], json!(format!("{rid}-m{}", n + 1)));
         assert_eq!(body["role"], "lead");
         assert_eq!(
             body["parameters"],
-            json!({"unit": oid("unit", key), "review": oid("review", review), "digest": sha(block.as_bytes())})
+            json!({"unit": oid("unit", key), "review": oid("review", review), "digest": sha(structure.as_bytes())})
         );
         assert_eq!(
             f.get("unit", key)["plan_reviewed"],
-            json!(sha(block.as_bytes()))
+            json!(sha(structure.as_bytes()))
         );
     }
     let [design] = &f.bodies("apply", "mark_design_reviewed")[..] else {
@@ -3583,6 +3598,63 @@ fn r25_marks_on_accept_name_every_block_read_and_the_design_record() {
     let (v, _) = g.ok(&g.req("unit", "u1"));
     assert_eq!(v["verdict"], "accept");
     assert!(v.get("marks").is_none() && !g.actions().iter().any(|a| a.starts_with("mark_")));
+}
+
+// spec: specs/ap/unit-review.md#R25
+#[test]
+fn r25_plan_structure_a_mark_carries_the_stored_digest_so_a_unit_of_the_old_formula_is_reviewed() {
+    let mut f = F::new();
+    plan_fixture(&mut f);
+    // Unit `a` stored with a digest of the formula before the structure (of the whole block, its write set not
+    // empty); unit `b` stored without one.
+    let a = f.get("unit", "a");
+    assert!(!a["write_set"].as_array().unwrap().is_empty());
+    let old = sha(plan_block("a", &a).as_bytes());
+    assert_ne!(old, sha(plan_structure("a", &a).as_bytes()));
+    f.modify("unit", "a", json!({"plan_digest": old}));
+    let (v, status) = f.ok(&f.req("intent", "widgets"));
+    assert_eq!((status, &v["verdict"]), (0, &json!("accept")));
+    // The reviewer still reads both lines.
+    let prompt = prompt_of(&f, &v);
+    assert!(prompt.contains(&format!("\n{}", plan_block("a", &f.get("unit", "a")))));
+    assert!(prompt.contains("Write set: src/widgets.rs\n"));
+    let marks = f.bodies("apply", "mark_plan_reviewed");
+    let digest = |key: &str| {
+        let m = marks
+            .iter()
+            .find(|m| m["parameters"]["unit"] == oid("unit", key));
+        m.unwrap()["parameters"]["digest"].clone()
+    };
+    assert_eq!(digest("a"), json!(old));
+    // The store's criterion of `specs/ap/unit.md` R54: `plan_reviewed` equal to `plan_digest`, so `a` is free
+    // of plan_not_reviewed without an amendment.
+    let a = f.get("unit", "a");
+    assert_eq!(a["plan_reviewed"], a["plan_digest"]);
+    let b = f.get("unit", "b");
+    assert_eq!(digest("b"), json!(sha(plan_structure("b", &b).as_bytes())));
+    assert_ne!(digest("b"), json!(sha(plan_block("b", &b).as_bytes())));
+}
+
+// spec: specs/ap/unit-review.md#R25
+#[test]
+fn r25_plan_structure_a_unit_amended_while_the_review_runs_is_left_not_reviewed() {
+    let mut f = F::new();
+    plan_fixture(&mut f);
+    let read = sha(plan_structure("a", &f.get("unit", "a")).as_bytes());
+    f.modify("unit", "a", json!({"plan_digest": read}));
+    f.structure_at_launch = Some("a");
+    let (v, status) = f.ok(&f.req("intent", "widgets"));
+    assert_eq!((status, &v["verdict"]), (0, &json!("accept")));
+    // The mark is the digest the review's one read gave, not the one stored since.
+    let a = f.get("unit", "a");
+    assert_eq!(a["plan_reviewed"], json!(read));
+    assert_ne!(a["plan_digest"], a["plan_reviewed"]);
+    // A unit amended in its write set alone keeps its digest, so the next review leaves it reviewed.
+    f.modify("unit", "a", json!({"write_set": ["src/other.rs"]}));
+    let (v, _) = f.ok(&f.req("intent", "widgets"));
+    assert_eq!(v["verdict"], "accept");
+    let a = f.get("unit", "a");
+    assert_eq!(a["plan_reviewed"], a["plan_digest"]);
 }
 
 // spec: specs/ap/unit-review.md#R27
