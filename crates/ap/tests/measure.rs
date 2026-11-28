@@ -2925,7 +2925,10 @@ fn r19_the_hourly_timer_runs_the_sessions_pass_alone() {
     }
     let timer: Vec<&str> = timer.lines().collect();
     assert_eq!(
-        timer.iter().filter(|l| l.starts_with("OnCalendar=")).count(),
+        timer
+            .iter()
+            .filter(|l| l.starts_with("OnCalendar="))
+            .count(),
         1
     );
     for l in [
