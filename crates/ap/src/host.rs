@@ -408,33 +408,46 @@ impl System for Host {
         Some(PathBuf::from(GIT_HOOKS))
     }
     fn call(&mut self, program: &str, args: &[String], input: &Value, ms: u64) -> Answer {
-        let error = || fail("process_failed", program, Value::Null);
+        let start = Instant::now();
+        // `process_failed` names its cause and the time of the call; never a word of the arguments,
+        // the input, the output or the environment.
+        let failed = |cause: &str, stream: Option<&str>| {
+            let mut detail = json!({
+                "cause": cause,
+                "ms": u64::try_from(start.elapsed().as_millis()).unwrap_or(u64::MAX),
+                "bound_ms": ms,
+            });
+            if let Some(stream) = stream {
+                detail["stream"] = json!(stream);
+            }
+            fail("process_failed", program, detail)
+        };
         let mut child = Command::new(program)
             .args(args)
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
             .spawn()
-            .map_err(|_| error())?;
-        let mut stdin = child.stdin.take().ok_or_else(error)?;
+            .map_err(|_| failed("spawn", None))?;
+        let mut stdin = child.stdin.take().ok_or_else(|| failed("spawn", None))?;
         let body = if input.is_null() {
             vec![]
         } else {
-            serde_json::to_vec(input).map_err(|_| error())?
+            serde_json::to_vec(input).map_err(|_| failed("stdin", None))?
         };
         let (tx, rx) = std::sync::mpsc::channel();
         std::thread::spawn(move || {
             let _ = tx.send(stdin.write_all(&body));
         });
         let (out_tx, out_rx) = std::sync::mpsc::channel();
-        let stdout = child.stdout.take().ok_or_else(error)?;
+        let stdout = child.stdout.take().ok_or_else(|| failed("spawn", None))?;
         let out_limit =
             if std::path::Path::new(program).file_name() == Some(std::ffi::OsStr::new("ont")) {
                 ANSWER_LIMIT
             } else {
                 LIMIT
             };
-        let stderr = child.stderr.take().ok_or_else(error)?;
+        let stderr = child.stderr.take().ok_or_else(|| failed("spawn", None))?;
         for (which, pipe, limit) in [
             (true, Box::new(stdout) as Box<dyn Read + Send>, out_limit),
             (false, Box::new(stderr) as Box<dyn Read + Send>, LIMIT),
@@ -449,32 +462,35 @@ impl System for Host {
                 let _ = tx.send(result);
             });
         }
-        let deadline = Instant::now() + Duration::from_millis(ms);
+        let deadline = start + Duration::from_millis(ms);
         let status = loop {
             match child.try_wait() {
                 Ok(Some(status)) => break status,
                 Ok(None) if Instant::now() < deadline => {
                     std::thread::sleep(Duration::from_millis(10))
                 }
+                // The bound passed, or the state of the program cannot be read: it is killed.
                 _ => {
-                    child.kill().map_err(|_| error())?;
-                    child.wait().map_err(|_| error())?;
-                    return Err(error());
+                    let _ = child.kill().and_then(|()| child.wait());
+                    return Err(failed("timeout", None));
                 }
             }
         };
         rx.recv_timeout(deadline.saturating_duration_since(Instant::now()))
-            .map_err(|_| error())?
-            .map_err(|_| error())?;
+            .map_err(|_| failed("stdin", None))?
+            .map_err(|_| failed("stdin", None))?;
         let mut out = vec![];
         let mut err = vec![];
         for _ in 0..2 {
             let (which, bytes, limit) = out_rx
                 .recv_timeout(deadline.saturating_duration_since(Instant::now()))
-                .map_err(|_| error())?
-                .map_err(|_| error())?;
+                .map_err(|_| failed("output_read", None))?
+                .map_err(|_| failed("output_read", None))?;
             if bytes.len() as u64 > limit {
-                return Err(error());
+                return Err(failed(
+                    "output_too_large",
+                    Some(if which { "stdout" } else { "stderr" }),
+                ));
             }
             if which {
                 out = bytes;
