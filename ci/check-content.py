@@ -5,7 +5,9 @@ Fails the build when (1) SHA256SUMS and the files disagree, (2) always-loaded te
 (AGENTS.md, skill frontmatter) carries a value that changes over time, (3) an owned file
 names a model (the Lead's page form, which names the reviewers' models, alone excepted), (4) a file that content/ routes a reader to does not exist, (5) a path
 is elided or points into a main checkout's files, (6) on a host that has the corpus of
-design sources, a line range of OFFICIAL-DOCS.md section 4 falls outside its file, (7) a file names a retired name
+design sources, a line range of OFFICIAL-DOCS.md section 4 falls outside its file, section 4 does not name the corpus's
+route table ROUTES.md (or, where the corpus is present, that file is not at its root), or section 4 holds a route row of
+its own, (7) a file names a retired name
 (RETIRED_NAMES), (8) a file names the legacy memory service (RETIRED_MEMORY, without case), or (9) AGENTS.md
 breaks its form (specs/content/agents-file.md): over 6,500 bytes, its eight section headings not in
 order, a line over 400 characters or a table row, or, on the host, an absolute path that does not exist, or (10) the
@@ -209,16 +211,28 @@ else:
     print(f"agents paths: skipped, {HOST} is absent (not this host)")
     with open(os.environ.get("CHECK_SKIPS") or os.devnull, "a", encoding="utf-8") as skips: skips.write("content-agents-paths\n")
 
-# The route table of the design sources (OFFICIAL-DOCS.md section 4): every line range inside its file. The corpus is on
-# the host only, so this runs where it is present (./check on the host) and is skipped in GitHub's CI.
+# The design sources (OFFICIAL-DOCS.md section 4): the section names the one route table of the corpus, ROUTE_TABLE at
+# the corpus root, and holds no route row of its own. Where the corpus is present (./check on the host; it is skipped in
+# GitHub's CI) the table's file exists, and every line range of a row the section still holds is inside its file.
 CORPUS = Path(os.environ.get("CONTENT_CHECK_CORPUS", "/home/palantirkc/external/reference-docs"))
 ROUTES = "runtime-references/OFFICIAL-DOCS.md"
+ROUTE_TABLE = "ROUTES.md"
 section = texts.get(ROUTES, "").split("\n## 4. ", 1)
-if CORPUS.is_dir() and len(section) != 2:
-    fail("design_routes_section_missing", ROUTES, "no section '## 4. ' to check against the corpus")
+body = section[1].split("\n## ", 1)[0] if len(section) == 2 else ""
+if len(section) != 2:
+    fail("design_routes_section_missing", ROUTES, f"no section '## 4. ' to name the route table {ROUTE_TABLE}")
+elif ROUTE_TABLE not in body:
+    fail("design_routes_section_missing", ROUTES, f"section 4 does not name the route table {ROUTE_TABLE} of the corpus")
+elif CORPUS.is_dir() and not (CORPUS / ROUTE_TABLE).is_file():
+    fail("design_routes_section_missing", ROUTES, f"{CORPUS / ROUTE_TABLE} does not exist: section 4 names a missing route table")
+# A row of a route table in section 4 is a second table beside ROUTE_TABLE; the routes change only there.
+for row in body.splitlines():
+    if row.startswith("|"):
+        for m in re.finditer(r"(?<![\w./-])((?:docs|palantir|text)/[^\s`|,;]*)", row):
+            fail("route_row_outside_routes", ROUTES, f"{m.group(1)}: a route row in section 4; the routes are in {ROUTE_TABLE} of the corpus")
+            break
 if CORPUS.is_dir() and len(section) == 2:
     checked = 0
-    body = section[1].split("\n## ", 1)[0]
     for row in body.splitlines():
         if not row.startswith("| ") or row.startswith(("| Question", "| ---")):
             continue

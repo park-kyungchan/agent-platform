@@ -242,23 +242,66 @@ class LeadExecutionMode(Scratch, unittest.TestCase):
 
 
 class PathsAndDesignRoutes(Scratch, unittest.TestCase):
-    """An elided path, a path into a main checkout's files, and the line ranges of OFFICIAL-DOCS.md section 4."""
+    """An elided path, a path into a main checkout's files, and OFFICIAL-DOCS.md section 4: it names the corpus's route
+    table ROUTES.md, holds no route row of its own, and the line ranges of a row it still holds are read."""
 
     ROUTES = "runtime-references/OFFICIAL-DOCS.md"
 
-    def add_route(self, root, row):
+    NAMES_THE_TABLE = "The one route table of the corpus is the file ROUTES.md at the corpus root.\n"
+
+    def write_section(self, root, body):
         path = root / "content" / self.ROUTES
         head = path.read_text(encoding="utf-8").split("\n## 4. ", 1)[0]
-        path.write_text(head + "\n## 4. Local copies of the design sources\n\n| Question | Start | Also |\n| --- | --- | --- |\n" + row + "\n", encoding="utf-8")
+        path.write_text(head + "\n## 4. Local copies of the design sources\n\n" + body, encoding="utf-8")
         sums = root / "content/SHA256SUMS"
         digest = hashlib.sha256(path.read_bytes()).hexdigest()
         sums.write_text("".join(f"{digest}  {self.ROUTES}\n" if l.endswith("  " + self.ROUTES) else l + "\n" for l in sums.read_text().splitlines()))
 
-    def corpus(self, root):
+    def add_route(self, root, row):
+        self.write_section(root, self.NAMES_THE_TABLE + "\n| Question | Start | Also |\n| --- | --- | --- |\n" + row + "\n")
+
+    def corpus(self, root, table=True):
         corpus = root / "corpus"
         (corpus / "docs/area").mkdir(parents=True)
         (corpus / "docs/area/one.md").write_text("".join(f"line {n}\n" for n in range(1, 10)), encoding="utf-8")
+        if table:
+            (corpus / "ROUTES.md").write_text("# Routes\n", encoding="utf-8")
         return corpus
+
+    def test_the_section_names_the_route_table_and_holds_no_row(self):
+        code, out = run_check(REPO, self.corpus(self.fixture()))
+        self.assertEqual(code, 0, out)
+        self.assertIn("design routes: 0 line ranges checked", out)
+
+    def test_a_section_that_names_no_route_table_fails_without_the_corpus(self):
+        root = self.fixture()
+        self.write_section(root, "Read the corpus by its rows.\n")
+        code, out = run_check(root)
+        self.assertEqual(code, 1, out)
+        self.assertIn("design_routes_section_missing@content/runtime-references/OFFICIAL-DOCS.md: section 4 does not name the route table ROUTES.md", out)
+
+    def test_a_route_table_missing_from_the_corpus_fails(self):
+        root = self.fixture()
+        code, out = run_check(root, self.corpus(root, table=False))
+        self.assertEqual(code, 1, out)
+        self.assertIn("design_routes_section_missing@content/runtime-references/OFFICIAL-DOCS.md: ", out)
+        self.assertIn("ROUTES.md does not exist", out)
+        # Without the corpus the file is not looked for.
+        code, out = run_check(root)
+        self.assertEqual(code, 0, out)
+
+    def test_a_route_row_in_the_section_fails_without_the_corpus(self):
+        root = self.fixture()
+        self.write_section(root, self.NAMES_THE_TABLE + "\n| Question | Start |\n| --- | --- |\n"
+                           "| One | `docs/area/one.md:2-5` |\n| Two | `palantir/area/two.md:1-2` |\n| Three | `text/three.txt:4` |\n"
+                           "| Four | the catalog llms.txt |\n\nRead `docs/area/one.md` first.\n")
+        code, out = run_check(root)
+        self.assertEqual(code, 1, out)
+        for path in ("docs/area/one.md:2-5", "palantir/area/two.md:1-2", "text/three.txt:4"):
+            self.assertIn(f"route_row_outside_routes@content/runtime-references/OFFICIAL-DOCS.md: {path}: a route row in section 4", out)
+        # A row that holds no such path, and a sentence that names one, are no route rows.
+        self.assertEqual(out.count("route_row_outside_routes@"), 3, out)
+        self.assertTrue(out.splitlines()[-1].endswith(" 3 errors"), out)
 
     def test_an_elided_path_fails(self):
         root = self.fixture()
@@ -286,8 +329,10 @@ class PathsAndDesignRoutes(Scratch, unittest.TestCase):
         root = self.fixture()
         self.add_route(root, "| A question | `docs/area/one.md:2-5` | `:7`; `:1-9` |")
         code, out = run_check(root, self.corpus(root))
-        self.assertEqual(code, 0, out)
-        self.assertIn("design routes:", out)
+        # The row is refused as a route row outside ROUTES.md; its ranges are inside its file.
+        self.assertEqual(code, 1, out)
+        self.assertEqual([l.split("@", 1)[0] for l in out.splitlines() if "@content/" in l], ["route_row_outside_routes"], out)
+        self.assertIn("design routes: 3 line ranges checked", out)
 
     def test_a_design_route_past_its_file_or_to_no_file_fails(self):
         root = self.fixture()
@@ -303,7 +348,9 @@ class PathsAndDesignRoutes(Scratch, unittest.TestCase):
         skips = root / "skips"
         skips.write_text("")
         code, out = run_check(root, skips=skips)
-        self.assertEqual(code, 0, out)
+        # The row is refused as a route row outside ROUTES.md, but its ranges are not read.
+        self.assertEqual(code, 1, out)
+        self.assertEqual([l.split("@", 1)[0] for l in out.splitlines() if "@content/" in l], ["route_row_outside_routes"], out)
         self.assertNotIn("design routes:", out)
         # The skip says so, and appends the ids of its rows of ci/skips.json (specs/ap/check.md R22).
         self.assertIn(f"corpus routes: skipped, {root / 'no-corpus'} is absent", out)
