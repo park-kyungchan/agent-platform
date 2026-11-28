@@ -200,3 +200,56 @@ fn other_program_keeps_one_mib() {
     assert_eq!(out.err().unwrap().code, "process_failed");
     let _ = std::fs::remove_dir_all(dir);
 }
+
+/// The `detail` of a failed call: the cause, the milliseconds and the bound, and the stream when
+/// the cause is `output_too_large`.
+fn detail_of(out: Answer) -> Value {
+    let failure = out.err().unwrap();
+    assert_eq!(failure.code, "process_failed");
+    failure.detail
+}
+
+#[test]
+fn process_failed_names_its_cause() {
+    // spawn: a path that does not exist; the secret word of its arguments stays out of the detail.
+    let d = detail_of(Host.call(
+        "/missing-ap-fixture",
+        &["token-word-1234".into()],
+        &json!({"secret": "input-word-5678"}),
+        700,
+    ));
+    assert_eq!(d["cause"], "spawn");
+    assert_eq!(d["bound_ms"], 700);
+    assert!(d["ms"].is_u64());
+    assert!(d.get("stream").is_none());
+    let text = d.to_string();
+    assert!(!text.contains("token-word-1234") && !text.contains("input-word-5678"));
+
+    // timeout: a program that sleeps past a bound of 500 ms.
+    let d = detail_of(Host.call("sleep", &["5".into()], &Value::Null, 500));
+    assert_eq!(d["cause"], "timeout");
+    assert_eq!(d["bound_ms"], 500);
+    assert!(d["ms"].as_u64().unwrap() >= 500);
+    assert!(d.get("stream").is_none());
+
+    // output_too_large: stdout of a fake `ont` over 8 MiB, then stderr over 1 MiB.
+    let (dir, path) = fake("ont", &json_of(9 * 1_048_576));
+    let d = detail_of(Host.call(path.to_str().unwrap(), &[], &Value::Null, 20_000));
+    assert_eq!(d["cause"], "output_too_large");
+    assert_eq!(d["stream"], "stdout");
+    assert_eq!(d["bound_ms"], 20_000);
+    assert!(d["ms"].is_u64());
+    let _ = std::fs::remove_dir_all(dir);
+    let (dir, path) = fake("ont", "head -c 2097152 /dev/zero | tr '\\0' a >&2; exit 1");
+    let d = detail_of(Host.call(path.to_str().unwrap(), &[], &Value::Null, 20_000));
+    assert_eq!(d["cause"], "output_too_large");
+    assert_eq!(d["stream"], "stderr");
+    let _ = std::fs::remove_dir_all(dir);
+
+    // stdin: 1 MiB to a program that exits at once without reading it.
+    let big = json!("a".repeat(1_048_576));
+    let d = detail_of(Host.call("sh", &["-c".into(), "exit 0".into()], &big, 20_000));
+    assert_eq!(d["cause"], "stdin");
+    assert_eq!(d["bound_ms"], 20_000);
+    assert!(d.get("stream").is_none());
+}

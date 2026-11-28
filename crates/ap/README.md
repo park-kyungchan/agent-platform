@@ -140,7 +140,7 @@ Refusals (local checks precede writes and status posts):
 - `review_not_accepting`: required review state or evidence is absent; detail names the first failing member.
 - `store_review_unreadable`: the exact review's current observation cannot be read.
 - `store_answer_unreadable`: an action reply is malformed or does not confirm the expected create.
-- `process_failed`: an external command failed or returned unreadable Git output; no automatic retry occurs.
+- `process_failed`: an external command failed or returned unreadable Git output; no automatic retry occurs. A failure of the port's one call of a program (`ont`, `gh`, `git`, every other) carries the `detail` `{"cause", "ms", "bound_ms"}`: `cause` is `spawn` (not started), `stdin` (writing the input failed or passed the bound), `timeout` (still running at the bound, killed), `output_too_large` (an output passed its limit, 8 MiB for `ont`'s standard output and 1 MiB otherwise; the member `stream` is then `stdout` or `stderr`) or `output_read` (an output was not read to its end within the bound); `ms` is the time from the start of the call to the failure. No argument word, input, output or environment value enters it.
 - `io_error`: stdin or the caller's working directory cannot be read.
 - `input_too_large`: stdin exceeds 1 MiB.
 - `usage`: exactly one supported verb is required.
